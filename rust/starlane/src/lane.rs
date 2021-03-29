@@ -30,35 +30,46 @@ pub struct ProtoLane
 
 impl ProtoLane
 {
-    pub async fn evolve(mut self) ->Result<Lane,Error>
+
+    pub async fn evolve(mut self, star: Option<Id>) ->Result<Lane,Error>
     {
-        self.tx.send(StarGram::StarLaneProtocolVersion(STARLANE_PROTOCOL_VERSION));
-        match self.rx.recv().await
+        self.tx.send(StarGram::StarLaneProtocolVersion(STARLANE_PROTOCOL_VERSION)).await;
+
+        if let Option::Some(star)=star
+        {
+            self.tx.send(StarGram::ReportStarId(star)).await;
+        }
+
+        // first we confirm that the version is as expected
+        let recv = self.rx.recv().await;
+
+        match recv
         {
             Some(StarGram::StarLaneProtocolVersion(version)) if version == STARLANE_PROTOCOL_VERSION => {
                 // do nothing... we move onto the next step
             },
-            Some(StarGram::StarLaneProtocolVersion(version)) => {return Err(format!("wrong version: {}",version).into());},
-            Some(gram) => {return Err(format!("unexpected star gram: {} (expected to receive StarLaneProtocolVersion first)",gram).into());}
-            None => {return Err("disconnected".into());},
+            Some(StarGram::StarLaneProtocolVersion(version)) => {
+                return Err(format!("wrong version: {}",version).into());},
+            Some(gram) => {
+                return Err(format!("unexpected star gram: {} (expected to receive StarLaneProtocolVersion first)",gram).into());}
+            None => {
+                return Err("disconnected".into());},
         }
 
-        // now wait for remote ReportStarId
         match self.rx.recv().await
         {
-            Some(StarGram::ReportStarId(id))=>{
-
-                let lane = Lane{
-                    remote_star: id,
+            Some(StarGram::ReportStarId(remote_star_id))=>{
+                return Ok( Lane {
+                    remote_star: remote_star_id,
                     tx: self.tx,
                     rx: self.rx
-                };
-
-                Ok(lane)
+                });
             },
-            Some(gram) => {Err(format!("unexpected star gram: {} (expected to receive StarLaneProtocolVersion first)",gram).into())}
-            None => {Err("disconnected".into())},
-        }
+            Some(gram) => {return Err(format!("unexpected star gram: {} (expected to receive StarLaneProtocolVersion first)",gram).into());}
+            None => {return Err("disconnected".into());},
+        };
+
+
     }
 }
 
@@ -69,14 +80,36 @@ pub struct Lane
     pub rx: Receiver<StarGram>
 }
 
-
-
-
-
-
-
-
-pub trait StarGramReceiver: Sync+Send
+#[cfg(test)]
+mod test
 {
-    fn receive( gram: StarGram )->Result<(),Error>;
+    use crate::lane::local_lane;
+    use crate::gram::StarGram;
+    use crate::id::Id;
+    use tokio::runtime::Runtime;
+    use crate::error::Error;
+    use futures::FutureExt;
+
+
+
+        #[test]
+   pub fn test()
+   {
+
+       let rt = Runtime::new().unwrap();
+       rt.block_on(async {
+           let star1id  =     Id::new(0,0);
+           let star2id  =     Id::new(0,2);
+           let (p1,p2) = local_lane();
+           let future1 = p1.evolve(Option::Some( star1id ));
+           let future2 = p2.evolve(Option::Some( star2id ));
+           let (result1,result2) = join!( future1, future2 );
+
+           assert!(result1.is_ok());
+           assert!(result2.is_ok());
+       });
+
+
+
+   }
 }

@@ -3,16 +3,18 @@ use crate::lane::{Lane, ProtoLane};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
 use futures::future::join_all;
+use futures::future::select_all;
 use crate::gram::StarGram;
 use crate::error::Error;
-use crate::id::Id;
+use crate::id::{Id, IdSeq};
+use futures::FutureExt;
 
 pub struct ProtoStar
 {
   lane_seq: AtomicI32,
   proto_lanes: Vec<ProtoLane>,
-  lanes: HashMap<i32, LaneMeta>,
-  kernel: Box<dyn ProtoStarKernel>
+  kernel: Box<dyn ProtoStarKernel>,
+  id: Option<Id>
 }
 
 impl ProtoStar
@@ -21,64 +23,70 @@ impl ProtoStar
     {
         Ok(ProtoStar{
             lane_seq: AtomicI32::new(0),
-            lanes: HashMap::new(),
             proto_lanes: vec![],
             kernel: kernel,
+            id: Option::None
         })
     }
 
     pub async fn evolve(mut self)->Result<Arc<Star>,Error>
     {
+        self.id = self.kernel.default_id();
+        let mut lanes = vec![];
         let mut futures = vec![];
         for proto_lane in self.proto_lanes.drain(..)
         {
-            futures.push(proto_lane.evolve());
+            let future = proto_lane.evolve(self.kernel.default_id() ).boxed();
+            futures.push(future);
         }
 
-        for result in join_all(futures ).await
+        let (lane, _ready_future_index, remaining_futures) = select_all(futures).await;
+
+        let mut lane = lane?;
+
+        if self.id.is_some()
         {
-            let lane = result?;
-            self.add_lane(lane);
+            lanes.push(lane);
+            for future in remaining_futures
+            {
+                let lane = future.await?;
+                lanes.push(lane);
+            }
+        }
+        else
+        {
+            lane.tx.send(StarGram::RequestUniqueSequence);
+            let sequence = match lane.rx.recv().await
+            {
+                None => {
+                    return Err("disconnection".into());
+                }
+                Some(gram) => {
+                    match gram
+                    {
+                        StarGram::AssignUniqueSequence(sequence) => {sequence}
+                        _ => {
+                            return Err(format!("unexpected gram in assign id phase: {}",gram).into());
+                        }
+                    }
+                }
+            };
+            let sequence = IdSeq::new(sequence);
+            self.id = Option::Some(sequence.next());
+            for future in remaining_futures
+            {
+                let lane = future.await?;
+                lane.tx.send( StarGram::ReportStarId(self.id.unwrap()));
+                lanes.push(lane);
+            }
         }
 
-        // now all lanes should have exchanged version information
-        // also, if this is a CENTRAL it should have broadcast it's id, prompting any listeners to request Id Sequences
+        let kernel = self.kernel.evolve()?;
 
         Ok(Arc::new(Star{
-           shell: StarShell{
-               kernel: self.kernel.evolve()?
-           }
+           shell: StarShell::new( lanes, kernel )
         }))
     }
-
-    pub fn add_lane( &mut self, lane: Lane )
-    {
-        let id = self.lane_seq.fetch_add(1,Ordering::Relaxed);
-        let wrapper = LaneMeta {
-            lane: lane,
-            id: id.clone()
-        };
-
-        self.lanes.insert(id.clone(),wrapper);
-
-        if let Option::Some(star) = self.kernel.id()
-        {
-            self.send_to_lane(id,StarGram::ReportStarId(star));
-        }
-    }
-
-    fn send_to_lane( &self, id: i32, gram: StarGram  )->Result<(),Error>
-    {
-        if let Some(lane) = self.lanes.get(&id)
-        {
-            lane.send(gram);
-            Ok(())
-        }
-        else {
-            Err(format!("cannot find lane: {}",id).into() )
-        }
-    }
-
 }
 
 pub struct Star
@@ -86,15 +94,27 @@ pub struct Star
     pub shell: StarShell
 }
 
-
 pub struct StarShell
 {
-   pub kernel: Box<dyn StarKernel>
+   pub kernel: Box<dyn StarKernel>,
+   pub lanes: Vec<Lane>
 }
+
+impl StarShell
+{
+   fn new(lanes: Vec<Lane>, kernel: Box<dyn StarKernel>)->Self
+   {
+       StarShell{
+           kernel: kernel,
+           lanes: lanes
+       }
+   }
+}
+
 
 pub trait ProtoStarKernel: Send+Sync
 {
-    fn id(&self)->Option<Id>;
+    fn default_id(&self) ->Option<Id>;
     fn evolve(&self) ->Result<Box<dyn StarKernel>,Error>;
 }
 
