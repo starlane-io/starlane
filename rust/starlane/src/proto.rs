@@ -5,14 +5,14 @@ use futures::future::{err, join_all, ok, select_all};
 use futures::FutureExt;
 use futures::prelude::*;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{mpsc, Mutex, broadcast};
 
 use crate::constellation::Constellation;
 use crate::error::Error;
 use crate::id::Id;
-use crate::lane::{Lane, STARLANE_PROTOCOL_VERSION, Tunnel};
+use crate::lane::{LaneRunner, STARLANE_PROTOCOL_VERSION, Tunnel};
 use crate::message::{ProtoGram, LaneGram};
-use crate::star::{Star, StarKernel, StarKey, StarShell, StarKind};
+use crate::star::{Star, StarKernel, StarKey, StarShell, StarKind, StarCommand, StarController};
 use std::cell::RefCell;
 
 pub struct ProtoStar
@@ -20,19 +20,24 @@ pub struct ProtoStar
   proto_lanes: Vec<ProtoTunnel>,
   lane_seq: AtomicI32,
   kind: StarKind,
-  id: StarKey,
+  key: StarKey,
+  command_rx: Receiver<StarCommand>
 }
 
 impl ProtoStar
 {
-    pub fn new(id: StarKey, kind: StarKind) ->Self
+    pub fn new(key: StarKey, kind: StarKind) ->(Self, StarController)
     {
-        ProtoStar{
+        let (command_tx, command_rx) = mpsc::channel(32);
+        (ProtoStar{
             lane_seq: AtomicI32::new(0),
             proto_lanes: vec![],
             kind,
-            id: id
-        }
+            key,
+            command_rx: command_rx
+        },StarController{
+            command_tx: command_tx
+        })
     }
 
     pub fn add_lane( &mut self, proto_lane: ProtoTunnel)
@@ -46,7 +51,7 @@ impl ProtoStar
         let mut futures = vec![];
         for proto_lane in self.proto_lanes.drain(..)
         {
-            let future = proto_lane.evolve(Option::None).boxed();
+            let future = proto_lane.evolve().boxed();
             futures.push(future);
         }
 
@@ -70,6 +75,11 @@ impl ProtoStar
 
  */
     }
+}
+
+pub struct ProtoStarController
+{
+    command_tx: Sender<StarCommand>
 }
 
 
@@ -113,6 +123,7 @@ impl StarKernel for PlaceholderKernel
 
 pub struct ProtoTunnel
 {
+    pub star: Option<StarKey>,
     pub tx: Sender<LaneGram>,
     pub rx: Receiver<LaneGram>,
 }
@@ -120,11 +131,11 @@ pub struct ProtoTunnel
 impl ProtoTunnel
 {
 
-    pub async fn evolve(mut self, star: Option<StarKey>) -> Result<Tunnel,Error>
+    pub async fn evolve(mut self) -> Result<Tunnel,Error>
     {
         self.tx.send(LaneGram::Proto(ProtoGram::StarLaneProtocolVersion(STARLANE_PROTOCOL_VERSION))).await;
 
-        if let Option::Some(star)=star
+        if let Option::Some(star)=self.star
         {
             self.tx.send(LaneGram::Proto(ProtoGram::ReportStarKey(star))).await;
         }
@@ -154,10 +165,12 @@ impl ProtoTunnel
             match recv
             {
                 ProtoGram::ReportStarKey(remote_star_key) => {
+                    let (signal_tx,_) = broadcast::channel(1);
                     return Ok(Tunnel{
                         remote_star: remote_star_key,
                         tx: self.tx,
-                        rx: self.rx
+                        rx: self.rx,
+                        signal_tx: signal_tx
                     });
                 }
                 gram => { return Err(format!("unexpected star gram: {} (expected to receive ReportStarId next)", gram).into()); }
@@ -169,17 +182,19 @@ impl ProtoTunnel
     }
 }
 
-pub fn local_lanes() ->(ProtoTunnel, ProtoTunnel)
+pub fn local_tunnels(high: StarKey, low:StarKey) ->(ProtoTunnel, ProtoTunnel)
 {
     let (atx,arx) = mpsc::channel::<LaneGram>(32);
     let (btx,brx) = mpsc::channel::<LaneGram>(32);
 
     (ProtoTunnel {
+        star: Option::Some(high),
         tx: atx,
         rx: brx
     },
      ProtoTunnel
     {
+        star: Option::Some(low),
         tx: btx,
         rx: arx
     })

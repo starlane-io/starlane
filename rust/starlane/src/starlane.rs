@@ -4,18 +4,19 @@ use crate::provision::Provisioner;
 use crate::error::Error;
 use crate::template::{ConstellationTemplate, StarKeyTemplate, StarKeyConstellationTemplate, StarKeyIndexTemplate};
 use crate::layout::ConstellationLayout;
-use crate::proto::{ProtoStar, local_lanes, ProtoTunnel};
-use crate::star::{StarKey, Star};
+use crate::proto::{ProtoStar, local_tunnels, ProtoTunnel, ProtoStarController};
+use crate::star::{StarKey, Star, StarController, StarCommand};
 use std::collections::{HashSet, HashMap};
 use std::sync::mpsc::{Sender, Receiver};
 use crate::message::LaneGram;
 use std::sync::Arc;
+use crate::lane::{Lane, LaneRunner};
 
 pub struct Starlane
 {
     pub tx: mpsc::Sender<StarlaneCommand>,
     rx: mpsc::Receiver<StarlaneCommand>,
-    stars: HashMap<StarKey,StarConnector>
+    star_controllers: HashMap<StarKey,StarController>
 }
 
 impl Starlane
@@ -24,7 +25,7 @@ impl Starlane
     {
         let (tx, rx) = mpsc::channel(32);
         Starlane{
-            stars: HashMap::new(),
+            star_controllers: HashMap::new(),
             tx: tx,
             rx: rx
         }
@@ -60,18 +61,43 @@ impl Starlane
         }
     }
 
+    async fn lookup_star_address( &self, key: &StarKey )->Result<StarAddress,Error>
+    {
+        if self.star_controllers.contains_key(key)
+        {
+            Ok(StarAddress::Local)
+        }
+        else {
+            Err(format!("could not find address for starkey: {}", key).into() )
+        }
+    }
+
     async fn provision( &mut self, template: ConstellationTemplate )->Result<(),Error>
     {
         for star_template in template.stars
         {
             let key = self.create_star_key(&star_template.key);
-            let mut proto_star = ProtoStar::new(key.clone(), star_template.kind.clone() );
-            self.stars.insert(key.clone(), StarConnector::ProtoStar(proto_star) );
-            //tokio::spawn( async move { proto_star.evolve().await; } );
+            let (mut proto_star,proto_star_ctrl) = ProtoStar::new(key.clone(), star_template.kind.clone() );
+            self.star_controllers.insert(key.clone(), proto_star_ctrl );
+            tokio::spawn( async move { proto_star.evolve().await; } );
             println!("creating proto star: {:?} key: {}", &star_template.kind, key );
         }
 
         Ok(())
+    }
+
+    async fn add_lane(&mut self, local: StarKey, remote: StarKey ) ->Result<(),Error>
+    {
+        if let Option::Some(star_ctrl) = self.star_controllers.get_mut(&local)
+        {
+            let (mut runner,controller,lane) = LaneRunner::new(remote.clone() );
+            tokio::spawn(async move{runner.run();} );
+            star_ctrl.command_tx.send(StarCommand::AddLane(lane) );
+            Ok(())
+        }
+        else {
+            Err(format!("missing star: {}",local).into())
+        }
     }
 
     fn create_star_key( &mut self, template: &StarKeyTemplate )->StarKey
@@ -91,30 +117,6 @@ impl Starlane
         StarKey::new_with_constellation(constellation, index)
     }
 
-}
-
-pub enum StarConnector
-{
-    Star(Star),
-    ProtoStar(ProtoStar)
-}
-
-impl StarConnector
-{
-    pub fn connect( &mut self )-> ProtoTunnel
-    {
-        let (lane_a, lane_b) = local_lanes();
-        match self{
-            StarConnector::Star( star ) => {
-               unimplemented!()
-            }
-            StarConnector::ProtoStar( proto) => {
-                proto.add_lane(lane_b)
-            }
-        }
-
-        lane_a
-    }
 }
 
 pub enum StarlaneCommand

@@ -1,7 +1,7 @@
 use std::sync::{Mutex, Weak, Arc};
-use crate::lane::{Lane};
+use crate::lane::{LaneRunner, Lane};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::atomic::{AtomicI32};
 use futures::future::join_all;
 use futures::future::select_all;
 use crate::message::ProtoGram;
@@ -10,7 +10,9 @@ use crate::id::{Id, IdSeq};
 use futures::FutureExt;
 use serde::{Serialize,Deserialize};
 use crate::proto::ProtoTunnel;
-use std::fmt;
+use std::{fmt, cmp};
+use tokio::sync::mpsc::Sender;
+use std::cmp::Ordering;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
 pub enum StarKind
@@ -22,11 +24,33 @@ pub enum StarKind
     Gateway
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, PartialOrd, Hash, Debug, Clone, Serialize, Deserialize)]
 pub struct StarKey
 {
     pub constellation: Vec<u8>,
     pub index: u16
+}
+
+impl cmp::Ord for StarKey
+{
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.constellation.len() > other.constellation.len()
+        {
+            Ordering::Greater
+        }
+        else if self.constellation.len() < other.constellation.len()
+        {
+            Ordering::Less
+        }
+        else if self.constellation.cmp(&other.constellation ) != Ordering::Less
+        {
+            return self.constellation.cmp(&other.constellation );
+        }
+        else
+        {
+            return self.index.cmp(&other.index );
+        }
+    }
 }
 
 impl fmt::Display for StarKey{
@@ -69,12 +93,12 @@ pub struct Star
 pub struct StarShell
 {
    pub kernel: Box<dyn StarKernel>,
-   pub lanes: Vec<Lane>
+   pub lanes: Vec<LaneRunner>
 }
 
 impl StarShell
 {
-   pub fn new(lanes: Vec<Lane>, kernel: Box<dyn StarKernel>)->Self
+   pub fn new(lanes: Vec<LaneRunner>, kernel: Box<dyn StarKernel>) ->Self
    {
        StarShell{
            kernel: kernel,
@@ -94,7 +118,7 @@ pub trait StarKernel : Send
 pub struct LaneMeta
 {
    pub id: i32,
-   pub lane: Lane
+   pub lane: LaneRunner
 }
 
 impl LaneMeta
@@ -110,6 +134,16 @@ impl LaneMeta
         //self.lane.tunnel_rx.recv().await
         unimplemented!()
     }
+}
+
+pub enum StarCommand
+{
+    AddLane(Lane)
+}
+
+pub struct StarController
+{
+    pub command_tx: Sender<StarCommand>
 }
 
 

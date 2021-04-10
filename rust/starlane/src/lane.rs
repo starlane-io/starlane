@@ -1,52 +1,64 @@
-use tokio::sync::mpsc;
+use futures::future::select_all;
+use futures::FutureExt;
+use tokio::sync::{broadcast, mpsc};
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot;
+use tokio::time::Duration;
 
 use crate::error::Error;
 use crate::id::Id;
-use crate::message::{Command, ProtoGram, LaneGram};
-use crate::proto::{ProtoTunnel, ProtoStar};
+use crate::message::{Command, LaneGram, ProtoGram};
+use crate::proto::{local_tunnels, ProtoStar, ProtoTunnel};
 use crate::star::{Star, StarKey};
-use crate::starlane::{StarlaneCommand, ConnectCommand};
+use crate::starlane::{ConnectCommand, StarlaneCommand};
 use crate::starlane::StarlaneCommand::Connect;
-use tokio::sync::mpsc::error::SendError;
-use futures::FutureExt;
-use futures::future::select_all;
+use std::cmp::Ordering;
 
-pub static STARLANE_PROTOCOL_VERSION :i32 = 1;
-pub static LANE_QUEUE_SIZE :usize = 32;
+pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
+pub static LANE_QUEUE_SIZE: usize = 32;
+
+
+pub struct LaneController
+{
+    pub tunnel_tx: Sender<Tunnel>
+}
 
 pub struct Lane
 {
-    pub closed: bool,
     pub remote_star: StarKey,
-    pub tunnel: Option<Tunnel>,
-    pub tunnel_tx: Sender<Tunnel>,
-    pub tunnel_rx: Receiver<Tunnel>,
-    pub local_tx: Sender<LaneGram>,
-    pub local_rx: Receiver<LaneGram>,
-    pub remote_tx: Sender<LaneGram>,
-    pub remote_rx: Receiver<LaneGram>
+    pub tx: Sender<LaneGram>,
+    //pub rx: Receiver<LaneGram>
 }
 
-impl Lane
+pub struct LaneRunner
 {
-    pub fn new( star: StarKey )->Self
+    pub closed: bool,
+    pub tunnel: Option<Tunnel>,
+    pub tunnel_rx: Receiver<Tunnel>,
+    pub remote_rx: Receiver<LaneGram>,
+}
+
+impl LaneRunner
+{
+    pub fn new(remote_star: StarKey) -> (Self, LaneController, Lane)
     {
-        let (tunnel_tx,tunnel_rx) = mpsc::channel(2 );
-        let (local_tx,local_rx) = mpsc::channel(LANE_QUEUE_SIZE );
-        let (remote_tx,remote_rx) = mpsc::channel(LANE_QUEUE_SIZE );
-        Lane{
-            remote_star: star,
+        let (tunnel_tx, tunnel_rx) = mpsc::channel(2);
+//        let (local_tx,local_rx) = mpsc::channel(LANE_QUEUE_SIZE );
+        let (remote_tx, remote_rx) = mpsc::channel(LANE_QUEUE_SIZE);
+        (LaneRunner {
             tunnel: None,
             closed: false,
-            tunnel_tx: tunnel_tx,
             tunnel_rx: tunnel_rx,
-            local_tx: local_tx,
-            local_rx: local_rx,
-            remote_tx: remote_tx,
             remote_rx: remote_rx,
-        }
+        },
+         LaneController {
+             tunnel_tx: tunnel_tx
+         },
+         Lane {
+             remote_star,
+             tx: remote_tx,
+         })
     }
 
     pub fn is_closed(&self)->bool
@@ -85,7 +97,8 @@ pub struct Tunnel
 {
     pub remote_star: StarKey,
     pub tx: Sender<LaneGram>,
-    pub rx: Receiver<LaneGram>
+    pub rx: Receiver<LaneGram>,
+    pub signal_tx: broadcast::Sender<LaneSignal>,
 }
 
 impl Tunnel
@@ -97,26 +110,67 @@ impl Tunnel
 }
 
 #[async_trait]
-pub trait LaneMaintainer
+pub trait TunnelMaintainer
 {
-    async fn run( &mut self );
+    async fn run(&mut self);
 }
 
-pub struct LocalLaneMaintainer
+#[derive(Clone)]
+pub enum LaneSignal
 {
-    pub key: StarKey,
-    pub tx: Sender<StarlaneCommand>,
+    Close
+}
+
+pub struct LocalTunnelMaintainer
+{
+    pub high_star: StarKey,
+    pub low_star: StarKey,
+    pub high_lane_ctrl: LaneController,
+    pub low_lane_ctrl: LaneController,
+    high_signal_rx: broadcast::Receiver<LaneSignal>,
+    low_signal_rx: broadcast::Receiver<LaneSignal>,
+}
+
+impl LocalTunnelMaintainer
+{
+    pub fn new(high_star: StarKey, low_star: StarKey, high_lane_ctrl: LaneController, low_lane_ctrl: LaneController, high_signal_rx: broadcast::Receiver<LaneSignal>, low_signal_rx: broadcast::Receiver<LaneSignal>) -> Result<Self,Error>
+    {
+        if high_star.cmp(&low_star) != Ordering::Greater
+        {
+            Err("High star must have a greater StarKey (meaning higher constelation index array and star index value".into())
+        }
+        else {
+            Ok(LocalTunnelMaintainer {
+                high_star: high_star,
+                low_star: low_star,
+                high_lane_ctrl: high_lane_ctrl,
+                low_lane_ctrl: low_lane_ctrl,
+                high_signal_rx: high_signal_rx,
+                low_signal_rx: low_signal_rx,
+            })
+        }
+    }
 }
 
 #[async_trait]
-impl LaneMaintainer for LocalLaneMaintainer
+impl TunnelMaintainer for LocalTunnelMaintainer
 {
-    async fn run( &mut self ) {
+    async fn run(&mut self) {
         loop {
-            let (tx,rx) = oneshot::channel();
-            let mut lookup = ConnectCommand::new(self.key.clone(), tx );
-            self.tx.send(StarlaneCommand::Connect(lookup)).await;
-            rx.await;
+            let (mut high, mut low) = local_tunnels(self.high_star.clone(), self.low_star.clone());
+
+            let (high, low) = tokio::join!(high.evolve(),low.evolve());
+
+            if let (Ok(high), Ok(low)) = (high, low)
+            {
+                self.high_signal_rx = high.signal_tx.subscribe();
+                self.low_signal_rx = low.signal_tx.subscribe();
+                self.high_lane_ctrl.tunnel_tx.send(high);
+                self.low_lane_ctrl.tunnel_tx.send(low);
+            } else {
+                eprintln!("connection failure... trying again in 10 seconds");
+                tokio::time::sleep(Duration::from_secs(10)).await;
+            }
         }
     }
 }
@@ -130,7 +184,7 @@ mod test
     use crate::error::Error;
     use crate::id::Id;
     use crate::message::ProtoGram;
-    use crate::proto::local_lanes;
+    use crate::proto::local_tunnels;
     use crate::star::StarKey;
 
     #[test]
@@ -139,12 +193,11 @@ mod test
 
        let rt = Runtime::new().unwrap();
        rt.block_on(async {
-           let star1id  =     StarKey::new(1);
-           let star2id  =     StarKey::new(2);
-           let (p1,p2) = local_lanes();
-           let future1 = p1.evolve(Option::Some( star1id ));
-           let future2 = p2.evolve(Option::Some( star2id ));
-           let (result1,result2) = join!( future1, future2 );
+           let (mut p1, mut p2) = local_tunnels(StarKey::new(2), StarKey::new(1));
+
+           let future1 = p1.evolve();
+           let future2 = p2.evolve();
+           let (result1, result2) = join!( future1, future2 );
 
            assert!(result1.is_ok());
            assert!(result2.is_ok());
