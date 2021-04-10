@@ -9,7 +9,7 @@ use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use futures::FutureExt;
 use serde::{Serialize,Deserialize};
-use crate::proto::ProtoLane;
+use crate::proto::ProtoTunnel;
 use std::fmt;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
@@ -101,12 +101,14 @@ impl LaneMeta
 {
     pub async fn send(&self, gram: ProtoGram) ->Result<(),Error>
     {
-        Ok(self.lane.tx.send(gram).await?)
+        //Ok(self.lane.tunnel_tx.send(gram).await?)
+        unimplemented!()
     }
 
     pub async fn receive( &mut self)->Option<ProtoGram>
     {
-        self.lane.rx.recv().await
+        //self.lane.tunnel_rx.recv().await
+        unimplemented!()
     }
 }
 

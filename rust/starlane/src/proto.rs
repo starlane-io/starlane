@@ -10,14 +10,14 @@ use tokio::sync::{mpsc, Mutex};
 use crate::constellation::Constellation;
 use crate::error::Error;
 use crate::id::Id;
-use crate::lane::{Lane, STARLANE_PROTOCOL_VERSION};
-use crate::message::ProtoGram;
+use crate::lane::{Lane, STARLANE_PROTOCOL_VERSION, Tunnel};
+use crate::message::{ProtoGram, LaneGram};
 use crate::star::{Star, StarKernel, StarKey, StarShell, StarKind};
 use std::cell::RefCell;
 
 pub struct ProtoStar
 {
-  proto_lanes: Vec<ProtoLane>,
+  proto_lanes: Vec<ProtoTunnel>,
   lane_seq: AtomicI32,
   kind: StarKind,
   id: StarKey,
@@ -35,7 +35,7 @@ impl ProtoStar
         }
     }
 
-    pub fn add_lane( &mut self, proto_lane: ProtoLane )
+    pub fn add_lane( &mut self, proto_lane: ProtoTunnel)
     {
         self.proto_lanes.push(proto_lane);
     }
@@ -111,67 +111,74 @@ impl StarKernel for PlaceholderKernel
 }
 
 
-pub struct ProtoLane
+pub struct ProtoTunnel
 {
-    pub tx: Sender<ProtoGram>,
-    pub rx: Receiver<ProtoGram>,
+    pub tx: Sender<LaneGram>,
+    pub rx: Receiver<LaneGram>,
 }
 
-impl ProtoLane
+impl ProtoTunnel
 {
 
-    pub async fn evolve(mut self, star: Option<Id>) -> Result<Lane,Error>
+    pub async fn evolve(mut self, star: Option<StarKey>) -> Result<Tunnel,Error>
     {
-        self.tx.send(ProtoGram::StarLaneProtocolVersion(STARLANE_PROTOCOL_VERSION)).await;
+        self.tx.send(LaneGram::Proto(ProtoGram::StarLaneProtocolVersion(STARLANE_PROTOCOL_VERSION))).await;
 
         if let Option::Some(star)=star
         {
-            self.tx.send(ProtoGram::ReportStarId(star)).await;
+            self.tx.send(LaneGram::Proto(ProtoGram::ReportStarKey(star))).await;
         }
 
         // first we confirm that the version is as expected
-        let recv = self.rx.recv().await;
-
-        match recv
+        if let Option::Some(LaneGram::Proto(recv)) = self.rx.recv().await
         {
-            Some(ProtoGram::StarLaneProtocolVersion(version)) if version == STARLANE_PROTOCOL_VERSION => {
-                // do nothing... we move onto the next step
-            },
-            Some(ProtoGram::StarLaneProtocolVersion(version)) => {
-                return Err(format!("wrong version: {}",version).into());},
-            Some(gram) => {
-                return Err(format!("unexpected star gram: {} (expected to receive StarLaneProtocolVersion first)",gram).into());}
-            None => {
-                return Err("disconnected".into());},
+            match recv
+            {
+                ProtoGram::StarLaneProtocolVersion(version) if version == STARLANE_PROTOCOL_VERSION => {
+                    // do nothing... we move onto the next step
+                },
+                ProtoGram::StarLaneProtocolVersion(version) => {
+                    return Err(format!("wrong version: {}", version).into());
+                },
+                gram => {
+                    return Err(format!("unexpected star gram: {} (expected to receive StarLaneProtocolVersion first)", gram).into());
+                }
+            }
+        }
+        else {
+            return Err("disconnected".into());
         }
 
-        match self.rx.recv().await
+        if let Option::Some(LaneGram::Proto(recv)) = self.rx.recv().await
         {
-            Some(ProtoGram::ReportStarId(remote_star_id))=>{
-                return Ok( Lane {
-                    remote_star: remote_star_id,
-                    tx: self.tx,
-                    rx: self.rx
-                });
-            },
-            Some(gram) => {return Err(format!("unexpected star gram: {} (expected to receive ReportStarId next)",gram).into());}
-            None => {return Err("disconnected".into());},
-        };
-
-
+            match recv
+            {
+                ProtoGram::ReportStarKey(remote_star_key) => {
+                    return Ok(Tunnel{
+                        remote_star: remote_star_key,
+                        tx: self.tx,
+                        rx: self.rx
+                    });
+                }
+                gram => { return Err(format!("unexpected star gram: {} (expected to receive ReportStarId next)", gram).into()); }
+            };
+        }
+        else {
+            return Err("disconnected!".into())
+        }
     }
 }
 
-pub fn local_lanes() ->(ProtoLane, ProtoLane)
+pub fn local_lanes() ->(ProtoTunnel, ProtoTunnel)
 {
-    let (atx,arx) = mpsc::channel::<ProtoGram>(32);
-    let (btx,brx) = mpsc::channel::<ProtoGram>(32);
+    let (atx,arx) = mpsc::channel::<LaneGram>(32);
+    let (btx,brx) = mpsc::channel::<LaneGram>(32);
 
-    (ProtoLane{
+    (ProtoTunnel {
         tx: atx,
         rx: brx
     },
-    ProtoLane
+     ProtoTunnel
     {
         tx: btx,
         rx: arx

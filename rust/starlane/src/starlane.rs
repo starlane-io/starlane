@@ -4,7 +4,7 @@ use crate::provision::Provisioner;
 use crate::error::Error;
 use crate::template::{ConstellationTemplate, StarKeyTemplate, StarKeyConstellationTemplate, StarKeyIndexTemplate};
 use crate::layout::ConstellationLayout;
-use crate::proto::{ProtoStar, local_lanes, ProtoLane};
+use crate::proto::{ProtoStar, local_lanes, ProtoTunnel};
 use crate::star::{StarKey, Star};
 use std::collections::{HashSet, HashMap};
 use std::sync::mpsc::{Sender, Receiver};
@@ -101,7 +101,7 @@ pub enum StarConnector
 
 impl StarConnector
 {
-    pub fn connect( &mut self )->ProtoLane
+    pub fn connect( &mut self )-> ProtoTunnel
     {
         let (lane_a, lane_b) = local_lanes();
         match self{

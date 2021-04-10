@@ -5,7 +5,7 @@ use futures::prelude::*;
 
 use crate::error::Error;
 use crate::id::Id;
-use crate::proto::{local_lanes, ProtoLane, ProtoStar};
+use crate::proto::{local_lanes, ProtoTunnel, ProtoStar};
 use crate::star::{Star, StarKey};
 
 pub struct Constellation
