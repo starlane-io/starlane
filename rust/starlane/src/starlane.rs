@@ -62,13 +62,12 @@ impl Starlane
 
     async fn provision( &mut self, template: ConstellationTemplate )->Result<(),Error>
     {
-        let mut proto_constellation = vec![];
         for star_template in template.stars
         {
             let key = self.create_star_key(&star_template.key);
-            let proto_star = Arc::new(ProtoStar::new(key.clone(), star_template.kind.clone() ));
-            proto_constellation.push(proto_star.clone());
-            //self.stars.insert(key.clone(), StarConnector::ProtoStar(proto_star.clone()) );
+            let mut proto_star = ProtoStar::new(key.clone(), star_template.kind.clone() );
+            self.stars.insert(key.clone(), StarConnector::ProtoStar(proto_star) );
+            //tokio::spawn( async move { proto_star.evolve().await; } );
             println!("creating proto star: {:?} key: {}", &star_template.kind, key );
         }
 
@@ -104,17 +103,17 @@ impl StarConnector
 {
     pub fn connect( &mut self )->ProtoLane
     {
-        let (big,small) = local_lanes();
+        let (lane_a, lane_b) = local_lanes();
         match self{
             StarConnector::Star( star ) => {
                unimplemented!()
             }
             StarConnector::ProtoStar( proto) => {
-                proto.add_lane(small)
+                proto.add_lane(lane_b)
             }
         }
 
-        big
+        lane_a
     }
 }
 

@@ -20,7 +20,7 @@ pub struct ProtoStar
   proto_lanes: Vec<ProtoLane>,
   lane_seq: AtomicI32,
   kind: StarKind,
-  id: StarKey
+  id: StarKey,
 }
 
 impl ProtoStar
