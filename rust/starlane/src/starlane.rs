@@ -4,7 +4,7 @@ use crate::provision::Provisioner;
 use crate::error::Error;
 use crate::template::{ConstellationTemplate, StarKeyTemplate, StarKeyConstellationTemplate, StarKeyIndexTemplate};
 use crate::layout::ConstellationLayout;
-use crate::proto::{ProtoStar, ProtoConstellation, local_lanes, ProtoLane};
+use crate::proto::{ProtoStar, local_lanes, ProtoLane};
 use crate::star::{StarKey, Star};
 use std::collections::{HashSet, HashMap};
 use std::sync::mpsc::{Sender, Receiver};
@@ -37,13 +37,15 @@ impl Starlane
             match command
             {
                 StarlaneCommand::Connect(command)=> {
-                    if self.stars.contains_key(&command.key)
+/*                    if self.stars.contains_key(&command.key)
                     {
 
                     }
                     else {
                         command.oneshot.send( Err(format!("could not find host address for star: {}", &command.key).into()) );
                     }
+ */
+                    unimplemented!()
                 }
                 StarlaneCommand::ProvisionConstellation(command) => {
                     let result = self.provision(command.template).await;
@@ -60,17 +62,15 @@ impl Starlane
 
     async fn provision( &mut self, template: ConstellationTemplate )->Result<(),Error>
     {
-        let mut proto_constellation = ProtoConstellation::new();
+        let mut proto_constellation = vec![];
         for star_template in template.stars
         {
             let key = self.create_star_key(&star_template.key);
             let proto_star = Arc::new(ProtoStar::new(key.clone(), star_template.kind.clone() ));
-            proto_constellation.proto_stars.push(proto_star.clone());
-            self.stars.insert(key.clone(), StarConnector::ProtoStar(proto_star.clone()) );
+            proto_constellation.push(proto_star.clone());
+            //self.stars.insert(key.clone(), StarConnector::ProtoStar(proto_star.clone()) );
             println!("creating proto star: {:?} key: {}", &star_template.kind, key );
         }
-
-
 
         Ok(())
     }
@@ -96,18 +96,20 @@ impl Starlane
 
 pub enum StarConnector
 {
-    Star(Arc<Star>),
-    ProtoStar(Arc<ProtoStar>)
+    Star(Star),
+    ProtoStar(ProtoStar)
 }
 
 impl StarConnector
 {
-    pub fn connect( &self )->ProtoLane
+    pub fn connect( &mut self )->ProtoLane
     {
         let (big,small) = local_lanes();
         match self{
-            StarConnector::Star(_) => {unimplemented!()}
-            StarConnector::ProtoStar( mut proto) => {
+            StarConnector::Star( star ) => {
+               unimplemented!()
+            }
+            StarConnector::ProtoStar( proto) => {
                 proto.add_lane(small)
             }
         }
@@ -159,7 +161,7 @@ impl ProvisionConstellationCommand
 }
 
 
-enum StarAddress
+pub enum StarAddress
 {
     Local
 }

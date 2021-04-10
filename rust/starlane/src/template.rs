@@ -1,6 +1,6 @@
 use crate::star::{StarKey, StarKind};
 use std::collections::{HashSet, HashMap};
-use crate::proto::{ProtoConstellation, PlaceholderKernel, ProtoStar, ProtoStarKernel};
+use crate::proto::{PlaceholderKernel, ProtoStar, ProtoStarKernel};
 use crate::id::Id;
 use crate::proto::ProtoStarKernel::Mesh;
 use crate::layout::ConstellationLayout;

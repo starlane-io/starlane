@@ -86,7 +86,7 @@ impl StarShell
 
 
 
-pub trait StarKernel
+pub trait StarKernel : Send
 {
 
 }

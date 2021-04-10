@@ -18,7 +18,6 @@ mod test
 {
     use tokio::runtime::Runtime;
 
-    use crate::proto::ProtoConstellation;
 
     #[test]
     pub fn test()

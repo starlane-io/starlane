@@ -39,7 +39,7 @@ impl LaneMaintainer for LocalLaneMaintainer
             let (tx,rx) = oneshot::channel();
             let mut lookup = ConnectCommand::new(self.key.clone(), tx );
             self.tx.send(StarlaneCommand::Connect(lookup)).await;
-            rx.await
+            rx.await;
         }
     }
 }

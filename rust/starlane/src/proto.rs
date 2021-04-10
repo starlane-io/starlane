@@ -15,65 +15,6 @@ use crate::message::ProtoGram;
 use crate::star::{Star, StarKernel, StarKey, StarShell, StarKind};
 use std::cell::RefCell;
 
-pub struct ProtoConstellation
-{
-    pub proto_stars: Vec<Arc<Mutex<ProtoStar>>>
-}
-
-impl ProtoConstellation
-{
-
-    /*
-    pub fn new_standalone()->Self
-    {
-        let mut protos = vec!();
-        let mut central = ProtoStar::new(StarKey::new(Id::new(0, 0)), Box::new(ProtoCentralKernel::new() ));
-        let mut mesh = ProtoStar::new(StarKey::new(vec![], Id::new(0, 1)), Box::new(ProtoMeshKernel::new() ));
-
-
-        let (mut lane1,mut lane2) = local_lane();
-        central.add_lane(lane1);
-        mesh.add_lane(lane2);
-
-        protos.push( central );
-        protos.push( mesh );
-
-        ProtoConstellation{
-            proto_stars: protos
-        }
-    }
-     */
-
-    pub fn new()->Self
-    {
-        ProtoConstellation{
-            proto_stars: vec![]
-        }
-    }
-
-    pub async fn evolve(&mut self)->Result<Constellation,Error>
-    {
-        let mut futures = vec![];
-        for mut proto_star in self.proto_stars.drain(..)
-        {
-
-            let mut proto_star = proto_star.lock().await;
-            let future = proto_star.evolve();
-            futures.push(future);
-        }
-        let mut stars = vec![];
-        for result in join_all(futures).await
-        {
-            let star = result?;
-            stars.push(star);
-        }
-
-        Ok(Constellation{
-            stars: stars
-        })
-    }
-}
-
 pub struct ProtoStar
 {
   proto_lanes: Vec<ProtoLane>,
