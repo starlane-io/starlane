@@ -2,13 +2,20 @@ use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use crate::provision::Provisioner;
 use crate::error::Error;
-use crate::template::ConstellationTemplate;
+use crate::template::{ConstellationTemplate, StarKeyTemplate, StarKeyConstellationTemplate, StarKeyIndexTemplate};
 use crate::layout::ConstellationLayout;
+use crate::proto::{ProtoStar, ProtoConstellation, local_lanes, ProtoLane};
+use crate::star::{StarKey, Star};
+use std::collections::{HashSet, HashMap};
+use std::sync::mpsc::{Sender, Receiver};
+use crate::message::LaneGram;
+use std::sync::Arc;
 
 pub struct Starlane
 {
     pub tx: mpsc::Sender<StarlaneCommand>,
-    rx: mpsc::Receiver<StarlaneCommand>
+    rx: mpsc::Receiver<StarlaneCommand>,
+    stars: HashMap<StarKey,StarConnector>
 }
 
 impl Starlane
@@ -17,7 +24,8 @@ impl Starlane
     {
         let (tx, rx) = mpsc::channel(32);
         Starlane{
-            tx:tx,
+            stars: HashMap::new(),
+            tx: tx,
             rx: rx
         }
     }
@@ -28,27 +36,90 @@ impl Starlane
         {
             match command
             {
-                StarlaneCommand::Provision(command) => {
-                    command.oneshot.send(Ok(()));
+                StarlaneCommand::Connect(command)=> {
+                    if self.stars.contains_key(&command.key)
+                    {
+
+                    }
+                    else {
+                        command.oneshot.send( Err(format!("could not find host address for star: {}", &command.key).into()) );
+                    }
                 }
-                StarlaneCommand::Hello => {
-                    println!("Goodbye");
+                StarlaneCommand::ProvisionConstellation(command) => {
+                    let result = self.provision(command.template).await;
+                    command.oneshot.send(result);
                 }
                 StarlaneCommand::Destroy => {
                     println!("closing rx");
                     self.rx.close();
                 }
-
+                _ => {}
             }
         }
     }
 
+    async fn provision( &mut self, template: ConstellationTemplate )->Result<(),Error>
+    {
+        let mut proto_constellation = ProtoConstellation::new();
+        for star_template in template.stars
+        {
+            let key = self.create_star_key(&star_template.key);
+            let proto_star = Arc::new(ProtoStar::new(key.clone(), star_template.kind.clone() ));
+            proto_constellation.proto_stars.push(proto_star.clone());
+            self.stars.insert(key.clone(), StarConnector::ProtoStar(proto_star.clone()) );
+            println!("creating proto star: {:?} key: {}", &star_template.kind, key );
+        }
+
+
+
+        Ok(())
+    }
+
+    fn create_star_key( &mut self, template: &StarKeyTemplate )->StarKey
+    {
+        let constellation = match &template.constellation{
+            StarKeyConstellationTemplate::Central => {
+                vec![]
+            }
+            StarKeyConstellationTemplate::Path(path) => {
+                path.clone()
+            }
+        };
+        let index = match &template.index{
+            StarKeyIndexTemplate::Central => {0 as _}
+            StarKeyIndexTemplate::Exact(index) => {index.clone()}
+        };
+        StarKey::new_with_constellation(constellation, index)
+    }
+
+}
+
+pub enum StarConnector
+{
+    Star(Arc<Star>),
+    ProtoStar(Arc<ProtoStar>)
+}
+
+impl StarConnector
+{
+    pub fn connect( &self )->ProtoLane
+    {
+        let (big,small) = local_lanes();
+        match self{
+            StarConnector::Star(_) => {unimplemented!()}
+            StarConnector::ProtoStar( mut proto) => {
+                proto.add_lane(small)
+            }
+        }
+
+        big
+    }
 }
 
 pub enum StarlaneCommand
 {
-    Hello,
-    Provision(ProvisionConstellationCommand),
+    Connect(ConnectCommand),
+    ProvisionConstellation(ProvisionConstellationCommand),
     Destroy
 }
 
@@ -56,6 +127,23 @@ pub struct ProvisionConstellationCommand
 {
     template: ConstellationTemplate,
     oneshot: oneshot::Sender<Result<(),Error>>
+}
+
+pub struct ConnectCommand
+{
+    pub key: StarKey,
+    pub oneshot: oneshot::Sender<Result<StarAddress,Error>>
+}
+
+impl ConnectCommand
+{
+    pub fn new( key: StarKey, oneshot: oneshot::Sender<Result<StarAddress,Error>>)->Self
+    {
+        ConnectCommand {
+            key: key,
+            oneshot: oneshot
+        }
+    }
 }
 
 impl ProvisionConstellationCommand
@@ -71,11 +159,21 @@ impl ProvisionConstellationCommand
 }
 
 
+enum StarAddress
+{
+    Local
+}
+
+
+
 #[cfg(test)]
 mod test
 {
     use tokio::runtime::Runtime;
-    use crate::starlane::{Starlane, StarlaneCommand};
+    use crate::starlane::{Starlane, StarlaneCommand, ProvisionConstellationCommand};
+    use crate::template::ConstellationTemplate;
+    use crate::error::Error;
+    use tokio::sync::oneshot::error::RecvError;
 
     #[test]
     pub fn starlane()
@@ -91,14 +189,25 @@ mod test
                 starlane.run().await;
             } );
 
-            tx.send(StarlaneCommand::Hello ).await;
+            {
+                let (command, mut rx) = ProvisionConstellationCommand::new(ConstellationTemplate::new_standalone());
+                tx.send(StarlaneCommand::ProvisionConstellation(command)).await;
+                let result = rx.await;
+                match result{
+                    Ok(result) => {
+                        match result{
+                            Ok(_) => {println!("template ok.")}
+                            Err(e) => {println!("{}", e)}
+                        }
+                    }
+                    Err(e) => {println!("{}", e)}
+                }
+            }
             tx.send(StarlaneCommand::Destroy ).await;
 
             handle.await;
 
         });
-
-
 
     }
 }

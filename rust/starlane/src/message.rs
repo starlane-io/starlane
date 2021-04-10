@@ -13,6 +13,10 @@ pub enum ProtoGram
     ReportStarId(Id)
 }
 
+pub enum LaneGram
+{
+    Proto(ProtoGram)
+}
 
 
 impl fmt::Display for ProtoGram {

@@ -10,6 +10,7 @@ use crate::id::{Id, IdSeq};
 use futures::FutureExt;
 use serde::{Serialize,Deserialize};
 use crate::proto::ProtoLane;
+use std::fmt;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
 pub enum StarKind
@@ -24,13 +25,18 @@ pub enum StarKind
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Serialize, Deserialize)]
 pub struct StarKey
 {
-    pub constellation: Vec<i64>,
-    pub index: i64
+    pub constellation: Vec<u8>,
+    pub index: u16
 }
 
+impl fmt::Display for StarKey{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({:?},{})",self.constellation,self.index)
+    }
+}
 impl StarKey
 {
-   pub fn new( index: i64)->Self
+   pub fn new( index: u16)->Self
    {
        StarKey {
            constellation: vec![],
@@ -38,15 +44,15 @@ impl StarKey
        }
    }
 
-   pub fn new_with_subgraph( subgraph: Vec<i64>, index: i64)->Self
+   pub fn new_with_constellation(constellation: Vec<u8>, index: u16) ->Self
    {
       StarKey {
-          constellation: subgraph,
+          constellation,
           index: index
       }
    }
 
-   pub fn with_index( &self, index: i64)->Self
+   pub fn with_index( &self, index: u16)->Self
    {
        StarKey {
            constellation: self.constellation.clone(),

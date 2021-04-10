@@ -5,7 +5,7 @@ use futures::future::{err, join_all, ok, select_all};
 use futures::FutureExt;
 use futures::prelude::*;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 
 use crate::constellation::Constellation;
 use crate::error::Error;
@@ -13,10 +13,11 @@ use crate::id::Id;
 use crate::lane::{Lane, STARLANE_PROTOCOL_VERSION};
 use crate::message::ProtoGram;
 use crate::star::{Star, StarKernel, StarKey, StarShell, StarKind};
+use std::cell::RefCell;
 
 pub struct ProtoConstellation
 {
-    pub proto_stars: Vec<ProtoStar>
+    pub proto_stars: Vec<Arc<Mutex<ProtoStar>>>
 }
 
 impl ProtoConstellation
@@ -55,6 +56,8 @@ impl ProtoConstellation
         let mut futures = vec![];
         for mut proto_star in self.proto_stars.drain(..)
         {
+
+            let mut proto_star = proto_star.lock().await;
             let future = proto_star.evolve();
             futures.push(future);
         }
@@ -96,7 +99,7 @@ impl ProtoStar
         self.proto_lanes.push(proto_lane);
     }
 
-    pub async fn evolve(mut self)->Result<Arc<Star>,Error>
+    pub async fn evolve(&mut self)->Result<Arc<Star>,Error>
     {
         let mut lanes = vec![];
         let mut futures = vec![];
@@ -218,7 +221,7 @@ impl ProtoLane
     }
 }
 
-pub fn local_lane() ->(ProtoLane, ProtoLane)
+pub fn local_lanes() ->(ProtoLane, ProtoLane)
 {
     let (atx,arx) = mpsc::channel::<ProtoGram>(32);
     let (btx,brx) = mpsc::channel::<ProtoGram>(32);

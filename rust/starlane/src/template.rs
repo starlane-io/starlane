@@ -29,9 +29,9 @@ impl ConstellationTemplate
 
         let mut central = StarTemplate::new(StarKeyTemplate::central(), StarKind::Central, Option::Some("central".to_string()) );
         let mut mesh = StarTemplate::new(StarKeyTemplate::central_geodesic(1), StarKind::Mesh, Option::Some("mesh".to_string())  );
-        let mut gateway = StarTemplate::new(StarKeyTemplate::central_geodesic(2), StarKind::Gateway, Option::Some("gateway".to_string())  );
-        let mut supervisor = StarTemplate::new(StarKeyTemplate::central_geodesic(3), StarKind::Supervisor, Option::Some("supervisor".to_string())  );
-        let mut server = StarTemplate::new(StarKeyTemplate::central_geodesic(4), StarKind::Server, Option::Some("server".to_string())  );
+        let mut supervisor = StarTemplate::new(StarKeyTemplate::central_geodesic(2), StarKind::Supervisor, Option::Some("supervisor".to_string())  );
+        let mut server = StarTemplate::new(StarKeyTemplate::central_geodesic(3), StarKind::Server, Option::Some("server".to_string())  );
+        let mut gateway = StarTemplate::new(StarKeyTemplate::central_geodesic(4), StarKind::Gateway, Option::Some("gateway".to_string())  );
 
         ConstellationTemplate::connect(&mut central, &mut mesh );
         ConstellationTemplate::connect(&mut supervisor, &mut mesh );
@@ -68,7 +68,7 @@ pub struct StarKeyTemplate
 
 impl StarKeyTemplate
 {
-    pub fn central_geodesic(index:i64) ->Self
+    pub fn central_geodesic(index:u16) ->Self
     {
         StarKeyTemplate{
             constellation: StarKeyConstellationTemplate::Central,
@@ -89,15 +89,14 @@ impl StarKeyTemplate
 pub enum StarKeyConstellationTemplate
 {
     Central,
-    // ARM and PATH
-    Path(i64,Vec<i64>),
+    Path(Vec<u8>),
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Serialize, Deserialize)]
 pub enum StarKeyIndexTemplate
 {
     Central,
-    Exact(i64)
+    Exact(u16)
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
