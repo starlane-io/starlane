@@ -115,24 +115,27 @@ impl Starlane
 
 
 
-                let ((local_lane, second_lane),(local_tunnel_tx,second_tunnel_tx)) = Lane::local_lanes(local.clone() , second.clone() );
+                let (mut local_lane, mut second_lane,local_lane_ctrl,second_lane_ctrl) = Lane::local_lanes(local.clone() , second.clone() );
 
-                local_star_ctrl.command_tx.send(StarCommand::AddLane(local_lane));
-                second_star_ctrl.command_tx.send(StarCommand::AddLane(second_lane));
+                tokio::spawn( async move { local_lane.run().await; } );
+                tokio::spawn( async move { second_lane.run().await; } );
 
-                let (high,low,high_tunnel_tx,low_tunnel_tx) = match &local.cmp(&second)
+                local_star_ctrl.command_tx.send(StarCommand::AddLane(local_lane_ctrl.clone()));
+                second_star_ctrl.command_tx.send(StarCommand::AddLane(second_lane_ctrl.clone()));
+
+                let (high,low, high_lane_ctrl, low_lane_ctrl) = match &local.cmp(&second)
                 {
                     Ordering::Greater =>
                     {
-                        (local,second,local_tunnel_tx,second_tunnel_tx)
+                        (local,second,local_lane_ctrl.clone(),second_lane_ctrl.clone())
                     }
                     _ =>
                     {
-                        (second,local,second_tunnel_tx,local_tunnel_tx)
+                        (second,local,second_lane_ctrl.clone(),local_lane_ctrl.clone())
                     }
                 };
 
-                let connector = LocalTunnelConnector::new(high, low, high_tunnel_tx, low_tunnel_tx );
+                let connector = LocalTunnelConnector::new(high, low, high_lane_ctrl, low_lane_ctrl);
 
                 Ok(())
     }

@@ -5,23 +5,25 @@ use futures::future::{err, join_all, ok, select_all};
 use futures::FutureExt;
 use futures::prelude::*;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::{mpsc, Mutex, broadcast};
+use tokio::sync::{mpsc, Mutex, broadcast, oneshot};
 
 use crate::constellation::Constellation;
 use crate::error::Error;
 use crate::id::Id;
-use crate::lane::{STARLANE_PROTOCOL_VERSION, Tunnel};
+use crate::lane::{STARLANE_PROTOCOL_VERSION, Tunnel, Lane, TunnelConnector, TunnelController};
 use crate::message::{ProtoGram, LaneGram};
-use crate::star::{Star, StarKernel, StarKey, StarShell, StarKind, StarCommand, StarController};
+use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController};
 use std::cell::RefCell;
+use std::collections::HashMap;
+use std::task::Poll;
 
 pub struct ProtoStar
 {
-  proto_lanes: Vec<ProtoTunnel>,
-  lane_seq: AtomicI32,
   kind: StarKind,
   key: StarKey,
-  command_rx: Receiver<StarCommand>
+  command_rx: Receiver<StarCommand>,
+  lanes: HashMap<StarKey,Lane>,
+  connectors: Vec<Box<dyn TunnelConnector>>
 }
 
 impl ProtoStar
@@ -30,51 +32,38 @@ impl ProtoStar
     {
         let (command_tx, command_rx) = mpsc::channel(32);
         (ProtoStar{
-            lane_seq: AtomicI32::new(0),
-            proto_lanes: vec![],
             kind,
             key,
-            command_rx: command_rx
+            command_rx: command_rx,
+            lanes: HashMap::new(),
+            connectors: vec![]
         },StarController{
             command_tx: command_tx
         })
     }
 
-    pub fn add_lane( &mut self, proto_lane: ProtoTunnel)
+    pub async fn evolve(mut self)->Result<Star,Error>
     {
-        self.proto_lanes.push(proto_lane);
-    }
+        loop {
+            let mut futures = vec!();
+//            futures.push(self.command().boxed());
+            for (key,mut lane) in &mut self.lanes
+            {
+                futures.push(lane.run().boxed());
+            }
 
-    pub async fn evolve(&mut self)->Result<Arc<Star>,Error>
-    {
-        let mut lanes = vec![];
-        let mut futures = vec![];
-        for proto_lane in self.proto_lanes.drain(..)
-        {
-            let future = proto_lane.evolve().boxed();
-            futures.push(future);
+            let result = select_all(futures).await;
         }
 
-        let (lane, _ready_future_index, remaining_futures) = select_all(futures).await;
-
-        let mut lane = lane?;
-
-        lanes.push(lane);
-        for future in remaining_futures
-        {
-          let lane = future.await?;
-          lanes.push(lane);
-        }
-
-        unimplemented!();
-/*        let kernel = self.kind.evolve()?;
-
-        Ok(Arc::new(Star{
-           shell: StarShell::new( lanes, kernel )
-        }))
-
- */
+        Ok(Star::new( self.lanes, Box::new(PlaceholderKernel::new()) ))
     }
+
+    async fn command(&mut self)
+    {
+        self.command_rx.recv().await;
+    }
+
+
 }
 
 pub struct ProtoStarController
@@ -131,7 +120,7 @@ pub struct ProtoTunnel
 impl ProtoTunnel
 {
 
-    pub async fn evolve(mut self) -> Result<Tunnel,Error>
+    pub async fn evolve(mut self) -> Result<(Tunnel, TunnelController),Error>
     {
         self.tx.send(LaneGram::Proto(ProtoGram::StarLaneProtocolVersion(STARLANE_PROTOCOL_VERSION))).await;
 
@@ -165,15 +154,18 @@ impl ProtoTunnel
             match recv
             {
                 ProtoGram::ReportStarKey(remote_star_key) => {
-                    let (signal_tx,_) = broadcast::channel(1);
-                    return Ok(Tunnel{
+                    let (close_signal_tx,close_signal_rx) = oneshot::channel();
+
+                    return Ok((Tunnel{
                         remote_star: remote_star_key,
-                        tx: self.tx,
                         rx: self.rx,
-                        signal_tx: signal_tx
-                    });
+                        tx: self.tx.clone(),
+                        close_signal_rx: close_signal_rx
+                    }, TunnelController {
+                        tx: self.tx,
+                        close_signal_tx:close_signal_tx}));
                 }
-                gram => { return Err(format!("unexpected star gram: {} (expected to receive ReportStarId next)", gram).into()); }
+                gram => { return Err(format!("unexpected star gram: {} (expected to receive ReportStarKey next)", gram).into()); }
             };
         }
         else {

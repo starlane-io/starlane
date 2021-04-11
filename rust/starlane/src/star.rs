@@ -1,5 +1,5 @@
 use std::sync::{Mutex, Weak, Arc};
-use crate::lane::Lane;
+use crate::lane::{Lane, TunnelConnector, LaneController};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32};
 use futures::future::join_all;
@@ -102,22 +102,18 @@ impl StarKey
    }
 }
 
+
 pub struct Star
 {
-    pub shell: StarShell
-}
-
-pub struct StarShell
-{
    pub kernel: Box<dyn StarKernel>,
-   pub lanes: Vec<Lane>
+   pub lanes: HashMap<StarKey,Lane>
 }
 
-impl StarShell
+impl Star
 {
-   pub fn new(lanes: Vec<Lane>, kernel: Box<dyn StarKernel>) ->Self
+   pub fn new(lanes: HashMap<StarKey,Lane>, kernel: Box<dyn StarKernel>) ->Self
    {
-       StarShell{
+       Star{
            kernel: kernel,
            lanes: lanes
        }
@@ -129,7 +125,6 @@ impl StarShell
 
 pub trait StarKernel : Send
 {
-
 }
 
 pub struct LaneMeta
@@ -155,7 +150,8 @@ impl LaneMeta
 
 pub enum StarCommand
 {
-    AddLane(Lane)
+    AddLane(LaneController),
+    AddTunnelConnector(Box<dyn TunnelConnector>)
 }
 
 #[derive(Clone)]

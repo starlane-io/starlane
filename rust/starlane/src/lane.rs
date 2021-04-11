@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use futures::future::select_all;
-use futures::FutureExt;
+use futures::{FutureExt, TryFutureExt};
 use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::mpsc::error::SendError;
@@ -15,6 +15,10 @@ use crate::proto::{local_tunnels, ProtoStar, ProtoTunnel};
 use crate::star::{Star, StarKey};
 use crate::starlane::{ConnectCommand, StarlaneCommand};
 use crate::starlane::StarlaneCommand::Connect;
+use std::task::Poll;
+use std::pin::Pin;
+use futures::task::Context;
+use futures::task;
 
 pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
 pub static LANE_QUEUE_SIZE: usize = 32;
@@ -22,7 +26,12 @@ pub static LANE_QUEUE_SIZE: usize = 32;
 #[derive(Clone)]
 pub struct LaneController
 {
-    pub tunnel_tx: Sender<Tunnel>
+    pub command_tx: Sender<LaneCommand>
+}
+
+pub enum LaneCommand
+{
+    TunnelState(TunnelState)
 }
 
 pub struct Chamber<T>
@@ -45,72 +54,77 @@ pub struct Lane
     pub remote_star: StarKey,
     pub tx: Sender<LaneGram>,
     rx: Receiver<LaneGram>,
-    tunnel_rx: Receiver<Tunnel>,
-    tunnel: Mutex<Chamber<Tunnel>>
+    command_rx: Receiver<LaneCommand>,
+    tunnel_state: TunnelState
 }
 
 impl Lane
 {
-    pub fn local_lanes(a: StarKey, b: StarKey ) ->((Lane, Lane),(Sender<Tunnel>,Sender<Tunnel>))
+    pub fn local_lanes(a: StarKey, b: StarKey ) ->(Lane, Lane,LaneController,LaneController)
     {
-        let (a_tunnel_tx, a_tunnel_rx) = mpsc::channel(2);
-        let (b_tunnel_tx, b_tunnel_rx) = mpsc::channel(2);
+        let (a_tunnel_tx, a_tunnel_rx) = mpsc::channel(1);
+        let (b_tunnel_tx, b_tunnel_rx) = mpsc::channel(1);
 
         let (a_tx, a_rx) = mpsc::channel(LANE_QUEUE_SIZE);
         let (b_tx, b_rx) = mpsc::channel(LANE_QUEUE_SIZE);
         (
-            (Lane {
+            Lane {
                 remote_star: b,
                 tx: a_tx,
                 rx: a_rx,
-                tunnel_rx: a_tunnel_rx,
-                tunnel: Mutex::new(Chamber::new() )
+                command_rx: a_tunnel_rx,
+                tunnel_state: TunnelState::None
             },
             Lane {
                 remote_star: a,
                 tx: b_tx,
                 rx: b_rx,
-                tunnel_rx: b_tunnel_rx,
-                tunnel: Mutex::new(Chamber::new() )
-            }),
-            (a_tunnel_tx,b_tunnel_tx)
+                command_rx: b_tunnel_rx,
+                tunnel_state: TunnelState::None
+            },
+            LaneController{
+                command_tx: a_tunnel_tx
+            },
+            LaneController{
+                command_tx: b_tunnel_tx
+            }
         )
     }
 
-    pub async fn update(&mut self)
+    pub async fn run(&mut self)
     {
 
+        loop
         {
-            let mut chamber = self.tunnel.lock().await;
-            if let Option::Some(tunnel) = &chamber.holding
+            if let TunnelState::Tunnel(tunnel_ctrl) = &self.tunnel_state
             {
-                if !tunnel.is_closed()
-                {
-                  let rx = self.rx.recv().fuse();
-                  let tunnel_rx= self.tunnel_rx.recv().fuse();
-                  pin_mut![rx,tunnel_rx];
+                  let mut rx = self.rx.recv().boxed();
+                  let mut command_rx = self.command_rx.recv().boxed();
                   tokio::select! {
-                    Some(gram) = rx => {
-                          match tunnel.tx.send(gram).await
-                          {
-                              Ok(_)=>{
-
-                              // here we leave this method so we don't await for Tunnel
-                              return ();
-                             },
-                              Err(e)=>{
-                                println!("{}",e);
-                              }
-                          }
-                      }
-                    Some(tunnel) = tunnel_rx => {
-                      chamber.holding = Option::Some(tunnel);
+                   command = command_rx => {
+                          //self.process_command(command);
                     }
                   }
+            }
+            else
+            {
+                //self.process_command(self.command_rx.recv().await);
+            }
+        }
+    }
+
+    async fn process_command( &mut self, command: Option<LaneCommand> )
+    {
+        match command{
+            Option::Some(command)=>{
+                match command
+                {
+                    LaneCommand::TunnelState(tunnel_state) => {self.tunnel_state=tunnel_state;}
                 }
             }
-
-            chamber.holding = self.tunnel_rx.recv().await
+            Option::None=>{
+                eprintln!("lane command stream ended.");
+            }
         }
     }
 }
@@ -120,7 +134,7 @@ pub struct Tunnel
     pub remote_star: StarKey,
     pub tx: Sender<LaneGram>,
     pub rx: Receiver<LaneGram>,
-    pub signal_tx: broadcast::Sender<LaneSignal>,
+    pub close_signal_rx: oneshot::Receiver<()>
 }
 
 impl Tunnel
@@ -129,10 +143,34 @@ impl Tunnel
     {
         self.tx.is_closed()
     }
+
+    pub async fn run(mut self)
+    {
+       self.close_signal_rx.await;
+       self.rx.close();
+       self.tx.send(LaneGram::Close).await;
+    }
+}
+
+pub enum TunnelState
+{
+    Tunnel(TunnelController),
+    None
+}
+
+pub struct TunnelController
+{
+    pub tx: Sender<LaneGram>,
+    pub close_signal_tx: oneshot::Sender<()>,
+}
+
+pub struct ConnectorController
+{
+    pub command_tx: mpsc::Sender<ConnectorCommand>,
 }
 
 #[async_trait]
-pub trait TunnelConnector
+pub trait TunnelConnector: Send
 {
     async fn run(&mut self);
 }
@@ -143,29 +181,39 @@ pub enum LaneSignal
     Close
 }
 
+pub enum ConnectorCommand
+{
+    Reset,
+    Close
+}
+
 pub struct LocalTunnelConnector
 {
     pub high_star: StarKey,
     pub low_star: StarKey,
-    pub high_tunnel_tx: Sender<Tunnel>,
-    pub low_tunnel_tx: Sender<Tunnel>
+    pub high_lane_ctrl: LaneController,
+    pub low_lane_ctrl: LaneController,
+    pub command_rx: mpsc::Receiver<ConnectorCommand>
 }
 
 impl LocalTunnelConnector
 {
-    pub fn new(high_star: StarKey, low_star: StarKey, high_tunnel_tx: Sender<Tunnel>, low_tunnel_tx: Sender<Tunnel>) -> Result<Self,Error>
+    pub fn new(high_star: StarKey, low_star: StarKey, high_lane_ctrl: LaneController, low_lane_ctrl: LaneController ) -> Result<(Self, ConnectorController),Error>
     {
         if high_star.cmp(&low_star) != Ordering::Greater
         {
             Err("High star must have a greater StarKey (meaning higher constellation index array and star index value".into())
         }
         else {
-            Ok(LocalTunnelConnector {
+            let (command_tx,command_rx) = mpsc::channel(1);
+
+            Ok((LocalTunnelConnector {
                 high_star: high_star,
                 low_star: low_star,
-                high_tunnel_tx: high_tunnel_tx,
-                low_tunnel_tx: low_tunnel_tx,
-            })
+                command_rx: command_rx,
+                high_lane_ctrl: high_lane_ctrl,
+                low_lane_ctrl: low_lane_ctrl,
+            },ConnectorController{ command_tx: command_tx}))
         }
     }
 }
@@ -174,21 +222,42 @@ impl LocalTunnelConnector
 impl TunnelConnector for LocalTunnelConnector
 {
     async fn run(&mut self) {
+
         loop {
             let (mut high, mut low) = local_tunnels(self.high_star.clone(), self.low_star.clone());
 
             let (high, low) = tokio::join!(high.evolve(),low.evolve());
 
-            if let (Ok(high), Ok(low)) = (high, low)
+            if let (Ok((high_tunnel, high_tunnel_ctrl)), Ok((low_tunnel, low_tunnel_ctrl))) = (high, low)
             {
-//                self.high_signal_rx = high.signal_tx.subscribe();
-//                self.low_signal_rx = low.signal_tx.subscribe();
-                self.high_tunnel_tx.send(high);
-                self.low_tunnel_tx.send(low);
-            } else {
+                self.high_lane_ctrl.command_tx.send(LaneCommand::TunnelState(TunnelState::Tunnel(high_tunnel_ctrl)));
+                self.low_lane_ctrl.command_tx.send(LaneCommand::TunnelState(TunnelState::Tunnel(low_tunnel_ctrl)));
+            }
+            else {
                 eprintln!("connection failure... trying again in 10 seconds");
                 tokio::time::sleep(Duration::from_secs(10)).await;
             }
+
+                // then wait for next command
+                match self.command_rx.recv().await
+                {
+                    None => {
+                        self.high_lane_ctrl.command_tx.send(LaneCommand::TunnelState(TunnelState::None));
+                        self.low_lane_ctrl.command_tx.send(LaneCommand::TunnelState(TunnelState::None));
+                        return;
+                    }
+                    Some(Reset) => {
+                        // first set olds to None
+                        self.high_lane_ctrl.command_tx.send(LaneCommand::TunnelState(TunnelState::None));
+                        self.low_lane_ctrl.command_tx.send(LaneCommand::TunnelState(TunnelState::None));
+                        // allow loop to continue
+                    }
+                    Some(Close) => {
+                        self.high_lane_ctrl.command_tx.send(LaneCommand::TunnelState(TunnelState::None));
+                        self.low_lane_ctrl.command_tx.send(LaneCommand::TunnelState(TunnelState::None));
+                        return; }
+                }
+
         }
     }
 }
