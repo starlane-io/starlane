@@ -1,5 +1,5 @@
 use std::sync::{Mutex, Weak, Arc};
-use crate::lane::{LaneRunner, Lane};
+use crate::lane::Lane;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32};
 use futures::future::join_all;
@@ -83,6 +83,23 @@ impl StarKey
            index: index
        }
    }
+
+   // highest to lowest
+   pub fn sort( a : StarKey, b: StarKey  ) -> Result<(Self,Self),Error>
+   {
+       if a == b
+       {
+           Err(format!("both StarKeys are equal. {}=={}",a,b).into())
+       }
+       else if a.cmp(&b) == Ordering::Greater
+       {
+           Ok((a,b))
+       }
+       else
+       {
+           Ok((b,a))
+       }
+   }
 }
 
 pub struct Star
@@ -93,12 +110,12 @@ pub struct Star
 pub struct StarShell
 {
    pub kernel: Box<dyn StarKernel>,
-   pub lanes: Vec<LaneRunner>
+   pub lanes: Vec<Lane>
 }
 
 impl StarShell
 {
-   pub fn new(lanes: Vec<LaneRunner>, kernel: Box<dyn StarKernel>) ->Self
+   pub fn new(lanes: Vec<Lane>, kernel: Box<dyn StarKernel>) ->Self
    {
        StarShell{
            kernel: kernel,
@@ -118,7 +135,7 @@ pub trait StarKernel : Send
 pub struct LaneMeta
 {
    pub id: i32,
-   pub lane: LaneRunner
+   pub lane: Lane
 }
 
 impl LaneMeta
@@ -141,6 +158,7 @@ pub enum StarCommand
     AddLane(Lane)
 }
 
+#[derive(Clone)]
 pub struct StarController
 {
     pub command_tx: Sender<StarCommand>

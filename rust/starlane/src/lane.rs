@@ -1,6 +1,6 @@
 use futures::future::select_all;
 use futures::FutureExt;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot;
@@ -19,79 +19,81 @@ pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
 pub static LANE_QUEUE_SIZE: usize = 32;
 
 
+#[derive(Clone)]
 pub struct LaneController
 {
     pub tunnel_tx: Sender<Tunnel>
+}
+
+pub struct Chamber<T>
+{
+    pub holding: Option<T>
+}
+
+impl <T> Chamber<T>
+{
+    pub fn new()->Self
+    {
+      Chamber {
+          holding: Option::None
+      }
+    }
 }
 
 pub struct Lane
 {
     pub remote_star: StarKey,
     pub tx: Sender<LaneGram>,
-    //pub rx: Receiver<LaneGram>
+    rx: Receiver<LaneGram>,
+    tunnel_rx: Receiver<Tunnel>,
+    tunnel: Mutex<Chamber<Tunnel>>
 }
 
-pub struct LaneRunner
+impl Lane
 {
-    pub closed: bool,
-    pub tunnel: Option<Tunnel>,
-    pub tunnel_rx: Receiver<Tunnel>,
-    pub remote_rx: Receiver<LaneGram>,
-}
-
-impl LaneRunner
-{
-    pub fn new(remote_star: StarKey) -> (Self, LaneController, Lane)
+    pub fn local_lanes(a: StarKey, b: StarKey ) ->((Lane, Lane),(Sender<Tunnel>,Sender<Tunnel>))
     {
-        let (tunnel_tx, tunnel_rx) = mpsc::channel(2);
-//        let (local_tx,local_rx) = mpsc::channel(LANE_QUEUE_SIZE );
-        let (remote_tx, remote_rx) = mpsc::channel(LANE_QUEUE_SIZE);
-        (LaneRunner {
-            tunnel: None,
-            closed: false,
-            tunnel_rx: tunnel_rx,
-            remote_rx: remote_rx,
-        },
-         LaneController {
-             tunnel_tx: tunnel_tx
-         },
-         Lane {
-             remote_star,
-             tx: remote_tx,
-         })
+        let (a_tunnel_tx, a_tunnel_rx) = mpsc::channel(2);
+        let (b_tunnel_tx, b_tunnel_rx) = mpsc::channel(2);
+
+        let (a_tx, a_rx) = mpsc::channel(LANE_QUEUE_SIZE);
+        let (b_tx, b_rx) = mpsc::channel(LANE_QUEUE_SIZE);
+        (
+            (Lane {
+                remote_star: b,
+                tx: a_tx,
+                rx: a_rx,
+                tunnel_rx: a_tunnel_rx,
+                tunnel: Mutex::new(Chamber::new() )
+            },
+            Lane {
+                remote_star: a,
+                tx: b_tx,
+                rx: b_rx,
+                tunnel_rx: b_tunnel_rx,
+                tunnel: Mutex::new(Chamber::new() )
+            }),
+            (a_tunnel_tx,b_tunnel_tx)
+        )
     }
 
-    pub fn is_closed(&self)->bool
+    pub async fn update(&mut self)
     {
-        self.closed
-    }
-
-    fn has_working_tunnel(&self)->bool
-    {
-        self.tunnel.is_some() && !self.tunnel.as_ref().unwrap().is_closed()
-    }
-
-    pub async fn run(&mut self)
-    {
-        while !self.is_closed()
+        let rx = self.rx.recv().fuse();
+        let tunnel_rx= self.tunnel_rx.recv().fuse();
+        pin_mut![rx,tunnel_rx];
         {
-            let mut tunnel_future = self.tunnel_rx.recv().boxed();
-            let mut gram_future = self.remote_rx.recv().boxed();
-            tokio::select!{
-               tunnel = &mut tunnel_future => {
-                 self.tunnel = tunnel;
-               }
-
-               Option::Some(gram) = &mut gram_future => {
-                    if let Option::Some(tunnel) = &self.tunnel
-                    {
-                        tunnel.tx.send(gram).await;
-                    }
-               }
+        let mut chamber = self.tunnel.lock().await;
+          tokio::select! {
+            Some(gram) = rx => { }
+            Some(tunnel) = tunnel_rx => {
+              chamber.holding = Option::Some(tunnel);
             }
+          }
         }
     }
 }
+
 
 pub struct Tunnel
 {
@@ -121,39 +123,35 @@ pub enum LaneSignal
     Close
 }
 
-pub struct LocalTunnelMaintainer
+pub struct LocalTunnelConnector
 {
     pub high_star: StarKey,
     pub low_star: StarKey,
-    pub high_lane_ctrl: LaneController,
-    pub low_lane_ctrl: LaneController,
-    high_signal_rx: broadcast::Receiver<LaneSignal>,
-    low_signal_rx: broadcast::Receiver<LaneSignal>,
+    pub high_tunnel_tx: Sender<Tunnel>,
+    pub low_tunnel_tx: Sender<Tunnel>
 }
 
-impl LocalTunnelMaintainer
+impl LocalTunnelConnector
 {
-    pub fn new(high_star: StarKey, low_star: StarKey, high_lane_ctrl: LaneController, low_lane_ctrl: LaneController, high_signal_rx: broadcast::Receiver<LaneSignal>, low_signal_rx: broadcast::Receiver<LaneSignal>) -> Result<Self,Error>
+    pub fn new(high_star: StarKey, low_star: StarKey, high_tunnel_tx: Sender<Tunnel>, low_tunnel_tx: Sender<Tunnel>) -> Result<Self,Error>
     {
         if high_star.cmp(&low_star) != Ordering::Greater
         {
             Err("High star must have a greater StarKey (meaning higher constelation index array and star index value".into())
         }
         else {
-            Ok(LocalTunnelMaintainer {
+            Ok(LocalTunnelConnector {
                 high_star: high_star,
                 low_star: low_star,
-                high_lane_ctrl: high_lane_ctrl,
-                low_lane_ctrl: low_lane_ctrl,
-                high_signal_rx: high_signal_rx,
-                low_signal_rx: low_signal_rx,
+                high_tunnel_tx: high_tunnel_tx,
+                low_tunnel_tx: low_tunnel_tx,
             })
         }
     }
 }
 
 #[async_trait]
-impl TunnelMaintainer for LocalTunnelMaintainer
+impl TunnelMaintainer for LocalTunnelConnector
 {
     async fn run(&mut self) {
         loop {
@@ -163,10 +161,10 @@ impl TunnelMaintainer for LocalTunnelMaintainer
 
             if let (Ok(high), Ok(low)) = (high, low)
             {
-                self.high_signal_rx = high.signal_tx.subscribe();
-                self.low_signal_rx = low.signal_tx.subscribe();
-                self.high_lane_ctrl.tunnel_tx.send(high);
-                self.low_lane_ctrl.tunnel_tx.send(low);
+//                self.high_signal_rx = high.signal_tx.subscribe();
+//                self.low_signal_rx = low.signal_tx.subscribe();
+                self.high_tunnel_tx.send(high);
+                self.low_tunnel_tx.send(low);
             } else {
                 eprintln!("connection failure... trying again in 10 seconds");
                 tokio::time::sleep(Duration::from_secs(10)).await;

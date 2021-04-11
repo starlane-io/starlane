@@ -10,7 +10,7 @@ use tokio::sync::{mpsc, Mutex, broadcast};
 use crate::constellation::Constellation;
 use crate::error::Error;
 use crate::id::Id;
-use crate::lane::{LaneRunner, STARLANE_PROTOCOL_VERSION, Tunnel};
+use crate::lane::{STARLANE_PROTOCOL_VERSION, Tunnel};
 use crate::message::{ProtoGram, LaneGram};
 use crate::star::{Star, StarKernel, StarKey, StarShell, StarKind, StarCommand, StarController};
 use std::cell::RefCell;

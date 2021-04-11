@@ -10,7 +10,8 @@ use std::collections::{HashSet, HashMap};
 use std::sync::mpsc::{Sender, Receiver};
 use crate::message::LaneGram;
 use std::sync::Arc;
-use crate::lane::{Lane, LaneRunner};
+use crate::lane::{Lane, LocalTunnelConnector};
+use std::cmp::Ordering;
 
 pub struct Starlane
 {
@@ -86,18 +87,54 @@ impl Starlane
         Ok(())
     }
 
-    async fn add_lane(&mut self, local: StarKey, remote: StarKey ) ->Result<(),Error>
+    async fn add_lane(&mut self, local: StarKey, second: StarKey ) ->Result<(),Error>
     {
-        if let Option::Some(star_ctrl) = self.star_controllers.get_mut(&local)
+        let local_star_ctrl =
         {
-            let (mut runner,controller,lane) = LaneRunner::new(remote.clone() );
-            tokio::spawn(async move{runner.run();} );
-            star_ctrl.command_tx.send(StarCommand::AddLane(lane) );
-            Ok(())
-        }
-        else {
-            Err(format!("missing star: {}",local).into())
-        }
+            let local_star_ctrl = self.star_controllers.get_mut(&local);
+            match local_star_ctrl
+            {
+                None => {
+                    return Err(format!("lane cannot construct. missing local star key: {}",local).into())
+                }
+                Some(local_star_ctrl) => {local_star_ctrl.clone()}
+            }
+        };
+
+        let second_star_ctrl =
+            {
+                let second_star_ctrl = self.star_controllers.get_mut(&second );
+                match second_star_ctrl
+                {
+                    None => {
+                        return Err(format!("lane cannot construct. missing second star key: {}",second).into())
+                    }
+                    Some(second_star_ctrl) => {second_star_ctrl.clone()}
+                }
+            };
+
+
+
+                let ((local_lane, second_lane),(local_tunnel_tx,second_tunnel_tx)) = Lane::local_lanes(local.clone() , second.clone() );
+
+                local_star_ctrl.command_tx.send(StarCommand::AddLane(local_lane));
+                second_star_ctrl.command_tx.send(StarCommand::AddLane(second_lane));
+
+                let (high,low,high_tunnel_tx,low_tunnel_tx) = match &local.cmp(&second)
+                {
+                    Ordering::Greater =>
+                    {
+                        (local,second,local_tunnel_tx,second_tunnel_tx)
+                    }
+                    _ =>
+                    {
+                        (second,local,second_tunnel_tx,local_tunnel_tx)
+                    }
+                };
+
+                let connector = LocalTunnelConnector::new(high, low, high_tunnel_tx, low_tunnel_tx );
+
+                Ok(())
     }
 
     fn create_star_key( &mut self, template: &StarKeyTemplate )->StarKey
