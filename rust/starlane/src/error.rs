@@ -1,6 +1,6 @@
 use std::fmt;
 use std::fmt::Formatter;
-use crate::message::ProtoGram;
+use crate::message::ProtoFrame;
 use tokio::sync::mpsc::error::SendError;
 
 #[derive(Debug, Clone)]
@@ -14,8 +14,8 @@ impl fmt::Display for Error{
     }
 }
 
-impl From<SendError<ProtoGram>> for Error{
-    fn from(e: SendError<ProtoGram>) -> Self {
+impl From<SendError<ProtoFrame>> for Error{
+    fn from(e: SendError<ProtoFrame>) -> Self {
         Error{
             error: format!("{}",e.to_string())
         }

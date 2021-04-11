@@ -10,8 +10,8 @@ use tokio::sync::{mpsc, Mutex, broadcast, oneshot};
 use crate::constellation::Constellation;
 use crate::error::Error;
 use crate::id::Id;
-use crate::lane::{STARLANE_PROTOCOL_VERSION, Tunnel, Lane, TunnelConnector, TunnelController, LaneCommand};
-use crate::message::{ProtoGram, LaneGram};
+use crate::lane::{STARLANE_PROTOCOL_VERSION, Tunnel, MidLane, TunnelConnector, TunnelController, LaneCommand};
+use crate::message::{ProtoFrame, LaneFrame};
 use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -22,7 +22,7 @@ pub struct ProtoStar
   kind: StarKind,
   key: StarKey,
   command_rx: Receiver<StarCommand>,
-  lanes: HashMap<StarKey,Lane>,
+  lanes: HashMap<StarKey, MidLane>,
   connectors: Vec<Box<dyn TunnelConnector>>
 }
 
@@ -45,14 +45,6 @@ impl ProtoStar
     pub async fn evolve(mut self)->Result<Star,Error>
     {
         loop {
-            let mut futures = vec!();
-//            futures.push(self.command().boxed());
-            for (key,mut lane) in &mut self.lanes
-            {
-                futures.push(lane.run().boxed());
-            }
-
-            let result = select_all(futures).await;
         }
 
         Ok(Star::new( self.lanes, Box::new(PlaceholderKernel::new()) ))
@@ -113,8 +105,8 @@ impl StarKernel for PlaceholderKernel
 pub struct ProtoTunnel
 {
     pub star: Option<StarKey>,
-    pub tx: Sender<LaneGram>,
-    pub rx: Receiver<LaneGram>,
+    pub tx: Sender<LaneFrame>,
+    pub rx: Receiver<LaneFrame>,
 }
 
 impl ProtoTunnel
@@ -122,22 +114,22 @@ impl ProtoTunnel
 
     pub async fn evolve(mut self) -> Result<(Tunnel, TunnelController),Error>
     {
-        self.tx.send(LaneGram::Proto(ProtoGram::StarLaneProtocolVersion(STARLANE_PROTOCOL_VERSION))).await;
+        self.tx.send(LaneFrame::Proto(ProtoFrame::StarLaneProtocolVersion(STARLANE_PROTOCOL_VERSION))).await;
 
         if let Option::Some(star)=self.star
         {
-            self.tx.send(LaneGram::Proto(ProtoGram::ReportStarKey(star))).await;
+            self.tx.send(LaneFrame::Proto(ProtoFrame::ReportStarKey(star))).await;
         }
 
         // first we confirm that the version is as expected
-        if let Option::Some(LaneGram::Proto(recv)) = self.rx.recv().await
+        if let Option::Some(LaneFrame::Proto(recv)) = self.rx.recv().await
         {
             match recv
             {
-                ProtoGram::StarLaneProtocolVersion(version) if version == STARLANE_PROTOCOL_VERSION => {
+                ProtoFrame::StarLaneProtocolVersion(version) if version == STARLANE_PROTOCOL_VERSION => {
                     // do nothing... we move onto the next step
                 },
-                ProtoGram::StarLaneProtocolVersion(version) => {
+                ProtoFrame::StarLaneProtocolVersion(version) => {
                     return Err(format!("wrong version: {}", version).into());
                 },
                 gram => {
@@ -149,18 +141,16 @@ impl ProtoTunnel
             return Err("disconnected".into());
         }
 
-        if let Option::Some(LaneGram::Proto(recv)) = self.rx.recv().await
+        if let Option::Some(LaneFrame::Proto(recv)) = self.rx.recv().await
         {
             match recv
             {
-                ProtoGram::ReportStarKey(remote_star_key) => {
-                    let (close_signal_tx,close_signal_rx) = oneshot::channel();
+                ProtoFrame::ReportStarKey(remote_star_key) => {
 
                     return Ok((Tunnel{
                         remote_star: remote_star_key,
                         rx: self.rx,
                         tx: self.tx.clone(),
-                        close_signal_rx: close_signal_rx
                     }, TunnelController {
                         tx: self.tx,
                         }));
@@ -178,8 +168,8 @@ impl ProtoTunnel
 
 pub fn local_tunnels(high: StarKey, low:StarKey) ->(ProtoTunnel, ProtoTunnel)
 {
-    let (atx,arx) = mpsc::channel::<LaneGram>(32);
-    let (btx,brx) = mpsc::channel::<LaneGram>(32);
+    let (atx,arx) = mpsc::channel::<LaneFrame>(32);
+    let (btx,brx) = mpsc::channel::<LaneFrame>(32);
 
     (ProtoTunnel {
         star: Option::Some(high),

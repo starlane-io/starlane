@@ -8,9 +8,9 @@ use crate::proto::{ProtoStar, local_tunnels, ProtoTunnel, ProtoStarController};
 use crate::star::{StarKey, Star, StarController, StarCommand};
 use std::collections::{HashSet, HashMap};
 use std::sync::mpsc::{Sender, Receiver};
-use crate::message::LaneGram;
+use crate::message::LaneFrame;
 use std::sync::Arc;
-use crate::lane::{Lane, LocalTunnelConnector};
+use crate::lane::{MidLane, LocalTunnelConnector, Lane};
 use std::cmp::Ordering;
 
 pub struct Starlane
@@ -112,32 +112,7 @@ impl Starlane
                     Some(second_star_ctrl) => {second_star_ctrl.clone()}
                 }
             };
-
-
-
-                let (mut local_lane, mut second_lane,local_lane_ctrl,second_lane_ctrl) = Lane::local_lanes(local.clone() , second.clone() );
-
-                tokio::spawn( async move { local_lane.run().await; } );
-                tokio::spawn( async move { second_lane.run().await; } );
-
-                local_star_ctrl.command_tx.send(StarCommand::AddLane(local_lane_ctrl.clone()));
-                second_star_ctrl.command_tx.send(StarCommand::AddLane(second_lane_ctrl.clone()));
-
-                let (high,low, high_lane_ctrl, low_lane_ctrl) = match &local.cmp(&second)
-                {
-                    Ordering::Greater =>
-                    {
-                        (local,second,local_lane_ctrl.clone(),second_lane_ctrl.clone())
-                    }
-                    _ =>
-                    {
-                        (second,local,second_lane_ctrl.clone(),local_lane_ctrl.clone())
-                    }
-                };
-
-                let connector = LocalTunnelConnector::new(high, low, high_lane_ctrl, low_lane_ctrl);
-
-                Ok(())
+           Ok(())
     }
 
     fn create_star_key( &mut self, template: &StarKeyTemplate )->StarKey

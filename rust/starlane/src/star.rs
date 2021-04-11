@@ -1,10 +1,10 @@
 use std::sync::{Mutex, Weak, Arc};
-use crate::lane::{Lane, TunnelConnector, LaneController};
+use crate::lane::{MidLane, TunnelConnector, OutgoingLane};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32};
 use futures::future::join_all;
 use futures::future::select_all;
-use crate::message::ProtoGram;
+use crate::message::ProtoFrame;
 use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use futures::FutureExt;
@@ -42,7 +42,7 @@ impl cmp::Ord for StarKey
         {
             Ordering::Less
         }
-        else if self.constellation.cmp(&other.constellation ) != Ordering::Less
+        else if self.constellation.cmp(&other.constellation ) != Ordering::Equal
         {
             return self.constellation.cmp(&other.constellation );
         }
@@ -106,12 +106,12 @@ impl StarKey
 pub struct Star
 {
    pub kernel: Box<dyn StarKernel>,
-   pub lanes: HashMap<StarKey,Lane>
+   pub lanes: HashMap<StarKey, MidLane>
 }
 
 impl Star
 {
-   pub fn new(lanes: HashMap<StarKey,Lane>, kernel: Box<dyn StarKernel>) ->Self
+   pub fn new(lanes: HashMap<StarKey, MidLane>, kernel: Box<dyn StarKernel>) ->Self
    {
        Star{
            kernel: kernel,
@@ -130,18 +130,18 @@ pub trait StarKernel : Send
 pub struct LaneMeta
 {
    pub id: i32,
-   pub lane: Lane
+   pub lane: MidLane
 }
 
 impl LaneMeta
 {
-    pub async fn send(&self, gram: ProtoGram) ->Result<(),Error>
+    pub async fn send(&self, gram: ProtoFrame) ->Result<(),Error>
     {
         //Ok(self.lane.tunnel_tx.send(gram).await?)
         unimplemented!()
     }
 
-    pub async fn receive( &mut self)->Option<ProtoGram>
+    pub async fn receive( &mut self)->Option<ProtoFrame>
     {
         //self.lane.tunnel_rx.recv().await
         unimplemented!()
@@ -150,7 +150,7 @@ impl LaneMeta
 
 pub enum StarCommand
 {
-    AddLane(LaneController),
+    AddLane(OutgoingLane),
     AddTunnelConnector(Box<dyn TunnelConnector>)
 }
 
