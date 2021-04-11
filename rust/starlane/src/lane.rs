@@ -1,7 +1,11 @@
 use std::cmp::Ordering;
+use std::pin::Pin;
+use std::task::Poll;
 
-use futures::future::select_all;
 use futures::{FutureExt, TryFutureExt};
+use futures::future::select_all;
+use futures::task;
+use futures::task::Context;
 use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::mpsc::error::SendError;
@@ -15,10 +19,6 @@ use crate::proto::{local_tunnels, ProtoStar, ProtoTunnel};
 use crate::star::{Star, StarKey};
 use crate::starlane::{ConnectCommand, StarlaneCommand};
 use crate::starlane::StarlaneCommand::Connect;
-use std::task::Poll;
-use std::pin::Pin;
-use futures::task::Context;
-use futures::task;
 
 pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
 pub static LANE_QUEUE_SIZE: usize = 32;
@@ -102,31 +102,40 @@ impl Lane
                   let mut command_rx = self.command_rx.recv().boxed();
                   tokio::select! {
                    command = command_rx => {
-                          //self.process_command(command);
+                          match command{
+                            Option::Some(command)=>{
+                                match command
+                                {
+                                    LaneCommand::TunnelState(tunnel_state) => {self.tunnel_state=tunnel_state;}
+                                }
+                            }
+                            Option::None=>{
+                                eprintln!("lane command stream ended.");
+                            }
+                        }
                     }
                   }
             }
             else
             {
-                //self.process_command(self.command_rx.recv().await);
+                match self.command_rx.recv().await
+                {
+                    Option::Some(command)=>{
+                        match command
+                        {
+                            LaneCommand::TunnelState(tunnel_state) => {self.tunnel_state=tunnel_state;}
+                        }
+                    }
+                    Option::None=>{
+                        eprintln!("lane command stream ended.");
+                    }
+                }
             }
         }
     }
 
     async fn process_command( &mut self, command: Option<LaneCommand> )
-    {
-        match command{
-            Option::Some(command)=>{
-                match command
-                {
-                    LaneCommand::TunnelState(tunnel_state) => {self.tunnel_state=tunnel_state;}
-                }
-            }
-            Option::None=>{
-                eprintln!("lane command stream ended.");
-            }
-        }
-    }
+    {}
 }
 
 pub struct Tunnel
@@ -152,16 +161,17 @@ impl Tunnel
     }
 }
 
+#[derive(Clone)]
 pub enum TunnelState
 {
     Tunnel(TunnelController),
     None
 }
 
+#[derive(Clone)]
 pub struct TunnelController
 {
-    pub tx: Sender<LaneGram>,
-    pub close_signal_tx: oneshot::Sender<()>,
+    pub tx: Sender<LaneGram>
 }
 
 pub struct ConnectorController

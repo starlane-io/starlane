@@ -10,7 +10,7 @@ use tokio::sync::{mpsc, Mutex, broadcast, oneshot};
 use crate::constellation::Constellation;
 use crate::error::Error;
 use crate::id::Id;
-use crate::lane::{STARLANE_PROTOCOL_VERSION, Tunnel, Lane, TunnelConnector, TunnelController};
+use crate::lane::{STARLANE_PROTOCOL_VERSION, Tunnel, Lane, TunnelConnector, TunnelController, LaneCommand};
 use crate::message::{ProtoGram, LaneGram};
 use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController};
 use std::cell::RefCell;
@@ -163,7 +163,7 @@ impl ProtoTunnel
                         close_signal_rx: close_signal_rx
                     }, TunnelController {
                         tx: self.tx,
-                        close_signal_tx:close_signal_tx}));
+                        }));
                 }
                 gram => { return Err(format!("unexpected star gram: {} (expected to receive ReportStarKey next)", gram).into()); }
             };
@@ -172,6 +172,8 @@ impl ProtoTunnel
             return Err("disconnected!".into())
         }
     }
+
+
 }
 
 pub fn local_tunnels(high: StarKey, low:StarKey) ->(ProtoTunnel, ProtoTunnel)
