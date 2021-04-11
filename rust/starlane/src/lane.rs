@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use futures::future::select_all;
 use futures::FutureExt;
 use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
@@ -13,11 +15,9 @@ use crate::proto::{local_tunnels, ProtoStar, ProtoTunnel};
 use crate::star::{Star, StarKey};
 use crate::starlane::{ConnectCommand, StarlaneCommand};
 use crate::starlane::StarlaneCommand::Connect;
-use std::cmp::Ordering;
 
 pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
 pub static LANE_QUEUE_SIZE: usize = 32;
-
 
 #[derive(Clone)]
 pub struct LaneController
@@ -79,21 +79,41 @@ impl Lane
 
     pub async fn update(&mut self)
     {
-        let rx = self.rx.recv().fuse();
-        let tunnel_rx= self.tunnel_rx.recv().fuse();
-        pin_mut![rx,tunnel_rx];
+
         {
-        let mut chamber = self.tunnel.lock().await;
-          tokio::select! {
-            Some(gram) = rx => { }
-            Some(tunnel) = tunnel_rx => {
-              chamber.holding = Option::Some(tunnel);
+            let mut chamber = self.tunnel.lock().await;
+            if let Option::Some(tunnel) = &chamber.holding
+            {
+                if !tunnel.is_closed()
+                {
+                  let rx = self.rx.recv().fuse();
+                  let tunnel_rx= self.tunnel_rx.recv().fuse();
+                  pin_mut![rx,tunnel_rx];
+                  tokio::select! {
+                    Some(gram) = rx => {
+                          match tunnel.tx.send(gram).await
+                          {
+                              Ok(_)=>{
+
+                              // here we leave this method so we don't await for Tunnel
+                              return ();
+                             },
+                              Err(e)=>{
+                                println!("{}",e);
+                              }
+                          }
+                      }
+                    Some(tunnel) = tunnel_rx => {
+                      chamber.holding = Option::Some(tunnel);
+                    }
+                  }
+                }
             }
-          }
+
+            chamber.holding = self.tunnel_rx.recv().await
         }
     }
 }
-
 
 pub struct Tunnel
 {
@@ -112,7 +132,7 @@ impl Tunnel
 }
 
 #[async_trait]
-pub trait TunnelMaintainer
+pub trait TunnelConnector
 {
     async fn run(&mut self);
 }
@@ -137,7 +157,7 @@ impl LocalTunnelConnector
     {
         if high_star.cmp(&low_star) != Ordering::Greater
         {
-            Err("High star must have a greater StarKey (meaning higher constelation index array and star index value".into())
+            Err("High star must have a greater StarKey (meaning higher constellation index array and star index value".into())
         }
         else {
             Ok(LocalTunnelConnector {
@@ -151,7 +171,7 @@ impl LocalTunnelConnector
 }
 
 #[async_trait]
-impl TunnelMaintainer for LocalTunnelConnector
+impl TunnelConnector for LocalTunnelConnector
 {
     async fn run(&mut self) {
         loop {
@@ -188,7 +208,6 @@ mod test
     #[test]
    pub fn test()
    {
-
        let rt = Runtime::new().unwrap();
        rt.block_on(async {
            let (mut p1, mut p2) = local_tunnels(StarKey::new(2), StarKey::new(1));
@@ -200,9 +219,6 @@ mod test
            assert!(result1.is_ok());
            assert!(result2.is_ok());
        });
-
-
-
    }
 }
 
