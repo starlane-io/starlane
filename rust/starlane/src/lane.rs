@@ -46,7 +46,7 @@ impl IncomingLane
 println!("IncomingLane: waiting to receive...");
         loop {
             println!("IncomingLane: staring select loop");
-            match &self.tunnel
+            match &mut self.tunnel
             {
                 TunnelReceiverState::None => {
                     match self.tunnel_receiver_rx.recv().await
@@ -65,47 +65,21 @@ if let TunnelReceiverState::Receiver(tunnel)=&tunnel
                         }
                     }
                 }
-                TunnelReceiverState::Receiver(tunnel) => {
-                    let tunnel_future = self.tunnel_receiver_rx.recv().fuse();
-                    let frame_future = self.rx.recv().fuse();
-                    pin_mut!(tunnel_future,frame_future);
-
-println!("IncomingLane: selecing...");
-                    tokio::select! {
-                    tunnel = tunnel_future => {
-                        match tunnel
-                        {
-                            None => {
-                                eprintln!("received None from tunnel");
-                                return Option::None;
-                            }
-                            Some(tunnel) => {
-println!("IncomingLane: received tunnel: {}",tunnel);
-                                self.tunnel = tunnel;
-                            }
+                TunnelReceiverState::Receiver( tunnel) => {
+println!("IncomingLane: waiting for frame...");
+                    match tunnel.rx.recv().await
+                    {
+                        None => {
+                            eprintln!("received None from tunnel.rx")
+                            // let's hope the tunnel is reset soon
                         }
-                    }
-                    frame = frame_future => {
-println!("IncomingLane: frame option received...");
-
-                        match frame
-                        {
-                            None => {
-                              eprintln!("received None from tunnel frame rx... this tunnel should be Reset");
-                              return Option::None;
-                            }
-                            Some(frame) =>
-                            {
-println!("IncomingLane: received frame: {}", frame);
-                               return Some(frame);
-                            }
-                        }
+                        Some(frame) => {return Option::Some(frame);}
                     }
                 }
+
                 }
             }
         }
-    }
 }
 
 pub struct LaneRunner
@@ -433,6 +407,7 @@ mod test
     {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
+
             let high = StarKey::new(2);
             let low = StarKey::new(1);
 
@@ -442,27 +417,41 @@ mod test
             println!("pre...");
             let connector_ctrl = LocalTunnelConnector::new(&high_lane, &low_lane).await.unwrap();
 
-            tokio::spawn( async move {
-                println!("sending PING");
+println!("sending PING");
                 high_lane.outgoing.tx.send(LaneCommand::LaneFrame(LaneFrame::Ping) ).await;
 
-                println!("WAITING FOR PiNG ...");
+println!("WAITING FOR PiNG ...");
                 let result = low_lane.incoming.recv().await;
                 if let Some(LaneFrame::Ping) = result
                 {
-                    println!("RECEIVED PING!");
+println!("RECEIVED PING!");
                     assert!(true);
                 } else if let Some(frame) = result{
-                    println!("RECEIVED {}",frame);
+println!("RECEIVED {}",frame);
                     assert!(false);
                 }
                 else
                 {
-                    println!("RECEIVED NONE");
+println!("RECEIVED NONE");
                     assert!(false);
                 }
-            });
-            tokio::time::sleep(Duration::from_secs(5)).await;
+            connector_ctrl.command_tx.send(ConnectorCommand::Reset ).await;
+            high_lane.outgoing.tx.send(LaneCommand::LaneFrame(LaneFrame::Pong) ).await;
+            let result = low_lane.incoming.recv().await;
+
+            if let Some(LaneFrame::Pong) = result
+            {
+                println!("RECEIVED PoNG!");
+                assert!(true);
+            } else if let Some(frame) = result{
+                println!("RECEIVED {}",frame);
+                assert!(false);
+            }
+            else
+            {
+                println!("RECEIVED NONE");
+                assert!(false);
+            }
         });
     }
 }
