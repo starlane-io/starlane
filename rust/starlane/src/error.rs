@@ -1,6 +1,6 @@
 use std::fmt;
 use std::fmt::Formatter;
-use crate::message::ProtoFrame;
+use crate::frame::ProtoFrame;
 use tokio::sync::mpsc::error::SendError;
 
 #[derive(Debug, Clone)]

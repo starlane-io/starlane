@@ -10,8 +10,8 @@ use tokio::sync::{mpsc, Mutex, broadcast, oneshot};
 use crate::constellation::Constellation;
 use crate::error::Error;
 use crate::id::Id;
-use crate::lane::{STARLANE_PROTOCOL_VERSION, Tunnel, MidLane, TunnelConnector, TunnelController, LaneCommand};
-use crate::message::{ProtoFrame, LaneFrame};
+use crate::lane::{STARLANE_PROTOCOL_VERSION, TunnelSenderState, OutgoingLaneRunner, TunnelConnector, TunnelSender, LaneCommand};
+use crate::frame::{ProtoFrame, LaneFrame};
 use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -22,7 +22,7 @@ pub struct ProtoStar
   kind: StarKind,
   key: StarKey,
   command_rx: Receiver<StarCommand>,
-  lanes: HashMap<StarKey, MidLane>,
+  lanes: HashMap<StarKey, OutgoingLaneRunner>,
   connectors: Vec<Box<dyn TunnelConnector>>
 }
 
@@ -112,7 +112,7 @@ pub struct ProtoTunnel
 impl ProtoTunnel
 {
 
-    pub async fn evolve(mut self) -> Result<(Tunnel, TunnelController),Error>
+    pub async fn evolve(mut self) -> Result<(TunnelSenderState, TunnelSender),Error>
     {
         self.tx.send(LaneFrame::Proto(ProtoFrame::StarLaneProtocolVersion(STARLANE_PROTOCOL_VERSION))).await;
 
@@ -147,11 +147,11 @@ impl ProtoTunnel
             {
                 ProtoFrame::ReportStarKey(remote_star_key) => {
 
-                    return Ok((Tunnel{
+                    return Ok((TunnelSenderState {
                         remote_star: remote_star_key,
                         rx: self.rx,
                         tx: self.tx.clone(),
-                    }, TunnelController {
+                    }, TunnelSender {
                         tx: self.tx,
                         }));
                 }

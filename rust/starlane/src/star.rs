@@ -1,10 +1,10 @@
 use std::sync::{Mutex, Weak, Arc};
-use crate::lane::{MidLane, TunnelConnector, OutgoingLane};
+use crate::lane::{OutgoingLaneRunner, TunnelConnector, OutgoingLane};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32};
 use futures::future::join_all;
 use futures::future::select_all;
-use crate::message::ProtoFrame;
+use crate::frame::ProtoFrame;
 use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use futures::FutureExt;
@@ -106,12 +106,12 @@ impl StarKey
 pub struct Star
 {
    pub kernel: Box<dyn StarKernel>,
-   pub lanes: HashMap<StarKey, MidLane>
+   pub lanes: HashMap<StarKey, OutgoingLaneRunner>
 }
 
 impl Star
 {
-   pub fn new(lanes: HashMap<StarKey, MidLane>, kernel: Box<dyn StarKernel>) ->Self
+   pub fn new(lanes: HashMap<StarKey, OutgoingLaneRunner>, kernel: Box<dyn StarKernel>) ->Self
    {
        Star{
            kernel: kernel,
@@ -130,7 +130,7 @@ pub trait StarKernel : Send
 pub struct LaneMeta
 {
    pub id: i32,
-   pub lane: MidLane
+   pub lane: OutgoingLaneRunner
 }
 
 impl LaneMeta

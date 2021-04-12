@@ -10,7 +10,7 @@ extern crate async_trait;
 
 pub mod star;
 pub mod lane;
-pub mod message;
+pub mod frame;
 pub mod id;
 pub mod error;
 pub mod constellation;

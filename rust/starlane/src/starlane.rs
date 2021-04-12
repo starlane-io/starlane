@@ -8,9 +8,9 @@ use crate::proto::{ProtoStar, local_tunnels, ProtoTunnel, ProtoStarController};
 use crate::star::{StarKey, Star, StarController, StarCommand};
 use std::collections::{HashSet, HashMap};
 use std::sync::mpsc::{Sender, Receiver};
-use crate::message::LaneFrame;
+use crate::frame::LaneFrame;
 use std::sync::Arc;
-use crate::lane::{MidLane, LocalTunnelConnector, Lane};
+use crate::lane::{OutgoingLaneRunner, LocalTunnelConnector, Lane};
 use std::cmp::Ordering;
 
 pub struct Starlane

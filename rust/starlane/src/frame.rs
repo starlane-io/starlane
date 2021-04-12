@@ -25,6 +25,17 @@ pub enum LaneFrame
     Pong
 }
 
+impl fmt::Display for LaneFrame{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let r = match self {
+            LaneFrame::Proto(_) => format!("Proto").to_string(),
+            LaneFrame::Close => format!("Close").to_string(),
+            LaneFrame::Ping => format!("Ping").to_string(),
+            LaneFrame::Pong =>  format!("Pong").to_string(),
+        };
+        write!(f, "{}",r)
+    }
+}
 
 impl fmt::Display for ProtoFrame {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
