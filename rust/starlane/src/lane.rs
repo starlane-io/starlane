@@ -27,28 +27,88 @@ pub static LANE_QUEUE_SIZE: usize = 32;
 #[derive(Clone)]
 pub struct OutgoingLane
 {
-    pub tx: Sender<LaneCommand>
+    pub tx: Sender<LaneCommand>,
 }
 
 pub struct IncomingLane
 {
-    rx: Receiver<LaneFrame>
+    rx: Receiver<LaneFrame>,
+    tunnel_receiver_rx: Receiver<TunnelReceiverState>,
+    tunnel: TunnelReceiverState
 }
 
-pub struct IncomingLaneRunner
+
+
+impl IncomingLane
 {
-    rx: Receiver<LaneFrame>
-}
-
-impl IncomingLaneRunner
+    pub async fn recv(&mut self) -> Option<LaneFrame>
+    {
+println!("IncomingLane: waiting to receive...");
+        loop {
+            println!("IncomingLane: staring select loop");
+            match &self.tunnel
+            {
+                TunnelReceiverState::None => {
+                    match self.tunnel_receiver_rx.recv().await
+                    {
+                        None => {
+                            eprintln!("received None from tunnel");
+                            return Option::None;
+                        }
+                        Some(tunnel) => {
+println!("IncomingLane: received tunnel: {}",tunnel);
+if let TunnelReceiverState::Receiver(tunnel)=&tunnel
 {
-   pub async fn run(mut self)
-   {
+    println!("IncomingLane: tunnel.remote_star {}", tunnel.remote_star );
+}
+                            self.tunnel = tunnel;
+                        }
+                    }
+                }
+                TunnelReceiverState::Receiver(tunnel) => {
+                    let tunnel_future = self.tunnel_receiver_rx.recv().fuse();
+                    let frame_future = self.rx.recv().fuse();
+                    pin_mut!(tunnel_future,frame_future);
 
-   }
+println!("IncomingLane: selecing...");
+                    tokio::select! {
+                    tunnel = tunnel_future => {
+                        match tunnel
+                        {
+                            None => {
+                                eprintln!("received None from tunnel");
+                                return Option::None;
+                            }
+                            Some(tunnel) => {
+println!("IncomingLane: received tunnel: {}",tunnel);
+                                self.tunnel = tunnel;
+                            }
+                        }
+                    }
+                    frame = frame_future => {
+println!("IncomingLane: frame option received...");
+
+                        match frame
+                        {
+                            None => {
+                              eprintln!("received None from tunnel frame rx... this tunnel should be Reset");
+                              return Option::None;
+                            }
+                            Some(frame) =>
+                            {
+println!("IncomingLane: received frame: {}", frame);
+                               return Some(frame);
+                            }
+                        }
+                    }
+                }
+                }
+            }
+        }
+    }
 }
 
-pub struct OutgoingLaneRunner
+pub struct LaneRunner
 {
     rx: Receiver<LaneCommand>,
     tx: Sender<LaneFrame>,
@@ -56,7 +116,7 @@ pub struct OutgoingLaneRunner
     queue: Vec<LaneFrame>
 }
 
-impl OutgoingLaneRunner
+impl LaneRunner
 {
     async fn die(&self, message: String)
     {
@@ -71,7 +131,7 @@ println!("running Mid.run()");
             {
                 LaneCommand::Tunnel(tunnel) => {
 println!("new Tunnel: {}",tunnel);
-                    if let TunnelSenderState::Tunnel(tunnel) = &tunnel
+                    if let TunnelSenderState::Sender(tunnel) = &tunnel
                     {
                         for frame in self.queue.drain(..)
                         {
@@ -83,7 +143,7 @@ println!("flushing frame {}",frame);
                 }
                 LaneCommand::LaneFrame(frame) => {
                     match &self.tunnel {
-                        TunnelSenderState::Tunnel(tunnel) => {
+                        TunnelSenderState::Sender(tunnel) => {
 println!("relaying frame to tunnel");
                             tunnel.tx.send(frame).await;
                         }
@@ -129,6 +189,7 @@ pub struct Lane
     pub remote_star: StarKey,
     pub incoming: IncomingLane,
     pub outgoing: OutgoingLane,
+    tunnel_receiver_tx: Sender<TunnelReceiverState>
 }
 
 impl Lane
@@ -137,8 +198,9 @@ impl Lane
     {
         let (mid_tx, mid_rx) = mpsc::channel(LANE_QUEUE_SIZE);
         let (in_tx, in_rx) = mpsc::channel(LANE_QUEUE_SIZE);
+        let (tunnel_receiver_tx, tunnel_receiver_rx) = mpsc::channel(1);
 
-        let midlane = OutgoingLaneRunner {
+        let midlane = LaneRunner {
             rx: mid_rx,
             tx: in_tx,
             tunnel: TunnelSenderState::None,
@@ -146,15 +208,24 @@ impl Lane
         };
 
         tokio::spawn( async move { midlane.run().await; } );
-            Lane{
-                remote_star: remote_star,
-                incoming: IncomingLane{
-                    rx: in_rx
-                },
-                outgoing: OutgoingLane {
-                    tx: mid_tx
-                },
-            }
+
+        Lane{
+            remote_star: remote_star,
+            tunnel_receiver_tx: tunnel_receiver_tx,
+            incoming: IncomingLane{
+                rx: in_rx,
+                tunnel_receiver_rx: tunnel_receiver_rx,
+                tunnel: TunnelReceiverState::None
+            },
+            outgoing: OutgoingLane {
+                tx: mid_tx
+            },
+        }
+    }
+
+    pub fn get_tunnel_receiver_tx_channel(&self) -> Sender<TunnelReceiverState>
+    {
+        self.tunnel_receiver_tx.clone()
     }
 
 }
@@ -171,15 +242,25 @@ pub enum TunnelSenderState
 
 pub enum TunnelReceiverState
 {
-    Tunnel(TunnelReceiver),
+    Receiver(TunnelReceiver),
     None
 }
 
 impl fmt::Display for TunnelSenderState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
-            TunnelSenderState::Tunnel(_) => "Tunnel".to_string(),
+            TunnelSenderState::Sender(_) => "Sender".to_string(),
             TunnelSenderState::None => "None".to_string()
+        };
+        write!(f, "{}",r)
+    }
+}
+
+impl fmt::Display for TunnelReceiverState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let r = match self {
+            TunnelReceiverState::Receiver(_) => "Receiver".to_string(),
+            TunnelReceiverState::None => "None".to_string()
         };
         write!(f, "{}",r)
     }
@@ -188,11 +269,13 @@ impl fmt::Display for TunnelSenderState {
 #[derive(Clone)]
 pub struct TunnelSender
 {
+    pub remote_star: StarKey,
     pub tx: Sender<LaneFrame>
 }
 
 pub struct TunnelReceiver
 {
+    pub remote_star: StarKey,
     pub rx: Receiver<LaneFrame>
 }
 
@@ -225,12 +308,14 @@ pub struct LocalTunnelConnector
     pub low_star: StarKey,
     pub high: OutgoingLane,
     pub low: OutgoingLane,
+    pub high_receiver_tx: Sender<TunnelReceiverState>,
+    pub low_receiver_tx: Sender<TunnelReceiverState>,
     command_rx: Receiver<ConnectorCommand>
 }
 
 impl LocalTunnelConnector
 {
-    pub fn new(high_lane: &Lane, low_lane: &Lane ) -> Result<(Self, ConnectorController),Error>
+    pub async fn new(high_lane: &Lane, low_lane: &Lane ) -> Result<ConnectorController,Error>
     {
         let high_star = low_lane.remote_star.clone();
         let low_star = high_lane.remote_star.clone();
@@ -242,13 +327,19 @@ println!("High {:?} Low {:?}",high_star.clone(),low_star.clone());
         else {
             let (command_tx,command_rx) = mpsc::channel(1);
 
-            Ok((LocalTunnelConnector {
+            let mut connector = LocalTunnelConnector {
                 high_star: high_star.clone(),
                 low_star: low_star.clone(),
                 high: high_lane.outgoing.clone(),
                 low: low_lane.outgoing.clone(),
+                high_receiver_tx: high_lane.get_tunnel_receiver_tx_channel(),
+                low_receiver_tx: low_lane.get_tunnel_receiver_tx_channel(),
                 command_rx: command_rx
-            },ConnectorController{ command_tx: command_tx}))
+            };
+
+            tokio::spawn( async move { connector.run().await });
+
+            Ok(ConnectorController{ command_tx: command_tx})
         }
     }
 }
@@ -263,13 +354,14 @@ println!("Entering LocalTunnelConnector.run()");
 
             let (high, low) = tokio::join!(high.evolve(),low.evolve());
 
-            if let (Ok((high_tunnel, high_tunnel_ctrl)), Ok((low_tunnel, low_tunnel_ctrl))) = (high, low)
+            if let (Ok((high_sender, mut high_receiver)), Ok((low_sender, low_receiver))) = (high, low)
             {
-
 println!("Sending high tunnel");
-                self.high.tx.send(LaneCommand::Tunnel(TunnelSenderState::Tunnel(high_tunnel))).await;
+                self.high.tx.send(LaneCommand::Tunnel(TunnelSenderState::Sender(high_sender))).await;
+                self.high_receiver_tx.send( TunnelReceiverState::Receiver(high_receiver)).await;
 println!("Sending low tunnel");
-                self.low.tx.send(LaneCommand::Tunnel(TunnelSenderState::Tunnel(low_tunnel))).await;
+                self.low.tx.send(LaneCommand::Tunnel(TunnelSenderState::Sender(low_sender))).await;
+                self.low_receiver_tx.send( TunnelReceiverState::Receiver(low_receiver)).await;
 println!("all tunnels sent");
             }
             else {
@@ -294,7 +386,8 @@ println!("all tunnels sent");
                     Some(Close) => {
                         self.high.tx.send(LaneCommand::Tunnel(TunnelSenderState::None)).await;
                         self.low.tx.send(LaneCommand::Tunnel(TunnelSenderState::None)).await;
-                        return; }
+                        return;
+                    }
                 }
 
         }
@@ -312,7 +405,7 @@ mod test
     use crate::frame::ProtoFrame;
     use crate::proto::local_tunnels;
     use crate::star::StarKey;
-    use crate::lane::{OutgoingLaneRunner, Lane, LaneCommand};
+    use crate::lane::{LaneRunner, Lane, LaneCommand};
     use crate::lane::LocalTunnelConnector;
     use crate::lane::TunnelConnector;
     use crate::lane::ConnectorCommand;
@@ -346,33 +439,30 @@ mod test
             let mut high_lane = Lane::new(low.clone()).await;
             let mut low_lane = Lane::new(high.clone()).await;
 
-
             println!("pre...");
-            let (mut connector, connector_ctrl) = LocalTunnelConnector::new(&high_lane, &low_lane).unwrap();
-            tokio::spawn( async move { connector.run().await } );
+            let connector_ctrl = LocalTunnelConnector::new(&high_lane, &low_lane).await.unwrap();
 
-            println!("sending PING");
-            high_lane.outgoing.tx.send(LaneCommand::LaneFrame(LaneFrame::Ping) ).await;
+            tokio::spawn( async move {
+                println!("sending PING");
+                high_lane.outgoing.tx.send(LaneCommand::LaneFrame(LaneFrame::Ping) ).await;
 
-            /*
-            match low_lane.incoming.rx.recv().await
-            {
-                None => {assert!(false);}
-                Some(frame) => {
-                    if let LaneFrame::Ping = frame
-                    {
-println!("received ping.");
-                        assert!(true);
-                    }
-                    else {
-                        assert!(false);
-                    }
+                println!("WAITING FOR PiNG ...");
+                let result = low_lane.incoming.recv().await;
+                if let Some(LaneFrame::Ping) = result
+                {
+                    println!("RECEIVED PING!");
+                    assert!(true);
+                } else if let Some(frame) = result{
+                    println!("RECEIVED {}",frame);
+                    assert!(false);
                 }
-            }
-
-             */
-
-            tokio::time::sleep(Duration::from_secs(10)).await;
+                else
+                {
+                    println!("RECEIVED NONE");
+                    assert!(false);
+                }
+            });
+            tokio::time::sleep(Duration::from_secs(5)).await;
         });
     }
 }

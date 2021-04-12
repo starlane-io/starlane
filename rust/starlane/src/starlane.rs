@@ -10,7 +10,7 @@ use std::collections::{HashSet, HashMap};
 use std::sync::mpsc::{Sender, Receiver};
 use crate::frame::LaneFrame;
 use std::sync::Arc;
-use crate::lane::{OutgoingLaneRunner, LocalTunnelConnector, Lane};
+use crate::lane::{LaneRunner, LocalTunnelConnector, Lane};
 use std::cmp::Ordering;
 
 pub struct Starlane
