@@ -75,44 +75,81 @@ impl Starlane
 
     async fn provision( &mut self, template: ConstellationTemplate )->Result<(),Error>
     {
-        for star_template in template.stars
+        let mut map = HashMap::new();
+        for star_template in &template.stars
         {
             let key = self.create_star_key(&star_template.key);
+            map.insert( star_template.key.clone(), key.clone() );
             let (mut proto_star,proto_star_ctrl) = ProtoStar::new(key.clone(), star_template.kind.clone() );
             self.star_controllers.insert(key.clone(), proto_star_ctrl );
             tokio::spawn( async move { proto_star.evolve().await; } );
+
             println!("creating proto star: {:?} key: {}", &star_template.kind, key );
+        }
+
+        // now make the LANES
+        for star_template in &template.stars
+        {
+            for lane in &star_template.lanes
+            {
+                let local = map.get(&star_template.key );
+                let second = map.get(&lane.star );
+
+                if local.is_none()
+                {
+                    return Err(format!("could not find local star_key {:?}",&star_template.key).into());
+                }
+
+                if second.is_none()
+                {
+                    return Err(format!("could not find secondstar_key {:?}",&star_template.key).into());
+                }
+
+                let local = local.unwrap().clone();
+                let second = second.unwrap().clone();
+
+                self.add_local_lane(local, second );
+            }
         }
 
         Ok(())
     }
 
-    async fn add_lane(&mut self, local: StarKey, second: StarKey ) ->Result<(),Error>
+    async fn add_local_lane(&mut self, local: StarKey, second: StarKey ) ->Result<(),Error>
     {
-        let local_star_ctrl =
+        let (high,low) = StarKey::sort(local,second)?;
+        let high_star_ctrl =
         {
-            let local_star_ctrl = self.star_controllers.get_mut(&local);
-            match local_star_ctrl
+            let high_star_ctrl = self.star_controllers.get_mut(&high);
+            match high_star_ctrl
             {
                 None => {
-                    return Err(format!("lane cannot construct. missing local star key: {}",local).into())
+                    return Err(format!("lane cannot construct. missing local star key: {}", high).into())
                 }
-                Some(local_star_ctrl) => {local_star_ctrl.clone()}
+                Some(high_star_ctrl) => {high_star_ctrl.clone()}
             }
         };
 
-        let second_star_ctrl =
+        let low_star_ctrl =
+        {
+            let low_star_ctrl = self.star_controllers.get_mut(&low);
+            match low_star_ctrl
             {
-                let second_star_ctrl = self.star_controllers.get_mut(&second );
-                match second_star_ctrl
-                {
-                    None => {
-                        return Err(format!("lane cannot construct. missing second star key: {}",second).into())
-                    }
-                    Some(second_star_ctrl) => {second_star_ctrl.clone()}
+                None => {
+                    return Err(format!("lane cannot construct. missing second star key: {}", low).into())
                 }
-            };
-           Ok(())
+                Some(low_star_ctrl) => {low_star_ctrl.clone()}
+            }
+        };
+
+        let high_lane= Lane::new(low).await;
+        let low_lane = Lane::new(high).await;
+        let connector = LocalTunnelConnector::new(&high_lane,&low_lane).await?;
+        high_star_ctrl.command_tx.send(StarCommand::AddLane(high_lane)).await;
+        low_star_ctrl.command_tx.send(StarCommand::AddLane(low_lane)).await;
+        high_star_ctrl.command_tx.send( StarCommand::AddConnectorController(connector)).await;
+
+        Ok(())
     }
 
     fn create_star_key( &mut self, template: &StarKeyTemplate )->StarKey
@@ -125,7 +162,7 @@ impl Starlane
                 path.clone()
             }
         };
-        let index = match &template.index{
+        let index = match &template.index {
             StarKeyIndexTemplate::Central => {0 as _}
             StarKeyIndexTemplate::Exact(index) => {index.clone()}
         };

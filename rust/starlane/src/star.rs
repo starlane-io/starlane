@@ -1,5 +1,5 @@
 use std::sync::{Mutex, Weak, Arc};
-use crate::lane::{LaneRunner, TunnelConnector, OutgoingLane};
+use crate::lane::{LaneRunner, TunnelConnector, OutgoingLane, Lane, ConnectorController};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32};
 use futures::future::join_all;
@@ -150,8 +150,8 @@ impl LaneMeta
 
 pub enum StarCommand
 {
-    AddLane(OutgoingLane),
-    AddTunnelConnector(Box<dyn TunnelConnector>)
+    AddLane(Lane),
+    AddConnectorController(ConnectorController)
 }
 
 #[derive(Clone)]
