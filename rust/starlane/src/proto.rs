@@ -30,7 +30,8 @@ pub struct ProtoStar
   sequence: Option<IdSeq>,
   transactions: HashMap<i64,Box<dyn Transaction>>,
   transaction_seq: AtomicI64,
-  star_search_transactions: HashMap<i64,StarSearchTransaction>
+  star_search_transactions: HashMap<i64,StarSearchTransaction>,
+  frame_hold: HashMap<StarKey,Vec<Frame>>
 }
 
 impl ProtoStar
@@ -47,7 +48,8 @@ impl ProtoStar
             sequence: Option::None,
             transactions: HashMap::new(),
             transaction_seq: AtomicI64::new(0),
-            star_search_transactions: HashMap::new()
+            star_search_transactions: HashMap::new(),
+            frame_hold: HashMap::new(),
         }, StarController{
             command_tx: command_tx
         })
@@ -111,10 +113,19 @@ impl ProtoStar
             if lane.has_path_to_star(star)
             {
                 lane.lane.outgoing.tx.send( LaneCommand::LaneFrame(frame) ).await;
-                break;
+                return;
             }
-        }
 
+        }
+        if let None = self.frame_hold.get(star)
+        {
+            self.frame_hold.insert(star.clone(), vec![] );
+        }
+        if let Some(frames) = self.frame_hold.get_mut(star)
+        {
+            frames.push(frame);
+        }
+        self.search_for_star(star.clone());
     }
 
     async fn search_for_star(&mut self, star: StarKey )
@@ -232,6 +243,13 @@ impl ProtoStar
                 {
                     search_trans.hits.insert( hit.star.clone(), hit.clone() );
                     lane.star_paths.insert( hit.star.clone() );
+                    if let Some(frames) = self.frame_hold.remove( &hit.star )
+                    {
+                        for frame in frames
+                        {
+                            lane.lane.outgoing.tx.send( LaneCommand::LaneFrame(frame) ).await;
+                        }
+                    }
                 }
                 search_trans.reported_lane_count = search_trans.reported_lane_count+1;
 
@@ -249,7 +267,6 @@ impl ProtoStar
                                 lane.lane.outgoing.tx.send( LaneCommand::LaneFrame(Frame::StarSearchResult(search_result)));
                             }
                         }
-
                     }
                 }
             }

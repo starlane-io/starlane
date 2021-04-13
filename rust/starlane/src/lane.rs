@@ -372,6 +372,10 @@ impl LaneMeta
 
     pub fn has_path_to_star( &self, star: &StarKey )->bool
     {
+        if *star == self.lane.remote_star
+        {
+            return true;
+        }
         self.star_paths.contains(star)
     }
 
