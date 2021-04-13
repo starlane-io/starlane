@@ -1,10 +1,10 @@
 use std::sync::{Mutex, Weak, Arc};
-use crate::lane::{Lane, TunnelConnector, OutgoingLane, ConnectorController};
+use crate::lane::{Lane, TunnelConnector, OutgoingLane, ConnectorController, LaneMeta};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32};
 use futures::future::join_all;
 use futures::future::select_all;
-use crate::frame::{ProtoFrame, Frame};
+use crate::frame::{ProtoFrame, Frame, StarSearchHit};
 use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use futures::FutureExt;
@@ -29,6 +29,17 @@ pub struct StarKey
 {
     pub constellation: Vec<u8>,
     pub index: u16
+}
+
+impl StarKey
+{
+    pub fn central()->Self
+    {
+        StarKey{
+            constellation: vec![],
+            index: 0
+        }
+    }
 }
 
 impl cmp::Ord for StarKey
@@ -106,12 +117,12 @@ impl StarKey
 pub struct Star
 {
    pub kernel: Box<dyn StarKernel>,
-   pub lanes: HashMap<StarKey, Lane>
+   pub lanes: HashMap<StarKey, LaneMeta>
 }
 
 impl Star
 {
-   pub fn new(lanes: HashMap<StarKey, Lane>, kernel: Box<dyn StarKernel>) ->Self
+   pub fn new(lanes: HashMap<StarKey, LaneMeta>, kernel: Box<dyn StarKernel>) ->Self
    {
        Star{
            kernel: kernel,
@@ -122,31 +133,13 @@ impl Star
 
 
 
-
 pub trait StarKernel : Send
 {
 }
 
-pub struct LaneMeta
-{
-   pub id: i32,
-   pub lane: Lane
-}
 
-impl LaneMeta
-{
-    pub async fn send(&self, gram: ProtoFrame) ->Result<(),Error>
-    {
-        //Ok(self.lane.tunnel_tx.send(gram).await?)
-        unimplemented!()
-    }
 
-    pub async fn receive( &mut self)->Option<ProtoFrame>
-    {
-        //self.lane.tunnel_rx.recv().await
-        unimplemented!()
-    }
-}
+
 
 pub enum StarCommand
 {
@@ -173,3 +166,58 @@ pub struct StarController
 }
 
 
+pub struct StarSearchTransaction
+{
+    pub star: StarKey,
+    pub reported_lane_count: i32,
+    pub hits: Vec<StarSearchHit>
+}
+
+impl StarSearchTransaction
+{
+    pub fn new( star: StarKey )->Self
+    {
+        StarSearchTransaction{
+            star: star,
+            reported_lane_count: 0,
+            hits: vec!()
+        }
+    }
+}
+
+
+pub enum TransactionState
+{
+    Continue,
+    Done
+}
+
+pub trait Transaction : Send
+{
+    fn on_frame( &mut self, frame: Frame, lane: & mut LaneMeta )->TransactionState;
+}
+
+pub struct StarKeySearchTransaction
+{
+}
+
+impl Transaction for StarKeySearchTransaction
+{
+    fn on_frame(&mut self, frame: Frame, lane: &mut LaneMeta)->TransactionState {
+
+        if let Frame::StarSearchResult(result) = frame
+        {
+            for hit in result.hits
+            {
+                lane.star_paths.insert(hit.star.clone());
+            }
+
+            if let Option::Some(missed) = result.missed
+            {
+                lane.not_star_paths.insert(missed);
+            }
+        }
+
+        TransactionState::Done
+    }
+}

@@ -20,6 +20,7 @@ use crate::star::{Star, StarKey, StarCommand};
 use crate::starlane::{ConnectCommand, StarlaneCommand};
 use crate::starlane::StarlaneCommand::Connect;
 use std::fmt;
+use std::collections::HashSet;
 
 pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
 pub static LANE_QUEUE_SIZE: usize = 32;
@@ -348,6 +349,35 @@ impl TunnelConnector for LocalTunnelConnector
                 }
 
         }
+    }
+}
+
+pub struct LaneMeta
+{
+    pub star_paths: HashSet<StarKey>,
+    pub not_star_paths: HashSet<StarKey>,
+    pub lane: Lane
+}
+
+impl LaneMeta
+{
+    pub fn new( lane: Lane ) -> Self
+    {
+        LaneMeta{
+            star_paths: HashSet::new(),
+            not_star_paths: HashSet::new(),
+            lane: lane
+        }
+    }
+
+    pub fn has_path_to_star( &self, star: &StarKey )->bool
+    {
+        self.star_paths.contains(star)
+    }
+
+    pub fn add_path_to_star( &mut self, star: StarKey  )
+    {
+        self.star_paths.insert(star);
     }
 }
 

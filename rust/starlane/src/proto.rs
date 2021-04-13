@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::sync::atomic::AtomicI32;
+use std::sync::atomic::{AtomicI32, AtomicI64, Ordering};
 
 use futures::future::{err, join_all, ok, select_all};
 use futures::FutureExt;
@@ -9,21 +9,26 @@ use tokio::sync::{mpsc, Mutex, broadcast, oneshot};
 
 use crate::constellation::Constellation;
 use crate::error::Error;
-use crate::id::Id;
-use crate::lane::{STARLANE_PROTOCOL_VERSION, TunnelSenderState, Lane, TunnelConnector, TunnelSender, LaneCommand, TunnelReceiver, ConnectorController};
-use crate::frame::{ProtoFrame, Frame};
-use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController};
+use crate::id::{Id, IdSeq};
+use crate::lane::{STARLANE_PROTOCOL_VERSION, TunnelSenderState, Lane, TunnelConnector, TunnelSender, LaneCommand, TunnelReceiver, ConnectorController, LaneMeta};
+use crate::frame::{ProtoFrame, Frame, StarMessageInner, StarMessagePayload, StarSearchInner, SearchPattern, StarSearchResultInner, StarSearchHit};
+use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController, Transaction, StarSearchTransaction};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::task::Poll;
+use crate::frame::Frame::{StarMessage, StarSearch};
 
 pub struct ProtoStar
 {
   kind: StarKind,
   key: StarKey,
   command_rx: Receiver<StarCommand>,
-  lanes: HashMap<StarKey, Lane>,
-  connector_ctrls: Vec<ConnectorController>
+  lanes: HashMap<StarKey, LaneMeta>,
+  connector_ctrls: Vec<ConnectorController>,
+  sequence: Option<IdSeq>,
+  transactions: HashMap<i64,Box<dyn Transaction>>,
+  transaction_seq: AtomicI64,
+  star_search_transactions: HashMap<i64,StarSearchTransaction>
 }
 
 impl ProtoStar
@@ -36,21 +41,26 @@ impl ProtoStar
             key,
             command_rx: command_rx,
             lanes: HashMap::new(),
-            connector_ctrls: vec![]
-        },StarController{
+            connector_ctrls: vec![],
+            sequence: Option::None,
+            transactions: HashMap::new(),
+            transaction_seq: AtomicI64::new(0),
+            star_search_transactions: HashMap::new()
+        }, StarController{
             command_tx: command_tx
         })
     }
 
     pub async fn evolve(mut self)->Result<Star,Error>
     {
+        // request a sequence from central
         loop {
             let mut futures = vec!();
             futures.push(self.command_rx.recv().boxed() );
 
             for (key,mut lane) in &mut self.lanes
             {
-               futures.push( lane.incoming.recv().boxed() )
+               futures.push( lane.lane.incoming.recv().boxed() )
             }
 
             let (command,_,_) = select_all(futures).await;
@@ -59,7 +69,7 @@ impl ProtoStar
             {
                 match command{
                     StarCommand::AddLane(lane) => {
-                        self.lanes.insert(lane.remote_star.clone(), lane);
+                        self.lanes.insert(lane.remote_star.clone(), LaneMeta::new(lane));
                     }
                     StarCommand::AddConnectorController(connector_ctrl) => {
                         self.connector_ctrls.push(connector_ctrl);
@@ -79,11 +89,109 @@ impl ProtoStar
         Ok(Star::new( self.lanes, Box::new(PlaceholderKernel::new()) ))
     }
 
-    async fn command(&mut self)
+    async fn lane_added(&mut self)
     {
-        self.command_rx.recv().await;
+        if self.sequence.is_none()
+        {
+            let message = Frame::StarMessage(StarMessageInner{
+                from: self.key.clone(),
+                to: StarKey::central(),
+                payload: StarMessagePayload::RequestSequence
+            });
+            self.send(&StarKey::central(), message).await
+        }
     }
 
+    async fn send(&mut self, star: &StarKey, frame: Frame )
+    {
+        for (remote_star,lane) in &self.lanes
+        {
+            if lane.has_path_to_star(star)
+            {
+                lane.lane.outgoing.tx.send( LaneCommand::LaneFrame(frame) ).await;
+                break;
+            }
+        }
+
+    }
+
+    async fn search(&mut self, star: StarKey )
+    {
+        let search_id = self.transaction_seq.fetch_add(1, Ordering::Relaxed );
+        let search_transaction = StarSearchTransaction::new(star.clone());
+        self.star_search_transactions.insert(search_id, search_transaction );
+
+        let search = Frame::StarSearch(StarSearchInner{
+            from: self.key.clone(),
+            pattern: SearchPattern::StarKey(star),
+            hops: vec![self.key.clone()],
+            transactions: vec![search_id],
+            max_hops: 255,
+            multi: false
+        });
+
+        for (star,lane) in &self.lanes
+        {
+           lane.lane.outgoing.tx.send( LaneCommand::LaneFrame(search.clone())).await;
+        }
+    }
+
+    async fn process_frame( &mut self, frame: Frame, lane: &LaneMeta )
+    {
+        match frame
+        {
+            StarSearch(search) => {
+                self.on_star_search(search, lane);
+            }
+            Frame::StarSearchResult(result) => {
+                self.on_star_search_result(result);
+            }
+            StarMessage(_) => {
+
+                eprintln!("star does not handle messages yet");
+            }
+            _ => {
+                eprintln!("star does not handle frame: {}", frame)
+            }
+        }
+    }
+
+    async fn on_star_search( &mut self, search: StarSearchInner, lane: &LaneMeta )
+    {
+        let hit = match &search.pattern
+        {
+            SearchPattern::StarKey(star) => {
+                self.key == *star
+            }
+            SearchPattern::StarKind(kind) => {
+                self.kind == *kind
+            }
+        };
+
+        if hit
+        {
+            let hops = search.hops.len()+1;
+            let frame = Frame::StarSearchResult(StarSearchResultInner{
+                missed: None,
+                hits: vec![StarSearchHit{ star: self.key.clone(), hops: hops as _ }],
+                search: search.clone(),
+                transactions: search.transactions
+            });
+
+            lane.lane.outgoing.tx.send(LaneCommand::LaneFrame(frame)).await;
+
+            if !search.multi
+            {
+                return;
+            }
+        }
+
+    }
+
+    async fn on_star_search_result( &mut self, search: StarSearchResultInner)
+    {
+
+    }
 
 }
 
