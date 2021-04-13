@@ -1,10 +1,12 @@
-use crate::star::{StarKey, StarKind};
+use crate::star::{StarKey, StarKind, GatewayKind, StarData, ServiceData};
 use std::collections::{HashSet, HashMap};
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoStarKernel};
 use crate::id::Id;
 use crate::proto::ProtoStarKernel::Mesh;
 use crate::layout::ConstellationLayout;
 use serde::{Serialize,Deserialize};
+use crate::error::Error;
+use crate::lane::{ConnectionInfo, ConnectionKind};
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct ConstellationTemplate
@@ -47,6 +49,25 @@ impl ConstellationTemplate
         template
     }
 
+    pub fn new_client() -> Self
+    {
+        let mut template = ConstellationTemplate {
+          stars: vec![]
+        };
+
+        let subgraph_data_key = "client".to_string();
+
+        let mut link = StarTemplate::new(StarKeyTemplate::subraph_data_key(subgraph_data_key.clone(), 0 ), StarKind::Client, Option::Some("link".to_string()) );
+        let mut client = StarTemplate::new(StarKeyTemplate::subraph_data_key(subgraph_data_key, 1 ), StarKind::Client, Option::Some("client".to_string()) );
+
+        ConstellationTemplate::connect(&mut client, &mut link );
+
+        template.add_star( link );
+        template.add_star( client );
+
+        template
+    }
+
     pub fn connect(a: &mut StarTemplate, b: &mut StarTemplate)
     {
         a.add_lane(LaneEndpointTemplate::new(b.key.clone()));
@@ -57,12 +78,81 @@ impl ConstellationTemplate
     {
         self.stars.push(star );
     }
+
+    pub fn get_star( &self, handle: String ) -> Option<&StarTemplate>
+    {
+        for star in &self.stars
+        {
+           if let Option::Some(handle) = &star.handle
+           {
+               return Option::Some(star);
+           }
+        }
+        Option::None
+    }
+}
+
+pub trait StarDataFactory: Send
+{
+    fn star_data(&self, kind: StarKind, handle: Option<String> ) -> Result<StarData,Error>;
+}
+
+pub struct DefaultStarDataFactory
+{
+   pub link_gateway: Option<StarKey>
+}
+
+impl StarDataFactory for DefaultStarDataFactory
+{
+    fn star_data(&self, kind: StarKind, handle: Option<String>) -> Result<StarData,Error> {
+        Ok(match kind
+        {
+            StarKind::Central => StarData::Central,
+            StarKind::Mesh => StarData::Mesh,
+            StarKind::Supervisor => StarData::Supervisor,
+            StarKind::Server => StarData::Server,
+            StarKind::Gateway => StarData::Gateway( ServiceData{port:8080} ),
+            StarKind::Link => {
+                if self.link_gateway.is_none()
+                {
+                    return Err("Link cannot have a default, gateway StarKey must be defined".into());
+                }
+                else {
+                    StarData::Link(ConnectionInfo {
+                        gateway: self.link_gateway.as_ref().unwrap().clone(),
+                        kind: ConnectionKind::Starlane,
+                    })
+                }
+            },
+            StarKind::Client => StarData::Client,
+            StarKind::Ext(_) => StarData::Ext
+        })
+    }
+}
+
+pub struct ConstellationData
+{
+    pub exclude_handles: HashSet<String>,
+    pub subgraphs: HashMap<String,Vec<u16>>,
+    pub star_data_factory : Box<dyn StarDataFactory>
+}
+
+impl ConstellationData
+{
+    pub fn new()->Self
+    {
+        ConstellationData{
+            exclude_handles: HashSet::new(),
+            subgraphs: HashMap::new(),
+            star_data_factory: Box::new(DefaultStarDataFactory{ link_gateway: Option::None } )
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Serialize, Deserialize)]
 pub struct StarKeyTemplate
 {
-    pub constellation: StarKeyConstellationTemplate,
+    pub subgraph: StarKeySubgraphTemplate,
     pub index: StarKeyIndexTemplate
 }
 
@@ -71,7 +161,7 @@ impl StarKeyTemplate
     pub fn central_geodesic(index:u16) ->Self
     {
         StarKeyTemplate{
-            constellation: StarKeyConstellationTemplate::Central,
+            subgraph: StarKeySubgraphTemplate::Central,
             index: StarKeyIndexTemplate::Exact(index)
         }
     }
@@ -79,17 +169,53 @@ impl StarKeyTemplate
     pub fn central()->Self
     {
         StarKeyTemplate{
-            constellation: StarKeyConstellationTemplate::Central,
+            subgraph: StarKeySubgraphTemplate::Central,
             index: StarKeyIndexTemplate::Central
         }
+    }
+
+    pub fn subraph_data_key(subgraph_key: String, index: u16) ->Self
+    {
+        StarKeyTemplate{
+            subgraph: StarKeySubgraphTemplate::SubgraphDataKey(subgraph_key),
+            index: StarKeyIndexTemplate::Exact(index)
+        }
+    }
+
+    pub fn create( &self, data: &ConstellationData ) -> Result<StarKey,Error>
+    {
+        let subgraph = match &self.subgraph
+        {
+            StarKeySubgraphTemplate::Central => {
+                vec![]
+            }
+            StarKeySubgraphTemplate::SubgraphDataKey(subgraph_data_key) => {
+                if let Option::Some(subgraph) = data.subgraphs.get(subgraph_data_key)
+                {
+                    subgraph.clone()
+                }
+                else {
+                    return Err(format!("could not find subgraph_data_key: {}", subgraph_data_key).into())
+                }
+            }
+            StarKeySubgraphTemplate::Path(path) => {path.to_owned()}
+        };
+        let index = match self.index
+        {
+            StarKeyIndexTemplate::Central => {0}
+            StarKeyIndexTemplate::Exact(index) => {index}
+        };
+
+        Ok(StarKey::new_with_subgraph(subgraph, index))
     }
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Serialize, Deserialize)]
-pub enum StarKeyConstellationTemplate
+pub enum StarKeySubgraphTemplate
 {
     Central,
-    Path(Vec<u8>),
+    SubgraphDataKey(String),
+    Path(Vec<u16>),
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Serialize, Deserialize)]

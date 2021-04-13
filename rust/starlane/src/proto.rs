@@ -12,50 +12,44 @@ use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use crate::lane::{STARLANE_PROTOCOL_VERSION, TunnelSenderState, Lane, TunnelConnector, TunnelSender, LaneCommand, TunnelReceiver, ConnectorController, LaneMeta};
 use crate::frame::{ProtoFrame, Frame, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarSearchHit};
-use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController, Transaction, StarSearchTransaction};
+use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController, Transaction, StarSearchTransaction, StarData};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::task::Poll;
 use crate::frame::Frame::{StarMessage, StarSearch};
+use crate::template::ConstellationTemplate;
+use crate::starlane::StarlaneCommand;
 
 pub static MAX_HOPS: i32 = 32;
 
 pub struct ProtoStar
 {
   kind: StarKind,
-  key: StarKey,
+  command_tx: Sender<StarCommand>,
   command_rx: Receiver<StarCommand>,
+  evolution_tx: oneshot::Sender<ProtoStarEvolution>,
   lanes: HashMap<StarKey, LaneMeta>,
-  connector_ctrls: Vec<ConnectorController>,
-  sequence: Option<IdSeq>,
-  transactions: HashMap<i64,Box<dyn Transaction>>,
-  transaction_seq: AtomicI64,
-  star_search_transactions: HashMap<i64,StarSearchTransaction>,
-  frame_hold: HashMap<StarKey,Vec<Frame>>
+  connector_ctrls: Vec<ConnectorController>
 }
 
 impl ProtoStar
 {
-    pub fn new(key: StarKey, kind: StarKind) ->(Self, StarController)
+    pub fn new(kind: StarKind, evolution_tx: oneshot::Sender<ProtoStarEvolution>) ->(Self, StarController)
     {
         let (command_tx, command_rx) = mpsc::channel(32);
         (ProtoStar{
             kind,
-            key,
+            evolution_tx,
+            command_tx: command_tx.clone(),
             command_rx: command_rx,
             lanes: HashMap::new(),
             connector_ctrls: vec![],
-            sequence: Option::None,
-            transactions: HashMap::new(),
-            transaction_seq: AtomicI64::new(0),
-            star_search_transactions: HashMap::new(),
-            frame_hold: HashMap::new(),
         }, StarController{
             command_tx: command_tx
         })
     }
 
-    pub async fn evolve(mut self)->Result<Star,Error>
+    pub async fn evolve(mut self) -> Result<Star,Error>
     {
         // request a sequence from central
         loop {
@@ -73,38 +67,46 @@ impl ProtoStar
             {
                 match command{
                     StarCommand::AddLane(lane) => {
-                        self.lanes.insert(lane.remote_star.clone(), LaneMeta::new(lane));
+                        if let Some(remote_star) = &lane.remote_star
+                        {
+                            self.lanes.insert(remote_star.clone(), LaneMeta::new(lane));
+                        }
+                        else {
+                            eprintln!("cannot add a lane to a star that doesn't have a remote_star");
+                        }
                     }
                     StarCommand::AddConnectorController(connector_ctrl) => {
                         self.connector_ctrls.push(connector_ctrl);
                     }
                     StarCommand::Frame(frame) => {
-                        println!("received frame: {}", frame);
+                        match frame {
+                            Frame::GrantSubgraphExpansion(subgraph) => {
+                                let key = StarKey::new_with_subgraph(subgraph,0);
+                                self.evolution_tx.send( ProtoStarEvolution{ star: key.clone(), controller: StarController {
+                                    command_tx: self.command_tx.clone()
+                                } });
+
+                                return Ok(Star::from_proto( key.clone(),
+                                                         self.kind.clone(),
+                                                              self.command_rx,
+                                                              self.lanes,
+                                                              self.connector_ctrls,
+                                                              ));
+                            },
+                            _ => {
+                                println!("frame unsupported by ProtoStar: {}",frame );
+                            }
+                        }
                     }
                 }
             }
             else
             {
-                return Err("command_rx has been disconnected".into());
+    //            return Err("command_rx has been disconnected".into());
             }
-
-        }
-
-        Ok(Star::new( self.lanes, Box::new(PlaceholderKernel::new()) ))
-    }
-
-    async fn lane_added(&mut self)
-    {
-        if self.sequence.is_none()
-        {
-            let message = Frame::StarMessage(StarMessageInner{
-                from: self.key.clone(),
-                to: StarKey::central(),
-                payload: StarMessagePayload::RequestSequence
-            });
-            self.send(&StarKey::central(), message).await
         }
     }
+
 
     async fn send(&mut self, star: &StarKey, frame: Frame )
     {
@@ -115,164 +117,27 @@ impl ProtoStar
                 lane.lane.outgoing.tx.send( LaneCommand::LaneFrame(frame) ).await;
                 return;
             }
-
         }
-        if let None = self.frame_hold.get(star)
-        {
-            self.frame_hold.insert(star.clone(), vec![] );
-        }
-        if let Some(frames) = self.frame_hold.get_mut(star)
-        {
-            frames.push(frame);
-        }
-        self.search_for_star(star.clone());
+        eprintln!("could not find star for frame: {}", frame );
     }
 
-    async fn search_for_star(&mut self, star: StarKey )
-    {
-        let search_id = self.transaction_seq.fetch_add(1, Ordering::Relaxed );
-        let search_transaction = StarSearchTransaction::new(StarSearchPattern::StarKey(self.key.clone()));
-        self.star_search_transactions.insert(search_id, search_transaction );
-
-        let search = Frame::StarSearch(StarSearchInner{
-            from: self.key.clone(),
-            pattern: StarSearchPattern::StarKey(star),
-            hops: vec![self.key.clone()],
-            transactions: vec![search_id],
-            max_hops: MAX_HOPS,
-            multi: false
-        });
-
-        for (star,lane) in &self.lanes
-        {
-           lane.lane.outgoing.tx.send( LaneCommand::LaneFrame(search.clone())).await;
-        }
-    }
 
     async fn process_frame( &mut self, frame: Frame, lane: &mut LaneMeta )
     {
         match frame
         {
-            StarSearch(search) => {
-                self.on_star_search(search, lane).await;
-            }
-            Frame::StarSearchResult(result) => {
-                self.on_star_search_result(result, lane ).await;
-            }
-            StarMessage(_) => {
-
-                eprintln!("star does not handle messages yet");
-            }
             _ => {
                 eprintln!("star does not handle frame: {}", frame)
             }
         }
     }
 
-    async fn on_star_search( &mut self, mut search: StarSearchInner, lane: &LaneMeta )
-    {
-        let hit = match &search.pattern
-        {
-            StarSearchPattern::StarKey(star) => {
-                self.key == *star
-            }
-            StarSearchPattern::StarKind(kind) => {
-                self.kind == *kind
-            }
-        };
+}
 
-        if hit
-        {
-            if search.pattern.is_single_match()
-            {
-                let hops = search.hops.len() + 1;
-                let frame = Frame::StarSearchResult( StarSearchResultInner {
-                    missed: None,
-                    hops: search.hops.clone(),
-                    hits: vec![ StarSearchHit { star: self.key.clone(), hops: hops as _ } ],
-                    search: search.clone(),
-                    transactions: search.transactions.clone()
-                });
-
-                lane.lane.outgoing.tx.send(LaneCommand::LaneFrame(frame)).await;
-            }
-            else {
-                // create a SearchTransaction here.
-                // gather ALL results into this transaction
-            }
-
-            if !search.multi
-            {
-                return;
-            }
-        }
-
-        let search_id = self.transaction_seq.fetch_add(1,Ordering::Relaxed);
-        let search_transaction = StarSearchTransaction::new(search.pattern.clone() );
-        self.star_search_transactions.insert(search_id,search_transaction);
-
-        search.inc( self.key.clone(), search_id );
-
-        if search.max_hops > MAX_HOPS
-        {
-            eprintln!("rejecting a search with more than 255 hops");
-        }
-
-        if (search.hops.len() as i32) > search.max_hops || self.lanes.len() <= 1
-        {
-            eprintln!("search has reached maximum hops... need to send not found");
-        }
-
-        for (star,lane) in &self.lanes
-        {
-            if !search.hops.contains(star)
-            {
-                lane.lane.outgoing.tx.send(LaneCommand::LaneFrame(Frame::StarSearch(search.clone()))).await;
-            }
-        }
-    }
-
-    async fn on_star_search_result( &mut self, mut search_result: StarSearchResultInner, lane: &mut LaneMeta )
-    {
-
-        if let Some(search_id) = search_result.transactions.last()
-        {
-            if let Some(search_trans) = self.star_search_transactions.get_mut(search_id)
-            {
-                for hit in &search_result.hits
-                {
-                    search_trans.hits.insert( hit.star.clone(), hit.clone() );
-                    lane.star_paths.insert( hit.star.clone() );
-                    if let Some(frames) = self.frame_hold.remove( &hit.star )
-                    {
-                        for frame in frames
-                        {
-                            lane.lane.outgoing.tx.send( LaneCommand::LaneFrame(frame) ).await;
-                        }
-                    }
-                }
-                search_trans.reported_lane_count = search_trans.reported_lane_count+1;
-
-                if search_trans.reported_lane_count >= (self.lanes.len() as i32)-1
-                {
-                    // this means all lanes have been searched and the search result can be reported to the next node
-                    if let Some(search_trans) = self.star_search_transactions.remove(search_id)
-                    {
-                        search_result.pop();
-                        if let Some(next)=search_result.hops.last()
-                        {
-                            if let Some(lane)=self.lanes.get_mut(next)
-                            {
-                                search_result.hits = search_trans.hits.values().map(|a|a.clone()).collect();
-                                lane.lane.outgoing.tx.send( LaneCommand::LaneFrame(Frame::StarSearchResult(search_result)));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
+pub struct ProtoStarEvolution
+{
+    pub star: StarKey,
+    pub controller: StarController
 }
 
 pub struct ProtoStarController
@@ -383,19 +248,19 @@ impl ProtoTunnel
 
 }
 
-pub fn local_tunnels(high: StarKey, low:StarKey) ->(ProtoTunnel, ProtoTunnel)
+pub fn local_tunnels(high: Option<StarKey>, low:Option<StarKey>) ->(ProtoTunnel, ProtoTunnel)
 {
     let (atx,arx) = mpsc::channel::<Frame>(32);
     let (btx,brx) = mpsc::channel::<Frame>(32);
 
     (ProtoTunnel {
-        star: Option::Some(high),
+        star: high,
         tx: atx,
         rx: brx
     },
      ProtoTunnel
     {
-        star: Option::Some(low),
+        star: low,
         tx: btx,
         rx: arx
     })

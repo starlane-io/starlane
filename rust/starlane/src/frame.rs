@@ -24,6 +24,8 @@ pub enum Frame
     Close,
     Ping,
     Pong,
+    RequestSubgraphExpansion,
+    GrantSubgraphExpansion(Vec<u16>),
     StarSearch(StarSearchInner),
     StarSearchResult(StarSearchResultInner),
     StarMessage(StarMessageInner)
@@ -101,25 +103,37 @@ pub struct StarMessageInner
 {
    pub from: StarKey,
    pub to: StarKey,
+   pub transaction: Option<Id>,
    pub payload: StarMessagePayload
 }
 
 impl StarMessageInner
 {
-    pub fn new(from: StarKey, to: StarKey, payload: StarMessagePayload ) -> Self
+    pub fn new(from: StarKey, to: StarKey, payload: StarMessagePayload) -> Self
     {
-        StarMessageInner{
+        StarMessageInner {
             from: from,
             to: to,
+            transaction: Option::None,
             payload: payload
         }
     }
+
+    pub fn reply(&mut self, payload: StarMessagePayload)
+    {
+        let tmp = self.from.clone();
+        self.from = self.to.clone();
+        self.to = tmp;
+        self.payload = payload;
+    }
+
 }
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum StarMessagePayload
 {
-   RequestSequence
+   RequestSequence,
+   AssignSequence(i64)
 }
 
 
@@ -135,6 +149,8 @@ impl fmt::Display for Frame {
             Frame::StarMessage(_)=>format!("StarMessage").to_string(),
             Frame::StarSearch(_)=>format!("StarSearch").to_string(),
             Frame::StarSearchResult(_)=>format!("StarSearchResult").to_string(),
+            Frame::RequestSubgraphExpansion=>format!("RequestSubgraphExpansion").to_string(),
+            Frame::GrantSubgraphExpansion(_)=>format!("GrantSubgraphExpansion").to_string(),
         };
         write!(f, "{}",r)
     }

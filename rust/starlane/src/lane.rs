@@ -11,6 +11,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot;
 use tokio::time::Duration;
+use serde::{Serialize,Deserialize};
 
 use crate::error::Error;
 use crate::id::Id;
@@ -21,6 +22,7 @@ use crate::starlane::{ConnectCommand, StarlaneCommand};
 use crate::starlane::StarlaneCommand::Connect;
 use std::fmt;
 use std::collections::HashSet;
+use url::Url;
 
 pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
 pub static LANE_QUEUE_SIZE: usize = 32;
@@ -149,7 +151,7 @@ impl <T> Chamber<T>
 
 pub struct Lane
 {
-    pub remote_star: StarKey,
+    pub remote_star: Option<StarKey>,
     pub incoming: IncomingLane,
     pub outgoing: OutgoingLane,
     tunnel_receiver_tx: Sender<TunnelReceiverState>
@@ -157,7 +159,7 @@ pub struct Lane
 
 impl Lane
 {
-    pub async fn new(remote_star: StarKey) -> Self
+    pub async fn new(remote_star: Option<StarKey>) -> Self
     {
         let (mid_tx, mid_rx) = mpsc::channel(LANE_QUEUE_SIZE);
         let (in_tx, in_rx) = mpsc::channel(LANE_QUEUE_SIZE);
@@ -267,8 +269,8 @@ pub enum ConnectorCommand
 
 pub struct LocalTunnelConnector
 {
-    pub high_star: StarKey,
-    pub low_star: StarKey,
+    pub high_star: Option<StarKey>,
+    pub low_star: Option<StarKey>,
     pub high: OutgoingLane,
     pub low: OutgoingLane,
     pub high_receiver_tx: Sender<TunnelReceiverState>,
@@ -372,7 +374,7 @@ impl LaneMeta
 
     pub fn has_path_to_star( &self, star: &StarKey )->bool
     {
-        if *star == self.lane.remote_star
+        if self.lane.remote_star.is_some() && star == self.lane.remote_star.as_ref().unwrap()
         {
             return true;
         }
@@ -383,6 +385,27 @@ impl LaneMeta
     {
         self.star_paths.insert(star);
     }
+}
+
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
+pub struct ConnectionInfo
+{
+    pub gateway: StarKey,
+    pub kind: ConnectionKind,
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
+pub enum ConnectionKind
+{
+    Starlane,
+    Url(String)
+}
+
+
+pub trait TunnelConnectorFactory: Send
+{
+    fn connector(&self, data: &ConnectionInfo) -> Result<Box<dyn TunnelConnector>,Error>;
 }
 
 #[cfg(test)]
@@ -408,7 +431,8 @@ mod test
    {
        let rt = Runtime::new().unwrap();
        rt.block_on(async {
-           let (mut p1, mut p2) = local_tunnels(StarKey::new(2), StarKey::new(1));
+
+           let (mut p1, mut p2) = local_tunnels(Option::Some(StarKey::new(2)), Option::Some(StarKey::new(1)));
 
            let future1 = p1.evolve();
            let future2 = p2.evolve();
@@ -428,8 +452,8 @@ mod test
             let high = StarKey::new(2);
             let low = StarKey::new(1);
 
-            let mut high_lane = Lane::new(low.clone()).await;
-            let mut low_lane = Lane::new(high.clone()).await;
+            let mut high_lane = Lane::new(Option::Some(low.clone())).await;
+            let mut low_lane = Lane::new(Option::Some(high.clone())).await;
 
             let connector_ctrl = LocalTunnelConnector::new(&high_lane, &low_lane).await.unwrap();
 
