@@ -11,12 +11,14 @@ use crate::constellation::Constellation;
 use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use crate::lane::{STARLANE_PROTOCOL_VERSION, TunnelSenderState, Lane, TunnelConnector, TunnelSender, LaneCommand, TunnelReceiver, ConnectorController, LaneMeta};
-use crate::frame::{ProtoFrame, Frame, StarMessageInner, StarMessagePayload, StarSearchInner, SearchPattern, StarSearchResultInner, StarSearchHit};
+use crate::frame::{ProtoFrame, Frame, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarSearchHit};
 use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController, Transaction, StarSearchTransaction};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::task::Poll;
 use crate::frame::Frame::{StarMessage, StarSearch};
+
+pub static MAX_HOPS: i32 = 32;
 
 pub struct ProtoStar
 {
@@ -115,18 +117,18 @@ impl ProtoStar
 
     }
 
-    async fn search(&mut self, star: StarKey )
+    async fn search_for_star(&mut self, star: StarKey )
     {
         let search_id = self.transaction_seq.fetch_add(1, Ordering::Relaxed );
-        let search_transaction = StarSearchTransaction::new(star.clone());
+        let search_transaction = StarSearchTransaction::new(StarSearchPattern::StarKey(self.key.clone()));
         self.star_search_transactions.insert(search_id, search_transaction );
 
         let search = Frame::StarSearch(StarSearchInner{
             from: self.key.clone(),
-            pattern: SearchPattern::StarKey(star),
+            pattern: StarSearchPattern::StarKey(star),
             hops: vec![self.key.clone()],
             transactions: vec![search_id],
-            max_hops: 255,
+            max_hops: MAX_HOPS,
             multi: false
         });
 
@@ -136,15 +138,15 @@ impl ProtoStar
         }
     }
 
-    async fn process_frame( &mut self, frame: Frame, lane: &LaneMeta )
+    async fn process_frame( &mut self, frame: Frame, lane: &mut LaneMeta )
     {
         match frame
         {
             StarSearch(search) => {
-                self.on_star_search(search, lane);
+                self.on_star_search(search, lane).await;
             }
             Frame::StarSearchResult(result) => {
-                self.on_star_search_result(result);
+                self.on_star_search_result(result, lane ).await;
             }
             StarMessage(_) => {
 
@@ -156,29 +158,37 @@ impl ProtoStar
         }
     }
 
-    async fn on_star_search( &mut self, search: StarSearchInner, lane: &LaneMeta )
+    async fn on_star_search( &mut self, mut search: StarSearchInner, lane: &LaneMeta )
     {
         let hit = match &search.pattern
         {
-            SearchPattern::StarKey(star) => {
+            StarSearchPattern::StarKey(star) => {
                 self.key == *star
             }
-            SearchPattern::StarKind(kind) => {
+            StarSearchPattern::StarKind(kind) => {
                 self.kind == *kind
             }
         };
 
         if hit
         {
-            let hops = search.hops.len()+1;
-            let frame = Frame::StarSearchResult(StarSearchResultInner{
-                missed: None,
-                hits: vec![StarSearchHit{ star: self.key.clone(), hops: hops as _ }],
-                search: search.clone(),
-                transactions: search.transactions
-            });
+            if search.pattern.is_single_match()
+            {
+                let hops = search.hops.len() + 1;
+                let frame = Frame::StarSearchResult( StarSearchResultInner {
+                    missed: None,
+                    hops: search.hops.clone(),
+                    hits: vec![ StarSearchHit { star: self.key.clone(), hops: hops as _ } ],
+                    search: search.clone(),
+                    transactions: search.transactions.clone()
+                });
 
-            lane.lane.outgoing.tx.send(LaneCommand::LaneFrame(frame)).await;
+                lane.lane.outgoing.tx.send(LaneCommand::LaneFrame(frame)).await;
+            }
+            else {
+                // create a SearchTransaction here.
+                // gather ALL results into this transaction
+            }
 
             if !search.multi
             {
@@ -186,11 +196,64 @@ impl ProtoStar
             }
         }
 
+        let search_id = self.transaction_seq.fetch_add(1,Ordering::Relaxed);
+        let search_transaction = StarSearchTransaction::new(search.pattern.clone() );
+        self.star_search_transactions.insert(search_id,search_transaction);
+
+        search.inc( self.key.clone(), search_id );
+
+        if search.max_hops > MAX_HOPS
+        {
+            eprintln!("rejecting a search with more than 255 hops");
+        }
+
+        if (search.hops.len() as i32) > search.max_hops || self.lanes.len() <= 1
+        {
+            eprintln!("search has reached maximum hops... need to send not found");
+        }
+
+        for (star,lane) in &self.lanes
+        {
+            if !search.hops.contains(star)
+            {
+                lane.lane.outgoing.tx.send(LaneCommand::LaneFrame(Frame::StarSearch(search.clone()))).await;
+            }
+        }
     }
 
-    async fn on_star_search_result( &mut self, search: StarSearchResultInner)
+    async fn on_star_search_result( &mut self, mut search_result: StarSearchResultInner, lane: &mut LaneMeta )
     {
 
+        if let Some(search_id) = search_result.transactions.last()
+        {
+            if let Some(search_trans) = self.star_search_transactions.get_mut(search_id)
+            {
+                for hit in &search_result.hits
+                {
+                    search_trans.hits.insert( hit.star.clone(), hit.clone() );
+                    lane.star_paths.insert( hit.star.clone() );
+                }
+                search_trans.reported_lane_count = search_trans.reported_lane_count+1;
+
+                if search_trans.reported_lane_count >= (self.lanes.len() as i32)-1
+                {
+                    // this means all lanes have been searched and the search result can be reported to the next node
+                    if let Some(search_trans) = self.star_search_transactions.remove(search_id)
+                    {
+                        search_result.pop();
+                        if let Some(next)=search_result.hops.last()
+                        {
+                            if let Some(lane)=self.lanes.get_mut(next)
+                            {
+                                search_result.hits = search_trans.hits.values().map(|a|a.clone()).collect();
+                                lane.lane.outgoing.tx.send( LaneCommand::LaneFrame(Frame::StarSearchResult(search_result)));
+                            }
+                        }
+
+                    }
+                }
+            }
+        }
     }
 
 }

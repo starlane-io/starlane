@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32};
 use futures::future::join_all;
 use futures::future::select_all;
-use crate::frame::{ProtoFrame, Frame, StarSearchHit};
+use crate::frame::{ProtoFrame, Frame, StarSearchHit, StarSearchPattern};
 use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use futures::FutureExt;
@@ -168,19 +168,19 @@ pub struct StarController
 
 pub struct StarSearchTransaction
 {
-    pub star: StarKey,
+    pub pattern: StarSearchPattern,
     pub reported_lane_count: i32,
-    pub hits: Vec<StarSearchHit>
+    pub hits: HashMap<StarKey,StarSearchHit>
 }
 
 impl StarSearchTransaction
 {
-    pub fn new( star: StarKey )->Self
+    pub fn new(pattern: StarSearchPattern) ->Self
     {
         StarSearchTransaction{
-            star: star,
+            pattern: pattern,
             reported_lane_count: 0,
-            hits: vec!()
+            hits: HashMap::new()
         }
     }
 }

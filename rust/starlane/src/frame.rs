@@ -33,18 +33,40 @@ pub enum Frame
 pub struct StarSearchInner
 {
     pub from: StarKey,
-    pub pattern: SearchPattern,
+    pub pattern: StarSearchPattern,
     pub hops: Vec<StarKey>,
     pub transactions: Vec<i64>,
     pub max_hops: i32,
     pub multi: bool
 }
 
+impl StarSearchInner
+{
+    pub fn inc( &mut self, hop: StarKey, transaction: i64 )
+    {
+        self.hops.push( hop );
+        self.transactions.push(transaction);
+    }
+
+}
+
 #[derive(Clone,Serialize,Deserialize)]
-pub enum SearchPattern
+pub enum StarSearchPattern
 {
     StarKey(StarKey),
     StarKind(StarKind)
+}
+
+impl StarSearchPattern
+{
+    pub fn is_single_match(&self) -> bool
+    {
+        match self
+        {
+            StarSearchPattern::StarKey(_) => {true}
+            StarSearchPattern::StarKind(_) => {false}
+        }
+    }
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -53,10 +75,20 @@ pub struct StarSearchResultInner
     pub missed: Option<StarKey>,
     pub hits: Vec<StarSearchHit>,
     pub search: StarSearchInner,
-    pub transactions: Vec<i64>
+    pub transactions: Vec<i64>,
+    pub hops : Vec<StarKey>
 }
 
-#[derive(Clone,Serialize,Deserialize)]
+impl StarSearchResultInner
+{
+    pub fn pop(&mut self)
+    {
+        self.transactions.pop();
+        self.hops.pop();
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct StarSearchHit
 {
     pub star: StarKey,
