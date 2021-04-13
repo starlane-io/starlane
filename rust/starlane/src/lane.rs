@@ -14,9 +14,9 @@ use tokio::time::Duration;
 
 use crate::error::Error;
 use crate::id::Id;
-use crate::frame::{Command, LaneFrame, ProtoFrame};
+use crate::frame::{Command, Frame, ProtoFrame};
 use crate::proto::{local_tunnels, ProtoStar, ProtoTunnel};
-use crate::star::{Star, StarKey};
+use crate::star::{Star, StarKey, StarCommand};
 use crate::starlane::{ConnectCommand, StarlaneCommand};
 use crate::starlane::StarlaneCommand::Connect;
 use std::fmt;
@@ -32,7 +32,7 @@ pub struct OutgoingLane
 
 pub struct IncomingLane
 {
-    rx: Receiver<LaneFrame>,
+    rx: Receiver<Frame>,
     tunnel_receiver_rx: Receiver<TunnelReceiverState>,
     tunnel: TunnelReceiverState
 }
@@ -41,11 +41,9 @@ pub struct IncomingLane
 
 impl IncomingLane
 {
-    pub async fn recv(&mut self) -> Option<LaneFrame>
+    pub async fn recv(&mut self) -> Option<StarCommand>
     {
-println!("IncomingLane: waiting to receive...");
         loop {
-            println!("IncomingLane: staring select loop");
             match &mut self.tunnel
             {
                 TunnelReceiverState::None => {
@@ -56,24 +54,19 @@ println!("IncomingLane: waiting to receive...");
                             return Option::None;
                         }
                         Some(tunnel) => {
-println!("IncomingLane: received tunnel: {}",tunnel);
-if let TunnelReceiverState::Receiver(tunnel)=&tunnel
-{
-    println!("IncomingLane: tunnel.remote_star {}", tunnel.remote_star );
-}
+
                             self.tunnel = tunnel;
                         }
                     }
                 }
                 TunnelReceiverState::Receiver( tunnel) => {
-println!("IncomingLane: waiting for frame...");
                     match tunnel.rx.recv().await
                     {
                         None => {
                             eprintln!("received None from tunnel.rx")
                             // let's hope the tunnel is reset soon
                         }
-                        Some(frame) => {return Option::Some(frame);}
+                        Some(frame) => {return Option::Some(StarCommand::Frame(frame));}
                     }
                 }
 
@@ -82,15 +75,15 @@ println!("IncomingLane: waiting for frame...");
         }
 }
 
-pub struct LaneRunner
+pub struct MidLane
 {
     rx: Receiver<LaneCommand>,
-    tx: Sender<LaneFrame>,
+    tx: Sender<Frame>,
     tunnel: TunnelSenderState,
-    queue: Vec<LaneFrame>
+    queue: Vec<Frame>
 }
 
-impl LaneRunner
+impl MidLane
 {
     async fn die(&self, message: String)
     {
@@ -99,17 +92,14 @@ impl LaneRunner
 
     pub async fn run(mut self)
     {
-println!("running Mid.run()");
         while let Option::Some(command) = self.rx.recv().await {
             match command
             {
                 LaneCommand::Tunnel(tunnel) => {
-println!("new Tunnel: {}",tunnel);
                     if let TunnelSenderState::Sender(tunnel) = &tunnel
                     {
                         for frame in self.queue.drain(..)
                         {
-println!("flushing frame {}",frame);
                             tunnel.tx.send(frame).await;
                         }
                     }
@@ -118,11 +108,9 @@ println!("flushing frame {}",frame);
                 LaneCommand::LaneFrame(frame) => {
                     match &self.tunnel {
                         TunnelSenderState::Sender(tunnel) => {
-println!("relaying frame to tunnel");
                             tunnel.tx.send(frame).await;
                         }
                         TunnelSenderState::None => {
-println!("adding frame to queue since Tunnel is not ready...");
                             self.queue.push(frame);
                         }
                     }
@@ -140,7 +128,7 @@ println!("adding frame to queue since Tunnel is not ready...");
 pub enum LaneCommand
 {
     Tunnel(TunnelSenderState),
-    LaneFrame(LaneFrame)
+    LaneFrame(Frame)
 }
 
 pub struct Chamber<T>
@@ -174,7 +162,7 @@ impl Lane
         let (in_tx, in_rx) = mpsc::channel(LANE_QUEUE_SIZE);
         let (tunnel_receiver_tx, tunnel_receiver_rx) = mpsc::channel(1);
 
-        let midlane = LaneRunner {
+        let midlane = MidLane {
             rx: mid_rx,
             tx: in_tx,
             tunnel: TunnelSenderState::None,
@@ -244,13 +232,13 @@ impl fmt::Display for TunnelReceiverState {
 pub struct TunnelSender
 {
     pub remote_star: StarKey,
-    pub tx: Sender<LaneFrame>
+    pub tx: Sender<Frame>
 }
 
 pub struct TunnelReceiver
 {
     pub remote_star: StarKey,
-    pub rx: Receiver<LaneFrame>
+    pub rx: Receiver<Frame>
 }
 
 pub struct ConnectorController
@@ -293,7 +281,6 @@ impl LocalTunnelConnector
     {
         let high_star = low_lane.remote_star.clone();
         let low_star = high_lane.remote_star.clone();
-println!("High {:?} Low {:?}",high_star.clone(),low_star.clone());
         if high_star.cmp(&low_star ) != Ordering::Greater
         {
             Err("High star must have a greater StarKey (meaning higher constellation index array and star index value".into())
@@ -322,7 +309,6 @@ println!("High {:?} Low {:?}",high_star.clone(),low_star.clone());
 impl TunnelConnector for LocalTunnelConnector
 {
     async fn run(&mut self) {
-println!("Entering LocalTunnelConnector.run()");
         loop {
             let (mut high, mut low) = local_tunnels(self.high_star.clone(), self.low_star.clone());
 
@@ -330,13 +316,10 @@ println!("Entering LocalTunnelConnector.run()");
 
             if let (Ok((high_sender, mut high_receiver)), Ok((low_sender, low_receiver))) = (high, low)
             {
-println!("Sending high tunnel");
                 self.high.tx.send(LaneCommand::Tunnel(TunnelSenderState::Sender(high_sender))).await;
                 self.high_receiver_tx.send( TunnelReceiverState::Receiver(high_receiver)).await;
-println!("Sending low tunnel");
                 self.low.tx.send(LaneCommand::Tunnel(TunnelSenderState::Sender(low_sender))).await;
                 self.low_receiver_tx.send( TunnelReceiverState::Receiver(low_receiver)).await;
-println!("all tunnels sent");
             }
             else {
                 eprintln!("connection failure... trying again in 10 seconds");
@@ -378,12 +361,12 @@ mod test
     use crate::id::Id;
     use crate::frame::ProtoFrame;
     use crate::proto::local_tunnels;
-    use crate::star::StarKey;
-    use crate::lane::{LaneRunner, Lane, LaneCommand};
+    use crate::star::{StarKey, StarCommand};
+    use crate::lane::{Lane, LaneCommand};
     use crate::lane::LocalTunnelConnector;
     use crate::lane::TunnelConnector;
     use crate::lane::ConnectorCommand;
-    use crate::lane::LaneFrame;
+    use crate::lane::Frame;
     use tokio::time::Duration;
 
     #[test]
@@ -414,15 +397,12 @@ mod test
             let mut high_lane = Lane::new(low.clone()).await;
             let mut low_lane = Lane::new(high.clone()).await;
 
-            println!("pre...");
             let connector_ctrl = LocalTunnelConnector::new(&high_lane, &low_lane).await.unwrap();
 
-println!("sending PING");
-                high_lane.outgoing.tx.send(LaneCommand::LaneFrame(LaneFrame::Ping) ).await;
+                high_lane.outgoing.tx.send(LaneCommand::LaneFrame(Frame::Ping) ).await;
 
-println!("WAITING FOR PiNG ...");
                 let result = low_lane.incoming.recv().await;
-                if let Some(LaneFrame::Ping) = result
+                if let Some(StarCommand::Frame(Frame::Ping)) = result
                 {
 println!("RECEIVED PING!");
                     assert!(true);
@@ -436,10 +416,10 @@ println!("RECEIVED NONE");
                     assert!(false);
                 }
             connector_ctrl.command_tx.send(ConnectorCommand::Reset ).await;
-            high_lane.outgoing.tx.send(LaneCommand::LaneFrame(LaneFrame::Pong) ).await;
+            high_lane.outgoing.tx.send(LaneCommand::LaneFrame(Frame::Pong) ).await;
             let result = low_lane.incoming.recv().await;
 
-            if let Some(LaneFrame::Pong) = result
+            if let Some(StarCommand::Frame(Frame::Pong)) = result
             {
                 println!("RECEIVED PoNG!");
                 assert!(true);

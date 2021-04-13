@@ -1,10 +1,10 @@
 use std::sync::{Mutex, Weak, Arc};
-use crate::lane::{LaneRunner, TunnelConnector, OutgoingLane, Lane, ConnectorController};
+use crate::lane::{Lane, TunnelConnector, OutgoingLane, ConnectorController};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32};
 use futures::future::join_all;
 use futures::future::select_all;
-use crate::frame::ProtoFrame;
+use crate::frame::{ProtoFrame, Frame};
 use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use futures::FutureExt;
@@ -106,12 +106,12 @@ impl StarKey
 pub struct Star
 {
    pub kernel: Box<dyn StarKernel>,
-   pub lanes: HashMap<StarKey, LaneRunner>
+   pub lanes: HashMap<StarKey, Lane>
 }
 
 impl Star
 {
-   pub fn new(lanes: HashMap<StarKey, LaneRunner>, kernel: Box<dyn StarKernel>) ->Self
+   pub fn new(lanes: HashMap<StarKey, Lane>, kernel: Box<dyn StarKernel>) ->Self
    {
        Star{
            kernel: kernel,
@@ -130,7 +130,7 @@ pub trait StarKernel : Send
 pub struct LaneMeta
 {
    pub id: i32,
-   pub lane: LaneRunner
+   pub lane: Lane
 }
 
 impl LaneMeta
@@ -151,7 +151,19 @@ impl LaneMeta
 pub enum StarCommand
 {
     AddLane(Lane),
-    AddConnectorController(ConnectorController)
+    AddConnectorController(ConnectorController),
+    Frame(Frame)
+}
+
+impl fmt::Display for StarCommand{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let r = match self {
+            StarCommand::AddLane(_) => format!("AddLane").to_string(),
+            StarCommand::AddConnectorController(_) => format!("AddConnectorController").to_string(),
+            StarCommand::Frame(frame) => format!("Frame({})",frame).to_string(),
+        };
+        write!(f, "{}",r)
+    }
 }
 
 #[derive(Clone)]

@@ -8,9 +8,9 @@ use crate::proto::{ProtoStar, local_tunnels, ProtoTunnel, ProtoStarController};
 use crate::star::{StarKey, Star, StarController, StarCommand};
 use std::collections::{HashSet, HashMap};
 use std::sync::mpsc::{Sender, Receiver};
-use crate::frame::LaneFrame;
+use crate::frame::Frame;
 use std::sync::Arc;
-use crate::lane::{LaneRunner, LocalTunnelConnector, Lane};
+use crate::lane::{Lane, LocalTunnelConnector };
 use std::cmp::Ordering;
 
 pub struct Starlane
@@ -108,7 +108,8 @@ impl Starlane
                 let local = local.unwrap().clone();
                 let second = second.unwrap().clone();
 
-                self.add_local_lane(local, second );
+
+                self.add_local_lane(local, second ).await;
             }
         }
 
@@ -229,6 +230,7 @@ mod test
     use crate::template::ConstellationTemplate;
     use crate::error::Error;
     use tokio::sync::oneshot::error::RecvError;
+    use tokio::time::Duration;
 
     #[test]
     pub fn starlane()
@@ -258,6 +260,8 @@ mod test
                     Err(e) => {println!("{}", e)}
                 }
             }
+            tokio::time::sleep(Duration::from_secs(10)).await;
+
             tx.send(StarlaneCommand::Destroy ).await;
 
             handle.await;

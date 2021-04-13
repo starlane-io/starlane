@@ -10,8 +10,8 @@ use tokio::sync::{mpsc, Mutex, broadcast, oneshot};
 use crate::constellation::Constellation;
 use crate::error::Error;
 use crate::id::Id;
-use crate::lane::{STARLANE_PROTOCOL_VERSION, TunnelSenderState, LaneRunner, TunnelConnector, TunnelSender, LaneCommand, TunnelReceiver};
-use crate::frame::{ProtoFrame, LaneFrame};
+use crate::lane::{STARLANE_PROTOCOL_VERSION, TunnelSenderState, Lane, TunnelConnector, TunnelSender, LaneCommand, TunnelReceiver, ConnectorController};
+use crate::frame::{ProtoFrame, Frame};
 use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -22,8 +22,8 @@ pub struct ProtoStar
   kind: StarKind,
   key: StarKey,
   command_rx: Receiver<StarCommand>,
-  lanes: HashMap<StarKey, LaneRunner>,
-  connectors: Vec<Box<dyn TunnelConnector>>
+  lanes: HashMap<StarKey, Lane>,
+  connector_ctrls: Vec<ConnectorController>
 }
 
 impl ProtoStar
@@ -36,7 +36,7 @@ impl ProtoStar
             key,
             command_rx: command_rx,
             lanes: HashMap::new(),
-            connectors: vec![]
+            connector_ctrls: vec![]
         },StarController{
             command_tx: command_tx
         })
@@ -45,6 +45,35 @@ impl ProtoStar
     pub async fn evolve(mut self)->Result<Star,Error>
     {
         loop {
+            let mut futures = vec!();
+            futures.push(self.command_rx.recv().boxed() );
+
+            for (key,mut lane) in &mut self.lanes
+            {
+               futures.push( lane.incoming.recv().boxed() )
+            }
+
+            let (command,_,_) = select_all(futures).await;
+
+            if let Some(command) = command
+            {
+                match command{
+                    StarCommand::AddLane(lane) => {
+                        self.lanes.insert(lane.remote_star.clone(), lane);
+                    }
+                    StarCommand::AddConnectorController(connector_ctrl) => {
+                        self.connector_ctrls.push(connector_ctrl);
+                    }
+                    StarCommand::Frame(frame) => {
+                        println!("received frame: {}", frame);
+                    }
+                }
+            }
+            else
+            {
+                return Err("command_rx has been disconnected".into());
+            }
+
         }
 
         Ok(Star::new( self.lanes, Box::new(PlaceholderKernel::new()) ))
@@ -105,8 +134,8 @@ impl StarKernel for PlaceholderKernel
 pub struct ProtoTunnel
 {
     pub star: Option<StarKey>,
-    pub tx: Sender<LaneFrame>,
-    pub rx: Receiver<LaneFrame>
+    pub tx: Sender<Frame>,
+    pub rx: Receiver<Frame>
 }
 
 impl ProtoTunnel
@@ -114,21 +143,20 @@ impl ProtoTunnel
 
     pub async fn evolve(mut self) -> Result<(TunnelSender, TunnelReceiver),Error>
     {
-        self.tx.send(LaneFrame::Proto(ProtoFrame::StarLaneProtocolVersion(STARLANE_PROTOCOL_VERSION))).await;
+        self.tx.send(Frame::Proto(ProtoFrame::StarLaneProtocolVersion(STARLANE_PROTOCOL_VERSION))).await;
 
         if let Option::Some(star)=self.star
         {
-            self.tx.send(LaneFrame::Proto(ProtoFrame::ReportStarKey(star))).await;
+            self.tx.send(Frame::Proto(ProtoFrame::ReportStarKey(star))).await;
         }
 
         // first we confirm that the version is as expected
-        if let Option::Some(LaneFrame::Proto(recv)) = self.rx.recv().await
+        if let Option::Some(Frame::Proto(recv)) = self.rx.recv().await
         {
             match recv
             {
                 ProtoFrame::StarLaneProtocolVersion(version) if version == STARLANE_PROTOCOL_VERSION => {
                     // do nothing... we move onto the next step
-println!("Received proto version.");
                 },
                 ProtoFrame::StarLaneProtocolVersion(version) => {
                     return Err(format!("wrong version: {}", version).into());
@@ -142,10 +170,8 @@ println!("Received proto version.");
             return Err("disconnected".into());
         }
 
-        if let Option::Some(LaneFrame::Proto(recv)) = self.rx.recv().await
+        if let Option::Some(Frame::Proto(recv)) = self.rx.recv().await
         {
-println!("Received remote star key");
-self.tx.send(LaneFrame::Pong);
 
             match recv
             {
@@ -171,8 +197,8 @@ self.tx.send(LaneFrame::Pong);
 
 pub fn local_tunnels(high: StarKey, low:StarKey) ->(ProtoTunnel, ProtoTunnel)
 {
-    let (atx,arx) = mpsc::channel::<LaneFrame>(32);
-    let (btx,brx) = mpsc::channel::<LaneFrame>(32);
+    let (atx,arx) = mpsc::channel::<Frame>(32);
+    let (btx,brx) = mpsc::channel::<Frame>(32);
 
     (ProtoTunnel {
         star: Option::Some(high),

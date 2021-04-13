@@ -17,7 +17,7 @@ pub enum ProtoFrame
 }
 
 #[derive(Clone)]
-pub enum LaneFrame
+pub enum Frame
 {
     Proto(ProtoFrame),
     Close,
@@ -25,13 +25,13 @@ pub enum LaneFrame
     Pong
 }
 
-impl fmt::Display for LaneFrame{
+impl fmt::Display for Frame {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
-            LaneFrame::Proto(_) => format!("Proto").to_string(),
-            LaneFrame::Close => format!("Close").to_string(),
-            LaneFrame::Ping => format!("Ping").to_string(),
-            LaneFrame::Pong =>  format!("Pong").to_string(),
+            Frame::Proto(_) => format!("Proto").to_string(),
+            Frame::Close => format!("Close").to_string(),
+            Frame::Ping => format!("Ping").to_string(),
+            Frame::Pong =>  format!("Pong").to_string(),
         };
         write!(f, "{}",r)
     }
