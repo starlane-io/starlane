@@ -52,3 +52,8 @@ impl IdSeq {
         }
     }
 }
+
+pub struct ApplicationKind
+{
+
+}

@@ -5,7 +5,7 @@ use crate::error::Error;
 use crate::template::{ConstellationTemplate, StarKeyTemplate, StarKeySubgraphTemplate, StarKeyIndexTemplate, ConstellationData};
 use crate::layout::ConstellationLayout;
 use crate::proto::{ProtoStar, local_tunnels, ProtoTunnel, ProtoStarController, ProtoStarEvolution};
-use crate::star::{StarKey, Star, StarController, StarCommand, StarData};
+use crate::star::{StarKey, Star, StarController, StarCommand, StarCore, StarCoreProvider, DefaultStarCoreProvider};
 use std::collections::{HashSet, HashMap};
 use std::sync::mpsc::{Sender, Receiver};
 use crate::frame::Frame;
@@ -18,7 +18,8 @@ pub struct Starlane
 {
     pub tx: mpsc::Sender<StarlaneCommand>,
     rx: mpsc::Receiver<StarlaneCommand>,
-    star_controllers: HashMap<StarKey,StarController>
+    star_controllers: HashMap<StarKey,StarController>,
+    star_core_provider: Arc<dyn StarCoreProvider>
 }
 
 impl Starlane
@@ -29,7 +30,8 @@ impl Starlane
         Starlane{
             star_controllers: HashMap::new(),
             tx: tx,
-            rx: rx
+            rx: rx,
+            star_core_provider: Arc::new( DefaultStarCoreProvider::new() )
         }
     }
 
@@ -84,7 +86,7 @@ impl Starlane
 
         let link = link.unwrap().clone();
         let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
-        let (proto_star, star_ctrl) = ProtoStar::new(link.kind.clone(), evolve_tx );
+        let (proto_star, star_ctrl) = ProtoStar::new(link.kind.clone(), evolve_tx, self.star_core_provider.clone() );
 
         println!("created proto star: {:?}", &link.kind);
 //        self.star_controllers.insert(star.key.clone(), star_ctrl.clone() );
@@ -165,7 +167,8 @@ impl Starlane
                 }
             }
             let key = star_template.key.create(&data)?;
-            let (mut star,star_ctrl) = Star::new(key.clone(), star_template.kind.clone() );
+            let core = self.star_core_provider.provide(&star_template.kind,key.clone());
+            let (mut star,star_ctrl) = Star::new(key.clone(), core );
             self.star_controllers.insert(key.clone(), star_ctrl );
             tokio::spawn( async move { star.run().await; } );
 

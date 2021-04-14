@@ -1,4 +1,4 @@
-use crate::star::{StarKey, StarKind, GatewayKind, StarData, ServiceData};
+use crate::star::{StarKey, StarKind, GatewayKind, StarCore, ServiceData};
 use std::collections::{HashSet, HashMap};
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoStarKernel};
 use crate::id::Id;
@@ -94,7 +94,7 @@ impl ConstellationTemplate
 
 pub trait StarDataFactory: Send
 {
-    fn star_data(&self, kind: StarKind, handle: Option<String> ) -> Result<StarData,Error>;
+    fn star_data(&self, kind: StarKind, handle: Option<String> ) -> Result<StarCore,Error>;
 }
 
 pub struct DefaultStarDataFactory
@@ -102,39 +102,11 @@ pub struct DefaultStarDataFactory
    pub link_gateway: Option<StarKey>
 }
 
-impl StarDataFactory for DefaultStarDataFactory
-{
-    fn star_data(&self, kind: StarKind, handle: Option<String>) -> Result<StarData,Error> {
-        Ok(match kind
-        {
-            StarKind::Central => StarData::Central,
-            StarKind::Mesh => StarData::Mesh,
-            StarKind::Supervisor => StarData::Supervisor,
-            StarKind::Server => StarData::Server,
-            StarKind::Gateway => StarData::Gateway( ServiceData{port:8080} ),
-            StarKind::Link => {
-                if self.link_gateway.is_none()
-                {
-                    return Err("Link cannot have a default, gateway StarKey must be defined".into());
-                }
-                else {
-                    StarData::Link(ConnectionInfo {
-                        gateway: self.link_gateway.as_ref().unwrap().clone(),
-                        kind: ConnectionKind::Starlane,
-                    })
-                }
-            },
-            StarKind::Client => StarData::Client,
-            StarKind::Ext(_) => StarData::Ext
-        })
-    }
-}
 
 pub struct ConstellationData
 {
     pub exclude_handles: HashSet<String>,
     pub subgraphs: HashMap<String,Vec<u16>>,
-    pub star_data_factory : Box<dyn StarDataFactory>
 }
 
 impl ConstellationData
@@ -144,7 +116,6 @@ impl ConstellationData
         ConstellationData{
             exclude_handles: HashSet::new(),
             subgraphs: HashMap::new(),
-            star_data_factory: Box::new(DefaultStarDataFactory{ link_gateway: Option::None } )
         }
     }
 }

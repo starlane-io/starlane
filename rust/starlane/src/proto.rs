@@ -12,7 +12,7 @@ use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use crate::lane::{STARLANE_PROTOCOL_VERSION, TunnelSenderState, Lane, TunnelConnector, TunnelSender, LaneCommand, TunnelReceiver, ConnectorController, LaneMeta};
 use crate::frame::{ProtoFrame, Frame, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarSearchHit};
-use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController, Transaction, StarSearchTransaction, StarData, StarLogger};
+use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController, Transaction, StarSearchTransaction, StarCore, StarLogger, StarCoreProvider};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::task::Poll;
@@ -30,12 +30,13 @@ pub struct ProtoStar
   evolution_tx: oneshot::Sender<ProtoStarEvolution>,
   lanes: HashMap<StarKey, LaneMeta>,
   connector_ctrls: Vec<ConnectorController>,
+  star_core_provider: Arc<dyn StarCoreProvider>,
   logger: StarLogger
 }
 
 impl ProtoStar
 {
-    pub fn new(kind: StarKind, evolution_tx: oneshot::Sender<ProtoStarEvolution>) ->(Self, StarController)
+    pub fn new(kind: StarKind, evolution_tx: oneshot::Sender<ProtoStarEvolution>, star_core_provider: Arc<dyn StarCoreProvider>) ->(Self, StarController)
     {
         let (command_tx, command_rx) = mpsc::channel(32);
         (ProtoStar{
@@ -45,6 +46,7 @@ impl ProtoStar
             command_rx: command_rx,
             lanes: HashMap::new(),
             connector_ctrls: vec![],
+            star_core_provider: star_core_provider,
             logger: StarLogger::new()
         }, StarController{
             command_tx: command_tx
@@ -92,7 +94,7 @@ impl ProtoStar
                                 } });
 
                                 return Ok(Star::from_proto( key.clone(),
-                                                         self.kind.clone(),
+                                                         self.star_core_provider.provide(&self.kind, key.clone()),
                                                               self.command_rx,
                                                               self.lanes,
                                                               self.connector_ctrls,

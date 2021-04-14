@@ -31,6 +31,7 @@ pub enum Frame
     StarMessage(StarMessageInner)
 }
 
+
 #[derive(Clone,Serialize,Deserialize)]
 pub struct StarSearchInner
 {
@@ -119,6 +120,17 @@ impl StarMessageInner
         }
     }
 
+    pub fn to_central(from: StarKey, payload: StarMessagePayload) -> Self
+    {
+        StarMessageInner {
+            from: from,
+            to: StarKey::central(),
+            transaction: Option::None,
+            payload: payload
+        }
+    }
+
+
     pub fn reply(&mut self, payload: StarMessagePayload)
     {
         let tmp = self.from.clone();
@@ -133,10 +145,62 @@ impl StarMessageInner
 pub enum StarMessagePayload
 {
    RequestSequence,
-   AssignSequence(i64)
+   AssignSequence(i64),
+   SupervisorPledgeToCentral,
+   ApplicationCreateRequest(ApplicationCreateRequestInner),
+   ApplicationAssign(ApplicationAssignInner),
+   ApplicationNotifyReady(ApplicationNotifyReadyInner),
+   ApplicationRequestSupervisor(ApplicationRequestSupervisorInner),
+   ApplicationReportSupervisor(ApplicationReportSupervisorInner),
+   ApplicationLookupId(ApplicationLookupIdInner),
+   Reject(RejectionInner)
 }
 
+#[derive(Clone,Serialize,Deserialize)]
+pub struct RejectionInner
+{
+    pub message: String,
+}
 
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ApplicationLookupIdInner
+{
+    pub name: String
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ApplicationCreateRequestInner
+{
+    pub name: Option<String>,
+    pub data: Vec<u8>,
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ApplicationAssignInner
+{
+    pub app_id: Id,
+    pub data: Vec<u8>,
+    pub notify: Vec<StarKey>
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ApplicationNotifyReadyInner
+{
+    pub app_id: Id,
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ApplicationRequestSupervisorInner
+{
+    pub app_id: Id,
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ApplicationReportSupervisorInner
+{
+    pub app_id: Id,
+    pub supervisor: StarKey
+}
 
 
 impl fmt::Display for Frame {
