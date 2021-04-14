@@ -1,6 +1,6 @@
 use std::sync::{Mutex, Weak, Arc};
 use crate::lane::{Lane, TunnelConnector, OutgoingLane, ConnectorController, LaneMeta, LaneCommand, TunnelConnectorFactory, ConnectionInfo};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicI32, AtomicI64 };
 use futures::future::join_all;
 use futures::future::select_all;
@@ -137,7 +137,7 @@ pub enum StarCore
 {
     Central(Box<dyn Core>),
     Mesh,
-    Supervisor,
+    Supervisor(Box<dyn Core>),
     Server,
     Gateway,
     Link,
@@ -152,7 +152,7 @@ impl StarCore
        match self{
            StarCore::Central(_) => StarKind::Central,
            StarCore::Mesh => StarKind::Mesh,
-           StarCore::Supervisor => StarKind::Supervisor,
+           StarCore::Supervisor(_) => StarKind::Supervisor,
            StarCore::Server => StarKind::Server,
            StarCore::Gateway => StarKind::Gateway,
            StarCore::Link => StarKind::Link,
@@ -173,8 +173,8 @@ impl Core for StarCore
             StarCore::Mesh => {
                 Err("this core does not know how to handle this message".into())
             }
-            StarCore::Supervisor => {
-                Err("this core does not know how to handle this message".into())
+            StarCore::Supervisor(core) => {
+                core.handle(message)
             }
             StarCore::Server => {
                 Err("this core does not know how to handle this message".into())
@@ -315,9 +315,110 @@ impl Core for CentralCore
 
             }
             _ => {
-                Ok(Option::Some(vec![]))
+                Err("central does not handle message of this type: _ ".into())
             }
         }
+    }
+}
+
+
+pub trait SupervisorCoreBacking: Send+Sync
+{
+    fn add_server( &mut self, server: StarKey );
+    fn remove_server( &mut self, server: &StarKey );
+    fn select_server(&mut self) -> Option<StarKey>;
+
+    fn add_application( &mut self, app_id: Id , data: Vec<u8> );
+    fn remove_application( &mut self, app_id: Id );
+}
+
+pub struct DefaultSupervisorCoreBacking
+{
+    star: StarKey,
+    servers: Vec<StarKey>,
+    server_select_index: usize,
+    applications: HashSet<Id>
+}
+
+impl DefaultSupervisorCoreBacking
+{
+    pub fn new(star: StarKey)->Self
+    {
+        DefaultSupervisorCoreBacking{
+            star: star,
+            servers: vec![],
+            server_select_index: 0,
+            applications: HashSet::new()
+        }
+    }
+}
+
+impl SupervisorCoreBacking for DefaultSupervisorCoreBacking
+{
+    fn add_server(&mut self, server: StarKey) {
+       self.servers.push(server);
+    }
+
+    fn remove_server(&mut self, server: &StarKey) {
+        self.servers.retain(|star| star != server );
+    }
+
+    fn select_server(&mut self) -> Option<StarKey> {
+        if self.servers.len() == 0
+        {
+            return Option::None;
+        }
+        self.server_select_index = self.server_select_index +1;
+        let server = self.servers.get( self.server_select_index % self.servers.len() ).unwrap();
+        Option::Some(server.clone())
+    }
+
+    fn add_application(&mut self, app_id: Id, data: Vec<u8>) {
+        self.applications.insert(app_id);
+    }
+
+    fn remove_application(&mut self, app_id: Id) {
+        self.applications.remove(&app_id);
+    }
+}
+
+pub struct SupervisorCore
+{
+    star: StarKey,
+    backing: Box<dyn SupervisorCoreBacking>
+}
+
+impl SupervisorCore
+{
+    pub fn new(star: StarKey)->Self
+    {
+       SupervisorCore{
+           star: star.clone(),
+           backing: Box::new(DefaultSupervisorCoreBacking::new(star))
+       }
+    }
+}
+
+impl Core for SupervisorCore
+{
+    fn handle(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
+
+        match &message.payload
+        {
+            StarMessagePayload::ApplicationAssign(assign) => {
+                self.backing.add_application(assign.app_id.clone(), assign.data.clone());
+                Ok(Option::None)
+            }
+            StarMessagePayload::ServerPledgeToSupervisor => {
+
+                self.backing.add_server(message.from.clone());
+                Ok(Option::None)
+            }
+            _ => {
+                Err("SupervisorCore does not handle message of this type: _".into())
+            }
+        }
+
     }
 }
 
@@ -348,7 +449,7 @@ impl StarCoreProvider for DefaultStarCoreProvider
         match kind{
             StarKind::Central => StarCore::Central(Box::new(CentralCore::new(star.clone()))),
             StarKind::Mesh => StarCore::Mesh,
-            StarKind::Supervisor => StarCore::Supervisor,
+            StarKind::Supervisor => StarCore::Supervisor(Box::new(SupervisorCore::new(star.clone()))),
             StarKind::Server => StarCore::Server,
             StarKind::Gateway => StarCore::Gateway,
             StarKind::Link => StarCore::Link,
@@ -633,7 +734,8 @@ impl Star
             StarKind::Supervisor => {
                 self.send( StarMessageInner::to_central( self.key.clone(), StarMessagePayload::SupervisorPledgeToCentral));
             }
-            StarKind::Server => {}
+            StarKind::Server => {
+            }
             StarKind::Gateway => {}
             StarKind::Link => {}
             StarKind::Client => {}

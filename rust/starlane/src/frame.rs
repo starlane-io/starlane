@@ -153,6 +153,7 @@ pub enum StarMessagePayload
    ApplicationRequestSupervisor(ApplicationRequestSupervisorInner),
    ApplicationReportSupervisor(ApplicationReportSupervisorInner),
    ApplicationLookupId(ApplicationLookupIdInner),
+   ServerPledgeToSupervisor,
    Reject(RejectionInner)
 }
 
