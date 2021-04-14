@@ -14,21 +14,28 @@ pub struct Command
 pub enum ProtoFrame
 {
     StarLaneProtocolVersion(i32),
-    ReportStarKey(StarKey)
+    ReportStarKey(StarKey),
+    RequestSubgraphExpansion,
+    GrantSubgraphExpansion(Vec<u16>),
+    CentralFound
 }
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Frame
 {
-    Proto(ProtoFrame),
     Close,
-    Ping,
-    Pong,
-    RequestSubgraphExpansion,
-    GrantSubgraphExpansion(Vec<u16>),
+    Proto(ProtoFrame),
+    Diagnose(FrameDiagnose),
     StarSearch(StarSearchInner),
     StarSearchResult(StarSearchResultInner),
     StarMessage(StarMessageInner)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum FrameDiagnose
+{
+  Ping,
+  Pong,
 }
 
 
@@ -144,6 +151,7 @@ impl StarMessageInner
 #[derive(Clone,Serialize,Deserialize)]
 pub enum StarMessagePayload
 {
+   Reject(RejectionInner),
    RequestSequence,
    AssignSequence(i64),
    SupervisorPledgeToCentral,
@@ -153,9 +161,17 @@ pub enum StarMessagePayload
    ApplicationRequestSupervisor(ApplicationRequestSupervisorInner),
    ApplicationReportSupervisor(ApplicationReportSupervisorInner),
    ApplicationLookupId(ApplicationLookupIdInner),
+   ApplicationRequestLaunch(ApplicationRequestLaunchInner),
    ServerPledgeToSupervisor,
-   Reject(RejectionInner)
 }
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ApplicationRequestLaunchInner
+{
+    pub app_id: Id,
+    pub data: Vec<u8>
+}
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct RejectionInner
@@ -203,19 +219,46 @@ pub struct ApplicationReportSupervisorInner
     pub supervisor: StarKey
 }
 
+impl fmt::Display for FrameDiagnose {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let r = match self {
+            FrameDiagnose::Ping => "Ping",
+            FrameDiagnose::Pong => "Pong"
+        };
+        write!(f, "{}",r)
+    }
+}
+
+impl fmt::Display for StarMessagePayload{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let r = match self {
+            StarMessagePayload::Reject(inner) => format!("Reject({})",inner.message),
+            StarMessagePayload::RequestSequence => "RequestSequence".to_string(),
+            StarMessagePayload::AssignSequence(_) => "AssignSequence".to_string(),
+            StarMessagePayload::SupervisorPledgeToCentral => "SupervisorPledgeToCentral".to_string(),
+            StarMessagePayload::ApplicationCreateRequest(_) => "ApplicationCreateRequest".to_string(),
+            StarMessagePayload::ApplicationAssign(_) => "ApplicationAssign".to_string(),
+            StarMessagePayload::ApplicationNotifyReady(_) => "ApplicationNotifyReady".to_string(),
+            StarMessagePayload::ApplicationRequestSupervisor(_) => "ApplicationRequestSupervisor".to_string(),
+            StarMessagePayload::ApplicationReportSupervisor(_) => "ApplicationReportSupervisor".to_string(),
+            StarMessagePayload::ApplicationLookupId(_) => "ApplicationLookupId".to_string(),
+            StarMessagePayload::ApplicationRequestLaunch(_) => "ApplicationRequestLaunch".to_string(),
+            StarMessagePayload::ServerPledgeToSupervisor => "ServerPledgeToSupervisor".to_string()
+        };
+        write!(f, "{}",r)
+    }
+}
+
 
 impl fmt::Display for Frame {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
-            Frame::Proto(_) => format!("Proto").to_string(),
+            Frame::Proto(proto) => format!("Proto({})",proto).to_string(),
             Frame::Close => format!("Close").to_string(),
-            Frame::Ping => format!("Ping").to_string(),
-            Frame::Pong =>  format!("Pong").to_string(),
-            Frame::StarMessage(_)=>format!("StarMessage").to_string(),
+            Frame::Diagnose(diagnose)=> format!("Diagnose({})",diagnose).to_string(),
+            Frame::StarMessage(inner)=>format!("StarMessage({})",inner.payload).to_string(),
             Frame::StarSearch(_)=>format!("StarSearch").to_string(),
             Frame::StarSearchResult(_)=>format!("StarSearchResult").to_string(),
-            Frame::RequestSubgraphExpansion=>format!("RequestSubgraphExpansion").to_string(),
-            Frame::GrantSubgraphExpansion(_)=>format!("GrantSubgraphExpansion").to_string(),
         };
         write!(f, "{}",r)
     }
@@ -225,7 +268,10 @@ impl fmt::Display for ProtoFrame {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
             ProtoFrame::StarLaneProtocolVersion(version) => format!("StarLaneProtocolVersion({})", version).to_string(),
-            ProtoFrame::ReportStarKey(id) => format!("ReportStarId({})", id).to_string()
+            ProtoFrame::ReportStarKey(id) => format!("ReportStarId({})", id).to_string(),
+            ProtoFrame::RequestSubgraphExpansion=> format!("RequestSubgraphExpansion").to_string(),
+            ProtoFrame::GrantSubgraphExpansion(path) => format!("GrantSubgraphExpansion({:?})", path).to_string(),
+            ProtoFrame::CentralFound => format!("CentralFound").to_string(),
         };
         write!(f, "{}",r)
     }

@@ -13,6 +13,8 @@ use std::sync::Arc;
 use crate::lane::{Lane, LocalTunnelConnector, ConnectionInfo, ConnectionKind};
 use std::cmp::Ordering;
 use tokio::sync::oneshot::error::RecvError;
+use futures::future::join_all;
+
 
 pub struct Starlane
 {
@@ -86,10 +88,9 @@ impl Starlane
 
         let link = link.unwrap().clone();
         let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
-        let (proto_star, star_ctrl) = ProtoStar::new(link.kind.clone(), evolve_tx, self.star_core_provider.clone() );
+        let (proto_star, star_ctrl) = ProtoStar::new(Option::None, link.kind.clone(), evolve_tx, self.star_core_provider.clone() );
 
         println!("created proto star: {:?}", &link.kind);
-//        self.star_controllers.insert(star.key.clone(), star_ctrl.clone() );
 
         let starlane_ctrl = self.tx.clone();
         tokio::spawn( async move {
@@ -148,7 +149,6 @@ impl Starlane
            eprintln!("got an error message on protostarevolution")
         }
 
-
         // now we need to create the lane to the desired gateway which is what the Link is all about
 
         Ok(())
@@ -156,7 +156,8 @@ impl Starlane
 
     async fn provision_constellation(&mut self, template: ConstellationTemplate, data: ConstellationData ) ->Result<(),Error>
     {
-        for star_template in &template.stars
+        let mut evolve_rxs = vec!();
+        for star_template in template.stars.clone()
         {
             if let Some(handle) = &star_template.handle
             {
@@ -166,13 +167,27 @@ impl Starlane
                     continue;
                 }
             }
-            let key = star_template.key.create(&data)?;
-            let core = self.star_core_provider.provide(&star_template.kind,key.clone());
-            let (mut star,star_ctrl) = Star::new(key.clone(), core );
-            self.star_controllers.insert(key.clone(), star_ctrl );
-            tokio::spawn( async move { star.run().await; } );
 
-            println!("created star: {:?} key: {}", &star_template.kind, key );
+            let star_key = star_template.key.create(&data)?;
+            let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
+            evolve_rxs.push(evolve_rx );
+
+            let (proto_star, star_ctrl) = ProtoStar::new(Option::Some(star_key.clone()), star_template.kind.clone(), evolve_tx, self.star_core_provider.clone() );
+            self.star_controllers.insert(star_key.clone(), star_ctrl.clone() );
+            println!("created proto star: {:?}", &star_template.kind);
+
+            tokio::spawn( async move {
+                println!("evolving proto star..." );
+                let star = proto_star.evolve().await;
+                if let Ok(star) = star
+                {
+                    println!("created star: {:?} key: {}", &star_template.kind, star_key);
+                    star.run().await;
+                }
+                else {
+                    eprintln!("experienced serious error could not evolve the proto_star");
+                }
+            } );
         }
 
         // now make the LANES
@@ -183,7 +198,21 @@ impl Starlane
                 let local = star_template.key.create(&data)?;
                 let second = lane.star.create(&data)?;
 
-                self.add_local_lane(local, second ).await;
+                self.add_local_lane(local, second ).await?;
+            }
+        }
+
+        let evolutions = join_all(evolve_rxs).await;
+
+        for evolve in evolutions
+        {
+            if let Ok(evolve) = evolve
+            {
+                self.star_controllers.insert(evolve.star, evolve.controller);
+            }
+            else if let Err(error) = evolve
+            {
+               return Err(error.to_string().into())
             }
         }
 
@@ -216,7 +245,6 @@ impl Starlane
                 Some(low_star_ctrl) => {low_star_ctrl.clone()}
             }
         };
-
         self.add_local_lane_ctrl(Option::Some(high), Option::Some(low), high_star_ctrl,low_star_ctrl).await
     }
 
@@ -227,9 +255,10 @@ impl Starlane
         let high_lane= Lane::new(low).await;
         let low_lane = Lane::new(high).await;
         let connector = LocalTunnelConnector::new(&high_lane,&low_lane).await?;
-        high_star_ctrl.command_tx.send(StarCommand::AddLane(high_lane)).await;
-        low_star_ctrl.command_tx.send(StarCommand::AddLane(low_lane)).await;
-        high_star_ctrl.command_tx.send( StarCommand::AddConnectorController(connector)).await;
+println!("Sending AddLane!");
+        high_star_ctrl.command_tx.send(StarCommand::AddLane(high_lane)).await?;
+        low_star_ctrl.command_tx.send(StarCommand::AddLane(low_lane)).await?;
+        high_star_ctrl.command_tx.send( StarCommand::AddConnectorController(connector)).await?;
 
         Ok(())
     }
@@ -336,6 +365,7 @@ mod test
             }
             tokio::time::sleep(Duration::from_secs(10)).await;
 
+            println!("sending Destroy command.");
             tx.send(StarlaneCommand::Destroy ).await;
 
             handle.await;

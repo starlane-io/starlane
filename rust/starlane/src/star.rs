@@ -407,6 +407,9 @@ impl Core for SupervisorCore
         {
             StarMessagePayload::ApplicationAssign(assign) => {
                 self.backing.add_application(assign.app_id.clone(), assign.data.clone());
+
+                // Now we need to Launch this application in the selected server
+
                 Ok(Option::None)
             }
             StarMessagePayload::ServerPledgeToSupervisor => {
@@ -610,16 +613,17 @@ pub struct Star
     command_rx: Receiver<StarCommand>,
     lanes: HashMap<StarKey, LaneMeta>,
     connector_ctrls: Vec<ConnectorController>,
-    sequence: Option<IdSeq>,
+    sequence: IdSeq,
     transactions: HashMap<i64,Box<dyn Transaction>>,
     transaction_seq: AtomicI64,
     star_search_transactions: HashMap<i64,StarSearchTransaction>,
-    frame_hold: HashMap<StarKey,Vec<Frame>>,
+    frame_hold: FrameHold,
     logger: StarLogger
 }
 
 impl Star
 {
+    /*
     pub fn new(key: StarKey, core: StarCore) ->(Self, StarController)
     {
         let (command_tx, command_rx) = mpsc::channel(32);
@@ -641,7 +645,9 @@ impl Star
         })
     }
 
-    pub fn from_proto(key: StarKey, core: StarCore, command_rx: Receiver<StarCommand>, lanes: HashMap<StarKey,LaneMeta>, connector_ctrls: Vec<ConnectorController>, logger: StarLogger) ->Self
+     */
+
+    pub fn from_proto(key: StarKey, core: StarCore, command_rx: Receiver<StarCommand>, lanes: HashMap<StarKey,LaneMeta>, connector_ctrls: Vec<ConnectorController>, logger: StarLogger, sequence: IdSeq, frame_hold: FrameHold ) ->Self
     {
         Star{
             kind: core.kind(),
@@ -650,11 +656,11 @@ impl Star
             command_rx: command_rx,
             lanes: lanes,
             connector_ctrls: connector_ctrls,
-            sequence: Option::None,
+            sequence: sequence,
             transactions: HashMap::new(),
             transaction_seq: AtomicI64::new(0),
             star_search_transactions: HashMap::new(),
-            frame_hold: HashMap::new(),
+            frame_hold: frame_hold,
             logger: logger
         }
     }
@@ -706,6 +712,9 @@ impl Star
                         let lane_key = lanes.get(index-1).unwrap().clone();
                         self.process_frame(frame, lane_key );
                     }
+                    _ => {
+                        eprintln!("cannot process command: {}",command);
+                    }
                 }
             }
             else
@@ -755,18 +764,11 @@ impl Star
         {
             if lane.has_path_to_star(&star)
             {
-                lane.lane.outgoing.tx.send( LaneCommand::LaneFrame(frame) ).await;
+                lane.lane.outgoing.tx.send( LaneCommand::Frame(frame) ).await;
                 return;
             }
         }
-        if let None = self.frame_hold.get(&star)
-        {
-            self.frame_hold.insert(star.clone(), vec![] );
-        }
-        if let Some(frames) = self.frame_hold.get_mut(&star)
-        {
-            frames.push(frame);
-        }
+        self.frame_hold.add( &star, frame );
         self.search_for_star(star.clone());
     }
 
@@ -789,7 +791,7 @@ impl Star
         self.logger.log(StarLog::StarSearchInitialized(search.clone()));
         for (star,lane) in &self.lanes
         {
-            lane.lane.outgoing.tx.send( LaneCommand::LaneFrame( Frame::StarSearch(search.clone()))).await;
+            lane.lane.outgoing.tx.send( LaneCommand::Frame( Frame::StarSearch(search.clone()))).await;
         }
     }
 
@@ -844,7 +846,7 @@ impl Star
                 });
 
                 let lane = self.lanes.get_mut(&lane_key).unwrap();
-                lane.lane.outgoing.tx.send(LaneCommand::LaneFrame(frame)).await;
+                lane.lane.outgoing.tx.send(LaneCommand::Frame(frame)).await;
             }
             else {
                 // create a SearchTransaction here.
@@ -877,7 +879,7 @@ impl Star
         {
             if !search.hops.contains(star)
             {
-                lane.lane.outgoing.tx.send(LaneCommand::LaneFrame(Frame::StarSearch(search.clone()))).await;
+                lane.lane.outgoing.tx.send(LaneCommand::Frame(Frame::StarSearch(search.clone()))).await;
             }
         }
     }
@@ -895,11 +897,11 @@ impl Star
                     search_trans.hits.insert( hit.star.clone(), hit.clone() );
                     let lane = self.lanes.get_mut(&lane_key).unwrap();
                     lane.star_paths.insert( hit.star.clone() );
-                    if let Some(frames) = self.frame_hold.remove( &hit.star )
+                    if let Some(frames) = self.frame_hold.release( &hit.star )
                     {
                         for frame in frames
                         {
-                            lane.lane.outgoing.tx.send( LaneCommand::LaneFrame(frame) ).await;
+                            lane.lane.outgoing.tx.send( LaneCommand::Frame(frame) ).await;
                         }
                     }
                 }
@@ -916,7 +918,7 @@ impl Star
                             if let Some(lane)=self.lanes.get_mut(next)
                             {
                                 search_result.hits = search_trans.hits.values().map(|a|a.clone()).collect();
-                                lane.lane.outgoing.tx.send( LaneCommand::LaneFrame(Frame::StarSearchResult(search_result))).await;
+                                lane.lane.outgoing.tx.send( LaneCommand::Frame(Frame::StarSearchResult(search_result))).await;
                             }
                         }
                     }
@@ -942,9 +944,6 @@ impl Star
 
             match message.payload
             {
-                StarMessagePayload::AssignSequence(sequence) => {
-                    self.sequence = Option::Some(IdSeq::new(sequence));
-                }
                 _ => {
                     if let Ok(Some(messages)) = self.core.handle(message)
                     {
@@ -978,14 +977,28 @@ pub enum StarCommand
     AddConnectorController(ConnectorController),
     AddLogger(broadcast::Sender<StarLog>),
     Test(StarTest),
-    Frame(Frame)
+    Frame(Frame),
+    FrameTimeout(FrameTimeoutInner),
+    FrameError(FrameErrorInner)
 }
+
+pub struct FrameTimeoutInner
+{
+    pub frame: Frame,
+    pub retries: usize
+}
+
+pub struct FrameErrorInner
+{
+    pub frame: Frame,
+    pub message: String
+}
+
 
 pub enum StarTest
 {
    StarSearchForStarKey(StarKey)
 }
-
 
 
 impl fmt::Display for StarCommand{
@@ -996,6 +1009,8 @@ impl fmt::Display for StarCommand{
             StarCommand::AddLogger(_) => format!("AddLogger").to_string(),
             StarCommand::Test(_) => format!("Test").to_string(),
             StarCommand::Frame(frame) => format!("Frame({})",frame).to_string(),
+            StarCommand::FrameTimeout(_) => format!("FrameTimeout").to_string(),
+            StarCommand::FrameError(_) => format!("FrameError").to_string(),
         };
         write!(f, "{}",r)
     }
@@ -1074,3 +1089,34 @@ pub enum StarLog
    StarSearchComplete(StarSearchTransaction)
 }
 
+pub struct FrameHold
+{
+    hold: HashMap<StarKey,Vec<Frame>>
+}
+
+impl FrameHold {
+
+    pub fn new()->Self
+    {
+        FrameHold{
+            hold: HashMap::new()
+        }
+    }
+
+    pub fn add(&mut self, star: &StarKey, frame: Frame)
+    {
+        if !self.hold.contains_key(star)
+        {
+            self.hold.insert( star.clone(), vec!() );
+        }
+        if let Option::Some(frames) = self.hold.get_mut(star)
+        {
+            frames.push(frame);
+        }
+    }
+
+    pub fn release( &mut self, star: &StarKey ) -> Option<Vec<Frame>>
+    {
+        self.hold.remove(star)
+    }
+}

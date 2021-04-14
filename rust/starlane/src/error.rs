@@ -14,13 +14,15 @@ impl fmt::Display for Error{
     }
 }
 
-impl From<SendError<ProtoFrame>> for Error{
+/*impl From<SendError<ProtoFrame>> for Error{
     fn from(e: SendError<ProtoFrame>) -> Self {
         Error{
             error: format!("{}",e.to_string())
         }
     }
 }
+
+ */
 
 impl From<&str> for Error{
     fn from(e: &str) -> Self {
@@ -34,6 +36,14 @@ impl From<String> for Error{
     fn from(e: String) -> Self {
         Error{
             error: format!("{:?}",e)
+        }
+    }
+}
+
+impl <T> From<SendError<T>> for Error{
+    fn from(e: SendError<T>) -> Self {
+        Error{
+            error: format!("{}",e)
         }
     }
 }

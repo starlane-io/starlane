@@ -108,7 +108,7 @@ impl MidLane
                     }
                     self.tunnel = tunnel;
                 }
-                LaneCommand::LaneFrame(frame) => {
+                LaneCommand::Frame(frame) => {
                     match &self.tunnel {
                         TunnelSenderState::Sender(tunnel) => {
                             tunnel.tx.send(frame).await;
@@ -131,7 +131,7 @@ impl MidLane
 pub enum LaneCommand
 {
     Tunnel(TunnelSenderState),
-    LaneFrame(Frame)
+    Frame(Frame)
 }
 
 pub struct Chamber<T>
@@ -415,7 +415,7 @@ mod test
 
     use crate::error::Error;
     use crate::id::Id;
-    use crate::frame::ProtoFrame;
+    use crate::frame::{ProtoFrame, FrameDiagnose};
     use crate::proto::local_tunnels;
     use crate::star::{StarKey, StarCommand};
     use crate::lane::{Lane, LaneCommand};
@@ -456,10 +456,10 @@ mod test
 
             let connector_ctrl = LocalTunnelConnector::new(&high_lane, &low_lane).await.unwrap();
 
-                high_lane.outgoing.tx.send(LaneCommand::LaneFrame(Frame::Ping) ).await;
+                high_lane.outgoing.tx.send(LaneCommand::Frame(Frame::Diagnose(FrameDiagnose::Ping) ) ).await;
 
                 let result = low_lane.incoming.recv().await;
-                if let Some(StarCommand::Frame(Frame::Ping)) = result
+                if let Some(StarCommand::Frame(Frame::Diagnose(FrameDiagnose::Ping))) = result
                 {
 println!("RECEIVED PING!");
                     assert!(true);
@@ -473,10 +473,10 @@ println!("RECEIVED NONE");
                     assert!(false);
                 }
             connector_ctrl.command_tx.send(ConnectorCommand::Reset ).await;
-            high_lane.outgoing.tx.send(LaneCommand::LaneFrame(Frame::Pong) ).await;
+            high_lane.outgoing.tx.send(LaneCommand::Frame(Frame::Diagnose(FrameDiagnose::Pong)) ).await;
             let result = low_lane.incoming.recv().await;
 
-            if let Some(StarCommand::Frame(Frame::Pong)) = result
+            if let Some(StarCommand::Frame(Frame::Diagnose(FrameDiagnose::Pong))) = result
             {
                 println!("RECEIVED PoNG!");
                 assert!(true);
