@@ -12,7 +12,7 @@ use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use crate::lane::{STARLANE_PROTOCOL_VERSION, TunnelSenderState, Lane, TunnelConnector, TunnelSender, LaneCommand, TunnelReceiver, ConnectorController, LaneMeta};
 use crate::frame::{ProtoFrame, Frame, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarSearchHit};
-use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController, Transaction, StarSearchTransaction, StarData};
+use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController, Transaction, StarSearchTransaction, StarData, StarLogger};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::task::Poll;
@@ -29,7 +29,8 @@ pub struct ProtoStar
   command_rx: Receiver<StarCommand>,
   evolution_tx: oneshot::Sender<ProtoStarEvolution>,
   lanes: HashMap<StarKey, LaneMeta>,
-  connector_ctrls: Vec<ConnectorController>
+  connector_ctrls: Vec<ConnectorController>,
+  logger: StarLogger
 }
 
 impl ProtoStar
@@ -44,6 +45,7 @@ impl ProtoStar
             command_rx: command_rx,
             lanes: HashMap::new(),
             connector_ctrls: vec![],
+            logger: StarLogger::new()
         }, StarController{
             command_tx: command_tx
         })
@@ -78,6 +80,9 @@ impl ProtoStar
                     StarCommand::AddConnectorController(connector_ctrl) => {
                         self.connector_ctrls.push(connector_ctrl);
                     }
+                    StarCommand::AddLogger(logger) => {
+                       self.logger.tx.push(logger);
+                    }
                     StarCommand::Frame(frame) => {
                         match frame {
                             Frame::GrantSubgraphExpansion(subgraph) => {
@@ -91,6 +96,7 @@ impl ProtoStar
                                                               self.command_rx,
                                                               self.lanes,
                                                               self.connector_ctrls,
+                                                              self.logger
                                                               ));
                             },
                             _ => {
@@ -98,6 +104,10 @@ impl ProtoStar
                             }
                         }
                     }
+                    _ => {
+                        eprintln!("not implemented");
+                    }
+
                 }
             }
             else

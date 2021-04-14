@@ -387,7 +387,6 @@ impl LaneMeta
     }
 }
 
-
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionInfo
 {

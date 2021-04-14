@@ -14,8 +14,10 @@ use std::{fmt, cmp};
 use tokio::sync::mpsc::{Sender, Receiver};
 use std::cmp::Ordering;
 use tokio::sync::mpsc;
+use tokio::sync::broadcast;
 use crate::frame::Frame::{StarSearch, StarMessage};
 use url::Url;
+use tokio::sync::broadcast::error::SendError;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
 pub enum StarKind
@@ -210,6 +212,33 @@ impl StarKey
 }
 
 
+pub struct StarLogger
+{
+   pub tx: Vec<broadcast::Sender<StarLog>>
+}
+
+impl StarLogger
+{
+    pub fn new() -> Self
+    {
+        StarLogger{
+            tx: vec!()
+        }
+    }
+
+    pub fn log( &mut self, log: StarLog )
+    {
+        self.tx.retain( |sender| {
+            if let Err(SendError(_)) = sender.send(log.clone())
+            {
+                true
+            }
+            else {
+                false
+            }
+        });
+    }
+}
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -224,7 +253,8 @@ pub struct Star
     transactions: HashMap<i64,Box<dyn Transaction>>,
     transaction_seq: AtomicI64,
     star_search_transactions: HashMap<i64,StarSearchTransaction>,
-    frame_hold: HashMap<StarKey,Vec<Frame>>
+    frame_hold: HashMap<StarKey,Vec<Frame>>,
+    logger: StarLogger
 }
 
 impl Star
@@ -243,12 +273,13 @@ impl Star
             transaction_seq: AtomicI64::new(0),
             star_search_transactions: HashMap::new(),
             frame_hold: HashMap::new(),
+            logger: StarLogger::new()
         }, StarController{
             command_tx: command_tx
         })
     }
 
-    pub fn from_proto(key: StarKey, kind: StarKind, command_rx: Receiver<StarCommand>, lanes: HashMap<StarKey,LaneMeta>, connector_ctrls: Vec<ConnectorController>) ->Self
+    pub fn from_proto(key: StarKey, kind: StarKind, command_rx: Receiver<StarCommand>, lanes: HashMap<StarKey,LaneMeta>, connector_ctrls: Vec<ConnectorController>, logger: StarLogger) ->Self
     {
         Star{
             kind,
@@ -261,6 +292,7 @@ impl Star
             transaction_seq: AtomicI64::new(0),
             star_search_transactions: HashMap::new(),
             frame_hold: HashMap::new(),
+            logger: logger
         }
     }
 
@@ -295,6 +327,17 @@ impl Star
                     }
                     StarCommand::AddConnectorController(connector_ctrl) => {
                         self.connector_ctrls.push(connector_ctrl);
+                    }
+                    StarCommand::AddLogger(tx) => {
+                        self.logger.tx.push(tx);
+                    }
+                    StarCommand::Test(test) => {
+                        match test
+                        {
+                            StarTest::StarSearchForStarKey(star) => {
+                                self.search_for_star(star).await;
+                            }
+                        }
                     }
                     StarCommand::Frame(frame) => {
                         let lane_key = lanes.get(index-1).unwrap().clone();
@@ -347,24 +390,26 @@ impl Star
         self.search_for_star(star.clone());
     }
 
-    async fn search_for_star(&mut self, star: StarKey )
+    async fn search_for_star( &mut self, star: StarKey )
     {
+
         let search_id = self.transaction_seq.fetch_add(1, std::sync::atomic::Ordering::Relaxed );
         let search_transaction = StarSearchTransaction::new(StarSearchPattern::StarKey(self.key.clone()));
         self.star_search_transactions.insert(search_id, search_transaction );
 
-        let search = Frame::StarSearch(StarSearchInner{
+        let search = StarSearchInner{
             from: self.key.clone(),
             pattern: StarSearchPattern::StarKey(star),
             hops: vec![self.key.clone()],
             transactions: vec![search_id],
             max_hops: MAX_HOPS,
             multi: false
-        });
+        };
 
+        self.logger.log(StarLog::StarSearchInitialized(search.clone()));
         for (star,lane) in &self.lanes
         {
-            lane.lane.outgoing.tx.send( LaneCommand::LaneFrame(search.clone())).await;
+            lane.lane.outgoing.tx.send( LaneCommand::LaneFrame( Frame::StarSearch(search.clone()))).await;
         }
     }
 
@@ -459,6 +504,8 @@ impl Star
 
     async fn on_star_search_result( &mut self, mut search_result: StarSearchResultInner, lane_key: StarKey )
     {
+
+        self.logger.log(StarLog::StarSearchResult(search_result.clone()));
         if let Some(search_id) = search_result.transactions.last()
         {
             if let Some(search_trans) = self.star_search_transactions.get_mut(search_id)
@@ -548,14 +595,25 @@ pub enum StarCommand
 {
     AddLane(Lane),
     AddConnectorController(ConnectorController),
+    AddLogger(broadcast::Sender<StarLog>),
+    Test(StarTest),
     Frame(Frame)
 }
+
+pub enum StarTest
+{
+   StarSearchForStarKey(StarKey)
+}
+
+
 
 impl fmt::Display for StarCommand{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
             StarCommand::AddLane(_) => format!("AddLane").to_string(),
             StarCommand::AddConnectorController(_) => format!("AddConnectorController").to_string(),
+            StarCommand::AddLogger(_) => format!("AddLogger").to_string(),
+            StarCommand::Test(_) => format!("Test").to_string(),
             StarCommand::Frame(frame) => format!("Frame({})",frame).to_string(),
         };
         write!(f, "{}",r)
@@ -569,6 +627,7 @@ pub struct StarController
 }
 
 
+#[derive(Clone)]
 pub struct StarSearchTransaction
 {
     pub pattern: StarSearchPattern,
@@ -624,3 +683,13 @@ impl Transaction for StarKeySearchTransaction
         TransactionState::Done
     }
 }
+
+
+#[derive(Clone)]
+pub enum StarLog
+{
+   StarSearchInitialized(StarSearchInner),
+   StarSearchResult(StarSearchResultInner),
+   StarSearchComplete(StarSearchTransaction)
+}
+

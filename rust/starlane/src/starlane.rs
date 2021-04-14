@@ -238,7 +238,14 @@ pub enum StarlaneCommand
 {
     Connect(ConnectCommand),
     ProvisionConstellation(ProvisionConstellationCommand),
+    RequestStarControlByStarKey(StarControlRequest),
     Destroy
+}
+
+pub struct StarControlRequest
+{
+    pub star: StarKey,
+    pub rtn: oneshot::Sender<StarController>
 }
 
 pub struct ProvisionConstellationCommand
@@ -314,9 +321,9 @@ mod test
                 let (command, mut rx) = ProvisionConstellationCommand::new(ConstellationTemplate::new_standalone(), ConstellationData::new());
                 tx.send(StarlaneCommand::ProvisionConstellation(command)).await;
                 let result = rx.await;
-                match result{
+                match result {
                     Ok(result) => {
-                        match result{
+                        match result {
                             Ok(_) => {println!("template ok.")}
                             Err(e) => {println!("{}", e)}
                         }
