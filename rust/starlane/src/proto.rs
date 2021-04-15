@@ -187,9 +187,11 @@ println!("proto received message: {}", message.payload );
                             }
 
                             Frame::StarWind(mut wind) => {
+
                                 if self.star_key.is_some()
                                 {
                                     let star_key = self.star_key.as_ref().unwrap().clone();
+println!("ProtoWind from: {} to: {}", self.star_key.as_ref().unwrap(), wind.to);
                                     wind.stars.push(star_key );
                                     self.send_frame(&wind.to.clone(), Frame::StarWind(wind)).await;
                                 }
@@ -200,11 +202,14 @@ println!("proto received message: {}", message.payload );
                                 {
                                     unwind.stars.pop();
                                     let first = unwind.stars.first().unwrap().clone();
+println!("ProtoUnwind from: {} to: {}", self.star_key.as_ref().unwrap(), first );
                                     self.send_frame(&first, Frame::StarUnwind(unwind)).await;
                                 }
                                 else {
                                     if let StarUnwindPayload::AssignSequence(sequence) = unwind.payload
                                     {
+println!("ProtoUnwind: RECEIVED {}", &self.kind );
+
                                             self.sequence = Option::Some(Arc::new(IdSeq::new(sequence)));
                                             let star_key = self.star_key.as_ref().unwrap().clone();
                                             self.evolution_tx.send(ProtoStarEvolution {

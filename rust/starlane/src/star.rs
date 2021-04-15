@@ -134,6 +134,22 @@ impl StarKind
     }
 }
 
+impl fmt::Display for StarKind{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"{}",
+        match self{
+            StarKind::Central => "Central".to_string(),
+            StarKind::Mesh => "Mesh".to_string(),
+            StarKind::Supervisor => "Supervisor".to_string(),
+            StarKind::Server => "Server".to_string(),
+            StarKind::Gateway => "Gateway".to_string(),
+            StarKind::Link => "Link".to_string(),
+            StarKind::Client => "Client".to_string(),
+            StarKind::Ext(_) => "Ext".to_string()
+        })
+    }
+}
+
 
 #[derive(Clone)]
 pub struct StarInfo
@@ -588,6 +604,9 @@ impl fmt::Display for StarKey{
         write!(f, "({:?},{})", self.subgraph, self.index)
     }
 }
+
+
+
 impl StarKey
 {
    pub fn new( index: u16)->Self
@@ -1100,7 +1119,18 @@ println!("Star sending: {}", message.payload );
 
     async fn on_unwind( &mut self, mut unwind: StarUnwindInner)
     {
-        // presently stars to not handle any unwinds
+        if unwind.stars.len() > 1
+        {
+            unwind.stars.pop();
+            if self.kind.relay()
+            {
+                let star = unwind.stars.last().unwrap().clone();
+                self.send_frame(star, Frame::StarUnwind(unwind)).await;
+            }
+            else {
+                return eprintln!("this star does not relay messages");
+            }
+        }
     }
 
     async fn on_message( &mut self, mut message: StarMessageInner ) -> Result<(),Error>
