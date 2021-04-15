@@ -21,7 +21,7 @@ use crate::star::{Star, StarKey, StarCommand};
 use crate::starlane::{ConnectCommand, StarlaneCommand};
 use crate::starlane::StarlaneCommand::Connect;
 use std::fmt;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use url::Url;
 
 pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
@@ -356,8 +356,7 @@ impl TunnelConnector for LocalTunnelConnector
 
 pub struct LaneMeta
 {
-    pub star_paths: HashSet<StarKey>,
-    pub not_star_paths: HashSet<StarKey>,
+    pub star_paths: HashMap<StarKey,usize>,
     pub lane: Lane
 }
 
@@ -366,24 +365,27 @@ impl LaneMeta
     pub fn new( lane: Lane ) -> Self
     {
         LaneMeta{
-            star_paths: HashSet::new(),
-            not_star_paths: HashSet::new(),
+            star_paths: HashMap::new(),
             lane: lane
         }
     }
 
-    pub fn has_path_to_star( &self, star: &StarKey )->bool
+    pub fn get_hops_to_star(&self, star: &StarKey ) ->Option<usize>
     {
         if self.lane.remote_star.is_some() && star == self.lane.remote_star.as_ref().unwrap()
         {
-            return true;
+            return Option::Some(1);
         }
-        self.star_paths.contains(star)
+        match self.star_paths.get(star)
+        {
+            None => Option::None,
+            Some(hops) => Option::Some(hops.clone())
+        }
     }
 
-    pub fn add_path_to_star( &mut self, star: StarKey  )
+    pub fn set_hops_to_star(&mut self, star: StarKey, hops: usize )
     {
-        self.star_paths.insert(star);
+        self.star_paths.insert(star, hops);
     }
 }
 

@@ -19,6 +19,7 @@ use crate::frame::Frame::{StarSearch, StarMessage};
 use url::Url;
 use tokio::sync::broadcast::error::SendError;
 use crate::frame::StarMessagePayload::ApplicationCreateRequest;
+use crate::frame::ProtoFrame::CentralSearch;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
 pub enum StarKind
@@ -133,9 +134,18 @@ impl StarKind
     }
 }
 
+
+#[derive(Clone)]
+pub struct StarInfo
+{
+   pub star_key: StarKey,
+   pub kind: StarKind,
+   pub sequence: Arc<IdSeq>
+}
+
 pub enum StarCore
 {
-    Central(Box<dyn Core>),
+    Central(Box<dyn CentralCore>),
     Mesh,
     Supervisor(Box<dyn Core>),
     Server,
@@ -195,6 +205,7 @@ impl Core for StarCore
 
         // terrible error message...
     }
+
 }
 
 pub trait Core: Send+Sync
@@ -202,9 +213,13 @@ pub trait Core: Send+Sync
     fn handle( &mut self, message: StarMessageInner ) -> Result<Option<Vec<StarMessageInner>>,Error>;
 }
 
-pub struct CentralCore
+pub trait CentralCore: Core
 {
-    star: StarKey,
+}
+
+pub struct CentralCoreDefault
+{
+    info: StarInfo,
     supervisors: Vec<StarKey>,
     sequence: IdSeq,
     application_to_supervisor: HashMap<Id,StarKey>,
@@ -212,12 +227,12 @@ pub struct CentralCore
     supervisor_index: usize
 }
 
-impl CentralCore
+impl CentralCoreDefault
 {
-    pub fn new( star: StarKey )->Self
+    pub fn new( info: StarInfo )->Self
     {
-        CentralCore{
-            star: star,
+        CentralCoreDefault {
+            info: info,
             supervisors: vec!(),
             sequence: IdSeq::new(0),
             application_to_supervisor: HashMap::new(),
@@ -241,7 +256,10 @@ impl CentralCore
 
 }
 
-impl Core for CentralCore
+impl CentralCore for CentralCoreDefault
+{}
+
+impl Core for CentralCoreDefault
 {
     fn handle(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
         let mut message = message;
@@ -269,13 +287,13 @@ impl Core for CentralCore
                         self.application_name_to_app_id.insert( name.clone(), app_id.clone() );
                     }
                     let message = StarMessageInner {
-                        from: self.star.clone(),
+                        from: self.info.star_key.clone(),
                         to: supervisor.unwrap(),
                         transaction: message.transaction.clone(),
                         payload: StarMessagePayload::ApplicationAssign( ApplicationAssignInner{
                             app_id: app_id,
                             data: request.data.clone(),
-                            notify: vec![message.from,self.star.clone()]
+                            notify: vec![message.from,self.info.star_key.clone()]
                         } )
                     };
                     Ok(Option::Some(vec![message]))
@@ -319,6 +337,7 @@ impl Core for CentralCore
             }
         }
     }
+
 }
 
 
@@ -334,7 +353,7 @@ pub trait SupervisorCoreBacking: Send+Sync
 
 pub struct DefaultSupervisorCoreBacking
 {
-    star: StarKey,
+    info: StarInfo,
     servers: Vec<StarKey>,
     server_select_index: usize,
     applications: HashSet<Id>
@@ -342,10 +361,10 @@ pub struct DefaultSupervisorCoreBacking
 
 impl DefaultSupervisorCoreBacking
 {
-    pub fn new(star: StarKey)->Self
+    pub fn new(info: StarInfo)->Self
     {
         DefaultSupervisorCoreBacking{
-            star: star,
+            info: info,
             servers: vec![],
             server_select_index: 0,
             applications: HashSet::new()
@@ -384,17 +403,17 @@ impl SupervisorCoreBacking for DefaultSupervisorCoreBacking
 
 pub struct SupervisorCore
 {
-    star: StarKey,
+    info: StarInfo,
     backing: Box<dyn SupervisorCoreBacking>
 }
 
 impl SupervisorCore
 {
-    pub fn new(star: StarKey)->Self
+    pub fn new(info: StarInfo)->Self
     {
        SupervisorCore{
-           star: star.clone(),
-           backing: Box::new(DefaultSupervisorCoreBacking::new(star))
+           info: info.clone(),
+           backing: Box::new(DefaultSupervisorCoreBacking::new(info))
        }
     }
 }
@@ -427,7 +446,7 @@ impl Core for SupervisorCore
 
 pub trait StarCoreProvider: Send+Sync
 {
-    fn provide( &self, kind: &StarKind, star: StarKey ) -> StarCore;
+    fn provide( &self, info: StarInfo ) -> StarCore;
 }
 
 
@@ -447,12 +466,12 @@ impl DefaultStarCoreProvider
 
 impl StarCoreProvider for DefaultStarCoreProvider
 {
-    fn provide(&self, kind: &StarKind, star: StarKey ) -> StarCore {
+    fn provide(&self, info: StarInfo ) -> StarCore {
 
-        match kind{
-            StarKind::Central => StarCore::Central(Box::new(CentralCore::new(star.clone()))),
+        match &info.kind{
+            StarKind::Central => StarCore::Central(Box::new(CentralCoreDefault::new(info.clone()))),
             StarKind::Mesh => StarCore::Mesh,
-            StarKind::Supervisor => StarCore::Supervisor(Box::new(SupervisorCore::new(star.clone()))),
+            StarKind::Supervisor => StarCore::Supervisor(Box::new(SupervisorCore::new(info.clone()))),
             StarKind::Server => StarCore::Server,
             StarKind::Gateway => StarCore::Gateway,
             StarKind::Link => StarCore::Link,
@@ -613,7 +632,6 @@ pub struct Star
     command_rx: Receiver<StarCommand>,
     lanes: HashMap<StarKey, LaneMeta>,
     connector_ctrls: Vec<ConnectorController>,
-    sequence: IdSeq,
     transactions: HashMap<i64,Box<dyn Transaction>>,
     transaction_seq: AtomicI64,
     star_search_transactions: HashMap<i64,StarSearchTransaction>,
@@ -647,7 +665,7 @@ impl Star
 
      */
 
-    pub fn from_proto(key: StarKey, core: StarCore, command_rx: Receiver<StarCommand>, lanes: HashMap<StarKey,LaneMeta>, connector_ctrls: Vec<ConnectorController>, logger: StarLogger, sequence: IdSeq, frame_hold: FrameHold ) ->Self
+    pub fn from_proto(key: StarKey, core: StarCore, command_rx: Receiver<StarCommand>, lanes: HashMap<StarKey,LaneMeta>, connector_ctrls: Vec<ConnectorController>, logger: StarLogger, frame_hold: FrameHold ) ->Self
     {
         Star{
             kind: core.kind(),
@@ -656,7 +674,6 @@ impl Star
             command_rx: command_rx,
             lanes: lanes,
             connector_ctrls: connector_ctrls,
-            sequence: sequence,
             transactions: HashMap::new(),
             transaction_seq: AtomicI64::new(0),
             star_search_transactions: HashMap::new(),
@@ -672,13 +689,14 @@ impl Star
         loop {
             let mut futures = vec!();
             let mut lanes = vec!();
-            futures.push(self.command_rx.recv().boxed() );
 
             for (key,mut lane) in &mut self.lanes
             {
                 futures.push( lane.lane.incoming.recv().boxed() );
                 lanes.push( key.clone() )
             }
+
+            futures.push(self.command_rx.recv().boxed() );
 
             let (command,index,_) = select_all(futures).await;
 
@@ -689,6 +707,12 @@ impl Star
                         if let Some(remote_star)=lane.remote_star.as_ref()
                         {
                             self.lanes.insert(remote_star.clone(), LaneMeta::new(lane));
+
+                            if self.kind.is_central()
+                            {
+                                self.broadcast( Frame::Proto(ProtoFrame::CentralFound(1)), &Option::None ).await;
+                            }
+
                         }
                         else {
                             eprintln!("for star remote star must be set");
@@ -709,8 +733,8 @@ impl Star
                         }
                     }
                     StarCommand::Frame(frame) => {
-                        let lane_key = lanes.get(index-1).unwrap().clone();
-                        self.process_frame(frame, lane_key );
+                        let lane_key = lanes.get(index).unwrap().clone();
+                        self.process_frame(frame, lane_key ).await;
                     }
                     _ => {
                         eprintln!("cannot process command: {}",command);
@@ -753,6 +777,22 @@ impl Star
 
     }
 
+    async fn broadcast(&mut self,  frame: Frame, exclude: &Option<HashSet<StarKey>> )
+    {
+        let mut stars = vec!();
+        for star in self.lanes.keys()
+        {
+            if exclude.is_none() || !exclude.as_ref().unwrap().contains(star)
+            {
+                stars.push(star.clone());
+            }
+        }
+        for star in stars
+        {
+            self.send_frame(star, frame.clone()).await;
+        }
+    }
+
     async fn send(&mut self, message: StarMessageInner )
     {
         self.send_frame(message.to.clone(), Frame::StarMessage(message) );
@@ -760,16 +800,59 @@ impl Star
 
     async fn send_frame(&mut self, star: StarKey, frame: Frame )
     {
-        for (remote_star,lane) in &self.lanes
+        let lane = self.lane_with_shortest_path_to_star(&star);
+        if let Option::Some(lane)=lane
         {
-            if lane.has_path_to_star(&star)
+            lane.lane.outgoing.tx.send( LaneCommand::Frame(frame) ).await;
+        }
+        else {
+            self.frame_hold.add( &star, frame );
+            self.search_for_star(star.clone());
+        }
+    }
+
+    fn lane_with_shortest_path_to_star( &self, star: &StarKey ) -> Option<&LaneMeta>
+    {
+        let mut min_hops= usize::MAX;
+        let mut rtn = Option::None;
+
+        for (_,lane) in &self.lanes
+        {
+            if let Option::Some(hops) = lane.get_hops_to_star(star)
             {
-                lane.lane.outgoing.tx.send( LaneCommand::Frame(frame) ).await;
-                return;
+                if hops < min_hops
+                {
+                    rtn = Option::Some(lane);
+                }
             }
         }
-        self.frame_hold.add( &star, frame );
-        self.search_for_star(star.clone());
+
+       rtn
+    }
+
+    fn get_hops_to_star( &self, star: &StarKey ) -> Option<usize>
+    {
+        let mut rtn= Option::None;
+
+        for (_,lane) in &self.lanes
+        {
+            if let Option::Some(hops) = lane.get_hops_to_star(star)
+            {
+                if rtn.is_none()
+                {
+                    rtn = Option::Some(hops);
+                }
+                else if let Option::Some(min_hops) = rtn
+                {
+                    if hops < min_hops
+                    {
+                        rtn = Option::Some(hops);
+                    }
+                }
+            }
+        }
+
+        rtn
     }
 
     async fn search_for_star( &mut self, star: StarKey )
@@ -799,13 +882,30 @@ impl Star
     {
         match frame
         {
-            StarSearch(search) => {
+            Frame::Proto(proto) => {
+              if let ProtoFrame::CentralSearch = proto
+              {
+                  if self.kind.is_central()
+                  {
+
+                      self.broadcast(Frame::Proto(ProtoFrame::CentralFound(1)) , &Option::None).await;
+                  } else if let Option::Some(hops) = self.get_hops_to_star(&StarKey::central() )
+                  {
+                      self.broadcast(Frame::Proto(ProtoFrame::CentralFound(hops+1)) , &Option::None).await;
+                  }
+                  else
+                  {
+                      self.search_for_star(StarKey::central()).await;
+                  }
+              }
+            }
+            Frame::StarSearch(search) => {
                 self.on_star_search(search, lane_key).await;
             }
             Frame::StarSearchResult(result) => {
                 self.on_star_search_result(result, lane_key ).await;
             }
-            StarMessage(message) => {
+            Frame::StarMessage(message) => {
                 match self.on_message(message).await
                 {
                     Ok(_) => {}
@@ -896,7 +996,7 @@ impl Star
                 {
                     search_trans.hits.insert( hit.star.clone(), hit.clone() );
                     let lane = self.lanes.get_mut(&lane_key).unwrap();
-                    lane.star_paths.insert( hit.star.clone() );
+                    lane.star_paths.insert( hit.star.clone(), hit.hops.clone() as _ );
                     if let Some(frames) = self.frame_hold.release( &hit.star )
                     {
                         for frame in frames
@@ -1050,7 +1150,7 @@ pub enum TransactionState
     Done
 }
 
-pub trait Transaction : Send
+pub trait Transaction : Send+Sync
 {
     fn on_frame( &mut self, frame: Frame, lane: & mut LaneMeta )->TransactionState;
 }
@@ -1067,12 +1167,7 @@ impl Transaction for StarKeySearchTransaction
         {
             for hit in result.hits
             {
-                lane.star_paths.insert(hit.star.clone());
-            }
-
-            if let Option::Some(missed) = result.missed
-            {
-                lane.not_star_paths.insert(missed);
+                lane.star_paths.insert(hit.star.clone(), hit.hops.clone() as _ );
             }
         }
 
@@ -1088,6 +1183,15 @@ pub enum StarLog
    StarSearchResult(StarSearchResultInner),
    StarSearchComplete(StarSearchTransaction)
 }
+
+
+pub struct ShortestPathStarKey
+{
+    pub to: StarKey,
+    pub next_lane: StarKey,
+    pub hops: usize
+}
+
 
 pub struct FrameHold
 {
@@ -1118,5 +1222,10 @@ impl FrameHold {
     pub fn release( &mut self, star: &StarKey ) -> Option<Vec<Frame>>
     {
         self.hold.remove(star)
+    }
+
+    pub fn has_hold( &self, star: &StarKey )->bool
+    {
+        return self.hold.contains_key(star);
     }
 }

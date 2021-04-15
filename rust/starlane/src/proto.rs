@@ -12,9 +12,9 @@ use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use crate::lane::{STARLANE_PROTOCOL_VERSION, TunnelSenderState, Lane, TunnelConnector, TunnelSender, LaneCommand, TunnelReceiver, ConnectorController, LaneMeta};
 use crate::frame::{ProtoFrame, Frame, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarSearchHit};
-use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController, Transaction, StarSearchTransaction, StarCore, StarLogger, StarCoreProvider, FrameTimeoutInner, FrameHold};
+use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController, Transaction, StarSearchTransaction, StarCore, StarLogger, StarCoreProvider, FrameTimeoutInner, FrameHold, StarInfo, ShortestPathStarKey};
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::task::Poll;
 use crate::frame::Frame::{StarMessage, StarSearch};
 use crate::template::ConstellationTemplate;
@@ -27,7 +27,7 @@ pub static MAX_HOPS: i32 = 32;
 pub struct ProtoStar
 {
   star_key: Option<StarKey>,
-  sequence: Option<IdSeq>,
+  sequence: Option<Arc<IdSeq>>,
   kind: StarKind,
   command_tx: Sender<StarCommand>,
   command_rx: Receiver<StarCommand>,
@@ -65,12 +65,28 @@ impl ProtoStar
 
     pub async fn evolve(mut self) -> Result<Star,Error>
     {
-        if self.star_key.is_none()
+        if self.kind.is_central()
         {
-            self.send_expansion_request().await;
+            self.star_key = Option::Some(StarKey::central());
+            self.sequence = Option::Some(Arc::new(IdSeq::new(0)));
+            let info = StarInfo{
+                star_key: self.star_key.as_ref().unwrap().clone(),
+                kind: self.kind.clone(),
+                sequence: self.sequence.as_ref().unwrap().clone()
+            };
+            let core = self.star_core_provider.provide(info.clone() );
+
+
+            return Ok(Star::from_proto(self.star_key.as_ref().unwrap().clone(),
+                                        core,
+                                       self.command_rx,
+                                       self.lanes,
+                                       self.connector_ctrls,
+                                       self.logger,
+                                       self.frame_hold));
         }
         else {
-            self.send_sequence_request().await;
+            self.send_central_search().await;
         }
 
         loop {
@@ -92,14 +108,12 @@ impl ProtoStar
                 futures.push(self.tracker.check().boxed())
             }
 
-
             let (command, future_index, _) = select_all(futures).await;
 
             if let Some(command) = command
             {
                 match command {
                     StarCommand::AddLane(lane) => {
-println!("Adding Lane!");
                         if let Some(remote_star) = &lane.remote_star
                         {
                             let remote_star = remote_star.clone();
@@ -109,15 +123,11 @@ println!("Adding Lane!");
                             {
                                 for frame in frames
                                 {
-                                    self.send( &remote_star, frame );
+                                    self.send_frame(&remote_star, frame ).await;
                                 }
                             }
 
-                            if self.kind.is_central()
-                            {
-println!("Sending CentralFound!");
-                                self.send( &remote_star, Frame::Proto(ProtoFrame::CentralFound));
-                            }
+                            self.broadcast( Frame::Proto(ProtoFrame::CentralSearch), &Option::None ).await;
 
                         } else {
                             eprintln!("cannot add a lane to a star that doesn't have a remote_star");
@@ -130,52 +140,80 @@ println!("Sending CentralFound!");
                         self.logger.tx.push(logger);
                     }
                     StarCommand::Frame(frame) => {
+println!("Received FRAME: {}",frame);
                         self.tracker.process(&frame);
+                        let lane_key = lanes.get(future_index).unwrap();
+                        let lane = self.lanes.get_mut(&lane_key).unwrap();
                         match frame {
-                            Frame::Proto(ProtoFrame::CentralFound) => {
-println!("Received CentralFound!");
-                                let central = StarKey::central();
+                            Frame::Proto(ProtoFrame::CentralSearch) => {
+                                if let Option::Some(hops) = self.get_hops_to_star(&StarKey::central())
                                 {
-                                    let lane_key = lanes.get(future_index).unwrap();
-                                    let lane = self.lanes.get_mut(&lane_key).unwrap();
-                                    lane.star_paths.insert(central.clone());
+                                    self.broadcast( Frame::Proto(ProtoFrame::CentralFound(hops + 1)), &Option::None ).await;
                                 }
-                                if let Option::Some(frames) = self.frame_hold.release(&central )
+                           }
+                            Frame::Proto(ProtoFrame::CentralFound(hops)) => {
+if let Option::Some(star) = &self.star_key
+{
+    println!("Received CentralFound! {}", star);
+}
+else
+{
+    println!("Received CentralFound!");
+}
+                                lane.star_paths.insert( StarKey::central(), hops );
+                               //now tell all the other lanes that CENTRAL is this way...
                                 {
-                                    for frame in frames
-                                    {
-                                        self.send( &central, frame );
-                                    }
+                                    let mut exclude = HashSet::new();
+                                    exclude.insert(lane_key.clone());
+                                    let exclude = Option::Some(exclude);
+                                    self.broadcast(Frame::Proto(ProtoFrame::CentralFound(hops+1)), &exclude ).await;
                                 }
+                                self.send_sequence_request().await;
                             },
                             Frame::Proto(ProtoFrame::GrantSubgraphExpansion(subgraph)) => {
                                 let key = StarKey::new_with_subgraph(subgraph.to_owned(), 0);
                                 self.star_key = Option::Some(key.clone());
 
-                                self.send_sequence_request().await;
+                                self.send_central_search().await;
                             },
                             Frame::StarMessage(message) => {
-                                if let StarMessagePayload::AssignSequence(sequence) = message.payload
+
+                                if self.star_key.is_some()
                                 {
-                                    self.sequence = Option::Some(IdSeq::new(sequence));
+                                    if  message.to == self.star_key.as_ref().unwrap().to_owned()
+                                    {
+                                        if let StarMessagePayload::AssignSequence(sequence) = message.payload
+                                        {
+                                            self.sequence = Option::Some(Arc::new(IdSeq::new(sequence)));
 
-                                    self.evolution_tx.send(ProtoStarEvolution {
-                                        star: self.star_key.as_ref().unwrap().clone(),
-                                        controller: StarController {
-                                            command_tx: self.command_tx.clone()
+                                            self.evolution_tx.send(ProtoStarEvolution {
+                                                star: self.star_key.as_ref().unwrap().clone(),
+                                                controller: StarController {
+                                                    command_tx: self.command_tx.clone()
+                                                }
+                                            });
+
+                                            let info = StarInfo{
+                                                star_key: self.star_key.as_ref().unwrap().clone(),
+                                                kind: self.kind.clone(),
+                                                sequence: self.sequence.as_ref().unwrap().clone()
+                                            };
+
+                                            return Ok(Star::from_proto(self.star_key.as_ref().unwrap().clone(),
+                                                                       self.star_core_provider.provide(info),
+                                                                       self.command_rx,
+                                                                       self.lanes,
+                                                                       self.connector_ctrls,
+                                                                       self.logger,
+                                                                       self.frame_hold)
+                                            );
                                         }
-                                    });
-
-                                    return Ok(Star::from_proto(self.star_key.as_ref().unwrap().clone(),
-                                                                            self.star_core_provider.provide(&self.kind, self.star_key.as_ref().unwrap().clone()),
-                                                                            self.command_rx,
-                                                                            self.lanes,
-                                                                            self.connector_ctrls,
-                                                                            self.logger,
-                                                                            self.sequence.unwrap(),
-                                                                            self.frame_hold)
-                                    );
+                                    }
+                                    else {
+                                        self.send(message).await;
+                                    }
                                 }
+
                             }
                             _ => {
                                 println!("frame unsupported by ProtoStar: {}", frame);
@@ -184,8 +222,8 @@ println!("Received CentralFound!");
                     }
 
                     StarCommand::FrameTimeout(timeout) => {
-                        eprintln!("frame timeout: {}.  resending.", timeout.frame);
-                        self.broadcast(timeout.frame).await;
+                        eprintln!("frame timeout: {}.  resending {} retry.", timeout.frame, timeout.retries);
+                        self.resend(timeout.frame).await;
                     }
                     _ => {
                         eprintln!("not implemented");
@@ -197,6 +235,25 @@ println!("Received CentralFound!");
         }
 
     }
+
+    async fn send_central_search(&mut self )
+    {
+        let frame = Frame::Proto(ProtoFrame::CentralSearch);
+        self.tracker.track( frame.clone(),  | frame |{
+            if let Frame::Proto( ProtoFrame::CentralFound(_))  = frame
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        } );
+
+println!("CentralSearch");
+        self.broadcast(frame, &Option::None ).await;
+    }
+
 
     async fn send_expansion_request( &mut self )
     {
@@ -212,7 +269,7 @@ println!("Received CentralFound!");
             }
         } );
 
-        self.broadcast(frame).await;
+        self.broadcast(frame, &Option::None ).await;
     }
 
     async fn send_sequence_request( &mut self )
@@ -244,37 +301,179 @@ println!("Received CentralFound!");
 
 
         println!("sending sequence request.");
-        self.send( &StarKey::central(), frame.clone() ).await;
+        self.send_frame(&StarKey::central(), frame.clone() ).await;
     }
 
+    async fn resend(&mut self,  frame: Frame)
+    {
+        match frame
+        {
+            Frame::Proto(ProtoFrame::RequestSubgraphExpansion) => {
+                self.broadcast_no_hold(frame, &Option::None ).await;
+            }
+            Frame::Proto(ProtoFrame::CentralSearch) => {
+                self.send_frame_no_hold(&StarKey::central(), frame ).await;
+            }
+            StarMessage(message) => {
+                self.send_no_hold(message).await;
+            }
+            _ => {
+                eprintln!("no rule to resend frame of type: {}", frame);
+            }
+        }
+    }
 
-    async fn broadcast(&mut self,  frame: Frame )
+    async fn broadcast(&mut self,  frame: Frame, exclude: &Option<HashSet<StarKey>> )
     {
         let mut stars = vec!();
         for star in self.lanes.keys()
         {
-            stars.push(star.clone());
+            if exclude.is_none() || !exclude.as_ref().unwrap().contains(star)
+            {
+                stars.push(star.clone());
+            }
         }
         for star in stars
         {
-            self.send(&star, frame.clone());
+            self.send_frame(&star, frame.clone()).await;
         }
     }
 
-
-    async fn send(&mut self, star: &StarKey, frame: Frame )
+    async fn broadcast_no_hold(&mut self,  frame: Frame, exclude: &Option<HashSet<StarKey>> )
     {
-        for (remote_star,lane) in &self.lanes
+        let mut stars = vec!();
+        for star in self.lanes.keys()
         {
-            if lane.has_path_to_star(star)
+            if exclude.is_none() || !exclude.as_ref().unwrap().contains(star)
             {
-                lane.lane.outgoing.tx.send( LaneCommand::Frame(frame) ).await;
-                return;
+                println!("BROADCASTING {} frame {}", star, &frame );
+                stars.push(star.clone());
+            }
+            else {
+                println!("EXCLUDING {}", star );
             }
         }
-        self.frame_hold.add( star, frame );
+        for star in stars
+        {
+            self.send_frame_no_hold(&star, frame.clone()).await;
+        }
     }
 
+
+
+    async fn send_no_hold(&mut self, message: StarMessageInner )
+    {
+        self.send_frame_no_hold(&message.to.clone(), Frame::StarMessage(message) );
+    }
+
+    async fn send_frame_no_hold(&mut self, star: &StarKey, frame: Frame )
+    {
+        let lane = self.lane_with_shortest_path_to_star(star);
+        if let Option::Some(lane) = lane
+        {
+            lane.lane.outgoing.tx.send(LaneCommand::Frame(frame)).await;
+        }
+        else {
+           eprintln!("could not find lane for {}", star);
+        }
+    }
+
+
+    async fn send(&mut self, message: StarMessageInner )
+    {
+        self.send_frame(&message.to.clone(), Frame::StarMessage(message) );
+    }
+
+    async fn send_frame(&mut self, star: &StarKey, frame: Frame )
+    {
+        let lane = self.lane_with_shortest_path_to_star(star);
+        if let Option::Some(lane) = lane
+        {
+            lane.lane.outgoing.tx.send(LaneCommand::Frame(frame)).await;
+        }
+        else {
+            self.frame_hold.add(star, frame);
+        }
+    }
+
+    fn lane_with_shortest_path_to_star( &self, star: &StarKey ) -> Option<&LaneMeta>
+    {
+        let mut min_hops= usize::MAX;
+        let mut rtn = Option::None;
+
+        for (_,lane) in &self.lanes
+        {
+            if let Option::Some(hops) = lane.get_hops_to_star(star)
+            {
+                if hops < min_hops
+                {
+                    rtn = Option::Some(lane);
+                }
+            }
+        }
+
+        rtn
+    }
+    fn shortest_path_star_key(&self, to: &StarKey ) -> Option<ShortestPathStarKey>
+    {
+        let mut rtn = Option::None;
+
+        for (_,lane) in &self.lanes
+        {
+            if let Option::Some(hops) = lane.get_hops_to_star(to)
+            {
+                if lane.lane.remote_star.is_some()
+                {
+                    if let Option::None = rtn
+                    {
+                        rtn = Option::Some(ShortestPathStarKey {
+                            to: to.clone(),
+                            next_lane: lane.lane.remote_star.as_ref().unwrap().clone(),
+                            hops
+                        });
+                    }
+                    else if let Option::Some(min) = &rtn
+                    {
+                        if hops < min.hops
+                        {
+                            rtn = Option::Some(ShortestPathStarKey {
+                                to: to.clone(),
+                                next_lane: lane.lane.remote_star.as_ref().unwrap().clone(),
+                                hops
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        rtn
+    }
+
+    fn get_hops_to_star( &self, star: &StarKey ) -> Option<usize>
+    {
+        let mut rtn= Option::None;
+
+        for (_,lane) in &self.lanes
+        {
+            if let Option::Some(hops) = lane.get_hops_to_star(star)
+            {
+                if rtn.is_none()
+                {
+                    rtn = Option::Some(hops);
+                }
+                else if let Option::Some(min_hops) = rtn
+                {
+                    if hops < min_hops
+                    {
+                        rtn = Option::Some(hops);
+                    }
+                }
+            }
+        }
+
+        rtn
+    }
 
     async fn process_frame( &mut self, frame: Frame, lane: &mut LaneMeta )
     {
@@ -500,3 +699,17 @@ impl ProtoTracker
         }
     }
 }
+
+pub enum LaneToCentralState
+{
+    Found(LaneToCentral),
+    None
+}
+
+pub struct LaneToCentral
+{
+    remote_star: StarKey,
+    hops: usize
+}
+
+

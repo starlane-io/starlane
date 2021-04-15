@@ -255,7 +255,6 @@ impl Starlane
         let high_lane= Lane::new(low).await;
         let low_lane = Lane::new(high).await;
         let connector = LocalTunnelConnector::new(&high_lane,&low_lane).await?;
-println!("Sending AddLane!");
         high_star_ctrl.command_tx.send(StarCommand::AddLane(high_lane)).await?;
         low_star_ctrl.command_tx.send(StarCommand::AddLane(low_lane)).await?;
         high_star_ctrl.command_tx.send( StarCommand::AddConnectorController(connector)).await?;

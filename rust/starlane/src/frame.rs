@@ -17,7 +17,8 @@ pub enum ProtoFrame
     ReportStarKey(StarKey),
     RequestSubgraphExpansion,
     GrantSubgraphExpansion(Vec<u16>),
-    CentralFound
+    CentralSearch,
+    CentralFound(usize)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -271,7 +272,8 @@ impl fmt::Display for ProtoFrame {
             ProtoFrame::ReportStarKey(id) => format!("ReportStarId({})", id).to_string(),
             ProtoFrame::RequestSubgraphExpansion=> format!("RequestSubgraphExpansion").to_string(),
             ProtoFrame::GrantSubgraphExpansion(path) => format!("GrantSubgraphExpansion({:?})", path).to_string(),
-            ProtoFrame::CentralFound => format!("CentralFound").to_string(),
+            ProtoFrame::CentralFound(_) => format!("CentralFound").to_string(),
+            ProtoFrame::CentralSearch => format!("CentralSearch").to_string(),
         };
         write!(f, "{}",r)
     }
