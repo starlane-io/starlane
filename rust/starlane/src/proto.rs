@@ -112,7 +112,6 @@ impl ProtoStar
 
             if let Some(command) = command
             {
-println!("Proto Received command: {}", command );
                 match command {
                     StarCommand::AddLane(lane) => {
                         if let Some(remote_star) = &lane.remote_star
@@ -141,7 +140,6 @@ println!("Proto Received command: {}", command );
                         self.logger.tx.push(logger);
                     }
                     StarCommand::Frame(frame) => {
-println!("Received FRAME: {}",frame);
                         self.tracker.process(&frame);
                         let lane_key = lanes.get(future_index).unwrap();
                         let lane = self.lanes.get_mut(&lane_key).unwrap();
@@ -171,7 +169,6 @@ println!("Received FRAME: {}",frame);
                                 self.send_central_search().await;
                             },
                             Frame::StarMessage(message) => {
-println!("proto received message: {}", message.payload );
                                 if self.star_key.is_some()
                                 {
                                     if  message.to == self.star_key.as_ref().unwrap().to_owned()
@@ -191,7 +188,6 @@ println!("proto received message: {}", message.payload );
                                 if self.star_key.is_some()
                                 {
                                     let star_key = self.star_key.as_ref().unwrap().clone();
-println!("ProtoWind from: {} to: {}", self.star_key.as_ref().unwrap(), wind.to);
                                     wind.stars.push(star_key );
                                     self.send_frame(&wind.to.clone(), Frame::StarWind(wind)).await;
                                 }
@@ -202,13 +198,11 @@ println!("ProtoWind from: {} to: {}", self.star_key.as_ref().unwrap(), wind.to);
                                 {
                                     unwind.stars.pop();
                                     let first = unwind.stars.first().unwrap().clone();
-println!("ProtoUnwind from: {} to: {}", self.star_key.as_ref().unwrap(), first );
                                     self.send_frame(&first, Frame::StarUnwind(unwind)).await;
                                 }
                                 else {
                                     if let StarUnwindPayload::AssignSequence(sequence) = unwind.payload
                                     {
-println!("ProtoUnwind: RECEIVED {}", &self.kind );
 
                                             self.sequence = Option::Some(Arc::new(IdSeq::new(sequence)));
                                             let star_key = self.star_key.as_ref().unwrap().clone();
@@ -273,7 +267,6 @@ println!("ProtoUnwind: RECEIVED {}", &self.kind );
             }
         } );
 
-println!("CentralSearch");
         self.broadcast(frame, &Option::None ).await;
     }
 
@@ -321,7 +314,6 @@ println!("CentralSearch");
             }
         } );
 
-        println!("sending sequence request.");
         self.send_frame(&StarKey::central(), frame.clone() ).await;
     }
 
@@ -336,11 +328,9 @@ println!("CentralSearch");
                 self.send_frame_no_hold(&StarKey::central(), frame ).await;
             }
             StarMessage(message) => {
-println!("retry message...");
                 self.send_no_hold(message).await;
             }
             StarWind(wind) => {
-                println!("retry message...");
                 self.send_frame_no_hold(&wind.to.clone(), Frame::StarWind(wind) ).await;
             }
 
@@ -373,11 +363,7 @@ println!("retry message...");
         {
             if exclude.is_none() || !exclude.as_ref().unwrap().contains(star)
             {
-                println!("BROADCASTING {} frame {}", star, &frame );
                 stars.push(star.clone());
-            }
-            else {
-                println!("EXCLUDING {}", star );
             }
         }
         for star in stars
@@ -390,7 +376,6 @@ println!("retry message...");
 
     async fn send_no_hold(&mut self, message: StarMessageInner )
     {
-println!("sending message no holds....");
         self.send_frame_no_hold(&message.to.clone(), Frame::StarMessage(message) ).await;
     }
 

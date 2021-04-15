@@ -846,7 +846,6 @@ impl Star
 
     async fn send(&mut self, message: StarMessageInner )
     {
-println!("Star sending: {}", message.payload );
         self.send_frame(message.to.clone(), Frame::StarMessage(message) ).await;
     }
 
