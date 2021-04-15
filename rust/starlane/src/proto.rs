@@ -112,6 +112,7 @@ impl ProtoStar
 
             if let Some(command) = command
             {
+println!("Proto Received command: {}", command );
                 match command {
                     StarCommand::AddLane(lane) => {
                         if let Some(remote_star) = &lane.remote_star
@@ -177,7 +178,7 @@ else
                                 self.send_central_search().await;
                             },
                             Frame::StarMessage(message) => {
-
+println!("proto received message: {}", message.payload );
                                 if self.star_key.is_some()
                                 {
                                     if  message.to == self.star_key.as_ref().unwrap().to_owned()
@@ -315,6 +316,7 @@ println!("CentralSearch");
                 self.send_frame_no_hold(&StarKey::central(), frame ).await;
             }
             StarMessage(message) => {
+println!("retry message...");
                 self.send_no_hold(message).await;
             }
             _ => {
@@ -363,7 +365,8 @@ println!("CentralSearch");
 
     async fn send_no_hold(&mut self, message: StarMessageInner )
     {
-        self.send_frame_no_hold(&message.to.clone(), Frame::StarMessage(message) );
+println!("sending message no holds....");
+        self.send_frame_no_hold(&message.to.clone(), Frame::StarMessage(message) ).await;
     }
 
     async fn send_frame_no_hold(&mut self, star: &StarKey, frame: Frame )
@@ -381,7 +384,7 @@ println!("CentralSearch");
 
     async fn send(&mut self, message: StarMessageInner )
     {
-        self.send_frame(&message.to.clone(), Frame::StarMessage(message) );
+        self.send_frame(&message.to.clone(), Frame::StarMessage(message) ).await;
     }
 
     async fn send_frame(&mut self, star: &StarKey, frame: Frame )

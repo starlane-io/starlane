@@ -795,7 +795,8 @@ impl Star
 
     async fn send(&mut self, message: StarMessageInner )
     {
-        self.send_frame(message.to.clone(), Frame::StarMessage(message) );
+println!("Star sending: {}", message.payload );
+        self.send_frame(message.to.clone(), Frame::StarMessage(message) ).await;
     }
 
     async fn send_frame(&mut self, star: StarKey, frame: Frame )
@@ -908,7 +909,7 @@ impl Star
             Frame::StarMessage(message) => {
                 match self.on_message(message).await
                 {
-                    Ok(_) => {}
+                    Ok(messages) => {}
                     Err(error) => {
 
                     }
