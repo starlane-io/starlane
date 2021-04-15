@@ -11,12 +11,12 @@ use crate::constellation::Constellation;
 use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use crate::lane::{STARLANE_PROTOCOL_VERSION, TunnelSenderState, Lane, TunnelConnector, TunnelSender, LaneCommand, TunnelReceiver, ConnectorController, LaneMeta};
-use crate::frame::{ProtoFrame, Frame, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarSearchHit};
+use crate::frame::{ProtoFrame, Frame, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarSearchHit, StarWindInner, StarUnwindPayload, StarWindPayload};
 use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController, Transaction, StarSearchTransaction, StarCore, StarLogger, StarCoreProvider, FrameTimeoutInner, FrameHold, StarInfo, ShortestPathStarKey};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::task::Poll;
-use crate::frame::Frame::{StarMessage, StarSearch};
+use crate::frame::Frame::{StarMessage, StarSearch, StarWind};
 use crate::template::ConstellationTemplate;
 use crate::starlane::StarlaneCommand;
 use tokio::time::{Duration, Instant};
@@ -153,14 +153,7 @@ println!("Received FRAME: {}",frame);
                                 }
                            }
                             Frame::Proto(ProtoFrame::CentralFound(hops)) => {
-if let Option::Some(star) = &self.star_key
-{
-    println!("Received CentralFound! {}", star);
-}
-else
-{
-    println!("Received CentralFound!");
-}
+
                                 lane.star_paths.insert( StarKey::central(), hops );
                                //now tell all the other lanes that CENTRAL is this way...
                                 {
@@ -183,12 +176,39 @@ println!("proto received message: {}", message.payload );
                                 {
                                     if  message.to == self.star_key.as_ref().unwrap().to_owned()
                                     {
-                                        if let StarMessagePayload::AssignSequence(sequence) = message.payload
-                                        {
-                                            self.sequence = Option::Some(Arc::new(IdSeq::new(sequence)));
+                                       // if let StarMessagePayload::AssignSequence(sequence) = message.payload
 
+                                    }
+                                    else {
+                                        self.send(message).await;
+                                    }
+                                }
+
+                            }
+
+                            Frame::StarWind(mut wind) => {
+                                if self.star_key.is_some()
+                                {
+                                    let star_key = self.star_key.as_ref().unwrap().clone();
+                                    wind.stars.push(star_key );
+                                    self.send_frame(&wind.to.clone(), Frame::StarWind(wind)).await;
+                                }
+                            }
+                            Frame::StarUnwind(mut unwind) => {
+
+                                if unwind.stars.len() != 1
+                                {
+                                    unwind.stars.pop();
+                                    let first = unwind.stars.first().unwrap().clone();
+                                    self.send_frame(&first, Frame::StarUnwind(unwind)).await;
+                                }
+                                else {
+                                    if let StarUnwindPayload::AssignSequence(sequence) = unwind.payload
+                                    {
+                                            self.sequence = Option::Some(Arc::new(IdSeq::new(sequence)));
+                                            let star_key = self.star_key.as_ref().unwrap().clone();
                                             self.evolution_tx.send(ProtoStarEvolution {
-                                                star: self.star_key.as_ref().unwrap().clone(),
+                                                star: star_key,
                                                 controller: StarController {
                                                     command_tx: self.command_tx.clone()
                                                 }
@@ -208,14 +228,11 @@ println!("proto received message: {}", message.payload );
                                                                        self.logger,
                                                                        self.frame_hold)
                                             );
-                                        }
-                                    }
-                                    else {
-                                        self.send(message).await;
                                     }
                                 }
 
                             }
+
                             _ => {
                                 println!("frame unsupported by ProtoStar: {}", frame);
                             }
@@ -275,17 +292,16 @@ println!("CentralSearch");
 
     async fn send_sequence_request( &mut self )
     {
-        let frame = Frame::StarMessage( StarMessageInner{
-            from: self.star_key.as_ref().unwrap().clone(),
+        let frame = Frame::StarWind( StarWindInner{
             to: StarKey::central(),
-            transaction: None,
-            payload: StarMessagePayload::RequestSequence
+            stars: vec![self.star_key.as_ref().unwrap().clone()],
+            payload: StarWindPayload::RequestSequence
         } );
 
         self.tracker.track( frame.clone(),  | frame |{
-            if let Frame::StarMessage( inner )  = frame
+            if let Frame::StarUnwind( inner )  = frame
             {
-                if let StarMessagePayload::AssignSequence(_) = inner.payload
+                if let StarUnwindPayload::AssignSequence(_) = inner.payload
                 {
                     return true;
                 }
@@ -299,7 +315,6 @@ println!("CentralSearch");
                 return false;
             }
         } );
-
 
         println!("sending sequence request.");
         self.send_frame(&StarKey::central(), frame.clone() ).await;
@@ -319,6 +334,11 @@ println!("CentralSearch");
 println!("retry message...");
                 self.send_no_hold(message).await;
             }
+            StarWind(wind) => {
+                println!("retry message...");
+                self.send_frame_no_hold(&wind.to.clone(), Frame::StarWind(wind) ).await;
+            }
+
             _ => {
                 eprintln!("no rule to resend frame of type: {}", frame);
             }

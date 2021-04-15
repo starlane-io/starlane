@@ -98,7 +98,7 @@ impl Starlane
             if let Ok(star) = star
             {
                 data.exclude_handles.insert("link".to_string() );
-                data.subgraphs.insert("client".to_string(), star.key.subgraph.clone() );
+                data.subgraphs.insert("client".to_string(), star.star_key.subgraph.clone() );
 
                 let (tx,rx) = oneshot::channel();
                 starlane_ctrl.send( StarlaneCommand::ProvisionConstellation(

@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicI32, AtomicI64 };
 use futures::future::join_all;
 use futures::future::select_all;
-use crate::frame::{ProtoFrame, Frame, StarSearchHit, StarSearchPattern, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchResultInner, RejectionInner, ApplicationAssignInner, ApplicationReportSupervisorInner};
+use crate::frame::{ProtoFrame, Frame, StarSearchHit, StarSearchPattern, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchResultInner, RejectionInner, ApplicationAssignInner, ApplicationReportSupervisorInner, StarWindInner, StarUnwindInner, StarUnwindPayload, StarWindPayload};
 use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use futures::FutureExt;
@@ -174,17 +174,17 @@ impl StarCore
 
 impl Core for StarCore
 {
-    fn handle(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
+    fn handle_message(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
         match self
         {
             StarCore::Central(core) => {
-                core.handle(message)
+                core.handle_message(message)
             }
             StarCore::Mesh => {
                 Err("this core does not know how to handle this message".into())
             }
             StarCore::Supervisor(core) => {
-                core.handle(message)
+                core.handle_message(message)
             }
             StarCore::Server => {
                 Err("this core does not know how to handle this message".into())
@@ -206,11 +206,41 @@ impl Core for StarCore
         // terrible error message...
     }
 
+    fn handle_wind(&mut self, wind: StarWindInner) -> Result<StarUnwindPayload, Error> {
+        match self
+        {
+            StarCore::Central(core) => {
+                core.handle_wind(wind)
+            }
+            StarCore::Mesh => {
+                Err("this core does not know how to handle this message".into())
+            }
+            StarCore::Supervisor(core) => {
+                core.handle_wind(wind)
+            }
+            StarCore::Server => {
+                Err("this core does not know how to handle this message".into())
+            }
+            StarCore::Gateway => {
+                Err("this core does not know how to handle this message".into())
+            }
+            StarCore::Link => {
+                Err("this core does not know how to handle this message".into())
+            }
+            StarCore::Client => {
+                Err("this core does not know how to handle this message".into())
+            }
+            StarCore::Ext => {
+                Err("this core does not know how to handle this message".into())
+            }
+        }
+    }
 }
 
 pub trait Core: Send+Sync
 {
-    fn handle( &mut self, message: StarMessageInner ) -> Result<Option<Vec<StarMessageInner>>,Error>;
+    fn handle_message(&mut self, message: StarMessageInner ) -> Result<Option<Vec<StarMessageInner>>,Error>;
+    fn handle_wind(&mut self, wind: StarWindInner ) -> Result<StarUnwindPayload,Error>;
 }
 
 pub trait CentralCore: Core
@@ -261,15 +291,11 @@ impl CentralCore for CentralCoreDefault
 
 impl Core for CentralCoreDefault
 {
-    fn handle(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
+    fn handle_message(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
         let mut message = message;
         match &message.payload
         {
-            StarMessagePayload::RequestSequence => {
-                message.reply(StarMessagePayload::AssignSequence(self.sequence.next().index));
-                Ok(Option::Some(vec![message]))
-            }
-            StarMessagePayload::SupervisorPledgeToCentral => {
+           StarMessagePayload::SupervisorPledgeToCentral => {
                 self.supervisors.push(message.from.clone());
                 Ok(Option::None)
             }
@@ -338,6 +364,15 @@ impl Core for CentralCoreDefault
         }
     }
 
+    fn handle_wind(&mut self, wind: StarWindInner) -> Result<StarUnwindPayload, Error> {
+        match wind.payload
+        {
+            StarWindPayload::RequestSequence => {
+                Ok(StarUnwindPayload::AssignSequence(self.sequence.next().index))
+            }
+        }
+
+    }
 }
 
 
@@ -420,7 +455,7 @@ impl SupervisorCore
 
 impl Core for SupervisorCore
 {
-    fn handle(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
+    fn handle_message(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
 
         match &message.payload
         {
@@ -441,6 +476,10 @@ impl Core for SupervisorCore
             }
         }
 
+    }
+
+    fn handle_wind(&mut self, wind: StarWindInner) -> Result<StarUnwindPayload, Error> {
+        Err("supervisor does not handle any winds".into())
     }
 }
 
@@ -627,7 +666,7 @@ pub static MAX_HOPS: i32 = 32;
 pub struct Star
 {
     pub kind: StarKind,
-    pub key: StarKey,
+    pub star_key: StarKey,
     core: StarCore,
     command_rx: Receiver<StarCommand>,
     lanes: HashMap<StarKey, LaneMeta>,
@@ -670,7 +709,7 @@ impl Star
         Star{
             kind: core.kind(),
             core: core,
-            key,
+            star_key: key,
             command_rx: command_rx,
             lanes: lanes,
             connector_ctrls: connector_ctrls,
@@ -753,19 +792,12 @@ impl Star
 
     async fn on_init( &mut self )
     {
-
-        // anybody but central
-        if !self.kind.is_central()
-        {
-            self.send(StarMessageInner::to_central(self.key.clone(), StarMessagePayload::RequestSequence ));
-        }
-
         match self.kind
         {
             StarKind::Central => {}
             StarKind::Mesh => {}
             StarKind::Supervisor => {
-                self.send( StarMessageInner::to_central( self.key.clone(), StarMessagePayload::SupervisorPledgeToCentral));
+                self.send( StarMessageInner::to_central(self.star_key.clone(), StarMessagePayload::SupervisorPledgeToCentral));
             }
             StarKind::Server => {
             }
@@ -860,13 +892,13 @@ println!("Star sending: {}", message.payload );
     {
 
         let search_id = self.transaction_seq.fetch_add(1, std::sync::atomic::Ordering::Relaxed );
-        let search_transaction = StarSearchTransaction::new(StarSearchPattern::StarKey(self.key.clone()));
+        let search_transaction = StarSearchTransaction::new(StarSearchPattern::StarKey(self.star_key.clone()));
         self.star_search_transactions.insert(search_id, search_transaction );
 
         let search = StarSearchInner{
-            from: self.key.clone(),
+            from: self.star_key.clone(),
             pattern: StarSearchPattern::StarKey(star),
-            hops: vec![self.key.clone()],
+            hops: vec![self.star_key.clone()],
             transactions: vec![search_id],
             max_hops: MAX_HOPS,
             multi: false
@@ -911,11 +943,18 @@ println!("Star sending: {}", message.payload );
                 {
                     Ok(messages) => {}
                     Err(error) => {
-
+                        eprintln!("error: {}", error)
                     }
                 }
             }
+            Frame::StarWind(wind) => {
+                self.on_wind(wind).await;
+            }
+            Frame::StarUnwind(unwind) => {
+                self.on_unwind(unwind).await;
+            }
             _ => {
+
                 eprintln!("star does not handle frame: {}", frame)
             }
         }
@@ -926,7 +965,7 @@ println!("Star sending: {}", message.payload );
         let hit = match &search.pattern
         {
             StarSearchPattern::StarKey(star) => {
-                self.key == *star
+                self.star_key == *star
             }
             StarSearchPattern::StarKind(kind) => {
                 self.kind == *kind
@@ -941,7 +980,7 @@ println!("Star sending: {}", message.payload );
                 let frame = Frame::StarSearchResult( StarSearchResultInner {
                     missed: None,
                     hops: search.hops.clone(),
-                    hits: vec![ StarSearchHit { star: self.key.clone(), hops: hops as _ } ],
+                    hits: vec![ StarSearchHit { star: self.star_key.clone(), hops: hops as _ } ],
                     search: search.clone(),
                     transactions: search.transactions.clone()
                 });
@@ -964,7 +1003,7 @@ println!("Star sending: {}", message.payload );
         let search_transaction = StarSearchTransaction::new(search.pattern.clone() );
         self.star_search_transactions.insert(search_id,search_transaction);
 
-        search.inc( self.key.clone(), search_id );
+        search.inc(self.star_key.clone(), search_id );
 
         if search.max_hops > MAX_HOPS
         {
@@ -1028,9 +1067,45 @@ println!("Star sending: {}", message.payload );
         }
     }
 
+    async fn on_wind( &mut self, mut wind: StarWindInner)
+    {
+        if wind.to != self.star_key
+        {
+            if self.kind.relay()
+            {
+                wind.stars.push( self.star_key.clone() );
+                self.send_frame(wind.to.clone(), Frame::StarWind(wind)).await;
+            }
+            else {
+                eprintln!("this star does not relay messages");
+            }
+        }
+        else {
+            let star_stack = wind.stars.clone();
+            match self.core.handle_wind(wind)
+            {
+                Ok(payload) => {
+                    let unwind = StarUnwindInner{
+                        stars: star_stack.clone(),
+                        payload: payload
+                    };
+                    self.send_frame(star_stack.last().unwrap().clone(), Frame::StarUnwind(unwind) ).await;
+                }
+                Err(error) => {
+                    eprintln!("encountered handle_wind error: {}", error );
+                }
+            };
+        }
+    }
+
+    async fn on_unwind( &mut self, mut unwind: StarUnwindInner)
+    {
+        // presently stars to not handle any unwinds
+    }
+
     async fn on_message( &mut self, mut message: StarMessageInner ) -> Result<(),Error>
     {
-        if message.to != self.key
+        if message.to != self.star_key
         {
             if self.kind.relay()
             {
@@ -1046,7 +1121,7 @@ println!("Star sending: {}", message.payload );
             match message.payload
             {
                 _ => {
-                    if let Ok(Some(messages)) = self.core.handle(message)
+                    if let Ok(Some(messages)) = self.core.handle_message(message)
                     {
                         for message in messages
                         {

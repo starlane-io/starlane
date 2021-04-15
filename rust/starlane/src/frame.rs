@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize, Serializer};
 pub struct Command
 {
     pub from: i32,
-    pub gram: ProtoFrame
+    pub frame: ProtoFrame
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -29,7 +29,36 @@ pub enum Frame
     Diagnose(FrameDiagnose),
     StarSearch(StarSearchInner),
     StarSearchResult(StarSearchResultInner),
-    StarMessage(StarMessageInner)
+    StarMessage(StarMessageInner),
+    StarWind(StarWindInner),
+    StarUnwind(StarUnwindInner)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum StarWindPayload
+{
+    RequestSequence
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum StarUnwindPayload
+{
+    AssignSequence(i64)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct StarWindInner
+{
+  pub to: StarKey,
+  pub stars: Vec<StarKey>,
+  pub payload: StarWindPayload
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct StarUnwindInner
+{
+    pub stars: Vec<StarKey>,
+    pub payload: StarUnwindPayload
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -153,8 +182,6 @@ impl StarMessageInner
 pub enum StarMessagePayload
 {
    Reject(RejectionInner),
-   RequestSequence,
-   AssignSequence(i64),
    SupervisorPledgeToCentral,
    ApplicationCreateRequest(ApplicationCreateRequestInner),
    ApplicationAssign(ApplicationAssignInner),
@@ -234,8 +261,6 @@ impl fmt::Display for StarMessagePayload{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
             StarMessagePayload::Reject(inner) => format!("Reject({})",inner.message),
-            StarMessagePayload::RequestSequence => "RequestSequence".to_string(),
-            StarMessagePayload::AssignSequence(_) => "AssignSequence".to_string(),
             StarMessagePayload::SupervisorPledgeToCentral => "SupervisorPledgeToCentral".to_string(),
             StarMessagePayload::ApplicationCreateRequest(_) => "ApplicationCreateRequest".to_string(),
             StarMessagePayload::ApplicationAssign(_) => "ApplicationAssign".to_string(),
@@ -260,6 +285,8 @@ impl fmt::Display for Frame {
             Frame::StarMessage(inner)=>format!("StarMessage({})",inner.payload).to_string(),
             Frame::StarSearch(_)=>format!("StarSearch").to_string(),
             Frame::StarSearchResult(_)=>format!("StarSearchResult").to_string(),
+            Frame::StarWind(_)=>format!("StarWind").to_string(),
+            Frame::StarUnwind(_)=>format!("StarUnwind").to_string(),
         };
         write!(f, "{}",r)
     }
