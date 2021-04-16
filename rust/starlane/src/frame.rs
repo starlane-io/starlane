@@ -30,8 +30,16 @@ pub enum Frame
     StarSearch(StarSearchInner),
     StarSearchResult(StarSearchResultInner),
     StarMessage(StarMessageInner),
+    StarAck(StarAckInner),
     StarWind(StarWindInner),
     StarUnwind(StarUnwindInner)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct StarAckInner
+{
+    to: StarKey,
+    id: Id
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -77,7 +85,6 @@ pub struct StarSearchInner
     pub hops: Vec<StarKey>,
     pub transactions: Vec<i64>,
     pub max_hops: i32,
-    pub multi: bool
 }
 
 impl StarSearchInner
@@ -96,6 +103,7 @@ pub enum StarSearchPattern
     StarKey(StarKey),
     StarKind(StarKind)
 }
+
 
 impl StarSearchPattern
 {
@@ -141,39 +149,54 @@ pub struct StarMessageInner
 {
    pub from: StarKey,
    pub to: StarKey,
+   pub id: Id,
    pub transaction: Option<Id>,
-   pub payload: StarMessagePayload
+   pub payload: StarMessagePayload,
+   pub retry: usize,
+   pub max_retries: usize
 }
 
 impl StarMessageInner
 {
-    pub fn new(from: StarKey, to: StarKey, payload: StarMessagePayload) -> Self
+    pub fn new(id:Id, from: StarKey, to: StarKey, payload: StarMessagePayload) -> Self
     {
         StarMessageInner {
+            id: id,
             from: from,
             to: to,
             transaction: Option::None,
-            payload: payload
+            payload: payload,
+            retry: 0,
+            max_retries: 16
         }
     }
 
-    pub fn to_central(from: StarKey, payload: StarMessagePayload) -> Self
+    pub fn to_central(id:Id, from: StarKey, payload: StarMessagePayload ) -> Self
     {
         StarMessageInner {
+            id: id,
             from: from,
             to: StarKey::central(),
             transaction: Option::None,
-            payload: payload
+            payload: payload,
+            retry: 0,
+            max_retries: 16
         }
     }
 
 
-    pub fn reply(&mut self, payload: StarMessagePayload)
+    pub fn reply(&mut self, id:Id, payload: StarMessagePayload)
     {
         let tmp = self.from.clone();
         self.from = self.to.clone();
         self.to = tmp;
         self.payload = payload;
+        self.retry = 0;
+    }
+
+    pub fn inc_retry(&mut self)
+    {
+        self.retry = self.retry + 1;
     }
 
 }
@@ -287,6 +310,7 @@ impl fmt::Display for Frame {
             Frame::StarSearchResult(_)=>format!("StarSearchResult").to_string(),
             Frame::StarWind(_)=>format!("StarWind").to_string(),
             Frame::StarUnwind(_)=>format!("StarUnwind").to_string(),
+            Frame::StarAck(_)=>format!("StarAck").to_string(),
         };
         write!(f, "{}",r)
     }

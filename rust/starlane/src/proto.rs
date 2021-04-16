@@ -12,7 +12,7 @@ use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use crate::lane::{STARLANE_PROTOCOL_VERSION, TunnelSenderState, Lane, TunnelConnector, TunnelSender, LaneCommand, TunnelReceiver, ConnectorController, LaneMeta};
 use crate::frame::{ProtoFrame, Frame, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarSearchHit, StarWindInner, StarUnwindPayload, StarWindPayload};
-use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController, Transaction, StarSearchTransaction, StarCore, StarLogger, StarCoreProvider, FrameTimeoutInner, FrameHold, StarInfo, ShortestPathStarKey};
+use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController, Transaction, StarSearchTransaction, StarCore, StarLogger, StarCoreFactory, FrameTimeoutInner, FrameHold, StarInfo, ShortestPathStarKey};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::task::Poll;
@@ -34,7 +34,7 @@ pub struct ProtoStar
   evolution_tx: oneshot::Sender<ProtoStarEvolution>,
   lanes: HashMap<StarKey, LaneMeta>,
   connector_ctrls: Vec<ConnectorController>,
-  star_core_provider: Arc<dyn StarCoreProvider>,
+  star_core_provider: Arc<dyn StarCoreFactory>,
   logger: StarLogger,
   frame_hold: FrameHold,
   tracker: ProtoTracker
@@ -42,7 +42,7 @@ pub struct ProtoStar
 
 impl ProtoStar
 {
-    pub fn new(key: Option<StarKey>, kind: StarKind, evolution_tx: oneshot::Sender<ProtoStarEvolution>, star_core_provider: Arc<dyn StarCoreProvider>) ->(Self, StarController)
+    pub fn new(key: Option<StarKey>, kind: StarKind, evolution_tx: oneshot::Sender<ProtoStarEvolution>, star_core_provider: Arc<dyn StarCoreFactory>) ->(Self, StarController)
     {
         let (command_tx, command_rx) = mpsc::channel(32);
         (ProtoStar{
@@ -67,23 +67,27 @@ impl ProtoStar
     {
         if self.kind.is_central()
         {
+            let sequence = Arc::new(IdSeq::new(0));
             self.star_key = Option::Some(StarKey::central());
-            self.sequence = Option::Some(Arc::new(IdSeq::new(0)));
+            self.sequence = Option::Some(sequence.clone());
             let info = StarInfo{
                 star_key: self.star_key.as_ref().unwrap().clone(),
                 kind: self.kind.clone(),
-                sequence: self.sequence.as_ref().unwrap().clone()
+                sequence: self.sequence.as_ref().unwrap().clone(),
+                command_tx: self.command_tx.clone()
             };
-            let core = self.star_core_provider.provide(info.clone() );
+            let core = self.star_core_provider.create(info.clone() );
 
 
             return Ok(Star::from_proto(self.star_key.as_ref().unwrap().clone(),
-                                        core,
+                                       core,
+                                       self.command_tx,
                                        self.command_rx,
                                        self.lanes,
                                        self.connector_ctrls,
                                        self.logger,
-                                       self.frame_hold));
+                                       self.frame_hold,
+                                       sequence));
         }
         else {
             self.send_central_search().await;
@@ -204,7 +208,8 @@ impl ProtoStar
                                     if let StarUnwindPayload::AssignSequence(sequence) = unwind.payload
                                     {
 
-                                            self.sequence = Option::Some(Arc::new(IdSeq::new(sequence)));
+                                        let sequence = Arc::new(IdSeq::new(sequence) );
+                                            self.sequence = Option::Some(sequence.clone());
                                             let star_key = self.star_key.as_ref().unwrap().clone();
                                             self.evolution_tx.send(ProtoStarEvolution {
                                                 star: star_key,
@@ -216,16 +221,20 @@ impl ProtoStar
                                             let info = StarInfo{
                                                 star_key: self.star_key.as_ref().unwrap().clone(),
                                                 kind: self.kind.clone(),
-                                                sequence: self.sequence.as_ref().unwrap().clone()
+                                                sequence: self.sequence.as_ref().unwrap().clone(),
+                                                command_tx: self.command_tx.clone()
                                             };
 
                                             return Ok(Star::from_proto(self.star_key.as_ref().unwrap().clone(),
-                                                                       self.star_core_provider.provide(info),
+                                                                       self.star_core_provider.create(info),
+                                                                       self.command_tx,
                                                                        self.command_rx,
                                                                        self.lanes,
                                                                        self.connector_ctrls,
                                                                        self.logger,
-                                                                       self.frame_hold)
+                                                                       self.frame_hold,
+                                                                       sequence
+                                            )
                                             );
                                     }
                                 }

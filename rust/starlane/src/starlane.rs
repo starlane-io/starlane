@@ -5,7 +5,7 @@ use crate::error::Error;
 use crate::template::{ConstellationTemplate, StarKeyTemplate, StarKeySubgraphTemplate, StarKeyIndexTemplate, ConstellationData};
 use crate::layout::ConstellationLayout;
 use crate::proto::{ProtoStar, local_tunnels, ProtoTunnel, ProtoStarController, ProtoStarEvolution};
-use crate::star::{StarKey, Star, StarController, StarCommand, StarCore, StarCoreProvider, DefaultStarCoreProvider};
+use crate::star::{StarKey, Star, StarController, StarCommand, StarCore, StarCoreFactory, DefaultStarCoreFactory};
 use std::collections::{HashSet, HashMap};
 use std::sync::mpsc::{Sender, Receiver};
 use crate::frame::Frame;
@@ -21,7 +21,7 @@ pub struct Starlane
     pub tx: mpsc::Sender<StarlaneCommand>,
     rx: mpsc::Receiver<StarlaneCommand>,
     star_controllers: HashMap<StarKey,StarController>,
-    star_core_provider: Arc<dyn StarCoreProvider>
+    star_core_provider: Arc<dyn StarCoreFactory>
 }
 
 impl Starlane
@@ -33,7 +33,7 @@ impl Starlane
             star_controllers: HashMap::new(),
             tx: tx,
             rx: rx,
-            star_core_provider: Arc::new( DefaultStarCoreProvider::new() )
+            star_core_provider: Arc::new( DefaultStarCoreFactory::new() )
         }
     }
 

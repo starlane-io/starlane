@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicI32, AtomicI64 };
 use futures::future::join_all;
 use futures::future::select_all;
-use crate::frame::{ProtoFrame, Frame, StarSearchHit, StarSearchPattern, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchResultInner, RejectionInner, ApplicationAssignInner, ApplicationReportSupervisorInner, StarWindInner, StarUnwindInner, StarUnwindPayload, StarWindPayload};
+use crate::frame::{ProtoFrame, Frame, StarSearchHit, StarSearchPattern, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchResultInner, RejectionInner, ApplicationAssignInner, ApplicationReportSupervisorInner, StarWindInner, StarUnwindInner, StarUnwindPayload, StarWindPayload, ApplicationNotifyReadyInner};
 use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use futures::FutureExt;
@@ -20,6 +20,9 @@ use url::Url;
 use tokio::sync::broadcast::error::SendError;
 use crate::frame::StarMessagePayload::ApplicationCreateRequest;
 use crate::frame::ProtoFrame::CentralSearch;
+use futures::channel::oneshot;
+use futures::channel::oneshot::Canceled;
+use crate::application::ApplicationState;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
 pub enum StarKind
@@ -156,7 +159,8 @@ pub struct StarInfo
 {
    pub star_key: StarKey,
    pub kind: StarKind,
-   pub sequence: Arc<IdSeq>
+   pub sequence: Arc<IdSeq>,
+   pub command_tx: Sender<StarCommand>
 }
 
 pub enum StarCore
@@ -164,7 +168,7 @@ pub enum StarCore
     Central(Box<dyn CentralCore>),
     Mesh,
     Supervisor(Box<dyn Core>),
-    Server,
+    Server(Box<dyn ServerCore>),
     Gateway,
     Link,
     Client,
@@ -179,7 +183,7 @@ impl StarCore
            StarCore::Central(_) => StarKind::Central,
            StarCore::Mesh => StarKind::Mesh,
            StarCore::Supervisor(_) => StarKind::Supervisor,
-           StarCore::Server => StarKind::Server,
+           StarCore::Server(_) => StarKind::Server,
            StarCore::Gateway => StarKind::Gateway,
            StarCore::Link => StarKind::Link,
            StarCore::Client => StarKind::Client,
@@ -188,22 +192,35 @@ impl StarCore
    }
 }
 
+#[async_trait]
 impl Core for StarCore
 {
-    fn handle_message(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
+   async fn start(&mut self) -> Result<(),Error> {
+        match self
+        {
+            StarCore::Central(core) => core.start().await,
+            StarCore::Supervisor(core) => core.start().await,
+            StarCore::Server(core) => core.start().await,
+            _ => {
+                Ok(())
+            }
+        }
+    }
+
+    async fn handle_message(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
         match self
         {
             StarCore::Central(core) => {
-                core.handle_message(message)
+                core.handle_message(message).await
             }
             StarCore::Mesh => {
                 Err("this core does not know how to handle this message".into())
             }
             StarCore::Supervisor(core) => {
-                core.handle_message(message)
+                core.handle_message(message).await
             }
-            StarCore::Server => {
-                Err("this core does not know how to handle this message".into())
+            StarCore::Server(core) => {
+                core.handle_message(message).await
             }
             StarCore::Gateway => {
                 Err("this core does not know how to handle this message".into())
@@ -222,20 +239,20 @@ impl Core for StarCore
         // terrible error message...
     }
 
-    fn handle_wind(&mut self, wind: StarWindInner) -> Result<StarUnwindPayload, Error> {
+    async fn handle_wind(&mut self, wind: StarWindInner) -> Result<StarUnwindPayload, Error> {
         match self
         {
             StarCore::Central(core) => {
-                core.handle_wind(wind)
+                core.handle_wind(wind).await
             }
             StarCore::Mesh => {
                 Err("this core does not know how to handle this message".into())
             }
             StarCore::Supervisor(core) => {
-                core.handle_wind(wind)
+                core.handle_wind(wind).await
             }
-            StarCore::Server => {
-                Err("this core does not know how to handle this message".into())
+            StarCore::Server(core) => {
+                core.handle_wind(wind).await
             }
             StarCore::Gateway => {
                 Err("this core does not know how to handle this message".into())
@@ -253,13 +270,27 @@ impl Core for StarCore
     }
 }
 
+#[async_trait]
 pub trait Core: Send+Sync
 {
-    fn handle_message(&mut self, message: StarMessageInner ) -> Result<Option<Vec<StarMessageInner>>,Error>;
-    fn handle_wind(&mut self, wind: StarWindInner ) -> Result<StarUnwindPayload,Error>;
+    async fn start(&mut self) -> Result<(),Error>;
+    async fn handle_message(&mut self, message: StarMessageInner ) -> Result<Option<Vec<StarMessageInner>>,Error>;
+    async fn handle_wind(&mut self, wind: StarWindInner ) -> Result<StarUnwindPayload,Error>;
 }
 
+#[async_trait]
 pub trait CentralCore: Core
+{
+}
+
+#[async_trait]
+pub trait ServerCore: Core
+{
+    async fn set_supervisor(&mut self, supervisor_key: StarKey ) -> Result<(),Error>;
+}
+
+#[async_trait]
+pub trait GatewayCore: Core
 {
 }
 
@@ -270,6 +301,7 @@ pub struct CentralCoreDefault
     sequence: IdSeq,
     application_to_supervisor: HashMap<Id,StarKey>,
     application_name_to_app_id : HashMap<String,Id>,
+    application_state: HashMap<Id,ApplicationState>,
     supervisor_index: usize
 }
 
@@ -283,10 +315,10 @@ impl CentralCoreDefault
             sequence: IdSeq::new(0),
             application_to_supervisor: HashMap::new(),
             application_name_to_app_id: HashMap::new(),
+            application_state: HashMap::new(),
             supervisor_index: 0
         }
     }
-
 
     fn select_supervisor( &mut self ) -> Option<StarKey>
     {
@@ -299,15 +331,110 @@ impl CentralCoreDefault
 
         Option::Some(self.supervisors.get( self.supervisor_index % self.supervisors.len() ).unwrap().clone())
     }
+}
+
+pub struct GatewayCoreDefault
+{
+    info: StarInfo
+}
+
+impl GatewayCoreDefault
+{
+    pub fn new( info: StarInfo ) -> Self
+    {
+        GatewayCoreDefault
+        {
+            info: info
+        }
+    }
+}
+
+#[async_trait]
+impl Core for GatewayCoreDefault
+{
+    async fn start(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    async fn handle_message(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
+        Err("Gateway does not handle any messages".into())
+    }
+
+    async fn handle_wind(&mut self, wind: StarWindInner) -> Result<StarUnwindPayload, Error> {
+        Err("gateway does not handle any unwinds".into())
+    }
+}
+
+#[async_trait]
+impl GatewayCore for GatewayCoreDefault
+{
 
 }
 
+
+pub struct ServerCoreDefault
+{
+  info: StarInfo,
+  supervisor: Option<StarKey>
+}
+
+impl ServerCoreDefault
+{
+   pub fn new( info: StarInfo ) -> Self
+   {
+       ServerCoreDefault
+       {
+           info: info,
+           supervisor: Option::None
+       }
+   }
+}
+
+#[async_trait]
+impl ServerCore for ServerCoreDefault
+{
+    async fn set_supervisor(&mut self, supervisor_key: StarKey) ->Result<(),Error>{
+        if self.supervisor.is_some()
+        {
+            Err("supervisor is already set".into())
+        }
+        else
+        {
+            Ok(())
+        }
+    }
+}
+
+#[async_trait]
+impl Core for ServerCoreDefault
+{
+    async fn start(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    async fn handle_message(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error>
+    {
+        Err("ServerCore does not handle any messages".into())
+    }
+
+    async fn handle_wind(&mut self, wind: StarWindInner) -> Result<StarUnwindPayload, Error>
+    {
+        Err("ServerCore does not hanle Winds".into())
+    }
+}
+
+#[async_trait]
 impl CentralCore for CentralCoreDefault
 {}
 
+#[async_trait]
 impl Core for CentralCoreDefault
 {
-    fn handle_message(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
+    async fn start(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    async fn handle_message(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
         let mut message = message;
         match &message.payload
         {
@@ -320,7 +447,7 @@ impl Core for CentralCoreDefault
                 let supervisor = self.select_supervisor();
                 if let Option::None = supervisor
                 {
-                    message.reply(StarMessagePayload::Reject(RejectionInner{ message: "no supervisors available to host application.".to_string()}));
+                    message.reply(self.sequence.next(), StarMessagePayload::Reject(RejectionInner{ message: "no supervisors available to host application.".to_string()}));
                     Ok(Option::Some(vec![message]))
                 }
                 else {
@@ -329,6 +456,7 @@ impl Core for CentralCoreDefault
                         self.application_name_to_app_id.insert( name.clone(), app_id.clone() );
                     }
                     let message = StarMessageInner {
+                        id: self.sequence.next(),
                         from: self.info.star_key.clone(),
                         to: supervisor.unwrap(),
                         transaction: message.transaction.clone(),
@@ -336,22 +464,25 @@ impl Core for CentralCoreDefault
                             app_id: app_id,
                             data: request.data.clone(),
                             notify: vec![message.from,self.info.star_key.clone()]
-                        } )
+                        } ),
+                        retry: 0,
+                        max_retries: 16
                     };
                     Ok(Option::Some(vec![message]))
                 }
             }
-            StarMessagePayload::ApplicationNotifyReady(_) => {
+            StarMessagePayload::ApplicationNotifyReady(notify) => {
+                self.application_state.insert(notify.app_id.clone(), ApplicationState::Ready );
                 Ok(Option::Some(vec![]))
                 // do nothing
             }
             StarMessagePayload::ApplicationRequestSupervisor(request) => {
                 if let Option::Some(supervisor) = self.application_to_supervisor.get(&request.app_id ) {
-                    message.reply(StarMessagePayload::ApplicationReportSupervisor(ApplicationReportSupervisorInner { app_id: request.app_id, supervisor: supervisor.clone() }));
+                    message.reply(self.sequence.next(), StarMessagePayload::ApplicationReportSupervisor(ApplicationReportSupervisorInner { app_id: request.app_id, supervisor: supervisor.clone() }));
                     Ok(Option::Some(vec![message]))
                 }
                 else {
-                    message.reply(StarMessagePayload::Reject(RejectionInner{ message: format!("cannot find app_id: {}",request.app_id).to_string() }));
+                    message.reply(self.sequence.next(), StarMessagePayload::Reject(RejectionInner{ message: format!("cannot find app_id: {}",request.app_id).to_string() }));
                     Ok(Option::Some(vec![message]))
                 }
             }
@@ -360,7 +491,7 @@ impl Core for CentralCoreDefault
                 if let Some(app_id) = app_id
                 {
                     if let Option::Some(supervisor) = self.application_to_supervisor.get(&app_id ) {
-                      message.reply(StarMessagePayload::ApplicationReportSupervisor(ApplicationReportSupervisorInner { app_id: app_id.clone(), supervisor: supervisor.clone() }));
+                      message.reply(self.sequence.next(), StarMessagePayload::ApplicationReportSupervisor(ApplicationReportSupervisorInner { app_id: app_id.clone(), supervisor: supervisor.clone() }));
                       Ok(Option::Some(vec![message]))
                     }
                     else {
@@ -368,7 +499,7 @@ impl Core for CentralCoreDefault
                     }
                 }
                 else {
-                    message.reply(StarMessagePayload::Reject(RejectionInner{ message: format!("could not find app_id for lookup name: {}",request.name).to_string() }));
+                    message.reply(self.sequence.next(), StarMessagePayload::Reject(RejectionInner{ message: format!("could not find app_id for lookup name: {}",request.name).to_string() }));
                     Ok(Option::Some(vec![message]))
                 }
                 // return this if both conditions fail
@@ -380,7 +511,7 @@ impl Core for CentralCoreDefault
         }
     }
 
-    fn handle_wind(&mut self, wind: StarWindInner) -> Result<StarUnwindPayload, Error> {
+    async fn handle_wind(&mut self, wind: StarWindInner) -> Result<StarUnwindPayload, Error> {
         match wind.payload
         {
             StarWindPayload::RequestSequence => {
@@ -391,7 +522,6 @@ impl Core for CentralCoreDefault
     }
 }
 
-
 pub trait SupervisorCoreBacking: Send+Sync
 {
     fn add_server( &mut self, server: StarKey );
@@ -400,6 +530,36 @@ pub trait SupervisorCoreBacking: Send+Sync
 
     fn add_application( &mut self, app_id: Id , data: Vec<u8> );
     fn remove_application( &mut self, app_id: Id );
+}
+
+// this is the meat of what makes this implementation of Starlane special
+pub trait SupervisorCoreExt: Send+Sync
+{
+    fn launch_application( &mut self, app_id: Id, data: Vec<u8> )->Result<(),Error>;
+    fn teardown_application( &mut self, app_id: Id );
+}
+
+pub struct DefaultSupervisorCoreExt
+{
+}
+
+impl DefaultSupervisorCoreExt
+{
+   pub fn new()->Self
+   {
+       DefaultSupervisorCoreExt{}
+   }
+}
+
+impl SupervisorCoreExt for DefaultSupervisorCoreExt
+{
+    fn launch_application(&mut self, app_id: Id, data: Vec<u8>) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn teardown_application(&mut self, app_id: Id) {
+
+    }
 }
 
 pub struct DefaultSupervisorCoreBacking
@@ -464,21 +624,33 @@ impl SupervisorCore
     {
        SupervisorCore{
            info: info.clone(),
-           backing: Box::new(DefaultSupervisorCoreBacking::new(info))
+           backing: Box::new(DefaultSupervisorCoreBacking::new(info)),
        }
     }
 }
 
+#[async_trait]
 impl Core for SupervisorCore
 {
-    fn handle_message(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
+    async fn start(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    async fn handle_message(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
 
         match &message.payload
         {
             StarMessagePayload::ApplicationAssign(assign) => {
                 self.backing.add_application(assign.app_id.clone(), assign.data.clone());
 
-                // Now we need to Launch this application in the selected server
+                // TODO: Now we need to Launch this application in the ext
+                // ext.launch_app()
+
+                for notify in &assign.notify
+                {
+                    let notify_app_ready = StarMessageInner::new(self.info.sequence.next(), self.info.star_key.clone(), notify.clone(), StarMessagePayload::ApplicationNotifyReady(ApplicationNotifyReadyInner{app_id:assign.app_id.clone()}));
+                    self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(notify_app_ready))).await;
+                }
 
                 Ok(Option::None)
             }
@@ -494,40 +666,40 @@ impl Core for SupervisorCore
 
     }
 
-    fn handle_wind(&mut self, wind: StarWindInner) -> Result<StarUnwindPayload, Error> {
+    async fn handle_wind(&mut self, wind: StarWindInner) -> Result<StarUnwindPayload, Error> {
         Err("supervisor does not handle any winds".into())
     }
 }
 
-pub trait StarCoreProvider: Send+Sync
+pub trait StarCoreFactory: Send+Sync
 {
-    fn provide( &self, info: StarInfo ) -> StarCore;
+    fn create(&self, info: StarInfo ) -> StarCore;
 }
 
 
 
-pub struct DefaultStarCoreProvider
+pub struct DefaultStarCoreFactory
 {
 
 }
 
-impl DefaultStarCoreProvider
+impl DefaultStarCoreFactory
 {
     pub fn new()->Self
     {
-        DefaultStarCoreProvider{}
+        DefaultStarCoreFactory {}
     }
 }
 
-impl StarCoreProvider for DefaultStarCoreProvider
+impl StarCoreFactory for DefaultStarCoreFactory
 {
-    fn provide(&self, info: StarInfo ) -> StarCore {
+    fn create(&self, info: StarInfo ) -> StarCore {
 
         match &info.kind{
             StarKind::Central => StarCore::Central(Box::new(CentralCoreDefault::new(info.clone()))),
             StarKind::Mesh => StarCore::Mesh,
             StarKind::Supervisor => StarCore::Supervisor(Box::new(SupervisorCore::new(info.clone()))),
-            StarKind::Server => StarCore::Server,
+            StarKind::Server => StarCore::Server(Box::new(ServerCoreDefault::new(info.clone()))),
             StarKind::Gateway => StarCore::Gateway,
             StarKind::Link => StarCore::Link,
             StarKind::Client => StarCore::Client,
@@ -686,8 +858,10 @@ pub struct Star
 {
     pub kind: StarKind,
     pub star_key: StarKey,
+    sequence: Arc<IdSeq>,
     core: StarCore,
     command_rx: Receiver<StarCommand>,
+    command_tx: Sender<StarCommand>,
     lanes: HashMap<StarKey, LaneMeta>,
     connector_ctrls: Vec<ConnectorController>,
     transactions: HashMap<i64,Box<dyn Transaction>>,
@@ -723,12 +897,13 @@ impl Star
 
      */
 
-    pub fn from_proto(key: StarKey, core: StarCore, command_rx: Receiver<StarCommand>, lanes: HashMap<StarKey,LaneMeta>, connector_ctrls: Vec<ConnectorController>, logger: StarLogger, frame_hold: FrameHold ) ->Self
+    pub fn from_proto(key: StarKey, core: StarCore, command_tx: Sender<StarCommand>, command_rx: Receiver<StarCommand>, lanes: HashMap<StarKey,LaneMeta>, connector_ctrls: Vec<ConnectorController>, logger: StarLogger, frame_hold: FrameHold, sequence: Arc<IdSeq> ) ->Self
     {
         Star{
             kind: core.kind(),
             core: core,
             star_key: key,
+            command_tx: command_tx,
             command_rx: command_rx,
             lanes: lanes,
             connector_ctrls: connector_ctrls,
@@ -736,6 +911,7 @@ impl Star
             transaction_seq: AtomicI64::new(0),
             star_search_transactions: HashMap::new(),
             frame_hold: frame_hold,
+            sequence: sequence,
             logger: logger
         }
     }
@@ -768,7 +944,7 @@ impl Star
 
                             if self.kind.is_central()
                             {
-                                self.broadcast( Frame::Proto(ProtoFrame::CentralFound(1)), &Option::None ).await;
+                                self.broadcast( Frame::Proto(ProtoFrame::CentralFound(1)) ).await;
                             }
 
                         }
@@ -790,6 +966,10 @@ impl Star
                             }
                         }
                     }
+                    StarCommand::SupervisorCommand(command) =>
+                    {
+                        self.on_supervisor_command(command).await;
+                    }
                     StarCommand::Frame(frame) => {
                         let lane_key = lanes.get(index).unwrap().clone();
                         self.process_frame(frame, lane_key ).await;
@@ -809,26 +989,73 @@ impl Star
 
     }
 
+    async fn on_supervisor_command( &mut self, command: SupervisorCommand )
+    {
+        match command
+        {
+            SupervisorCommand::PledgeToCentral => {
+                self.send( StarMessageInner::to_central(self.sequence.next(), self.star_key.clone(), StarMessagePayload::SupervisorPledgeToCentral) ).await;
+            }
+        }
+    }
+
+    async fn on_server_command( &mut self, command: ServerCommand )
+    {
+        match command
+        {
+            ServerCommand::PledgeToSupervisor => {
+                if let Ok(search) = self.search( StarSearchPattern::StarKind(StarKind::Supervisor)).await
+                {
+                    match search.nearest()
+                    {
+                        None => {
+                            eprintln!("Cannot find NEAREST supervisor")
+                        }
+                        Some(supervisor) => {
+                            if let StarCore::Server(core) = &mut self.core
+                            {
+                                core.set_supervisor(supervisor.clone()).await;
+                                let message = StarMessageInner::new(self.sequence.next(), self.star_key.clone(), supervisor, StarMessagePayload::ServerPledgeToSupervisor);
+                                self.command_tx.send(StarCommand::Frame(StarMessage(message))).await;
+                            }
+                            else {
+                                eprintln!("attempt to set supervisor for not Server {}", self.kind );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
     async fn on_init( &mut self )
     {
+        self.core.start();
         match self.kind
-        {
+           {
             StarKind::Central => {}
             StarKind::Mesh => {}
-            StarKind::Supervisor => {
-                self.send( StarMessageInner::to_central(self.star_key.clone(), StarMessagePayload::SupervisorPledgeToCentral));
-            }
+            StarKind::Supervisor => {}
             StarKind::Server => {
+                if let Ok(search) = self.search( StarSearchPattern::StarKind(StarKind::Supervisor)).await
+                {
+                    search.nearest();
+                }
             }
             StarKind::Gateway => {}
             StarKind::Link => {}
             StarKind::Client => {}
             StarKind::Ext(_) => {}
         }
-
     }
 
-    async fn broadcast(&mut self,  frame: Frame, exclude: &Option<HashSet<StarKey>> )
+    async fn broadcast(&mut self,  frame: Frame )
+    {
+        self.broadcast_excluding(frame, &Option::None ).await;
+    }
+
+    async fn broadcast_excluding(&mut self,  frame: Frame, exclude: &Option<HashSet<StarKey>> )
     {
         let mut stars = vec!();
         for star in self.lanes.keys()
@@ -843,6 +1070,7 @@ impl Star
             self.send_frame(star, frame.clone()).await;
         }
     }
+
 
     async fn send(&mut self, message: StarMessageInner )
     {
@@ -906,11 +1134,31 @@ impl Star
         rtn
     }
 
+    async fn search( &mut self, pattern: StarSearchPattern )->Result<StarSearchCompletion,Canceled>
+    {
+        let search_id = self.transaction_seq.fetch_add(1, std::sync::atomic::Ordering::Relaxed );
+        let (search_transaction,rx) = StarSearchTransaction::new(StarSearchPattern::StarKey(self.star_key.clone()));
+
+        self.star_search_transactions.insert(search_id, search_transaction );
+
+        let search = StarSearchInner{
+            from: self.star_key.clone(),
+            pattern: pattern,
+            hops: vec![self.star_key.clone()],
+            transactions: vec![search_id],
+            max_hops: MAX_HOPS
+        };
+
+        self.broadcast(Frame::StarSearch(search) ).await;
+
+        rx.await
+    }
+
     async fn search_for_star( &mut self, star: StarKey )
     {
 
         let search_id = self.transaction_seq.fetch_add(1, std::sync::atomic::Ordering::Relaxed );
-        let search_transaction = StarSearchTransaction::new(StarSearchPattern::StarKey(self.star_key.clone()));
+        let (search_transaction,_) = StarSearchTransaction::new(StarSearchPattern::StarKey(self.star_key.clone()));
         self.star_search_transactions.insert(search_id, search_transaction );
 
         let search = StarSearchInner{
@@ -919,126 +1167,12 @@ impl Star
             hops: vec![self.star_key.clone()],
             transactions: vec![search_id],
             max_hops: MAX_HOPS,
-            multi: false
         };
 
         self.logger.log(StarLog::StarSearchInitialized(search.clone()));
         for (star,lane) in &self.lanes
         {
             lane.lane.outgoing.tx.send( LaneCommand::Frame( Frame::StarSearch(search.clone()))).await;
-        }
-    }
-
-    async fn process_frame( &mut self, frame: Frame, lane_key: StarKey )
-    {
-        match frame
-        {
-            Frame::Proto(proto) => {
-              if let ProtoFrame::CentralSearch = proto
-              {
-                  if self.kind.is_central()
-                  {
-
-                      self.broadcast(Frame::Proto(ProtoFrame::CentralFound(1)) , &Option::None).await;
-                  } else if let Option::Some(hops) = self.get_hops_to_star(&StarKey::central() )
-                  {
-                      self.broadcast(Frame::Proto(ProtoFrame::CentralFound(hops+1)) , &Option::None).await;
-                  }
-                  else
-                  {
-                      self.search_for_star(StarKey::central()).await;
-                  }
-              }
-            }
-            Frame::StarSearch(search) => {
-                self.on_star_search(search, lane_key).await;
-            }
-            Frame::StarSearchResult(result) => {
-                self.on_star_search_result(result, lane_key ).await;
-            }
-            Frame::StarMessage(message) => {
-                match self.on_message(message).await
-                {
-                    Ok(messages) => {}
-                    Err(error) => {
-                        eprintln!("error: {}", error)
-                    }
-                }
-            }
-            Frame::StarWind(wind) => {
-                self.on_wind(wind).await;
-            }
-            Frame::StarUnwind(unwind) => {
-                self.on_unwind(unwind).await;
-            }
-            _ => {
-
-                eprintln!("star does not handle frame: {}", frame)
-            }
-        }
-    }
-
-    async fn on_star_search( &mut self, mut search: StarSearchInner, lane_key: StarKey )
-    {
-        let hit = match &search.pattern
-        {
-            StarSearchPattern::StarKey(star) => {
-                self.star_key == *star
-            }
-            StarSearchPattern::StarKind(kind) => {
-                self.kind == *kind
-            }
-        };
-
-        if hit
-        {
-            if search.pattern.is_single_match()
-            {
-                let hops = search.hops.len() + 1;
-                let frame = Frame::StarSearchResult( StarSearchResultInner {
-                    missed: None,
-                    hops: search.hops.clone(),
-                    hits: vec![ StarSearchHit { star: self.star_key.clone(), hops: hops as _ } ],
-                    search: search.clone(),
-                    transactions: search.transactions.clone()
-                });
-
-                let lane = self.lanes.get_mut(&lane_key).unwrap();
-                lane.lane.outgoing.tx.send(LaneCommand::Frame(frame)).await;
-            }
-            else {
-                // create a SearchTransaction here.
-                // gather ALL results into this transaction
-            }
-
-            if !search.multi
-            {
-                return;
-            }
-        }
-
-        let search_id = self.transaction_seq.fetch_add(1,std::sync::atomic::Ordering::Relaxed);
-        let search_transaction = StarSearchTransaction::new(search.pattern.clone() );
-        self.star_search_transactions.insert(search_id,search_transaction);
-
-        search.inc(self.star_key.clone(), search_id );
-
-        if search.max_hops > MAX_HOPS
-        {
-            eprintln!("rejecting a search with more than 255 hops");
-        }
-
-        if (search.hops.len() as i32) > search.max_hops || self.lanes.len() <= 1
-        {
-            eprintln!("search has reached maximum hops... need to send not found");
-        }
-
-        for (star,lane) in &self.lanes
-        {
-            if !search.hops.contains(star)
-            {
-                lane.lane.outgoing.tx.send(LaneCommand::Frame(Frame::StarSearch(search.clone()))).await;
-            }
         }
     }
 
@@ -1079,11 +1213,137 @@ impl Star
                                 lane.lane.outgoing.tx.send( LaneCommand::Frame(Frame::StarSearchResult(search_result))).await;
                             }
                         }
+
+                        search_trans.complete();
                     }
                 }
             }
         }
     }
+
+    async fn process_frame( &mut self, frame: Frame, lane_key: StarKey )
+    {
+        match frame
+        {
+            Frame::Proto(proto) => {
+              match &proto
+              {
+                  ProtoFrame::CentralSearch => {
+                      if self.kind.is_central()
+                      {
+                          self.broadcast(Frame::Proto(ProtoFrame::CentralFound(1))).await;
+                      } else if let Option::Some(hops) = self.get_hops_to_star(&StarKey::central() )
+                      {
+                          self.broadcast(Frame::Proto(ProtoFrame::CentralFound(hops+1))).await;
+                      }
+                      else
+                      {
+                          self.search_for_star(StarKey::central()).await;
+                      }
+                  },
+                  ProtoFrame::RequestSubgraphExpansion => {
+                      let mut subgraph = self.star_key.subgraph.clone();
+                      subgraph.push( self.star_key.index.clone() );
+                      self.send_frame(lane_key.clone(), Frame::Proto(ProtoFrame::GrantSubgraphExpansion(subgraph))).await;
+                  }
+                  _ => {}
+
+              }
+
+            }
+            Frame::StarSearch(search) => {
+                self.on_star_search(search, lane_key).await;
+            }
+            Frame::StarSearchResult(result) => {
+                self.on_star_search_result(result, lane_key ).await;
+            }
+            Frame::StarMessage(message) => {
+                match self.on_message(message).await
+                {
+                    Ok(messages) => {}
+                    Err(error) => {
+                        eprintln!("error: {}", error)
+                    }
+                }
+            }
+            Frame::StarWind(wind) => {
+                self.on_wind(wind).await;
+            }
+            Frame::StarUnwind(unwind) => {
+                self.on_unwind(unwind).await;
+            }
+            _ => {
+                eprintln!("star does not handle frame: {}", frame)
+            }
+        }
+    }
+
+    async fn on_star_search( &mut self, mut search: StarSearchInner, lane_key: StarKey )
+    {
+        let hit = match &search.pattern
+        {
+            StarSearchPattern::StarKey(star) => {
+                self.star_key == *star
+            }
+            StarSearchPattern::StarKind(kind) => {
+                self.kind == *kind
+            }
+        };
+
+        if hit
+        {
+            if search.pattern.is_single_match()
+            {
+                let hops = search.hops.len() + 1;
+                let frame = Frame::StarSearchResult( StarSearchResultInner {
+                    missed: None,
+                    hops: search.hops.clone(),
+                    hits: vec![ StarSearchHit { star: self.star_key.clone(), hops: hops as _ } ],
+                    search: search.clone(),
+                    transactions: search.transactions.clone()
+                });
+
+                let lane = self.lanes.get_mut(&lane_key).unwrap();
+                lane.lane.outgoing.tx.send(LaneCommand::Frame(frame)).await;
+            }
+            else {
+                // create a SearchTransaction here.
+                // gather ALL results into this transaction
+            }
+
+            if search.pattern.is_single_match()
+            {
+                return;
+            }
+        }
+
+        let search_id = self.transaction_seq.fetch_add(1,std::sync::atomic::Ordering::Relaxed);
+        let (search_transaction,_) = StarSearchTransaction::new(search.pattern.clone() );
+        self.star_search_transactions.insert(search_id,search_transaction);
+
+        search.inc(self.star_key.clone(), search_id );
+
+        if search.max_hops > MAX_HOPS
+        {
+            eprintln!("rejecting a search with more than 255 hops");
+        }
+
+        if (search.hops.len() as i32) > search.max_hops || self.lanes.len() <= 1
+        {
+            eprintln!("search has reached maximum hops... need to send not found");
+        }
+
+        for (star,lane) in &self.lanes
+        {
+            if !search.hops.contains(star)
+            {
+                lane.lane.outgoing.tx.send(LaneCommand::Frame(Frame::StarSearch(search.clone()))).await;
+            }
+        }
+
+    }
+
+
 
     async fn on_wind( &mut self, mut wind: StarWindInner)
     {
@@ -1100,7 +1360,7 @@ impl Star
         }
         else {
             let star_stack = wind.stars.clone();
-            match self.core.handle_wind(wind)
+            match self.core.handle_wind(wind).await
             {
                 Ok(payload) => {
                     let unwind = StarUnwindInner{
@@ -1150,7 +1410,7 @@ impl Star
             match message.payload
             {
                 _ => {
-                    if let Ok(Some(messages)) = self.core.handle_message(message)
+                    if let Ok(Some(messages)) = self.core.handle_message(message).await
                     {
                         for message in messages
                         {
@@ -1184,7 +1444,19 @@ pub enum StarCommand
     Test(StarTest),
     Frame(Frame),
     FrameTimeout(FrameTimeoutInner),
-    FrameError(FrameErrorInner)
+    FrameError(FrameErrorInner),
+    SupervisorCommand(SupervisorCommand),
+    ServerCommand(ServerCommand)
+}
+
+pub enum SupervisorCommand
+{
+    PledgeToCentral
+}
+
+pub enum ServerCommand
+{
+    PledgeToSupervisor
 }
 
 pub struct FrameTimeoutInner
@@ -1216,6 +1488,8 @@ impl fmt::Display for StarCommand{
             StarCommand::Frame(frame) => format!("Frame({})",frame).to_string(),
             StarCommand::FrameTimeout(_) => format!("FrameTimeout").to_string(),
             StarCommand::FrameError(_) => format!("FrameError").to_string(),
+            StarCommand::SupervisorCommand(_) => format!("SupervisorCommand").to_string(),
+            StarCommand::ServerCommand(_) => format!("ServerCommand").to_string(),
         };
         write!(f, "{}",r)
     }
@@ -1228,26 +1502,74 @@ pub struct StarController
 }
 
 
-#[derive(Clone)]
+
 pub struct StarSearchTransaction
 {
     pub pattern: StarSearchPattern,
     pub reported_lane_count: i32,
-    pub hits: HashMap<StarKey,StarSearchHit>
+    pub hits: HashMap<StarKey,StarSearchHit>,
+    tx: oneshot::Sender<StarSearchCompletion>
 }
+
 
 impl StarSearchTransaction
 {
-    pub fn new(pattern: StarSearchPattern) ->Self
+    pub fn new(pattern: StarSearchPattern) ->(Self,oneshot::Receiver<StarSearchCompletion>)
     {
-        StarSearchTransaction{
+        let (tx,rx) = oneshot::channel();
+        (StarSearchTransaction{
             pattern: pattern,
             reported_lane_count: 0,
-            hits: HashMap::new()
-        }
+            hits: HashMap::new(),
+            tx: tx,
+        },rx)
+    }
+
+    pub fn complete(self)
+    {
+        let completion = StarSearchCompletion{
+            hits: self.hits.clone()
+        };
+        self.tx.send(completion);
     }
 }
 
+
+#[derive(Clone)]
+pub struct StarSearchCompletion
+{
+    pub hits: HashMap<StarKey,StarSearchHit>,
+}
+
+impl StarSearchCompletion
+{
+   pub fn nearest(&self)->Option<StarKey>
+   {
+       let mut min = Option::None;
+       for hit in self.hits.values()
+       {
+           if min.is_none()
+           {
+               min = Option::Some(hit.clone());
+           }
+           else if let Option::Some(m) = &min
+           {
+               if hit.hops < m.hops
+               {
+                   min = Option::Some(hit.clone());
+               }
+           }
+       }
+
+       match min
+       {
+           None => Option::None,
+           Some(hit) => {
+               Option::Some(hit.star)
+           }
+       }
+   }
+}
 
 pub enum TransactionState
 {
@@ -1286,7 +1608,6 @@ pub enum StarLog
 {
    StarSearchInitialized(StarSearchInner),
    StarSearchResult(StarSearchResultInner),
-   StarSearchComplete(StarSearchTransaction)
 }
 
 
