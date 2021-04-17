@@ -2,6 +2,9 @@ use crate::id::Id;
 use std::fmt;
 use crate::star::{StarKey, StarKind};
 use serde::{Deserialize, Serialize, Serializer};
+use crate::resource::ResourceKey;
+use std::sync::Arc;
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct Command
@@ -214,7 +217,108 @@ pub enum StarMessagePayload
    ApplicationLookupId(ApplicationLookupIdInner),
    ApplicationRequestLaunch(ApplicationRequestLaunchInner),
    ServerPledgeToSupervisor,
+   ResourceEvent(ResourceEvent),
+   ResourceMessage(ResourceMessage),
+   ResourceRequestBind(ResourceRequestBind),
+   ResourceReportBind(ResourceReportBind)
 }
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceEvent
+{
+    pub star: StarKey,
+    pub kind: ResourceEventKind,
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ResourceEventKind
+{
+   StateChange(ResourceState),
+   Broadcast(ResourceBroadcast)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceBroadcast
+{
+    pub topic: String,
+    pub payloads: ResourcePayloads
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourcePayloads
+{
+    pub map: HashMap<String,ResourcePayload>
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourcePayload
+{
+    pub kind: String,
+    pub data: Arc<Vec<u8>>
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceState
+{
+    pub payloads: ResourcePayloads
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceReportBind
+{
+    pub star: StarKey,
+    pub key: ResourceKey,
+    pub name: Option<String>
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceRequestBind
+{
+    pub lookup: ResourceLookupKind
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ResourceLookupKind
+{
+    Key(ResourceKey),
+    Name(String)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceFrom
+{
+    key: ResourceKey,
+    source: Option<Vec<u8>>
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceTo
+{
+    key: ResourceKey,
+    target: Option<Vec<u8>>
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceMessage
+{
+    pub id: Id,
+    pub from: ResourceFrom,
+    pub to: ResourceTo,
+    pub payloads: ResourcePayloads,
+    pub transaction: Option<Id>
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceBound
+{
+   pub key: ResourceKey,
+   pub star: StarKey
+}
+
+
+
+
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ApplicationRequestLaunchInner
@@ -292,7 +396,11 @@ impl fmt::Display for StarMessagePayload{
             StarMessagePayload::ApplicationReportSupervisor(_) => "ApplicationReportSupervisor".to_string(),
             StarMessagePayload::ApplicationLookupId(_) => "ApplicationLookupId".to_string(),
             StarMessagePayload::ApplicationRequestLaunch(_) => "ApplicationRequestLaunch".to_string(),
-            StarMessagePayload::ServerPledgeToSupervisor => "ServerPledgeToSupervisor".to_string()
+            StarMessagePayload::ServerPledgeToSupervisor => "ServerPledgeToSupervisor".to_string(),
+            StarMessagePayload::ResourceEvent(_)=>"ResourceEvent".to_string(),
+            StarMessagePayload::ResourceMessage(_)=>"ResourceMessage".to_string(),
+            StarMessagePayload::ResourceRequestBind(_)=>"ResourceRequestBind".to_string(),
+            StarMessagePayload::ResourceReportBind(_)=>"ResourceReportBind".to_string(),
         };
         write!(f, "{}",r)
     }
@@ -329,3 +437,4 @@ impl fmt::Display for ProtoFrame {
         write!(f, "{}",r)
     }
 }
+
