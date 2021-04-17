@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicI32, AtomicI64 };
 use futures::future::join_all;
 use futures::future::select_all;
-use crate::frame::{ProtoFrame, Frame, StarSearchHit, StarSearchPattern, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchResultInner, RejectionInner, ApplicationAssignInner, ApplicationReportSupervisorInner, StarWindInner, StarUnwindInner, StarUnwindPayload, StarWindPayload, ApplicationNotifyReadyInner, ResourceMessage, ResourceBind};
+use crate::frame::{ProtoFrame, Frame, StarSearchHit, StarSearchPattern, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchResultInner, RejectionInner, ApplicationAssignInner, ApplicationReportSupervisorInner, StarWindInner, StarUnwindInner, StarUnwindPayload, StarWindPayload, ApplicationNotifyReadyInner, ResourceMessage, ResourceBind, ResourceReportLocation, ResourceLookupKind};
 use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use futures::FutureExt;
@@ -18,7 +18,7 @@ use tokio::sync::broadcast;
 use crate::frame::Frame::{StarSearch, StarMessage};
 use url::Url;
 use tokio::sync::broadcast::error::SendError;
-use crate::frame::StarMessagePayload::ApplicationCreateRequest;
+use crate::frame::StarMessagePayload::{ApplicationCreateRequest, Reject};
 use crate::frame::ProtoFrame::CentralSearch;
 use futures::channel::oneshot;
 use futures::channel::oneshot::Canceled;
@@ -548,9 +548,8 @@ pub trait SupervisorCoreBacking: Send+Sync
     fn remove_application( &mut self, app_id: Id );
 
     fn set_resource_name(&mut self, name: String, key: ResourceKey );
-    fn get_resource_by_name(&mut self, name: String) -> Option<&ResourceKey>;
     fn set_resource_location(&mut self, resource: ResourceKey, location: ResourceLocation );
-    fn get_resource_location(&mut self, resource: ResourceKey ) -> Option<&ResourceLocation>;
+    fn get_resource_location(&self, lookup: &ResourceLookupKind) -> Option<&ResourceLocation>;
 }
 
 // this is the meat of what makes this implementation of Starlane special
@@ -640,16 +639,27 @@ impl SupervisorCoreBacking for DefaultSupervisorCoreBacking
         self.name_to_resource.insert(name,key );
     }
 
-    fn get_resource_by_name(&mut self, name: String) -> Option<&ResourceKey> {
-        self.name_to_resource.get( &name )
-    }
-
     fn set_resource_location(&mut self, resource: ResourceKey, location: ResourceLocation) {
         self.resource_location.insert( resource, location );
     }
 
-    fn get_resource_location(&mut self, resource: ResourceKey) -> Option<&ResourceLocation> {
-        self.resource_location.get(&resource )
+    fn get_resource_location(&self, lookup: &ResourceLookupKind) -> Option<&ResourceLocation> {
+        match lookup
+        {
+            ResourceLookupKind::Key(key) => {
+                return self.resource_location.get(key)
+            }
+            ResourceLookupKind::Name(name) => {
+
+                if let Some(key) = self.name_to_resource.get(name)
+                {
+                    return self.resource_location.get(key)
+                }
+                else {
+                    Option::None
+                }
+            }
+        }
     }
 }
 
@@ -677,7 +687,7 @@ impl Core for SupervisorCore
         Ok(())
     }
 
-    async fn handle_message(&mut self, message: StarMessageInner) -> Result<(), Error> {
+    async fn handle_message(&mut self, mut message: StarMessageInner) -> Result<(), Error> {
 
         match &message.payload
         {
@@ -700,6 +710,30 @@ impl Core for SupervisorCore
                 self.backing.add_server(message.from.clone());
                 Ok(())
             }
+            StarMessagePayload::ResourceReportLocation(report) =>
+            {
+                self.backing.set_resource_location(report.resource.clone(),report.clone());
+                Ok(())
+            }
+            StarMessagePayload::ResourceRequestLocation(request) =>
+                {
+
+                    let location = self.backing.get_resource_location(&request.lookup);
+
+                    match location
+                    {
+                        None => {
+                            return Err(format!("cannot find resource: {}", request.lookup).into() );
+                        }
+                        Some(location) => {
+                            let location = location.clone();
+                            let payload = StarMessagePayload::ResourceReportLocation(location);
+                            message.reply( self.info.sequence.next(), payload );
+                            self.info.command_tx.send( StarCommand::Frame(Frame::StarMessage(message))).await;
+                        }
+                    }
+                    Ok(())
+                }
             _ => {
                 Err("SupervisorCore does not handle message of this type: _".into())
             }
@@ -818,6 +852,15 @@ impl fmt::Display for StarKey{
     }
 }
 
+impl fmt::Display for ResourceLookupKind{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let r = match self{
+            ResourceLookupKind::Key(resource) => format!( "Key({})", resource ).to_string(),
+            ResourceLookupKind::Name(name) => {format!( "Name({})", name).to_string()}
+        };
+        write!(f, "{}",r)
+    }
+}
 
 
 impl StarKey

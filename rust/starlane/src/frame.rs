@@ -221,7 +221,7 @@ pub enum StarMessagePayload
    ResourceEvent(ResourceEvent),
    ResourceMessage(ResourceMessage),
    ResourceRequestLocation(ResourceRequestLocation),
-   ResourceReportLocation(ResourceReportLocation)
+   ResourceReportLocation(ResourceLocation)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
