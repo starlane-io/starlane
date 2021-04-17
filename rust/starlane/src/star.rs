@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicI32, AtomicI64 };
 use futures::future::join_all;
 use futures::future::select_all;
-use crate::frame::{ProtoFrame, Frame, StarSearchHit, StarSearchPattern, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchResultInner, RejectionInner, ApplicationAssignInner, ApplicationReportSupervisorInner, StarWindInner, StarUnwindInner, StarUnwindPayload, StarWindPayload, ApplicationNotifyReadyInner};
+use crate::frame::{ProtoFrame, Frame, StarSearchHit, StarSearchPattern, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchResultInner, RejectionInner, ApplicationAssignInner, ApplicationReportSupervisorInner, StarWindInner, StarUnwindInner, StarUnwindPayload, StarWindPayload, ApplicationNotifyReadyInner, ResourceMessage, ResourceBind};
 use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use futures::FutureExt;
@@ -23,6 +23,7 @@ use crate::frame::ProtoFrame::CentralSearch;
 use futures::channel::oneshot;
 use futures::channel::oneshot::Canceled;
 use crate::application::ApplicationState;
+use crate::resource::{ResourceWatcher, ResourceKey, ResourceLocation};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
 pub enum StarKind
@@ -207,7 +208,7 @@ impl Core for StarCore
         }
     }
 
-    async fn handle_message(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
+    async fn handle_message(&mut self, message: StarMessageInner) -> Result<(), Error> {
         match self
         {
             StarCore::Central(core) => {
@@ -274,7 +275,7 @@ impl Core for StarCore
 pub trait Core: Send+Sync
 {
     async fn start(&mut self) -> Result<(),Error>;
-    async fn handle_message(&mut self, message: StarMessageInner ) -> Result<Option<Vec<StarMessageInner>>,Error>;
+    async fn handle_message(&mut self, message: StarMessageInner ) -> Result<(),Error>;
     async fn handle_wind(&mut self, wind: StarWindInner ) -> Result<StarUnwindPayload,Error>;
 }
 
@@ -356,7 +357,7 @@ impl Core for GatewayCoreDefault
         Ok(())
     }
 
-    async fn handle_message(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
+    async fn handle_message(&mut self, message: StarMessageInner) -> Result<(), Error> {
         Err("Gateway does not handle any messages".into())
     }
 
@@ -412,9 +413,15 @@ impl Core for ServerCoreDefault
         Ok(())
     }
 
-    async fn handle_message(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error>
+    async fn handle_message(&mut self, message: StarMessageInner) -> Result<(),Error>
     {
-        Err("ServerCore does not handle any messages".into())
+        if let StarMessagePayload::ResourceMessage(message) = message.payload
+        {
+
+        }
+
+        Ok(())
+
     }
 
     async fn handle_wind(&mut self, wind: StarWindInner) -> Result<StarUnwindPayload, Error>
@@ -422,6 +429,8 @@ impl Core for ServerCoreDefault
         Err("ServerCore does not hanle Winds".into())
     }
 }
+
+
 
 #[async_trait]
 impl CentralCore for CentralCoreDefault
@@ -434,13 +443,13 @@ impl Core for CentralCoreDefault
         Ok(())
     }
 
-    async fn handle_message(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
+    async fn handle_message(&mut self, message: StarMessageInner) -> Result<(), Error> {
         let mut message = message;
         match &message.payload
         {
            StarMessagePayload::SupervisorPledgeToCentral => {
                 self.supervisors.push(message.from.clone());
-                Ok(Option::None)
+                Ok(())
             }
             StarMessagePayload::ApplicationCreateRequest(request) => {
                 let app_id = self.sequence.next();
@@ -448,7 +457,8 @@ impl Core for CentralCoreDefault
                 if let Option::None = supervisor
                 {
                     message.reply(self.sequence.next(), StarMessagePayload::Reject(RejectionInner{ message: "no supervisors available to host application.".to_string()}));
-                    Ok(Option::Some(vec![message]))
+                    self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
+                    Ok(())
                 }
                 else {
                     if let Some(name)=&request.name
@@ -468,22 +478,25 @@ impl Core for CentralCoreDefault
                         retry: 0,
                         max_retries: 16
                     };
-                    Ok(Option::Some(vec![message]))
+                    self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
+                    Ok(())
                 }
             }
             StarMessagePayload::ApplicationNotifyReady(notify) => {
                 self.application_state.insert(notify.app_id.clone(), ApplicationState::Ready );
-                Ok(Option::Some(vec![]))
+                Ok(())
                 // do nothing
             }
             StarMessagePayload::ApplicationRequestSupervisor(request) => {
                 if let Option::Some(supervisor) = self.application_to_supervisor.get(&request.app_id ) {
                     message.reply(self.sequence.next(), StarMessagePayload::ApplicationReportSupervisor(ApplicationReportSupervisorInner { app_id: request.app_id, supervisor: supervisor.clone() }));
-                    Ok(Option::Some(vec![message]))
+                    self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
+                    Ok(())
                 }
                 else {
                     message.reply(self.sequence.next(), StarMessagePayload::Reject(RejectionInner{ message: format!("cannot find app_id: {}",request.app_id).to_string() }));
-                    Ok(Option::Some(vec![message]))
+                    self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
+                    Ok(())
                 }
             }
             StarMessagePayload::ApplicationLookupId(request) => {
@@ -492,15 +505,18 @@ impl Core for CentralCoreDefault
                 {
                     if let Option::Some(supervisor) = self.application_to_supervisor.get(&app_id ) {
                       message.reply(self.sequence.next(), StarMessagePayload::ApplicationReportSupervisor(ApplicationReportSupervisorInner { app_id: app_id.clone(), supervisor: supervisor.clone() }));
-                      Ok(Option::Some(vec![message]))
+                        self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
+                        Ok(())
                     }
                     else {
-                        Ok(Option::Some(vec![message]))
+                        self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
+                        Ok(())
                     }
                 }
                 else {
                     message.reply(self.sequence.next(), StarMessagePayload::Reject(RejectionInner{ message: format!("could not find app_id for lookup name: {}",request.name).to_string() }));
-                    Ok(Option::Some(vec![message]))
+                    self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
+                    Ok(())
                 }
                 // return this if both conditions fail
 
@@ -530,6 +546,11 @@ pub trait SupervisorCoreBacking: Send+Sync
 
     fn add_application( &mut self, app_id: Id , data: Vec<u8> );
     fn remove_application( &mut self, app_id: Id );
+
+    fn set_resource_name(&mut self, name: String, key: ResourceKey );
+    fn get_resource_by_name(&mut self, name: String) -> Option<&ResourceKey>;
+    fn set_resource_location(&mut self, resource: ResourceKey, location: ResourceLocation );
+    fn get_resource_location(&mut self, resource: ResourceKey ) -> Option<&ResourceLocation>;
 }
 
 // this is the meat of what makes this implementation of Starlane special
@@ -567,7 +588,9 @@ pub struct DefaultSupervisorCoreBacking
     info: StarInfo,
     servers: Vec<StarKey>,
     server_select_index: usize,
-    applications: HashSet<Id>
+    applications: HashSet<Id>,
+    name_to_resource: HashMap<String,ResourceKey>,
+    resource_location: HashMap<ResourceKey,ResourceLocation>
 }
 
 impl DefaultSupervisorCoreBacking
@@ -578,7 +601,9 @@ impl DefaultSupervisorCoreBacking
             info: info,
             servers: vec![],
             server_select_index: 0,
-            applications: HashSet::new()
+            applications: HashSet::new(),
+            name_to_resource: HashMap::new(),
+            resource_location: HashMap::new(),
         }
     }
 }
@@ -610,6 +635,22 @@ impl SupervisorCoreBacking for DefaultSupervisorCoreBacking
     fn remove_application(&mut self, app_id: Id) {
         self.applications.remove(&app_id);
     }
+
+    fn set_resource_name(&mut self, name: String, key: ResourceKey) {
+        self.name_to_resource.insert(name,key );
+    }
+
+    fn get_resource_by_name(&mut self, name: String) -> Option<&ResourceKey> {
+        self.name_to_resource.get( &name )
+    }
+
+    fn set_resource_location(&mut self, resource: ResourceKey, location: ResourceLocation) {
+        self.resource_location.insert( resource, location );
+    }
+
+    fn get_resource_location(&mut self, resource: ResourceKey) -> Option<&ResourceLocation> {
+        self.resource_location.get(&resource )
+    }
 }
 
 pub struct SupervisorCore
@@ -636,7 +677,7 @@ impl Core for SupervisorCore
         Ok(())
     }
 
-    async fn handle_message(&mut self, message: StarMessageInner) -> Result<Option<Vec<StarMessageInner>>, Error> {
+    async fn handle_message(&mut self, message: StarMessageInner) -> Result<(), Error> {
 
         match &message.payload
         {
@@ -652,12 +693,12 @@ impl Core for SupervisorCore
                     self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(notify_app_ready))).await;
                 }
 
-                Ok(Option::None)
+                Ok(())
             }
             StarMessagePayload::ServerPledgeToSupervisor => {
 
                 self.backing.add_server(message.from.clone());
-                Ok(Option::None)
+                Ok(())
             }
             _ => {
                 Err("SupervisorCore does not handle message of this type: _".into())
@@ -1406,23 +1447,8 @@ impl Star
             }
         }
         else {
-
-            match message.payload
-            {
-                _ => {
-                    if let Ok(Some(messages)) = self.core.handle_message(message).await
-                    {
-                        for message in messages
-                        {
-                            self.send( message ).await;
-                        }
-                    }
-                }
-
-            }
-
+           Ok(self.core.handle_message(message).await?)
         }
-        return Ok(());
     }
 
 

@@ -2,7 +2,7 @@ use crate::id::Id;
 use std::fmt;
 use crate::star::{StarKey, StarKind};
 use serde::{Deserialize, Serialize, Serializer};
-use crate::resource::ResourceKey;
+use crate::resource::{ResourceKey, ResourceGatheringKey, ResourceLocation};
 use std::sync::Arc;
 use std::collections::HashMap;
 
@@ -217,11 +217,20 @@ pub enum StarMessagePayload
    ApplicationLookupId(ApplicationLookupIdInner),
    ApplicationRequestLaunch(ApplicationRequestLaunchInner),
    ServerPledgeToSupervisor,
+   ResourceStateRequest(ResourceStateRequest),
    ResourceEvent(ResourceEvent),
    ResourceMessage(ResourceMessage),
-   ResourceRequestBind(ResourceRequestBind),
-   ResourceReportBind(ResourceReportBind)
+   ResourceRequestLocation(ResourceRequestLocation),
+   ResourceReportLocation(ResourceReportLocation)
 }
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ResourceStateRequest
+{
+    Resource(ResourceKey),
+    Gathering(ResourceGatheringKey)
+}
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceEvent
@@ -233,7 +242,8 @@ pub struct ResourceEvent
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ResourceEventKind
 {
-   StateChange(ResourceState),
+   ResourceStateChange(ResourceState),
+   ResourceGatheringChange(ResourceGatheringChange),
    Broadcast(ResourceBroadcast)
 }
 
@@ -264,6 +274,12 @@ pub struct ResourceState
 }
 
 #[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceGatheringChange
+{
+    pub payloads: ResourcePayloads
+}
+
+#[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceReportBind
 {
     pub star: StarKey,
@@ -272,10 +288,18 @@ pub struct ResourceReportBind
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceRequestBind
+pub struct ResourceRequestLocation
 {
     pub lookup: ResourceLookupKind
 }
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceReportLocation
+{
+    pub resource: ResourceKey,
+    pub location: ResourceLocation
+}
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ResourceLookupKind
@@ -309,7 +333,7 @@ pub struct ResourceMessage
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceBound
+pub struct ResourceBind
 {
    pub key: ResourceKey,
    pub star: StarKey
@@ -399,8 +423,9 @@ impl fmt::Display for StarMessagePayload{
             StarMessagePayload::ServerPledgeToSupervisor => "ServerPledgeToSupervisor".to_string(),
             StarMessagePayload::ResourceEvent(_)=>"ResourceEvent".to_string(),
             StarMessagePayload::ResourceMessage(_)=>"ResourceMessage".to_string(),
-            StarMessagePayload::ResourceRequestBind(_)=>"ResourceRequestBind".to_string(),
-            StarMessagePayload::ResourceReportBind(_)=>"ResourceReportBind".to_string(),
+            StarMessagePayload::ResourceRequestLocation(_)=>"ResourceRequestLocation".to_string(),
+            StarMessagePayload::ResourceReportLocation(_)=>"ResourceReportLocation".to_string(),
+            StarMessagePayload::ResourceStateRequest(_)=>"ResourceStateRequest".to_string(),
         };
         write!(f, "{}",r)
     }

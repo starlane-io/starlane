@@ -21,3 +21,4 @@ pub mod provision;
 pub mod starlane;
 pub mod application;
 pub mod resource;
+pub mod server;
