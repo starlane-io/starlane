@@ -38,14 +38,14 @@ pub enum Frame
     StarWind(StarWindInner),
     StarUnwind(StarUnwindInner),
     Watch(Watch),
+    ResourceEvent(ResourceEvent)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Watch
 {
     Add(WatchInfo),
-    Remove(Id),
-    Event(ResourceEvent)
+    Remove(WatchInfo)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -103,7 +103,7 @@ pub struct StarSearchInner
     pub from: StarKey,
     pub pattern: StarSearchPattern,
     pub hops: Vec<StarKey>,
-    pub transactions: Vec<i64>,
+    pub transactions: Vec<Id>,
     pub max_hops: i32,
 }
 
@@ -143,7 +143,7 @@ pub struct StarSearchResultInner
     pub missed: Option<StarKey>,
     pub hits: Vec<StarSearchHit>,
     pub search: StarSearchInner,
-    pub transactions: Vec<i64>,
+    pub transactions: Vec<Id>,
     pub hops : Vec<StarKey>
 }
 
@@ -238,15 +238,13 @@ pub enum StarMessagePayload
    ResourceEvent(ResourceEvent),
    ResourceMessage(ResourceMessage),
    ResourceRequestLocation(ResourceRequestLocation),
-   ResourceReportLocation(ResourceLocation),
+   ResourceReportLocation(ResourceLocation)
 }
-
-
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceEvent
 {
-    pub star: StarKey,
+    pub resource: ResourceKey,
     pub kind: ResourceEventKind,
 }
 
@@ -259,12 +257,23 @@ pub enum ResourceEventKind
    Broadcast(ResourceBroadcast)
 }
 
-pub struct ResourceScattered
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceState
 {
-    from: ResourceKey
+    pub payloads: ResourcePayloads
 }
 
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceGathered
+{
+    pub to: ResourceKey
+}
 
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceScattered
+{
+    pub from : ResourceKey
+}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceBroadcast
@@ -284,18 +293,6 @@ pub struct ResourcePayload
 {
     pub kind: String,
     pub data: Arc<Vec<u8>>
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceState
-{
-    pub payloads: ResourcePayloads
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceGathered
-{
-    pub resource: ResourceKey
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -324,7 +321,26 @@ pub struct ResourceReportLocation
 pub enum ResourceLookupKind
 {
     Key(ResourceKey),
-    Name(String)
+    Name(ResourceNameLookup)
+}
+
+impl ResourceLookupKind
+{
+    pub fn app_id(&self)->Id
+    {
+        match self
+        {
+            ResourceLookupKind::Key(resource) => resource.app_id.clone(),
+            ResourceLookupKind::Name(name) => name.app_id.clone()
+        }
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceNameLookup
+{
+    pub app_id: Id,
+    pub name: String
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -357,10 +373,6 @@ pub struct ResourceBind
    pub key: ResourceKey,
    pub star: StarKey
 }
-
-
-
-
 
 
 #[derive(Clone,Serialize,Deserialize)]

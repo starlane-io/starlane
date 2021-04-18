@@ -1,26 +1,27 @@
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
+use std::ops::Deref;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, AtomicI64, Ordering};
+use std::task::Poll;
 
 use futures::future::{err, join_all, ok, select_all};
 use futures::FutureExt;
 use futures::prelude::*;
+use tokio::sync::{broadcast, mpsc, Mutex, oneshot};
+use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::{mpsc, Mutex, broadcast, oneshot};
+use tokio::time::{Duration, Instant};
 
 use crate::constellation::Constellation;
 use crate::error::Error;
-use crate::id::{Id, IdSeq};
-use crate::lane::{STARLANE_PROTOCOL_VERSION, TunnelSenderState, Lane, TunnelConnector, TunnelSender, LaneCommand, TunnelReceiver, ConnectorController, LaneMeta};
-use crate::frame::{ProtoFrame, Frame, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarSearchHit, StarWindInner, StarUnwindPayload, StarWindPayload};
-use crate::star::{Star, StarKernel, StarKey, StarKind, StarCommand, StarController, Transaction, StarSearchTransaction, StarCore, StarLogger, StarCoreFactory, FrameTimeoutInner, FrameHold, StarInfo, ShortestPathStarKey};
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
-use std::task::Poll;
+use crate::frame::{Frame, ProtoFrame, StarMessageInner, StarMessagePayload, StarSearchHit, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarUnwindPayload, StarWindInner, StarWindPayload};
 use crate::frame::Frame::{StarMessage, StarSearch, StarWind};
-use crate::template::ConstellationTemplate;
+use crate::id::{Id, IdSeq};
+use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelReceiver, TunnelSender, TunnelSenderState};
+use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarLogger, StarSearchTransaction, Transaction, StarManagerFactory};
 use crate::starlane::StarlaneCommand;
-use tokio::time::{Duration, Instant};
-use std::ops::Deref;
+use crate::template::ConstellationTemplate;
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -29,12 +30,12 @@ pub struct ProtoStar
   star_key: Option<StarKey>,
   sequence: Option<Arc<IdSeq>>,
   kind: StarKind,
-  command_tx: Sender<StarCommand>,
-  command_rx: Receiver<StarCommand>,
+  command_tx: broadcast::Sender<StarCommand>,
+  command_rx: broadcast::Receiver<StarCommand>,
   evolution_tx: oneshot::Sender<ProtoStarEvolution>,
   lanes: HashMap<StarKey, LaneMeta>,
   connector_ctrls: Vec<ConnectorController>,
-  star_core_provider: Arc<dyn StarCoreFactory>,
+  star_core_provider: Arc<dyn StarManagerFactory>,
   logger: StarLogger,
   frame_hold: FrameHold,
   tracker: ProtoTracker
@@ -42,9 +43,9 @@ pub struct ProtoStar
 
 impl ProtoStar
 {
-    pub fn new(key: Option<StarKey>, kind: StarKind, evolution_tx: oneshot::Sender<ProtoStarEvolution>, star_core_provider: Arc<dyn StarCoreFactory>) ->(Self, StarController)
+    pub fn new(key: Option<StarKey>, kind: StarKind, evolution_tx: oneshot::Sender<ProtoStarEvolution>, star_core_provider: Arc<dyn StarManagerFactory>) ->(Self, StarController)
     {
-        let (command_tx, command_rx) = mpsc::channel(32);
+        let (command_tx, command_rx) = broadcast::channel(32);
         (ProtoStar{
             star_key: key,
             sequence: Option::None,
@@ -105,7 +106,10 @@ impl ProtoStar
                 lanes.push( key.clone() )
             }
 
-            futures.push(self.command_rx.recv().boxed());
+            futures.push(self.command_rx.recv().map( |r| match r{
+                Ok(command) => Option::Some(command),
+                Err(_) => Option::None
+            }).boxed());
 
             if self.tracker.has_expectation()
             {

@@ -1,12 +1,14 @@
-use crate::star::{StarKey, StarKind, GatewayKind, StarCore, ServiceData};
-use std::collections::{HashSet, HashMap};
-use crate::proto::{PlaceholderKernel, ProtoStar, ProtoStarKernel};
-use crate::id::Id;
-use crate::proto::ProtoStarKernel::Mesh;
-use crate::layout::ConstellationLayout;
-use serde::{Serialize,Deserialize};
+use std::collections::{HashMap, HashSet};
+
+use serde::{Deserialize, Serialize};
+
 use crate::error::Error;
+use crate::id::Id;
 use crate::lane::{ConnectionInfo, ConnectionKind};
+use crate::layout::ConstellationLayout;
+use crate::proto::{PlaceholderKernel, ProtoStar, ProtoStarKernel};
+use crate::proto::ProtoStarKernel::Mesh;
+use crate::star::{StarKey, StarKind};
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct ConstellationTemplate
@@ -92,16 +94,6 @@ impl ConstellationTemplate
         }
         Option::None
     }
-}
-
-pub trait StarDataFactory: Send
-{
-    fn star_data(&self, kind: StarKind, handle: Option<String> ) -> Result<StarCore,Error>;
-}
-
-pub struct DefaultStarDataFactory
-{
-   pub link_gateway: Option<StarKey>
 }
 
 

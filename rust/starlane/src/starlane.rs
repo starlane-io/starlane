@@ -1,27 +1,28 @@
+use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+use std::sync::mpsc::{Receiver, Sender};
+
+use futures::future::join_all;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
-use crate::provision::Provisioner;
-use crate::error::Error;
-use crate::template::{ConstellationTemplate, StarKeyTemplate, StarKeySubgraphTemplate, StarKeyIndexTemplate, ConstellationData};
-use crate::layout::ConstellationLayout;
-use crate::proto::{ProtoStar, local_tunnels, ProtoTunnel, ProtoStarController, ProtoStarEvolution};
-use crate::star::{StarKey, Star, StarController, StarCommand, StarCore, StarCoreFactory, DefaultStarCoreFactory};
-use std::collections::{HashSet, HashMap};
-use std::sync::mpsc::{Sender, Receiver};
-use crate::frame::Frame;
-use std::sync::Arc;
-use crate::lane::{Lane, LocalTunnelConnector, ConnectionInfo, ConnectionKind};
-use std::cmp::Ordering;
 use tokio::sync::oneshot::error::RecvError;
-use futures::future::join_all;
 
+use crate::error::Error;
+use crate::frame::Frame;
+use crate::lane::{ConnectionInfo, ConnectionKind, Lane, LocalTunnelConnector};
+use crate::layout::ConstellationLayout;
+use crate::proto::{local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoTunnel};
+use crate::provision::Provisioner;
+use crate::star::{Star, StarCommand, StarController, StarKey, StarManagerFactory, StarManagerFactoryDefault};
+use crate::template::{ConstellationData, ConstellationTemplate, StarKeyIndexTemplate, StarKeySubgraphTemplate, StarKeyTemplate};
 
 pub struct Starlane
 {
     pub tx: mpsc::Sender<StarlaneCommand>,
     rx: mpsc::Receiver<StarlaneCommand>,
     star_controllers: HashMap<StarKey,StarController>,
-    star_core_provider: Arc<dyn StarCoreFactory>
+    star_core_provider: Arc<dyn StarManagerFactory>
 }
 
 impl Starlane
@@ -33,7 +34,7 @@ impl Starlane
             star_controllers: HashMap::new(),
             tx: tx,
             rx: rx,
-            star_core_provider: Arc::new( DefaultStarCoreFactory::new() )
+            star_core_provider: Arc::new( StarManagerFactoryDefault{} )
         }
     }
 
@@ -255,9 +256,9 @@ impl Starlane
         let high_lane= Lane::new(low).await;
         let low_lane = Lane::new(high).await;
         let connector = LocalTunnelConnector::new(&high_lane,&low_lane).await?;
-        high_star_ctrl.command_tx.send(StarCommand::AddLane(high_lane)).await?;
-        low_star_ctrl.command_tx.send(StarCommand::AddLane(low_lane)).await?;
-        high_star_ctrl.command_tx.send( StarCommand::AddConnectorController(connector)).await?;
+        high_star_ctrl.command_tx.send(StarCommand::AddLane(high_lane))?;
+        low_star_ctrl.command_tx.send(StarCommand::AddLane(low_lane))?;
+        high_star_ctrl.command_tx.send( StarCommand::AddConnectorController(connector))?;
 
         Ok(())
     }
@@ -328,11 +329,12 @@ pub enum StarAddress
 mod test
 {
     use tokio::runtime::Runtime;
-    use crate::starlane::{Starlane, StarlaneCommand, ProvisionConstellationCommand};
-    use crate::template::{ConstellationTemplate, ConstellationData};
-    use crate::error::Error;
     use tokio::sync::oneshot::error::RecvError;
     use tokio::time::Duration;
+
+    use crate::error::Error;
+    use crate::starlane::{ProvisionConstellationCommand, Starlane, StarlaneCommand};
+    use crate::template::{ConstellationData, ConstellationTemplate};
 
     #[test]
     pub fn starlane()
