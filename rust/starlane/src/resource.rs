@@ -1,4 +1,5 @@
 use crate::id::Id;
+use tokio::sync::broadcast;
 use std::sync::Arc;
 use crate::star::StarKey;
 use crate::error::Error;
@@ -11,8 +12,18 @@ use std::fmt;
 pub struct ResourceKey
 {
     pub app_id: Id,
-    pub id: Id
+    pub id: Id,
+    pub kind: ResourceKind
 }
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ResourceKind
+{
+    Single,
+    Group
+}
+
+
 
 impl fmt::Display for ResourceKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -20,21 +31,12 @@ impl fmt::Display for ResourceKey {
     }
 }
 
-
-
-#[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
-pub struct ResourceGatheringKey
-{
-    pub app_id: Id,
-    pub id: Id
-}
-
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceLocation
 {
     pub resource: ResourceKey,
     pub star: StarKey,
-    pub gathering: Option<ResourceGatheringKey>,
+    pub group: Option<ResourceKey>,
     pub ext: Option<Vec<u8>>
 }
 
@@ -46,7 +48,7 @@ impl ResourceLocation
             resource: resource,
             star: star,
             ext: Option::None,
-            gathering: Option::None
+            group: Option::None
         }
     }
 
@@ -55,28 +57,35 @@ impl ResourceLocation
         ResourceLocation{
             resource: resource,
             star: star,
-            gathering: Option::None,
-            ext: Option::Some(ext)
+            ext: Option::Some(ext),
+            group: Option::None
         }
     }
 }
 
-pub struct ResourceGathering
+pub struct ResourceGroup
 {
-    pub key: ResourceGatheringKey,
+    pub key: ResourceKey,
     pub resources: Vec<ResourceKey>
 }
 
-pub enum ResourceWatchPattern
-{
-    Resource(ResourceKey),
-    Gathering(ResourceGatheringKey)
-}
 
 pub struct ResourceWatcher
 {
-    pub pattern: ResourceWatchPattern,
+    pub resource: ResourceKey,
     pub tx: Sender<ResourceEvent>
+}
+
+impl ResourceWatcher
+{
+    pub fn new( resource: ResourceKey )->(Self,broadcast::Receiver<ResourceEvent>)
+    {
+        let (tx,rx) = broadcast::channel(32);
+        (ResourceWatcher{
+            resource: resource,
+            tx: tx
+        },rx)
+    }
 }
 
 impl ResourceWatcher

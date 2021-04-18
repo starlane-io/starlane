@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicI32, AtomicI64 };
 use futures::future::join_all;
 use futures::future::select_all;
-use crate::frame::{ProtoFrame, Frame, StarSearchHit, StarSearchPattern, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchResultInner, RejectionInner, ApplicationAssignInner, ApplicationReportSupervisorInner, StarWindInner, StarUnwindInner, StarUnwindPayload, StarWindPayload, ApplicationNotifyReadyInner, ResourceMessage, ResourceBind, ResourceReportLocation, ResourceLookupKind};
+use crate::frame::{ProtoFrame, Frame, StarSearchHit, StarSearchPattern, StarMessageInner, StarMessagePayload, StarSearchInner, StarSearchResultInner, RejectionInner, ApplicationAssignInner, ApplicationReportSupervisorInner, StarWindInner, StarUnwindInner, StarUnwindPayload, StarWindPayload, ApplicationNotifyReadyInner, ResourceMessage, ResourceBind, ResourceReportLocation, ResourceLookupKind, Watch, ApplicationRequestSupervisorInner, ResourceRequestLocation};
 use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use futures::FutureExt;
@@ -24,6 +24,8 @@ use futures::channel::oneshot;
 use futures::channel::oneshot::Canceled;
 use crate::application::ApplicationState;
 use crate::resource::{ResourceWatcher, ResourceKey, ResourceLocation};
+use tokio::time::Instant;
+use lru::LruCache;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
 pub enum StarKind
@@ -269,6 +271,20 @@ impl Core for StarCore
             }
         }
     }
+
+    async fn has_resource(&mut self, resource: &ResourceKey) -> bool {
+        match self
+        {
+            StarCore::Central(core) => core.has_resource(resource),
+            StarCore::Mesh => {false}
+            StarCore::Supervisor(core) => {core.has_resource(resource)}
+            StarCore::Server(core) => {core.has_resource(resource)}
+            StarCore::Gateway => {false}
+            StarCore::Link => {false}
+            StarCore::Client => {false}
+            StarCore::Ext => {false}
+        }
+    }
 }
 
 #[async_trait]
@@ -277,6 +293,7 @@ pub trait Core: Send+Sync
     async fn start(&mut self) -> Result<(),Error>;
     async fn handle_message(&mut self, message: StarMessageInner ) -> Result<(),Error>;
     async fn handle_wind(&mut self, wind: StarWindInner ) -> Result<StarUnwindPayload,Error>;
+    async fn has_resource(&mut self, resource: &ResourceKey ) -> bool;
 }
 
 #[async_trait]
@@ -364,6 +381,10 @@ impl Core for GatewayCoreDefault
     async fn handle_wind(&mut self, wind: StarWindInner) -> Result<StarUnwindPayload, Error> {
         Err("gateway does not handle any unwinds".into())
     }
+
+    async fn has_resource(&mut self, resource: ResourceKey) -> bool {
+        false
+    }
 }
 
 #[async_trait]
@@ -427,6 +448,10 @@ impl Core for ServerCoreDefault
     async fn handle_wind(&mut self, wind: StarWindInner) -> Result<StarUnwindPayload, Error>
     {
         Err("ServerCore does not hanle Winds".into())
+    }
+
+    async fn has_resource(&mut self, resource: ResourceKey) -> bool {
+        false
     }
 }
 
@@ -535,6 +560,10 @@ impl Core for CentralCoreDefault
             }
         }
 
+    }
+
+    async fn has_resource(&mut self, resource: ResourceKey) -> bool {
+        false
     }
 }
 
@@ -744,6 +773,10 @@ impl Core for SupervisorCore
     async fn handle_wind(&mut self, wind: StarWindInner) -> Result<StarUnwindPayload, Error> {
         Err("supervisor does not handle any winds".into())
     }
+
+    async fn has_resource(&mut self, resource: ResourceKey) -> bool {
+        false
+    }
 }
 
 pub trait StarCoreFactory: Send+Sync
@@ -948,11 +981,15 @@ pub struct Star
     command_tx: Sender<StarCommand>,
     lanes: HashMap<StarKey, LaneMeta>,
     connector_ctrls: Vec<ConnectorController>,
-    transactions: HashMap<i64,Box<dyn Transaction>>,
+    transactions: HashMap<Id,Box<dyn Transaction>>,
     transaction_seq: AtomicI64,
     star_search_transactions: HashMap<i64,StarSearchTransaction>,
     frame_hold: FrameHold,
-    logger: StarLogger
+    logger: StarLogger,
+    watches: HashMap<ResourceKey,Vec<StarWatchInfo>>,
+    id_to_watch_pattern: HashMap<Id,ResourceKey>,
+    resources: LruCache<ResourceKey,ResourceLocation>,
+    applications: LruCache<Id,StarKey>
 }
 
 impl Star
@@ -996,7 +1033,11 @@ impl Star
             star_search_transactions: HashMap::new(),
             frame_hold: frame_hold,
             sequence: sequence,
-            logger: logger
+            logger: logger,
+            watches: HashMap::new(),
+            id_to_watch_pattern: HashMap::new(),
+            resources: LruCache::new(64*1024 ),
+            applications: LruCache::new(4*1024 )
         }
     }
 
@@ -1305,8 +1346,36 @@ impl Star
         }
     }
 
+    async fn process_transactions( &mut self, frame: &Frame, lane_key: &StarKey )
+    {
+        let tid = match frame
+        {
+            Frame::StarMessage(message) => {
+                message.transaction
+            }
+            _ => Option::None
+        };
+
+        if let Option::Some(tid) = tid
+        {
+            let transaction = self.transactions.get_mut(&tid);
+            if let Option::Some(transaction) = transaction
+            {
+                match transaction.on_frame(frame,self.lanes.get_mut(lane_key).unwrap() )
+                {
+                    TransactionState::Continue => {}
+                    TransactionState::Done => {
+                        self.transactions.remove(&tid);
+                    }
+                }
+            }
+        }
+
+    }
+
     async fn process_frame( &mut self, frame: Frame, lane_key: StarKey )
     {
+        self.process_transactions(&frame,&lane_key).await;
         match frame
         {
             Frame::Proto(proto) => {
@@ -1360,6 +1429,83 @@ impl Star
                 eprintln!("star does not handle frame: {}", frame)
             }
         }
+    }
+
+    async fn on_watch( &mut self, watch: Watch, lane_key: StarKey )
+    {
+        match &watch
+        {
+            Watch::Add(info) => {
+                let star_watch = StarWatchInfo{
+                    id: info.id.clone(),
+                    lane: lane_key.clone(),
+                    timestamp: Instant::now()
+                };
+                match self.watches.get_mut(&info.resource )
+                {
+                    None => {
+                        let mut watches = vec!();
+                        watches.push(star_watch);
+                        self.watches.insert(info.resource.clone(), watches);
+                    }
+                    Some(mut watches) => {
+                        watches.push(star_watch);
+                    }
+                }
+                self.id_to_watch_pattern.insert( info.id.clone(), info.resource.clone() );
+
+                if self.core.has_resource(&info.resource).await
+                {
+    //                self.core.hanlde_watch(info);
+                }
+                else
+                {
+                    let location = self.find_resource(ResourceLookupKind::Key(info.resource.clone())).await;
+                }
+            }
+            Watch::Remove(watch_id) => {
+
+            }
+            Watch::Event(_) => {}
+        }
+    }
+
+    async fn find_app_supervisor(&mut self, app_id: &Id ) -> Result<StarKey,Error>
+    {
+        if let Option::Some( supervisor_key ) = self.applications.get(&app_id)
+        {
+            Ok(supervisor_key.clone())
+        }
+
+        let payload = StarMessagePayload::ApplicationRequestSupervisor(ApplicationRequestSupervisorInner{ app_id: app_id.clone() } );
+        let mut message = StarMessageInner::new(self.sequence.next(), self.star_key.clone(), StarKey::central(), payload );
+        message.transaction = Option::Some(self.sequence.next());
+
+        let (transaction,rx) = ApplicationSupervisorSearchTransaction::new(app_id.clone());
+        let transaction = Box::new(transaction);
+        self.transactions.insert( message.transaction.unwrap().clone(), transaction );
+
+        self.send( message ).await?;
+
+        Ok(rx.await?)
+    }
+
+    async fn find_resource( &mut self, kind: ResourceLookupKind ) -> Result<ResourceLocation,Error>
+    {
+        if let Option::Some(location) = self.resources.get(resource)
+        {
+            return Ok(location.clone())
+        }
+
+        let supervisor_star = self.find_app_supervisor( &resource.app_id ).await?;
+        let payload = StarMessagePayload::ResourceRequestLocation(ResourceRequestLocation{ lookup: kind } );
+        let mut message = StarMessageInner::new( self.sequence.next(), self.star_key.clone(), supervisor_star, payload );
+        message.transaction = Option::Some(self.sequence.next());
+        let (transaction,rx) =  ResourceLocationRequestTransaction::new();
+        self.transactions.insert( message.transaction.unwrap().clone(), Box::new(transaction) );
+        self.send( message ).await?;
+
+        Ok(rx.await?)
     }
 
     async fn on_star_search( &mut self, mut search: StarSearchInner, lane_key: StarKey )
@@ -1426,8 +1572,6 @@ impl Star
         }
 
     }
-
-
 
     async fn on_wind( &mut self, mut wind: StarWindInner)
     {
@@ -1571,6 +1715,86 @@ pub struct StarController
 }
 
 
+#[derive(Clone)]
+pub struct StarWatchInfo
+{
+    pub id: Id,
+    pub timestamp: Instant,
+    pub lane: StarKey
+}
+
+
+pub struct ApplicationSupervisorSearchTransaction
+{
+    pub app_id: Id,
+    pub tx: oneshot::Sender<StarKey>
+}
+
+impl ApplicationSupervisorSearchTransaction
+{
+    pub fn new(app_id: Id) ->(Self,oneshot::Receiver<StarKey>)
+    {
+        let (tx,rx) = oneshot::channel();
+        (ApplicationSupervisorSearchTransaction{
+            app_id: app_id,
+            tx: tx
+        },rx)
+    }
+}
+
+impl Transaction for ApplicationSupervisorSearchTransaction
+{
+    fn on_frame(&mut self, frame: Frame, lane: &mut LaneMeta) -> TransactionState {
+
+        if let Frame::StarMessage( message ) = frame
+        {
+            if let StarMessagePayload::ApplicationReportSupervisor(report) = message.payload
+            {
+                self.tx.send(report.supervisor );
+            }
+        }
+
+        TransactionState::Done
+    }
+
+
+}
+
+
+
+pub struct ResourceLocationRequestTransaction
+{
+    pub tx: oneshot::Sender<ResourceLocation>
+}
+
+impl ResourceLocationRequestTransaction
+{
+    pub fn new() ->(Self,oneshot::Receiver<ResourceLocation>)
+    {
+        let (tx,rx) = oneshot::channel();
+        (ResourceLocationRequestTransaction{
+            tx: tx
+        },rx)
+    }
+}
+
+impl Transaction for ResourceLocationRequestTransaction
+{
+    fn on_frame(&mut self, frame: Frame, lane: &mut LaneMeta) -> TransactionState {
+
+        if let Frame::StarMessage( message ) = frame
+        {
+            if let StarMessagePayload::ResourceReportLocation(location ) = message.payload
+            {
+                self.tx.send(location );
+            }
+        }
+
+        TransactionState::Done
+    }
+
+}
+
 
 pub struct StarSearchTransaction
 {
@@ -1648,29 +1872,8 @@ pub enum TransactionState
 
 pub trait Transaction : Send+Sync
 {
-    fn on_frame( &mut self, frame: Frame, lane: & mut LaneMeta )->TransactionState;
+    fn on_frame( &mut self, frame: &Frame, lane: & mut LaneMeta )->TransactionState;
 }
-
-pub struct StarKeySearchTransaction
-{
-}
-
-impl Transaction for StarKeySearchTransaction
-{
-    fn on_frame(&mut self, frame: Frame, lane: &mut LaneMeta)->TransactionState {
-
-        if let Frame::StarSearchResult(result) = frame
-        {
-            for hit in result.hits
-            {
-                lane.star_paths.insert(hit.star.clone(), hit.hops.clone() as _ );
-            }
-        }
-
-        TransactionState::Done
-    }
-}
-
 
 #[derive(Clone)]
 pub enum StarLog

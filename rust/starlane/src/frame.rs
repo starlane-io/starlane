@@ -1,10 +1,11 @@
 use crate::id::Id;
 use std::fmt;
-use crate::star::{StarKey, StarKind};
+use crate::star::{StarKey, StarKind, StarWatchInfo};
 use serde::{Deserialize, Serialize, Serializer};
-use crate::resource::{ResourceKey, ResourceGatheringKey, ResourceLocation};
+use crate::resource::{ResourceKey, ResourceLocation};
 use std::sync::Arc;
 use std::collections::HashMap;
+use tokio::time::Instant;
 
 #[derive(Clone)]
 pub struct Command
@@ -35,7 +36,23 @@ pub enum Frame
     StarMessage(StarMessageInner),
     StarAck(StarAckInner),
     StarWind(StarWindInner),
-    StarUnwind(StarUnwindInner)
+    StarUnwind(StarUnwindInner),
+    Watch(Watch),
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum Watch
+{
+    Add(WatchInfo),
+    Remove(Id),
+    Event(ResourceEvent)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct WatchInfo
+{
+    pub id: Id,
+    pub resource: ResourceKey,
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -217,19 +234,13 @@ pub enum StarMessagePayload
    ApplicationLookupId(ApplicationLookupIdInner),
    ApplicationRequestLaunch(ApplicationRequestLaunchInner),
    ServerPledgeToSupervisor,
-   ResourceStateRequest(ResourceStateRequest),
+   ResourceStateRequest(ResourceKey),
    ResourceEvent(ResourceEvent),
    ResourceMessage(ResourceMessage),
    ResourceRequestLocation(ResourceRequestLocation),
-   ResourceReportLocation(ResourceLocation)
+   ResourceReportLocation(ResourceLocation),
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub enum ResourceStateRequest
-{
-    Resource(ResourceKey),
-    Gathering(ResourceGatheringKey)
-}
 
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -243,9 +254,17 @@ pub struct ResourceEvent
 pub enum ResourceEventKind
 {
    ResourceStateChange(ResourceState),
-   ResourceGatheringChange(ResourceGatheringChange),
+   ResourceGathered(ResourceGathered),
+   ResourceScattered(ResourceScattered),
    Broadcast(ResourceBroadcast)
 }
+
+pub struct ResourceScattered
+{
+    from: ResourceKey
+}
+
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceBroadcast
@@ -274,9 +293,9 @@ pub struct ResourceState
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceGatheringChange
+pub struct ResourceGathered
 {
-    pub payloads: ResourcePayloads
+    pub resource: ResourceKey
 }
 
 #[derive(Clone,Serialize,Deserialize)]
