@@ -16,7 +16,7 @@ pub struct ResourceKey
     pub kind: ResourceKind
 }
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
 pub enum ResourceKind
 {
     Single,

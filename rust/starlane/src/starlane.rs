@@ -16,13 +16,15 @@ use crate::proto::{local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolu
 use crate::provision::Provisioner;
 use crate::star::{Star, StarCommand, StarController, StarKey, StarManagerFactory, StarManagerFactoryDefault};
 use crate::template::{ConstellationData, ConstellationTemplate, StarKeyIndexTemplate, StarKeySubgraphTemplate, StarKeyTemplate};
+use crate::core::{StarCoreFactory, StarCoreFactoryDefault};
 
 pub struct Starlane
 {
     pub tx: mpsc::Sender<StarlaneCommand>,
     rx: mpsc::Receiver<StarlaneCommand>,
     star_controllers: HashMap<StarKey,StarController>,
-    star_core_provider: Arc<dyn StarManagerFactory>
+    star_manager_factory: Arc<dyn StarManagerFactory>,
+    star_core_factory: Arc<dyn StarCoreFactory>
 }
 
 impl Starlane
@@ -34,7 +36,8 @@ impl Starlane
             star_controllers: HashMap::new(),
             tx: tx,
             rx: rx,
-            star_core_provider: Arc::new( StarManagerFactoryDefault{} )
+            star_manager_factory: Arc::new( StarManagerFactoryDefault{} ),
+            star_core_factory: Arc::new( StarCoreFactoryDefault{} )
         }
     }
 
@@ -89,7 +92,7 @@ impl Starlane
 
         let link = link.unwrap().clone();
         let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
-        let (proto_star, star_ctrl) = ProtoStar::new(Option::None, link.kind.clone(), evolve_tx, self.star_core_provider.clone() );
+        let (proto_star, star_ctrl) = ProtoStar::new(Option::None, link.kind.clone(), evolve_tx, self.star_manager_factory.clone(), self.star_core_factory.clone() );
 
         println!("created proto star: {:?}", &link.kind);
 
@@ -99,7 +102,7 @@ impl Starlane
             if let Ok(star) = star
             {
                 data.exclude_handles.insert("link".to_string() );
-                data.subgraphs.insert("client".to_string(), star.star_key.subgraph.clone() );
+                data.subgraphs.insert("client".to_string(), star.star_key().subgraph.clone() );
 
                 let (tx,rx) = oneshot::channel();
                 starlane_ctrl.send( StarlaneCommand::ProvisionConstellation(
@@ -173,7 +176,7 @@ impl Starlane
             let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
             evolve_rxs.push(evolve_rx );
 
-            let (proto_star, star_ctrl) = ProtoStar::new(Option::Some(star_key.clone()), star_template.kind.clone(), evolve_tx, self.star_core_provider.clone() );
+            let (proto_star, star_ctrl) = ProtoStar::new(Option::Some(star_key.clone()), star_template.kind.clone(), evolve_tx, self.star_manager_factory.clone(), self.star_core_factory.clone() );
             self.star_controllers.insert(star_key.clone(), star_ctrl.clone() );
             println!("created proto star: {:?}", &star_template.kind);
 
@@ -256,9 +259,9 @@ impl Starlane
         let high_lane= Lane::new(low).await;
         let low_lane = Lane::new(high).await;
         let connector = LocalTunnelConnector::new(&high_lane,&low_lane).await?;
-        high_star_ctrl.command_tx.send(StarCommand::AddLane(high_lane))?;
-        low_star_ctrl.command_tx.send(StarCommand::AddLane(low_lane))?;
-        high_star_ctrl.command_tx.send( StarCommand::AddConnectorController(connector))?;
+        high_star_ctrl.command_tx.send(StarCommand::AddLane(high_lane)).await?;
+        low_star_ctrl.command_tx.send(StarCommand::AddLane(low_lane)).await?;
+        high_star_ctrl.command_tx.send( StarCommand::AddConnectorController(connector)).await?;
 
         Ok(())
     }

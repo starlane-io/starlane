@@ -15,13 +15,14 @@ use tokio::time::{Duration, Instant};
 
 use crate::constellation::Constellation;
 use crate::error::Error;
-use crate::frame::{Frame, ProtoFrame, StarMessageInner, StarMessagePayload, StarSearchHit, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarUnwindPayload, StarWindInner, StarWindPayload};
+use crate::frame::{Frame, ProtoFrame, StarMessageInner, StarMessagePayload, SearchHit, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarUnwindPayload, StarWindInner, StarWindPayload};
 use crate::frame::Frame::{StarMessage, StarSearch, StarWind};
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelReceiver, TunnelSender, TunnelSenderState};
 use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarLogger, StarSearchTransaction, Transaction, StarManagerFactory};
 use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
+use crate::core::StarCoreFactory;
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -30,12 +31,13 @@ pub struct ProtoStar
   star_key: Option<StarKey>,
   sequence: Option<Arc<IdSeq>>,
   kind: StarKind,
-  command_tx: broadcast::Sender<StarCommand>,
-  command_rx: broadcast::Receiver<StarCommand>,
+  command_tx: mpsc::Sender<StarCommand>,
+  command_rx: mpsc::Receiver<StarCommand>,
   evolution_tx: oneshot::Sender<ProtoStarEvolution>,
   lanes: HashMap<StarKey, LaneMeta>,
   connector_ctrls: Vec<ConnectorController>,
-  star_core_provider: Arc<dyn StarManagerFactory>,
+  star_manager_factory: Arc<dyn StarManagerFactory>,
+  star_core_factory: Arc<dyn StarCoreFactory>,
   logger: StarLogger,
   frame_hold: FrameHold,
   tracker: ProtoTracker
@@ -43,9 +45,9 @@ pub struct ProtoStar
 
 impl ProtoStar
 {
-    pub fn new(key: Option<StarKey>, kind: StarKind, evolution_tx: oneshot::Sender<ProtoStarEvolution>, star_core_provider: Arc<dyn StarManagerFactory>) ->(Self, StarController)
+    pub fn new(key: Option<StarKey>, kind: StarKind, evolution_tx: oneshot::Sender<ProtoStarEvolution>, star_manager_factory: Arc<dyn StarManagerFactory>, star_core_factory: Arc<dyn StarCoreFactory>) ->(Self, StarController)
     {
-        let (command_tx, command_rx) = broadcast::channel(32);
+        let (command_tx, command_rx) = mpsc::channel(32);
         (ProtoStar{
             star_key: key,
             sequence: Option::None,
@@ -55,7 +57,8 @@ impl ProtoStar
             command_rx: command_rx,
             lanes: HashMap::new(),
             connector_ctrls: vec![],
-            star_core_provider: star_core_provider,
+            star_manager_factory: star_manager_factory,
+            star_core_factory: star_core_factory,
             logger: StarLogger::new(),
             frame_hold: FrameHold::new(),
             tracker: ProtoTracker::new(),
@@ -77,18 +80,19 @@ impl ProtoStar
                 sequence: self.sequence.as_ref().unwrap().clone(),
                 command_tx: self.command_tx.clone()
             };
-            let core = self.star_core_provider.create(info.clone() );
+
+            let manager_tx= self.star_manager_factory.create(info.clone() ).await;
+            let core_tx = self.star_core_factory.create(&info.kind).await;
 
 
-            return Ok(Star::from_proto(self.star_key.as_ref().unwrap().clone(),
-                                       core,
-                                       self.command_tx,
+            return Ok(Star::from_proto(info.clone(),
                                        self.command_rx,
+                                       manager_tx,
+                                       core_tx,
                                        self.lanes,
                                        self.connector_ctrls,
                                        self.logger,
-                                       self.frame_hold,
-                                       sequence));
+                                       self.frame_hold ));
         }
         else {
             self.send_central_search().await;
@@ -106,10 +110,7 @@ impl ProtoStar
                 lanes.push( key.clone() )
             }
 
-            futures.push(self.command_rx.recv().map( |r| match r{
-                Ok(command) => Option::Some(command),
-                Err(_) => Option::None
-            }).boxed());
+            futures.push(self.command_rx.recv().boxed());
 
             if self.tracker.has_expectation()
             {
@@ -229,15 +230,17 @@ impl ProtoStar
                                                 command_tx: self.command_tx.clone()
                                             };
 
-                                            return Ok(Star::from_proto(self.star_key.as_ref().unwrap().clone(),
-                                                                       self.star_core_provider.create(info),
-                                                                       self.command_tx,
+                                        let manager_tx= self.star_manager_factory.create(info.clone() ).await;
+                                        let core_tx = self.star_core_factory.create(&info.kind).await;
+
+                                        return Ok(Star::from_proto(info.clone(),
                                                                        self.command_rx,
+                                                                       manager_tx,
+                                                                       core_tx,
                                                                        self.lanes,
                                                                        self.connector_ctrls,
                                                                        self.logger,
-                                                                       self.frame_hold,
-                                                                       sequence
+                                                                       self.frame_hold
                                             )
                                             );
                                     }

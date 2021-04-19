@@ -109,7 +109,7 @@ pub struct StarSearchInner
 
 impl StarSearchInner
 {
-    pub fn inc( &mut self, hop: StarKey, transaction: i64 )
+    pub fn inc( &mut self, hop: StarKey, transaction: Id )
     {
         self.hops.push( hop );
         self.transactions.push(transaction);
@@ -141,7 +141,7 @@ impl StarSearchPattern
 pub struct StarSearchResultInner
 {
     pub missed: Option<StarKey>,
-    pub hits: Vec<StarSearchHit>,
+    pub hits: Vec<SearchHit>,
     pub search: StarSearchInner,
     pub transactions: Vec<Id>,
     pub hops : Vec<StarKey>
@@ -157,10 +157,10 @@ impl StarSearchResultInner
 }
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
-pub struct StarSearchHit
+pub struct SearchHit
 {
     pub star: StarKey,
-    pub hops: i32
+    pub hops: usize
 }
 
 
@@ -475,6 +475,8 @@ impl fmt::Display for Frame {
             Frame::StarWind(_)=>format!("StarWind").to_string(),
             Frame::StarUnwind(_)=>format!("StarUnwind").to_string(),
             Frame::StarAck(_)=>format!("StarAck").to_string(),
+            Frame::Watch(_) => format!("Watch").to_string(),
+            Frame::ResourceEvent(_) => format!("ResourceEvent").to_string()
         };
         write!(f, "{}",r)
     }
