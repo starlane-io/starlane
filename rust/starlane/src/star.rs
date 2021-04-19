@@ -1917,6 +1917,12 @@ impl fmt::Display for StarKey{
     }
 }
 
+#[derive(Eq,PartialEq,Hash,Clone)]
+pub struct StarName
+{
+    pub constellation: String,
+    pub star: String
+}
 
 impl StarKey
 {

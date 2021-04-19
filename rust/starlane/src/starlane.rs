@@ -14,7 +14,7 @@ use crate::lane::{ConnectionInfo, ConnectionKind, Lane, LocalTunnelConnector};
 use crate::layout::ConstellationLayout;
 use crate::proto::{local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoTunnel};
 use crate::provision::Provisioner;
-use crate::star::{Star, StarCommand, StarController, StarKey, StarManagerFactory, StarManagerFactoryDefault};
+use crate::star::{Star, StarCommand, StarController, StarKey, StarManagerFactory, StarManagerFactoryDefault, StarName};
 use crate::template::{ConstellationData, ConstellationTemplate, StarKeyIndexTemplate, StarKeySubgraphTemplate, StarKeyTemplate};
 use crate::core::{StarCoreFactory, StarCoreFactoryDefault};
 
@@ -23,8 +23,10 @@ pub struct Starlane
     pub tx: mpsc::Sender<StarlaneCommand>,
     rx: mpsc::Receiver<StarlaneCommand>,
     star_controllers: HashMap<StarKey,StarController>,
+    star_names: HashMap<StarName,StarKey>,
     star_manager_factory: Arc<dyn StarManagerFactory>,
-    star_core_factory: Arc<dyn StarCoreFactory>
+    star_core_factory: Arc<dyn StarCoreFactory>,
+    constellation_names: HashSet<String>
 }
 
 impl Starlane
@@ -34,6 +36,8 @@ impl Starlane
         let (tx, rx) = mpsc::channel(32);
         Starlane{
             star_controllers: HashMap::new(),
+            star_names: HashMap::new(),
+            constellation_names: HashSet::new(),
             tx: tx,
             rx: rx,
             star_manager_factory: Arc::new( StarManagerFactoryDefault{} ),
@@ -58,9 +62,18 @@ impl Starlane
  */
                     unimplemented!()
                 }
-                StarlaneCommand::ProvisionConstellation(command) => {
-                    let result = self.provision_constellation(command.template, command.data).await;
+                StarlaneCommand::ConstellationCreate(command) => {
+                    let result = self.constellation_create(command.template, command.data, command.name ).await;
                     command.oneshot.send(result);
+                }
+                StarlaneCommand::StarControlRequestByName(request) => {
+                   if let Option::Some(key) = self.star_names.get(&request.name)
+                   {
+                       if let Option::Some(ctrl) = self.star_controllers.get(key)
+                       {
+                           request.tx.send(ctrl.clone());
+                       }
+                   }
                 }
                 StarlaneCommand::Destroy => {
                     println!("closing rx");
@@ -105,8 +118,9 @@ impl Starlane
                 data.subgraphs.insert("client".to_string(), star.star_key().subgraph.clone() );
 
                 let (tx,rx) = oneshot::channel();
-                starlane_ctrl.send( StarlaneCommand::ProvisionConstellation(
-                    ProvisionConstellationCommand{
+                starlane_ctrl.send( StarlaneCommand::ConstellationCreate(
+                    ConstellationCreate {
+                        name: Option::None,
                         template: template,
                         data: data,
                         oneshot: tx
@@ -158,8 +172,13 @@ impl Starlane
         Ok(())
     }
 
-    async fn provision_constellation(&mut self, template: ConstellationTemplate, data: ConstellationData ) ->Result<(),Error>
+    async fn constellation_create(&mut self, template: ConstellationTemplate, data: ConstellationData, name: Option<String>) ->Result<(),Error>
     {
+        if name.is_some() && self.constellation_names.contains(name.as_ref().unwrap())
+        {
+            return Err(format!("a constellation named: {} already exists!", name.as_ref().unwrap()).into() );
+        }
+
         let mut evolve_rxs = vec!();
         for star_template in template.stars.clone()
         {
@@ -178,10 +197,17 @@ impl Starlane
 
             let (proto_star, star_ctrl) = ProtoStar::new(Option::Some(star_key.clone()), star_template.kind.clone(), evolve_tx, self.star_manager_factory.clone(), self.star_core_factory.clone() );
             self.star_controllers.insert(star_key.clone(), star_ctrl.clone() );
+            if name.is_some() && star_template.handle.is_some()
+            {
+                let name = StarName{
+                    constellation: name.as_ref().unwrap().clone(),
+                    star: star_template.handle.as_ref().unwrap().clone()
+                };
+                self.star_names.insert( name, star_key.clone() );
+            }
             println!("created proto star: {:?}", &star_template.kind);
 
             tokio::spawn( async move {
-                println!("evolving proto star..." );
                 let star = proto_star.evolve().await;
                 if let Ok(star) = star
                 {
@@ -272,19 +298,42 @@ impl Starlane
 pub enum StarlaneCommand
 {
     Connect(ConnectCommand),
-    ProvisionConstellation(ProvisionConstellationCommand),
-    RequestStarControlByStarKey(StarControlRequest),
+    ConstellationCreate(ConstellationCreate),
+    StarControlRequestByKey(StarControlRequestByKey),
+    StarControlRequestByName(StarControlRequestByName),
     Destroy
 }
 
-pub struct StarControlRequest
+pub struct StarControlRequestByKey
 {
     pub star: StarKey,
-    pub rtn: oneshot::Sender<StarController>
+    pub tx: oneshot::Sender<StarController>
 }
 
-pub struct ProvisionConstellationCommand
+pub struct StarControlRequestByName
 {
+    pub name: StarName,
+    pub tx: oneshot::Sender<StarController>
+}
+
+impl StarControlRequestByName
+{
+    pub fn new( constellation: String, star: String )->(Self,oneshot::Receiver<StarController>)
+    {
+        let (tx,rx) = oneshot::channel();
+        (StarControlRequestByName{
+            name: StarName {
+                constellation: constellation,
+                star: star
+            },
+            tx: tx
+        },rx)
+    }
+}
+
+pub struct ConstellationCreate
+{
+    name: Option<String>,
     template: ConstellationTemplate,
     data: ConstellationData,
     oneshot: oneshot::Sender<Result<(),Error>>
@@ -307,16 +356,17 @@ impl ConnectCommand
     }
 }
 
-impl ProvisionConstellationCommand
+impl ConstellationCreate
 {
-    pub fn new(template: ConstellationTemplate, data: ConstellationData )->(Self,oneshot::Receiver<Result<(),Error>>)
+    pub fn new(template: ConstellationTemplate, data: ConstellationData, name: Option<String> )->(Self,oneshot::Receiver<Result<(),Error>>)
     {
         let (tx,rx)= oneshot::channel();
-        (ProvisionConstellationCommand{
+        (ConstellationCreate {
+            name: name,
             template: template,
             data: data,
             oneshot: tx
-        },rx)
+        }, rx)
     }
 }
 
@@ -336,8 +386,9 @@ mod test
     use tokio::time::Duration;
 
     use crate::error::Error;
-    use crate::starlane::{ProvisionConstellationCommand, Starlane, StarlaneCommand};
+    use crate::starlane::{ConstellationCreate, Starlane, StarlaneCommand, StarControlRequestByName};
     use crate::template::{ConstellationData, ConstellationTemplate};
+    use crate::star::StarController;
 
     #[test]
     pub fn starlane()
@@ -354,8 +405,8 @@ mod test
             } );
 
             {
-                let (command, mut rx) = ProvisionConstellationCommand::new(ConstellationTemplate::new_standalone(), ConstellationData::new());
-                tx.send(StarlaneCommand::ProvisionConstellation(command)).await;
+                let (command, mut rx) = ConstellationCreate::new(ConstellationTemplate::new_standalone(), ConstellationData::new(), Option::Some("standalone".to_owned()));
+                tx.send(StarlaneCommand::ConstellationCreate(command)).await;
                 let result = rx.await;
                 match result {
                     Ok(result) => {
@@ -367,6 +418,15 @@ mod test
                     Err(e) => {println!("{}", e)}
                 }
             }
+
+            let mesh_ctrl = {
+                let (request,rx) = StarControlRequestByName::new("standalone".to_owned(), "server".to_owned());
+                tx.send(StarlaneCommand::StarControlRequestByName(request)).await;
+                rx.await.unwrap()
+           };
+
+            println!("got mesh_ctrl");
+
             tokio::time::sleep(Duration::from_secs(10)).await;
 
             println!("sending Destroy command.");
