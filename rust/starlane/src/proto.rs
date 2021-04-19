@@ -161,15 +161,18 @@ impl ProtoStar
                            }
                             Frame::Proto(ProtoFrame::CentralFound(hops)) => {
 
-                                lane.star_paths.put( StarKey::central(), hops );
-                               //now tell all the other lanes that CENTRAL is this way...
+                                if Option::None == lane.star_paths.get(&StarKey::central())
                                 {
-                                    let mut exclude = HashSet::new();
-                                    exclude.insert(lane_key.clone());
-                                    let exclude = Option::Some(exclude);
-                                    self.broadcast(Frame::Proto(ProtoFrame::CentralFound(hops+1)), &exclude ).await;
+                                    lane.star_paths.put(StarKey::central(), hops);
+                                    //now tell all the other lanes that CENTRAL is this way...
+                                    {
+                                        let mut exclude = HashSet::new();
+                                        exclude.insert(lane_key.clone());
+                                        let exclude = Option::Some(exclude);
+                                        self.broadcast(Frame::Proto(ProtoFrame::CentralFound(hops + 1)), &exclude).await;
+                                    }
+                                    self.send_sequence_request().await;
                                 }
-                                self.send_sequence_request().await;
                             },
                             Frame::Proto(ProtoFrame::GrantSubgraphExpansion(subgraph)) => {
                                 let key = StarKey::new_with_subgraph(subgraph.to_owned(), 0);

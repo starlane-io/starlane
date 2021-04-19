@@ -302,6 +302,7 @@ impl Star
                     StarCommand::ReleaseHold(star) => {
                         if let Option::Some(frames) = self.frame_hold.release(&star)
                         {
+println!("RELEASING HOLD!");
                             for frame in frames
                             {
                                 self.send_frame(star.clone(),frame).await;
@@ -346,6 +347,9 @@ impl Star
                     StarCommand::Frame(frame) => {
                         let lane_key = lanes.get(index).unwrap().clone();
                         self.process_frame(frame, lane_key ).await;
+                    }
+                    StarCommand::ForwardFrame(forward) => {
+                        self.send_frame( forward.to.clone(), forward.frame ).await;
                     }
                     _ => {
                         eprintln!("cannot process command: {}",command);
@@ -1022,8 +1026,16 @@ pub enum StarCommand
     SearchCommit(SearchCommit),
     Test(StarTest),
     Frame(Frame),
+    ForwardFrame(ForwardFrame),
     FrameTimeout(FrameTimeoutInner),
     FrameError(FrameErrorInner)
+}
+
+
+pub struct ForwardFrame
+{
+    pub to: StarKey,
+    pub frame: Frame
 }
 
 pub struct AddResourceLocation
@@ -1127,7 +1139,8 @@ impl fmt::Display for StarCommand{
             StarCommand::SearchCommit(_) => format!("SearchResult").to_string(),
             StarCommand::ReleaseHold(_) => format!("ReleaseHold").to_string(),
             StarCommand::AddResourceLocation(_) => format!("AddResourceLocation").to_string(),
-            StarCommand::AddAppLocation(_) => format!("AddAppLocation").to_string()
+            StarCommand::AddAppLocation(_) => format!("AddAppLocation").to_string(),
+            StarCommand::ForwardFrame(_) => format!("ForwardFrame").to_string(),
         };
         write!(f, "{}",r)
     }
@@ -1549,7 +1562,7 @@ impl StarManager for CentralManager
                         payload: payload
                     };
 
-                    self.info.command_tx.send( StarCommand::Frame(Frame::StarUnwind(inner))).await;
+                    self.info.command_tx.send( StarCommand::ForwardFrame(ForwardFrame{ to: inner.stars.last().cloned().unwrap(), frame: Frame::StarUnwind(inner)})).await;
 
                     Ok(())
                 }
