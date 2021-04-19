@@ -19,7 +19,7 @@ use tokio::sync::mpsc;
 use tokio::time::Instant;
 use url::Url;
 
-use crate::application::ApplicationState;
+use crate::application::{ApplicationState, AppLocation};
 use crate::error::Error;
 use crate::frame::{ApplicationAssignInner, ApplicationNotifyReadyInner, ApplicationReportSupervisorInner, ApplicationRequestSupervisorInner, Frame, ProtoFrame, RejectionInner, ResourceBind, ResourceEvent, ResourceEventKind, ResourceLookupKind, ResourceMessage, ResourceReportLocation, ResourceRequestLocation, StarMessageInner, StarMessagePayload, SearchHit, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarUnwindInner, StarUnwindPayload, StarWindInner, StarWindPayload, Watch, WatchInfo};
 use crate::frame::Frame::{StarMessage, StarSearch};
@@ -291,6 +291,14 @@ impl Star
                     StarCommand::AddConnectorController(connector_ctrl) => {
                         self.connector_ctrls.push(connector_ctrl);
                     }
+                    StarCommand::AddResourceLocation(add_resource_location) => {
+                        self.resource_locations.put( add_resource_location.resource_location.resource.clone(), add_resource_location.resource_location.clone() );
+                        add_resource_location.tx.send( ()).await;
+                    }
+                    StarCommand::AddAppLocation(add_app_location) => {
+                        self.app_locations.put( add_app_location.app_location.app_id.clone(), add_app_location.app_location.supervisor.clone() );
+                        add_app_location.tx.send( () ).await;
+                    }
                     StarCommand::ReleaseHold(star) => {
                         if let Option::Some(frames) = self.frame_hold.release(&star)
                         {
@@ -329,7 +337,8 @@ impl Star
                             let hits = commit.result.hits.get(lane).unwrap();
                             for (star,size) in hits
                             {
-                                self.lanes.get_mut(lane).unwrap().star_paths.insert(star.clone(),size.clone() );
+                                self.lanes.get_mut(lane).unwrap().star_paths.put(star.clone(),size.clone() );
+
                             }
                         }
                         commit.tx.send( commit.result );
@@ -519,12 +528,12 @@ impl Star
         }
     }
 
-    fn lane_with_shortest_path_to_star( &self, star: &StarKey ) -> Option<&LaneMeta>
+    fn lane_with_shortest_path_to_star( &mut self, star: &StarKey ) -> Option<&mut LaneMeta>
     {
         let mut min_hops= usize::MAX;
         let mut rtn = Option::None;
 
-        for (_,lane) in &self.lanes
+        for (_,lane) in &mut self.lanes
         {
             if let Option::Some(hops) = lane.get_hops_to_star(star)
             {
@@ -538,11 +547,11 @@ impl Star
        rtn
     }
 
-    fn get_hops_to_star( &self, star: &StarKey ) -> Option<usize>
+    fn get_hops_to_star( &mut self, star: &StarKey ) -> Option<usize>
     {
         let mut rtn= Option::None;
 
-        for (_,lane) in &self.lanes
+        for (_,lane) in &mut self.lanes
         {
             if let Option::Some(hops) = lane.get_hops_to_star(star)
             {
@@ -678,7 +687,7 @@ impl Star
             let transaction = self.transactions.get_mut(&tid);
             if let Option::Some(transaction) = transaction
             {
-                match transaction.on_frame(frame,self.lanes.get_mut(lane_key).unwrap() ).await
+                match transaction.on_frame(frame,self.lanes.get_mut(lane_key).unwrap(), &mut self.info.command_tx ).await
                 {
                     TransactionResult::Continue => {}
                     TransactionResult::Done => {
@@ -847,20 +856,34 @@ impl Star
         }
         else
         {
-            if let Ok(location) = self.find_resource(ResourceLookupKind::Key(resource.clone())).await
+            let lookup = ResourceLookupKind::Key(resource.clone());
+            let location = self.get_resource_location(lookup.clone() );
+
+
+            if let Some(location) = location.cloned()
             {
-                self.send_frame(location.star, Frame::Watch(watch)).await;
+                self.send_frame(location.star.clone(), Frame::Watch(watch)).await;
+            }
+            else
+            {
+                let mut rx = self.find_resource_location(lookup).await;
+                let command_tx = self.info.command_tx.clone();
+                tokio::spawn( async move {
+                    if let Option::Some(_) = rx.recv().await
+                    {
+                        command_tx.send(StarCommand::Frame(Frame::Watch(watch))).await;
+                    }
+                });
             }
         }
     }
-
-    async fn find_app_supervisor(&mut self, app_id: &Id ) -> Result<StarKey,Error>
+    fn get_app_location(&mut self, app_id: &Id ) -> Option<&StarKey>
     {
-        if let Option::Some( supervisor_key ) = self.app_locations.get(app_id)
-        {
-            return Ok(supervisor_key.clone());
-        }
+        self.app_locations.get(app_id)
+    }
 
+    async fn find_app_location(&mut self, app_id: &Id ) -> mpsc::Receiver<()>
+    {
         let payload = StarMessagePayload::ApplicationRequestSupervisor(ApplicationRequestSupervisorInner{ app_id: app_id.clone() } );
         let mut message = StarMessageInner::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
         message.transaction = Option::Some(self.info.sequence.next());
@@ -871,28 +894,40 @@ impl Star
 
         self.send( message ).await;
 
-        Ok(rx.await?)
+        rx
     }
 
-    async fn find_resource( &mut self, kind: ResourceLookupKind ) -> Result<ResourceLocation,Error>
+    fn get_resource_location( &mut self, kind: ResourceLookupKind ) -> Option<&ResourceLocation>
     {
         if let ResourceLookupKind::Key(resource) = &kind
         {
-            if let Option::Some(location) = self.resource_locations.get(resource)
-            {
-                return Ok(location.clone())
+            self.resource_locations.get(resource)
+        }
+        else {
+            Option::None
+        }
+    }
+    async fn find_resource_location(&mut self, kind: ResourceLookupKind ) -> mpsc::Receiver<()>
+    {
+
+        let supervisor_star = self.get_app_location(&kind.app_id() ).cloned();
+
+        match supervisor_star{
+            None => {
+                let rx = self.find_app_location(&kind.app_id()).await;
+                rx
+            }
+            Some(supervisor_star) => {
+                let payload = StarMessagePayload::ResourceRequestLocation(ResourceRequestLocation{ lookup: kind } );
+                let mut message = StarMessageInner::new( self.info.sequence.next(), self.info.star_key.clone(), supervisor_star, payload );
+                message.transaction = Option::Some(self.info.sequence.next());
+                let (transaction,rx) =  ResourceLocationRequestTransaction::new();
+                self.transactions.insert( message.transaction.unwrap().clone(), Box::new(transaction) );
+                self.send( message ).await;
+                rx
             }
         }
 
-        let supervisor_star = self.find_app_supervisor( &kind.app_id() ).await?;
-        let payload = StarMessagePayload::ResourceRequestLocation(ResourceRequestLocation{ lookup: kind } );
-        let mut message = StarMessageInner::new( self.info.sequence.next(), self.info.star_key.clone(), supervisor_star, payload );
-        message.transaction = Option::Some(self.info.sequence.next());
-        let (transaction,rx) =  ResourceLocationRequestTransaction::new();
-        self.transactions.insert( message.transaction.unwrap().clone(), Box::new(transaction) );
-        self.send( message ).await;
-
-        Ok(rx.await?)
     }
 
 
@@ -979,6 +1014,8 @@ pub enum StarCommand
 {
     AddLane(Lane),
     AddConnectorController(ConnectorController),
+    AddResourceLocation(AddResourceLocation),
+    AddAppLocation(AddAppLocation),
     AddLogger(broadcast::Sender<StarLog>),
     ReleaseHold(StarKey),
     Search(Search),
@@ -987,6 +1024,19 @@ pub enum StarCommand
     Frame(Frame),
     FrameTimeout(FrameTimeoutInner),
     FrameError(FrameErrorInner)
+}
+
+pub struct AddResourceLocation
+{
+    pub tx: mpsc::Sender<()>,
+    pub resource_location: ResourceLocation
+}
+
+
+pub struct AddAppLocation
+{
+    pub tx: mpsc::Sender<()>,
+    pub app_location: AppLocation
 }
 
 
@@ -1075,7 +1125,9 @@ impl fmt::Display for StarCommand{
             StarCommand::FrameError(_) => format!("FrameError").to_string(),
             StarCommand::Search(_) => format!("Search").to_string(),
             StarCommand::SearchCommit(_) => format!("SearchResult").to_string(),
-            StarCommand::ReleaseHold(_) => format!("ReleaseHold").to_string()
+            StarCommand::ReleaseHold(_) => format!("ReleaseHold").to_string(),
+            StarCommand::AddResourceLocation(_) => format!("AddResourceLocation").to_string(),
+            StarCommand::AddAppLocation(_) => format!("AddAppLocation").to_string()
         };
         write!(f, "{}",r)
     }
@@ -1100,14 +1152,14 @@ pub struct StarWatchInfo
 pub struct ApplicationSupervisorSearchTransaction
 {
     pub app_id: Id,
-    pub tx: oneshot::Sender<StarKey>
+    pub tx: mpsc::Sender<()>
 }
 
 impl ApplicationSupervisorSearchTransaction
 {
-    pub fn new(app_id: Id) ->(Self,oneshot::Receiver<StarKey>)
+    pub fn new(app_id: Id) ->(Self,mpsc::Receiver<()>)
     {
-        let (tx,rx) = oneshot::channel();
+        let (tx,rx) = mpsc::channel(1);
         (ApplicationSupervisorSearchTransaction{
             app_id: app_id,
             tx: tx
@@ -1118,34 +1170,36 @@ impl ApplicationSupervisorSearchTransaction
 #[async_trait]
 impl Transaction for ApplicationSupervisorSearchTransaction
 {
-    async fn on_frame(&mut self, frame: &Frame, lane: &mut LaneMeta) -> TransactionResult {
+    async fn on_frame(&mut self, frame: &Frame, lane: &mut LaneMeta, command_tx: &mut Sender<StarCommand>) -> TransactionResult {
 
         if let Frame::StarMessage( message ) = frame
         {
             if let StarMessagePayload::ApplicationReportSupervisor(report) = &message.payload
             {
-                self.tx.send(report.supervisor.clone() );
+                command_tx.send( StarCommand::AddAppLocation(AddAppLocation{
+                    tx: self.tx.clone(),
+                    app_location: AppLocation{
+                        app_id: report.app_id.clone(),
+                        supervisor: report.supervisor.clone()
+                    }
+                })).await;
             }
         }
 
         TransactionResult::Done
     }
-
-
 }
-
-
 
 pub struct ResourceLocationRequestTransaction
 {
-    pub tx: oneshot::Sender<ResourceLocation>
+    pub tx: mpsc::Sender<()>
 }
 
 impl ResourceLocationRequestTransaction
 {
-    pub fn new() ->(Self,oneshot::Receiver<ResourceLocation>)
+    pub fn new() ->(Self,mpsc::Receiver<()>)
     {
-        let (tx,rx) = oneshot::channel();
+        let (tx,rx) = mpsc::channel(1);
         (ResourceLocationRequestTransaction{
             tx: tx
         },rx)
@@ -1155,13 +1209,13 @@ impl ResourceLocationRequestTransaction
 #[async_trait]
 impl Transaction for ResourceLocationRequestTransaction
 {
-    async fn on_frame(&mut self, frame: &Frame, lane: &mut LaneMeta) -> TransactionResult {
+    async fn on_frame(&mut self, frame: &Frame, lane: &mut LaneMeta, command_tx: &mut Sender<StarCommand>) -> TransactionResult {
 
         if let Frame::StarMessage( message ) = frame
         {
             if let StarMessagePayload::ResourceReportLocation(location ) = &message.payload
             {
-                self.tx.send(location.clone() );
+                command_tx.send( StarCommand::AddResourceLocation(AddResourceLocation{ tx: self.tx.clone(), resource_location: location.clone() })).await;
             }
         }
 
@@ -1217,7 +1271,7 @@ impl StarSearchTransaction
 #[async_trait]
 impl Transaction for StarSearchTransaction
 {
-    async fn on_frame(&mut self, frame: &Frame, lane: &mut LaneMeta) -> TransactionResult {
+    async fn on_frame(&mut self, frame: &Frame, lane: &mut LaneMeta, command_tx: &mut Sender<StarCommand>) -> TransactionResult {
 
         if let Frame::StarSearchResult(result) = frame
         {
@@ -1319,7 +1373,7 @@ pub enum TransactionResult
 #[async_trait]
 pub trait Transaction : Send+Sync
 {
-    async fn on_frame( &mut self, frame: &Frame, lane: & mut LaneMeta )-> TransactionResult;
+    async fn on_frame( &mut self, frame: &Frame, lane: &mut LaneMeta, command_tx: &mut mpsc::Sender<StarCommand> )-> TransactionResult;
 }
 
 #[derive(Clone)]

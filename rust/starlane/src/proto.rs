@@ -161,7 +161,7 @@ impl ProtoStar
                            }
                             Frame::Proto(ProtoFrame::CentralFound(hops)) => {
 
-                                lane.star_paths.insert( StarKey::central(), hops );
+                                lane.star_paths.put( StarKey::central(), hops );
                                //now tell all the other lanes that CENTRAL is this way...
                                 {
                                     let mut exclude = HashSet::new();
@@ -425,12 +425,12 @@ impl ProtoStar
         }
     }
 
-    fn lane_with_shortest_path_to_star( &self, star: &StarKey ) -> Option<&LaneMeta>
+    fn lane_with_shortest_path_to_star( &mut self, star: &StarKey ) -> Option<&mut LaneMeta>
     {
         let mut min_hops= usize::MAX;
         let mut rtn = Option::None;
 
-        for (_,lane) in &self.lanes
+        for (_,lane) in &mut self.lanes
         {
             if let Option::Some(hops) = lane.get_hops_to_star(star)
             {
@@ -443,11 +443,11 @@ impl ProtoStar
 
         rtn
     }
-    fn shortest_path_star_key(&self, to: &StarKey ) -> Option<ShortestPathStarKey>
+    fn shortest_path_star_key(&mut self, to: &StarKey ) -> Option<ShortestPathStarKey>
     {
         let mut rtn = Option::None;
 
-        for (_,lane) in &self.lanes
+        for (_,lane) in &mut self.lanes
         {
             if let Option::Some(hops) = lane.get_hops_to_star(to)
             {
@@ -479,11 +479,11 @@ impl ProtoStar
         rtn
     }
 
-    fn get_hops_to_star( &self, star: &StarKey ) -> Option<usize>
+    fn get_hops_to_star( &mut self, star: &StarKey ) -> Option<usize>
     {
         let mut rtn= Option::None;
 
-        for (_,lane) in &self.lanes
+        for (_,lane) in &mut self.lanes
         {
             if let Option::Some(hops) = lane.get_hops_to_star(star)
             {

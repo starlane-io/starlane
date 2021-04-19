@@ -23,6 +23,7 @@ use crate::starlane::StarlaneCommand::Connect;
 use std::fmt;
 use std::collections::{HashSet, HashMap};
 use url::Url;
+use lru::LruCache;
 
 pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
 pub static LANE_QUEUE_SIZE: usize = 32;
@@ -356,7 +357,7 @@ impl TunnelConnector for LocalTunnelConnector
 
 pub struct LaneMeta
 {
-    pub star_paths: HashMap<StarKey,usize>,
+    pub star_paths: LruCache<StarKey,usize>,
     pub lane: Lane
 }
 
@@ -365,12 +366,12 @@ impl LaneMeta
     pub fn new( lane: Lane ) -> Self
     {
         LaneMeta{
-            star_paths: HashMap::new(),
+            star_paths: LruCache::new(32*1024 ),
             lane: lane
         }
     }
 
-    pub fn get_hops_to_star(&self, star: &StarKey ) ->Option<usize>
+    pub fn get_hops_to_star(&mut self, star: &StarKey ) ->Option<usize>
     {
         if self.lane.remote_star.is_some() && star == self.lane.remote_star.as_ref().unwrap()
         {
@@ -385,7 +386,7 @@ impl LaneMeta
 
     pub fn set_hops_to_star(&mut self, star: StarKey, hops: usize )
     {
-        self.star_paths.insert(star, hops);
+        self.star_paths.put(star, hops);
     }
 }
 
