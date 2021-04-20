@@ -16,6 +16,15 @@ impl fmt::Display for Error{
     }
 }
 
+
+impl From<tokio::sync::oneshot::error::RecvError> for Error{
+    fn from(e: tokio::sync::oneshot::error::RecvError) -> Self {
+        Error{
+            error: format!("{}",e.to_string())
+        }
+    }
+}
+
 impl <E> From<broadcast::error::SendError<E>> for Error{
     fn from(e: broadcast::error::SendError<E>) -> Self {
         Error{

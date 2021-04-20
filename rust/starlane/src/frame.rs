@@ -105,7 +105,7 @@ pub struct StarSearchInner
     pub pattern: StarSearchPattern,
     pub hops: Vec<StarKey>,
     pub transactions: Vec<Id>,
-    pub max_hops: i32,
+    pub max_hops: usize,
 }
 
 impl StarSearchInner

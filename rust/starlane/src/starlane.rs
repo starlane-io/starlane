@@ -426,6 +426,7 @@ mod test
            };
 
             println!("got mesh_ctrl");
+            tokio::time::sleep(Duration::from_secs(1)).await;
 
             if let Ok(app_ctrl) = mesh_ctrl.create_app(Option::None,vec!() ).await
             {
