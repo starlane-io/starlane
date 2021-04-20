@@ -384,22 +384,26 @@ mod test
     use tokio::runtime::Runtime;
     use tokio::sync::oneshot::error::RecvError;
     use tokio::time::Duration;
+    use tokio::time::timeout;
 
     use crate::error::Error;
     use crate::starlane::{ConstellationCreate, Starlane, StarlaneCommand, StarControlRequestByName};
     use crate::template::{ConstellationData, ConstellationTemplate};
     use crate::star::StarController;
+    use crate::application::AppController;
 
     #[test]
     pub fn starlane()
     {
 
+        println!("starlane");
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
 
             let mut starlane = Starlane::new();
             let tx = starlane.tx.clone();
 
+            println!("running starlane");
             let handle = tokio::spawn( async move {
                 starlane.run().await;
             } );
@@ -419,22 +423,26 @@ mod test
                 }
             }
 
+            println!("getting mesh ctrl");
             let mesh_ctrl = {
-                let (request,rx) = StarControlRequestByName::new("standalone".to_owned(), "server".to_owned());
+                let (request,rx) = StarControlRequestByName::new("standalone".to_owned(), "mesh".to_owned());
                 tx.send(StarlaneCommand::StarControlRequestByName(request)).await;
-                rx.await.unwrap()
+                timeout(Duration::from_millis(10), rx).await.unwrap().unwrap()
            };
+
 
             println!("got mesh_ctrl");
             tokio::time::sleep(Duration::from_secs(1)).await;
 
-            if let Ok(app_ctrl) = mesh_ctrl.create_app(Option::None,vec!() ).await
+            match mesh_ctrl.create_app(Option::None,vec!() ).await
             {
-                println!("got app_ctrl {}", app_ctrl.app_id);
-            }
-            else
-            {
-                assert!(false);
+                Ok(app_ctrl) => {
+                    println!("got app_ctrl!");
+                }
+                Err(error) => {
+                    eprintln!("{}",error);
+                    assert!(false);
+                }
             }
 
             tokio::time::sleep(Duration::from_secs(10)).await;

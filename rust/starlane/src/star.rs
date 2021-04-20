@@ -14,7 +14,7 @@ use tokio::sync::{broadcast, oneshot};
 use tokio::sync::broadcast::error::{RecvError, SendError};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::mpsc;
-use tokio::time::Instant;
+use tokio::time::{Instant, Duration,timeout};
 use url::Url;
 
 use crate::application::{ApplicationState, AppLocation, AppController, AppLifecycleCommand, AppCommand, AppCreate};
@@ -32,6 +32,7 @@ use crate::core::CoreCommand;
 use std::collections::hash_map::RandomState;
 use std::cell::Cell;
 use std::borrow::Borrow;
+use tokio::time::error::Elapsed;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
 pub enum StarKind
@@ -312,7 +313,6 @@ impl Star
                     StarCommand::ReleaseHold(star) => {
                         if let Option::Some(frames) = self.frame_hold.release(&star)
                         {
-println!("RELEASING HOLD!");
                             for frame in frames
                             {
                                 self.send_frame(star.clone(),frame).await;
@@ -349,7 +349,7 @@ println!("RELEASING HOLD!");
                     }
                     StarCommand::SearchLocalCommit(commit) =>
                     {
-                        for lane in commit.result.hits.keys()
+                        for lane in commit.result.lane_hits.keys()
                         {
                             let hits = commit.result.lane_hits.get(lane).unwrap();
                             for (star,size) in hits
@@ -357,7 +357,6 @@ println!("RELEASING HOLD!");
                                 self.lanes.get_mut(lane).unwrap().star_paths.put(star.clone(),size.clone() );
                             }
                         }
-println!("Search COMMIT! {} on {}", &commit.result.pattern, self.info.kind );
                         commit.tx.send( commit.result );
                     }
                     StarCommand::SearchReturnResult(result) =>
@@ -420,18 +419,17 @@ println!("Search COMMIT! {} on {}", &commit.result.pattern, self.info.kind );
 
 
     async fn search_for_star( &mut self, star: StarKey, tx: oneshot::Sender<SearchResult> )
-    {
+   {
         let search = Search{
             pattern: StarSearchPattern::StarKey(star),
             tx: tx,
             max_hops: 16
         };
-        self.do_search(search);
+        self.info.command_tx.send( StarCommand::SearchInit(search) ).await;
     }
 
     async fn do_search( &mut self, search: Search )
     {
-println!("DOING SEARCH ");
         let tx = search.tx;
         let search = StarSearchInner{
             from: self.info.star_key.clone(),
@@ -446,6 +444,16 @@ println!("DOING SEARCH ");
 
     async fn do_search_with_hops( &mut self, mut search: StarSearchInner, tx: oneshot::Sender<SearchResult>, exclude: Option<HashSet<StarKey>> )
     {
+        let hit = match &search.pattern
+        {
+            StarSearchPattern::StarKey(star) => {
+                self.info.star_key == *star
+            }
+            StarSearchPattern::StarKind(kind) => {
+                self.info.kind == *kind
+            }
+        };
+
         let tid = self.info.sequence.next();
 
         let num_excludes:usize = match &exclude
@@ -454,7 +462,11 @@ println!("DOING SEARCH ");
             Some(exclude) => exclude.len()
         };
 
-        let transaction = Box::new(StarSearchTransaction::new(search.pattern.clone(), self.info.command_tx.clone(), tx, self.lanes.len()-num_excludes ));
+        let local_hit = match hit{
+            true => Option::Some(self.info.star_key.clone()),
+            false => Option::None
+        };
+        let transaction = Box::new(StarSearchTransaction::new(search.pattern.clone(), self.info.command_tx.clone(), tx, self.lanes.len()-num_excludes, local_hit ));
         self.transactions.insert(tid.clone(), transaction );
 
         search.transactions.push(tid.clone());
@@ -480,7 +492,6 @@ println!("DOING SEARCH ");
 
         if hit
         {
-println!( "Hit: {} -> {}",&search.pattern, self.info.kind);
 
             if search.pattern.is_single_match()
             {
@@ -517,12 +528,22 @@ println!( "Hit: {} -> {}",&search.pattern, self.info.kind);
             if self.info.kind.relay() { eprintln!("node is not a relay node, therefore it must return search results"); }
              */
 
+            let hits = match hit
+            {
+                true => {
+                    vec![SearchHit {star: self.info.star_key.clone(), hops: search.hops.len().clone() }]
+                }
+                false => {
+                    vec!()
+                }
+            };
+
             // return the search with 0 hits
             let hops = search.hops.len() + 1;
             let results = Frame::StarSearchResult( StarSearchResultInner {
                 missed: None,
                 hops: search.hops.clone(),
-                hits: vec![],
+                hits: hits,
                 search: search.clone(),
                 transactions: search.transactions.clone()
             });
@@ -544,7 +565,6 @@ println!( "Hit: {} -> {}",&search.pattern, self.info.kind);
 
         tokio::spawn( async move {
             let result = rx.await;
-println!("BACK FROM HOP SEARCH {}", kind);
             match result{
                 Ok(result) => {
 
@@ -607,12 +627,19 @@ println!("BACK FROM HOP SEARCH {}", kind);
         else {
             self.frame_hold.add( &star, frame );
             let (tx,rx) = oneshot::channel();
+
             self.search_for_star(star.clone(), tx ).await;
             let command_tx = self.info.command_tx.clone();
             tokio::spawn(async move {
-                if let Ok(_)=rx.await
+
+                match rx.await
                 {
-                    command_tx.send( StarCommand::ReleaseHold(star) ).await;
+                    Ok(_) => {
+                        command_tx.send( StarCommand::ReleaseHold(star) ).await;
+                    }
+                    Err(error) => {
+                        eprintln!("RELEASE HOLD RX ERROR : {}",error);
+                    }
                 }
             });
         }
@@ -1113,6 +1140,7 @@ println!("BACK FROM HOP SEARCH {}", kind);
 
     async fn on_message( &mut self, mut message: StarMessageInner ) -> Result<(),Error>
     {
+
         if message.to != self.info.star_key
         {
             if self.info.kind.relay() || message.from == self.info.star_key
@@ -1246,7 +1274,7 @@ pub enum StarTest
 impl fmt::Display for SubCommand{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
-            SubCommand::Frame(_) => "Frame".to_string(),
+            SubCommand::Frame(frame) => format!("Frame({})",frame).to_string(),
             SubCommand::SupervisorCommand(_) => "SupervisorCommand".to_string(),
             SubCommand::ServerCommand(_) => "ServerCommand".to_string(),
             SubCommand::Init => "Init".to_string()
@@ -1290,10 +1318,6 @@ impl StarController
 {
    pub async fn create_app(&self, name: Option<String>, data: Vec<u8> )->Result<AppController,Error>
    {
-       let request = ApplicationCreateRequest(ApplicationCreateRequestInner{
-           name: name,
-           data: data
-       });
 
        let (tx,mut rx) = mpsc::channel(1);
 
@@ -1306,12 +1330,21 @@ impl StarController
 
        self.command_tx.send( StarCommand::AppLifecycleCommand(app_create) ).await;
 
-       if let Some(rtn) = rx.recv().await
+       match timeout(Duration::from_secs(10), rx.recv() ).await
        {
-           Ok(rtn)
-       }
-       else {
-           Err("could not create app".into())
+           Ok(opt) => {
+               match opt{
+                   None => {
+                       Err("connection closed before AppController returned".into())
+                   }
+                   Some(ctrl) => {
+                       Ok(ctrl)
+                   }
+               }
+           }
+           Err(error) => {
+               Err("timeout when trying to acquire AppController".into())
+           }
        }
    }
 }
@@ -1409,12 +1442,14 @@ pub struct StarSearchTransaction
     pub lanes: usize,
     pub hits: HashMap<StarKey, HashMap<StarKey,usize>>,
     command_tx: mpsc::Sender<StarCommand>,
-    tx: Vec<oneshot::Sender<SearchResult>>
+    tx: Vec<oneshot::Sender<SearchResult>>,
+    local_hit: Option<StarKey>
+
 }
 
 impl StarSearchTransaction
 {
-    pub fn new(pattern: StarSearchPattern, command_tx: mpsc::Sender<StarCommand>, tx: oneshot::Sender<SearchResult>, lanes: usize ) ->Self
+    pub fn new(pattern: StarSearchPattern, command_tx: mpsc::Sender<StarCommand>, tx: oneshot::Sender<SearchResult>, lanes: usize, local_hit: Option<StarKey> ) ->Self
     {
         StarSearchTransaction{
             pattern: pattern,
@@ -1422,7 +1457,8 @@ impl StarSearchTransaction
             hits: HashMap::new(),
             command_tx: command_tx,
             tx: vec!(tx),
-            lanes: lanes
+            lanes: lanes,
+            local_hit: local_hit
         }
     }
 
@@ -1448,6 +1484,11 @@ impl StarSearchTransaction
                     rtn.insert( star.clone(), hops.clone() );
                 }
             }
+        }
+
+        if let Option::Some(local) = &self.local_hit
+        {
+           rtn.insert( local.clone(), 0 );
         }
 
         rtn
@@ -1513,7 +1554,6 @@ impl Transaction for StarSearchTransaction
 
         if self.reported_lane_count >= self.lanes
         {
-println!("DOING SEARCH COMMIT {}", self.pattern );
             self.commit().await;
             TransactionResult::Done
         }
@@ -1562,9 +1602,10 @@ impl Transaction for AppCreateTransaction
                         app_ctrl_tx.send(ctrl).await;
                     }
                 });
+                return TransactionResult::Done;
             }
         }
-        TransactionResult::Done
+        TransactionResult::Continue
     }
 }
 
@@ -1738,7 +1779,7 @@ impl StarManager for CentralManager
                                 app_id: app_id,
                                 data: request.data.clone(),
                                 notify: vec![message.from, self.info.star_key.clone()],
-                                supervisor: supervisor
+                                supervisor: supervisor.clone()
                             }),
                             retry: 0,
                             max_retries: 16
@@ -1981,7 +2022,8 @@ impl SupervisorManager
                         supervisor: assign.supervisor.clone()
                     };
                     let payload = StarMessagePayload::ApplicationNotifyReady(ApplicationNotifyReadyInner{ location: location});
-                    let notify_app_ready = StarMessageInner::new(self.info.sequence.next(), self.info.star_key.clone(), notify.clone(), payload );
+                    let mut notify_app_ready = StarMessageInner::new(self.info.sequence.next(), self.info.star_key.clone(), notify.clone(), payload );
+                    notify_app_ready.transaction = message.transaction.clone();
                     self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(notify_app_ready))).await?;
                 }
 
@@ -1993,10 +2035,10 @@ impl SupervisorManager
                 Ok(())
             }
             StarMessagePayload::ResourceReportLocation(report) =>
-                {
+            {
                     self.backing.set_entity_location(report.entity.clone(), report.clone());
                     Ok(())
-                }
+            }
             StarMessagePayload::ResourceRequestLocation(request) =>
                 {
 
@@ -2280,9 +2322,7 @@ impl ServerManager
     {
         let (search,rx) = Search::new(StarSearchPattern::StarKind(StarKind::Supervisor));
         self.info.command_tx.send( StarCommand::SearchInit( search ) ).await;
-println!("pledge WAITING...");
         let result = rx.await?;
-println!("pledge SEARCH RECEIVED");
 
 
         if let Option::Some(hit) = result.nearest()
@@ -2291,6 +2331,9 @@ println!("pledge SEARCH RECEIVED");
            let payload = StarMessagePayload::ServerPledgeToSupervisor;
            let message = StarMessageInner::new( self.info.sequence.next(), self.info.star_key.clone(), hit.star, payload );
            self.info.command_tx.send( StarCommand::Frame(Frame::StarMessage(message))).await;
+        }
+        else {
+            eprintln!("could not find a supervisor for Server results:{} ", result.hits.len() );
         }
 
         Ok(())
@@ -2302,13 +2345,10 @@ impl StarManager for ServerManager
 {
     async fn handle(&mut self, command: SubCommand) -> Result<(), Error> {
 
-println!("server handling: {}",&command);
-
         match command
         {
             SubCommand::Init => {
                 self.pledge().await?;
-println!("INIT HANDLED {}",&command);
                 Ok(())
             }
             SubCommand::ServerCommand(command) => {
@@ -2330,7 +2370,8 @@ println!("INIT HANDLED {}",&command);
 
             }
             unimplemented => {
-                Err(format!("{} unimplemented for {}", unimplemented, self.info.kind).into())
+                println!("{} unimplemented for {}", unimplemented, self.info.kind);
+                Ok(())
             }
         }
     }
@@ -2361,7 +2402,8 @@ impl StarManager for PlaceholderStarManager
         {
             SubCommand::Init => {Ok(())}
             _ => {
-                Err(format!("command {} Placeholder unimplemented for kind: {}",command,self.info.kind).into())
+                println!("command {} Placeholder unimplemented for kind: {}",command,self.info.kind);
+                Ok(())
             }
         }
     }
