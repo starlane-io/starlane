@@ -2,10 +2,11 @@ use crate::id::Id;
 use std::fmt;
 use crate::star::{StarKey, StarKind, StarWatchInfo};
 use serde::{Deserialize, Serialize, Serializer};
-use crate::resource::{ResourceKey, ResourceLocation};
+use crate::entity::{EntityKey, EntityLocation};
 use std::sync::Arc;
 use std::collections::HashMap;
 use tokio::time::Instant;
+use crate::application::AppLocation;
 
 #[derive(Clone)]
 pub struct Command
@@ -38,7 +39,7 @@ pub enum Frame
     StarWind(StarWindInner),
     StarUnwind(StarUnwindInner),
     Watch(Watch),
-    ResourceEvent(ResourceEvent)
+    EntityEvent(EntityEvent)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -52,7 +53,7 @@ pub enum Watch
 pub struct WatchInfo
 {
     pub id: Id,
-    pub resource: ResourceKey,
+    pub entity: EntityKey,
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -234,17 +235,17 @@ pub enum StarMessagePayload
    ApplicationLookupId(ApplicationLookupIdInner),
    ApplicationRequestLaunch(ApplicationRequestLaunchInner),
    ServerPledgeToSupervisor,
-   ResourceStateRequest(ResourceKey),
-   ResourceEvent(ResourceEvent),
+   ResourceStateRequest(EntityKey),
+   ResourceEvent(EntityEvent),
    ResourceMessage(ResourceMessage),
    ResourceRequestLocation(ResourceRequestLocation),
-   ResourceReportLocation(ResourceLocation)
+   ResourceReportLocation(EntityLocation)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceEvent
+pub struct EntityEvent
 {
-    pub resource: ResourceKey,
+    pub entity: EntityKey,
     pub kind: ResourceEventKind,
 }
 
@@ -266,13 +267,13 @@ pub struct ResourceState
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceGathered
 {
-    pub to: ResourceKey
+    pub to: EntityKey
 }
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceScattered
 {
-    pub from : ResourceKey
+    pub from : EntityKey
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -299,39 +300,39 @@ pub struct ResourcePayload
 pub struct ResourceReportBind
 {
     pub star: StarKey,
-    pub key: ResourceKey,
+    pub key: EntityKey,
     pub name: Option<String>
 }
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceRequestLocation
 {
-    pub lookup: ResourceLookupKind
+    pub lookup: EntityLookup
 }
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceReportLocation
 {
-    pub resource: ResourceKey,
-    pub location: ResourceLocation
+    pub resource: EntityKey,
+    pub location: EntityLocation
 }
 
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum ResourceLookupKind
+pub enum EntityLookup
 {
-    Key(ResourceKey),
+    Key(EntityKey),
     Name(ResourceNameLookup)
 }
 
-impl ResourceLookupKind
+impl EntityLookup
 {
     pub fn app_id(&self)->Id
     {
         match self
         {
-            ResourceLookupKind::Key(resource) => resource.app_id.clone(),
-            ResourceLookupKind::Name(name) => name.app_id.clone()
+            EntityLookup::Key(resource) => resource.app_id.clone(),
+            EntityLookup::Name(name) => name.app_id.clone()
         }
     }
 }
@@ -346,14 +347,14 @@ pub struct ResourceNameLookup
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceFrom
 {
-    key: ResourceKey,
+    key: EntityKey,
     source: Option<Vec<u8>>
 }
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceTo
 {
-    key: ResourceKey,
+    key: EntityKey,
     target: Option<Vec<u8>>
 }
 
@@ -370,7 +371,7 @@ pub struct ResourceMessage
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceBind
 {
-   pub key: ResourceKey,
+   pub key: EntityKey,
    pub star: StarKey
 }
 
@@ -407,13 +408,14 @@ pub struct ApplicationAssignInner
 {
     pub app_id: Id,
     pub data: Vec<u8>,
-    pub notify: Vec<StarKey>
+    pub notify: Vec<StarKey>,
+    pub supervisor: StarKey
 }
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ApplicationNotifyReadyInner
 {
-    pub app_id: Id,
+    pub location: AppLocation
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -476,7 +478,7 @@ impl fmt::Display for Frame {
             Frame::StarUnwind(_)=>format!("StarUnwind").to_string(),
             Frame::StarAck(_)=>format!("StarAck").to_string(),
             Frame::Watch(_) => format!("Watch").to_string(),
-            Frame::ResourceEvent(_) => format!("ResourceEvent").to_string()
+            Frame::EntityEvent(_) => format!("ResourceEvent").to_string()
         };
         write!(f, "{}",r)
     }

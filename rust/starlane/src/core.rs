@@ -7,7 +7,7 @@ use crate::application::ApplicationState;
 use crate::error::Error;
 use crate::frame::{ResourceMessage, StarMessageInner, StarMessagePayload, StarUnwindPayload, StarWindInner, Watch, WatchInfo};
 use crate::id::{Id, IdSeq};
-use crate::resource::ResourceKey;
+use crate::entity::EntityKey;
 use crate::star::{StarCommand, StarKey, StarKind};
 use std::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;

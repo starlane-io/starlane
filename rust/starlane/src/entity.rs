@@ -3,21 +3,21 @@ use tokio::sync::broadcast;
 use std::sync::Arc;
 use crate::star::StarKey;
 use crate::error::Error;
-use crate::frame::{ResourceMessage, ResourceState, ResourceEvent};
+use crate::frame::{ResourceMessage, ResourceState, EntityEvent};
 use serde::{Deserialize, Serialize, Serializer};
 use tokio::sync::broadcast::Sender;
 use std::fmt;
 
 #[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
-pub struct ResourceKey
+pub struct EntityKey
 {
     pub app_id: Id,
     pub id: Id,
-    pub kind: ResourceKind
+    pub kind: EntityKind
 }
 
 #[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
-pub enum ResourceKind
+pub enum EntityKind
 {
     Single,
     Group
@@ -25,37 +25,37 @@ pub enum ResourceKind
 
 
 
-impl fmt::Display for ResourceKey {
+impl fmt::Display for EntityKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({},{})", self.app_id, self.id)
     }
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceLocation
+pub struct EntityLocation
 {
-    pub resource: ResourceKey,
+    pub entity: EntityKey,
     pub star: StarKey,
-    pub group: Option<ResourceKey>,
+    pub group: Option<EntityKey>,
     pub ext: Option<Vec<u8>>
 }
 
-impl ResourceLocation
+impl EntityLocation
 {
-    pub fn new( resource: ResourceKey, star: StarKey )->Self
+    pub fn new(resource: EntityKey, star: StarKey ) ->Self
     {
-        ResourceLocation{
-            resource: resource,
+        EntityLocation {
+            entity: resource,
             star: star,
             ext: Option::None,
             group: Option::None
         }
     }
 
-    pub fn new_ext( resource: ResourceKey, star: StarKey, ext: Vec<u8>) -> Self
+    pub fn new_ext(resource: EntityKey, star: StarKey, ext: Vec<u8>) -> Self
     {
-        ResourceLocation{
-            resource: resource,
+        EntityLocation {
+            entity: resource,
             star: star,
             ext: Option::Some(ext),
             group: Option::None
@@ -63,34 +63,34 @@ impl ResourceLocation
     }
 }
 
-pub struct ResourceGroup
+pub struct EntityGroup
 {
-    pub key: ResourceKey,
-    pub resources: Vec<ResourceKey>
+    pub key: EntityKey,
+    pub entity: Vec<EntityKey>
 }
 
 
-pub struct ResourceWatcher
+pub struct EntityWatcher
 {
-    pub resource: ResourceKey,
-    pub tx: Sender<ResourceEvent>
+    pub entity: EntityKey,
+    pub tx: Sender<EntityEvent>
 }
 
-impl ResourceWatcher
+impl EntityWatcher
 {
-    pub fn new( resource: ResourceKey )->(Self,broadcast::Receiver<ResourceEvent>)
+    pub fn new(entity: EntityKey) ->(Self, broadcast::Receiver<EntityEvent>)
     {
         let (tx,rx) = broadcast::channel(32);
-        (ResourceWatcher{
-            resource: resource,
+        (EntityWatcher {
+            entity,
             tx: tx
-        },rx)
+        }, rx)
     }
 }
 
-impl ResourceWatcher
+impl EntityWatcher
 {
-    pub fn notify( &self, event: ResourceEvent )
+    pub fn notify( &self, event: EntityEvent)
     {
         self.tx.send(event);
     }

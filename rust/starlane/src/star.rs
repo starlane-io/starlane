@@ -5,30 +5,28 @@ use std::future::Future;
 use std::sync::{Arc, Mutex, Weak};
 use std::sync::atomic::{AtomicI32, AtomicI64};
 
-use futures::channel::oneshot;
-use futures::channel::oneshot::Canceled;
 use futures::future::{join_all, Map, BoxFuture};
 use futures::future::select_all;
 use futures::FutureExt;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, oneshot};
 use tokio::sync::broadcast::error::{RecvError, SendError};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 use url::Url;
 
-use crate::application::{ApplicationState, AppLocation};
+use crate::application::{ApplicationState, AppLocation, AppController, AppLifecycleCommand, AppCommand, AppCreate};
 use crate::error::Error;
-use crate::frame::{ApplicationAssignInner, ApplicationNotifyReadyInner, ApplicationReportSupervisorInner, ApplicationRequestSupervisorInner, Frame, ProtoFrame, RejectionInner, ResourceBind, ResourceEvent, ResourceEventKind, ResourceLookupKind, ResourceMessage, ResourceReportLocation, ResourceRequestLocation, StarMessageInner, StarMessagePayload, SearchHit, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarUnwindInner, StarUnwindPayload, StarWindInner, StarWindPayload, Watch, WatchInfo};
+use crate::frame::{ApplicationAssignInner, ApplicationNotifyReadyInner, ApplicationReportSupervisorInner, ApplicationRequestSupervisorInner, Frame, ProtoFrame, RejectionInner, ResourceBind, EntityEvent, ResourceEventKind, EntityLookup, ResourceMessage, ResourceReportLocation, ResourceRequestLocation, StarMessageInner, StarMessagePayload, SearchHit, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarUnwindInner, StarUnwindPayload, StarWindInner, StarWindPayload, Watch, WatchInfo, ApplicationCreateRequestInner};
 use crate::frame::Frame::{StarMessage, StarSearch};
 use crate::frame::ProtoFrame::CentralSearch;
 use crate::frame::StarMessagePayload::{ApplicationCreateRequest, Reject};
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
-use crate::resource::{ResourceKey, ResourceLocation, ResourceWatcher};
+use crate::entity::{EntityKey, EntityLocation, EntityWatcher};
 use futures::prelude::future::FusedFuture;
 use crate::core::CoreCommand;
 use std::collections::hash_map::RandomState;
@@ -159,11 +157,11 @@ impl fmt::Display for StarKind{
     }
 }
 
-impl fmt::Display for ResourceLookupKind{
+impl fmt::Display for EntityLookup {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self{
-            ResourceLookupKind::Key(resource) => format!( "Key({})", resource ).to_string(),
-            ResourceLookupKind::Name(lookup) => {format!( "Name({})", lookup.name).to_string()}
+            EntityLookup::Key(entity) => format!("Key({})", entity).to_string(),
+            EntityLookup::Name(lookup) => {format!("Name({})", lookup.name).to_string()}
         };
         write!(f, "{}",r)
     }
@@ -209,10 +207,10 @@ pub struct Star
     transactions: HashMap<Id,Box<dyn Transaction>>,
     frame_hold: FrameHold,
     logger: StarLogger,
-    watches: HashMap<ResourceKey,HashMap<Id,StarWatchInfo>>,
-    resource_locations: LruCache<ResourceKey,ResourceLocation>,
+    watches: HashMap<EntityKey,HashMap<Id,StarWatchInfo>>,
+    entity_locations: LruCache<EntityKey, EntityLocation>,
     app_locations: LruCache<Id,StarKey>,
-    resources: HashSet<ResourceKey>,
+    entities: HashSet<EntityKey>,
     core_tx: mpsc::Sender<CoreCommand>,
 }
 
@@ -239,16 +237,16 @@ impl Star
             frame_hold: frame_hold,
             logger: logger,
             watches: HashMap::new(),
-            resource_locations: LruCache::new(64*1024 ),
+            entity_locations: LruCache::new(64*1024 ),
             app_locations: LruCache::new(4*1024 ),
-            resources: HashSet::new(),
+            entities: HashSet::new(),
             core_tx: core_tx
         }
     }
 
-    pub fn has_resource( &self, key: &ResourceKey ) -> bool
+    pub fn has_entities(&self, key: &EntityKey) -> bool
     {
-        self.resources.contains(&key)
+        self.entities.contains(&key)
     }
 
 
@@ -291,13 +289,13 @@ impl Star
                     StarCommand::AddConnectorController(connector_ctrl) => {
                         self.connector_ctrls.push(connector_ctrl);
                     }
-                    StarCommand::AddResourceLocation(add_resource_location) => {
-                        self.resource_locations.put( add_resource_location.resource_location.resource.clone(), add_resource_location.resource_location.clone() );
-                        add_resource_location.tx.send( ()).await;
+                    StarCommand::AddEntityLocation(add_entity_location) => {
+                        self.entity_locations.put(add_entity_location.entity_location.entity.clone(), add_entity_location.entity_location.clone() );
+                        add_entity_location.tx.send( ()).await;
                     }
                     StarCommand::AddAppLocation(add_app_location) => {
                         self.app_locations.put( add_app_location.app_location.app_id.clone(), add_app_location.app_location.supervisor.clone() );
-                        add_app_location.tx.send( () ).await;
+                        add_app_location.tx.send( add_app_location.app_location ).await;
                     }
                     StarCommand::ReleaseHold(star) => {
                         if let Option::Some(frames) = self.frame_hold.release(&star)
@@ -308,6 +306,12 @@ println!("RELEASING HOLD!");
                                 self.send_frame(star.clone(),frame).await;
                             }
                         }
+                    }
+                    StarCommand::AppLifecycleCommand(command)=>{
+                        self.on_app_lifecycle_command(command).await;
+                    }
+                    StarCommand::AppCommand(command)=>{
+                        self.on_app_command(command).await;
                     }
                     StarCommand::AddLogger(tx) => {
                         self.logger.tx.push(tx);
@@ -345,6 +349,11 @@ println!("RELEASING HOLD!");
                         commit.tx.send( commit.result );
                     }
                     StarCommand::Frame(frame) => {
+                        let lane_key = lanes.get(index);
+                        if lane_key.is_none()
+                        {
+                            println!("Null lanekey on: {}",frame );
+                        }
                         let lane_key = lanes.get(index).unwrap().clone();
                         self.process_frame(frame, lane_key ).await;
                     }
@@ -363,8 +372,41 @@ println!("RELEASING HOLD!");
             }
 
         }
+    }
+
+    async fn on_app_lifecycle_command( &mut self, command: AppLifecycleCommand )
+    {
+        match command
+        {
+            AppLifecycleCommand::Create(create) => {
+                let payload = StarMessagePayload::ApplicationCreateRequest(ApplicationCreateRequestInner{
+                    name: create.name,
+                    data: create.data
+                });
+                let tid = self.info.sequence.next();
+                let mut message = StarMessageInner::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
+                message.transaction = Option::Some(tid);
+
+                let transaction = AppCreateTransaction{
+                    command_tx: self.info.command_tx.clone(),
+                    tx: create.tx.clone()
+                };
+                self.transactions.insert( tid.clone(), Box::new(transaction) );
+
+                self.send(message).await;
+            }
+            AppLifecycleCommand::Get(_) => {}
+            AppLifecycleCommand::Destroy(_) => {}
+        }
 
     }
+
+    async fn on_app_command( &mut self, command: AppCommand )
+    {
+
+    }
+
+
     async fn search_for_star( &mut self, star: StarKey, tx: oneshot::Sender<SearchResult> )
     {
         let search = Search{
@@ -772,9 +814,9 @@ println!("RELEASING HOLD!");
         }
     }
 
-    async fn on_event( &mut self, event: ResourceEvent, lane_key: StarKey  )
+    async fn on_event(&mut self, event: EntityEvent, lane_key: StarKey  )
     {
-        let watches = self.watches.get(&event.resource );
+        let watches = self.watches.get(&event.entity);
 
         if watches.is_some()
         {
@@ -785,7 +827,7 @@ println!("RELEASING HOLD!");
 
             for lane in stars
             {
-                self.send_frame( lane.clone(), Frame::ResourceEvent(event.clone()));
+                self.send_frame( lane.clone(), Frame::EntityEvent(event.clone()));
             }
         }
     }
@@ -799,12 +841,12 @@ println!("RELEASING HOLD!");
                 self.forward_watch(watch).await;
             }
             Watch::Remove(info) => {
-                if let Option::Some(watches) = self.watches.get_mut(&info.resource )
+                if let Option::Some(watches) = self.watches.get_mut(&info.entity)
                 {
                     watches.remove(&info.id);
                     if watches.is_empty()
                     {
-                        self.watches.remove( &info.resource );
+                        self.watches.remove( &info.entity);
                     }
                 }
                 self.forward_watch(watch).await;
@@ -819,12 +861,12 @@ println!("RELEASING HOLD!");
             lane: lane_key.clone(),
             timestamp: Instant::now()
         };
-        match self.watches.get_mut(&watch_info.resource )
+        match self.watches.get_mut(&watch_info.entity)
         {
             None => {
                 let mut watches = HashMap::new();
                 watches.insert(watch_info.id.clone(), star_watch);
-                self.watches.insert(watch_info.resource.clone(), watches);
+                self.watches.insert(watch_info.entity.clone(), watches);
             }
             Some(mut watches) => {
                 watches.insert(watch_info.id.clone(), star_watch);
@@ -834,34 +876,34 @@ println!("RELEASING HOLD!");
 
     async fn forward_watch( &mut self, watch: Watch )
     {
-        let has_resource = match &watch
+        let has_entity = match &watch
         {
             Watch::Add(info) => {
-                self.has_resource(&info.resource)
+                self.has_entities(&info.entity)
             }
             Watch::Remove(info) => {
-                self.has_resource(&info.resource)
+                self.has_entities(&info.entity)
             }
         };
 
-        let resource = match &watch
+        let entity = match &watch
         {
             Watch::Add(info) => {
-                &info.resource
+                &info.entity
             }
             Watch::Remove(info) => {
-                &info.resource
+                &info.entity
             }
         };
 
-        if has_resource
+        if has_entity
         {
             self.core_tx.send(CoreCommand::Watch(watch)).await;
         }
         else
         {
-            let lookup = ResourceLookupKind::Key(resource.clone());
-            let location = self.get_resource_location(lookup.clone() );
+            let lookup = EntityLookup::Key(entity.clone());
+            let location = self.get_entity_location(lookup.clone() );
 
 
             if let Some(location) = location.cloned()
@@ -870,7 +912,7 @@ println!("RELEASING HOLD!");
             }
             else
             {
-                let mut rx = self.find_resource_location(lookup).await;
+                let mut rx = self.find_entity_location(lookup).await;
                 let command_tx = self.info.command_tx.clone();
                 tokio::spawn( async move {
                     if let Option::Some(_) = rx.recv().await
@@ -886,7 +928,7 @@ println!("RELEASING HOLD!");
         self.app_locations.get(app_id)
     }
 
-    async fn find_app_location(&mut self, app_id: &Id ) -> mpsc::Receiver<()>
+    async fn find_app_location(&mut self, app_id: &Id ) -> mpsc::Receiver<AppLocation>
     {
         let payload = StarMessagePayload::ApplicationRequestSupervisor(ApplicationRequestSupervisorInner{ app_id: app_id.clone() } );
         let mut message = StarMessageInner::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
@@ -901,25 +943,35 @@ println!("RELEASING HOLD!");
         rx
     }
 
-    fn get_resource_location( &mut self, kind: ResourceLookupKind ) -> Option<&ResourceLocation>
+    fn get_entity_location(&mut self, kind: EntityLookup) -> Option<&EntityLocation>
     {
-        if let ResourceLookupKind::Key(resource) = &kind
+        if let EntityLookup::Key(entity) = &kind
         {
-            self.resource_locations.get(resource)
+            self.entity_locations.get(entity)
         }
         else {
             Option::None
         }
     }
-    async fn find_resource_location(&mut self, kind: ResourceLookupKind ) -> mpsc::Receiver<()>
+
+    async fn find_entity_location(&mut self, kind: EntityLookup) -> mpsc::Receiver<()>
     {
 
         let supervisor_star = self.get_app_location(&kind.app_id() ).cloned();
 
         match supervisor_star{
             None => {
-                let rx = self.find_app_location(&kind.app_id()).await;
-                rx
+                let mut rx = self.find_app_location(&kind.app_id()).await;
+                let (xt,xr) = mpsc::channel(1);
+
+                tokio::spawn( async move {
+                    if let Option::Some(_) = rx.recv().await
+                    {
+                        xt.send(()).await;
+                    }
+                });
+
+                xr
             }
             Some(supervisor_star) => {
                 let payload = StarMessagePayload::ResourceRequestLocation(ResourceRequestLocation{ lookup: kind } );
@@ -1018,7 +1070,7 @@ pub enum StarCommand
 {
     AddLane(Lane),
     AddConnectorController(ConnectorController),
-    AddResourceLocation(AddResourceLocation),
+    AddEntityLocation(AddEntityLocation),
     AddAppLocation(AddAppLocation),
     AddLogger(broadcast::Sender<StarLog>),
     ReleaseHold(StarKey),
@@ -1028,7 +1080,9 @@ pub enum StarCommand
     Frame(Frame),
     ForwardFrame(ForwardFrame),
     FrameTimeout(FrameTimeoutInner),
-    FrameError(FrameErrorInner)
+    FrameError(FrameErrorInner),
+    AppLifecycleCommand(AppLifecycleCommand),
+    AppCommand(AppCommand)
 }
 
 
@@ -1038,16 +1092,16 @@ pub struct ForwardFrame
     pub frame: Frame
 }
 
-pub struct AddResourceLocation
+pub struct AddEntityLocation
 {
     pub tx: mpsc::Sender<()>,
-    pub resource_location: ResourceLocation
+    pub entity_location: EntityLocation
 }
 
 
 pub struct AddAppLocation
 {
-    pub tx: mpsc::Sender<()>,
+    pub tx: mpsc::Sender<AppLocation>,
     pub app_location: AppLocation
 }
 
@@ -1138,9 +1192,11 @@ impl fmt::Display for StarCommand{
             StarCommand::Search(_) => format!("Search").to_string(),
             StarCommand::SearchCommit(_) => format!("SearchResult").to_string(),
             StarCommand::ReleaseHold(_) => format!("ReleaseHold").to_string(),
-            StarCommand::AddResourceLocation(_) => format!("AddResourceLocation").to_string(),
+            StarCommand::AddEntityLocation(_) => format!("AddResourceLocation").to_string(),
             StarCommand::AddAppLocation(_) => format!("AddAppLocation").to_string(),
             StarCommand::ForwardFrame(_) => format!("ForwardFrame").to_string(),
+            StarCommand::AppLifecycleCommand(_) => format!("AppLifecycleCommand").to_string(),
+            StarCommand::AppCommand(_) => format!("AppCommand").to_string(),
         };
         write!(f, "{}",r)
     }
@@ -1150,6 +1206,36 @@ impl fmt::Display for StarCommand{
 pub struct StarController
 {
     pub command_tx: mpsc::Sender<StarCommand>
+}
+
+impl StarController
+{
+   pub async fn create_app(&self, name: Option<String>, data: Vec<u8> )->Result<AppController,Error>
+   {
+       let request = ApplicationCreateRequest(ApplicationCreateRequestInner{
+           name: name,
+           data: data
+       });
+
+       let (tx,mut rx) = mpsc::channel(1);
+
+
+       let app_create = AppLifecycleCommand::Create( AppCreate{
+           name: Option::Some("app".to_string()),
+           data: vec!(),
+           tx: tx
+       } );
+
+       self.command_tx.send( StarCommand::AppLifecycleCommand(app_create) ).await;
+
+       if let Some(rtn) = rx.recv().await
+       {
+           Ok(rtn)
+       }
+       else {
+           Err("could not create app".into())
+       }
+   }
 }
 
 
@@ -1165,12 +1251,12 @@ pub struct StarWatchInfo
 pub struct ApplicationSupervisorSearchTransaction
 {
     pub app_id: Id,
-    pub tx: mpsc::Sender<()>
+    pub tx: mpsc::Sender<AppLocation>
 }
 
 impl ApplicationSupervisorSearchTransaction
 {
-    pub fn new(app_id: Id) ->(Self,mpsc::Receiver<()>)
+    pub fn new(app_id: Id) ->(Self,mpsc::Receiver<AppLocation>)
     {
         let (tx,rx) = mpsc::channel(1);
         (ApplicationSupervisorSearchTransaction{
@@ -1228,7 +1314,7 @@ impl Transaction for ResourceLocationRequestTransaction
         {
             if let StarMessagePayload::ResourceReportLocation(location ) = &message.payload
             {
-                command_tx.send( StarCommand::AddResourceLocation(AddResourceLocation{ tx: self.tx.clone(), resource_location: location.clone() })).await;
+                command_tx.send( StarCommand::AddEntityLocation(AddEntityLocation { tx: self.tx.clone(), entity_location: location.clone() })).await;
             }
         }
 
@@ -1321,6 +1407,50 @@ impl Transaction for StarSearchTransaction
             TransactionResult::Continue
         }
 
+    }
+}
+
+pub struct AppCreateTransaction
+{
+    pub command_tx: mpsc::Sender<StarCommand>,
+    pub tx: mpsc::Sender<AppController>
+}
+
+#[async_trait]
+impl Transaction for AppCreateTransaction
+{
+    async fn on_frame(&mut self, frame: &Frame, lane: &mut LaneMeta, command_tx: &mut Sender<StarCommand>) -> TransactionResult
+    {
+        if let Frame::StarMessage(message) = &frame
+        {
+            if let StarMessagePayload::ApplicationNotifyReady(notify) = &message.payload
+            {
+                let (tx,mut rx) = mpsc::channel(1);
+                let add = AddAppLocation{ tx: tx.clone(), app_location: notify.location.clone() };
+                self.command_tx.send( StarCommand::AddAppLocation(add)).await;
+
+                let ( app_tx, mut app_rx ) = mpsc::channel(1);
+                let command_tx = self.command_tx.clone();
+                tokio::spawn( async move {
+                    while let Option::Some(command) = app_rx.recv().await {
+                        command_tx.send( StarCommand::AppCommand(command)).await;
+                    }
+                });
+
+                let app_ctrl_tx = self.tx.clone();
+                tokio::spawn( async move {
+                    if let Option::Some(location) = rx.recv().await
+                    {
+                        let ctrl = AppController{
+                            app_id: location.app_id.clone(),
+                            tx: app_tx
+                        };
+                        app_ctrl_tx.send(ctrl).await;
+                    }
+                });
+            }
+        }
+        TransactionResult::Done
     }
 }
 
@@ -1494,15 +1624,17 @@ impl StarManager for CentralManager
                         {
                             self.backing.set_application_name_to_app_id(name.clone(),app_id.clone());
                         }
+                        let supervisor = supervisor.unwrap();
                         let message = StarMessageInner {
                             id: self.info.sequence.next(),
                             from: self.info.star_key.clone(),
-                            to: supervisor.unwrap(),
+                            to: supervisor.clone(),
                             transaction: message.transaction.clone(),
                             payload: StarMessagePayload::ApplicationAssign(ApplicationAssignInner {
                                 app_id: app_id,
                                 data: request.data.clone(),
-                                notify: vec![message.from, self.info.star_key.clone()]
+                                notify: vec![message.from, self.info.star_key.clone()],
+                                supervisor: supervisor
                             }),
                             retry: 0,
                             max_retries: 16
@@ -1512,7 +1644,7 @@ impl StarManager for CentralManager
                     }
                 }
                 StarMessagePayload::ApplicationNotifyReady(notify) => {
-                    self.backing.set_application_state(notify.app_id.clone(), ApplicationState::Ready);
+                    self.backing.set_application_state(notify.location.app_id.clone(), ApplicationState::Ready);
                     Ok(())
                     // do nothing
                 }
@@ -1733,7 +1865,12 @@ impl SupervisorManager
 
                 for notify in &assign.notify
                 {
-                    let notify_app_ready = StarMessageInner::new(self.info.sequence.next(), self.info.star_key.clone(), notify.clone(), StarMessagePayload::ApplicationNotifyReady(ApplicationNotifyReadyInner{app_id:assign.app_id.clone()}));
+                    let location = AppLocation{
+                        app_id: assign.app_id.clone(),
+                        supervisor: assign.supervisor.clone()
+                    };
+                    let payload = StarMessagePayload::ApplicationNotifyReady(ApplicationNotifyReadyInner{ location: location});
+                    let notify_app_ready = StarMessageInner::new(self.info.sequence.next(), self.info.star_key.clone(), notify.clone(), payload );
                     self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(notify_app_ready))).await?;
                 }
 
@@ -1746,18 +1883,18 @@ impl SupervisorManager
             }
             StarMessagePayload::ResourceReportLocation(report) =>
                 {
-                    self.backing.set_resource_location(report.resource.clone(),report.clone());
+                    self.backing.set_entity_location(report.entity.clone(), report.clone());
                     Ok(())
                 }
             StarMessagePayload::ResourceRequestLocation(request) =>
                 {
 
-                    let location = self.backing.get_resource_location(&request.lookup);
+                    let location = self.backing.get_entity_location(&request.lookup);
 
                     match location
                     {
                         None => {
-                            return Err(format!("cannot find resource: {}", request.lookup).into() );
+                            return Err(format!("cannot find entity: {}", request.lookup).into() );
                         }
                         Some(location) => {
                             let location = location.clone();
@@ -1784,9 +1921,9 @@ pub trait SupervisorManagerBacking: Send+Sync
     fn add_application( &mut self, app_id: Id , data: Vec<u8> );
     fn remove_application( &mut self, app_id: Id );
 
-    fn set_resource_name(&mut self, name: String, key: ResourceKey );
-    fn set_resource_location(&mut self, resource: ResourceKey, location: ResourceLocation );
-    fn get_resource_location(&self, lookup: &ResourceLookupKind) -> Option<&ResourceLocation>;
+    fn set_entity_name(&mut self, name: String, key: EntityKey);
+    fn set_entity_location(&mut self, entity: EntityKey, location: EntityLocation);
+    fn get_entity_location(&self, lookup: &EntityLookup) -> Option<&EntityLocation>;
 }
 
 pub struct SupervisorManagerBackingDefault
@@ -1795,8 +1932,8 @@ pub struct SupervisorManagerBackingDefault
     servers: Vec<StarKey>,
     server_select_index: usize,
     applications: HashSet<Id>,
-    name_to_resource: HashMap<String,ResourceKey>,
-    resource_location: HashMap<ResourceKey,ResourceLocation>
+    name_to_entity: HashMap<String, EntityKey>,
+    entity_location: HashMap<EntityKey, EntityLocation>
 }
 
 impl SupervisorManagerBackingDefault
@@ -1808,8 +1945,8 @@ impl SupervisorManagerBackingDefault
             servers: vec![],
             server_select_index: 0,
             applications: HashSet::new(),
-            name_to_resource: HashMap::new(),
-            resource_location: HashMap::new(),
+            name_to_entity: HashMap::new(),
+            entity_location: HashMap::new(),
         }
     }
 }
@@ -1842,25 +1979,25 @@ impl SupervisorManagerBacking for SupervisorManagerBackingDefault
         self.applications.remove(&app_id);
     }
 
-    fn set_resource_name(&mut self, name: String, key: ResourceKey) {
-        self.name_to_resource.insert(name,key );
+    fn set_entity_name(&mut self, name: String, key: EntityKey) {
+        self.name_to_entity.insert(name, key );
     }
 
-    fn set_resource_location(&mut self, resource: ResourceKey, location: ResourceLocation) {
-        self.resource_location.insert( resource, location );
+    fn set_entity_location(&mut self, entity: EntityKey, location: EntityLocation) {
+        self.entity_location.insert(entity, location );
     }
 
-    fn get_resource_location(&self, lookup: &ResourceLookupKind) -> Option<&ResourceLocation> {
+    fn get_entity_location(&self, lookup: &EntityLookup) -> Option<&EntityLocation> {
         match lookup
         {
-            ResourceLookupKind::Key(key) => {
-                return self.resource_location.get(key)
+            EntityLookup::Key(key) => {
+                return self.entity_location.get(key)
             }
-            ResourceLookupKind::Name(lookup) => {
+            EntityLookup::Name(lookup) => {
 
-                if let Some(key) = self.name_to_resource.get(&lookup.name)
+                if let Some(key) = self.name_to_entity.get(&lookup.name)
                 {
-                    return self.resource_location.get(key)
+                    return self.entity_location.get(key)
                 }
                 else {
                     Option::None
