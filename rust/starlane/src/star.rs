@@ -26,9 +26,9 @@ use crate::frame::StarMessagePayload::{ApplicationCreateRequest, Reject};
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
-use crate::entity::{EntityKey, EntityLocation, EntityWatcher};
+use crate::entity::{EntityKey, EntityLocation, EntityWatcher, Entity};
 use futures::prelude::future::FusedFuture;
-use crate::core::CoreCommand;
+use crate::core::StarCoreCommand;
 use std::collections::hash_map::RandomState;
 use std::cell::Cell;
 use std::borrow::Borrow;
@@ -214,7 +214,7 @@ pub struct Star
 {
     info: StarInfo,
     command_rx: mpsc::Receiver<StarCommand>,
-    manager_tx: mpsc::Sender<SubCommand>,
+    manager_tx: mpsc::Sender<StarManagerCommand>,
     lanes: HashMap<StarKey, LaneMeta>,
     connector_ctrls: Vec<ConnectorController>,
     transactions: HashMap<Id,Box<dyn Transaction>>,
@@ -224,7 +224,7 @@ pub struct Star
     entity_locations: LruCache<EntityKey, EntityLocation>,
     app_locations: LruCache<AppKey,StarKey>,
     entities: HashSet<EntityKey>,
-    core_tx: mpsc::Sender<CoreCommand>,
+    core_tx: mpsc::Sender<StarCoreCommand>,
 }
 
 impl Star
@@ -232,8 +232,8 @@ impl Star
 
     pub fn from_proto(info: StarInfo,
                       command_rx: mpsc::Receiver<StarCommand>,
-                      manager_tx: mpsc::Sender<SubCommand>,
-                      core_tx: mpsc::Sender<CoreCommand>,
+                      manager_tx: mpsc::Sender<StarManagerCommand>,
+                      core_tx: mpsc::Sender<StarCoreCommand>,
                       lanes: HashMap<StarKey,LaneMeta>,
                       connector_ctrls: Vec<ConnectorController>,
                       logger: StarLogger,
@@ -265,7 +265,7 @@ impl Star
 
     pub async fn run(mut self)
     {
-        self.manager_tx.send(SubCommand::Init ).await;
+        self.manager_tx.send(StarManagerCommand::Init ).await;
         loop {
             let mut futures = vec!();
             let mut lanes = vec!();
@@ -370,6 +370,9 @@ impl Star
                     }
                     StarCommand::ForwardFrame(forward) => {
                         self.send_frame( forward.to.clone(), forward.frame ).await;
+                    }
+                    StarCommand::EntityCommand(command) => {
+                        self.core_tx.send( StarCoreCommand::Entity(command)).await;
                     }
                     _ => {
                         eprintln!("cannot process command: {}",command);
@@ -999,7 +1002,7 @@ impl Star
 
         if has_entity
         {
-            self.core_tx.send(CoreCommand::Watch(watch)).await;
+            self.core_tx.send(StarCoreCommand::Watch(watch)).await;
         }
         else
         {
@@ -1104,7 +1107,7 @@ impl Star
         }
         else {
             let star_stack = wind.stars.clone();
-            self.manager_tx.send(SubCommand::Frame(Frame::StarWind(wind)) ).await;
+            self.manager_tx.send(StarManagerCommand::Frame(Frame::StarWind(wind)) ).await;
             /*{
                 Ok(payload) => {
                     let unwind = StarUnwindInner{
@@ -1153,7 +1156,7 @@ impl Star
             }
         }
         else {
-            Ok(self.manager_tx.send( SubCommand::Frame( Frame::StarMessage(message))).await?)
+            Ok(self.manager_tx.send( StarManagerCommand::Frame( Frame::StarMessage(message))).await?)
         }
     }
 
@@ -1185,9 +1188,31 @@ pub enum StarCommand
     FrameTimeout(FrameTimeoutInner),
     FrameError(FrameErrorInner),
     AppLifecycleCommand(AppAccessCommand),
-    AppCommand(AppCommand)
+    AppCommand(AppCommand),
+    EntityCommand(EntityCommand)
 }
 
+pub enum EntityCommand
+{
+   Create(Entity)
+}
+
+pub struct EntityCreate
+{
+    pub app: AppKey,
+    pub entity: Entity
+}
+
+impl EntityCreate
+{
+    pub fn new(app:AppKey,entity:Entity) -> Self
+    {
+        EntityCreate{
+            app: app,
+            entity: entity
+        }
+    }
+}
 
 pub struct ForwardFrame
 {
@@ -1229,12 +1254,13 @@ impl Search
     }
 }
 
-pub enum SubCommand
+pub enum StarManagerCommand
 {
     Init,
     Frame(Frame),
     SupervisorCommand(SupervisorCommand),
     ServerCommand(ServerCommand),
+    EntityCommand(EntityCommand)
 }
 
 pub enum CentralCommand
@@ -1271,13 +1297,13 @@ pub enum StarTest
 }
 
 
-impl fmt::Display for SubCommand{
+impl fmt::Display for StarManagerCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
-            SubCommand::Frame(frame) => format!("Frame({})",frame).to_string(),
-            SubCommand::SupervisorCommand(_) => "SupervisorCommand".to_string(),
-            SubCommand::ServerCommand(_) => "ServerCommand".to_string(),
-            SubCommand::Init => "Init".to_string()
+            StarManagerCommand::Frame(frame) => format!("Frame({})", frame).to_string(),
+            StarManagerCommand::SupervisorCommand(_) => "SupervisorCommand".to_string(),
+            StarManagerCommand::ServerCommand(_) => "ServerCommand".to_string(),
+            StarManagerCommand::Init => "Init".to_string()
         };
         write!(f, "{}",r)
     }
@@ -1718,7 +1744,7 @@ impl FrameHold {
 #[async_trait]
 trait StarManager: Send+Sync
 {
-    async fn handle(&mut self, command: SubCommand) -> Result<(),Error>;
+    async fn handle(&mut self, command: StarManagerCommand) -> Result<(),Error>;
 }
 
 pub struct CentralManager
@@ -1742,13 +1768,13 @@ impl CentralManager
 #[async_trait]
 impl StarManager for CentralManager
 {
-    async fn handle(&mut self, command: SubCommand ) -> Result<(), Error> {
+    async fn handle(&mut self, command: StarManagerCommand) -> Result<(), Error> {
 
-        if let SubCommand::Init = command
+        if let StarManagerCommand::Init = command
         {
            Ok(())
         }
-        else if let SubCommand::Frame(Frame::StarMessage(message)) = command
+        else if let StarManagerCommand::Frame(Frame::StarMessage(message)) = command
         {
             let mut message = message;
             match &message.payload
@@ -1831,7 +1857,7 @@ impl StarManager for CentralManager
                 }
             }
         }
-        else if let SubCommand::Frame(Frame::StarWind(wind)) = &command {
+        else if let StarManagerCommand::Frame(Frame::StarWind(wind)) = &command {
             match wind.payload
             {
                 StarWindPayload::RequestSequence => {
@@ -1968,17 +1994,17 @@ impl SupervisorManager
 #[async_trait]
 impl StarManager for SupervisorManager
 {
-    async fn handle(&mut self, command: SubCommand) -> Result<(), Error> {
+    async fn handle(&mut self, command: StarManagerCommand) -> Result<(), Error> {
         match command
         {
-            SubCommand::Init => {
+            StarManagerCommand::Init => {
                let payload = StarMessagePayload::SupervisorPledgeToCentral;
                let message = StarMessageInner::new( self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
                let command = StarCommand::Frame(Frame::StarMessage(message));
                self.info.command_tx.send( command ).await;
                Ok(())
             }
-            SubCommand::Frame(frame) => {
+            StarManagerCommand::Frame(frame) => {
                 match frame {
                     Frame::StarMessage(message) => {
                         self.handle_message(message).await
@@ -1986,7 +2012,7 @@ impl StarManager for SupervisorManager
                     _ => Err(format!("{} manager does not know how to handle frame: {}", self.info.kind, frame).into())
                 }
             }
-            SubCommand::SupervisorCommand(command) => {
+            StarManagerCommand::SupervisorCommand(command) => {
                 if let SupervisorCommand::PledgeToCentral = command
                 {
                     let message = StarMessageInner::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), StarMessagePayload::SupervisorPledgeToCentral );
@@ -1996,7 +2022,7 @@ impl StarManager for SupervisorManager
                     Err(format!("{} manager does not know how to handle : ...", self.info.kind).into())
                 }
             }
-            SubCommand::ServerCommand(_) => {
+            StarManagerCommand::ServerCommand(_) => {
                 Err(format!("{} manager does not know how to handle : {}", self.info.kind, command).into())
             }
         }
@@ -2353,15 +2379,15 @@ impl ServerManager
 #[async_trait]
 impl StarManager for ServerManager
 {
-    async fn handle(&mut self, command: SubCommand) -> Result<(), Error> {
+    async fn handle(&mut self, command: StarManagerCommand) -> Result<(), Error> {
 
         match command
         {
-            SubCommand::Init => {
+            StarManagerCommand::Init => {
                 self.pledge().await?;
                 Ok(())
             }
-            SubCommand::ServerCommand(command) => {
+            StarManagerCommand::ServerCommand(command) => {
 
                 match command
                 {
@@ -2407,10 +2433,10 @@ impl PlaceholderStarManager
 #[async_trait]
 impl StarManager for PlaceholderStarManager
 {
-    async fn handle(&mut self, command: SubCommand ) -> Result<(), Error> {
+    async fn handle(&mut self, command: StarManagerCommand) -> Result<(), Error> {
         match command
         {
-            SubCommand::Init => {Ok(())}
+            StarManagerCommand::Init => {Ok(())}
             _ => {
                 println!("command {} Placeholder unimplemented for kind: {}",command,self.info.kind);
                 Ok(())
@@ -2422,7 +2448,7 @@ impl StarManager for PlaceholderStarManager
 #[async_trait]
 pub trait StarManagerFactory: Sync+Send
 {
-    async fn create( &self, info: StarInfo ) -> mpsc::Sender<SubCommand>;
+    async fn create( &self, info: StarInfo ) -> mpsc::Sender<StarManagerCommand>;
 }
 
 
@@ -2455,7 +2481,7 @@ impl StarManagerFactoryDefault
 #[async_trait]
 impl StarManagerFactory for StarManagerFactoryDefault
 {
-    async fn create( &self, info: StarInfo ) -> mpsc::Sender<SubCommand>
+    async fn create( &self, info: StarInfo ) -> mpsc::Sender<StarManagerCommand>
     {
         let (mut tx,mut rx) = mpsc::channel(32);
         let mut manager:Box<dyn StarManager> = self.create_inner(&info);

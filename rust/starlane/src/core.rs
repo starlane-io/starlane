@@ -8,21 +8,22 @@ use crate::error::Error;
 use crate::frame::{ResourceMessage, StarMessageInner, StarMessagePayload, StarUnwindPayload, StarWindInner, Watch, WatchInfo};
 use crate::id::{Id, IdSeq};
 use crate::entity::EntityKey;
-use crate::star::{StarCommand, StarKey, StarKind};
+use crate::star::{StarCommand, StarKey, StarKind, EntityCommand};
 use std::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 
 
-pub enum CoreCommand
+pub enum StarCoreCommand
 {
     Message(ResourceMessage),
-    Watch(Watch)
+    Watch(Watch),
+    Entity(EntityCommand)
 }
 
 #[async_trait]
 pub trait StarCoreFactory: Sync+Send
 {
-    async fn create( &self, kind: &StarKind ) -> mpsc::Sender<CoreCommand>;
+    async fn create( &self, kind: &StarKind ) -> mpsc::Sender<StarCoreCommand>;
 }
 
 pub struct StarCoreFactoryDefault
@@ -32,7 +33,7 @@ pub struct StarCoreFactoryDefault
 #[async_trait]
 impl StarCoreFactory for StarCoreFactoryDefault
 {
-    async fn create(&self, kind: &StarKind) -> Sender<CoreCommand> {
+    async fn create(&self, kind: &StarKind) -> Sender<StarCoreCommand> {
        let (tx,rx) = mpsc::channel(32);
        let mut core = ServerStarCore{
            command_rx: rx
@@ -50,7 +51,7 @@ impl StarCoreFactory for StarCoreFactoryDefault
 
 pub struct ServerStarCore
 {
-    command_rx: mpsc::Receiver<CoreCommand>
+    command_rx: mpsc::Receiver<StarCoreCommand>
 }
 
 impl ServerStarCore
@@ -60,7 +61,21 @@ impl ServerStarCore
     {
         while let Option::Some(command) = self.command_rx.recv().await
         {
-            //process command
+            match &command
+            {
+                StarCoreCommand::Message(_) => {}
+                StarCoreCommand::Watch(_) => {}
+                StarCoreCommand::Entity(entity_command) => {
+                    match entity_command
+                    {
+                        EntityCommand::Create(create) => {
+
+                            // need to communicate with Ext here...
+
+                        }
+                    }
+                }
+            }
         }
     }
 }

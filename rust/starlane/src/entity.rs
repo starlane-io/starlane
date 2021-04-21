@@ -26,6 +26,13 @@ pub struct EntityKey
     pub id: Id,
 }
 
+pub struct Entity
+{
+  pub info: EntityInfo,
+  pub data: Vec<u8>
+}
+
+
 pub type EntityKindExt = String;
 pub type GatheringKindExt = String;
 
