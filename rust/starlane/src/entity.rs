@@ -7,27 +7,49 @@ use crate::frame::{ResourceMessage, ResourceState, EntityEvent};
 use serde::{Deserialize, Serialize, Serializer};
 use tokio::sync::broadcast::Sender;
 use std::fmt;
+use crate::application::AppKey;
+
+pub static DEFAULT_ENTITY_KIND_EXT: &str = "default";
+pub static DEFAULT_GATHERING_KIND_EXT: &str = "default";
 
 #[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
-pub struct EntityKey
+pub struct EntityInfo
 {
-    pub app_id: Id,
-    pub id: Id,
+    pub key: EntityKey,
     pub kind: EntityKind
 }
 
 #[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
-pub enum EntityKind
+pub struct EntityKey
 {
-    Single,
-    Group
+    pub app: AppKey,
+    pub id: Id,
 }
 
+pub type EntityKindExt = String;
+pub type GatheringKindExt = String;
 
+#[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
+pub enum EntityKind
+{
+    Entity(EntityKindExt),
+    Gathering(GatheringKindExt)
+}
+
+impl EntityKind
+{
+    pub fn default_entity()->Self {
+        EntityKind::Entity(DEFAULT_ENTITY_KIND_EXT.to_string())
+    }
+
+    pub fn default_gathering()-> Self {
+        EntityKind::Entity(DEFAULT_GATHERING_KIND_EXT.to_string())
+    }
+}
 
 impl fmt::Display for EntityKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({},{})", self.app_id, self.id)
+        write!(f, "({},{})", self.app, self.id)
     }
 }
 
@@ -36,7 +58,7 @@ pub struct EntityLocation
 {
     pub entity: EntityKey,
     pub star: StarKey,
-    pub group: Option<EntityKey>,
+    pub gathering: Option<EntityKey>,
     pub ext: Option<Vec<u8>>
 }
 
@@ -48,7 +70,7 @@ impl EntityLocation
             entity: resource,
             star: star,
             ext: Option::None,
-            group: Option::None
+            gathering: Option::None
         }
     }
 
@@ -58,12 +80,12 @@ impl EntityLocation
             entity: resource,
             star: star,
             ext: Option::Some(ext),
-            group: Option::None
+            gathering: Option::None
         }
     }
 }
 
-pub struct EntityGroup
+pub struct EntityGathering
 {
     pub key: EntityKey,
     pub entity: Vec<EntityKey>

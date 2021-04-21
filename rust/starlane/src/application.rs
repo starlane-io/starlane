@@ -6,21 +6,25 @@ use tokio::sync::{oneshot, mpsc};
 use crate::entity::{EntityKey, EntityLocation};
 use serde::{Deserialize, Serialize};
 
-pub enum AppLifecycleCommand
+
+pub type AppKey = Id;
+pub type AppKind = String;
+
+pub enum AppAccessCommand
 {
     Create(AppCreate),
-    Get(AppGet),
-    Destroy(Id)
+    Get(AppGet)
 }
 
 pub enum AppCommand
 {
-    ResourceCreate(ResourceCreate)
+    EntityCreate(EntityCreate),
+    Destroy
 }
 
-pub struct ResourceCreate
+pub struct EntityCreate
 {
-    app_id: Id,
+    app: AppKey,
     data: Vec<u8>,
     pub tx: oneshot::Sender<EntityKey>
 }
@@ -30,6 +34,7 @@ pub struct ResourceCreate
 pub struct AppCreate
 {
     pub name: Option<String>,
+    pub kind: AppKind,
     pub data: Vec<u8>,
     pub tx: mpsc::Sender<AppController>,
 }
@@ -53,14 +58,7 @@ pub enum AppEvent
 
 }
 
-pub struct Application
-{
-    pub app_id: Id,
-    pub tx: Sender<AppLifecycleCommand>,
-    pub rx: Receiver<AppEvent>
-}
-
-pub enum ApplicationState
+pub enum ApplicationStatus
 {
     None,
     Launching,
@@ -68,15 +66,53 @@ pub enum ApplicationState
 }
 
 #[derive(Clone,Serialize,Deserialize)]
+pub struct AppInfo
+{
+    pub key: AppKey,
+    pub kind: AppKind
+}
+
+impl AppInfo
+{
+    pub fn new( key: AppKey, kind: AppKind ) -> Self
+    {
+        AppInfo
+        {
+            key: key,
+            kind: kind
+        }
+    }
+}
+
+pub struct Application
+{
+    pub info: AppInfo,
+    pub data: Vec<u8>
+}
+
+impl Application
+{
+    pub fn new( info: AppInfo, data: Vec<u8> ) -> Self
+    {
+        Application
+        {
+            info: info,
+            data: data
+        }
+    }
+}
+
+
+#[derive(Clone,Serialize,Deserialize)]
 pub struct AppLocation
 {
-    pub app_id: Id,
+    pub app: AppKey,
     pub supervisor: StarKey
 }
 
 #[derive(Clone)]
 pub struct AppController
 {
-    pub app_id: Id,
+    pub app: AppKey,
     pub tx: Sender<AppCommand>
 }

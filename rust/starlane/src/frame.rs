@@ -6,7 +6,7 @@ use crate::entity::{EntityKey, EntityLocation};
 use std::sync::Arc;
 use std::collections::HashMap;
 use tokio::time::Instant;
-use crate::application::AppLocation;
+use crate::application::{AppLocation, AppKey, AppInfo, AppKind};
 
 #[derive(Clone)]
 pub struct Command
@@ -331,7 +331,7 @@ impl EntityLookup
     {
         match self
         {
-            EntityLookup::Key(resource) => resource.app_id.clone(),
+            EntityLookup::Key(resource) => resource.app.clone(),
             EntityLookup::Name(name) => name.app_id.clone()
         }
     }
@@ -400,13 +400,14 @@ pub struct ApplicationLookupIdInner
 pub struct ApplicationCreateRequestInner
 {
     pub name: Option<String>,
+    pub kind: AppKind,
     pub data: Vec<u8>,
 }
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ApplicationAssignInner
 {
-    pub app_id: Id,
+    pub app : AppInfo,
     pub data: Vec<u8>,
     pub notify: Vec<StarKey>,
     pub supervisor: StarKey
@@ -421,13 +422,13 @@ pub struct ApplicationNotifyReadyInner
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ApplicationRequestSupervisorInner
 {
-    pub app_id: Id,
+    pub app: AppKey,
 }
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ApplicationReportSupervisorInner
 {
-    pub app_id: Id,
+    pub app: AppKey,
     pub supervisor: StarKey
 }
 

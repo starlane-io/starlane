@@ -17,7 +17,7 @@ use tokio::sync::mpsc;
 use tokio::time::{Instant, Duration,timeout};
 use url::Url;
 
-use crate::application::{ApplicationState, AppLocation, AppController, AppLifecycleCommand, AppCommand, AppCreate};
+use crate::application::{ApplicationStatus, AppLocation, AppController, AppAccessCommand, AppCommand, AppCreate, AppKind, AppKey, AppInfo, Application};
 use crate::error::Error;
 use crate::frame::{ApplicationAssignInner, ApplicationNotifyReadyInner, ApplicationReportSupervisorInner, ApplicationRequestSupervisorInner, Frame, ProtoFrame, RejectionInner, ResourceBind, EntityEvent, ResourceEventKind, EntityLookup, ResourceMessage, ResourceReportLocation, ResourceRequestLocation, StarMessageInner, StarMessagePayload, SearchHit, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarUnwindInner, StarUnwindPayload, StarWindInner, StarWindPayload, Watch, WatchInfo, ApplicationCreateRequestInner};
 use crate::frame::Frame::{StarMessage, StarSearch};
@@ -222,7 +222,7 @@ pub struct Star
     logger: StarLogger,
     watches: HashMap<EntityKey,HashMap<Id,StarWatchInfo>>,
     entity_locations: LruCache<EntityKey, EntityLocation>,
-    app_locations: LruCache<Id,StarKey>,
+    app_locations: LruCache<AppKey,StarKey>,
     entities: HashSet<EntityKey>,
     core_tx: mpsc::Sender<CoreCommand>,
 }
@@ -307,7 +307,7 @@ impl Star
                         add_entity_location.tx.send( ()).await;
                     }
                     StarCommand::AddAppLocation(add_app_location) => {
-                        self.app_locations.put( add_app_location.app_location.app_id.clone(), add_app_location.app_location.supervisor.clone() );
+                        self.app_locations.put(add_app_location.app_location.app.clone(), add_app_location.app_location.supervisor.clone() );
                         add_app_location.tx.send( add_app_location.app_location ).await;
                     }
                     StarCommand::ReleaseHold(star) => {
@@ -385,12 +385,13 @@ impl Star
         }
     }
 
-    async fn on_app_lifecycle_command( &mut self, command: AppLifecycleCommand )
+    async fn on_app_lifecycle_command( &mut self, command: AppAccessCommand)
     {
         match command
         {
-            AppLifecycleCommand::Create(create) => {
+            AppAccessCommand::Create(create) => {
                 let payload = StarMessagePayload::ApplicationCreateRequest(ApplicationCreateRequestInner{
+                    kind: "default".to_string(),
                     name: create.name,
                     data: create.data
                 });
@@ -406,8 +407,7 @@ impl Star
 
                 self.send(message).await;
             }
-            AppLifecycleCommand::Get(_) => {}
-            AppLifecycleCommand::Destroy(_) => {}
+            AppAccessCommand::Get(_) => {}
         }
 
     }
@@ -1031,7 +1031,7 @@ impl Star
 
     async fn find_app_location(&mut self, app_id: &Id ) -> mpsc::Receiver<AppLocation>
     {
-        let payload = StarMessagePayload::ApplicationRequestSupervisor(ApplicationRequestSupervisorInner{ app_id: app_id.clone() } );
+        let payload = StarMessagePayload::ApplicationRequestSupervisor(ApplicationRequestSupervisorInner{ app: app_id.clone() } );
         let mut message = StarMessageInner::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
         message.transaction = Option::Some(self.info.sequence.next());
 
@@ -1184,7 +1184,7 @@ pub enum StarCommand
     ForwardFrame(ForwardFrame),
     FrameTimeout(FrameTimeoutInner),
     FrameError(FrameErrorInner),
-    AppLifecycleCommand(AppLifecycleCommand),
+    AppLifecycleCommand(AppAccessCommand),
     AppCommand(AppCommand)
 }
 
@@ -1316,13 +1316,14 @@ pub struct StarController
 
 impl StarController
 {
-   pub async fn create_app(&self, name: Option<String>, data: Vec<u8> )->Result<AppController,Error>
+   pub async fn create_app(&self, name: Option<String>, kind: AppKind, data: Vec<u8> )->Result<AppController,Error>
    {
 
        let (tx,mut rx) = mpsc::channel(1);
 
 
-       let app_create = AppLifecycleCommand::Create( AppCreate{
+       let app_create = AppAccessCommand::Create( AppCreate{
+           kind: kind,
            name: Option::Some("app".to_string()),
            data: vec!(),
            tx: tx
@@ -1389,7 +1390,7 @@ impl Transaction for ApplicationSupervisorSearchTransaction
                 command_tx.send( StarCommand::AddAppLocation(AddAppLocation{
                     tx: self.tx.clone(),
                     app_location: AppLocation{
-                        app_id: report.app_id.clone(),
+                        app: report.app.clone(),
                         supervisor: report.supervisor.clone()
                     }
                 })).await;
@@ -1596,7 +1597,7 @@ impl Transaction for AppCreateTransaction
                     if let Option::Some(location) = rx.recv().await
                     {
                         let ctrl = AppController{
-                            app_id: location.app_id.clone(),
+                            app: location.app.clone(),
                             tx: app_tx
                         };
                         app_ctrl_tx.send(ctrl).await;
@@ -1757,7 +1758,8 @@ impl StarManager for CentralManager
                     Ok(())
                 }
                 StarMessagePayload::ApplicationCreateRequest(request) => {
-                    let app_id = self.info.sequence.next();
+                    let app_key = self.info.sequence.next();
+                    let app = AppInfo::new(app_key, request.kind.clone());
                     let supervisor = self.backing.select_supervisor();
                     if let Option::None = supervisor
                     {
@@ -1767,7 +1769,7 @@ impl StarManager for CentralManager
                     } else {
                         if let Some(name) = &request.name
                         {
-                            self.backing.set_application_name_to_app_id(name.clone(),app_id.clone());
+                            self.backing.set_name_to_application(name.clone(), app.clone());
                         }
                         let supervisor = supervisor.unwrap();
                         let message = StarMessageInner {
@@ -1776,7 +1778,7 @@ impl StarManager for CentralManager
                             to: supervisor.clone(),
                             transaction: message.transaction.clone(),
                             payload: StarMessagePayload::ApplicationAssign(ApplicationAssignInner {
-                                app_id: app_id,
+                                app: app,
                                 data: request.data.clone(),
                                 notify: vec![message.from, self.info.star_key.clone()],
                                 supervisor: supervisor.clone()
@@ -1789,28 +1791,28 @@ impl StarManager for CentralManager
                     }
                 }
                 StarMessagePayload::ApplicationNotifyReady(notify) => {
-                    self.backing.set_application_state(notify.location.app_id.clone(), ApplicationState::Ready);
+                    self.backing.set_application_state(notify.location.app.clone(), ApplicationStatus::Ready);
                     Ok(())
                     // do nothing
                 }
                 StarMessagePayload::ApplicationRequestSupervisor(request) => {
                     if let Option::Some(supervisor) = self.backing.select_supervisor()
                     {
-                        message.reply(self.info.sequence.next(), StarMessagePayload::ApplicationReportSupervisor(ApplicationReportSupervisorInner { app_id: request.app_id, supervisor: supervisor.clone() }));
+                        message.reply(self.info.sequence.next(), StarMessagePayload::ApplicationReportSupervisor(ApplicationReportSupervisorInner { app: request.app, supervisor: supervisor.clone() }));
                         self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
                         Ok(())
                     } else {
-                        message.reply(self.info.sequence.next(), StarMessagePayload::Reject(RejectionInner { message: format!("cannot find app_id: {}", request.app_id).to_string() }));
+                        message.reply(self.info.sequence.next(), StarMessagePayload::Reject(RejectionInner { message: format!("cannot find app_id: {}", request.app).to_string() }));
                         self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
                         Ok(())
                     }
                 }
                 StarMessagePayload::ApplicationLookupId(request) => {
                     let app_id = self.backing.get_application_for_name(&request.name);
-                    if let Some(app_id) = app_id
+                    if let Some(app) = app_id
                     {
-                        if let Option::Some(supervisor) = self.backing.get_application_for_supervisor(&app_id) {
-                            message.reply(self.info.sequence.next(), StarMessagePayload::ApplicationReportSupervisor(ApplicationReportSupervisorInner { app_id: app_id.clone(), supervisor: supervisor.clone() }));
+                        if let Option::Some(supervisor) = self.backing.get_supervisor_for_application(&app.key) {
+                            message.reply(self.info.sequence.next(), StarMessagePayload::ApplicationReportSupervisor(ApplicationReportSupervisorInner { app: app.key.clone(), supervisor: supervisor.clone() }));
                             self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
                             Ok(())
                         } else {
@@ -1857,12 +1859,12 @@ trait CentralManagerBacking: Send+Sync
     fn sequence_next(&mut self)->Id;
     fn add_supervisor(&mut self, star: StarKey );
     fn remove_supervisor(&mut self, star: StarKey );
-    fn set_application_for_supervisor(&mut self, app_id: Id, supervisor_star: StarKey );
-    fn get_application_for_supervisor(&self, app_id: &Id) -> Option<&StarKey>;
-    fn set_application_name_to_app_id(&mut self, name: String, app_id: Id );
-    fn set_application_state(&mut self,  app_id: Id, state: ApplicationState );
-    fn get_application_state(&self,  app_id: &Id ) -> Option<&ApplicationState>;
-    fn get_application_for_name(&self,  name: &String ) -> Option<&Id>;
+    fn set_supervisor_for_application(&mut self, app: AppKey, supervisor_star: StarKey );
+    fn get_supervisor_for_application(&self, app: &AppKey) -> Option<&StarKey>;
+    fn set_name_to_application(&mut self, name: String, app: AppInfo);
+    fn set_application_state(&mut self,  app: AppKey, state: ApplicationStatus);
+    fn get_application_state(&self,  app: &AppKey ) -> Option<&ApplicationStatus>;
+    fn get_application_for_name(&self,  name: &String ) -> Option<&AppInfo>;
     fn select_supervisor(&mut self )->Option<StarKey>;
 }
 
@@ -1871,9 +1873,9 @@ pub struct CentralManagerBackingDefault
 {
     info: StarInfo,
     supervisors: Vec<StarKey>,
-    application_to_supervisor: HashMap<Id,StarKey>,
-    application_name_to_app_id : HashMap<String,Id>,
-    application_state: HashMap<Id,ApplicationState>,
+    application_to_supervisor: HashMap<AppKey,StarKey>,
+    application_name_to_app_id : HashMap<String,AppInfo>,
+    application_state: HashMap<AppKey, ApplicationStatus>,
     supervisor_index: usize
 }
 
@@ -1909,27 +1911,27 @@ impl CentralManagerBacking for CentralManagerBackingDefault
         self.supervisors.retain( |s| *s != star );
     }
 
-    fn set_application_for_supervisor(&mut self, app_id: Id, supervisor_star: StarKey) {
-        self.application_to_supervisor.insert( app_id, supervisor_star );
+    fn set_supervisor_for_application(&mut self, app: AppKey, supervisor_star: StarKey) {
+        self.application_to_supervisor.insert( app, supervisor_star );
     }
 
-    fn get_application_for_supervisor(&self, app_id: &Id) -> Option<&StarKey> {
-        self.application_to_supervisor.get(app_id)
+    fn get_supervisor_for_application(&self, app: &AppKey) -> Option<&StarKey> {
+        self.application_to_supervisor.get(app )
     }
 
-    fn set_application_name_to_app_id(&mut self, name: String, app_id: Id) {
-        self.application_name_to_app_id.insert( name, app_id );
+    fn set_name_to_application(&mut self, name: String, app: AppInfo) {
+        self.application_name_to_app_id.insert(name, app);
     }
 
-    fn set_application_state(&mut self, app_id: Id, state: ApplicationState) {
-        self.application_state.insert( app_id, state );
+    fn set_application_state(&mut self, app: AppKey, state: ApplicationStatus) {
+        self.application_state.insert( app, state );
     }
 
-    fn get_application_state(&self, app_id: &Id)->Option<&ApplicationState> {
-        self.application_state.get( app_id )
+    fn get_application_state(&self, app: &AppKey )->Option<&ApplicationStatus> {
+        self.application_state.get( app)
     }
 
-    fn get_application_for_name(&self, name: &String) -> Option<&Id> {
+    fn get_application_for_name(&self, name: &String) -> Option<&AppInfo> {
         self.application_name_to_app_id.get(name)
     }
 
@@ -2010,7 +2012,9 @@ impl SupervisorManager
         match &message.payload
         {
             StarMessagePayload::ApplicationAssign(assign) => {
-                self.backing.add_application(assign.app_id.clone(), assign.data.clone());
+
+                let application = Application::new(assign.app.clone(), assign.data.clone() );
+                self.backing.add_application(assign.app.key.clone(), application);
 
                 // TODO: Now we need to Launch this application in the ext
                 // ext.launch_app()
@@ -2018,7 +2022,7 @@ impl SupervisorManager
                 for notify in &assign.notify
                 {
                     let location = AppLocation{
-                        app_id: assign.app_id.clone(),
+                        app: assign.app.key.clone(),
                         supervisor: assign.supervisor.clone()
                     };
                     let payload = StarMessagePayload::ApplicationNotifyReady(ApplicationNotifyReadyInner{ location: location});
@@ -2071,8 +2075,10 @@ pub trait SupervisorManagerBacking: Send+Sync
     fn remove_server( &mut self, server: &StarKey );
     fn select_server(&mut self) -> Option<StarKey>;
 
-    fn add_application( &mut self, app_id: Id , data: Vec<u8> );
-    fn remove_application( &mut self, app_id: Id );
+    fn add_application(&mut self, app: AppKey, application: Application );
+    fn get_application(&mut self, app: AppKey ) -> Option<&Application>;
+
+    fn remove_application(&mut self, app: AppKey );
 
     fn set_entity_name(&mut self, name: String, key: EntityKey);
     fn set_entity_location(&mut self, entity: EntityKey, location: EntityLocation);
@@ -2084,7 +2090,7 @@ pub struct SupervisorManagerBackingDefault
     info: StarInfo,
     servers: Vec<StarKey>,
     server_select_index: usize,
-    applications: HashSet<Id>,
+    applications: HashMap<AppKey,Application>,
     name_to_entity: HashMap<String, EntityKey>,
     entity_location: HashMap<EntityKey, EntityLocation>
 }
@@ -2097,7 +2103,7 @@ impl SupervisorManagerBackingDefault
             info: info,
             servers: vec![],
             server_select_index: 0,
-            applications: HashSet::new(),
+            applications: HashMap::new(),
             name_to_entity: HashMap::new(),
             entity_location: HashMap::new(),
         }
@@ -2124,12 +2130,16 @@ impl SupervisorManagerBacking for SupervisorManagerBackingDefault
         Option::Some(server.clone())
     }
 
-    fn add_application(&mut self, app_id: Id, data: Vec<u8>) {
-        self.applications.insert(app_id);
+    fn add_application(&mut self, app: AppKey, application: Application ) {
+        self.applications.insert(app, application);
     }
 
-    fn remove_application(&mut self, app_id: Id) {
-        self.applications.remove(&app_id);
+    fn get_application(&mut self, app: AppKey) -> Option<&Application> {
+        self.applications.get(&app)
+    }
+
+    fn remove_application(&mut self, app: AppKey) {
+        self.applications.remove(&app);
     }
 
     fn set_entity_name(&mut self, name: String, key: EntityKey) {

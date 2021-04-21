@@ -434,7 +434,7 @@ mod test
             println!("got mesh_ctrl");
             tokio::time::sleep(Duration::from_secs(1)).await;
 
-            match mesh_ctrl.create_app(Option::None,vec!() ).await
+            match mesh_ctrl.create_app(Option::None,"default".to_string(), vec!() ).await
             {
                 Ok(app_ctrl) => {
                     println!("got app_ctrl!");
