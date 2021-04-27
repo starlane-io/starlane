@@ -3,7 +3,7 @@ use tokio::sync::broadcast;
 use std::sync::Arc;
 use crate::star::StarKey;
 use crate::error::Error;
-use crate::frame::{ResourceMessage, ResourceState, EntityEvent};
+use crate::frame::{EntityMessage, ResourceState, EntityEvent};
 use serde::{Deserialize, Serialize, Serializer};
 use tokio::sync::broadcast::Sender;
 use std::fmt;

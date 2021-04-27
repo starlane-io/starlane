@@ -5,6 +5,7 @@ use crate::star::StarKey;
 use tokio::sync::{oneshot, mpsc};
 use crate::entity::{EntityKey, EntityLocation};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 
 pub type AppKey = Id;
@@ -25,7 +26,7 @@ pub enum AppCommand
 pub struct EntityCreate
 {
     app: AppKey,
-    data: Vec<u8>,
+    data: Arc<Vec<u8>>,
     pub tx: oneshot::Sender<EntityKey>
 }
 

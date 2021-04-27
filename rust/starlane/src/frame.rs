@@ -237,7 +237,7 @@ pub enum StarMessagePayload
    ServerPledgeToSupervisor,
    ResourceStateRequest(EntityKey),
    ResourceEvent(EntityEvent),
-   ResourceMessage(ResourceMessage),
+   ResourceMessage(EntityMessage),
    ResourceRequestLocation(ResourceRequestLocation),
    ResourceReportLocation(EntityLocation)
 }
@@ -344,26 +344,32 @@ pub struct ResourceNameLookup
     pub name: String
 }
 
+
+pub enum EntityFromKind
+{
+    Entity(EntityFrom)
+}
+
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceFrom
+pub struct EntityFrom
 {
     key: EntityKey,
     source: Option<Vec<u8>>
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceTo
+pub struct EntityTo
 {
     key: EntityKey,
     target: Option<Vec<u8>>
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceMessage
+pub struct EntityMessage
 {
     pub id: Id,
-    pub from: ResourceFrom,
-    pub to: ResourceTo,
+    pub from: EntityFromKind,
+    pub to: EntityTo,
     pub payloads: ResourcePayloads,
     pub transaction: Option<Id>
 }

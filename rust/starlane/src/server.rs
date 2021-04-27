@@ -1,15 +1,15 @@
-use crate::frame::{ResourceMessage, EntityEvent};
+use crate::frame::{EntityMessage, EntityEvent};
 use tokio::sync::watch::{Sender, Receiver};
 
 pub enum ServerMessageIn
 {
-   ResourceMessage(ResourceMessage)
+   ResourceMessage(EntityMessage)
 }
 
 pub enum ServerMessageOut
 {
     ResourceEvent(EntityEvent),
-   ResourceMessage(ResourceMessage),
+   ResourceMessage(EntityMessage),
 }
 
 pub struct Server

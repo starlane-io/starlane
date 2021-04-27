@@ -19,14 +19,14 @@ use url::Url;
 
 use crate::application::{ApplicationStatus, AppLocation, AppController, AppAccessCommand, AppCommand, AppCreate, AppKind, AppKey, AppInfo, Application};
 use crate::error::Error;
-use crate::frame::{ApplicationAssignInner, ApplicationNotifyReadyInner, ApplicationReportSupervisorInner, ApplicationRequestSupervisorInner, Frame, ProtoFrame, RejectionInner, ResourceBind, EntityEvent, ResourceEventKind, EntityLookup, ResourceMessage, ResourceReportLocation, ResourceRequestLocation, StarMessageInner, StarMessagePayload, SearchHit, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarUnwindInner, StarUnwindPayload, StarWindInner, StarWindPayload, Watch, WatchInfo, ApplicationCreateRequestInner};
+use crate::frame::{ApplicationAssignInner, ApplicationNotifyReadyInner, ApplicationReportSupervisorInner, ApplicationRequestSupervisorInner, Frame, ProtoFrame, RejectionInner, ResourceBind, EntityEvent, ResourceEventKind, EntityLookup, EntityMessage, ResourceReportLocation, ResourceRequestLocation, StarMessageInner, StarMessagePayload, SearchHit, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarUnwindInner, StarUnwindPayload, StarWindInner, StarWindPayload, Watch, WatchInfo, ApplicationCreateRequestInner};
 use crate::frame::Frame::{StarMessage, StarSearch};
 use crate::frame::ProtoFrame::CentralSearch;
 use crate::frame::StarMessagePayload::{ApplicationCreateRequest, Reject};
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
-use crate::entity::{EntityKey, EntityLocation, EntityWatcher, Entity};
+use crate::entity::{EntityKey, EntityLocation, EntityWatcher, Entity, EntityKind};
 use futures::prelude::future::FusedFuture;
 use crate::core::StarCoreCommand;
 use std::collections::hash_map::RandomState;
@@ -34,16 +34,24 @@ use std::cell::Cell;
 use std::borrow::Borrow;
 use tokio::time::error::Elapsed;
 
+
+
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
 pub enum StarKind
 {
     Central,
     Mesh,
     Supervisor,
-    Server,
+    Server(ServerKindExt),
     Gateway,
     Link,
     Client
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
+pub struct ServerKindExt
+{
+   pub name: String
 }
 
 impl StarKind
@@ -1194,22 +1202,24 @@ pub enum StarCommand
 
 pub enum EntityCommand
 {
-   Create(Entity)
+   Create(EntityCreate)
 }
 
 pub struct EntityCreate
 {
     pub app: AppKey,
-    pub entity: Entity
+    pub kind: EntityKind,
+    pub data: Vec<u8>
 }
 
 impl EntityCreate
 {
-    pub fn new(app:AppKey,entity:Entity) -> Self
+    pub fn new(app:AppKey, kind:EntityKind, data:Vec<u8>) -> Self
     {
         EntityCreate{
             app: app,
-            entity: entity
+            kind: kind,
+            data: data
         }
     }
 }
@@ -1303,12 +1313,21 @@ impl fmt::Display for StarManagerCommand {
             StarManagerCommand::Frame(frame) => format!("Frame({})", frame).to_string(),
             StarManagerCommand::SupervisorCommand(_) => "SupervisorCommand".to_string(),
             StarManagerCommand::ServerCommand(_) => "ServerCommand".to_string(),
-            StarManagerCommand::Init => "Init".to_string()
+            StarManagerCommand::Init => "Init".to_string(),
+            StarManagerCommand::EntityCommand(command) => format!("EntityCommand({})",command).to_string()
         };
         write!(f, "{}",r)
     }
 }
 
+impl fmt::Display for EntityCommand{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let r = match self {
+            EntityCommand::Create(_) => format!("Create(_)").to_string()
+        };
+        write!(f, "{}",r)
+    }
+}
 
 impl fmt::Display for StarCommand{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1328,7 +1347,8 @@ impl fmt::Display for StarCommand{
             StarCommand::ForwardFrame(_) => format!("ForwardFrame").to_string(),
             StarCommand::AppLifecycleCommand(_) => format!("AppLifecycleCommand").to_string(),
             StarCommand::AppCommand(_) => format!("AppCommand").to_string(),
-            StarCommand::SearchReturnResult(_) => format!("SearchReturnResult").to_string()
+            StarCommand::SearchReturnResult(_) => format!("SearchReturnResult").to_string(),
+            StarCommand::EntityCommand(command) => format!("EntityCommand({})",command).to_string(),
         };
         write!(f, "{}",r)
     }

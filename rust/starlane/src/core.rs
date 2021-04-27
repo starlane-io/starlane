@@ -5,25 +5,88 @@ use tokio::sync::mpsc;
 
 use crate::application::ApplicationStatus;
 use crate::error::Error;
-use crate::frame::{ResourceMessage, StarMessageInner, StarMessagePayload, StarUnwindPayload, StarWindInner, Watch, WatchInfo};
+use crate::frame::{EntityMessage, StarMessageInner, StarMessagePayload, StarUnwindPayload, StarWindInner, Watch, WatchInfo};
 use crate::id::{Id, IdSeq};
-use crate::entity::EntityKey;
-use crate::star::{StarCommand, StarKey, StarKind, EntityCommand};
+use crate::entity::{EntityKey, Entity};
+use crate::star::{StarCommand, StarKey, StarKind, EntityCommand, EntityCreate};
 use std::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
+use tokio::runtime::Runtime;
+use tokio::time::Duration;
+use std::future::Future;
 
 
 pub enum StarCoreCommand
 {
-    Message(ResourceMessage),
+    Message(EntityMessage),
     Watch(Watch),
     Entity(EntityCommand)
 }
 
+
+pub struct CoreRunner
+{
+    runtime: Option<Runtime>,
+    factory: Box<dyn StarCoreFactory>
+}
+
+impl CoreRunner
+{
+    pub fn start(&mut self)
+    {
+        if self.runtime.is_some()
+        {
+            return;
+        }
+
+        self.runtime = Option::new(Runtime::new().unwrap());
+    }
+
+    pub fn stop(&mut self)
+    {
+        if let Some(runtime) = &self.runtime
+        {
+            runtime.shutdown_timeout(Duration::from_secs(15));
+            self.runtime = Option::None;
+        }
+    }
+
+    fn run(&mut self, future: Box<dyn Future>) ->Result<(),Error>
+    {
+        if let Some(runtime)=&mut self.runtime
+        {
+            let runtime = self.runtime.unwrap();
+            runtime.spawn(future);
+            Ok(())
+        }
+        else {
+            Err("CoreRunner: runtime has not been started.".into())
+        }
+    }
+
+    pub fn create(&mut self, kind: &StarKind, star_tx: mpsc::Sender<StarCommand> )->mpsc::Sender<StarCoreCommand>
+    {
+
+    }
+}
+
+
+pub trait StarCoreExt: Sync+Send
+{
+}
+
+pub trait EntityStarCoreExt: StarCoreExt
+{
+    fn create_entity( &mut self, create: EntityCreate ) -> Result<EntityKey,Error>;
+    fn message(&mut self, message: EntityMessage) -> Result<(),Error>;
+    fn watch( &mut self, watch: Watch ) -> Result<(),Error>;
+}
+
+
 #[async_trait]
 pub trait StarCoreFactory: Sync+Send
 {
-    async fn create( &self, kind: &StarKind ) -> mpsc::Sender<StarCoreCommand>;
+    fn create( &self, kind: &StarKind, star_tx: mpsc::Sender<StarCommand> ) -> mpsc::Sender<StarCoreCommand>;
 }
 
 pub struct StarCoreFactoryDefault
@@ -33,15 +96,13 @@ pub struct StarCoreFactoryDefault
 #[async_trait]
 impl StarCoreFactory for StarCoreFactoryDefault
 {
-    async fn create(&self, kind: &StarKind) -> Sender<StarCoreCommand> {
+    fn create(&self, kind: &StarKind, star_tx: mpsc::Sender<StarCommand>) -> Sender<StarCoreCommand> {
        let (tx,rx) = mpsc::channel(32);
        let mut core = ServerStarCore{
            command_rx: rx
        };
 
-       tokio::spawn( async move {
-           core.run().await
-       } );
+      // instance runtime here
 
        tx
     }
