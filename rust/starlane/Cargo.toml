@@ -3,6 +3,11 @@ name = "starlane"
 version = "0.1.0"
 authors = ["Scott Williams <scott@mightydevco.com>"]
 edition = "2018"
+description = "Starlane is a messaging framework built to faciliate realtime communication between the various components of a distributed application."
+homepage = "http://starlane.io"
+repository = "https://github.com/mechtronium/starlane"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
