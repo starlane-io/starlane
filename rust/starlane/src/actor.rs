@@ -39,18 +39,18 @@ pub type GatheringKindExt = String;
 #[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
 pub enum ActorKind
 {
-    Entity(ActorKindExt),
+    Actor(ActorKindExt),
     Gathering(GatheringKindExt)
 }
 
 impl ActorKind
 {
     pub fn default_entity()->Self {
-        ActorKind::Entity(DEFAULT_ENTITY_KIND_EXT.to_string())
+        ActorKind::Actor(DEFAULT_ENTITY_KIND_EXT.to_string())
     }
 
     pub fn default_gathering()-> Self {
-        ActorKind::Entity(DEFAULT_GATHERING_KIND_EXT.to_string())
+        ActorKind::Actor(DEFAULT_GATHERING_KIND_EXT.to_string())
     }
 }
 
