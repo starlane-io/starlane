@@ -5,9 +5,9 @@ use tokio::sync::mpsc;
 
 use crate::application::ApplicationStatus;
 use crate::error::Error;
-use crate::frame::{EntityMessage, StarMessage, StarMessagePayload, StarUnwindPayload, StarWind, Watch, WatchInfo};
+use crate::frame::{ActorMessage, StarMessage, StarMessagePayload, StarUnwindPayload, StarWind, Watch, WatchInfo};
 use crate::id::{Id, IdSeq};
-use crate::entity::{EntityKey, Entity};
+use crate::actor::{ActorKey, Actor};
 use crate::star::{StarCommand, StarKey, StarKind, EntityCommand, EntityCreate};
 use std::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
@@ -18,7 +18,7 @@ use std::future::Future;
 
 pub enum StarCoreCommand
 {
-    Message(EntityMessage),
+    Message(ActorMessage),
     Watch(Watch),
     Entity(EntityCommand)
 }
@@ -51,7 +51,7 @@ impl CoreRunner
         }
     }
 
-    fn run(&mut self, future: Box<dyn Future>) ->Result<(),Error>
+    fn run(&mut self, future: Box<dyn Future<Output=()>>) ->Result<(),Error>
     {
         if let Some(runtime)=&mut self.runtime
         {
@@ -64,9 +64,10 @@ impl CoreRunner
         }
     }
 
-    pub fn create(&mut self, kind: &StarKind, star_tx: mpsc::Sender<StarCommand> )->mpsc::Sender<StarCoreCommand>
+    pub fn create(&mut self, kind: &StarKind )->mpsc::Sender<StarCoreCommand>
     {
-
+        let (tx,rx) = mpsc::channel(32);
+        self.factory.create(kind,tx)
     }
 }
 
@@ -77,8 +78,8 @@ pub trait StarCoreExt: Sync+Send
 
 pub trait EntityStarCoreExt: StarCoreExt
 {
-    fn create_entity( &mut self, create: EntityCreate ) -> Result<EntityKey,Error>;
-    fn message(&mut self, message: EntityMessage) -> Result<(),Error>;
+    fn create_entity( &mut self, create: EntityCreate ) -> Result<ActorKey,Error>;
+    fn message(&mut self, message: ActorMessage) -> Result<(),Error>;
     fn watch( &mut self, watch: Watch ) -> Result<(),Error>;
 }
 

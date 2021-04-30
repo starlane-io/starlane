@@ -3,7 +3,7 @@ use tokio::sync::broadcast;
 use std::sync::Arc;
 use crate::star::StarKey;
 use crate::error::Error;
-use crate::frame::{EntityMessage, ResourceState, EntityEvent};
+use crate::frame::{ActorMessage, ActorState, ActorEvent};
 use serde::{Deserialize, Serialize, Serializer};
 use tokio::sync::broadcast::Sender;
 use std::fmt;
@@ -13,78 +13,78 @@ pub static DEFAULT_ENTITY_KIND_EXT: &str = "default";
 pub static DEFAULT_GATHERING_KIND_EXT: &str = "default";
 
 #[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
-pub struct EntityInfo
+pub struct ActorInfo
 {
-    pub key: EntityKey,
-    pub kind: EntityKind
+    pub key: ActorKey,
+    pub kind: ActorKind
 }
 
 #[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
-pub struct EntityKey
+pub struct ActorKey
 {
     pub app: AppKey,
     pub id: Id,
 }
 
-pub struct Entity
+pub struct Actor
 {
-  pub info: EntityInfo,
+  pub info: ActorInfo,
   pub data: Vec<u8>
 }
 
 
-pub type EntityKindExt = String;
+pub type ActorKindExt = String;
 pub type GatheringKindExt = String;
 
 #[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
-pub enum EntityKind
+pub enum ActorKind
 {
-    Entity(EntityKindExt),
+    Entity(ActorKindExt),
     Gathering(GatheringKindExt)
 }
 
-impl EntityKind
+impl ActorKind
 {
     pub fn default_entity()->Self {
-        EntityKind::Entity(DEFAULT_ENTITY_KIND_EXT.to_string())
+        ActorKind::Entity(DEFAULT_ENTITY_KIND_EXT.to_string())
     }
 
     pub fn default_gathering()-> Self {
-        EntityKind::Entity(DEFAULT_GATHERING_KIND_EXT.to_string())
+        ActorKind::Entity(DEFAULT_GATHERING_KIND_EXT.to_string())
     }
 }
 
-impl fmt::Display for EntityKey {
+impl fmt::Display for ActorKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({},{})", self.app, self.id)
     }
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct EntityLocation
+pub struct ActorLocation
 {
-    pub entity: EntityKey,
+    pub actor: ActorKey,
     pub star: StarKey,
-    pub gathering: Option<EntityKey>,
+    pub gathering: Option<ActorKey>,
     pub ext: Option<Vec<u8>>
 }
 
-impl EntityLocation
+impl ActorLocation
 {
-    pub fn new(resource: EntityKey, star: StarKey ) ->Self
+    pub fn new(resource: ActorKey, star: StarKey ) ->Self
     {
-        EntityLocation {
-            entity: resource,
+        ActorLocation {
+            actor: resource,
             star: star,
             ext: Option::None,
             gathering: Option::None
         }
     }
 
-    pub fn new_ext(resource: EntityKey, star: StarKey, ext: Vec<u8>) -> Self
+    pub fn new_ext(resource: ActorKey, star: StarKey, ext: Vec<u8>) -> Self
     {
-        EntityLocation {
-            entity: resource,
+        ActorLocation {
+            actor: resource,
             star: star,
             ext: Option::Some(ext),
             gathering: Option::None
@@ -92,34 +92,34 @@ impl EntityLocation
     }
 }
 
-pub struct EntityGathering
+pub struct ActorGathering
 {
-    pub key: EntityKey,
-    pub entity: Vec<EntityKey>
+    pub key: ActorKey,
+    pub entity: Vec<ActorKey>
 }
 
 
-pub struct EntityWatcher
+pub struct ActorWatcher
 {
-    pub entity: EntityKey,
-    pub tx: Sender<EntityEvent>
+    pub entity: ActorKey,
+    pub tx: Sender<ActorEvent>
 }
 
-impl EntityWatcher
+impl ActorWatcher
 {
-    pub fn new(entity: EntityKey) ->(Self, broadcast::Receiver<EntityEvent>)
+    pub fn new(entity: ActorKey) ->(Self, broadcast::Receiver<ActorEvent>)
     {
         let (tx,rx) = broadcast::channel(32);
-        (EntityWatcher {
+        (ActorWatcher {
             entity,
             tx: tx
         }, rx)
     }
 }
 
-impl EntityWatcher
+impl ActorWatcher
 {
-    pub fn notify( &self, event: EntityEvent)
+    pub fn notify( &self, event: ActorEvent)
     {
         self.tx.send(event);
     }

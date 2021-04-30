@@ -3,7 +3,7 @@ use tokio::sync::mpsc::{Sender};
 use tokio::sync::broadcast::{Receiver};
 use crate::star::StarKey;
 use tokio::sync::{oneshot, mpsc};
-use crate::entity::{EntityKey, EntityLocation};
+use crate::actor::{ActorKey, ActorLocation};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -19,7 +19,7 @@ pub enum AppAccessCommand
 
 pub enum AppCommand
 {
-    EntityCreate(EntityCreate),
+    ActorCreate(EntityCreate),
     Destroy
 }
 
@@ -27,7 +27,7 @@ pub struct EntityCreate
 {
     app: AppKey,
     data: Arc<Vec<u8>>,
-    pub tx: oneshot::Sender<EntityKey>
+    pub tx: oneshot::Sender<ActorKey>
 }
 
 

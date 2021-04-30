@@ -16,7 +16,6 @@ use tokio::time::{Duration, Instant};
 use crate::constellation::Constellation;
 use crate::error::Error;
 use crate::frame::{Frame, ProtoFrame, StarMessage, StarMessagePayload, SearchHit, StarSearch, StarSearchPattern, StarSearchResult, StarUnwindPayload, StarWind, StarWindPayload};
-use crate::frame::Frame::{StarMessage, StarSearch, StarWind};
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelReceiver, TunnelSender, TunnelSenderState};
 use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarLogger, StarSearchTransaction, Transaction, StarManagerFactory};
@@ -346,10 +345,10 @@ impl ProtoStar
             Frame::Proto(ProtoFrame::CentralSearch) => {
                 self.send_frame_no_hold(&StarKey::central(), frame ).await;
             }
-            StarMessage(message) => {
+            Frame::StarMessage(message) => {
                 self.send_no_hold(message).await;
             }
-            StarWind(wind) => {
+            Frame::StarWind(wind) => {
                 self.send_frame_no_hold(&wind.to.clone(), Frame::StarWind(wind) ).await;
             }
 

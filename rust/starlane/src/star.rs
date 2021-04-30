@@ -19,14 +19,11 @@ use url::Url;
 
 use crate::application::{ApplicationStatus, AppLocation, AppController, AppAccessCommand, AppCommand, AppCreate, AppKind, AppKey, AppInfo, Application};
 use crate::error::Error;
-use crate::frame::{ApplicationAssign, ApplicationNotifyReady, ApplicationReportSupervisor, ApplicationRequestSupervisor, Frame, ProtoFrame, Rejection, ResourceBind, EntityEvent, ResourceEventKind, EntityLookup, EntityMessage, ResourceReportLocation, EntityRequestLocation, StarMessage, StarMessagePayload, SearchHit, StarSearch, StarSearchPattern, StarSearchResult, StarUnwind, StarUnwindPayload, StarWind, StarWindPayload, Watch, WatchInfo, ApplicationCreateRequest};
-use crate::frame::Frame::{StarMessage, StarSearch};
-use crate::frame::ProtoFrame::CentralSearch;
-use crate::frame::StarMessagePayload::{ApplicationCreateRequest, Reject};
+use crate::frame::{ApplicationAssign, ApplicationNotifyReady, ApplicationSupervisorReport, ApplicationSupervisorRequest, Frame, ProtoFrame, Rejection, ActorBind, ActorEvent, ActorEventKind, ActorLookup, ActorMessage, ActorLocationReport, ActorLocationRequest, StarMessage, StarMessagePayload, SearchHit, StarSearch, StarSearchPattern, StarSearchResult, StarUnwind, StarUnwindPayload, StarWind, StarWindPayload, Watch, WatchInfo, ApplicationCreateRequest};
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
-use crate::entity::{EntityKey, EntityLocation, EntityWatcher, Entity, EntityKind};
+use crate::actor::{ActorKey, ActorLocation, ActorWatcher, Actor, ActorKind};
 use futures::prelude::future::FusedFuture;
 use crate::core::StarCoreCommand;
 use std::collections::hash_map::RandomState;
@@ -114,7 +111,7 @@ impl StarKind
 
     pub fn server_result(&self)->Result<(),Error>
     {
-        if let StarKind::Server= self
+        if let StarKind::Server(_)= self
         {
             Ok(())
         }
@@ -143,7 +140,7 @@ impl StarKind
             StarKind::Central => false,
             StarKind::Mesh => true,
             StarKind::Supervisor => false,
-            StarKind::Server => true,
+            StarKind::Server(_) => true,
             StarKind::Gateway => true,
             StarKind::Client => true,
             StarKind::Link => true,
@@ -158,7 +155,7 @@ impl fmt::Display for StarKind{
             StarKind::Central => "Central".to_string(),
             StarKind::Mesh => "Mesh".to_string(),
             StarKind::Supervisor => "Supervisor".to_string(),
-            StarKind::Server => "Server".to_string(),
+            StarKind::Server(_) => "Server".to_string(),
             StarKind::Gateway => "Gateway".to_string(),
             StarKind::Link => "Link".to_string(),
             StarKind::Client => "Client".to_string(),
@@ -178,11 +175,11 @@ impl fmt::Display for StarSearchPattern{
 }
 
 
-impl fmt::Display for EntityLookup {
+impl fmt::Display for ActorLookup {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self{
-            EntityLookup::Key(entity) => format!("Key({})", entity).to_string(),
-            EntityLookup::Name(lookup) => {format!("Name({})", lookup.name).to_string()}
+            ActorLookup::Key(entity) => format!("Key({})", entity).to_string(),
+            ActorLookup::Name(lookup) => {format!("Name({})", lookup.name).to_string()}
         };
         write!(f, "{}",r)
     }
@@ -228,10 +225,10 @@ pub struct Star
     transactions: HashMap<Id,Box<dyn Transaction>>,
     frame_hold: FrameHold,
     logger: StarLogger,
-    watches: HashMap<EntityKey,HashMap<Id,StarWatchInfo>>,
-    entity_locations: LruCache<EntityKey, EntityLocation>,
+    watches: HashMap<ActorKey,HashMap<Id,StarWatchInfo>>,
+    entity_locations: LruCache<ActorKey, ActorLocation>,
     app_locations: LruCache<AppKey,StarKey>,
-    entities: HashSet<EntityKey>,
+    entities: HashSet<ActorKey>,
     core_tx: mpsc::Sender<StarCoreCommand>,
 }
 
@@ -265,7 +262,7 @@ impl Star
         }
     }
 
-    pub fn has_entities(&self, key: &EntityKey) -> bool
+    pub fn has_entities(&self, key: &ActorKey) -> bool
     {
         self.entities.contains(&key)
     }
@@ -311,7 +308,7 @@ impl Star
                         self.connector_ctrls.push(connector_ctrl);
                     }
                     StarCommand::AddEntityLocation(add_entity_location) => {
-                        self.entity_locations.put(add_entity_location.entity_location.entity.clone(), add_entity_location.entity_location.clone() );
+                        self.entity_locations.put(add_entity_location.entity_location.actor.clone(), add_entity_location.entity_location.clone() );
                         add_entity_location.tx.send( ()).await;
                     }
                     StarCommand::AddAppLocation(add_app_location) => {
@@ -926,7 +923,7 @@ impl Star
         }
     }
 
-    async fn on_event(&mut self, event: EntityEvent, lane_key: StarKey  )
+    async fn on_event(&mut self, event: ActorEvent, lane_key: StarKey  )
     {
         let watches = self.watches.get(&event.entity);
 
@@ -939,7 +936,7 @@ impl Star
 
             for lane in stars
             {
-                self.send_frame( lane.clone(), Frame::EntityEvent(event.clone()));
+                self.send_frame( lane.clone(), Frame::ActorEvent(event.clone()));
             }
         }
     }
@@ -1014,7 +1011,7 @@ impl Star
         }
         else
         {
-            let lookup = EntityLookup::Key(entity.clone());
+            let lookup = ActorLookup::Key(entity.clone());
             let location = self.get_entity_location(lookup.clone() );
 
 
@@ -1042,7 +1039,7 @@ impl Star
 
     async fn find_app_location(&mut self, app_id: &Id ) -> mpsc::Receiver<AppLocation>
     {
-        let payload = StarMessagePayload::ApplicationRequestSupervisor(ApplicationRequestSupervisor { app: app_id.clone() } );
+        let payload = StarMessagePayload::ApplicationSupervisorRequest(ApplicationSupervisorRequest { app: app_id.clone() } );
         let mut message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
         message.transaction = Option::Some(self.info.sequence.next());
 
@@ -1055,9 +1052,9 @@ impl Star
         rx
     }
 
-    fn get_entity_location(&mut self, kind: EntityLookup) -> Option<&EntityLocation>
+    fn get_entity_location(&mut self, kind: ActorLookup) -> Option<&ActorLocation>
     {
-        if let EntityLookup::Key(entity) = &kind
+        if let ActorLookup::Key(entity) = &kind
         {
             self.entity_locations.get(entity)
         }
@@ -1066,7 +1063,7 @@ impl Star
         }
     }
 
-    async fn find_entity_location(&mut self, kind: EntityLookup) -> mpsc::Receiver<()>
+    async fn find_entity_location(&mut self, kind: ActorLookup) -> mpsc::Receiver<()>
     {
 
         let supervisor_star = self.get_app_location(&kind.app_id() ).cloned();
@@ -1086,7 +1083,7 @@ impl Star
                 xr
             }
             Some(supervisor_star) => {
-                let payload = StarMessagePayload::EntityRequestLocation(EntityRequestLocation { lookup: kind } );
+                let payload = StarMessagePayload::ActorLocationRequest(ActorLocationRequest { lookup: kind } );
                 let mut message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), supervisor_star, payload );
                 message.transaction = Option::Some(self.info.sequence.next());
                 let (transaction,rx) =  ResourceLocationRequestTransaction::new();
@@ -1208,13 +1205,13 @@ pub enum EntityCommand
 pub struct EntityCreate
 {
     pub app: AppKey,
-    pub kind: EntityKind,
+    pub kind: ActorKind,
     pub data: Vec<u8>
 }
 
 impl EntityCreate
 {
-    pub fn new(app:AppKey, kind:EntityKind, data:Vec<u8>) -> Self
+    pub fn new(app:AppKey, kind: ActorKind, data:Vec<u8>) -> Self
     {
         EntityCreate{
             app: app,
@@ -1233,7 +1230,7 @@ pub struct ForwardFrame
 pub struct AddEntityLocation
 {
     pub tx: mpsc::Sender<()>,
-    pub entity_location: EntityLocation
+    pub entity_location: ActorLocation
 }
 
 
@@ -1431,7 +1428,7 @@ impl Transaction for ApplicationSupervisorSearchTransaction
 
         if let Frame::StarMessage( message ) = frame
         {
-            if let StarMessagePayload::ApplicationReportSupervisor(report) = &message.payload
+            if let StarMessagePayload::ApplicationSupervisorReport(report) = &message.payload
             {
                 command_tx.send( StarCommand::AddAppLocation(AddAppLocation{
                     tx: self.tx.clone(),
@@ -1470,7 +1467,7 @@ impl Transaction for ResourceLocationRequestTransaction
 
         if let Frame::StarMessage( message ) = frame
         {
-            if let StarMessagePayload::EntityReportLocation(location ) = &message.payload
+            if let StarMessagePayload::ActorLocationReport(location ) = &message.payload
             {
                 command_tx.send( StarCommand::AddEntityLocation(AddEntityLocation { tx: self.tx.clone(), entity_location: location.clone() })).await;
             }
@@ -1841,10 +1838,10 @@ impl StarManager for CentralManager
                     Ok(())
                     // do nothing
                 }
-                StarMessagePayload::ApplicationRequestSupervisor(request) => {
+                StarMessagePayload::ApplicationSupervisorRequest(request) => {
                     if let Option::Some(supervisor) = self.backing.select_supervisor()
                     {
-                        message.reply(self.info.sequence.next(), StarMessagePayload::ApplicationReportSupervisor(ApplicationReportSupervisor { app: request.app, supervisor: supervisor.clone() }));
+                        message.reply(self.info.sequence.next(), StarMessagePayload::ApplicationSupervisorReport(ApplicationSupervisorReport { app: request.app, supervisor: supervisor.clone() }));
                         self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
                         Ok(())
                     } else {
@@ -1858,7 +1855,7 @@ impl StarManager for CentralManager
                     if let Some(app) = app_id
                     {
                         if let Option::Some(supervisor) = self.backing.get_supervisor_for_application(&app.key) {
-                            message.reply(self.info.sequence.next(), StarMessagePayload::ApplicationReportSupervisor(ApplicationReportSupervisor { app: app.key.clone(), supervisor: supervisor.clone() }));
+                            message.reply(self.info.sequence.next(), StarMessagePayload::ApplicationSupervisorReport(ApplicationSupervisorReport { app: app.key.clone(), supervisor: supervisor.clone() }));
                             self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
                             Ok(())
                         } else {
@@ -2045,6 +2042,9 @@ impl StarManager for SupervisorManager
             StarManagerCommand::ServerCommand(_) => {
                 Err(format!("{} manager does not know how to handle : {}", self.info.kind, command).into())
             }
+            StarManagerCommand::EntityCommand(_) => {
+                Err(format!("{} manager does not know how to handle : {}", self.info.kind, command).into())
+            }
         }
     }
 }
@@ -2084,12 +2084,12 @@ impl SupervisorManager
                 self.backing.add_server(message.from.clone());
                 Ok(())
             }
-            StarMessagePayload::EntityReportLocation(report) =>
+            StarMessagePayload::ActorLocationReport(report) =>
             {
-                    self.backing.set_entity_location(report.entity.clone(), report.clone());
+                    self.backing.set_entity_location(report.actor.clone(), report.clone());
                     Ok(())
             }
-            StarMessagePayload::EntityRequestLocation(request) =>
+            StarMessagePayload::ActorLocationRequest(request) =>
                 {
 
                     let location = self.backing.get_entity_location(&request.lookup);
@@ -2101,7 +2101,7 @@ impl SupervisorManager
                         }
                         Some(location) => {
                             let location = location.clone();
-                            let payload = StarMessagePayload::EntityReportLocation(location);
+                            let payload = StarMessagePayload::ActorLocationReport(location);
                             message.reply( self.info.sequence.next(), payload );
                             self.info.command_tx.send( StarCommand::Frame(Frame::StarMessage(message))).await?;
                         }
@@ -2126,9 +2126,9 @@ pub trait SupervisorManagerBacking: Send+Sync
 
     fn remove_application(&mut self, app: AppKey );
 
-    fn set_entity_name(&mut self, name: String, key: EntityKey);
-    fn set_entity_location(&mut self, entity: EntityKey, location: EntityLocation);
-    fn get_entity_location(&self, lookup: &EntityLookup) -> Option<&EntityLocation>;
+    fn set_entity_name(&mut self, name: String, key: ActorKey);
+    fn set_entity_location(&mut self, entity: ActorKey, location: ActorLocation);
+    fn get_entity_location(&self, lookup: &ActorLookup) -> Option<&ActorLocation>;
 }
 
 pub struct SupervisorManagerBackingDefault
@@ -2137,8 +2137,8 @@ pub struct SupervisorManagerBackingDefault
     servers: Vec<StarKey>,
     server_select_index: usize,
     applications: HashMap<AppKey,Application>,
-    name_to_entity: HashMap<String, EntityKey>,
-    entity_location: HashMap<EntityKey, EntityLocation>
+    name_to_entity: HashMap<String, ActorKey>,
+    entity_location: HashMap<ActorKey, ActorLocation>
 }
 
 impl SupervisorManagerBackingDefault
@@ -2188,21 +2188,21 @@ impl SupervisorManagerBacking for SupervisorManagerBackingDefault
         self.applications.remove(&app);
     }
 
-    fn set_entity_name(&mut self, name: String, key: EntityKey) {
+    fn set_entity_name(&mut self, name: String, key: ActorKey) {
         self.name_to_entity.insert(name, key );
     }
 
-    fn set_entity_location(&mut self, entity: EntityKey, location: EntityLocation) {
+    fn set_entity_location(&mut self, entity: ActorKey, location: ActorLocation) {
         self.entity_location.insert(entity, location );
     }
 
-    fn get_entity_location(&self, lookup: &EntityLookup) -> Option<&EntityLocation> {
+    fn get_entity_location(&self, lookup: &ActorLookup) -> Option<&ActorLocation> {
         match lookup
         {
-            EntityLookup::Key(key) => {
+            ActorLookup::Key(key) => {
                 return self.entity_location.get(key)
             }
-            EntityLookup::Name(lookup) => {
+            ActorLookup::Name(lookup) => {
 
                 if let Some(key) = self.name_to_entity.get(&lookup.name)
                 {
@@ -2488,7 +2488,7 @@ impl StarManagerFactoryDefault
         {
             return Box::new(SupervisorManager::new(info.clone()));
         }
-        else if let StarKind::Server= info.kind
+        else if let StarKind::Server(_)= info.kind
         {
             return Box::new(ServerManager::new(info.clone()));
         }

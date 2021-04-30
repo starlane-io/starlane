@@ -2,7 +2,7 @@ use crate::id::Id;
 use std::fmt;
 use crate::star::{StarKey, StarKind, StarWatchInfo};
 use serde::{Deserialize, Serialize, Serializer};
-use crate::entity::{EntityKey, EntityLocation};
+use crate::actor::{ActorKey, ActorLocation};
 use std::sync::Arc;
 use std::collections::HashMap;
 use tokio::time::Instant;
@@ -40,7 +40,7 @@ pub enum Frame
     StarWind(StarWind),
     StarUnwind(StarUnwind),
     Watch(Watch),
-    EntityEvent(EntityEvent)
+    ActorEvent(ActorEvent)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -54,7 +54,7 @@ pub enum Watch
 pub struct WatchInfo
 {
     pub id: Id,
-    pub entity: EntityKey,
+    pub entity: ActorKey,
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -231,115 +231,115 @@ pub enum StarMessagePayload
    ApplicationCreateRequest(ApplicationCreateRequest),
    ApplicationAssign(ApplicationAssign),
    ApplicationNotifyReady(ApplicationNotifyReady),
-   ApplicationRequestSupervisor(ApplicationRequestSupervisor),
-   ApplicationReportSupervisor(ApplicationReportSupervisor),
+   ApplicationSupervisorRequest(ApplicationSupervisorRequest),
+   ApplicationSupervisorReport(ApplicationSupervisorReport),
    ApplicationLookup(ApplicationLookup),
    ApplicationRequestLaunch(ApplicationRequestLaunch),
    ServerPledgeToSupervisor,
-   EntityStateRequest(EntityKey),
-   EntityEvent(EntityEvent),
-   EntityMessage(EntityMessage),
-   EntityRequestLocation(EntityRequestLocation),
-   EntityReportLocation(EntityLocation)
+   ActorStateRequest(ActorKey),
+   ActorEvent(ActorEvent),
+   ActorMessage(ActorMessage),
+   ActorLocationRequest(ActorLocationRequest),
+   ActorLocationReport(ActorLocation)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct EntityEvent
+pub struct ActorEvent
 {
-    pub entity: EntityKey,
-    pub kind: ResourceEventKind,
+    pub entity: ActorKey,
+    pub kind: ActorEventKind,
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum ResourceEventKind
+pub enum ActorEventKind
 {
-   ResourceStateChange(ResourceState),
-   ResourceGathered(ResourceGathered),
-   ResourceScattered(ResourceScattered),
-   Broadcast(ResourceBroadcast)
+   StateChange(ActorState),
+   Gathered(ActorGathered),
+   Scattered(ActorScattered),
+   Broadcast(ActorBroadcast)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceState
+pub struct ActorState
 {
-    pub payloads: ResourcePayloads
+    pub payloads: ActorPayloads
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceGathered
+pub struct ActorGathered
 {
-    pub to: EntityKey
+    pub to: ActorKey
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceScattered
+pub struct ActorScattered
 {
-    pub from : EntityKey
+    pub from : ActorKey
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceBroadcast
+pub struct ActorBroadcast
 {
     pub topic: String,
-    pub payloads: ResourcePayloads
+    pub payloads: ActorPayloads
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourcePayloads
+pub struct ActorPayloads
 {
-    pub map: HashMap<String,ResourcePayload>
+    pub map: HashMap<String, ActorPayload>
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourcePayload
+pub struct ActorPayload
 {
     pub kind: String,
     pub data: Arc<Vec<u8>>
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceReportBind
+pub struct ActorBindReport
 {
     pub star: StarKey,
-    pub key: EntityKey,
+    pub key: ActorKey,
     pub name: Option<String>
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct EntityRequestLocation
+pub struct ActorLocationRequest
 {
-    pub lookup: EntityLookup
+    pub lookup: ActorLookup
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceReportLocation
+pub struct ActorLocationReport
 {
-    pub resource: EntityKey,
-    pub location: EntityLocation
+    pub resource: ActorKey,
+    pub location: ActorLocation
 }
 
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum EntityLookup
+pub enum ActorLookup
 {
-    Key(EntityKey),
-    Name(ResourceNameLookup)
+    Key(ActorKey),
+    Name(ActorNameLookup)
 }
 
-impl EntityLookup
+impl ActorLookup
 {
     pub fn app_id(&self)->Id
     {
         match self
         {
-            EntityLookup::Key(resource) => resource.app.clone(),
-            EntityLookup::Name(name) => name.app_id.clone()
+            ActorLookup::Key(resource) => resource.app.clone(),
+            ActorLookup::Name(name) => name.app_id.clone()
         }
     }
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceNameLookup
+pub struct ActorNameLookup
 {
     pub app_id: Id,
     pub name: String
@@ -347,40 +347,40 @@ pub struct ResourceNameLookup
 
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum EntityFromKind
+pub enum ActorFromKind
 {
-    Entity(EntityFrom),
+    Actor(ActorFrom),
     User(User)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct EntityFrom
+pub struct ActorFrom
 {
-    key: EntityKey,
+    key: ActorKey,
     source: Option<Vec<u8>>
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct EntityTo
+pub struct ActorTo
 {
-    key: EntityKey,
+    key: ActorKey,
     target: Option<Vec<u8>>
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct EntityMessage
+pub struct ActorMessage
 {
     pub id: Id,
-    pub from: EntityFromKind,
-    pub to: EntityTo,
-    pub payloads: ResourcePayloads,
+    pub from: ActorFromKind,
+    pub to: ActorTo,
+    pub payloads: ActorPayloads,
     pub transaction: Option<Id>
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceBind
+pub struct ActorBind
 {
-   pub key: EntityKey,
+   pub key: ActorKey,
    pub star: StarKey
 }
 
@@ -429,13 +429,13 @@ pub struct ApplicationNotifyReady
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ApplicationRequestSupervisor
+pub struct ApplicationSupervisorRequest
 {
     pub app: AppKey,
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ApplicationReportSupervisor
+pub struct ApplicationSupervisorReport
 {
     pub app: AppKey,
     pub supervisor: StarKey
@@ -459,16 +459,16 @@ impl fmt::Display for StarMessagePayload{
             StarMessagePayload::ApplicationCreateRequest(_) => "ApplicationCreateRequest".to_string(),
             StarMessagePayload::ApplicationAssign(_) => "ApplicationAssign".to_string(),
             StarMessagePayload::ApplicationNotifyReady(_) => "ApplicationNotifyReady".to_string(),
-            StarMessagePayload::ApplicationRequestSupervisor(_) => "ApplicationRequestSupervisor".to_string(),
-            StarMessagePayload::ApplicationReportSupervisor(_) => "ApplicationReportSupervisor".to_string(),
+            StarMessagePayload::ApplicationSupervisorRequest(_) => "ApplicationRequestSupervisor".to_string(),
+            StarMessagePayload::ApplicationSupervisorReport(_) => "ApplicationReportSupervisor".to_string(),
             StarMessagePayload::ApplicationLookup(_) => "ApplicationLookupId".to_string(),
             StarMessagePayload::ApplicationRequestLaunch(_) => "ApplicationRequestLaunch".to_string(),
             StarMessagePayload::ServerPledgeToSupervisor => "ServerPledgeToSupervisor".to_string(),
-            StarMessagePayload::EntityEvent(_)=>"ResourceEvent".to_string(),
-            StarMessagePayload::EntityMessage(_)=>"ResourceMessage".to_string(),
-            StarMessagePayload::EntityRequestLocation(_)=>"ResourceRequestLocation".to_string(),
-            StarMessagePayload::EntityReportLocation(_)=>"ResourceReportLocation".to_string(),
-            StarMessagePayload::EntityStateRequest(_)=>"ResourceStateRequest".to_string(),
+            StarMessagePayload::ActorEvent(_)=>"ActorEvent".to_string(),
+            StarMessagePayload::ActorMessage(_)=>"ActorMessage".to_string(),
+            StarMessagePayload::ActorLocationRequest(_)=>"ActorLocationRequest".to_string(),
+            StarMessagePayload::ActorLocationReport(_)=>"ActorLocationReport".to_string(),
+            StarMessagePayload::ActorStateRequest(_)=>"ActorStateRequest".to_string(),
         };
         write!(f, "{}",r)
     }
@@ -488,7 +488,7 @@ impl fmt::Display for Frame {
             Frame::StarUnwind(_)=>format!("StarUnwind").to_string(),
             Frame::StarAck(_)=>format!("StarAck").to_string(),
             Frame::Watch(_) => format!("Watch").to_string(),
-            Frame::EntityEvent(_) => format!("ResourceEvent").to_string()
+            Frame::ActorEvent(_) => format!("ActorEvent").to_string()
         };
         write!(f, "{}",r)
     }
