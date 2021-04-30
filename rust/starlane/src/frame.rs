@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use tokio::time::Instant;
 use crate::application::{AppLocation, AppKey, AppInfo, AppKind};
+use crate::user::User;
 
 #[derive(Clone)]
 pub struct Command
@@ -32,12 +33,12 @@ pub enum Frame
     Close,
     Proto(ProtoFrame),
     Diagnose(FrameDiagnose),
-    StarSearch(StarSearchInner),
-    StarSearchResult(StarSearchResultInner),
-    StarMessage(StarMessageInner),
-    StarAck(StarAckInner),
-    StarWind(StarWindInner),
-    StarUnwind(StarUnwindInner),
+    StarSearch(StarSearch),
+    StarSearchResult(StarSearchResult),
+    StarMessage(StarMessage),
+    StarAck(StarAck),
+    StarWind(StarWind),
+    StarUnwind(StarUnwind),
     Watch(Watch),
     EntityEvent(EntityEvent)
 }
@@ -57,7 +58,7 @@ pub struct WatchInfo
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct StarAckInner
+pub struct StarAck
 {
     to: StarKey,
     id: Id
@@ -76,7 +77,7 @@ pub enum StarUnwindPayload
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct StarWindInner
+pub struct StarWind
 {
   pub to: StarKey,
   pub stars: Vec<StarKey>,
@@ -84,7 +85,7 @@ pub struct StarWindInner
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct StarUnwindInner
+pub struct StarUnwind
 {
     pub stars: Vec<StarKey>,
     pub payload: StarUnwindPayload
@@ -99,7 +100,7 @@ pub enum FrameDiagnose
 
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct StarSearchInner
+pub struct StarSearch
 {
     pub from: StarKey,
     pub pattern: StarSearchPattern,
@@ -108,7 +109,7 @@ pub struct StarSearchInner
     pub max_hops: usize,
 }
 
-impl StarSearchInner
+impl StarSearch
 {
     pub fn inc( &mut self, hop: StarKey, transaction: Id )
     {
@@ -139,16 +140,16 @@ impl StarSearchPattern
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct StarSearchResultInner
+pub struct StarSearchResult
 {
     pub missed: Option<StarKey>,
     pub hits: Vec<SearchHit>,
-    pub search: StarSearchInner,
+    pub search: StarSearch,
     pub transactions: Vec<Id>,
     pub hops : Vec<StarKey>
 }
 
-impl StarSearchResultInner
+impl StarSearchResult
 {
     pub fn pop(&mut self)
     {
@@ -166,7 +167,7 @@ pub struct SearchHit
 
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct StarMessageInner
+pub struct StarMessage
 {
    pub from: StarKey,
    pub to: StarKey,
@@ -177,11 +178,11 @@ pub struct StarMessageInner
    pub max_retries: usize
 }
 
-impl StarMessageInner
+impl StarMessage
 {
     pub fn new(id:Id, from: StarKey, to: StarKey, payload: StarMessagePayload) -> Self
     {
-        StarMessageInner {
+        StarMessage {
             id: id,
             from: from,
             to: to,
@@ -194,7 +195,7 @@ impl StarMessageInner
 
     pub fn to_central(id:Id, from: StarKey, payload: StarMessagePayload ) -> Self
     {
-        StarMessageInner {
+        StarMessage {
             id: id,
             from: from,
             to: StarKey::central(),
@@ -225,21 +226,21 @@ impl StarMessageInner
 #[derive(Clone,Serialize,Deserialize)]
 pub enum StarMessagePayload
 {
-   Reject(RejectionInner),
+   Reject(Rejection),
    SupervisorPledgeToCentral,
-   ApplicationCreateRequest(ApplicationCreateRequestInner),
-   ApplicationAssign(ApplicationAssignInner),
-   ApplicationNotifyReady(ApplicationNotifyReadyInner),
-   ApplicationRequestSupervisor(ApplicationRequestSupervisorInner),
-   ApplicationReportSupervisor(ApplicationReportSupervisorInner),
-   ApplicationLookupId(ApplicationLookupIdInner),
-   ApplicationRequestLaunch(ApplicationRequestLaunchInner),
+   ApplicationCreateRequest(ApplicationCreateRequest),
+   ApplicationAssign(ApplicationAssign),
+   ApplicationNotifyReady(ApplicationNotifyReady),
+   ApplicationRequestSupervisor(ApplicationRequestSupervisor),
+   ApplicationReportSupervisor(ApplicationReportSupervisor),
+   ApplicationLookup(ApplicationLookup),
+   ApplicationRequestLaunch(ApplicationRequestLaunch),
    ServerPledgeToSupervisor,
-   ResourceStateRequest(EntityKey),
-   ResourceEvent(EntityEvent),
-   ResourceMessage(EntityMessage),
-   ResourceRequestLocation(ResourceRequestLocation),
-   ResourceReportLocation(EntityLocation)
+   EntityStateRequest(EntityKey),
+   EntityEvent(EntityEvent),
+   EntityMessage(EntityMessage),
+   EntityRequestLocation(EntityRequestLocation),
+   EntityReportLocation(EntityLocation)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -305,7 +306,7 @@ pub struct ResourceReportBind
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceRequestLocation
+pub struct EntityRequestLocation
 {
     pub lookup: EntityLookup
 }
@@ -345,9 +346,11 @@ pub struct ResourceNameLookup
 }
 
 
+#[derive(Clone,Serialize,Deserialize)]
 pub enum EntityFromKind
 {
-    Entity(EntityFrom)
+    Entity(EntityFrom),
+    User(User)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -383,7 +386,7 @@ pub struct ResourceBind
 
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ApplicationRequestLaunchInner
+pub struct ApplicationRequestLaunch
 {
     pub app_id: Id,
     pub data: Vec<u8>
@@ -391,19 +394,19 @@ pub struct ApplicationRequestLaunchInner
 
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct RejectionInner
+pub struct Rejection
 {
     pub message: String,
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ApplicationLookupIdInner
+pub struct ApplicationLookup
 {
     pub name: String
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ApplicationCreateRequestInner
+pub struct ApplicationCreateRequest
 {
     pub name: Option<String>,
     pub kind: AppKind,
@@ -411,7 +414,7 @@ pub struct ApplicationCreateRequestInner
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ApplicationAssignInner
+pub struct ApplicationAssign
 {
     pub app : AppInfo,
     pub data: Vec<u8>,
@@ -420,19 +423,19 @@ pub struct ApplicationAssignInner
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ApplicationNotifyReadyInner
+pub struct ApplicationNotifyReady
 {
     pub location: AppLocation
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ApplicationRequestSupervisorInner
+pub struct ApplicationRequestSupervisor
 {
     pub app: AppKey,
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ApplicationReportSupervisorInner
+pub struct ApplicationReportSupervisor
 {
     pub app: AppKey,
     pub supervisor: StarKey
@@ -458,14 +461,14 @@ impl fmt::Display for StarMessagePayload{
             StarMessagePayload::ApplicationNotifyReady(_) => "ApplicationNotifyReady".to_string(),
             StarMessagePayload::ApplicationRequestSupervisor(_) => "ApplicationRequestSupervisor".to_string(),
             StarMessagePayload::ApplicationReportSupervisor(_) => "ApplicationReportSupervisor".to_string(),
-            StarMessagePayload::ApplicationLookupId(_) => "ApplicationLookupId".to_string(),
+            StarMessagePayload::ApplicationLookup(_) => "ApplicationLookupId".to_string(),
             StarMessagePayload::ApplicationRequestLaunch(_) => "ApplicationRequestLaunch".to_string(),
             StarMessagePayload::ServerPledgeToSupervisor => "ServerPledgeToSupervisor".to_string(),
-            StarMessagePayload::ResourceEvent(_)=>"ResourceEvent".to_string(),
-            StarMessagePayload::ResourceMessage(_)=>"ResourceMessage".to_string(),
-            StarMessagePayload::ResourceRequestLocation(_)=>"ResourceRequestLocation".to_string(),
-            StarMessagePayload::ResourceReportLocation(_)=>"ResourceReportLocation".to_string(),
-            StarMessagePayload::ResourceStateRequest(_)=>"ResourceStateRequest".to_string(),
+            StarMessagePayload::EntityEvent(_)=>"ResourceEvent".to_string(),
+            StarMessagePayload::EntityMessage(_)=>"ResourceMessage".to_string(),
+            StarMessagePayload::EntityRequestLocation(_)=>"ResourceRequestLocation".to_string(),
+            StarMessagePayload::EntityReportLocation(_)=>"ResourceReportLocation".to_string(),
+            StarMessagePayload::EntityStateRequest(_)=>"ResourceStateRequest".to_string(),
         };
         write!(f, "{}",r)
     }

@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 
 use crate::application::ApplicationStatus;
 use crate::error::Error;
-use crate::frame::{EntityMessage, StarMessageInner, StarMessagePayload, StarUnwindPayload, StarWindInner, Watch, WatchInfo};
+use crate::frame::{EntityMessage, StarMessage, StarMessagePayload, StarUnwindPayload, StarWind, Watch, WatchInfo};
 use crate::id::{Id, IdSeq};
 use crate::entity::{EntityKey, Entity};
 use crate::star::{StarCommand, StarKey, StarKind, EntityCommand, EntityCreate};

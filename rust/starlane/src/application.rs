@@ -11,7 +11,7 @@ use std::sync::Arc;
 pub type AppKey = Id;
 pub type AppKind = String;
 
-pb enum AppAccessCommand
+pub enum AppAccessCommand
 {
     Create(AppCreate),
     Get(AppGet)

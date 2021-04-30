@@ -23,4 +23,5 @@ pub mod application;
 pub mod entity;
 pub mod server;
 pub mod core;
+pub mod user;
 

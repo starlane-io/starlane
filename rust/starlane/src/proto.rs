@@ -15,7 +15,7 @@ use tokio::time::{Duration, Instant};
 
 use crate::constellation::Constellation;
 use crate::error::Error;
-use crate::frame::{Frame, ProtoFrame, StarMessageInner, StarMessagePayload, SearchHit, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarUnwindPayload, StarWindInner, StarWindPayload};
+use crate::frame::{Frame, ProtoFrame, StarMessage, StarMessagePayload, SearchHit, StarSearch, StarSearchPattern, StarSearchResult, StarUnwindPayload, StarWind, StarWindPayload};
 use crate::frame::Frame::{StarMessage, StarSearch, StarWind};
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelReceiver, TunnelSender, TunnelSenderState};
@@ -309,7 +309,7 @@ impl ProtoStar
 
     async fn send_sequence_request( &mut self )
     {
-        let frame = Frame::StarWind( StarWindInner{
+        let frame = Frame::StarWind( StarWind {
             to: StarKey::central(),
             stars: vec![self.star_key.as_ref().unwrap().clone()],
             payload: StarWindPayload::RequestSequence
@@ -393,7 +393,7 @@ impl ProtoStar
 
 
 
-    async fn send_no_hold(&mut self, message: StarMessageInner )
+    async fn send_no_hold(&mut self, message: StarMessage)
     {
         self.send_frame_no_hold(&message.to.clone(), Frame::StarMessage(message) ).await;
     }
@@ -411,7 +411,7 @@ impl ProtoStar
     }
 
 
-    async fn send(&mut self, message: StarMessageInner )
+    async fn send(&mut self, message: StarMessage)
     {
         self.send_frame(&message.to.clone(), Frame::StarMessage(message) ).await;
     }

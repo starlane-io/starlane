@@ -19,7 +19,7 @@ use url::Url;
 
 use crate::application::{ApplicationStatus, AppLocation, AppController, AppAccessCommand, AppCommand, AppCreate, AppKind, AppKey, AppInfo, Application};
 use crate::error::Error;
-use crate::frame::{ApplicationAssignInner, ApplicationNotifyReadyInner, ApplicationReportSupervisorInner, ApplicationRequestSupervisorInner, Frame, ProtoFrame, RejectionInner, ResourceBind, EntityEvent, ResourceEventKind, EntityLookup, EntityMessage, ResourceReportLocation, ResourceRequestLocation, StarMessageInner, StarMessagePayload, SearchHit, StarSearchInner, StarSearchPattern, StarSearchResultInner, StarUnwindInner, StarUnwindPayload, StarWindInner, StarWindPayload, Watch, WatchInfo, ApplicationCreateRequestInner};
+use crate::frame::{ApplicationAssign, ApplicationNotifyReady, ApplicationReportSupervisor, ApplicationRequestSupervisor, Frame, ProtoFrame, Rejection, ResourceBind, EntityEvent, ResourceEventKind, EntityLookup, EntityMessage, ResourceReportLocation, EntityRequestLocation, StarMessage, StarMessagePayload, SearchHit, StarSearch, StarSearchPattern, StarSearchResult, StarUnwind, StarUnwindPayload, StarWind, StarWindPayload, Watch, WatchInfo, ApplicationCreateRequest};
 use crate::frame::Frame::{StarMessage, StarSearch};
 use crate::frame::ProtoFrame::CentralSearch;
 use crate::frame::StarMessagePayload::{ApplicationCreateRequest, Reject};
@@ -401,13 +401,13 @@ impl Star
         match command
         {
             AppAccessCommand::Create(create) => {
-                let payload = StarMessagePayload::ApplicationCreateRequest(ApplicationCreateRequestInner{
+                let payload = StarMessagePayload::ApplicationCreateRequest(ApplicationCreateRequest {
                     kind: "default".to_string(),
                     name: create.name,
                     data: create.data
                 });
                 let tid = self.info.sequence.next();
-                let mut message = StarMessageInner::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
+                let mut message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
                 message.transaction = Option::Some(tid);
 
                 let transaction = AppCreateTransaction{
@@ -442,7 +442,7 @@ impl Star
     async fn do_search( &mut self, search: Search )
     {
         let tx = search.tx;
-        let search = StarSearchInner{
+        let search = StarSearch {
             from: self.info.star_key.clone(),
             pattern: search.pattern,
             hops: vec!(),
@@ -453,7 +453,7 @@ impl Star
         self.do_search_with_hops(search, tx, Option::None).await;
     }
 
-    async fn do_search_with_hops( &mut self, mut search: StarSearchInner, tx: oneshot::Sender<SearchResult>, exclude: Option<HashSet<StarKey>> )
+    async fn do_search_with_hops(&mut self, mut search: StarSearch, tx: oneshot::Sender<SearchResult>, exclude: Option<HashSet<StarKey>> )
     {
         let hit = match &search.pattern
         {
@@ -489,7 +489,7 @@ impl Star
 
 
 
-    async fn on_star_search_hop(&mut self, mut search: StarSearchInner, lane_key: StarKey )
+    async fn on_star_search_hop(&mut self, mut search: StarSearch, lane_key: StarKey )
     {
         let hit = match &search.pattern
         {
@@ -507,7 +507,7 @@ impl Star
             if search.pattern.is_single_match()
             {
                 let hops = search.hops.len() + 1;
-                let results = Frame::StarSearchResult( StarSearchResultInner {
+                let results = Frame::StarSearchResult( StarSearchResult {
                     missed: None,
                     hops: search.hops.clone(),
                     hits: vec![ SearchHit { star: self.info.star_key.clone(), hops: hops.clone() as _ } ],
@@ -551,7 +551,7 @@ impl Star
 
             // return the search with 0 hits
             let hops = search.hops.len() + 1;
-            let results = Frame::StarSearchResult( StarSearchResultInner {
+            let results = Frame::StarSearchResult( StarSearchResult {
                 missed: None,
                 hops: search.hops.clone(),
                 hits: hits,
@@ -579,7 +579,7 @@ impl Star
             match result{
                 Ok(result) => {
 
-                    let mut return_results = StarSearchResultInner {
+                    let mut return_results = StarSearchResult {
                         missed: None,
                         hops: search.hops.clone(),
                         hits: result.hits.iter().map(|(star,hops)| SearchHit{ star: star.clone(), hops: hops.clone()+1} ).collect(),
@@ -623,7 +623,7 @@ impl Star
     }
 
 
-    async fn send(&mut self, message: StarMessageInner )
+    async fn send(&mut self, message: StarMessage)
     {
         self.send_frame(message.to.clone(), Frame::StarMessage(message) ).await;
     }
@@ -746,7 +746,7 @@ impl Star
         }
     }*/
 
-    async fn on_star_search_result( &mut self, mut search_result: StarSearchResultInner, lane_key: StarKey )
+    async fn on_star_search_result(&mut self, mut search_result: StarSearchResult, lane_key: StarKey )
     {
 //        println!("ON STAR SEARCH RESULTS");
     }
@@ -1042,8 +1042,8 @@ impl Star
 
     async fn find_app_location(&mut self, app_id: &Id ) -> mpsc::Receiver<AppLocation>
     {
-        let payload = StarMessagePayload::ApplicationRequestSupervisor(ApplicationRequestSupervisorInner{ app: app_id.clone() } );
-        let mut message = StarMessageInner::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
+        let payload = StarMessagePayload::ApplicationRequestSupervisor(ApplicationRequestSupervisor { app: app_id.clone() } );
+        let mut message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
         message.transaction = Option::Some(self.info.sequence.next());
 
         let (transaction,rx) = ApplicationSupervisorSearchTransaction::new(app_id.clone());
@@ -1086,8 +1086,8 @@ impl Star
                 xr
             }
             Some(supervisor_star) => {
-                let payload = StarMessagePayload::ResourceRequestLocation(ResourceRequestLocation{ lookup: kind } );
-                let mut message = StarMessageInner::new( self.info.sequence.next(), self.info.star_key.clone(), supervisor_star, payload );
+                let payload = StarMessagePayload::EntityRequestLocation(EntityRequestLocation { lookup: kind } );
+                let mut message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), supervisor_star, payload );
                 message.transaction = Option::Some(self.info.sequence.next());
                 let (transaction,rx) =  ResourceLocationRequestTransaction::new();
                 self.transactions.insert( message.transaction.unwrap().clone(), Box::new(transaction) );
@@ -1100,7 +1100,7 @@ impl Star
 
 
 
-    async fn on_wind( &mut self, mut wind: StarWindInner)
+    async fn on_wind( &mut self, mut wind: StarWind)
     {
         if wind.to != self.info.star_key
         {
@@ -1133,7 +1133,7 @@ impl Star
         }
     }
 
-    async fn on_unwind( &mut self, mut unwind: StarUnwindInner)
+    async fn on_unwind( &mut self, mut unwind: StarUnwind)
     {
         if unwind.stars.len() > 1
         {
@@ -1149,7 +1149,7 @@ impl Star
         }
     }
 
-    async fn on_message( &mut self, mut message: StarMessageInner ) -> Result<(),Error>
+    async fn on_message(&mut self, mut message: StarMessage) -> Result<(),Error>
     {
 
         if message.to != self.info.star_key
@@ -1189,7 +1189,7 @@ pub enum StarCommand
     ReleaseHold(StarKey),
     SearchInit(Search),
     SearchLocalCommit(SearchCommit),
-    SearchReturnResult(StarSearchResultInner),
+    SearchReturnResult(StarSearchResult),
     Test(StarTest),
     Frame(Frame),
     ForwardFrame(ForwardFrame),
@@ -1470,7 +1470,7 @@ impl Transaction for ResourceLocationRequestTransaction
 
         if let Frame::StarMessage( message ) = frame
         {
-            if let StarMessagePayload::ResourceReportLocation(location ) = &message.payload
+            if let StarMessagePayload::EntityReportLocation(location ) = &message.payload
             {
                 command_tx.send( StarCommand::AddEntityLocation(AddEntityLocation { tx: self.tx.clone(), entity_location: location.clone() })).await;
             }
@@ -1710,8 +1710,8 @@ pub trait Transaction : Send+Sync
 #[derive(Clone)]
 pub enum StarLog
 {
-   StarSearchInitialized(StarSearchInner),
-   StarSearchResult(StarSearchResultInner),
+   StarSearchInitialized(StarSearch),
+   StarSearchResult(StarSearchResult),
 }
 
 
@@ -1809,7 +1809,7 @@ impl StarManager for CentralManager
                     let supervisor = self.backing.select_supervisor();
                     if let Option::None = supervisor
                     {
-                        message.reply(self.info.sequence.next(), StarMessagePayload::Reject(RejectionInner { message: "no supervisors available to host application.".to_string() }));
+                        message.reply(self.info.sequence.next(), StarMessagePayload::Reject(Rejection { message: "no supervisors available to host application.".to_string() }));
                         self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
                         Ok(())
                     } else {
@@ -1818,12 +1818,12 @@ impl StarManager for CentralManager
                             self.backing.set_name_to_application(name.clone(), app.clone());
                         }
                         let supervisor = supervisor.unwrap();
-                        let message = StarMessageInner {
+                        let message = StarMessage {
                             id: self.info.sequence.next(),
                             from: self.info.star_key.clone(),
                             to: supervisor.clone(),
                             transaction: message.transaction.clone(),
-                            payload: StarMessagePayload::ApplicationAssign(ApplicationAssignInner {
+                            payload: StarMessagePayload::ApplicationAssign(ApplicationAssign {
                                 app: app,
                                 data: request.data.clone(),
                                 notify: vec![message.from, self.info.star_key.clone()],
@@ -1844,21 +1844,21 @@ impl StarManager for CentralManager
                 StarMessagePayload::ApplicationRequestSupervisor(request) => {
                     if let Option::Some(supervisor) = self.backing.select_supervisor()
                     {
-                        message.reply(self.info.sequence.next(), StarMessagePayload::ApplicationReportSupervisor(ApplicationReportSupervisorInner { app: request.app, supervisor: supervisor.clone() }));
+                        message.reply(self.info.sequence.next(), StarMessagePayload::ApplicationReportSupervisor(ApplicationReportSupervisor { app: request.app, supervisor: supervisor.clone() }));
                         self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
                         Ok(())
                     } else {
-                        message.reply(self.info.sequence.next(), StarMessagePayload::Reject(RejectionInner { message: format!("cannot find app_id: {}", request.app).to_string() }));
+                        message.reply(self.info.sequence.next(), StarMessagePayload::Reject(Rejection { message: format!("cannot find app_id: {}", request.app).to_string() }));
                         self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
                         Ok(())
                     }
                 }
-                StarMessagePayload::ApplicationLookupId(request) => {
+                StarMessagePayload::ApplicationLookup(request) => {
                     let app_id = self.backing.get_application_for_name(&request.name);
                     if let Some(app) = app_id
                     {
                         if let Option::Some(supervisor) = self.backing.get_supervisor_for_application(&app.key) {
-                            message.reply(self.info.sequence.next(), StarMessagePayload::ApplicationReportSupervisor(ApplicationReportSupervisorInner { app: app.key.clone(), supervisor: supervisor.clone() }));
+                            message.reply(self.info.sequence.next(), StarMessagePayload::ApplicationReportSupervisor(ApplicationReportSupervisor { app: app.key.clone(), supervisor: supervisor.clone() }));
                             self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
                             Ok(())
                         } else {
@@ -1866,7 +1866,7 @@ impl StarManager for CentralManager
                             Ok(())
                         }
                     } else {
-                        message.reply(self.info.sequence.next(), StarMessagePayload::Reject(RejectionInner { message: format!("could not find app_id for lookup name: {}", request.name).to_string() }));
+                        message.reply(self.info.sequence.next(), StarMessagePayload::Reject(Rejection { message: format!("could not find app_id for lookup name: {}", request.name).to_string() }));
                         self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
                         Ok(())
                     }
@@ -1882,7 +1882,7 @@ impl StarManager for CentralManager
             {
                 StarWindPayload::RequestSequence => {
                     let payload = StarUnwindPayload::AssignSequence(self.backing.sequence_next().index);
-                    let inner = StarUnwindInner{
+                    let inner = StarUnwind {
                         stars: wind.stars.clone(),
                         payload: payload
                     };
@@ -2019,7 +2019,7 @@ impl StarManager for SupervisorManager
         {
             StarManagerCommand::Init => {
                let payload = StarMessagePayload::SupervisorPledgeToCentral;
-               let message = StarMessageInner::new( self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
+               let message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
                let command = StarCommand::Frame(Frame::StarMessage(message));
                self.info.command_tx.send( command ).await;
                Ok(())
@@ -2035,7 +2035,7 @@ impl StarManager for SupervisorManager
             StarManagerCommand::SupervisorCommand(command) => {
                 if let SupervisorCommand::PledgeToCentral = command
                 {
-                    let message = StarMessageInner::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), StarMessagePayload::SupervisorPledgeToCentral );
+                    let message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), StarMessagePayload::SupervisorPledgeToCentral );
                     Ok(self.info.command_tx.send( StarCommand::Frame(Frame::StarMessage(message))).await?)
                 }
                 else {
@@ -2052,7 +2052,7 @@ impl StarManager for SupervisorManager
 
 impl SupervisorManager
 {
-    async fn handle_message(&mut self, message: StarMessageInner) -> Result<(), Error> {
+    async fn handle_message(&mut self, message: StarMessage) -> Result<(), Error> {
 
         let mut message = message;
         match &message.payload
@@ -2071,8 +2071,8 @@ impl SupervisorManager
                         app: assign.app.key.clone(),
                         supervisor: assign.supervisor.clone()
                     };
-                    let payload = StarMessagePayload::ApplicationNotifyReady(ApplicationNotifyReadyInner{ location: location});
-                    let mut notify_app_ready = StarMessageInner::new(self.info.sequence.next(), self.info.star_key.clone(), notify.clone(), payload );
+                    let payload = StarMessagePayload::ApplicationNotifyReady(ApplicationNotifyReady { location: location});
+                    let mut notify_app_ready = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), notify.clone(), payload );
                     notify_app_ready.transaction = message.transaction.clone();
                     self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(notify_app_ready))).await?;
                 }
@@ -2084,12 +2084,12 @@ impl SupervisorManager
                 self.backing.add_server(message.from.clone());
                 Ok(())
             }
-            StarMessagePayload::ResourceReportLocation(report) =>
+            StarMessagePayload::EntityReportLocation(report) =>
             {
                     self.backing.set_entity_location(report.entity.clone(), report.clone());
                     Ok(())
             }
-            StarMessagePayload::ResourceRequestLocation(request) =>
+            StarMessagePayload::EntityRequestLocation(request) =>
                 {
 
                     let location = self.backing.get_entity_location(&request.lookup);
@@ -2101,7 +2101,7 @@ impl SupervisorManager
                         }
                         Some(location) => {
                             let location = location.clone();
-                            let payload = StarMessagePayload::ResourceReportLocation(location);
+                            let payload = StarMessagePayload::EntityReportLocation(location);
                             message.reply( self.info.sequence.next(), payload );
                             self.info.command_tx.send( StarCommand::Frame(Frame::StarMessage(message))).await?;
                         }
@@ -2385,7 +2385,7 @@ impl ServerManager
         {
            self.set_supervisor(hit.star.clone());
            let payload = StarMessagePayload::ServerPledgeToSupervisor;
-           let message = StarMessageInner::new( self.info.sequence.next(), self.info.star_key.clone(), hit.star, payload );
+           let message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), hit.star, payload );
            self.info.command_tx.send( StarCommand::Frame(Frame::StarMessage(message))).await;
         }
         else {
