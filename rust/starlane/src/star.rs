@@ -40,6 +40,7 @@ pub enum StarKind
     Mesh,
     Supervisor,
     Server(ServerKindExt),
+    Store(StoreKindExt),
     Gateway,
     Link,
     Client
@@ -50,6 +51,33 @@ pub struct ServerKindExt
 {
    pub name: String
 }
+
+impl ServerKindExt
+{
+    pub fn new( name: String ) -> Self
+    {
+        ServerKindExt{
+            name: name
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
+pub struct StoreKindExt
+{
+    pub name: String
+}
+
+impl StoreKindExt
+{
+    pub fn new( name: String ) -> Self
+    {
+        StoreKindExt{
+            name: name
+        }
+    }
+}
+
 
 impl StarKind
 {
@@ -144,6 +172,7 @@ impl StarKind
             StarKind::Gateway => true,
             StarKind::Client => true,
             StarKind::Link => true,
+            StarKind::Store(_) => false
         }
     }
 }
@@ -155,7 +184,8 @@ impl fmt::Display for StarKind{
             StarKind::Central => "Central".to_string(),
             StarKind::Mesh => "Mesh".to_string(),
             StarKind::Supervisor => "Supervisor".to_string(),
-            StarKind::Server(_) => "Server".to_string(),
+            StarKind::Server(ext) => format!("Server({})",ext.name).to_string(),
+            StarKind::Store(ext) => format!("Store({})",ext.name).to_string(),
             StarKind::Gateway => "Gateway".to_string(),
             StarKind::Link => "Link".to_string(),
             StarKind::Client => "Client".to_string(),
@@ -376,8 +406,8 @@ impl Star
                     StarCommand::ForwardFrame(forward) => {
                         self.send_frame( forward.to.clone(), forward.frame ).await;
                     }
-                    StarCommand::EntityCommand(command) => {
-                        self.core_tx.send( StarCoreCommand::Entity(command)).await;
+                    StarCommand::ActorCommand(command) => {
+                        self.core_tx.send( StarCoreCommand::Actor(command)).await;
                     }
                     _ => {
                         eprintln!("cannot process command: {}",command);
@@ -1194,26 +1224,26 @@ pub enum StarCommand
     FrameError(FrameErrorInner),
     AppLifecycleCommand(AppAccessCommand),
     AppCommand(AppCommand),
-    EntityCommand(EntityCommand)
+    ActorCommand(ActorCommand)
 }
 
-pub enum EntityCommand
+pub enum ActorCommand
 {
-   Create(EntityCreate)
+   Create(ActorCreate)
 }
 
-pub struct EntityCreate
+pub struct ActorCreate
 {
     pub app: AppKey,
     pub kind: ActorKind,
     pub data: Vec<u8>
 }
 
-impl EntityCreate
+impl ActorCreate
 {
     pub fn new(app:AppKey, kind: ActorKind, data:Vec<u8>) -> Self
     {
-        EntityCreate{
+        ActorCreate {
             app: app,
             kind: kind,
             data: data
@@ -1267,7 +1297,7 @@ pub enum StarManagerCommand
     Frame(Frame),
     SupervisorCommand(SupervisorCommand),
     ServerCommand(ServerCommand),
-    EntityCommand(EntityCommand)
+    EntityCommand(ActorCommand)
 }
 
 pub enum CentralCommand
@@ -1317,10 +1347,10 @@ impl fmt::Display for StarManagerCommand {
     }
 }
 
-impl fmt::Display for EntityCommand{
+impl fmt::Display for ActorCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
-            EntityCommand::Create(_) => format!("Create(_)").to_string()
+            ActorCommand::Create(_) => format!("Create(_)").to_string()
         };
         write!(f, "{}",r)
     }
@@ -1345,7 +1375,7 @@ impl fmt::Display for StarCommand{
             StarCommand::AppLifecycleCommand(_) => format!("AppLifecycleCommand").to_string(),
             StarCommand::AppCommand(_) => format!("AppCommand").to_string(),
             StarCommand::SearchReturnResult(_) => format!("SearchReturnResult").to_string(),
-            StarCommand::EntityCommand(command) => format!("EntityCommand({})",command).to_string(),
+            StarCommand::ActorCommand(command) => format!("EntityCommand({})", command).to_string(),
         };
         write!(f, "{}",r)
     }

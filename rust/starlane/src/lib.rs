@@ -24,4 +24,5 @@ pub mod actor;
 pub mod server;
 pub mod core;
 pub mod user;
+pub mod service;
 

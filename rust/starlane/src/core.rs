@@ -8,7 +8,7 @@ use crate::error::Error;
 use crate::frame::{ActorMessage, StarMessage, StarMessagePayload, StarUnwindPayload, StarWind, Watch, WatchInfo};
 use crate::id::{Id, IdSeq};
 use crate::actor::{ActorKey, Actor};
-use crate::star::{StarCommand, StarKey, StarKind, EntityCommand, EntityCreate};
+use crate::star::{StarCommand, StarKey, StarKind, ActorCommand, ActorCreate};
 use std::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::runtime::Runtime;
@@ -20,7 +20,7 @@ pub enum StarCoreCommand
 {
     Message(ActorMessage),
     Watch(Watch),
-    Entity(EntityCommand)
+    Actor(ActorCommand)
 }
 
 
@@ -78,7 +78,7 @@ pub trait StarCoreExt: Sync+Send
 
 pub trait EntityStarCoreExt: StarCoreExt
 {
-    fn create_entity( &mut self, create: EntityCreate ) -> Result<ActorKey,Error>;
+    fn create_entity(&mut self, create: ActorCreate) -> Result<ActorKey,Error>;
     fn message(&mut self, message: ActorMessage) -> Result<(),Error>;
     fn watch( &mut self, watch: Watch ) -> Result<(),Error>;
 }
@@ -127,10 +127,10 @@ impl ServerStarCore
             {
                 StarCoreCommand::Message(_) => {}
                 StarCoreCommand::Watch(_) => {}
-                StarCoreCommand::Entity(entity_command) => {
-                    match entity_command
+                StarCoreCommand::Actor(actor_command) => {
+                    match actor_command
                     {
-                        EntityCommand::Create(create) => {
+                        ActorCommand::Create(create) => {
 
                             // need to communicate with Ext here...
 
