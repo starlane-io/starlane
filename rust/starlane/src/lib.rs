@@ -25,4 +25,6 @@ pub mod server;
 pub mod core;
 pub mod user;
 pub mod service;
+pub mod label;
+pub mod message;
 

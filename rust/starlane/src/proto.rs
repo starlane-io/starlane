@@ -420,6 +420,7 @@ impl ProtoStar
         let lane = self.lane_with_shortest_path_to_star(star);
         if let Option::Some(lane) = lane
         {
+
             lane.lane.outgoing.tx.send(LaneCommand::Frame(frame)).await;
         }
         else {

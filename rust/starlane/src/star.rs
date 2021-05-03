@@ -2,7 +2,7 @@ use std::{cmp, fmt};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex, Weak, mpsc};
 use std::sync::atomic::{AtomicI32, AtomicI64};
 
 use futures::future::{join_all, Map, BoxFuture};
@@ -13,13 +13,12 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, oneshot};
 use tokio::sync::broadcast::error::{RecvError, SendError};
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::mpsc;
 use tokio::time::{Instant, Duration,timeout};
 use url::Url;
 
 use crate::application::{ApplicationStatus, AppLocation, AppController, AppAccessCommand, AppCommand, AppCreate, AppKind, AppKey, AppInfo, Application};
 use crate::error::Error;
-use crate::frame::{ApplicationAssign, ApplicationNotifyReady, ApplicationSupervisorReport, ApplicationSupervisorRequest, Frame, ProtoFrame, Rejection, ActorBind, ActorEvent, ActorEventKind, ActorLookup, ActorMessage, ActorLocationReport, ActorLocationRequest, StarMessage, StarMessagePayload, SearchHit, StarSearch, StarSearchPattern, StarSearchResult, StarUnwind, StarUnwindPayload, StarWind, StarWindPayload, Watch, WatchInfo, ApplicationCreateRequest};
+use crate::frame::{ApplicationAssign, ApplicationNotifyReady, ApplicationSupervisorReport, ApplicationSupervisorRequest, Frame, ProtoFrame, Rejection, ActorBind, ActorEvent, ActorEventKind, ActorLookup, ActorMessage, ActorLocationReport, ActorLocationRequest, StarMessage, StarMessagePayload, SearchHit, StarSearch, StarSearchPattern, StarSearchResult, StarUnwind, StarUnwindPayload, StarWind, StarWindPayload, Watch, WatchInfo, ApplicationCreateRequest, StarMessageAck};
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
@@ -30,7 +29,6 @@ use std::collections::hash_map::RandomState;
 use std::cell::Cell;
 use std::borrow::Borrow;
 use tokio::time::error::Elapsed;
-
 
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
@@ -232,7 +230,7 @@ impl StarLogger
     pub fn log( &mut self, log: StarLog )
     {
         self.tx.retain( |sender| {
-            if let Err(SendError(_)) = sender.send(log.clone())
+            if let Err(broadcast::SendError(_)) = sender.send(log.clone())
             {
                 true
             }
@@ -250,16 +248,17 @@ pub struct Star
     info: StarInfo,
     command_rx: mpsc::Receiver<StarCommand>,
     manager_tx: mpsc::Sender<StarManagerCommand>,
+    core_tx: mpsc::Sender<StarCoreCommand>,
     lanes: HashMap<StarKey, LaneMeta>,
     connector_ctrls: Vec<ConnectorController>,
     transactions: HashMap<Id,Box<dyn Transaction>>,
     frame_hold: FrameHold,
     logger: StarLogger,
     watches: HashMap<ActorKey,HashMap<Id,StarWatchInfo>>,
-    entity_locations: LruCache<ActorKey, ActorLocation>,
+    actor_locations: LruCache<ActorKey, ActorLocation>,
     app_locations: LruCache<AppKey,StarKey>,
-    entities: HashSet<ActorKey>,
-    core_tx: mpsc::Sender<StarCoreCommand>,
+    actors: HashSet<ActorKey>,
+    message_ack_tx: HashMap<Id,oneshot::Sender<()>>
 }
 
 impl Star
@@ -279,22 +278,23 @@ impl Star
             info: info,
             command_rx: command_rx,
             manager_tx: manager_tx,
+            core_tx: core_tx,
             lanes: lanes,
             connector_ctrls: connector_ctrls,
             transactions: HashMap::new(),
             frame_hold: frame_hold,
             logger: logger,
             watches: HashMap::new(),
-            entity_locations: LruCache::new(64*1024 ),
+            actor_locations: LruCache::new(64*1024 ),
             app_locations: LruCache::new(4*1024 ),
-            entities: HashSet::new(),
-            core_tx: core_tx
+            actors: HashSet::new(),
+            message_ack_tx: HashMap::new()
         }
     }
 
     pub fn has_entities(&self, key: &ActorKey) -> bool
     {
-        self.entities.contains(&key)
+        self.actors.contains(&key)
     }
 
 
@@ -338,7 +338,7 @@ impl Star
                         self.connector_ctrls.push(connector_ctrl);
                     }
                     StarCommand::AddEntityLocation(add_entity_location) => {
-                        self.entity_locations.put(add_entity_location.entity_location.actor.clone(), add_entity_location.entity_location.clone() );
+                        self.actor_locations.put(add_entity_location.entity_location.actor.clone(), add_entity_location.entity_location.clone() );
                         add_entity_location.tx.send( ()).await;
                     }
                     StarCommand::AddAppLocation(add_app_location) => {
@@ -348,11 +348,15 @@ impl Star
                     StarCommand::ReleaseHold(star) => {
                         if let Option::Some(frames) = self.frame_hold.release(&star)
                         {
-                            for frame in frames
+                            let lane = self.lane_with_shortest_path_to_star(&star);
+                            if let Option::Some(lane)=lane
                             {
-                                self.send_frame(star.clone(),frame).await;
+                                lane.lane.outgoing.tx.send( LaneCommand::Frame(frame) ).await;
                             }
-                        }
+                            else {
+                                eprintln!("release hold called on star that is not ready!")
+                            }
+                       }
                     }
                     StarCommand::AppLifecycleCommand(command)=>{
                         self.on_app_lifecycle_command(command).await;
@@ -443,7 +447,7 @@ impl Star
                 };
                 self.transactions.insert( tid.clone(), Box::new(transaction) );
 
-                self.send(message).await;
+                self.message(message).await;
             }
             AppAccessCommand::Get(_) => {}
         }
@@ -650,9 +654,18 @@ impl Star
     }
 
 
-    async fn send(&mut self, message: StarMessage)
+    async fn message(&mut self, message: StarMessage) -> oneshot::Receiver<()>
     {
+        let (ack_tx, ack_rx) = oneshot::channel();
+        self.message_ack_tx.insert(message.id.clone(), ack_tx);
+
+
+        // put some code here ensuring that ACK is received
+        tokio::spawn( async move {} );
+
         self.send_frame(message.to.clone(), Frame::StarMessage(message) ).await;
+
+        ack_rx
     }
 
     async fn send_frame(&mut self, star: StarKey, frame: Frame )
@@ -941,6 +954,16 @@ impl Star
                     }
                 }
             }
+            Frame::StarMessageAck(ack) => {
+                match self.on_message_ack(ack).await
+                {
+                    Ok(messages) => {}
+                    Err(error) => {
+                        eprintln!("error: {}", error)
+                    }
+                }
+            }
+
             Frame::StarWind(wind) => {
                 self.on_wind(wind).await;
             }
@@ -1077,7 +1100,7 @@ impl Star
         let transaction = Box::new(transaction);
         self.transactions.insert( message.transaction.unwrap().clone(), transaction );
 
-        self.send( message ).await;
+        self.message( message ).await;
 
         rx
     }
@@ -1086,7 +1109,7 @@ impl Star
     {
         if let ActorLookup::Key(entity) = &kind
         {
-            self.entity_locations.get(entity)
+            self.actor_locations.get(entity)
         }
         else {
             Option::None
@@ -1118,7 +1141,7 @@ impl Star
                 message.transaction = Option::Some(self.info.sequence.next());
                 let (transaction,rx) =  ResourceLocationRequestTransaction::new();
                 self.transactions.insert( message.transaction.unwrap().clone(), Box::new(transaction) );
-                self.send( message ).await;
+                self.message( message ).await;
                 rx
             }
         }
@@ -1178,12 +1201,11 @@ impl Star
 
     async fn on_message(&mut self, mut message: StarMessage) -> Result<(),Error>
     {
-
         if message.to != self.info.star_key
         {
             if self.info.kind.relay() || message.from == self.info.star_key
             {
-                self.send(message).await;
+                self.message(message).await;
                 return Ok(());
             }
             else {
@@ -1192,6 +1214,28 @@ impl Star
         }
         else {
             Ok(self.manager_tx.send( StarManagerCommand::Frame( Frame::StarMessage(message))).await?)
+        }
+    }
+
+    async fn on_message_ack(&mut self, mut ack: StarMessageAck) -> Result<(),Error>
+    {
+        if ack.to != self.info.star_key
+        {
+            if self.info.kind.relay() || ack.from == self.info.star_key
+            {
+                self.send_frame(ack.to.clone(), Frame::StarMessageAck(ack) ).await;
+                return Ok(());
+            }
+            else {
+                return Err(format!("this star {} does not relay MessageAcks", self.info.kind ).into())
+            }
+        }
+        else {
+            if let Option::Some(tx) = self.message_ack_tx.remove(&ack.id)
+            {
+                tx.send(());
+            }
+            Ok(())
         }
     }
 
@@ -1297,7 +1341,7 @@ pub enum StarManagerCommand
     Frame(Frame),
     SupervisorCommand(SupervisorCommand),
     ServerCommand(ServerCommand),
-    EntityCommand(ActorCommand)
+    ActorCommand(ActorCommand)
 }
 
 pub enum CentralCommand
@@ -1341,7 +1385,7 @@ impl fmt::Display for StarManagerCommand {
             StarManagerCommand::SupervisorCommand(_) => "SupervisorCommand".to_string(),
             StarManagerCommand::ServerCommand(_) => "ServerCommand".to_string(),
             StarManagerCommand::Init => "Init".to_string(),
-            StarManagerCommand::EntityCommand(command) => format!("EntityCommand({})",command).to_string()
+            StarManagerCommand::ActorCommand(command) => format!("EntityCommand({})", command).to_string()
         };
         write!(f, "{}",r)
     }
@@ -1591,7 +1635,7 @@ impl StarSearchTransaction
 #[async_trait]
 impl Transaction for StarSearchTransaction
 {
-    async fn on_frame(&mut self, frame: &Frame, lane: Option<&mut LaneMeta>, command_tx: &mut Sender<StarCommand>) -> TransactionResult {
+    async fn on_frame(&mut self, frame: &Frame, lane: Option<&mut LaneMeta>, command_tx: &mut mscp::Sender<StarCommand>) -> TransactionResult {
         if let Option::None = lane
         {
             eprintln!("lane is not set for StarSearchTransaction");
@@ -2072,7 +2116,7 @@ impl StarManager for SupervisorManager
             StarManagerCommand::ServerCommand(_) => {
                 Err(format!("{} manager does not know how to handle : {}", self.info.kind, command).into())
             }
-            StarManagerCommand::EntityCommand(_) => {
+            StarManagerCommand::ActorCommand(_) => {
                 Err(format!("{} manager does not know how to handle : {}", self.info.kind, command).into())
             }
         }

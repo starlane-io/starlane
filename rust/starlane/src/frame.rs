@@ -36,7 +36,7 @@ pub enum Frame
     StarSearch(StarSearch),
     StarSearchResult(StarSearchResult),
     StarMessage(StarMessage),
-    StarAck(StarAck),
+    StarMessageAck(StarMessageAck),
     StarWind(StarWind),
     StarUnwind(StarUnwind),
     Watch(Watch),
@@ -58,10 +58,11 @@ pub struct WatchInfo
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct StarAck
+pub struct StarMessageAck
 {
-    to: StarKey,
-    id: Id
+    pub from: StarKey,
+    pub to: StarKey,
+    pub id: Id
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -234,13 +235,15 @@ pub enum StarMessagePayload
    ApplicationSupervisorRequest(ApplicationSupervisorRequest),
    ApplicationSupervisorReport(ApplicationSupervisorReport),
    ApplicationLookup(ApplicationLookup),
-   ApplicationRequestLaunch(ApplicationRequestLaunch),
+   ApplicationLaunchRequest(ApplicationLaunchRequest),
    ServerPledgeToSupervisor,
    ActorStateRequest(ActorKey),
    ActorEvent(ActorEvent),
    ActorMessage(ActorMessage),
    ActorLocationRequest(ActorLocationRequest),
-   ActorLocationReport(ActorLocation)
+   ActorLocationReport(ActorLocation),
+   Ok,
+   Error
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -386,7 +389,7 @@ pub struct ActorBind
 
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ApplicationRequestLaunch
+pub struct ApplicationLaunchRequest
 {
     pub app_id: Id,
     pub data: Vec<u8>
@@ -462,7 +465,7 @@ impl fmt::Display for StarMessagePayload{
             StarMessagePayload::ApplicationSupervisorRequest(_) => "ApplicationRequestSupervisor".to_string(),
             StarMessagePayload::ApplicationSupervisorReport(_) => "ApplicationReportSupervisor".to_string(),
             StarMessagePayload::ApplicationLookup(_) => "ApplicationLookupId".to_string(),
-            StarMessagePayload::ApplicationRequestLaunch(_) => "ApplicationRequestLaunch".to_string(),
+            StarMessagePayload::ApplicationLaunchRequest(_) => "ApplicationRequestLaunch".to_string(),
             StarMessagePayload::ServerPledgeToSupervisor => "ServerPledgeToSupervisor".to_string(),
             StarMessagePayload::ActorEvent(_)=>"ActorEvent".to_string(),
             StarMessagePayload::ActorMessage(_)=>"ActorMessage".to_string(),
@@ -486,7 +489,7 @@ impl fmt::Display for Frame {
             Frame::StarSearchResult(_)=>format!("StarSearchResult").to_string(),
             Frame::StarWind(_)=>format!("StarWind").to_string(),
             Frame::StarUnwind(_)=>format!("StarUnwind").to_string(),
-            Frame::StarAck(_)=>format!("StarAck").to_string(),
+            Frame::StarMessageAck(_)=>format!("StarMessageAck").to_string(),
             Frame::Watch(_) => format!("Watch").to_string(),
             Frame::ActorEvent(_) => format!("ActorEvent").to_string()
         };

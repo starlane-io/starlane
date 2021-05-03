@@ -6,60 +6,61 @@ use tokio::sync::{oneshot, mpsc};
 use crate::actor::{ActorKey, ActorLocation, ActorKind};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-
+use crate::error::Error;
+use crate::label::LabelSelectionCriteria;
+use std::collections::HashMap;
 
 pub type AppKey = Id;
 pub type AppKind = String;
 
+#[derive(Clone,Serialize,Deserialize)]
 pub enum AppAccessCommand
 {
     Create(AppCreate),
-    Get(AppGet)
-}
-
-pub enum AppCommand
-{
-    ActorCreate(ActorCreate),
+    Select(AppSelect),
     Destroy
 }
 
-pub struct ActorCreate
+#[derive(Clone,Serialize,Deserialize)]
+pub enum AppCommand
 {
-    app: AppKey,
-    kind: ActorKind,
-    data: Arc<Vec<u8>>,
-    pub tx: oneshot::Sender<ActorKey>
+    ActorCreate(ActorCreate),
+    ActorSelect(ActorSelect),
+    ActorDestroy(ActorKey)
 }
 
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ActorCreate
+{
+    pub app: AppKey,
+    pub kind: ActorKind,
+    pub data: Arc<Vec<u8>>,
+    pub labels: HashMap<String,String>
+}
 
-#[derive(Clone)]
+#[derive(Clone,Serialize,Deserialize)]
+pub struct AppSelect
+{
+    criteria: Vec<LabelSelectionCriteria>
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ActorSelect
+{
+    criteria: Vec<LabelSelectionCriteria>
+}
+
+#[derive(Clone,Serialize,Deserialize)]
 pub struct AppCreate
 {
     pub name: Option<String>,
     pub kind: AppKind,
     pub data: Vec<u8>,
-    pub tx: mpsc::Sender<AppController>,
+    pub labels: HashMap<String,String>
 }
 
-#[derive(Clone)]
-pub struct AppGet
-{
-    pub tx: mpsc::Sender<AppController>,
-    pub lookup: AppLookup
-}
 
-#[derive(Clone)]
-pub enum AppLookup
-{
-    Name(String),
-    Id(Id)
-}
-
-pub enum AppEvent
-{
-
-}
-
+#[derive(Clone,Serialize,Deserialize)]
 pub enum ApplicationStatus
 {
     None,
@@ -86,6 +87,7 @@ impl AppInfo
     }
 }
 
+#[derive(Clone,Serialize,Deserialize)]
 pub struct Application
 {
     pub info: AppInfo,
@@ -118,3 +120,13 @@ pub struct AppController
     pub app: AppKey,
     pub tx: Sender<AppCommand>
 }
+
+#[async_trait]
+pub trait AppKindSupervisorExt
+{
+    async fn create( create: AppCreate ) -> Result<(),Error>;
+    async fn destroy() -> Result<(),Error>;
+    async fn handle( command: AppCommand ) -> Result<(),Error>;
+}
+
+

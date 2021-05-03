@@ -26,6 +26,7 @@ pub struct ActorKey
     pub id: Id,
 }
 
+#[derive(Clone,Serialize,Deserialize)]
 pub struct Actor
 {
   pub info: ActorInfo,
@@ -124,5 +125,4 @@ impl ActorWatcher
         self.tx.send(event);
     }
 }
-
 
