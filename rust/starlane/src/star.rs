@@ -5,7 +5,8 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::RandomState;
 use std::future::Future;
-use std::sync::{Arc, mpsc, Mutex, Weak};
+use std::sync::{Arc, Mutex, Weak};
+
 use std::sync::atomic::{AtomicI32, AtomicI64};
 
 use futures::future::{BoxFuture, join_all, Map};
@@ -16,7 +17,7 @@ use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, oneshot};
 use tokio::sync::broadcast::error::{RecvError, SendError};
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc;
 use tokio::time::{Duration, Instant, timeout};
 use tokio::time::error::Elapsed;
 use url::Url;
@@ -25,12 +26,14 @@ use crate::actor::{Actor, ActorKey, ActorKind, ActorLocation, ActorWatcher};
 use crate::app::{AppCommandWrapper, AppController, AppCreate, AppInfo, AppKey, AppKind, Application, ApplicationStatus, AppLocation};
 use crate::core::StarCoreCommand;
 use crate::error::Error;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, ApplicationAssign, AppCreateRequest, AppNotifyCreated, ApplicationSupervisorReport, AppSupervisorRequest, Event, Frame, ProtoFrame, Rejection, SearchHit, StarMessage, StarMessageAck, StarMessagePayload, StarSearch, StarSearchPattern, StarSearchResult, StarUnwind, StarUnwindPayload, StarWind, StarWindPayload, Watch, WatchInfo};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, AppAssign, AppCreateRequest, AppNotifyCreated, ApplicationSupervisorReport, AppSupervisorRequest, Event, Frame, ProtoFrame, Rejection, SearchHit, StarMessage, StarMessageAck, StarMessagePayload, StarSearch, StarSearchPattern, StarSearchResult, StarUnwind, StarUnwindPayload, StarWind, StarWindPayload, Watch, WatchInfo};
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::org::OrgCommand;
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
 use crate::star::central::CentralManager;
+use crate::message::{ProtoMessage, MessageUpdate, StarMessageDeliveryInsurance, MessageReplyTracker, TrackerJob, MessageResult};
+use crate::star::supervisor::SupervisorCommand;
 
 pub mod central;
 pub mod supervisor;
@@ -261,8 +264,9 @@ pub struct Star
     watches: HashMap<ActorKey,HashMap<Id,StarWatchInfo>>,
     actor_locations: LruCache<ActorKey, ActorLocation>,
     app_locations: LruCache<AppKey,StarKey>,
+    messages_received: HashMap<Id,Instant>,
+    message_reply_trackers: HashMap<Id, MessageReplyTracker>,
     actors: HashSet<ActorKey>,
-    message_ack_tx: HashMap<Id,oneshot::Sender<()>>
 }
 
 impl Star
@@ -291,8 +295,9 @@ impl Star
             watches: HashMap::new(),
             actor_locations: LruCache::new(64*1024 ),
             app_locations: LruCache::new(4*1024 ),
+            messages_received: HashMap::new(),
+            message_reply_trackers: HashMap::new(),
             actors: HashSet::new(),
-            message_ack_tx: HashMap::new()
         }
     }
 
@@ -341,13 +346,16 @@ impl Star
                     StarCommand::AddConnectorController(connector_ctrl) => {
                         self.connector_ctrls.push(connector_ctrl);
                     }
-                    StarCommand::AddEntityLocation(add_entity_location) => {
+                    StarCommand::AddActorLocation(add_entity_location) => {
                         self.actor_locations.put(add_entity_location.entity_location.actor.clone(), add_entity_location.entity_location.clone() );
                         add_entity_location.tx.send( ()).await;
                     }
                     StarCommand::AddAppLocation(add_app_location) => {
                         self.app_locations.put(add_app_location.app_location.app.clone(), add_app_location.app_location.supervisor.clone() );
                         add_app_location.tx.send( add_app_location.app_location ).await;
+                    }
+                    StarCommand::SendProtoMessage(message) => {
+                        self.send_proto_message(message).await;
                     }
                     StarCommand::ReleaseHold(star) => {
                         if let Option::Some(frames) = self.frame_hold.release(&star)
@@ -429,6 +437,28 @@ impl Star
             }
 
         }
+    }
+
+    async fn send_proto_message( &mut self, proto: ProtoMessage )
+    {
+
+        if let Err(errors) = proto.validate()
+        {
+            eprintln!("protomessage is not valid cannot send: {}" errors.into() );
+            return;
+        }
+
+        let message = StarMessage{
+            from: self.info.star_key.clone(),
+            to: proto.to.unwrap(),
+            id: self.info.sequence.next(),
+            transaction: proto.transaction,
+            payload: StarMessagePayload::None,
+        };
+
+        let delivery = StarMessageDeliveryInsurance::new(message, proto.expect, proto.retries );
+
+        self.message(delivery).await;
     }
 
     async fn on_app_lifecycle_command( &mut self, command: OrgCommand)
@@ -657,19 +687,60 @@ impl Star
         }
     }
 
-
-    async fn message(&mut self, message: StarMessage) -> oneshot::Receiver<()>
+    async fn message(&mut self, delivery: StarMessageDeliveryInsurance)
     {
-        let (ack_tx, ack_rx) = oneshot::channel();
-        self.message_ack_tx.insert(message.id.clone(), ack_tx);
 
+        if !delivery.message.payload.is_ack()
+        {
+            let tracker = MessageReplyTracker {
+                reply_to: delivery.message.id.clone(),
+                tx: delivery.tx.clone()
+            };
 
-        // put some code here ensuring that ACK is received
-        tokio::spawn( async move {} );
+            self.message_reply_trackers.insert(delivery.message.id.clone(), tracker);
+
+            let message = delivery.message.clone();
+            tokio::spawn( async move {
+                let mut delivery = delivery;
+                loop
+                {
+                     let result = timeout(Duration::from_secs(5) ,delivery.rx.recv()).await;
+                     match result{
+                         Ok(result) => {
+                             match result
+                             {
+                                 Ok(update) => {
+                                     match update
+                                     {
+                                         MessageUpdate::Result(_) => {
+                                             // we have a result no longer need to resend
+                                             break;
+                                         }
+                                         _ => {}
+                                     }
+                                 }
+                                 Err(_) => {
+                                     // probably the TX got dropped
+                                     break;
+                                 }
+                             }
+                         }
+                         Err(elapsed) => {
+                             if delivery.retries == 0 {
+                                 delivery.tx.send( MessageUpdate::Result(MessageResult::Timeout));
+                                 break;
+                             }
+                             else {
+                                 // do a retry
+                                 delivery.retries = delivery.retries - 1;
+                             }
+                         }
+                     }
+                 }
+            });
+        }
 
         self.send_frame(message.to.clone(), Frame::StarMessage(message) ).await;
-
-        ack_rx
     }
 
     async fn send_frame(&mut self, star: StarKey, frame: Frame )
@@ -874,6 +945,18 @@ impl Star
                     TransactionResult::Done => {
                         self.transactions.remove(&tid);
                     }
+                }
+            }
+        }
+    }
+
+    async fn process_message_reply( &mut self, message: &StarMessage )
+    {
+        if message.reply_to.is_some() && self.message_reply_trackers.contains_key(message.reply_to.as_ref().unwrap()) {
+            if let Some(tracker) = self.message_reply_trackers.get(message.reply_to.as_ref().unwrap()) {
+                if let TrackerJob::Done = tracker.on_message(message)
+                {
+                    self.message_reply_trackers.remove(message.reply_to.as_ref().unwrap());
                 }
             }
         }
@@ -1258,9 +1341,10 @@ pub enum StarCommand
 {
     AddLane(Lane),
     AddConnectorController(ConnectorController),
-    AddEntityLocation(AddEntityLocation),
+    AddActorLocation(AddEntityLocation),
     AddAppLocation(AddAppLocation),
     AddLogger(broadcast::Sender<StarLog>),
+    SendProtoMessage(ProtoMessage),
     ReleaseHold(StarKey),
     SearchInit(Search),
     SearchLocalCommit(SearchCommit),
@@ -1411,13 +1495,14 @@ impl fmt::Display for StarCommand{
             StarCommand::SearchInit(_) => format!("Search").to_string(),
             StarCommand::SearchLocalCommit(_) => format!("SearchResult").to_string(),
             StarCommand::ReleaseHold(_) => format!("ReleaseHold").to_string(),
-            StarCommand::AddEntityLocation(_) => format!("AddResourceLocation").to_string(),
+            StarCommand::AddActorLocation(_) => format!("AddResourceLocation").to_string(),
             StarCommand::AddAppLocation(_) => format!("AddAppLocation").to_string(),
             StarCommand::ForwardFrame(_) => format!("ForwardFrame").to_string(),
             StarCommand::AppLifecycleCommand(_) => format!("AppLifecycleCommand").to_string(),
             StarCommand::AppCommand(_) => format!("AppCommand").to_string(),
             StarCommand::SearchReturnResult(_) => format!("SearchReturnResult").to_string(),
             StarCommand::ActorCommand(command) => format!("EntityCommand({})", command).to_string(),
+            StarCommand::SendProtoMessage(_) => format!("SendProtoMessage(_)").to_string(),
         };
         write!(f, "{}",r)
     }
@@ -1541,7 +1626,7 @@ impl Transaction for ResourceLocationRequestTransaction
         {
             if let StarMessagePayload::ActorLocationReport(location ) = &message.payload
             {
-                command_tx.send( StarCommand::AddEntityLocation(AddEntityLocation { tx: self.tx.clone(), entity_location: location.clone() })).await;
+                command_tx.send( StarCommand::AddActorLocation(AddEntityLocation { tx: self.tx.clone(), entity_location: location.clone() })).await;
             }
         }
 
@@ -1833,7 +1918,7 @@ impl FrameHold {
 #[async_trait]
 trait StarManager: Send+Sync
 {
-    async fn handle(&mut self, command: StarManagerCommand) -> Result<(),Error>;
+    async fn handle(&mut self, command: StarManagerCommand);
 }
 
 pub trait SupervisorManagerBacking: Send+Sync
@@ -2170,3 +2255,21 @@ pub struct StarInfo
    pub command_tx: mpsc::Sender<StarCommand>
 }
 
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct StarNotify
+{
+    pub star: StarKey,
+    pub transaction: Id
+}
+
+impl StarNotify
+{
+    pub fn new( star: StarKey, transaction: Id ) -> Self
+    {
+        StarNotify{
+            star: star,
+            transaction: transaction
+        }
+    }
+}

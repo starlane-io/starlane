@@ -8,10 +8,12 @@ use tokio::time::Instant;
 use crate::actor::{ActorKey, ActorLocation};
 use crate::app::{AppInfo, AppKey, AppKind, AppLocation, AppCreate};
 use crate::id::Id;
-use crate::star::{StarKey, StarKind, StarWatchInfo};
-use crate::user::{User, UserKey, GroupKey};
+use crate::star::{StarKey, StarKind, StarWatchInfo, StarNotify};
+use crate::user::{User, UserKey, GroupKey, AuthToken};
 use crate::org::OrgKey;
 use crate::label::Labels;
+use crate::message::{MessageResult, ProtoMessage};
+use tokio::sync::oneshot;
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Frame
@@ -22,7 +24,6 @@ pub enum Frame
     StarSearch(StarSearch),
     StarSearchResult(StarSearchResult),
     StarMessage(StarMessage),
-    StarMessageAck(StarMessageAck),
     StarWind(StarWind),
     StarUnwind(StarUnwind),
     Watch(Watch),
@@ -164,6 +165,7 @@ pub struct SearchHit
 }
 
 
+
 #[derive(Clone,Serialize,Deserialize)]
 pub struct StarMessage
 {
@@ -172,8 +174,7 @@ pub struct StarMessage
    pub id: Id,
    pub transaction: Option<Id>,
    pub payload: StarMessagePayload,
-   pub retry: usize,
-   pub max_retries: usize
+   pub reply_to: Option<Id>
 }
 
 impl StarMessage
@@ -186,8 +187,7 @@ impl StarMessage
             to: to,
             transaction: Option::None,
             payload: payload,
-            retry: 0,
-            max_retries: 16
+            reply_to: Option::None
         }
     }
 
@@ -199,24 +199,23 @@ impl StarMessage
             to: StarKey::central(),
             transaction: Option::None,
             payload: payload,
-            retry: 0,
-            max_retries: 16
+            reply_to: Option::None
         }
     }
 
 
-    pub fn reply(&mut self, id:Id, payload: StarMessagePayload)
+    pub fn reply(&self, payload: StarMessagePayload)->ProtoMessage
     {
-        let tmp = self.from.clone();
-        self.from = self.to.clone();
-        self.to = tmp;
-        self.payload = payload;
-        self.retry = 0;
+        let mut proto = ProtoMessage::new();
+        proto.to = Option::Some(self.from.clone());
+        proto.reply_to = Option::Some(self.id.clone());
+        proto.payload = payload;
+        proto
     }
 
     pub fn inc_retry(&mut self)
     {
-        self.retry = &self.retry + 1;
+        self.retries = &self.retries + 1;
     }
 
 }
@@ -224,19 +223,49 @@ impl StarMessage
 #[derive(Clone,Serialize,Deserialize)]
 pub enum StarMessagePayload
 {
+   None,
    Pledge,
    Tenant(TenantMessage),
    Ok,
    Error(String),
-   Reject(Rejection),
+   Ack(MessageAck)
 }
+
+impl StarMessagePayload{
+    pub fn is_ack(&self)->bool
+    {
+        match self{
+            StarMessagePayload::Ack(_) => {
+                true
+            }
+            _ => {
+                false
+            }
+        }
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct MessageAck
+{
+    pub id: Id,
+    pub kind: MessageAckKind
+}
+
+pub enum MessageAckKind
+{
+    Hop(StarKey),
+    Received,
+    Processing
+}
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct TenantMessage
 {
-    tenant: TenantKey,
-    user: UserKey,
-    payload: TenantMessagePayload
+    pub tenant: TenantKey,
+    pub token: AuthToken,
+    pub payload: TenantMessagePayload
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -251,7 +280,7 @@ pub enum TenantMessagePayload
 #[derive(Clone,Serialize,Deserialize)]
 pub enum AssignMessage
 {
-    App(AppCreate)
+    App(AppAssign)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -470,18 +499,17 @@ pub struct AppLookup
 #[derive(Clone,Serialize,Deserialize)]
 pub struct AppCreateRequest
 {
-    pub name: Option<String>,
+    pub labels: Labels,
     pub kind: AppKind,
     pub data: Vec<u8>,
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ApplicationAssign
+pub struct AppAssign
 {
     pub app : AppInfo,
     pub data: Vec<u8>,
-    pub notify: Vec<StarKey>,
-    pub supervisor: StarKey
+    pub notify: Vec<StarNotify>,
 }
 
 #[derive(Clone,Serialize,Deserialize)]

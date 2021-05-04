@@ -1,12 +1,15 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::app::{AppInfo, AppKey, ApplicationStatus};
+use tokio::sync::mpsc;
+use crate::app::{AppInfo, AppKey, ApplicationStatus, AppCreate};
 use crate::error::Error;
-use crate::frame::{ApplicationAssign, ApplicationSupervisorReport, Frame, Rejection, StarMessage, StarMessagePayload, StarUnwind, StarUnwindPayload, StarWindPayload};
+use crate::frame::{AppAssign, ApplicationSupervisorReport, Frame, Rejection, StarMessage, StarMessagePayload, StarUnwind, StarUnwindPayload, StarWindPayload, TenantMessage, TenantMessagePayload, RequestMessage, AssignMessage};
 use crate::id::Id;
 use crate::label::Labels;
-use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarInfo, StarKey, StarManager, StarManagerCommand};
+use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarInfo, StarKey, StarManager, StarManagerCommand, StarNotify};
+use crate::user::{AuthToken, AppAccess};
+use crate::message::ProtoMessage;
 
 pub struct CentralManager
 {
@@ -24,57 +27,97 @@ impl CentralManager
             backing: Box::new( CentralManagerBackingDefault::new(info) )
         }
     }
-}
 
-#[async_trait]
+    pub async fn reply_ok(&self, mut message: StarMessage )
+    {
+        message.reply( self.info.sequence.next(), StarMessagePayload::Ok );
+        let result = self.info.command_tx.send( StarCommand::Frame(Frame::StarMessage(message))).await;
+        match result
+        {
+            Ok(_) => {}
+            Err(error) => {
+                eprintln!("could not send starcommand from manager to star: {}",error.into());
+            }
+        }
+    }
+
+    pub async fn reply_error(&self, mut message: StarMessage, error_message: &str )
+    {
+        message.reply( self.info.sequence.next(), StarMessagePayload::Error(error_message.to_string()));
+        let result = self.info.command_tx.send( StarCommand::Frame(Frame::StarMessage(message))).await;
+        match result
+        {
+            Ok(_) => {}
+            Err(error) => {
+                eprintln!("could not send star command from manager to star: {}",error.into());
+            }
+        }
+    }
+
+
+    async fn launch_app( &mut self, tenant: TenantKey, create: AppCreate, notify: Vec<StarNotify> )->Result<(),Error>
+    {
+            let app_id = self.info.sequence.next();
+            let app_key = AppKey::new(tenant_message.tenant.clone(), app_id.index );
+            let app = AppInfo::new(app_key, tenant_payload.kind.clone());
+            let supervisor = self.backing.select_supervisor();
+            if let Option::None = supervisor
+            {
+                Err("could not find supervisor to host application".into())
+            } else {
+                let supervisor = supervisor.unwrap();
+                let mut message = ProtoMessage::new();
+                message.to = Some(supervisor);
+                message.payload = StarMessagePayload::Tenant(TenantMessage {
+                    tenant: tenant,
+                    token: self.backing.get_superuser_token()?,
+                    payload: TenantMessagePayload::Assign(AssignMessage::App(AppAssign{
+                        app: app,
+                        data: create.data,
+                        notify: notify
+                    }))
+                });
+            }
+        Ok(())
+    }
+
+
+    #[async_trait]
 impl StarManager for CentralManager
 {
-    async fn handle(&mut self, command: StarManagerCommand) -> Result<(), Error> {
+    async fn handle(&mut self, command: StarManagerCommand) {
 
         if let StarManagerCommand::Init = command
         {
-            Ok(())
         }
         else if let StarManagerCommand::Frame(Frame::StarMessage(message)) = command
         {
             let mut message = message;
             match &message.payload
             {
-                StarMessagePayload::SupervisorPledgeToCentral => {
+                unexpected => { eprintln!("CentralManager: unexpected message: {} ", unexpected) }
+
+                StarMessagePayload::Pledge=> {
                     self.backing.add_supervisor(message.from.clone());
-                    Ok(())
+                    self.reply_ok(message).await;
                 }
-                StarMessagePayload::ApplicationCreateRequest(request) => {
-                    let app_key = self.info.sequence.next();
-                    let app = AppInfo::new(app_key, request.kind.clone());
-                    let supervisor = self.backing.select_supervisor();
-                    if let Option::None = supervisor
+                StarMessagePayload::Tenant(tenant_message) => {
+                    match &tenant_message.payload
                     {
-                        message.reply(self.info.sequence.next(), StarMessagePayload::Reject(Rejection { message: "no supervisors available to host application.".to_string() }));
-                        self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
-                        Ok(())
-                    } else {
-                        if let Some(name) = &request.name
-                        {
-                            self.backing.set_name_to_application(name.clone(), app.clone());
+                        TenantMessagePayload::Request(tenant_payload) => {
+                            match tenant_payload {
+                                RequestMessage::AppCreate(create) =>{
+                                    self.launch_app()
+                                }
+                                RequestMessage::AppSupervisor(_) => {}
+                                RequestMessage::AppLookup(_) => {}
+                                RequestMessage::AppMessage(_) => {}
+                                RequestMessage::AppLabel(_) => {}
+                            }
                         }
-                        let supervisor = supervisor.unwrap();
-                        let message = StarMessage {
-                            id: self.info.sequence.next(),
-                            from: self.info.star_key.clone(),
-                            to: supervisor.clone(),
-                            transaction: message.transaction.clone(),
-                            payload: StarMessagePayload::ApplicationAssign(ApplicationAssign {
-                                app: app,
-                                data: request.data.clone(),
-                                notify: vec![message.from, self.info.star_key.clone()],
-                                supervisor: supervisor.clone()
-                            }),
-                            retry: 0,
-                            max_retries: 16
-                        };
-                        self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await?;
-                        Ok(())
+                        _ => {}
+                    }
+
                     }
                 }
                 StarMessagePayload::ApplicationNotifyReady(notify) => {
@@ -148,11 +191,9 @@ trait CentralManagerBacking: Send+Sync
     fn remove_supervisor(&mut self, star: StarKey );
     fn set_supervisor_for_application(&mut self, app: AppKey, supervisor_star: StarKey );
     fn get_supervisor_for_application(&self, app: &AppKey) -> Option<&StarKey>;
-    fn set_name_to_application(&mut self, name: String, app: AppInfo);
-    fn set_application_state(&mut self,  app: AppKey, state: ApplicationStatus);
-    fn get_application_state(&self,  app: &AppKey ) -> Option<&ApplicationStatus>;
-    fn get_application_for_name(&self,  name: &String ) -> Option<&AppInfo>;
     fn select_supervisor(&mut self )->Option<StarKey>;
+
+    fn get_superuser_token(&mut self) -> Result<AuthToken,Error>;
 }
 
 
@@ -205,23 +246,6 @@ impl CentralManagerBacking for CentralManagerBackingDefault
     fn get_supervisor_for_application(&self, app: &AppKey) -> Option<&StarKey> {
         self.application_to_supervisor.get(app )
     }
-
-    fn set_name_to_application(&mut self, name: String, app: AppInfo) {
-        self.application_name_to_app_id.insert(name, app);
-    }
-
-    fn set_application_state(&mut self, app: AppKey, state: ApplicationStatus) {
-        self.application_state.insert( app, state );
-    }
-
-    fn get_application_state(&self, app: &AppKey )->Option<&ApplicationStatus> {
-        self.application_state.get( app)
-    }
-
-    fn get_application_for_name(&self, name: &String) -> Option<&AppInfo> {
-        self.application_name_to_app_id.get(name)
-    }
-
 
     fn select_supervisor(&mut self) -> Option<StarKey> {
         if self.supervisors.len() == 0

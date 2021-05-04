@@ -30,13 +30,11 @@ pub struct ActorKey
     pub id: Id,
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct Actor
-{
-  pub info: ActorInfo,
-  pub data: Vec<u8>
-}
 
+pub trait Actor
+{
+    async fn handle_message(&mut self, message: ActorMessage );
+}
 
 pub type ActorKindExt = String;
 pub type GatheringKindExt = String;

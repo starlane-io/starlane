@@ -1,19 +1,20 @@
 use crate::error::Error;
 use crate::label::Labels;
 use crate::org::OrgKey;
+use std::collections::HashSet;
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
-pub struct UserToken
+pub struct AuthToken
 {
     user: User,
     valid: bool
 }
 
-impl UserToken
+impl AuthToken
 {
     pub fn new( user: User ) -> Self
     {
-        UserToken{
+        AuthToken {
             user: user,
             valid: true
         }
@@ -59,7 +60,92 @@ pub enum UserKind
     Custom(String)
 }
 
-pub struct Group
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub enum UserPattern
 {
-    pub name: String
+    None,
+    Any,
+    Exact(String),
+    Kind(UserKind)
+}
+
+impl UserPattern
+{
+    pub fn is_match( &self, user: &User) -> bool
+    {
+        match &self
+        {
+            UserPattern::None => {
+                false
+            }
+            UserPattern::Any => {
+                true
+            }
+            UserPattern::Kind(kind) => {
+                kind == user.kind
+            }
+            UserPattern::Exact(name) => {
+                if name == user.name {
+                    true
+                }
+                else {
+                    false
+                }
+            }
+        }
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub struct Permissions
+{
+    pub patterns: Vec<UserPattern>,
+    pub access: HashSet<AccessPriv>
+}
+
+impl Permissions
+{
+    pub fn is_permitted( &self, user: &User ) -> bool
+    {
+        for pattern in &self.patterns
+        {
+            if pattern.is_match(user)
+            {
+                true
+            }
+        }
+        false
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub enum AccessPriv
+{
+    App(AppAccess),
+    Actor(ActorAccess)
+}
+
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub enum AppAccess
+{
+    Create,
+    Message,
+    Watch,
+    Destroy
+}
+
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub enum ActorAccess
+{
+    Create,
+    Watch,
+    Message(MessagePortAccess),
+    Destroy
+}
+
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub enum MessagePortAccess
+{
+    Any,
+    Exact(String),
 }
