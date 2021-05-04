@@ -1,7 +1,8 @@
 use crate::error::Error;
 use crate::label::Labels;
-use crate::org::OrgKey;
 use std::collections::HashSet;
+use serde::{Deserialize, Serialize, Serializer};
+use crate::keys::UserKey;
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub struct AuthToken

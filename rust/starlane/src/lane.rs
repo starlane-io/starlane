@@ -15,7 +15,7 @@ use serde::{Serialize,Deserialize};
 
 use crate::error::Error;
 use crate::id::Id;
-use crate::frame::{Command, Frame, ProtoFrame};
+use crate::frame::{Frame, ProtoFrame};
 use crate::proto::{local_tunnels, ProtoStar, ProtoTunnel};
 use crate::star::{Star, StarKey, StarCommand};
 use crate::starlane::{ConnectCommand, StarlaneCommand};

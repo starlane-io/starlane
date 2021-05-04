@@ -1,5 +1,6 @@
-use starlane::org::OrgKey;
-use starlane::user::GroupKey;
+use std::fmt;
+use serde::{Deserialize, Serialize, Serializer};
+
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct TenantKey
@@ -10,7 +11,7 @@ pub struct TenantKey
 
 impl TenantKey
 {
-    fn new( org: OrgKey, group: GroupKey ) -> Self
+    pub(crate) fn new(org: OrgKey, group: GroupKey ) -> Self
     {
        TenantKey{
            org: org,
@@ -52,13 +53,21 @@ pub struct AppKey
     pub id: u64
 }
 
+
+
 impl AppKey
 {
     pub fn new(tenant: TenantKey, id: u64)->Self
     {
         AppKey{
-            tenant: TenantKey,
+            tenant: tenant,
             id: id
         }
+    }
+}
+
+impl fmt::Display for AppKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({},{})", self.app, self.id)
     }
 }

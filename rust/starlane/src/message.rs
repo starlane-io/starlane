@@ -136,19 +136,19 @@ pub struct StarMessageDeliveryInsurance
 
 impl StarMessageDeliveryInsurance
 {
-    pub fn new( message: StarMessage, expect: MessageExpect, retries: usize ) -> Self
+    pub fn new( message: StarMessage, expect: MessageExpect) -> Self
     {
         let (tx,rx) = broadcast::channel(8);
-        StarMessageDeliveryInsurance::with_txrx(message,expect,retries,tx,rx)
+        StarMessageDeliveryInsurance::with_txrx(message,expect,tx,rx)
     }
 
 
-    pub fn with_txrx( message: StarMessage, expect: MessageExpect, retries: usize, tx: broadcast::Sender<MessageUpdate>, rx:broadcast::Receiver<MessageUpdate> ) -> Self
+    pub fn with_txrx( message: StarMessage, expect: MessageExpect, tx: broadcast::Sender<MessageUpdate>, rx:broadcast::Receiver<MessageUpdate> ) -> Self
     {
         StarMessageDeliveryInsurance {
             message: message,
+            retries: expect.retries(),
             expect: expect,
-            retries: retries,
             tx: tx,
             rx: rx
         }

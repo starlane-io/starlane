@@ -6,12 +6,12 @@ use serde::{Deserialize, Serialize, Serializer};
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::Sender;
 
-use crate::app::AppKey;
 use crate::error::Error;
 use crate::frame::{Event, ActorMessage, ActorState};
 use crate::id::Id;
 use crate::label::LabelSelectionCriteria;
 use crate::star::StarKey;
+use crate::keys::AppKey;
 
 pub static DEFAULT_ENTITY_KIND_EXT: &str = "default";
 pub static DEFAULT_GATHERING_KIND_EXT: &str = "default";
@@ -31,6 +31,7 @@ pub struct ActorKey
 }
 
 
+#[async_trait]
 pub trait Actor
 {
     async fn handle_message(&mut self, message: ActorMessage );

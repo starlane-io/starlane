@@ -23,7 +23,6 @@ use tokio::time::error::Elapsed;
 use url::Url;
 
 use crate::actor::{Actor, ActorKey, ActorKind, ActorLocation, ActorWatcher};
-use crate::app::{AppCommandWrapper, AppController, AppCreate, AppInfo, AppKey, AppKind, Application, ApplicationStatus, AppLocation};
 use crate::core::StarCoreCommand;
 use crate::error::Error;
 use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, AppAssign, AppCreateRequest, AppNotifyCreated, ApplicationSupervisorReport, AppSupervisorRequest, Event, Frame, ProtoFrame, Rejection, SearchHit, StarMessage, StarMessageAck, StarMessagePayload, StarSearch, StarSearchPattern, StarSearchResult, StarUnwind, StarUnwindPayload, StarWind, StarWindPayload, Watch, WatchInfo};
@@ -32,8 +31,11 @@ use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMe
 use crate::org::OrgCommand;
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
 use crate::star::central::CentralManager;
-use crate::message::{ProtoMessage, MessageUpdate, StarMessageDeliveryInsurance, MessageReplyTracker, TrackerJob, MessageResult};
-use crate::star::supervisor::SupervisorCommand;
+use crate::message::{ProtoMessage, MessageUpdate, StarMessageDeliveryInsurance, MessageReplyTracker, TrackerJob, MessageResult, MessageExpect, MessageExpectWait};
+use crate::star::supervisor::{SupervisorCommand, SupervisorManager};
+use crate::label::Labels;
+use crate::keys::AppKey;
+use crate::app::{AppCommandWrapper, AppLocation, AppKind, AppController, AppCreate, Application};
 
 pub mod central;
 pub mod supervisor;
@@ -237,7 +239,7 @@ impl StarLogger
     pub fn log( &mut self, log: StarLog )
     {
         self.tx.retain( |sender| {
-            if let Err(broadcast::SendError(_)) = sender.send(log.clone())
+            if let Err(err) = sender.send(log.clone())
             {
                 true
             }
@@ -363,7 +365,10 @@ impl Star
                             let lane = self.lane_with_shortest_path_to_star(&star);
                             if let Option::Some(lane)=lane
                             {
-                                lane.lane.outgoing.tx.send( LaneCommand::Frame(frame) ).await;
+                                for frame in frames
+                                {
+                                    lane.lane.outgoing.tx.send(LaneCommand::Frame(frame)).await;
+                                }
                             }
                             else {
                                 eprintln!("release hold called on star that is not ready!")
@@ -444,7 +449,7 @@ impl Star
 
         if let Err(errors) = proto.validate()
         {
-            eprintln!("protomessage is not valid cannot send: {}" errors.into() );
+                eprintln!("protomessage is not valid cannot send: {}", errors );
             return;
         }
 
@@ -454,9 +459,10 @@ impl Star
             id: self.info.sequence.next(),
             transaction: proto.transaction,
             payload: StarMessagePayload::None,
+            reply_to: proto.reply_to
         };
 
-        let delivery = StarMessageDeliveryInsurance::new(message, proto.expect, proto.retries );
+        let delivery = StarMessageDeliveryInsurance::new(message, proto.expect );
 
         self.message(delivery).await;
     }
@@ -468,8 +474,8 @@ impl Star
             OrgCommand::AppCreate(create) => {
                 let payload = StarMessagePayload::ApplicationCreateRequest(AppCreateRequest {
                     kind: "default".to_string(),
-                    name: create.name,
-                    data: create.data
+                    data: create.data,
+                    labels: Labels::new()
                 });
                 let tid = self.info.sequence.next();
                 let mut message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
@@ -481,7 +487,9 @@ impl Star
                 };
                 self.transactions.insert( tid.clone(), Box::new(transaction) );
 
-                self.message(message).await;
+                let delivery = StarMessageDeliveryInsurance::new(message,MessageExpect::None);
+
+                self.message(delivery).await;
             }
             OrgCommand::Get(_) => {}
         }
@@ -707,7 +715,7 @@ impl Star
 
                 loop
                 {
-                    let wait = if delivery.retries() == 0 && delivery.expect.retry_forever(){
+                    let wait = if delivery.retries == 0 && delivery.expect.retry_forever(){
                         // take a 2 minute break if retry_forever to be sure that all messages have expired
                         120 as u64
                     }
@@ -1194,22 +1202,25 @@ impl Star
             }
         }
     }
-    fn get_app_location(&mut self, app_id: &Id ) -> Option<&StarKey>
+
+    fn get_app_location(&mut self, app_key: &AppKey) -> Option<&StarKey>
     {
-        self.app_locations.get(app_id)
+        self.app_locations.get(app_key )
     }
 
-    async fn find_app_location(&mut self, app_id: &Id ) -> mpsc::Receiver<AppLocation>
+    async fn find_app_location(&mut self, app: AppKey ) -> mpsc::Receiver<AppLocation>
     {
-        let payload = StarMessagePayload::ApplicationSupervisorRequest(AppSupervisorRequest { app: app_id.clone() } );
+        let payload = StarMessagePayload::ApplicationSupervisorRequest(AppSupervisorRequest { app: app.clone() } );
         let mut message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
         message.transaction = Option::Some(self.info.sequence.next());
 
-        let (transaction,rx) = ApplicationSupervisorSearchTransaction::new(app_id.clone());
+        let (transaction,rx) = ApplicationSupervisorSearchTransaction::new(app.clone());
         let transaction = Box::new(transaction);
         self.transactions.insert( message.transaction.unwrap().clone(), transaction );
 
-        self.message( message ).await;
+        let delivery = StarMessageDeliveryInsurance::new(message, MessageExpect::ReplyErrOrTimeout(MessageExpectWait::Short));
+
+        self.message( delivery ).await;
 
         rx
     }
@@ -1225,14 +1236,14 @@ impl Star
         }
     }
 
-    async fn find_entity_location(&mut self, kind: ActorLookup) -> mpsc::Receiver<()>
+    async fn find_entity_location(&mut self, lookup: ActorLookup) -> mpsc::Receiver<()>
     {
 
-        let supervisor_star = self.get_app_location(&kind.app_id() ).cloned();
+        let supervisor_star = self.get_app_location(&lookup.app() ).cloned();
 
         match supervisor_star{
             None => {
-                let mut rx = self.find_app_location(&kind.app_id()).await;
+                let mut rx = self.find_app_location(lookup.app()).await;
                 let (xt,xr) = mpsc::channel(1);
 
                 tokio::spawn( async move {
@@ -1245,12 +1256,13 @@ impl Star
                 xr
             }
             Some(supervisor_star) => {
-                let payload = StarMessagePayload::ActorLocationRequest(ActorLocationRequest { lookup: kind } );
+                let payload = StarMessagePayload::ActorLocationRequest(ActorLocationRequest { lookup } );
                 let mut message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), supervisor_star, payload );
                 message.transaction = Option::Some(self.info.sequence.next());
                 let (transaction,rx) =  ResourceLocationRequestTransaction::new();
                 self.transactions.insert( message.transaction.unwrap().clone(), Box::new(transaction) );
-                self.message( message ).await;
+                let delivery = StarMessageDeliveryInsurance::new(message, MessageExpect::ReplyErrOrTimeout(MessageExpectWait::Short));
+                self.message( delivery ).await;
                 rx
             }
         }
@@ -1314,7 +1326,9 @@ impl Star
         {
             if self.info.kind.relay() || message.from == self.info.star_key
             {
-                self.message(message).await;
+
+                let delivery = StarMessageDeliveryInsurance::new(message, MessageExpect::ReplyErrOrTimeout(MessageExpectWait::Short));
+                self.message(delivery).await;
                 return Ok(());
             }
             else {
@@ -1546,9 +1560,8 @@ impl StarController
 
        let app_create = OrgCommand::AppCreate( AppCreate{
            kind: kind,
-           name: Option::Some("app".to_string()),
-           data: vec!(),
-           tx: tx
+           data: Arc::new(vec!()),
+           labels: Labels::new()
        } );
 
        self.command_tx.send( StarCommand::AppLifecycleCommand(app_create) ).await;
@@ -1584,13 +1597,13 @@ pub struct StarWatchInfo
 
 pub struct ApplicationSupervisorSearchTransaction
 {
-    pub app_id: Id,
+    pub app_id: AppKey,
     pub tx: mpsc::Sender<AppLocation>
 }
 
 impl ApplicationSupervisorSearchTransaction
 {
-    pub fn new(app_id: Id) ->(Self,mpsc::Receiver<AppLocation>)
+    pub fn new(app_id: AppKey) ->(Self,mpsc::Receiver<AppLocation>)
     {
         let (tx,rx) = mpsc::channel(1);
         (ApplicationSupervisorSearchTransaction{
@@ -1603,7 +1616,7 @@ impl ApplicationSupervisorSearchTransaction
 #[async_trait]
 impl Transaction for ApplicationSupervisorSearchTransaction
 {
-    async fn on_frame(&mut self, frame: &Frame, lane: Option<&mut LaneMeta>, command_tx: &mut Sender<StarCommand>) -> TransactionResult {
+    async fn on_frame(&mut self, frame: &Frame, lane: Option<&mut LaneMeta>, command_tx: &mut mpsc::Sender<StarCommand>) -> TransactionResult {
 
         if let Frame::StarMessage( message ) = frame
         {
@@ -1642,7 +1655,7 @@ impl ResourceLocationRequestTransaction
 #[async_trait]
 impl Transaction for ResourceLocationRequestTransaction
 {
-    async fn on_frame(&mut self, frame: &Frame, lane: Option<&mut LaneMeta>, command_tx: &mut Sender<StarCommand>) -> TransactionResult {
+    async fn on_frame(&mut self, frame: &Frame, lane: Option<&mut LaneMeta>, command_tx: &mut mpsc::Sender<StarCommand>) -> TransactionResult {
 
         if let Frame::StarMessage( message ) = frame
         {
@@ -1740,7 +1753,7 @@ impl StarSearchTransaction
 #[async_trait]
 impl Transaction for StarSearchTransaction
 {
-    async fn on_frame(&mut self, frame: &Frame, lane: Option<&mut LaneMeta>, command_tx: &mut mscp::Sender<StarCommand>) -> TransactionResult {
+    async fn on_frame(&mut self, frame: &Frame, lane: Option<&mut LaneMeta>, command_tx: &mut mpsc::Sender<StarCommand>) -> TransactionResult {
         if let Option::None = lane
         {
             eprintln!("lane is not set for StarSearchTransaction");
@@ -1796,7 +1809,7 @@ pub struct AppCreateTransaction
 #[async_trait]
 impl Transaction for AppCreateTransaction
 {
-    async fn on_frame(&mut self, frame: &Frame, lane: Option<&mut LaneMeta>, command_tx: &mut Sender<StarCommand>) -> TransactionResult
+    async fn on_frame(&mut self, frame: &Frame, lane: Option<&mut LaneMeta>, command_tx: &mut mpsc::Sender<StarCommand>) -> TransactionResult
     {
         if let Frame::StarMessage(message) = &frame
         {
@@ -1949,7 +1962,7 @@ pub trait SupervisorManagerBacking: Send+Sync
     fn remove_server( &mut self, server: &StarKey );
     fn select_server(&mut self) -> Option<StarKey>;
 
-    fn add_application(&mut self, app: AppKey, application: Application );
+    fn add_application(&mut self, app: AppKey, application: Box<dyn Application> );
     fn get_application(&mut self, app: AppKey ) -> Option<&Application>;
 
     fn remove_application(&mut self, app: AppKey );

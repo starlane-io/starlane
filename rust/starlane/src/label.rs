@@ -14,7 +14,7 @@ pub struct LabelConfig
 #[derive(Clone,Serialize,Deserialize)]
 pub struct UniqueLabelConstraint
 {
-    pub labels: vec<String>
+    pub labels: Vec<String>
 }
 
 #[derive(Clone,Serialize,Deserialize)]

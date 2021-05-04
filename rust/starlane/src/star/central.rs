@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use tokio::sync::{mpsc, oneshot, broadcast};
-use crate::app::{AppInfo, AppKey, ApplicationStatus, AppCreate, AppLocation};
+use crate::app::{AppInfo, ApplicationStatus, AppCreate, AppLocation};
 use crate::error::Error;
 use crate::frame::{AppAssign, ApplicationSupervisorReport, Frame, Rejection, StarMessage, StarMessagePayload, StarUnwind, StarUnwindPayload, StarWindPayload, TenantMessage, TenantMessagePayload, RequestMessage, AssignMessage, ReportMessage, AppCreateRequest};
 use crate::id::Id;
@@ -10,6 +10,7 @@ use crate::label::Labels;
 use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarInfo, StarKey, StarManager, StarManagerCommand, StarNotify};
 use crate::user::{AuthToken, AppAccess};
 use crate::message::{ProtoMessage, MessageExpect, MessageUpdate, MessageResult, MessageExpectWait};
+use crate::keys::{TenantKey, AppKey, GroupKey};
 use tokio::sync::mpsc::error::SendError;
 use futures::FutureExt;
 use tokio::sync::oneshot::Receiver;
@@ -76,7 +77,7 @@ impl CentralManager
         proto.to = Option::Some(StarKey::central());
         proto.expect = MessageExpect::RetryUntilOk;
         proto.payload = StarMessagePayload::Tenant(TenantMessage{
-                                                   tenant:TenantKey::new( 0, 0 ),
+                                                   tenant:TenantKey::new( 0, GroupKey{id:0} ),
                                                    token: self.backing.get_superuser_token()?,
                                                    payload: TenantMessagePayload::Request(RequestMessage::AppCreate(AppCreateRequest{
                                                    labels: HashMap::new(),
@@ -124,8 +125,8 @@ impl CentralManager
     async fn launch_app(&mut self, tenant: TenantKey, create: AppCreate, expect: MessageExpect) -> Result<oneshot::Receiver<AppLocation>, Error>
     {
         let app_id = self.info.sequence.next();
-        let app_key = AppKey::new(tenant_message.tenant.clone(), app_id.index);
-        let app = AppInfo::new(app_key.clone(), tenant_payload.kind.clone());
+        let app_key = AppKey::new(tenant.clone(), app_id.index);
+        let app = AppInfo::new(app_key.clone(), create.kind.clone());
         let supervisor = self.backing.select_supervisor();
         if let Option::None = supervisor
         {
@@ -284,6 +285,7 @@ trait CentralManagerBacking: Send+Sync
 pub struct CentralManagerBackingDefault
 {
     info: StarInfo,
+    init_status: CentralInitStatus,
     supervisors: Vec<StarKey>,
     application_to_supervisor: HashMap<AppKey,StarKey>,
     application_name_to_app_id : HashMap<String,AppInfo>,
@@ -297,6 +299,7 @@ impl CentralManagerBackingDefault
     {
         CentralManagerBackingDefault {
             info: info,
+            init_status: CentralInitStatus::None,
             supervisors: vec![],
             application_to_supervisor: HashMap::new(),
             application_name_to_app_id: HashMap::new(),
@@ -331,6 +334,18 @@ impl CentralManagerBacking for CentralManagerBackingDefault
         self.application_to_supervisor.get(app )
     }
 
+    fn has_supervisor(&self) -> bool {
+        !self.supervisors.is_empty()
+    }
+
+    fn get_init_status(&self) -> CentralInitStatus {
+        todo!()
+    }
+
+    fn set_init_status(&self, status: CentralInitStatus) {
+        todo!()
+    }
+
     fn select_supervisor(&mut self) -> Option<StarKey> {
         if self.supervisors.len() == 0
         {
@@ -341,7 +356,13 @@ impl CentralManagerBacking for CentralManagerBackingDefault
             return self.supervisors.get(&self.supervisor_index%self.supervisors.len()).cloned();
         }
     }
+
+    fn get_superuser_token(&mut self) -> Result<AuthToken, Error> {
+        todo!()
+    }
 }
+
+#[async_trait]
 pub trait AppCentral
 {
     async fn create( &self, info: AppInfo, data: Arc<Vec<u8>> ) -> Result<Labels,Error>;

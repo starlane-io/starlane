@@ -1,22 +1,15 @@
-use alloc::boxed::Box;
-use alloc::string::String;
-use alloc::vec::Vec;
 use async_trait::async_trait;
 use core::option::Option;
 use core::option::Option::{None, Some};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
-use starlane::actor::{ActorKey, ActorLocation};
-use starlane::app::{AppKey, Application, AppLocation};
-use starlane::error::Error;
-use starlane::frame::{ActorLookup, ApplicationNotifyReady, Frame, StarMessage, StarMessagePayload};
-use starlane::star::{StarCommand, StarInfo, StarKey, StarManager, StarManagerCommand, SupervisorManagerBacking};
 use crate::star::{StarInfo, SupervisorManagerBacking, StarManager, StarManagerCommand, StarCommand, StarKey};
 use crate::frame::{StarMessagePayload, StarMessage, Frame, AppNotifyCreated, ActorLookup};
 use crate::error::Error;
-use crate::app::{Application, AppLocation, AppKey};
 use std::collections::HashMap;
 use crate::actor::{ActorKey, ActorLocation};
+use crate::app::{AppLocation, Application};
+use crate::keys::AppKey;
 
 pub enum SupervisorCommand
 {
@@ -135,8 +128,9 @@ impl SupervisorManager
                         Some(location) => {
                             let location = location.clone();
                             let payload = StarMessagePayload::ActorLocationReport(location);
-                            message.reply( self.info.sequence.next(), payload );
-                            self.info.command_tx.send( StarCommand::Frame(Frame::StarMessage(message))).await?;
+                            let proto = message.reply( payload );
+
+                            self.info.command_tx.send( StarCommand::SendProtoMessage(proto)).await?;
                         }
                     }
                     Ok(())
@@ -153,7 +147,7 @@ pub struct SupervisorManagerBackingDefault
     info: StarInfo,
     servers: Vec<StarKey>,
     server_select_index: usize,
-    applications: HashMap<AppKey,Application>,
+    applications: HashMap<AppKey,Box<dyn Application>>,
     name_to_entity: HashMap<String, ActorKey>,
     entity_location: HashMap<ActorKey, ActorLocation>
 }
@@ -193,7 +187,7 @@ impl SupervisorManagerBacking for SupervisorManagerBackingDefault
         Option::Some(server.clone())
     }
 
-    fn add_application(&mut self, app: AppKey, application: Application ) {
+    fn add_application(&mut self, app: AppKey, application: Box<dyn Application>) {
         self.applications.insert(app, application);
     }
 

@@ -11,6 +11,7 @@ pub struct SystemAppCentral
 {
 }
 
+#[async_trait]
 impl Application for SystemAppCentral
 {
     async fn create(&self, context: &AppContext, create: AppCreate) -> Result<Labels, Error> {

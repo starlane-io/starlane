@@ -5,9 +5,11 @@ use crate::actor::{Actor, ActorCreate, ActorKey, ActorKind, ActorSelect};
 use crate::error::Error;
 use crate::frame::ActorMessage;
 use crate::label::{Labels, LabelSelectionCriteria};
-use crate::org::OrgKey;
 use crate::star::{ActorCommand, StarCommand, StarKey};
-use crate::user::UserKey;
+use crate::keys::{AppKey, UserKey};
+use serde::{Deserialize, Serialize, Serializer};
+
+
 
 pub mod system;
 
@@ -114,7 +116,7 @@ pub struct AppContext
 
 
 #[async_trait]
-pub trait Application
+pub trait Application: Send+Sync
 {
     async fn create( &self, context: &AppContext, create: AppCreate ) -> Result<Labels,Error>;
     async fn destroy( &self, context: &AppContext, destroy: AppDestroy ) -> Result<(),Error>;

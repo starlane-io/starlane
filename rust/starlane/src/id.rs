@@ -37,7 +37,7 @@ impl IdSeq {
     pub fn with_seq_and_start_index(seq_id: u64, start_index: u64) -> Self {
         IdSeq {
             sequence: seq_id,
-            index: AtomicI64::new(start_index ),
+            index: AtomicU64::new(start_index ),
         }
     }
 

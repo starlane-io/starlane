@@ -6,14 +6,14 @@ use serde::{Deserialize, Serialize, Serializer};
 use tokio::time::Instant;
 
 use crate::actor::{ActorKey, ActorLocation};
-use crate::app::{AppInfo, AppKey, AppKind, AppLocation, AppCreate};
 use crate::id::Id;
 use crate::star::{StarKey, StarKind, StarWatchInfo, StarNotify};
-use crate::user::{User, UserKey, GroupKey, AuthToken};
-use crate::org::OrgKey;
 use crate::label::Labels;
 use crate::message::{MessageResult, ProtoMessage, MessageExpect, MessageUpdate};
 use tokio::sync::{oneshot, broadcast};
+use crate::keys::{TenantKey, AppKey, UserKey};
+use crate::app::{AppLocation, AppKind, AppInfo};
+use crate::user::AuthToken;
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Frame
@@ -213,13 +213,13 @@ impl StarMessage
         proto
     }
 
-    pub fn resubmit(&self, expect: MessageExpect, tx: broadcast::Sender<MessageUpdate>, rx: broadcast::Receiver<MessageUpdate> ) -> ProtoMessage
+    pub fn resubmit(self, expect: MessageExpect, tx: broadcast::Sender<MessageUpdate>, rx: broadcast::Receiver<MessageUpdate> ) -> ProtoMessage
     {
         let mut proto = ProtoMessage::with_txrx(tx,rx);
         proto.to = Option::Some(self.from.clone());
         proto.expect = expect;
         proto.reply_to = Option::Some(self.id.clone());
-        proto.payload = payload;
+        proto.payload = self.payload;
         proto
     }
 
@@ -322,6 +322,11 @@ pub struct AppMessage
 {
     pub app: AppKey,
     pub payload: AppMessagePayload
+}
+
+pub enum AppMessagePayload
+{
+   None
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -442,8 +447,17 @@ pub struct ActorLocationReport
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ActorLookup
 {
-    Key(ActorKey),
-    Name(ActorNameLookup)
+    Key(ActorKey)
+}
+
+impl ActorLookup
+{
+    pub fn app(&self) -> AppKey {
+        match self
+        {
+            ActorLookup::Key(key) => {key.app.clone()}
+        }
+    }
 }
 
 #[derive(Clone,Serialize,Deserialize)]
