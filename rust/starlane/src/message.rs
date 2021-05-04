@@ -13,27 +13,29 @@ pub struct ProtoMessage
     pub to: Option<StarKey>,
     pub payload: StarMessagePayload,
     pub transaction: Option< Id >,
-    pub tx: mpsc::Sender<StarMessagePayload>,
-    pub rx: Cell<mpsc::Receiver<StarMessagePayload>>,
-    pub timeout_seconds: usize,
-    pub retries: usize,
+    pub tx: broadcast::Sender<MessageUpdate>,
+    pub rx: broadcast::Receiver<MessageUpdate>,
     pub expect: MessageExpect,
     pub reply_to: Option<Id>
 }
 
 impl ProtoMessage
 {
+
     pub fn new()->Self
     {
-        let (tx,rx) = mpsc::channel();
+        let (tx,rx) = broadcast::channel(8);
+        ProtoMessage::with_txrx(tx,rx)
+    }
+
+    pub fn with_txrx( tx: broadcast::Sender<MessageUpdate>, rx: broadcast::Receiver<MessageUpdate> )->Self
+    {
         ProtoMessage{
             to: Option::None,
             payload: StarMessagePayload::None,
             transaction: Option::None,
-            timeout_seconds: 60,
             tx: tx,
-            rx: Cell::new(rx),
-            retries: 5,
+            rx: rx,
             expect: MessageExpect::None,
             reply_to: Option::None
         }
@@ -63,6 +65,13 @@ impl ProtoMessage
         }
 
         Ok(())
+    }
+
+    pub async fn get_ok_result(&self) -> oneshot::Receiver<StarMessagePayload>
+    {
+        let (waiter, rx) = OkResultWaiter::new(self.tx.subscribe() );
+        waiter.wait().await;
+        rx
     }
 }
 
@@ -130,6 +139,12 @@ impl StarMessageDeliveryInsurance
     pub fn new( message: StarMessage, expect: MessageExpect, retries: usize ) -> Self
     {
         let (tx,rx) = broadcast::channel(8);
+        StarMessageDeliveryInsurance::with_txrx(message,expect,retries,tx,rx)
+    }
+
+
+    pub fn with_txrx( message: StarMessage, expect: MessageExpect, retries: usize, tx: broadcast::Sender<MessageUpdate>, rx:broadcast::Receiver<MessageUpdate> ) -> Self
+    {
         StarMessageDeliveryInsurance {
             message: message,
             expect: expect,
@@ -144,5 +159,116 @@ impl StarMessageDeliveryInsurance
 pub enum MessageExpect
 {
     None,
-    Reply
+    ReplyErrOrTimeout(MessageExpectWait),
+    RetryUntilOk
 }
+
+impl MessageExpect {
+    pub(crate) fn wait_seconds(&self) -> u64 {
+        match self
+        {
+            MessageExpect::None => {
+                30
+            }
+            MessageExpect::ReplyErrOrTimeout(wait) => {
+                wait.wait_seconds()
+            }
+            MessageExpect::RetryUntilOk => {
+                5
+            }
+        }
+    }
+
+    pub fn retries(&self) -> usize {
+        match self
+        {
+            MessageExpect::None => {1}
+            MessageExpect::ReplyErrOrTimeout(wait) => {
+                wait.retries()
+            }
+            MessageExpect::RetryUntilOk => {
+                10
+            }
+        }
+    }
+
+    pub fn retry_forever(&self) -> bool
+    {
+        match self
+        {
+            MessageExpect::RetryUntilOk => {
+                true
+            }
+            _ => {
+                false
+            }
+        }
+    }
+}
+
+pub enum MessageExpectWait
+{
+    Short,
+    Med,
+    Long
+}
+
+impl MessageExpectWait {
+    pub fn wait_seconds(&self) -> u64 {
+        match self
+        {
+            MessageExpectWait::Short => {5}
+            MessageExpectWait::Med => {15}
+            MessageExpectWait::Long => {30}
+        }
+    }
+
+    pub fn retries(&self) -> usize {
+        match self
+        {
+            MessageExpectWait::Short => {5}
+            MessageExpectWait::Med => {10}
+            MessageExpectWait::Long => {15}
+        }
+    }
+}
+
+pub struct OkResultWaiter
+{
+    rx: broadcast::Receiver<MessageUpdate>,
+    tx: oneshot::Sender<StarMessagePayload>
+}
+
+impl OkResultWaiter
+{
+    pub fn new( rx: broadcast::Receiver<MessageUpdate> )->(Self,oneshot::Receiver<StarMessagePayload>)
+    {
+        let (tx,osrx) = oneshot::channel();
+        (OkResultWaiter{
+            rx: rx,
+            tx: tx
+        },osrx)
+    }
+
+    pub async fn wait( mut self )
+    {
+        tokio::spawn( async move {
+        loop{
+            if let Ok(MessageUpdate::Result(result)) = self.rx.recv().await
+            {
+                match result
+                {
+                    MessageResult::Ok(payload) => {
+                        self.tx.send(payload).unwrap();
+                    }
+                    _ => {
+                        eprintln!("not expecting this results for OkResultWaiter...");
+                        self.tx.send(StarMessagePayload::None);
+                    }
+                }
+                break;
+            }
+        }});
+    }
+}
+

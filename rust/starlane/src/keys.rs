@@ -8,6 +8,17 @@ pub struct TenantKey
     pub group: GroupKey
 }
 
+impl TenantKey
+{
+    fn new( org: OrgKey, group: GroupKey ) -> Self
+    {
+       TenantKey{
+           org: org,
+           group: group
+       }
+    }
+}
+
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct UserKey
 {
@@ -29,8 +40,25 @@ impl UserKey
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub struct GroupKey
 {
-    pub org: OrgKey,
     pub id: u16
 }
 
 pub type OrgKey=u64;
+
+#[derive(Clone,Hash,Eq,PartialEq)]
+pub struct AppKey
+{
+    pub tenant: TenantKey,
+    pub id: u64
+}
+
+impl AppKey
+{
+    pub fn new(tenant: TenantKey, id: u64)->Self
+    {
+        AppKey{
+            tenant: TenantKey,
+            id: id
+        }
+    }
+}

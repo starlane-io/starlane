@@ -12,8 +12,8 @@ use crate::star::{StarKey, StarKind, StarWatchInfo, StarNotify};
 use crate::user::{User, UserKey, GroupKey, AuthToken};
 use crate::org::OrgKey;
 use crate::label::Labels;
-use crate::message::{MessageResult, ProtoMessage};
-use tokio::sync::oneshot;
+use crate::message::{MessageResult, ProtoMessage, MessageExpect, MessageUpdate};
+use tokio::sync::{oneshot, broadcast};
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Frame
@@ -213,6 +213,17 @@ impl StarMessage
         proto
     }
 
+    pub fn resubmit(&self, expect: MessageExpect, tx: broadcast::Sender<MessageUpdate>, rx: broadcast::Receiver<MessageUpdate> ) -> ProtoMessage
+    {
+        let mut proto = ProtoMessage::with_txrx(tx,rx);
+        proto.to = Option::Some(self.from.clone());
+        proto.expect = expect;
+        proto.reply_to = Option::Some(self.id.clone());
+        proto.payload = payload;
+        proto
+    }
+
+
     pub fn inc_retry(&mut self)
     {
         self.retries = &self.retries + 1;
@@ -275,6 +286,12 @@ pub enum TenantMessagePayload
     Request(RequestMessage),
     Report(ReportMessage),
     Assign(AssignMessage),
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ReportMessage
+{
+   AppLocation(AppLocation)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -501,15 +518,14 @@ pub struct AppCreateRequest
 {
     pub labels: Labels,
     pub kind: AppKind,
-    pub data: Vec<u8>,
+    pub data: Arc<Vec<u8>>,
 }
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct AppAssign
 {
     pub app : AppInfo,
-    pub data: Vec<u8>,
-    pub notify: Vec<StarNotify>,
+    pub data: Arc<Vec<u8>>,
 }
 
 #[derive(Clone,Serialize,Deserialize)]

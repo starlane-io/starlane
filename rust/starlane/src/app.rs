@@ -13,23 +13,7 @@ pub mod system;
 
 pub type AppKind = String;
 
-#[derive(Clone,Hash,Eq,PartialEq)]
-pub struct AppKey
-{
-    pub tenant: TenantKey,
-    pub id: u64
-}
 
-impl AppKey
-{
-    pub fn new(tenant: TenantKey, id: u64)->Self
-    {
-        AppKey{
-            tenant: TenantKey,
-            id: id
-        }
-    }
-}
 
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -67,10 +51,9 @@ pub struct AppSelect
 #[derive(Clone,Serialize,Deserialize)]
 pub struct AppCreate
 {
-    pub name: Option<String>,
     pub kind: AppKind,
-    pub data: Vec<u8>,
-    pub labels: HashMap<String,String>
+    pub data: Arc<Vec<u8>>,
+    pub labels: Labels
 }
 
 #[derive(Clone,Serialize,Deserialize)]

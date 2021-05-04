@@ -690,6 +690,7 @@ impl Star
     async fn message(&mut self, delivery: StarMessageDeliveryInsurance)
     {
 
+        let message = delivery.message.clone();
         if !delivery.message.payload.is_ack()
         {
             let tracker = MessageReplyTracker {
@@ -699,13 +700,22 @@ impl Star
 
             self.message_reply_trackers.insert(delivery.message.id.clone(), tracker);
 
-            let message = delivery.message.clone();
+            let star_tx = self.info.command_tx.clone();
             tokio::spawn( async move {
                 let mut delivery = delivery;
+                delivery.retries = delivery.expect.retries();
+
                 loop
                 {
-                     let result = timeout(Duration::from_secs(5) ,delivery.rx.recv()).await;
-                     match result{
+                    let wait = if delivery.retries() == 0 && delivery.expect.retry_forever(){
+                        // take a 2 minute break if retry_forever to be sure that all messages have expired
+                        120 as u64
+                    }
+                    else {
+                        delivery.expect.wait_seconds()
+                    };
+                    let result = timeout(Duration::from_secs(wait ) ,delivery.rx.recv() ).await;
+                    match result{
                          Ok(result) => {
                              match result
                              {
@@ -713,7 +723,8 @@ impl Star
                                      match update
                                      {
                                          MessageUpdate::Result(_) => {
-                                             // we have a result no longer need to resend
+                                             // the result will have been captured on another
+                                             // rx as this is a broadcast.  no longer need to wait.
                                              break;
                                          }
                                          _ => {}
@@ -726,21 +737,32 @@ impl Star
                              }
                          }
                          Err(elapsed) => {
+                             delivery.retries = delivery.retries - 1;
                              if delivery.retries == 0 {
-                                 delivery.tx.send( MessageUpdate::Result(MessageResult::Timeout));
-                                 break;
+                                 if delivery.expect.retry_forever()
+                                 {
+                                     // we have to keep trying with a new message Id since the old one is now expired
+                                     let proto = delivery.message.resubmit( delivery.expect, delivery.tx.clone(), delivery.tx.subscribe() );
+                                     star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                                     break;
+                                 }
+                                 else {
+                                     // out of retries, this
+                                     delivery.tx.send(MessageUpdate::Result(MessageResult::Timeout));
+                                     break;
+                                 }
                              }
                              else {
-                                 // do a retry
-                                 delivery.retries = delivery.retries - 1;
+                                 // we resend the message and hope it arrives this time
+                                 self.send_frame(delivery.message.to.clone(), Frame::StarMessage(delivery.message.clone()) ).await;
                              }
                          }
                      }
                  }
             });
         }
-
         self.send_frame(message.to.clone(), Frame::StarMessage(message) ).await;
+
     }
 
     async fn send_frame(&mut self, star: StarKey, frame: Frame )
