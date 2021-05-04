@@ -25,7 +25,7 @@ use crate::actor::{Actor, ActorKey, ActorKind, ActorLocation, ActorWatcher};
 use crate::app::{AppCommandWrapper, AppController, AppCreate, AppInfo, AppKey, AppKind, Application, ApplicationStatus, AppLocation};
 use crate::core::StarCoreCommand;
 use crate::error::Error;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, ApplicationAssign, ApplicationCreateRequest, ApplicationNotifyReady, ApplicationSupervisorReport, ApplicationSupervisorRequest, Event, Frame, ProtoFrame, Rejection, SearchHit, StarMessage, StarMessageAck, StarMessagePayload, StarSearch, StarSearchPattern, StarSearchResult, StarUnwind, StarUnwindPayload, StarWind, StarWindPayload, Watch, WatchInfo};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, ApplicationAssign, AppCreateRequest, AppNotifyCreated, ApplicationSupervisorReport, AppSupervisorRequest, Event, Frame, ProtoFrame, Rejection, SearchHit, StarMessage, StarMessageAck, StarMessagePayload, StarSearch, StarSearchPattern, StarSearchResult, StarUnwind, StarUnwindPayload, StarWind, StarWindPayload, Watch, WatchInfo};
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::org::OrgCommand;
@@ -436,7 +436,7 @@ impl Star
         match command
         {
             OrgCommand::AppCreate(create) => {
-                let payload = StarMessagePayload::ApplicationCreateRequest(ApplicationCreateRequest {
+                let payload = StarMessagePayload::ApplicationCreateRequest(AppCreateRequest {
                     kind: "default".to_string(),
                     name: create.name,
                     data: create.data
@@ -1096,7 +1096,7 @@ impl Star
 
     async fn find_app_location(&mut self, app_id: &Id ) -> mpsc::Receiver<AppLocation>
     {
-        let payload = StarMessagePayload::ApplicationSupervisorRequest(ApplicationSupervisorRequest { app: app_id.clone() } );
+        let payload = StarMessagePayload::ApplicationSupervisorRequest(AppSupervisorRequest { app: app_id.clone() } );
         let mut message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
         message.transaction = Option::Some(self.info.sequence.next());
 

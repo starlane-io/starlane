@@ -6,11 +6,12 @@ use serde::{Deserialize, Serialize, Serializer};
 use tokio::time::Instant;
 
 use crate::actor::{ActorKey, ActorLocation};
-use crate::app::{AppInfo, AppKey, AppKind, AppLocation};
+use crate::app::{AppInfo, AppKey, AppKind, AppLocation, AppCreate};
 use crate::id::Id;
 use crate::star::{StarKey, StarKind, StarWatchInfo};
 use crate::user::{User, UserKey, GroupKey};
 use crate::org::OrgKey;
+use crate::label::Labels;
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Frame
@@ -224,54 +225,51 @@ impl StarMessage
 pub enum StarMessagePayload
 {
    Pledge,
-   OrgMessage(OrgMessage),
+   Tenant(TenantMessage),
    Ok,
    Error(String),
    Reject(Rejection),
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct OrgMessage
+pub struct TenantMessage
 {
-    pub org: OrgKey,
-    pub group: GroupKey,
-    pub user: UserKey,
-    pub payload: OrgMessagePayload
+    tenant: TenantKey,
+    user: UserKey,
+    payload: TenantMessagePayload
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum OrgMessagePayload
+pub enum TenantMessagePayload
 {
     App(AppMessage),
-    Actor(ActorMessage),
-    Location(LocationMessage)
-}
-
-
-#[derive(Clone,Serialize,Deserialize)]
-pub enum LocationMessage
-{
-    Request(LocationRequest),
-    Report(LocationReport)
+    Request(RequestMessage),
+    Report(ReportMessage),
+    Assign(AssignMessage),
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum LocationRequest
+pub enum AssignMessage
 {
-    App(AppKey),
-    Actor(ActorKey)
+    App(AppCreate)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum LocationResponse
+pub enum RequestMessage
 {
-    NotFound,
-    App(StarKey),
-    Actor(StarKey)
+    AppCreate(AppCreateRequest),
+    AppSupervisor(AppSupervisorRequest),
+    AppLookup(AppLookup),
+    AppMessage(AppMessage),
+    AppLabel(AppLabelRequest)
 }
 
-
-
+#[derive(Clone,Serialize,Deserialize)]
+pub struct AppLabelRequest
+{
+    pub app: AppKey,
+    pub labels: Labels
+}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct AppMessage
@@ -281,19 +279,18 @@ pub struct AppMessage
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum AppMessagePayload
+pub enum ResponseMessage
 {
-    ApplicationCreateRequest(ApplicationCreateRequest),
-    ApplicationAssign(ApplicationAssign),
-    ApplicationNotifyReady(ApplicationNotifyReady),
-    ApplicationSupervisorRequest(ApplicationSupervisorRequest),
-    ApplicationSupervisorReport(ApplicationSupervisorReport),
-    ApplicationLookup(ApplicationLookup),
+    AppNotifyCreated(AppNotifyCreated),
+    AppSupervisorReport(ApplicationSupervisorReport),
 }
+
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Event
 {
+    App(AppEvent),
     Actor(ActorEvent),
     Star(StarEvent)
 }
@@ -304,7 +301,16 @@ pub enum ActorEvent
    StateChange(ActorState),
    Gathered(ActorGathered),
    Scattered(ActorScattered),
-   Broadcast(ActorBroadcast)
+   Broadcast(ActorBroadcast),
+   Destroyed
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum AppEvent
+{
+    Created,
+    Ready,
+    Destroyed
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -394,18 +400,6 @@ pub enum ActorLookup
     Name(ActorNameLookup)
 }
 
-impl ActorLookup
-{
-    pub fn app_id(&self)->Id
-    {
-        match self
-        {
-            ActorLookup::Key(resource) => resource.app.clone(),
-            ActorLookup::Name(name) => name.app_id.clone()
-        }
-    }
-}
-
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ActorNameLookup
 {
@@ -418,7 +412,7 @@ pub struct ActorNameLookup
 pub enum ActorFromKind
 {
     Actor(ActorFrom),
-    User(User)
+    User(UserKey)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -468,13 +462,13 @@ pub struct Rejection
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ApplicationLookup
+pub struct AppLookup
 {
     pub name: String
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ApplicationCreateRequest
+pub struct AppCreateRequest
 {
     pub name: Option<String>,
     pub kind: AppKind,
@@ -491,13 +485,13 @@ pub struct ApplicationAssign
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ApplicationNotifyReady
+pub struct AppNotifyCreated
 {
     pub location: AppLocation
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ApplicationSupervisorRequest
+pub struct AppSupervisorRequest
 {
     pub app: AppKey,
 }

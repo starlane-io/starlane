@@ -12,7 +12,7 @@ use starlane::error::Error;
 use starlane::frame::{ActorLookup, ApplicationNotifyReady, Frame, StarMessage, StarMessagePayload};
 use starlane::star::{StarCommand, StarInfo, StarKey, StarManager, StarManagerCommand, SupervisorManagerBacking};
 use crate::star::{StarInfo, SupervisorManagerBacking, StarManager, StarManagerCommand, StarCommand, StarKey};
-use crate::frame::{StarMessagePayload, StarMessage, Frame, ApplicationNotifyReady, ActorLookup};
+use crate::frame::{StarMessagePayload, StarMessage, Frame, AppNotifyCreated, ActorLookup};
 use crate::error::Error;
 use crate::app::{Application, AppLocation, AppKey};
 use std::collections::HashMap;
@@ -104,7 +104,7 @@ impl SupervisorManager
                         app: assign.app.key.clone(),
                         supervisor: assign.supervisor.clone()
                     };
-                    let payload = StarMessagePayload::ApplicationNotifyReady(ApplicationNotifyReady { location: location});
+                    let payload = StarMessagePayload::ApplicationNotifyReady(AppNotifyCreated { location: location});
                     let mut notify_app_ready = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), notify.clone(), payload );
                     notify_app_ready.transaction = message.transaction.clone();
                     self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(notify_app_ready))).await?;

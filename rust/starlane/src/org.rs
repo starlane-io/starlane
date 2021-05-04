@@ -1,8 +1,6 @@
 use crate::app::{AppCreate, AppSelect};
 use crate::user::UserKey;
 
-pub type OrgKey=u64;
-
 #[derive(Clone,Serialize,Deserialize)]
 pub struct OrgCommandWrapper
 {

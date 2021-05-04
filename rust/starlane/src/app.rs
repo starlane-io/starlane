@@ -16,16 +16,16 @@ pub type AppKind = String;
 #[derive(Clone,Hash,Eq,PartialEq)]
 pub struct AppKey
 {
-    pub org: OrgKey,
+    pub tenant: TenantKey,
     pub id: u64
 }
 
 impl AppKey
 {
-    pub fn new(org: OrgKey, id: u64)->Self
+    pub fn new(tenant: TenantKey, id: u64)->Self
     {
         AppKey{
-            org: org,
+            tenant: TenantKey,
             id: id
         }
     }
@@ -43,9 +43,19 @@ pub struct AppCommandWrapper
 #[derive(Clone,Serialize,Deserialize)]
 pub enum AppCommand
 {
+    AppMessageExt(AppMessageExt),
     ActorCreate(ActorCreate),
     ActorSelect(ActorSelect),
     ActorDestroy(ActorKey)
+}
+
+pub type AppMessageKind = String;
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct AppMessageExt
+{
+    pub kind: AppMessageKind,
+    pub data: Arc<Vec<u8>>
 }
 
 #[derive(Clone,Serialize,Deserialize)]

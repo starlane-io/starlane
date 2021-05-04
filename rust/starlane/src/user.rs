@@ -1,24 +1,6 @@
-use crate::org::OrgKey;
-use crate::label::Labels;
 use crate::error::Error;
-
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
-pub struct UserKey
-{
-  pub org: OrgKey,
-  pub id: u64
-}
-
-impl UserKey
-{
-    pub fn new( org: OrgKey, id: u64 ) -> Self
-    {
-        UserKey{
-            org: org,
-            id: id
-        }
-    }
-}
+use crate::label::Labels;
+use crate::org::OrgKey;
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub struct UserToken
@@ -75,13 +57,6 @@ pub enum UserKind
     User,
     Guest,
     Custom(String)
-}
-
-#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
-pub struct GroupKey
-{
-    pub org: OrgKey,
-    pub id: u64
 }
 
 pub struct Group
