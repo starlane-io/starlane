@@ -1,13 +1,17 @@
-use crate::id::Id;
-use tokio::sync::broadcast;
-use std::sync::Arc;
-use crate::star::StarKey;
-use crate::error::Error;
-use crate::frame::{ActorMessage, ActorState, ActorEvent};
-use serde::{Deserialize, Serialize, Serializer};
-use tokio::sync::broadcast::Sender;
+use std::collections::HashMap;
 use std::fmt;
-use crate::application::AppKey;
+use std::sync::Arc;
+
+use serde::{Deserialize, Serialize, Serializer};
+use tokio::sync::broadcast;
+use tokio::sync::broadcast::Sender;
+
+use crate::app::AppKey;
+use crate::error::Error;
+use crate::frame::{Event, ActorMessage, ActorState};
+use crate::id::Id;
+use crate::label::LabelSelectionCriteria;
+use crate::star::StarKey;
 
 pub static DEFAULT_ENTITY_KIND_EXT: &str = "default";
 pub static DEFAULT_GATHERING_KIND_EXT: &str = "default";
@@ -103,12 +107,12 @@ pub struct ActorGathering
 pub struct ActorWatcher
 {
     pub entity: ActorKey,
-    pub tx: Sender<ActorEvent>
+    pub tx: Sender<Event>
 }
 
 impl ActorWatcher
 {
-    pub fn new(entity: ActorKey) ->(Self, broadcast::Receiver<ActorEvent>)
+    pub fn new(entity: ActorKey) ->(Self, broadcast::Receiver<Event>)
     {
         let (tx,rx) = broadcast::channel(32);
         (ActorWatcher {
@@ -120,9 +124,24 @@ impl ActorWatcher
 
 impl ActorWatcher
 {
-    pub fn notify( &self, event: ActorEvent)
+    pub fn notify( &self, event: Event)
     {
         self.tx.send(event);
     }
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ActorCreate
+{
+    pub app: AppKey,
+    pub kind: ActorKind,
+    pub data: Arc<Vec<u8>>,
+    pub labels: HashMap<String,String>
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ActorSelect
+{
+    criteria: Vec<LabelSelectionCriteria>
 }
 

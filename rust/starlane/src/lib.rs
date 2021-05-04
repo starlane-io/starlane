@@ -19,7 +19,6 @@ pub mod proto;
 pub mod layout;
 pub mod provision;
 pub mod starlane;
-pub mod application;
 pub mod actor;
 pub mod server;
 pub mod core;
@@ -27,4 +26,6 @@ pub mod user;
 pub mod service;
 pub mod label;
 pub mod message;
+pub mod app;
+pub mod org;
 

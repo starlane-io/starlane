@@ -390,7 +390,7 @@ mod test
     use crate::starlane::{ConstellationCreate, Starlane, StarlaneCommand, StarControlRequestByName};
     use crate::template::{ConstellationData, ConstellationTemplate};
     use crate::star::StarController;
-    use crate::application::AppController;
+    use crate::app::AppController;
 
     #[test]
     pub fn starlane()

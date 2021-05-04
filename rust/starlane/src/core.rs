@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use tokio::sync::mpsc;
 
-use crate::application::ApplicationStatus;
+use crate::app::ApplicationStatus;
 use crate::error::Error;
 use crate::frame::{ActorMessage, StarMessage, StarMessagePayload, StarUnwindPayload, StarWind, Watch, WatchInfo};
 use crate::id::{Id, IdSeq};

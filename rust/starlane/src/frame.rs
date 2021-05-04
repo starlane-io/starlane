@@ -1,31 +1,16 @@
-use crate::id::Id;
-use std::fmt;
-use crate::star::{StarKey, StarKind, StarWatchInfo};
-use serde::{Deserialize, Serialize, Serializer};
-use crate::actor::{ActorKey, ActorLocation};
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::fmt;
+use std::sync::Arc;
+
+use serde::{Deserialize, Serialize, Serializer};
 use tokio::time::Instant;
-use crate::application::{AppLocation, AppKey, AppInfo, AppKind};
-use crate::user::User;
 
-#[derive(Clone)]
-pub struct Command
-{
-    pub from: i32,
-    pub frame: ProtoFrame
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub enum ProtoFrame
-{
-    StarLaneProtocolVersion(i32),
-    ReportStarKey(StarKey),
-    RequestSubgraphExpansion,
-    GrantSubgraphExpansion(Vec<u16>),
-    CentralSearch,
-    CentralFound(usize)
-}
+use crate::actor::{ActorKey, ActorLocation};
+use crate::app::{AppInfo, AppKey, AppKind, AppLocation};
+use crate::id::Id;
+use crate::star::{StarKey, StarKind, StarWatchInfo};
+use crate::user::{User, UserKey, GroupKey};
+use crate::org::OrgKey;
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Frame
@@ -40,7 +25,18 @@ pub enum Frame
     StarWind(StarWind),
     StarUnwind(StarUnwind),
     Watch(Watch),
-    ActorEvent(ActorEvent)
+    Event(Event)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ProtoFrame
+{
+    StarLaneProtocolVersion(i32),
+    ReportStarKey(StarKey),
+    RequestSubgraphExpansion,
+    GrantSubgraphExpansion(Vec<u16>),
+    CentralSearch,
+    CentralFound(usize)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -219,7 +215,7 @@ impl StarMessage
 
     pub fn inc_retry(&mut self)
     {
-        self.retry = self.retry + 1;
+        self.retry = &self.retry + 1;
     }
 
 }
@@ -227,39 +223,108 @@ impl StarMessage
 #[derive(Clone,Serialize,Deserialize)]
 pub enum StarMessagePayload
 {
-   Reject(Rejection),
-   SupervisorPledgeToCentral,
-   ApplicationCreateRequest(ApplicationCreateRequest),
-   ApplicationAssign(ApplicationAssign),
-   ApplicationNotifyReady(ApplicationNotifyReady),
-   ApplicationSupervisorRequest(ApplicationSupervisorRequest),
-   ApplicationSupervisorReport(ApplicationSupervisorReport),
-   ApplicationLookup(ApplicationLookup),
-   ApplicationLaunchRequest(ApplicationLaunchRequest),
-   ServerPledgeToSupervisor,
-   ActorStateRequest(ActorKey),
-   ActorEvent(ActorEvent),
-   ActorMessage(ActorMessage),
-   ActorLocationRequest(ActorLocationRequest),
-   ActorLocationReport(ActorLocation),
+   Pledge,
+   OrgMessage(OrgMessage),
    Ok,
-   Error
+   Error(String),
+   Reject(Rejection),
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ActorEvent
+pub struct OrgMessage
 {
-    pub entity: ActorKey,
-    pub kind: ActorEventKind,
+    pub org: OrgKey,
+    pub group: GroupKey,
+    pub user: UserKey,
+    pub payload: OrgMessagePayload
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum ActorEventKind
+pub enum OrgMessagePayload
+{
+    App(AppMessage),
+    Actor(ActorMessage),
+    Location(LocationMessage)
+}
+
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum LocationMessage
+{
+    Request(LocationRequest),
+    Report(LocationReport)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum LocationRequest
+{
+    App(AppKey),
+    Actor(ActorKey)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum LocationResponse
+{
+    NotFound,
+    App(StarKey),
+    Actor(StarKey)
+}
+
+
+
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct AppMessage
+{
+    pub app: AppKey,
+    pub payload: AppMessagePayload
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum AppMessagePayload
+{
+    ApplicationCreateRequest(ApplicationCreateRequest),
+    ApplicationAssign(ApplicationAssign),
+    ApplicationNotifyReady(ApplicationNotifyReady),
+    ApplicationSupervisorRequest(ApplicationSupervisorRequest),
+    ApplicationSupervisorReport(ApplicationSupervisorReport),
+    ApplicationLookup(ApplicationLookup),
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum Event
+{
+    Actor(ActorEvent),
+    Star(StarEvent)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ActorEvent
 {
    StateChange(ActorState),
    Gathered(ActorGathered),
    Scattered(ActorScattered),
    Broadcast(ActorBroadcast)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum StarEvent
+{
+    Lane(LaneEvent)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct LaneEvent
+{
+    pub star: StarKey,
+    pub kind: LaneEventKind
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum LaneEventKind
+{
+    Connect,
+    Disconnect
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -491,7 +556,7 @@ impl fmt::Display for Frame {
             Frame::StarUnwind(_)=>format!("StarUnwind").to_string(),
             Frame::StarMessageAck(_)=>format!("StarMessageAck").to_string(),
             Frame::Watch(_) => format!("Watch").to_string(),
-            Frame::ActorEvent(_) => format!("ActorEvent").to_string()
+            Frame::Event(_) => format!("ActorEvent").to_string()
         };
         write!(f, "{}",r)
     }

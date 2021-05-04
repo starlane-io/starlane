@@ -1,5 +1,8 @@
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+pub type Labels = HashMap<String,String>;
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct LabelConfig
