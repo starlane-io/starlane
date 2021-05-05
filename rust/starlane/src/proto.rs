@@ -16,13 +16,14 @@ use tokio::time::{Duration, Instant};
 use crate::constellation::Constellation;
 use crate::core::StarCoreFactory;
 use crate::error::Error;
-use crate::frame::{Frame, ProtoFrame, SearchHit, StarMessage, StarMessagePayload, StarSearch, StarSearchPattern, StarSearchResult, StarUnwindPayload, StarWind, StarWindPayload};
+use crate::frame::{Frame, ProtoFrame, SearchHit, StarMessage, StarMessagePayload, StarSearch, StarSearchPattern, StarSearchResult, SequenceMessage, ProtoEvolution, ProtoSequence};
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelReceiver, TunnelSender, TunnelSenderState};
 use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarManagerFactory, StarSearchTransaction, Transaction};
 use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
 use crate::logger::Logger;
+use crate::frame::ProtoFrame::Evolution;
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -137,6 +138,7 @@ impl ProtoStar
                             }
 
                             self.broadcast( Frame::Proto(ProtoFrame::CentralSearch), &Option::None ).await;
+                            self.broadcast( Frame::Proto(ProtoFrame::Evolution(ProtoEvolution::Request)), &Option::None ).await;
 
                         } else {
                             eprintln!("cannot add a lane to a star that doesn't have a remote_star");
@@ -180,79 +182,41 @@ impl ProtoStar
 
                                 self.send_central_search().await;
                             },
-                            Frame::StarMessage(message) => {
-                                if self.star_key.is_some()
-                                {
-                                    if  message.to == self.star_key.as_ref().unwrap().to_owned()
-                                    {
-                                       // if let StarMessagePayload::AssignSequence(sequence) = message.payload
+                            Frame::Proto(ProtoFrame::Evolution(ProtoEvolution::Report)) =>
+                            {
+println!("{} RECEIVED EVOLUTION report", self.kind);
+                                // a nearby evolution triggers a send sequence request
+                                self.send_sequence_request().await;
+                            },
+                            Frame::Proto(ProtoFrame::Sequence(ProtoSequence::Reply(sequence))) =>
+                            {
+                                self.sequence = Option::Some(Arc::new(IdSeq::new(sequence)));
+                                let info = StarInfo{
+                                    star_key: self.star_key.as_ref().unwrap().clone(),
+                                    kind: self.kind.clone(),
+                                    sequence: self.sequence.as_ref().unwrap().clone(),
+                                    command_tx: self.command_tx.clone()
+                                };
 
-                                    }
-                                    else {
-                                        self.send(message).await;
-                                    }
-                                }
+                                let manager_tx= self.star_manager_factory.create(info.clone() ).await;
+                                let core_tx = self.star_core_factory.create(&info.kind,manager_tx.clone());
 
-                            }
 
-                            Frame::StarWind(mut wind) => {
+println!("{} .... EVOLVED .... ", self.kind);
+                                return Ok(Star::from_proto(info.clone(),
+                                                           self.command_rx,
+                                                           manager_tx,
+                                                           core_tx,
+                                                           self.lanes,
+                                                           self.connector_ctrls,
+                                                           self.logger,
+                                                           self.frame_hold ));
 
-                                if self.star_key.is_some()
-                                {
-                                    let star_key = self.star_key.as_ref().unwrap().clone();
-                                    wind.stars.push(star_key );
-                                    self.send_frame(&wind.to.clone(), Frame::StarWind(wind)).await;
-                                }
-                            }
-                            Frame::StarUnwind(mut unwind) => {
+                            },
 
-                                if unwind.stars.len() != 1
-                                {
-                                    unwind.stars.pop();
-                                    let first = unwind.stars.first().unwrap().clone();
-                                    self.send_frame(&first, Frame::StarUnwind(unwind)).await;
-                                }
-                                else {
-                                    if let StarUnwindPayload::AssignSequence(sequence) = unwind.payload
-                                    {
-
-                                        let sequence = Arc::new(IdSeq::new(sequence) );
-                                            self.sequence = Option::Some(sequence.clone());
-                                            let star_key = self.star_key.as_ref().unwrap().clone();
-                                            self.evolution_tx.send(ProtoStarEvolution {
-                                                star: star_key,
-                                                controller: StarController {
-                                                    command_tx: self.command_tx.clone()
-                                                }
-                                            });
-
-                                            let info = StarInfo{
-                                                star_key: self.star_key.as_ref().unwrap().clone(),
-                                                kind: self.kind.clone(),
-                                                sequence: self.sequence.as_ref().unwrap().clone(),
-                                                command_tx: self.command_tx.clone()
-                                            };
-
-                                        let manager_tx= self.star_manager_factory.create(info.clone() ).await;
-                                        let core_tx = self.star_core_factory.create(&info.kind, manager_tx.clone());
-
-                                        return Ok(Star::from_proto(info.clone(),
-                                                                       self.command_rx,
-                                                                       manager_tx,
-                                                                       core_tx,
-                                                                       self.lanes,
-                                                                       self.connector_ctrls,
-                                                                       self.logger,
-                                                                       self.frame_hold
-                                            )
-                                            );
-                                    }
-                                }
-
-                            }
 
                             _ => {
-                                println!("frame unsupported by ProtoStar: {}", frame);
+                                println!("{} frame unsupported by ProtoStar: {}", self.kind, frame);
                             }
                         }
                     }
@@ -309,31 +273,7 @@ impl ProtoStar
 
     async fn send_sequence_request( &mut self )
     {
-        let frame = Frame::StarWind( StarWind {
-            to: StarKey::central(),
-            stars: vec![self.star_key.as_ref().unwrap().clone()],
-            payload: StarWindPayload::RequestSequence
-        } );
-
-        self.tracker.track( frame.clone(),  | frame |{
-            if let Frame::StarUnwind( inner )  = frame
-            {
-                if let StarUnwindPayload::AssignSequence(_) = inner.payload
-                {
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
-            }
-            else
-            {
-                return false;
-            }
-        } );
-
-        self.send_frame(&StarKey::central(), frame.clone() ).await;
+        self.send_frame(&StarKey::central(), Frame::Proto(ProtoFrame::Sequence(ProtoSequence::Request)) ).await;
     }
 
     async fn resend(&mut self,  frame: Frame)
@@ -349,10 +289,6 @@ impl ProtoStar
             Frame::StarMessage(message) => {
                 self.send_no_hold(message).await;
             }
-            Frame::StarWind(wind) => {
-                self.send_frame_no_hold(&wind.to.clone(), Frame::StarWind(wind) ).await;
-            }
-
             _ => {
                 eprintln!("no rule to resend frame of type: {}", frame);
             }

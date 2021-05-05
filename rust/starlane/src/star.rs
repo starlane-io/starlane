@@ -25,7 +25,7 @@ use crate::actor::{Actor, ActorKey, ActorKind, ActorLocation, ActorWatcher};
 use crate::app::{AppCommandWrapper, AppController, AppCreate, AppKind, Application, AppLocation};
 use crate::core::StarCoreCommand;
 use crate::error::Error;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, AppAssign, AppCreateRequest, ApplicationSupervisorReport, AppNotifyCreated, AppSupervisorRequest, Event, Frame, ProtoFrame, Rejection, SearchHit, StarMessage, StarMessageAck, StarMessagePayload, StarSearch, StarSearchPattern, StarSearchResult, StarUnwind, StarUnwindPayload, StarWind, StarWindPayload, Watch, WatchInfo};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, AppAssign, AppCreateRequest, ApplicationSupervisorReport, AppNotifyCreated, AppSupervisorRequest, Event, Frame, ProtoFrame, Rejection, SearchHit, StarMessage, StarMessageAck, StarMessagePayload, StarSearch, StarSearchPattern, StarSearchResult, Watch, WatchInfo, SequenceMessage, ProtoEvolution, ProtoSequence};
 use crate::id::{Id, IdSeq};
 use crate::keys::AppKey;
 use crate::label::Labels;
@@ -282,6 +282,10 @@ impl Star
 
     pub async fn run(mut self)
     {
+        self.broadcast(Frame::Proto(ProtoFrame::Evolution(ProtoEvolution::Report))).await;
+
+println!("{} reporting EVOLUTION ", self.info.kind);
+
         self.manager_tx.send(StarManagerCommand::Init ).await;
         loop {
             let mut futures = vec!();
@@ -388,8 +392,7 @@ impl Star
                         }
                         commit.tx.send( commit.result );
                     }
-                    StarCommand::SearchReturnResult(result) =>
-                    {
+                    StarCommand::SearchReturnResult(result) => {
                         let lane = result.hops.last().unwrap();
                         self.send_frame( lane.clone(), Frame::StarSearchResult(result)).await;
                     }
@@ -420,24 +423,30 @@ impl Star
     async fn send_proto_message( &mut self, proto: ProtoMessage )
     {
 
-        if let Err(errors) = proto.validate()
-        {
+        if let Err(errors) = proto.validate() {
                 eprintln!("protomessage is not valid cannot send: {}", errors );
             return;
         }
 
+        let id = self.info.sequence.next();
+
         let message = StarMessage{
+            id: id,
             from: self.info.star_key.clone(),
             to: proto.to.unwrap(),
-            id: self.info.sequence.next(),
             transaction: proto.transaction,
-            payload: StarMessagePayload::None,
+            payload: proto.payload,
             reply_to: proto.reply_to
         };
 
-        let delivery = StarMessageDeliveryInsurance::new(message, proto.expect );
-
-        self.message(delivery).await;
+        if message.to == self.info.star_key
+        {
+            eprintln!("star {} kind {} cannot send a proto message to itself, payload:a {} ", self.info.star_key, self.info.kind, message.payload );
+        }
+        else {
+            let delivery = StarMessageDeliveryInsurance::new(message, proto.expect);
+            self.message(delivery).await;
+        }
     }
 
     async fn on_app_lifecycle_command( &mut self, command: OrgCommand)
@@ -988,6 +997,49 @@ impl Star
                       }
 
                   }
+                  ProtoFrame::Evolution(ProtoEvolution::Request)=> {
+                      self.broadcast(Frame::Proto(ProtoFrame::Evolution(ProtoEvolution::Report) )).await;
+                  }
+                  ProtoFrame::Sequence(ProtoSequence::Request)=> {
+
+println!("{} received SEQUENCE request....", self.info.kind );
+
+
+                      if let Option::Some(star) = lane_key.cloned()
+                      {
+                          if let Some(lane) = self.lanes.get(&star)
+                          {
+                              if self.info.kind.is_central()
+                              {
+                                  println!("{} received SEQUENCE REPLY VIA FRAME....", self.info.kind );
+                                      lane.lane.outgoing.tx.send(LaneCommand::Frame(Frame::Proto(ProtoFrame::Sequence(ProtoSequence::Reply(self.info.sequence.next().index))))).await;
+                              }
+                              else {
+                                  let mut proto = ProtoMessage::new();
+                                  proto.to = Option::Some(StarKey::central());
+                                  proto.expect = MessageExpect::RetryUntilOk;
+                                  proto.payload = StarMessagePayload::Sequence(SequenceMessage::Request);
+                                  let mut rx = proto.get_ok_result().await;
+
+                                  let lane_tx = lane.lane.outgoing.tx.clone();
+                                  tokio::spawn(async move {
+                                      if let Ok(StarMessagePayload::Sequence(SequenceMessage::Response(sequence))) = rx.await
+                                      {
+                                          println!("received SEQUENCE response...");
+                                          lane_tx.send(LaneCommand::Frame(Frame::Proto(ProtoFrame::Sequence(ProtoSequence::Reply(sequence))))).await;
+                                      }
+                                  });
+
+                                  println!("SENT Sequence request PROTO MESSAGE...");
+                                  self.info.command_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                              }
+                          }
+
+
+                      }
+
+                  }
+
                   _ => {}
 
               }
@@ -1020,13 +1072,6 @@ impl Star
                         eprintln!("error: {}", error)
                     }
                 }
-            }
-
-            Frame::StarWind(wind) => {
-                self.on_wind(wind).await;
-            }
-            Frame::StarUnwind(unwind) => {
-                self.on_unwind(unwind).await;
             }
             _ => {
                 eprintln!("star does not handle frame: {}", frame)
@@ -1220,56 +1265,6 @@ impl Star
 
     }
 
-
-
-    async fn on_wind( &mut self, mut wind: StarWind)
-    {
-        if wind.to != self.info.star_key
-        {
-            if self.info.kind.relay()
-            {
-                wind.stars.push( self.info.star_key.clone() );
-                self.send_frame(wind.to.clone(), Frame::StarWind(wind)).await;
-            }
-            else {
-                eprintln!("this star {} does not relay Winds", self.info.kind);
-            }
-        }
-        else {
-            let star_stack = wind.stars.clone();
-            self.manager_tx.send(StarManagerCommand::Frame(Frame::StarWind(wind)) ).await;
-            /*{
-                Ok(payload) => {
-                    let unwind = StarUnwindInner{
-                        stars: star_stack.clone(),
-                        payload: payload
-                    };
-                    self.send_frame(star_stack.last().unwrap().clone(), Frame::StarUnwind(unwind) ).await;
-                }
-                Err(error) => {
-                    eprintln!("encountered handle_wind error: {}", error );
-                }
-            };
-
-             */
-        }
-    }
-
-    async fn on_unwind( &mut self, mut unwind: StarUnwind)
-    {
-        if unwind.stars.len() > 1
-        {
-            unwind.stars.pop();
-            if self.info.kind.relay()
-            {
-                let star = unwind.stars.last().unwrap().clone();
-                self.send_frame(star, Frame::StarUnwind(unwind)).await;
-            }
-            else {
-                return eprintln!("this star {} does not relay Unwinds", self.info.kind );
-            }
-        }
-    }
 
     async fn on_message(&mut self, mut message: StarMessage) -> Result<(),Error>
     {

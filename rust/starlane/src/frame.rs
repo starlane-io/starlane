@@ -24,8 +24,6 @@ pub enum Frame
     StarSearch(StarSearch),
     StarSearchResult(StarSearchResult),
     StarMessage(StarMessage),
-    StarWind(StarWind),
-    StarUnwind(StarUnwind),
     Watch(Watch),
     Event(Event)
 }
@@ -38,7 +36,23 @@ pub enum ProtoFrame
     RequestSubgraphExpansion,
     GrantSubgraphExpansion(Vec<u16>),
     CentralSearch,
-    CentralFound(usize)
+    CentralFound(usize),
+    Evolution(ProtoEvolution),
+    Sequence(ProtoSequence),
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ProtoEvolution
+{
+    Request,
+    Report
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ProtoSequence
+{
+    Request,
+    Reply(u64)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -61,33 +75,6 @@ pub struct StarMessageAck
     pub from: StarKey,
     pub to: StarKey,
     pub id: Id
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub enum StarWindPayload
-{
-    RequestSequence
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub enum StarUnwindPayload
-{
-    AssignSequence(u64)
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct StarWind
-{
-  pub to: StarKey,
-  pub stars: Vec<StarKey>,
-  pub payload: StarWindPayload
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct StarUnwind
-{
-    pub stars: Vec<StarKey>,
-    pub payload: StarUnwindPayload
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -233,7 +220,8 @@ pub enum StarMessagePayload
    Tenant(TenantMessage),
    Ok,
    Error(String),
-   Ack(MessageAck)
+   Ack(MessageAck),
+   Sequence(SequenceMessage)
 }
 
 impl StarMessagePayload{
@@ -248,6 +236,13 @@ impl StarMessagePayload{
             }
         }
     }
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum SequenceMessage
+{
+    Request,
+    Response(u64)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -576,6 +571,7 @@ impl fmt::Display for StarMessagePayload{
             StarMessagePayload::Ok => "Ok".to_string(),
             StarMessagePayload::Error(_) => "Error".to_string(),
             StarMessagePayload::Ack(_) => "Ack".to_string(),
+            StarMessagePayload::Sequence(_) => "Sequence".to_string(),
         };
         write!(f, "{}",r)
     }
@@ -591,8 +587,6 @@ impl fmt::Display for Frame {
             Frame::StarMessage(inner)=>format!("StarMessage({})",inner.payload).to_string(),
             Frame::StarSearch(_)=>format!("StarSearch").to_string(),
             Frame::StarSearchResult(_)=>format!("StarSearchResult").to_string(),
-            Frame::StarWind(_)=>format!("StarWind").to_string(),
-            Frame::StarUnwind(_)=>format!("StarUnwind").to_string(),
             Frame::Watch(_) => format!("Watch").to_string(),
             Frame::Event(_) => format!("ActorEvent").to_string()
         };
@@ -609,6 +603,8 @@ impl fmt::Display for ProtoFrame {
             ProtoFrame::GrantSubgraphExpansion(path) => format!("GrantSubgraphExpansion({:?})", path).to_string(),
             ProtoFrame::CentralFound(_) => format!("CentralFound").to_string(),
             ProtoFrame::CentralSearch => format!("CentralSearch").to_string(),
+            ProtoFrame::Evolution(_) => "Evolution".to_string(),
+            ProtoFrame::Sequence(_) => "Sequence".to_string()
         };
         write!(f, "{}",r)
     }

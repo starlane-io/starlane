@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use tokio::sync::{mpsc, oneshot, broadcast};
 use crate::app::{AppInfo, ApplicationStatus, AppCreate, AppLocation};
-use crate::frame::{AppAssign, ApplicationSupervisorReport, Frame, Rejection, StarMessage, StarMessagePayload, StarUnwind, StarUnwindPayload, StarWindPayload, TenantMessage, TenantMessagePayload, RequestMessage, AssignMessage, ReportMessage, AppCreateRequest};
 use crate::id::Id;
 use crate::label::Labels;
 use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarInfo, StarKey, StarManager, StarManagerCommand, StarNotify};
@@ -16,6 +15,7 @@ use tokio::sync::oneshot::Receiver;
 use crate::star::StarCommand::AppLifecycleCommand;
 use tokio::sync::oneshot::error::RecvError;
 use crate::error::Error;
+use crate::frame::{StarMessage, Frame, StarMessagePayload, RequestMessage, TenantMessagePayload, ReportMessage, TenantMessage, AssignMessage, AppAssign, AppCreateRequest, SequenceMessage};
 
 pub struct CentralManager
 {
@@ -172,8 +172,18 @@ impl StarManager for CentralManager
             let mut message = message;
             match &message.payload
             {
-                unexpected => { eprintln!("CentralManager: unexpected message: {} ", unexpected) }
 
+                StarMessagePayload::Sequence( seq_message)=> {
+                   match seq_message
+                   {
+                       SequenceMessage::Request => {
+println!("responding with: SEQUENCE to: {}", message.from );
+                           let proto = message.reply(StarMessagePayload::Sequence(SequenceMessage::Response(self.info.sequence.next().index)));
+                           self.info.command_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                       }
+                       _ => { eprintln!("CentralManager: unexpected message: Sequence message") }
+                   }
+                }
                 StarMessagePayload::Pledge => {
                     self.backing.add_supervisor(message.from.clone());
                     self.reply_ok(message).await;
@@ -228,6 +238,7 @@ impl StarManager for CentralManager
                         _ => {}
                     }
                 }
+                unexpected => { eprintln!("CentralManager: unexpected message: {} ", unexpected) }
             }
         }
     }
