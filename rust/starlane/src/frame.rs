@@ -7,13 +7,15 @@ use tokio::time::Instant;
 
 use crate::actor::{ActorKey, ActorLocation};
 use crate::id::Id;
-use crate::star::{StarKey, StarKind, StarWatchInfo, StarNotify};
+use crate::star::{StarKey, StarKind, StarWatchInfo, StarNotify, Star, StarCommand, StarInfo};
 use crate::label::Labels;
 use crate::message::{MessageResult, ProtoMessage, MessageExpect, MessageUpdate};
-use tokio::sync::{oneshot, broadcast};
+use tokio::sync::{oneshot, broadcast, mpsc};
 use crate::keys::{AppKey, UserKey, SubSpaceKey};
 use crate::app::{AppLocation, AppKind, AppInfo};
 use crate::user::AuthToken;
+use crate::logger::Flags;
+use crate::error::Error;
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Frame
@@ -21,11 +23,18 @@ pub enum Frame
     Close,
     Proto(ProtoFrame),
     Diagnose(FrameDiagnose),
-    StarSearch(StarSearch),
-    StarSearchResult(StarSearchResult),
+    StarWind(StarWind),
+//    StarSearchResult(StarSearchResult),
     StarMessage(StarMessage),
     Watch(Watch),
     Event(Event)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum StarWind
+{
+    Up(WindUp),
+    Down(WindDown)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -86,16 +95,80 @@ pub enum FrameDiagnose
 
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct StarSearch
+pub struct WindUp
 {
     pub from: StarKey,
-    pub pattern: StarSearchPattern,
+    pub pattern: StarPattern,
     pub hops: Vec<StarKey>,
     pub transactions: Vec<Id>,
     pub max_hops: usize,
+    pub action: WindAction
 }
 
-impl StarSearch
+impl WindUp
+{
+    pub fn new( from: StarKey, pattern: StarPattern, action: WindAction )->Self
+    {
+        WindUp
+        {
+           from: from,
+           pattern: pattern,
+           action: action,
+           hops: vec![],
+           transactions: vec![],
+           max_hops: 255
+        }
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum WindAction
+{
+    SearchHits,
+    Flags(Flags)
+}
+
+impl WindAction
+{
+    pub fn update(&self, mut new_hits: Vec<WindHit>, result: WindResults) -> Result<WindResults,Error>
+    {
+        match self
+        {
+            WindAction::SearchHits => {
+                if let WindResults::None = result {
+                    let mut hits = vec!();
+                    hits.append( &mut new_hits);
+                    Ok(WindResults::Hits(hits))
+                }
+                else if let WindResults::Hits(mut old_hits) = result
+                {
+                    let mut hits= vec!();
+                    hits.append( &mut old_hits );
+                    hits.append( &mut new_hits );
+                    Ok(WindResults::Hits(hits))
+                }
+                else
+                {
+                    Err("when action is SearchHIts, expecting WindResult::Hits or WindResult::None".into())
+                }
+            }
+            WindAction::Flags(flags) => {
+                Ok(WindResults::None)
+            }
+        }
+    }
+}
+
+
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum WindResults
+{
+    None,
+    Hits(Vec<WindHit>)
+}
+
+impl WindUp
 {
     pub fn inc( &mut self, hop: StarKey, transaction: Id )
     {
@@ -106,36 +179,56 @@ impl StarSearch
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum StarSearchPattern
+pub enum StarPattern
 {
+    Any,
+    None,
     StarKey(StarKey),
     StarKind(StarKind)
 }
 
 
-impl StarSearchPattern
+impl StarPattern
 {
+    pub fn is_match( &self, info: &StarInfo ) -> bool
+    {
+        match self
+        {
+            StarPattern::Any => {true}
+            StarPattern::None => {false}
+            StarPattern::StarKey(star) => {
+                *star == info.star_key
+            }
+            StarPattern::StarKind(kind) => {
+                *kind == info.kind
+            }
+        }
+    }
+
+
     pub fn is_single_match(&self) -> bool
     {
         match self
         {
-            StarSearchPattern::StarKey(_) => {true}
-            StarSearchPattern::StarKind(_) => {false}
+            StarPattern::StarKey(_) => {true}
+            StarPattern::StarKind(_) => {false}
+            StarPattern::Any => {false}
+            StarPattern::None => {false}
         }
     }
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct StarSearchResult
+pub struct WindDown
 {
     pub missed: Option<StarKey>,
-    pub hits: Vec<SearchHit>,
-    pub search: StarSearch,
+    pub result: WindResults,
+    pub wind_up: WindUp,
     pub transactions: Vec<Id>,
     pub hops : Vec<StarKey>
 }
 
-impl StarSearchResult
+impl WindDown
 {
     pub fn pop(&mut self)
     {
@@ -145,7 +238,7 @@ impl StarSearchResult
 }
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
-pub struct SearchHit
+pub struct WindHit
 {
     pub star: StarKey,
     pub hops: usize
@@ -585,14 +678,36 @@ impl fmt::Display for Frame {
             Frame::Close => format!("Close").to_string(),
             Frame::Diagnose(diagnose)=> format!("Diagnose({})",diagnose).to_string(),
             Frame::StarMessage(inner)=>format!("StarMessage({})",inner.payload).to_string(),
-            Frame::StarSearch(_)=>format!("StarSearch").to_string(),
-            Frame::StarSearchResult(_)=>format!("StarSearchResult").to_string(),
+            Frame::StarWind(wind)=>format!("StarWind({})",wind).to_string(),
             Frame::Watch(_) => format!("Watch").to_string(),
             Frame::Event(_) => format!("ActorEvent").to_string()
         };
         write!(f, "{}",r)
     }
 }
+
+impl fmt::Display for StarWind{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let r = match self {
+            StarWind::Up(up) => format!("Up({})",&up.pattern).to_string(),
+            StarWind::Down(_) => "Down".to_string()
+        };
+        write!(f, "{}",r)
+    }
+}
+
+impl fmt::Display for StarPattern{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let r = match self {
+            StarPattern::Any => "Any".to_string(),
+            StarPattern::None => "None".to_string(),
+            StarPattern::StarKey(key) => format!("{}",key).to_string(),
+            StarPattern::StarKind(kind) => format!("{}",kind).to_string()
+        };
+        write!(f, "{}",r)
+    }
+}
+
 
 impl fmt::Display for ProtoFrame {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

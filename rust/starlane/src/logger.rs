@@ -1,9 +1,9 @@
 use tokio::sync::{broadcast, mpsc, RwLock};
 
-use crate::frame::{StarSearch, StarSearchResult};
+use crate::frame::{WindUp, WindDown};
 use crate::star::StarKey;
 use std::sync::Arc;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use serde::{Deserialize, Serialize};
 
 pub struct Logger
@@ -32,11 +32,7 @@ impl Logger
     }
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct Flags
-{
-
-}
+pub type Flags = HashMap<Flag,bool>;
 
 
 

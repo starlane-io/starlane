@@ -13,9 +13,8 @@ use crate::keys::AppKey;
 
 pub enum SupervisorCommand
 {
-    PledgeToCentral
+    Pledge
 }
-
 
 pub struct SupervisorManager
 {

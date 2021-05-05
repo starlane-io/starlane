@@ -16,7 +16,7 @@ use tokio::time::{Duration, Instant};
 use crate::constellation::Constellation;
 use crate::core::StarCoreFactory;
 use crate::error::Error;
-use crate::frame::{Frame, ProtoFrame, SearchHit, StarMessage, StarMessagePayload, StarSearch, StarSearchPattern, StarSearchResult, SequenceMessage, ProtoEvolution, ProtoSequence};
+use crate::frame::{Frame, ProtoFrame, WindHit, StarMessage, StarMessagePayload, WindUp, StarPattern, WindDown, SequenceMessage, ProtoEvolution, ProtoSequence};
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelReceiver, TunnelSender, TunnelSenderState};
 use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarManagerFactory, StarSearchTransaction, Transaction};
