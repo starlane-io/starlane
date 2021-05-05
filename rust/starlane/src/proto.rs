@@ -14,14 +14,15 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{Duration, Instant};
 
 use crate::constellation::Constellation;
+use crate::core::StarCoreFactory;
 use crate::error::Error;
-use crate::frame::{Frame, ProtoFrame, StarMessage, StarMessagePayload, SearchHit, StarSearch, StarSearchPattern, StarSearchResult, StarUnwindPayload, StarWind, StarWindPayload};
+use crate::frame::{Frame, ProtoFrame, SearchHit, StarMessage, StarMessagePayload, StarSearch, StarSearchPattern, StarSearchResult, StarUnwindPayload, StarWind, StarWindPayload};
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelReceiver, TunnelSender, TunnelSenderState};
-use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarLogger, StarSearchTransaction, Transaction, StarManagerFactory};
+use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarManagerFactory, StarSearchTransaction, Transaction};
 use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
-use crate::core::StarCoreFactory;
+use crate::logger::Logger;
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -37,7 +38,7 @@ pub struct ProtoStar
   connector_ctrls: Vec<ConnectorController>,
   star_manager_factory: Arc<dyn StarManagerFactory>,
   star_core_factory: Arc<dyn StarCoreFactory>,
-  logger: StarLogger,
+  logger: Logger,
   frame_hold: FrameHold,
   tracker: ProtoTracker
 }
@@ -58,7 +59,7 @@ impl ProtoStar
             connector_ctrls: vec![],
             star_manager_factory: star_manager_factory,
             star_core_factory: star_core_factory,
-            logger: StarLogger::new(),
+            logger: Logger::new(),
             frame_hold: FrameHold::new(),
             tracker: ProtoTracker::new(),
         }, StarController{
@@ -145,7 +146,7 @@ impl ProtoStar
                         self.connector_ctrls.push(connector_ctrl);
                     }
                     StarCommand::AddLogger(logger) => {
-                        self.logger.tx.push(logger);
+//                        self.logger =
                     }
                     StarCommand::Frame(frame) => {
                         self.tracker.process(&frame);

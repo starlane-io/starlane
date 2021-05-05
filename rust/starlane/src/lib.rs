@@ -29,4 +29,5 @@ pub mod message;
 pub mod app;
 pub mod org;
 pub mod keys;
+pub mod logger;
 

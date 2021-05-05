@@ -6,7 +6,6 @@ use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::RandomState;
 use std::future::Future;
 use std::sync::{Arc, Mutex, Weak};
-
 use std::sync::atomic::{AtomicI32, AtomicI64};
 
 use futures::future::{BoxFuture, join_all, Map};
@@ -23,19 +22,20 @@ use tokio::time::error::Elapsed;
 use url::Url;
 
 use crate::actor::{Actor, ActorKey, ActorKind, ActorLocation, ActorWatcher};
+use crate::app::{AppCommandWrapper, AppController, AppCreate, AppKind, Application, AppLocation};
 use crate::core::StarCoreCommand;
 use crate::error::Error;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, AppAssign, AppCreateRequest, AppNotifyCreated, ApplicationSupervisorReport, AppSupervisorRequest, Event, Frame, ProtoFrame, Rejection, SearchHit, StarMessage, StarMessageAck, StarMessagePayload, StarSearch, StarSearchPattern, StarSearchResult, StarUnwind, StarUnwindPayload, StarWind, StarWindPayload, Watch, WatchInfo};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, AppAssign, AppCreateRequest, ApplicationSupervisorReport, AppNotifyCreated, AppSupervisorRequest, Event, Frame, ProtoFrame, Rejection, SearchHit, StarMessage, StarMessageAck, StarMessagePayload, StarSearch, StarSearchPattern, StarSearchResult, StarUnwind, StarUnwindPayload, StarWind, StarWindPayload, Watch, WatchInfo};
 use crate::id::{Id, IdSeq};
+use crate::keys::AppKey;
+use crate::label::Labels;
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
+use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob};
 use crate::org::OrgCommand;
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
 use crate::star::central::CentralManager;
-use crate::message::{ProtoMessage, MessageUpdate, StarMessageDeliveryInsurance, MessageReplyTracker, TrackerJob, MessageResult, MessageExpect, MessageExpectWait};
 use crate::star::supervisor::{SupervisorCommand, SupervisorManager};
-use crate::label::Labels;
-use crate::keys::AppKey;
-use crate::app::{AppCommandWrapper, AppLocation, AppKind, AppController, AppCreate, Application};
+use crate::logger::Logger;
 
 pub mod central;
 pub mod supervisor;
@@ -221,34 +221,6 @@ impl fmt::Display for ActorLookup {
     }
 }
 
-pub struct StarLogger
-{
-   pub tx: Vec<broadcast::Sender<StarLog>>
-}
-
-impl StarLogger
-{
-    pub fn new() -> Self
-    {
-        StarLogger{
-            tx: vec!()
-        }
-    }
-
-    pub fn log( &mut self, log: StarLog )
-    {
-        self.tx.retain( |sender| {
-            if let Err(err) = sender.send(log.clone())
-            {
-                true
-            }
-            else {
-                false
-            }
-        });
-    }
-}
-
 pub static MAX_HOPS: usize = 16;
 
 pub struct Star
@@ -261,7 +233,7 @@ pub struct Star
     connector_ctrls: Vec<ConnectorController>,
     transactions: HashMap<Id,Box<dyn Transaction>>,
     frame_hold: FrameHold,
-    logger: StarLogger,
+    logger: Logger,
     watches: HashMap<ActorKey,HashMap<Id,StarWatchInfo>>,
     actor_locations: LruCache<ActorKey, ActorLocation>,
     app_locations: LruCache<AppKey,StarKey>,
@@ -279,7 +251,7 @@ impl Star
                       core_tx: mpsc::Sender<StarCoreCommand>,
                       lanes: HashMap<StarKey,LaneMeta>,
                       connector_ctrls: Vec<ConnectorController>,
-                      logger: StarLogger,
+                      logger: Logger,
                       frame_hold: FrameHold ) ->Self
 
     {
@@ -383,7 +355,7 @@ impl Star
                         self.on_app_command(command).await;
                     }
                     StarCommand::AddLogger(tx) => {
-                        self.logger.tx.push(tx);
+//                        self.logger.tx.push(tx);
                     }
                     StarCommand::Test(test) => {
 /*                        match test
@@ -1338,7 +1310,7 @@ pub enum StarCommand
     AddConnectorController(ConnectorController),
     AddActorLocation(AddEntityLocation),
     AddAppLocation(AddAppLocation),
-    AddLogger(broadcast::Sender<StarLog>),
+    AddLogger(broadcast::Sender<Logger>),
     SendProtoMessage(ProtoMessage),
     ReleaseHold(StarKey),
     SearchInit(Search),
@@ -1866,13 +1838,6 @@ pub enum TransactionResult
 pub trait Transaction : Send+Sync
 {
     async fn on_frame( &mut self, frame: &Frame, lane: Option<&mut LaneMeta>, command_tx: &mut mpsc::Sender<StarCommand> )-> TransactionResult;
-}
-
-#[derive(Clone)]
-pub enum StarLog
-{
-   StarSearchInitialized(StarSearch),
-   StarSearchResult(StarSearchResult),
 }
 
 
