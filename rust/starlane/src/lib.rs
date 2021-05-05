@@ -27,7 +27,7 @@ pub mod service;
 pub mod label;
 pub mod message;
 pub mod app;
-pub mod org;
+pub mod space;
 pub mod keys;
 pub mod logger;
 

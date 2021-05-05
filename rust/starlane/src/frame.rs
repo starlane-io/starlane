@@ -11,7 +11,7 @@ use crate::star::{StarKey, StarKind, StarWatchInfo, StarNotify};
 use crate::label::Labels;
 use crate::message::{MessageResult, ProtoMessage, MessageExpect, MessageUpdate};
 use tokio::sync::{oneshot, broadcast};
-use crate::keys::{TenantKey, AppKey, UserKey};
+use crate::keys::{AppKey, UserKey, SubSpaceKey};
 use crate::app::{AppLocation, AppKind, AppInfo};
 use crate::user::AuthToken;
 
@@ -217,7 +217,7 @@ pub enum StarMessagePayload
 {
    None,
    Pledge,
-   Tenant(TenantMessage),
+   Space(SpaceMessage),
    Ok,
    Error(String),
    Ack(MessageAck),
@@ -262,15 +262,15 @@ pub enum MessageAckKind
 
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct TenantMessage
+pub struct SpaceMessage
 {
-    pub tenant: TenantKey,
+    pub sub_space: SubSpaceKey,
     pub token: AuthToken,
-    pub payload: TenantMessagePayload
+    pub payload: SpacePayload
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum TenantMessagePayload
+pub enum SpacePayload
 {
     App(AppMessage),
     Request(RequestMessage),
@@ -567,7 +567,7 @@ impl fmt::Display for StarMessagePayload{
         let r = match self {
             StarMessagePayload::None => "None".to_string(),
             StarMessagePayload::Pledge =>"Pledge".to_string(),
-            StarMessagePayload::Tenant(_) => "Tenant".to_string(),
+            StarMessagePayload::Space(_) => "Space".to_string(),
             StarMessagePayload::Ok => "Ok".to_string(),
             StarMessagePayload::Error(_) => "Error".to_string(),
             StarMessagePayload::Ack(_) => "Ack".to_string(),
@@ -603,10 +603,29 @@ impl fmt::Display for ProtoFrame {
             ProtoFrame::GrantSubgraphExpansion(path) => format!("GrantSubgraphExpansion({:?})", path).to_string(),
             ProtoFrame::CentralFound(_) => format!("CentralFound").to_string(),
             ProtoFrame::CentralSearch => format!("CentralSearch").to_string(),
-            ProtoFrame::Evolution(_) => "Evolution".to_string(),
-            ProtoFrame::Sequence(_) => "Sequence".to_string()
+            ProtoFrame::Evolution(evol) => format!("Evolution({})", evol).to_string(),
+            ProtoFrame::Sequence(seq) => format!("Sequence({})", seq).to_string(),
         };
         write!(f, "{}",r)
     }
 }
 
+impl fmt::Display for ProtoEvolution {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let r = match self {
+            ProtoEvolution::Request => "Request".to_string(),
+            ProtoEvolution::Report => "Report".to_string()
+        };
+        write!(f, "{}", r)
+    }
+}
+
+impl fmt::Display for ProtoSequence{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let r = match self {
+            ProtoSequence::Request => "Request".to_string(),
+            ProtoSequence::Reply(seq)=> format!("Reply({})",seq).to_string()
+        };
+        write!(f, "{}", r)
+    }
+}

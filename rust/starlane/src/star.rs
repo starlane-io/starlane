@@ -31,11 +31,11 @@ use crate::keys::AppKey;
 use crate::label::Labels;
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob};
-use crate::org::OrgCommand;
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
 use crate::star::central::CentralManager;
 use crate::star::supervisor::{SupervisorCommand, SupervisorManager};
 use crate::logger::Logger;
+use crate::space::SpaceCommand;
 
 pub mod central;
 pub mod supervisor;
@@ -284,7 +284,6 @@ impl Star
     {
         self.broadcast(Frame::Proto(ProtoFrame::Evolution(ProtoEvolution::Report))).await;
 
-println!("{} reporting EVOLUTION ", self.info.kind);
 
         self.manager_tx.send(StarManagerCommand::Init ).await;
         loop {
@@ -441,16 +440,17 @@ println!("{} reporting EVOLUTION ", self.info.kind);
 
         if message.to == self.info.star_key
         {
-            eprintln!("star {} kind {} cannot send a proto message to itself, payload:a {} ", self.info.star_key, self.info.kind, message.payload );
+            eprintln!("star {} kind {} cannot send a proto message to itself, payload: {} ", self.info.star_key, self.info.kind, message.payload );
         }
         else {
-            let delivery = StarMessageDeliveryInsurance::new(message, proto.expect);
+            let delivery = StarMessageDeliveryInsurance::with_txrx(message, proto.expect, proto.tx.clone(), proto.tx.subscribe() );
             self.message(delivery).await;
         }
     }
 
-    async fn on_app_lifecycle_command( &mut self, command: OrgCommand)
+    async fn on_app_lifecycle_command( &mut self, command: SpaceCommand)
     {
+println!("on_app_lifecycle_command: {}",command );
         todo!()
     }
 
@@ -690,6 +690,7 @@ println!("{} reporting EVOLUTION ", self.info.kind);
                                      match update
                                      {
                                          MessageUpdate::Result(_) => {
+
                                              // the result will have been captured on another
                                              // rx as this is a broadcast.  no longer need to wait.
                                              break;
@@ -698,7 +699,7 @@ println!("{} reporting EVOLUTION ", self.info.kind);
                                      }
                                  }
                                  Err(_) => {
-                                     // probably the TX got dropped
+                                     // probably the TX got dropped. no point in sticking around.
                                      break;
                                  }
                              }
@@ -943,6 +944,7 @@ println!("{} reporting EVOLUTION ", self.info.kind);
     {
         if message.reply_to.is_some() && self.message_reply_trackers.contains_key(message.reply_to.as_ref().unwrap()) {
             if let Some(tracker) = self.message_reply_trackers.get(message.reply_to.as_ref().unwrap()) {
+                println!("MESSGE REPLY MATCH ....");
                 if let TrackerJob::Done = tracker.on_message(message)
                 {
                     self.message_reply_trackers.remove(message.reply_to.as_ref().unwrap());
@@ -1002,7 +1004,6 @@ println!("{} reporting EVOLUTION ", self.info.kind);
                   }
                   ProtoFrame::Sequence(ProtoSequence::Request)=> {
 
-println!("{} received SEQUENCE request....", self.info.kind );
 
 
                       if let Option::Some(star) = lane_key.cloned()
@@ -1030,7 +1031,7 @@ println!("{} received SEQUENCE request....", self.info.kind );
                                       }
                                   });
 
-                                  println!("SENT Sequence request PROTO MESSAGE...");
+                                  println!("{} SENT Sequence request PROTO MESSAGE to CENTRAL.", self.info.kind );
                                   self.info.command_tx.send(StarCommand::SendProtoMessage(proto)).await;
                               }
                           }
@@ -1272,9 +1273,8 @@ println!("{} received SEQUENCE request....", self.info.kind );
         {
             if self.info.kind.relay() || message.from == self.info.star_key
             {
-
-                let delivery = StarMessageDeliveryInsurance::new(message, MessageExpect::ReplyErrOrTimeout(MessageExpectWait::Short));
-                self.message(delivery).await;
+                //forward the message
+                self.send_frame(message.to.clone(), Frame::StarMessage(message) ).await;
                 return Ok(());
             }
             else {
@@ -1282,6 +1282,7 @@ println!("{} received SEQUENCE request....", self.info.kind );
             }
         }
         else {
+            self.process_message_reply(&message).await;
             Ok(self.manager_tx.send( StarManagerCommand::Frame( Frame::StarMessage(message))).await?)
         }
     }
@@ -1316,7 +1317,7 @@ pub enum StarCommand
     ForwardFrame(ForwardFrame),
     FrameTimeout(FrameTimeoutInner),
     FrameError(FrameErrorInner),
-    AppLifecycleCommand(OrgCommand),
+    AppLifecycleCommand(SpaceCommand),
     AppCommand(AppCommandWrapper),
     ActorCommand(ActorCommand)
 }
@@ -1484,7 +1485,7 @@ impl StarController
        let (tx,mut rx) = mpsc::channel(1);
 
 
-       let app_create = OrgCommand::AppCreate( AppCreate{
+       let app_create = SpaceCommand::AppCreate( AppCreate{
            kind: kind,
            data: Arc::new(vec!()),
            labels: Labels::new()

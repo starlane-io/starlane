@@ -8,14 +8,14 @@ use crate::label::Labels;
 use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarInfo, StarKey, StarManager, StarManagerCommand, StarNotify};
 use crate::user::{AuthToken, AppAccess};
 use crate::message::{ProtoMessage, MessageExpect, MessageUpdate, MessageResult, MessageExpectWait};
-use crate::keys::{TenantKey, AppKey, GroupKey};
+use crate::keys::{AppKey, SubSpaceKey};
 use tokio::sync::mpsc::error::SendError;
 use futures::FutureExt;
 use tokio::sync::oneshot::Receiver;
 use crate::star::StarCommand::AppLifecycleCommand;
 use tokio::sync::oneshot::error::RecvError;
 use crate::error::Error;
-use crate::frame::{StarMessage, Frame, StarMessagePayload, RequestMessage, TenantMessagePayload, ReportMessage, TenantMessage, AssignMessage, AppAssign, AppCreateRequest, SequenceMessage};
+use crate::frame::{StarMessage, Frame, StarMessagePayload, RequestMessage, SpacePayload, ReportMessage, SpaceMessage, AssignMessage, AppAssign, AppCreateRequest, SequenceMessage};
 
 pub struct CentralManager
 {
@@ -57,15 +57,14 @@ impl CentralManager
 
     async fn launch_system_app(&mut self)
     {
-unimplemented!();
         let token =  self.backing.get_superuser_token().unwrap();
         let mut proto = ProtoMessage::new();
         proto.to = Option::Some(StarKey::central());
         proto.expect = MessageExpect::RetryUntilOk;
-        proto.payload = StarMessagePayload::Tenant(TenantMessage{
-                                                   tenant:TenantKey::new( 0, GroupKey{id:0} ),
+        proto.payload = StarMessagePayload::Space(SpaceMessage {
+                                                   sub_space:SubSpaceKey::main(),
                                                    token: token,
-                                                   payload: TenantMessagePayload::Request(RequestMessage::AppCreate(AppCreateRequest{
+                                                   payload: SpacePayload::Request(RequestMessage::AppCreate(AppCreateRequest{
                                                    labels: HashMap::new(),
                                                    kind: "system".to_string(),
                                                    data: Arc::new(vec![]) }))});
@@ -108,10 +107,10 @@ unimplemented!();
     }
 
 
-    async fn launch_app(&mut self, tenant: TenantKey, create: AppCreate, expect: MessageExpect) -> Result<oneshot::Receiver<AppLocation>, Error>
+    async fn launch_app(&mut self, sub_space: SubSpaceKey, create: AppCreate, expect: MessageExpect) -> Result<oneshot::Receiver<AppLocation>, Error>
     {
         let app_id = self.info.sequence.next();
-        let app_key = AppKey::new(tenant.clone(), app_id.index);
+        let app_key = AppKey::new(sub_space.clone(), app_id.index);
         let app = AppInfo::new(app_key.clone(), create.kind.clone());
         let supervisor = self.backing.select_supervisor();
         if let Option::None = supervisor
@@ -122,10 +121,10 @@ unimplemented!();
         let supervisor = supervisor.unwrap();
         let mut proto = ProtoMessage::new();
         proto.to = Some(supervisor.clone());
-        proto.payload = StarMessagePayload::Tenant(TenantMessage {
-            tenant: tenant,
+        proto.payload = StarMessagePayload::Space(SpaceMessage {
+            sub_space,
             token: self.backing.get_superuser_token()?,
-            payload: TenantMessagePayload::Assign(AssignMessage::App(AppAssign {
+            payload: SpacePayload::Assign(AssignMessage::App(AppAssign {
                 app: app,
                 data: create.data,
             }))
@@ -177,7 +176,6 @@ impl StarManager for CentralManager
                    match seq_message
                    {
                        SequenceMessage::Request => {
-println!("responding with: SEQUENCE to: {}", message.from );
                            let proto = message.reply(StarMessagePayload::Sequence(SequenceMessage::Response(self.info.sequence.next().index)));
                            self.info.command_tx.send(StarCommand::SendProtoMessage(proto)).await;
                        }
@@ -188,10 +186,10 @@ println!("responding with: SEQUENCE to: {}", message.from );
                     self.backing.add_supervisor(message.from.clone());
                     self.reply_ok(message).await;
                 }
-                StarMessagePayload::Tenant(tenant_message) => {
+                StarMessagePayload::Space(tenant_message) => {
                     match &tenant_message.payload
                     {
-                        TenantMessagePayload::Request(tenant_payload) => {
+                        SpacePayload::Request(tenant_payload) => {
                             match tenant_payload {
                                 RequestMessage::AppCreate(app_create_request) => {
                                     let create = AppCreate {
@@ -199,7 +197,7 @@ println!("responding with: SEQUENCE to: {}", message.from );
                                         data: app_create_request.data.clone(),
                                         labels: app_create_request.labels.clone()
                                     };
-                                    match self.launch_app(tenant_message.tenant.clone(), create, MessageExpect::ReplyErrOrTimeout(MessageExpectWait::Med)).await
+                                    match self.launch_app(tenant_message.sub_space.clone(), create, MessageExpect::ReplyErrOrTimeout(MessageExpectWait::Med)).await
                                     {
                                         Ok(rx) => {
                                             match rx.await
@@ -208,10 +206,10 @@ println!("responding with: SEQUENCE to: {}", message.from );
                                                     match self.backing.get_superuser_token()
                                                     {
                                                         Ok(token) => {
-                                                            let proto = message.reply(StarMessagePayload::Tenant(TenantMessage {
-                                                                tenant: tenant_message.tenant.clone(),
+                                                            let proto = message.reply(StarMessagePayload::Space(SpaceMessage {
+                                                                sub_space: tenant_message.sub_space.clone(),
                                                                 token: token,
-                                                                payload: TenantMessagePayload::Report(ReportMessage::AppLocation(app_loc))
+                                                                payload: SpacePayload::Report(ReportMessage::AppLocation(app_loc))
                                                             }));
                                                             self.info.command_tx.send(StarCommand::SendProtoMessage(proto)).await;
                                                         }

@@ -182,9 +182,12 @@ impl ProtoStar
 
                                 self.send_central_search().await;
                             },
+                            Frame::Proto(ProtoFrame::Evolution(ProtoEvolution::Request)) =>
+                            {
+                                // ignore
+                            },
                             Frame::Proto(ProtoFrame::Evolution(ProtoEvolution::Report)) =>
                             {
-println!("{} RECEIVED EVOLUTION report", self.kind);
                                 // a nearby evolution triggers a send sequence request
                                 self.send_sequence_request().await;
                             },

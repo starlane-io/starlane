@@ -67,8 +67,9 @@ impl IncomingLane
                     match tunnel.rx.recv().await
                     {
                         None => {
-                            eprintln!("received None from tunnel.rx")
+                            eprintln!("received None from tunnel.rx");
                             // let's hope the tunnel is reset soon
+break None;
                         }
                         Some(frame) => {return Option::Some(StarCommand::Frame(frame));}
                     }
