@@ -46,7 +46,7 @@ pub struct GroupKey
 
 pub type OrgKey=u64;
 
-#[derive(Clone,Hash,Eq,PartialEq)]
+#[derive(Clone,Hash,Eq,PartialEq,Serialize,Deserialize)]
 pub struct AppKey
 {
     pub tenant: TenantKey,

@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use tokio::sync::{mpsc, oneshot, broadcast};
 use crate::app::{AppInfo, ApplicationStatus, AppCreate, AppLocation};
-use crate::error::Error;
 use crate::frame::{AppAssign, ApplicationSupervisorReport, Frame, Rejection, StarMessage, StarMessagePayload, StarUnwind, StarUnwindPayload, StarWindPayload, TenantMessage, TenantMessagePayload, RequestMessage, AssignMessage, ReportMessage, AppCreateRequest};
 use crate::id::Id;
 use crate::label::Labels;
@@ -16,41 +15,26 @@ use futures::FutureExt;
 use tokio::sync::oneshot::Receiver;
 use crate::star::StarCommand::AppLifecycleCommand;
 use tokio::sync::oneshot::error::RecvError;
+use crate::error::Error;
 
 pub struct CentralManager
 {
     info: StarInfo,
     backing: Box<dyn CentralManagerBacking>,
-    status_tx: broadcast::Sender<CentralStatus>,
     manager_tx: mpsc::Sender<StarManagerCommand>,
     pub status: CentralStatus,
 }
 
 impl CentralManager
 {
-    pub async fn new(info: StarInfo, manager_tx: mpsc::Sender<StarManagerCommand>) -> CentralManager
+    pub fn new(info: StarInfo, manager_tx: mpsc::Sender<StarManagerCommand>) -> CentralManager
     {
-        let (status_tx,mut status_rx) = broadcast::channel(1);
-
-        tokio::spawn( async move {
-            loop {
-                match status_rx.recv().await
-                {
-                    Ok(status) => {}
-                    Err(error) => {
-                        eprintln!("Central can no longer listen for status changes");
-                        break;
-                    }
-                }
-            }
-        }).await;
 
         CentralManager
         {
             info: info.clone(),
             backing: Box::new(CentralManagerBackingDefault::new(info)),
             status: CentralStatus::Launching,
-            status_tx: status_tx,
             manager_tx: manager_tx
         }
     }
@@ -73,12 +57,14 @@ impl CentralManager
 
     async fn launch_system_app(&mut self)
     {
+unimplemented!();
+        let token =  self.backing.get_superuser_token().unwrap();
         let mut proto = ProtoMessage::new();
         proto.to = Option::Some(StarKey::central());
         proto.expect = MessageExpect::RetryUntilOk;
         proto.payload = StarMessagePayload::Tenant(TenantMessage{
                                                    tenant:TenantKey::new( 0, GroupKey{id:0} ),
-                                                   token: self.backing.get_superuser_token()?,
+                                                   token: token,
                                                    payload: TenantMessagePayload::Request(RequestMessage::AppCreate(AppCreateRequest{
                                                    labels: HashMap::new(),
                                                    kind: "system".to_string(),
@@ -102,7 +88,7 @@ impl CentralManager
         {
             Ok(_) => {}
             Err(error) => {
-                eprintln!("could not send starcommand from manager to star: {}", error.into());
+                eprintln!("could not send starcommand from manager to star: {}", error);
             }
         }
     }
@@ -114,7 +100,7 @@ impl CentralManager
         self.unwrap(result);
     }
 
-    pub async fn reply_error(&self, mut message: StarMessage, error_message: &str)
+    pub async fn reply_error(&self, mut message: StarMessage, error_message: String )
     {
         message.reply(StarMessagePayload::Error(error_message.to_string()));
         let result = self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await;
@@ -130,7 +116,8 @@ impl CentralManager
         let supervisor = self.backing.select_supervisor();
         if let Option::None = supervisor
         {
-            Err("could not find supervisor to host application".into())
+//            Err("could not find supervisor to host application".to_string().into());
+            unimplemented!()
         }
         let supervisor = supervisor.unwrap();
         let mut proto = ProtoMessage::new();
@@ -157,7 +144,7 @@ impl CentralManager
                         MessageUpdate::Ack(_) => {}
                         MessageUpdate::Result(result) => {
                             let app_loc = AppLocation { app: app_key, supervisor };
-                            tx.send(app_loc).unwrap();
+                            tx.send(app_loc);
                             break;
                         }
                     }
@@ -219,17 +206,17 @@ impl StarManager for CentralManager
                                                             self.info.command_tx.send(StarCommand::SendProtoMessage(proto)).await;
                                                         }
                                                         Err(error) => {
-                                                            self.reply_error(message, error.into());
+                                                            self.reply_error(message, error.to_string());
                                                         }
                                                     }
                                                 }
                                                 Err(error) => {
-                                                    self.reply_error(message, error.into());
+                                                    self.reply_error(message, error.to_string());
                                                 }
                                             }
                                         }
                                         Err(error) => {
-                                            self.reply_error(message, error.into());
+                                            self.reply_error(message, error.to_string());
                                         }
                                     }
                                 }

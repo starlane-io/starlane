@@ -8,7 +8,7 @@ use crate::lane::{ConnectionInfo, ConnectionKind};
 use crate::layout::ConstellationLayout;
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoStarKernel};
 use crate::proto::ProtoStarKernel::Mesh;
-use crate::star::{StarKey, StarKind};
+use crate::star::{StarKey, StarKind, ServerKindExt};
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct ConstellationTemplate
@@ -34,7 +34,7 @@ impl ConstellationTemplate
         let mut central = StarTemplate::new(StarKeyTemplate::central(), StarKind::Central, Option::Some("central".to_string()) );
         let mut mesh = StarTemplate::new(StarKeyTemplate::central_geodesic(1), StarKind::Mesh, Option::Some("mesh".to_string())  );
         let mut supervisor = StarTemplate::new(StarKeyTemplate::central_geodesic(2), StarKind::Supervisor, Option::Some("supervisor".to_string())  );
-        let mut server = StarTemplate::new(StarKeyTemplate::central_geodesic(3), StarKind::Server, Option::Some("server".to_string())  );
+        let mut server = StarTemplate::new(StarKeyTemplate::central_geodesic(3), StarKind::Server(ServerKindExt::new("mock".to_string())), Option::Some("server".to_string())  );
         let mut gateway = StarTemplate::new(StarKeyTemplate::central_geodesic(4), StarKind::Gateway, Option::Some("gateway".to_string())  );
 
 

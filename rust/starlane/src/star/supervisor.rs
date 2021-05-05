@@ -37,108 +37,16 @@ impl SupervisorManager
 #[async_trait]
 impl StarManager for SupervisorManager
 {
-    async fn handle(&mut self, command: StarManagerCommand) -> Result<(), Error> {
-        match command
-        {
-            StarManagerCommand::Init => {
-               let payload = StarMessagePayload::SupervisorPledgeToCentral;
-               let message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
-               let command = StarCommand::Frame(Frame::StarMessage(message));
-               self.info.command_tx.send( command ).await;
-               Ok(())
-            }
-            StarManagerCommand::Frame(frame) => {
-                match frame {
-                    Frame::StarMessage(message) => {
-                        self.handle_message(message).await
-                    }
-                    _ => Err(format!("{} manager does not know how to handle frame: {}", self.info.kind, frame).into())
-                }
-            }
-            StarManagerCommand::SupervisorCommand(command) => {
-                if let SupervisorCommand::PledgeToCentral = command
-                {
-                    let message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), StarMessagePayload::SupervisorPledgeToCentral );
-                    Ok(self.info.command_tx.send( StarCommand::Frame(Frame::StarMessage(message))).await?)
-                }
-                else {
-                    Err(format!("{} manager does not know how to handle : ...", self.info.kind).into())
-                }
-            }
-            StarManagerCommand::ServerCommand(_) => {
-                Err(format!("{} manager does not know how to handle : {}", self.info.kind, command).into())
-            }
-            StarManagerCommand::ActorCommand(_) => {
-                Err(format!("{} manager does not know how to handle : {}", self.info.kind, command).into())
-            }
-        }
+    async fn handle(&mut self, command: StarManagerCommand)  {
+
     }
 }
 
 
 impl SupervisorManager
 {
-    async fn handle_message(&mut self, message: StarMessage) -> Result<(), Error> {
+    async fn handle_message(&mut self, message: StarMessage) {
 
-        let mut message = message;
-        match &message.payload
-        {
-            StarMessagePayload::ApplicationAssign(assign) => {
-
-                let application = Application::new(assign.app.clone(), assign.data.clone() );
-                self.backing.add_application(assign.app.key.clone(), application);
-
-                // TODO: Now we need to Launch this application in the ext
-                // ext.launch_app()
-
-                for notify in &assign.notify
-                {
-                    let location = AppLocation{
-                        app: assign.app.key.clone(),
-                        supervisor: assign.supervisor.clone()
-                    };
-                    let payload = StarMessagePayload::ApplicationNotifyReady(AppNotifyCreated { location: location});
-                    let mut notify_app_ready = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), notify.clone(), payload );
-                    notify_app_ready.transaction = message.transaction.clone();
-                    self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(notify_app_ready))).await?;
-                }
-
-                Ok(())
-            }
-            StarMessagePayload::ServerPledgeToSupervisor => {
-
-                self.backing.add_server(message.from.clone());
-                Ok(())
-            }
-            StarMessagePayload::ActorLocationReport(report) =>
-            {
-                    self.backing.set_entity_location(report.actor.clone(), report.clone());
-                    Ok(())
-            }
-            StarMessagePayload::ActorLocationRequest(request) =>
-                {
-
-                    let location = self.backing.get_entity_location(&request.lookup);
-
-                    match location
-                    {
-                        None => {
-                            return Err(format!("cannot find entity: {}", request.lookup).into() );
-                        }
-                        Some(location) => {
-                            let location = location.clone();
-                            let payload = StarMessagePayload::ActorLocationReport(location);
-                            let proto = message.reply( payload );
-
-                            self.info.command_tx.send( StarCommand::SendProtoMessage(proto)).await?;
-                        }
-                    }
-                    Ok(())
-                }
-            _ => {
-                Err("SupervisorCore does not handle message of this type: _".into())
-            }
-        }
     }
 }
 
@@ -191,7 +99,7 @@ impl SupervisorManagerBacking for SupervisorManagerBackingDefault
         self.applications.insert(app, application);
     }
 
-    fn get_application(&mut self, app: AppKey) -> Option<&Application> {
+    fn get_application(&mut self, app: AppKey) -> Option<&Box<dyn Application>> {
         self.applications.get(&app)
     }
 
@@ -212,16 +120,6 @@ impl SupervisorManagerBacking for SupervisorManagerBackingDefault
         {
             ActorLookup::Key(key) => {
                 return self.entity_location.get(key)
-            }
-            ActorLookup::Name(lookup) => {
-
-                if let Some(key) = self.name_to_entity.get(&lookup.name)
-                {
-                    return self.entity_location.get(key)
-                }
-                else {
-                    Option::None
-                }
             }
         }
     }

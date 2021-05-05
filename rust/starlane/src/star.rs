@@ -216,7 +216,6 @@ impl fmt::Display for ActorLookup {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self{
             ActorLookup::Key(entity) => format!("Key({})", entity).to_string(),
-            ActorLookup::Name(lookup) => {format!("Name({})", lookup.name).to_string()}
         };
         write!(f, "{}",r)
     }
@@ -303,7 +302,7 @@ impl Star
         }
     }
 
-    pub fn has_entities(&self, key: &ActorKey) -> bool
+    pub fn has_actor(&self, key: &ActorKey) -> bool
     {
         self.actors.contains(&key)
     }
@@ -316,10 +315,12 @@ impl Star
             let mut futures = vec!();
             let mut lanes = vec!();
 
-            for (key,mut lane) in &mut self.lanes
             {
-                futures.push( lane.lane.incoming.recv().boxed() );
-                lanes.push( key.clone() )
+                for (key, mut lane) in &mut self.lanes
+                {
+                    futures.push(lane.lane.incoming.recv().boxed());
+                    lanes.push(key.clone())
+                }
             }
 
 
@@ -469,36 +470,13 @@ impl Star
 
     async fn on_app_lifecycle_command( &mut self, command: OrgCommand)
     {
-        match command
-        {
-            OrgCommand::AppCreate(create) => {
-                let payload = StarMessagePayload::ApplicationCreateRequest(AppCreateRequest {
-                    kind: "default".to_string(),
-                    data: create.data,
-                    labels: Labels::new()
-                });
-                let tid = self.info.sequence.next();
-                let mut message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
-                message.transaction = Option::Some(tid);
-
-                let transaction = AppCreateTransaction{
-                    command_tx: self.info.command_tx.clone(),
-                    tx: create.tx.clone()
-                };
-                self.transactions.insert( tid.clone(), Box::new(transaction) );
-
-                let delivery = StarMessageDeliveryInsurance::new(message,MessageExpect::None);
-
-                self.message(delivery).await;
-            }
-            OrgCommand::Get(_) => {}
-        }
-
+        todo!()
     }
 
     async fn on_app_command( &mut self, command: AppCommandWrapper)
     {
 
+        todo!()
     }
 
 
@@ -762,7 +740,7 @@ impl Star
                              }
                              else {
                                  // we resend the message and hope it arrives this time
-                                 self.send_frame(delivery.message.to.clone(), Frame::StarMessage(delivery.message.clone()) ).await;
+                                 star_tx.send( StarCommand::ForwardFrame( ForwardFrame{ to: delivery.message.to.clone(), frame: Frame::StarMessage(delivery.message.clone()) }  )).await;
                              }
                          }
                      }
@@ -1071,15 +1049,6 @@ impl Star
                     }
                 }
             }
-            Frame::StarMessageAck(ack) => {
-                match self.on_message_ack(ack).await
-                {
-                    Ok(messages) => {}
-                    Err(error) => {
-                        eprintln!("error: {}", error)
-                    }
-                }
-            }
 
             Frame::StarWind(wind) => {
                 self.on_wind(wind).await;
@@ -1095,7 +1064,9 @@ impl Star
 
     async fn on_event(&mut self, event: Event, lane_key: StarKey  )
     {
-        let watches = self.watches.get(&event.entity);
+        unimplemented!()
+        /*
+        let watches = self.watches.get(&event.actor );
 
         if watches.is_some()
         {
@@ -1109,6 +1080,7 @@ impl Star
                 self.send_frame( lane.clone(), Frame::Event(event.clone()));
             }
         }
+         */
     }
 
     async fn on_watch( &mut self, watch: Watch, lane_key: StarKey )
@@ -1158,10 +1130,10 @@ impl Star
         let has_entity = match &watch
         {
             Watch::Add(info) => {
-                self.has_entities(&info.entity)
+                self.has_actor(&info.entity)
             }
             Watch::Remove(info) => {
-                self.has_entities(&info.entity)
+                self.has_actor(&info.entity)
             }
         };
 
@@ -1191,7 +1163,7 @@ impl Star
             }
             else
             {
-                let mut rx = self.find_entity_location(lookup).await;
+                let mut rx = self.find_actor_location(lookup).await;
                 let command_tx = self.info.command_tx.clone();
                 tokio::spawn( async move {
                     if let Option::Some(_) = rx.recv().await
@@ -1210,6 +1182,8 @@ impl Star
 
     async fn find_app_location(&mut self, app: AppKey ) -> mpsc::Receiver<AppLocation>
     {
+        unimplemented!()
+        /*
         let payload = StarMessagePayload::ApplicationSupervisorRequest(AppSupervisorRequest { app: app.clone() } );
         let mut message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
         message.transaction = Option::Some(self.info.sequence.next());
@@ -1223,6 +1197,8 @@ impl Star
         self.message( delivery ).await;
 
         rx
+
+         */
     }
 
     fn get_entity_location(&mut self, kind: ActorLookup) -> Option<&ActorLocation>
@@ -1236,7 +1212,7 @@ impl Star
         }
     }
 
-    async fn find_entity_location(&mut self, lookup: ActorLookup) -> mpsc::Receiver<()>
+    async fn find_actor_location(&mut self, lookup: ActorLookup) -> mpsc::Receiver<()>
     {
 
         let supervisor_star = self.get_app_location(&lookup.app() ).cloned();
@@ -1256,7 +1232,8 @@ impl Star
                 xr
             }
             Some(supervisor_star) => {
-                let payload = StarMessagePayload::ActorLocationRequest(ActorLocationRequest { lookup } );
+                unimplemented!()
+/*                let payload = StarMessagePayload::ActorLocationRequest(ActorLocationRequest { lookup } );
                 let mut message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), supervisor_star, payload );
                 message.transaction = Option::Some(self.info.sequence.next());
                 let (transaction,rx) =  ResourceLocationRequestTransaction::new();
@@ -1264,6 +1241,8 @@ impl Star
                 let delivery = StarMessageDeliveryInsurance::new(message, MessageExpect::ReplyErrOrTimeout(MessageExpectWait::Short));
                 self.message( delivery ).await;
                 rx
+
+ */
             }
         }
 
@@ -1340,27 +1319,7 @@ impl Star
         }
     }
 
-    async fn on_message_ack(&mut self, mut ack: StarMessageAck) -> Result<(),Error>
-    {
-        if ack.to != self.info.star_key
-        {
-            if self.info.kind.relay() || ack.from == self.info.star_key
-            {
-                self.send_frame(ack.to.clone(), Frame::StarMessageAck(ack) ).await;
-                return Ok(());
-            }
-            else {
-                return Err(format!("this star {} does not relay MessageAcks", self.info.kind ).into())
-            }
-        }
-        else {
-            if let Option::Some(tx) = self.message_ack_tx.remove(&ack.id)
-            {
-                tx.send(());
-            }
-            Ok(())
-        }
-    }
+
 
 
 }
@@ -1617,7 +1576,9 @@ impl ApplicationSupervisorSearchTransaction
 impl Transaction for ApplicationSupervisorSearchTransaction
 {
     async fn on_frame(&mut self, frame: &Frame, lane: Option<&mut LaneMeta>, command_tx: &mut mpsc::Sender<StarCommand>) -> TransactionResult {
+        unimplemented!()
 
+        /*
         if let Frame::StarMessage( message ) = frame
         {
             if let StarMessagePayload::ApplicationSupervisorReport(report) = &message.payload
@@ -1633,6 +1594,8 @@ impl Transaction for ApplicationSupervisorSearchTransaction
         }
 
         TransactionResult::Done
+
+         */
     }
 }
 
@@ -1656,6 +1619,7 @@ impl ResourceLocationRequestTransaction
 impl Transaction for ResourceLocationRequestTransaction
 {
     async fn on_frame(&mut self, frame: &Frame, lane: Option<&mut LaneMeta>, command_tx: &mut mpsc::Sender<StarCommand>) -> TransactionResult {
+        /*
 
         if let Frame::StarMessage( message ) = frame
         {
@@ -1665,6 +1629,10 @@ impl Transaction for ResourceLocationRequestTransaction
             }
         }
 
+
+
+         */
+        unimplemented!();
         TransactionResult::Done
     }
 
@@ -1811,6 +1779,7 @@ impl Transaction for AppCreateTransaction
 {
     async fn on_frame(&mut self, frame: &Frame, lane: Option<&mut LaneMeta>, command_tx: &mut mpsc::Sender<StarCommand>) -> TransactionResult
     {
+        /*
         if let Frame::StarMessage(message) = &frame
         {
             if let StarMessagePayload::ApplicationNotifyReady(notify) = &message.payload
@@ -1841,6 +1810,9 @@ impl Transaction for AppCreateTransaction
                 return TransactionResult::Done;
             }
         }
+
+         */
+        unimplemented!();
         TransactionResult::Continue
     }
 }
@@ -1963,7 +1935,7 @@ pub trait SupervisorManagerBacking: Send+Sync
     fn select_server(&mut self) -> Option<StarKey>;
 
     fn add_application(&mut self, app: AppKey, application: Box<dyn Application> );
-    fn get_application(&mut self, app: AppKey ) -> Option<&Application>;
+    fn get_application(&mut self, app: AppKey ) -> Option<&Box<dyn Application>>;
 
     fn remove_application(&mut self, app: AppKey );
 
@@ -2140,7 +2112,7 @@ impl ServerManager
         if let Option::Some(hit) = result.nearest()
         {
            self.set_supervisor(hit.star.clone());
-           let payload = StarMessagePayload::ServerPledgeToSupervisor;
+           let payload = StarMessagePayload::Pledge;
            let message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), hit.star, payload );
            self.info.command_tx.send( StarCommand::Frame(Frame::StarMessage(message))).await;
         }
@@ -2155,37 +2127,8 @@ impl ServerManager
 #[async_trait]
 impl StarManager for ServerManager
 {
-    async fn handle(&mut self, command: StarManagerCommand) -> Result<(), Error> {
+    async fn handle(&mut self, command: StarManagerCommand) {
 
-        match command
-        {
-            StarManagerCommand::Init => {
-                self.pledge().await?;
-                Ok(())
-            }
-            StarManagerCommand::ServerCommand(command) => {
-
-                match command
-                {
-                    ServerCommand::PledgeToSupervisor => {
-                        if let Option::None = self.get_supervisor()
-                        {
-                            self.pledge().await?;
-                            Ok(())
-                        }
-                        else {
-                            eprintln!("supervisor is already set");
-                            Ok(())
-                        }
-                    }
-                }
-
-            }
-            unimplemented => {
-                println!("{} unimplemented for {}", unimplemented, self.info.kind);
-                Ok(())
-            }
-        }
     }
 }
 
@@ -2209,13 +2152,12 @@ impl PlaceholderStarManager
 #[async_trait]
 impl StarManager for PlaceholderStarManager
 {
-    async fn handle(&mut self, command: StarManagerCommand) -> Result<(), Error> {
+    async fn handle(&mut self, command: StarManagerCommand)  {
         match command
         {
-            StarManagerCommand::Init => {Ok(())}
+            StarManagerCommand::Init => {}
             _ => {
                 println!("command {} Placeholder unimplemented for kind: {}",command,self.info.kind);
-                Ok(())
             }
         }
     }
@@ -2234,11 +2176,11 @@ pub struct StarManagerFactoryDefault
 
 impl StarManagerFactoryDefault
 {
-    fn create_inner( &self, info: &StarInfo) -> Box<dyn StarManager>
+    fn create_inner( &self, info: &StarInfo, manager_tx: mpsc::Sender<StarManagerCommand>) -> Box<dyn StarManager>
     {
         if let StarKind::Central = info.kind
         {
-            return Box::new(CentralManager::new(info.clone()));
+            return Box::new(CentralManager::new(info.clone(), manager_tx) );
         }
         else if let StarKind::Supervisor= info.kind
         {
@@ -2260,19 +2202,13 @@ impl StarManagerFactory for StarManagerFactoryDefault
     async fn create( &self, info: StarInfo ) -> mpsc::Sender<StarManagerCommand>
     {
         let (mut tx,mut rx) = mpsc::channel(32);
-        let mut manager:Box<dyn StarManager> = self.create_inner(&info);
+        let mut manager:Box<dyn StarManager> = self.create_inner(&info,tx.clone());
 
         let kind = info.kind.clone();
         tokio::spawn( async move {
             while let Option::Some(command) = rx.recv().await
             {
-                match manager.handle(command).await
-                {
-                    Ok(_) => {}
-                    Err(error) => {
-                        eprintln!("{} manager error: {}", kind, error);
-                    }
-                }
+                manager.handle(command).await;
             }
         }  );
 

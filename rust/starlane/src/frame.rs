@@ -72,7 +72,7 @@ pub enum StarWindPayload
 #[derive(Clone,Serialize,Deserialize)]
 pub enum StarUnwindPayload
 {
-    AssignSequence(i64)
+    AssignSequence(u64)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -223,12 +223,6 @@ impl StarMessage
         proto
     }
 
-
-    pub fn inc_retry(&mut self)
-    {
-        self.retries = &self.retries + 1;
-    }
-
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -263,6 +257,7 @@ pub struct MessageAck
     pub kind: MessageAckKind
 }
 
+#[derive(Clone,Serialize,Deserialize)]
 pub enum MessageAckKind
 {
     Hop(StarKey),
@@ -324,6 +319,7 @@ pub struct AppMessage
     pub payload: AppMessagePayload
 }
 
+#[derive(Clone,Serialize,Deserialize)]
 pub enum AppMessagePayload
 {
    None
@@ -574,21 +570,12 @@ impl fmt::Display for FrameDiagnose {
 impl fmt::Display for StarMessagePayload{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
-            StarMessagePayload::Reject(inner) => format!("Reject({})",inner.message),
-            StarMessagePayload::SupervisorPledgeToCentral => "SupervisorPledgeToCentral".to_string(),
-            StarMessagePayload::ApplicationCreateRequest(_) => "ApplicationCreateRequest".to_string(),
-            StarMessagePayload::ApplicationAssign(_) => "ApplicationAssign".to_string(),
-            StarMessagePayload::ApplicationNotifyReady(_) => "ApplicationNotifyReady".to_string(),
-            StarMessagePayload::ApplicationSupervisorRequest(_) => "ApplicationRequestSupervisor".to_string(),
-            StarMessagePayload::ApplicationSupervisorReport(_) => "ApplicationReportSupervisor".to_string(),
-            StarMessagePayload::ApplicationLookup(_) => "ApplicationLookupId".to_string(),
-            StarMessagePayload::ApplicationLaunchRequest(_) => "ApplicationRequestLaunch".to_string(),
-            StarMessagePayload::ServerPledgeToSupervisor => "ServerPledgeToSupervisor".to_string(),
-            StarMessagePayload::ActorEvent(_)=>"ActorEvent".to_string(),
-            StarMessagePayload::ActorMessage(_)=>"ActorMessage".to_string(),
-            StarMessagePayload::ActorLocationRequest(_)=>"ActorLocationRequest".to_string(),
-            StarMessagePayload::ActorLocationReport(_)=>"ActorLocationReport".to_string(),
-            StarMessagePayload::ActorStateRequest(_)=>"ActorStateRequest".to_string(),
+            StarMessagePayload::None => "None".to_string(),
+            StarMessagePayload::Pledge =>"Pledge".to_string(),
+            StarMessagePayload::Tenant(_) => "Tenant".to_string(),
+            StarMessagePayload::Ok => "Ok".to_string(),
+            StarMessagePayload::Error(_) => "Error".to_string(),
+            StarMessagePayload::Ack(_) => "Ack".to_string(),
         };
         write!(f, "{}",r)
     }
@@ -606,7 +593,6 @@ impl fmt::Display for Frame {
             Frame::StarSearchResult(_)=>format!("StarSearchResult").to_string(),
             Frame::StarWind(_)=>format!("StarWind").to_string(),
             Frame::StarUnwind(_)=>format!("StarUnwind").to_string(),
-            Frame::StarMessageAck(_)=>format!("StarMessageAck").to_string(),
             Frame::Watch(_) => format!("Watch").to_string(),
             Frame::Event(_) => format!("ActorEvent").to_string()
         };

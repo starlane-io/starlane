@@ -8,12 +8,13 @@ use crate::error::Error;
 use crate::frame::{ActorMessage, StarMessage, StarMessagePayload, StarUnwindPayload, StarWind, Watch, WatchInfo};
 use crate::id::{Id, IdSeq};
 use crate::actor::{ActorKey, Actor};
-use crate::star::{StarCommand, StarKey, StarKind, ActorCommand, ActorCreate};
+use crate::star::{StarCommand, StarKey, StarKind, ActorCommand, ActorCreate, StarManagerCommand};
 use std::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::runtime::Runtime;
 use tokio::time::Duration;
 use std::future::Future;
+use futures::FutureExt;
 
 
 pub enum StarCoreCommand
@@ -39,7 +40,7 @@ impl CoreRunner
             return;
         }
 
-        self.runtime = Option::new(Runtime::new().unwrap());
+        self.runtime = Option::Some(Runtime::new().unwrap());
     }
 
     pub fn stop(&mut self)
@@ -55,8 +56,11 @@ impl CoreRunner
     {
         if let Some(runtime)=&mut self.runtime
         {
-            let runtime = self.runtime.unwrap();
+            unimplemented!();
+/*            let runtime = self.runtime.unwrap();
             runtime.spawn(future);
+
+ */
             Ok(())
         }
         else {
@@ -87,7 +91,7 @@ pub trait EntityStarCoreExt: StarCoreExt
 #[async_trait]
 pub trait StarCoreFactory: Sync+Send
 {
-    fn create( &self, kind: &StarKind, star_tx: mpsc::Sender<StarCommand> ) -> mpsc::Sender<StarCoreCommand>;
+    fn create( &self, kind: &StarKind, star_tx: mpsc::Sender<StarManagerCommand> ) -> mpsc::Sender<StarCoreCommand>;
 }
 
 pub struct StarCoreFactoryDefault
@@ -97,7 +101,7 @@ pub struct StarCoreFactoryDefault
 #[async_trait]
 impl StarCoreFactory for StarCoreFactoryDefault
 {
-    fn create(&self, kind: &StarKind, star_tx: mpsc::Sender<StarCommand>) -> Sender<StarCoreCommand> {
+    fn create(&self, kind: &StarKind, star_tx: mpsc::Sender<StarManagerCommand>) -> Sender<StarCoreCommand> {
        let (tx,rx) = mpsc::channel(32);
        let mut core = ServerStarCore{
            command_rx: rx

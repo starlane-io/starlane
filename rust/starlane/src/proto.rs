@@ -81,7 +81,7 @@ impl ProtoStar
             };
 
             let manager_tx= self.star_manager_factory.create(info.clone() ).await;
-            let core_tx = self.star_core_factory.create(&info.kind).await;
+            let core_tx = self.star_core_factory.create(&info.kind,manager_tx.clone());
 
 
             return Ok(Star::from_proto(info.clone(),
@@ -233,7 +233,7 @@ impl ProtoStar
                                             };
 
                                         let manager_tx= self.star_manager_factory.create(info.clone() ).await;
-                                        let core_tx = self.star_core_factory.create(&info.kind).await;
+                                        let core_tx = self.star_core_factory.create(&info.kind, manager_tx.clone());
 
                                         return Ok(Star::from_proto(info.clone(),
                                                                        self.command_rx,

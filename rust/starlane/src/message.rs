@@ -259,7 +259,7 @@ impl OkResultWaiter
                 match result
                 {
                     MessageResult::Ok(payload) => {
-                        self.tx.send(payload).unwrap();
+                        self.tx.send(payload);
                     }
                     _ => {
                         eprintln!("not expecting this results for OkResultWaiter...");
