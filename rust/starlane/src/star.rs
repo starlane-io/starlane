@@ -34,7 +34,7 @@ use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, Mess
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
 use crate::star::central::CentralManager;
 use crate::star::supervisor::{SupervisorCommand, SupervisorManager};
-use crate::logger::Logger;
+use crate::logger::{Logger, Flags};
 use crate::space::SpaceCommand;
 use crate::frame::WindAction::SearchHits;
 
@@ -231,6 +231,7 @@ pub struct Star
     messages_received: HashMap<Id,Instant>,
     message_reply_trackers: HashMap<Id, MessageReplyTracker>,
     actors: HashSet<ActorKey>,
+    flags: Flags
 }
 
 impl Star
@@ -243,7 +244,8 @@ impl Star
                       lanes: HashMap<StarKey,LaneMeta>,
                       connector_ctrls: Vec<ConnectorController>,
                       logger: Logger,
-                      frame_hold: FrameHold ) ->Self
+                      frame_hold: FrameHold,
+                      flags: Flags ) ->Self
 
     {
         Star{
@@ -262,6 +264,7 @@ impl Star
             messages_received: HashMap::new(),
             message_reply_trackers: HashMap::new(),
             actors: HashSet::new(),
+            flags: flags
         }
     }
 
@@ -297,6 +300,11 @@ impl Star
             if let Some(command) = command
             {
                 match command{
+                    StarCommand::SetFlags(set_flags ) => {
+                       self.flags = set_flags.flags;
+                       println!("new flags set!");
+                       set_flags.tx.send(());
+                    }
                     StarCommand::AddLane(lane) => {
                         if let Some(remote_star)=lane.remote_star.as_ref()
                         {
@@ -1320,6 +1328,7 @@ pub enum StarCommand
     AddAppLocation(AddAppLocation),
     AddLogger(broadcast::Sender<Logger>),
     SendProtoMessage(ProtoMessage),
+    SetFlags(SetFlags),
     ReleaseHold(StarKey),
     WindInit(Wind),
     WindCommit(WindCommit),
@@ -1333,6 +1342,15 @@ pub enum StarCommand
     AppCommand(AppCommandWrapper),
     ActorCommand(ActorCommand)
 }
+
+
+pub struct SetFlags
+{
+    pub flags: Flags,
+    pub tx: oneshot::Sender<()>
+}
+
+
 pub enum ActorCommand
 {
    Create(ActorCreate)
@@ -1487,6 +1505,7 @@ impl fmt::Display for StarCommand{
             StarCommand::WindDown(_) => format!("SearchReturnResult").to_string(),
             StarCommand::ActorCommand(command) => format!("EntityCommand({})", command).to_string(),
             StarCommand::SendProtoMessage(_) => format!("SendProtoMessage(_)").to_string(),
+            StarCommand::SetFlags(_) => format!("SetFlags(_)").to_string(),
         };
         write!(f, "{}",r)
     }
@@ -1500,6 +1519,19 @@ pub struct StarController
 
 impl StarController
 {
+   pub async fn set_flags(&self, flags: Flags ) -> oneshot::Receiver<()>
+   {
+       let (tx,rx) = oneshot::channel();
+
+       let set_flags = SetFlags{
+           flags: flags,
+           tx: tx
+       };
+
+       self.command_tx.send( StarCommand::SetFlags(set_flags) ).await;
+       rx
+   }
+
    pub async fn create_app(&self, name: Option<String>, kind: AppKind, data: Vec<u8> )->Result<AppController,Error>
    {
 

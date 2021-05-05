@@ -22,7 +22,7 @@ use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PRO
 use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarManagerFactory, StarSearchTransaction, Transaction};
 use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
-use crate::logger::Logger;
+use crate::logger::{Logger, Flags};
 use crate::frame::ProtoFrame::Evolution;
 
 pub static MAX_HOPS: i32 = 32;
@@ -41,12 +41,13 @@ pub struct ProtoStar
   star_core_factory: Arc<dyn StarCoreFactory>,
   logger: Logger,
   frame_hold: FrameHold,
+  flags: Flags,
   tracker: ProtoTracker
 }
 
 impl ProtoStar
 {
-    pub fn new(key: Option<StarKey>, kind: StarKind, evolution_tx: oneshot::Sender<ProtoStarEvolution>, star_manager_factory: Arc<dyn StarManagerFactory>, star_core_factory: Arc<dyn StarCoreFactory>) ->(Self, StarController)
+    pub fn new(key: Option<StarKey>, kind: StarKind, evolution_tx: oneshot::Sender<ProtoStarEvolution>, star_manager_factory: Arc<dyn StarManagerFactory>, star_core_factory: Arc<dyn StarCoreFactory>, flags: Flags ) ->(Self, StarController)
     {
         let (command_tx, command_rx) = mpsc::channel(32);
         (ProtoStar{
@@ -63,6 +64,7 @@ impl ProtoStar
             logger: Logger::new(),
             frame_hold: FrameHold::new(),
             tracker: ProtoTracker::new(),
+            flags: flags
         }, StarController{
             command_tx: command_tx
         })
@@ -93,7 +95,8 @@ impl ProtoStar
                                        self.lanes,
                                        self.connector_ctrls,
                                        self.logger,
-                                       self.frame_hold ));
+                                       self.frame_hold,
+                                       self.flags ));
         }
         else {
             self.send_central_search().await;
@@ -205,7 +208,6 @@ impl ProtoStar
                                 let core_tx = self.star_core_factory.create(&info.kind,manager_tx.clone());
 
 
-println!("{} .... EVOLVED .... ", self.kind);
                                 return Ok(Star::from_proto(info.clone(),
                                                            self.command_rx,
                                                            manager_tx,
@@ -213,7 +215,8 @@ println!("{} .... EVOLVED .... ", self.kind);
                                                            self.lanes,
                                                            self.connector_ctrls,
                                                            self.logger,
-                                                           self.frame_hold ));
+                                                           self.frame_hold,
+                                                           self.flags ));
 
                             },
 

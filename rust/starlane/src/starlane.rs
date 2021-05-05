@@ -17,6 +17,7 @@ use crate::provision::Provisioner;
 use crate::star::{Star, StarCommand, StarController, StarKey, StarManagerFactory, StarManagerFactoryDefault, StarName};
 use crate::template::{ConstellationData, ConstellationTemplate, StarKeyIndexTemplate, StarKeySubgraphTemplate, StarKeyTemplate};
 use crate::core::{StarCoreFactory, StarCoreFactoryDefault};
+use crate::logger::Flags;
 
 pub struct Starlane
 {
@@ -26,7 +27,8 @@ pub struct Starlane
     star_names: HashMap<StarName,StarKey>,
     star_manager_factory: Arc<dyn StarManagerFactory>,
     star_core_factory: Arc<dyn StarCoreFactory>,
-    constellation_names: HashSet<String>
+    constellation_names: HashSet<String>,
+    flags: Flags
 }
 
 impl Starlane
@@ -41,7 +43,8 @@ impl Starlane
             tx: tx,
             rx: rx,
             star_manager_factory: Arc::new( StarManagerFactoryDefault{} ),
-            star_core_factory: Arc::new( StarCoreFactoryDefault{} )
+            star_core_factory: Arc::new( StarCoreFactoryDefault{} ),
+            flags: Flags::new()
         }
     }
 
@@ -105,7 +108,7 @@ impl Starlane
 
         let link = link.unwrap().clone();
         let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
-        let (proto_star, star_ctrl) = ProtoStar::new(Option::None, link.kind.clone(), evolve_tx, self.star_manager_factory.clone(), self.star_core_factory.clone() );
+        let (proto_star, star_ctrl) = ProtoStar::new(Option::None, link.kind.clone(), evolve_tx, self.star_manager_factory.clone(), self.star_core_factory.clone(), self.flags.clone() );
 
         println!("created proto star: {:?}", &link.kind);
 
@@ -195,7 +198,7 @@ impl Starlane
             let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
             evolve_rxs.push(evolve_rx );
 
-            let (proto_star, star_ctrl) = ProtoStar::new(Option::Some(star_key.clone()), star_template.kind.clone(), evolve_tx, self.star_manager_factory.clone(), self.star_core_factory.clone() );
+            let (proto_star, star_ctrl) = ProtoStar::new(Option::Some(star_key.clone()), star_template.kind.clone(), evolve_tx, self.star_manager_factory.clone(), self.star_core_factory.clone(), self.flags.clone() );
             self.star_controllers.insert(star_key.clone(), star_ctrl.clone() );
             if name.is_some() && star_template.handle.is_some()
             {
@@ -391,6 +394,7 @@ mod test
     use crate::template::{ConstellationData, ConstellationTemplate};
     use crate::star::StarController;
     use crate::app::AppController;
+    use crate::logger::Flags;
 
     #[test]
     pub fn starlane()
@@ -434,6 +438,12 @@ mod test
             println!("got mesh_ctrl");
             tokio::time::sleep(Duration::from_secs(1)).await;
 
+            let rx = mesh_ctrl.set_flags(Flags::new()).await;
+
+            timeout(Duration::from_secs(1), rx).await.unwrap().unwrap();
+            println!("set flags confirmed.");
+
+            tokio::time::sleep(Duration::from_secs(1)).await;
             match mesh_ctrl.create_app(Option::None,"default".to_string(), vec!() ).await
             {
                 Ok(app_ctrl) => {
