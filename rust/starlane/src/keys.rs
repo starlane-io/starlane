@@ -53,7 +53,11 @@ pub struct AppKey
     pub id: u64
 }
 
-
+impl fmt::Display for GroupKey{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.id)
+    }
+}
 
 impl AppKey
 {
@@ -68,6 +72,13 @@ impl AppKey
 
 impl fmt::Display for AppKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({},{})", self.app, self.id)
+        write!(f, "({},{})", self.tenant, self.id)
+    }
+}
+
+
+impl fmt::Display for TenantKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({},{})", self.org, self.group)
     }
 }

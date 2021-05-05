@@ -21,14 +21,15 @@ impl AuthToken
         }
     }
 
-    pub fn get_user(&self)->Result<User,TokenError>
+    pub fn get_user(&self)->Result<User,Error>
     {
         if !&self.valid
         {
-            Err(TokenError::Invalid)
+            Err("TokenError::Invalid".into())
         }
-
-        Ok(self.user.clone())
+        else {
+            Ok(self.user.clone())
+        }
     }
 
     pub fn is_valid(&self) -> bool
@@ -48,7 +49,8 @@ pub struct User
 {
     pub name: String,
     pub key: UserKey,
-    pub labels: Option<Labels>
+    pub labels: Option<Labels>,
+    pub kind: UserKind
 }
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
@@ -83,10 +85,10 @@ impl UserPattern
                 true
             }
             UserPattern::Kind(kind) => {
-                kind == user.kind
+                *kind == user.kind
             }
             UserPattern::Exact(name) => {
-                if name == user.name {
+                if *name == user.name {
                     true
                 }
                 else {
@@ -97,7 +99,7 @@ impl UserPattern
     }
 }
 
-#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub struct Permissions
 {
     pub patterns: Vec<UserPattern>,
@@ -112,10 +114,10 @@ impl Permissions
         {
             if pattern.is_match(user)
             {
-                true
+                return true;
             }
         }
-        false
+        return false;
     }
 }
 

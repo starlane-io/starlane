@@ -32,7 +32,7 @@ pub struct ActorKey
 
 
 #[async_trait]
-pub trait Actor
+pub trait Actor: Sync+Send
 {
     async fn handle_message(&mut self, message: ActorMessage );
 }

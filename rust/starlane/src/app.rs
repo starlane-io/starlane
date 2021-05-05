@@ -110,7 +110,7 @@ pub type Apps = HashMap<AppKind,Box<dyn Application>>;
 
 pub struct AppContext
 {
-    pub star_tx: mpsc::Sender<AppCommandWrapper>,
+//    pub star_tx: mpsc::Sender<AppCommandWrapper>,
     pub info: AppInfo
 }
 

@@ -48,7 +48,7 @@ impl ProtoMessage
         {
             errors.push("must specify 'to' field");
         }
-        if self.payload.is_none()
+        if let StarMessagePayload::None = self.payload
         {
             errors.push("must specify a message payload");
         }
@@ -61,10 +61,10 @@ impl ProtoMessage
                 rtn.push_str(err);
                 rtn.push('\n');
             }
-            Err(rtn.into())
+            return Err(rtn.into());
         }
 
-        Ok(())
+        return Ok(());
     }
 
     pub async fn get_ok_result(&self) -> oneshot::Receiver<StarMessagePayload>
@@ -124,7 +124,6 @@ pub enum MessageResult
     Timeout
 }
 
-#[derive(Clone)]
 pub struct StarMessageDeliveryInsurance
 {
     pub message: StarMessage,
@@ -206,6 +205,7 @@ impl MessageExpect {
     }
 }
 
+#[derive(Clone)]
 pub enum MessageExpectWait
 {
     Short,

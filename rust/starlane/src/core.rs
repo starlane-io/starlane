@@ -47,7 +47,8 @@ impl CoreRunner
     {
         if let Some(runtime) = &self.runtime
         {
-            runtime.shutdown_timeout(Duration::from_secs(15));
+            unimplemented!();
+            //runtime.shutdown_timeout(Duration::from_secs(15));
             self.runtime = Option::None;
         }
     }
