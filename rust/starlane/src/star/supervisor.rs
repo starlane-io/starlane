@@ -3,13 +3,15 @@ use core::option::Option;
 use core::option::Option::{None, Some};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
-use crate::star::{StarData, SupervisorManagerBacking, StarManager, StarManagerCommand, StarCommand, StarKey};
+use crate::star::{StarData,StarInfo, SupervisorManagerBacking, StarManager, StarManagerCommand, StarCommand, StarKey};
 use crate::frame::{StarMessagePayload, StarMessage, Frame, AppNotifyCreated, ActorLookup};
 use crate::error::Error;
 use std::collections::HashMap;
 use crate::actor::{ActorKey, ActorLocation};
 use crate::app::{AppLocation, Application};
 use crate::keys::AppKey;
+use crate::message::{ProtoMessage, MessageExpect};
+use crate::logger::{Flag, StarFlag, Log, StarLog, StarLogPayload};
 
 pub enum SupervisorCommand
 {
@@ -18,17 +20,17 @@ pub enum SupervisorCommand
 
 pub struct SupervisorManager
 {
-    info: StarData,
+    data: StarData,
     backing: Box<dyn SupervisorManagerBacking>
 }
 
 impl SupervisorManager
 {
-    pub fn new(info: StarData) ->Self
+    pub fn new(data: StarData) ->Self
     {
         SupervisorManager{
-            info: info.clone(),
-            backing: Box::new(SupervisorManagerBackingDefault::new(info)),
+            data: data.clone(),
+            backing: Box::new(SupervisorManagerBackingDefault::new(data)),
         }
     }
 }
@@ -37,6 +39,41 @@ impl SupervisorManager
 impl StarManager for SupervisorManager
 {
     async fn handle(&mut self, command: StarManagerCommand)  {
+
+        match command
+        {
+
+           StarManagerCommand::Init => {
+           }
+           StarManagerCommand::SupervisorCommand(command) => {
+                match command{
+                    SupervisorCommand::Pledge => {
+                        let mut proto = ProtoMessage::new();
+                        proto.to = Option::Some(StarKey::central());
+                        proto.payload = StarMessagePayload::Pledge;
+                        proto.expect = MessageExpect::RetryUntilOk;
+                        let rx = proto.get_ok_result().await;
+                        self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+
+                        if self.data.flags.check(Flag::Star(StarFlag::DiagnosePledge))
+                        {
+                            self.data.logger.log( Log::Star( StarLog::new( &self.data.info, StarLogPayload::PledgeSent )));
+                            let mut data = self.data.clone();
+                            tokio::spawn(async move {
+                                let payload = rx.await;
+                                if let Ok(StarMessagePayload::Ok) = payload
+                                {
+                                    data.logger.log( Log::Star( StarLog::new( &data.info, StarLogPayload::PledgeOkRecv )))
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+            what => {
+                eprintln!("supervisor manager doesn't handle {}", what )
+            }
+        }
 
     }
 }
@@ -51,7 +88,7 @@ impl SupervisorManager
 
 pub struct SupervisorManagerBackingDefault
 {
-    info: StarData,
+    data: StarData,
     servers: Vec<StarKey>,
     server_select_index: usize,
     applications: HashMap<AppKey,Box<dyn Application>>,
@@ -61,10 +98,10 @@ pub struct SupervisorManagerBackingDefault
 
 impl SupervisorManagerBackingDefault
 {
-    pub fn new(info: StarData) ->Self
+    pub fn new(data: StarData ) ->Self
     {
         SupervisorManagerBackingDefault {
-            info: info,
+            data: data,
             servers: vec![],
             server_select_index: 0,
             applications: HashMap::new(),

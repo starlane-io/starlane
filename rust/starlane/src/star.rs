@@ -218,7 +218,6 @@ pub struct Star
 {
     data: StarData,
     star_rx: mpsc::Receiver<StarCommand>,
-    manager_tx: mpsc::Sender<StarManagerCommand>,
     core_tx: mpsc::Sender<StarCoreCommand>,
     lanes: HashMap<StarKey, LaneMeta>,
     connector_ctrls: Vec<ConnectorController>,
@@ -237,7 +236,6 @@ impl Star
 
     pub fn from_proto(data: StarData,
                       star_rx: mpsc::Receiver<StarCommand>,
-                      manager_tx: mpsc::Sender<StarManagerCommand>,
                       core_tx: mpsc::Sender<StarCoreCommand>,
                       lanes: HashMap<StarKey,LaneMeta>,
                       connector_ctrls: Vec<ConnectorController>,
@@ -247,7 +245,6 @@ impl Star
         Star{
             data: data,
             star_rx: star_rx,
-            manager_tx: manager_tx,
             core_tx: core_tx,
             lanes: lanes,
             connector_ctrls: connector_ctrls,
@@ -273,7 +270,7 @@ impl Star
         self.broadcast(Frame::Proto(ProtoFrame::Evolution(ProtoEvolution::Report))).await;
 
 
-        self.manager_tx.send(StarManagerCommand::Init ).await;
+        self.data.manager_tx.send(StarManagerCommand::Init ).await;
         loop {
             let mut futures = vec!();
             let mut lanes = vec!();
@@ -479,7 +476,7 @@ println!("on_app_lifecycle_command: {}",command );
             Some(exclude) => exclude.len()
         };
 
-        let local_hit = match wind.pattern.is_match(&self.data){
+        let local_hit = match wind.pattern.is_match(&self.data.info){
             true => Option::Some(self.data.info.star.clone()),
             false => Option::None
         };
@@ -499,7 +496,7 @@ println!("on_app_lifecycle_command: {}",command );
     async fn on_wind_up_hop(&mut self, mut wind_up: WindUp, lane_key: StarKey )
     {
 
-        if wind_up.pattern.is_match(&self.data)
+        if wind_up.pattern.is_match(&self.data.info)
         {
 
             if wind_up.pattern.is_single_match()
@@ -546,7 +543,7 @@ println!("on_app_lifecycle_command: {}",command );
             return;
         }
 
-        let hit = wind_up.pattern.is_match(&self.data);
+        let hit = wind_up.pattern.is_match(&self.data.info);
 
         if wind_up.hops.len()+1 > wind_up.max_hops || self.lanes.len() <= 1 || !self.data.info.kind.relay()
         {
@@ -1294,7 +1291,7 @@ println!("on_app_lifecycle_command: {}",command );
         }
         else {
             self.process_message_reply(&message).await;
-            Ok(self.manager_tx.send( StarManagerCommand::Frame( Frame::StarMessage(message))).await?)
+            Ok(self.data.manager_tx.send( StarManagerCommand::Frame( Frame::StarMessage(message))).await?)
         }
     }
 
@@ -1410,9 +1407,9 @@ impl Wind
 
 pub enum StarManagerCommand
 {
+    StarData(StarData),
     Init,
     Frame(Frame),
-    StarData(StarData),
     CentralCommand(CentralCommand),
     SupervisorCommand(SupervisorCommand),
     ServerCommand(ServerCommand),
@@ -2175,7 +2172,7 @@ impl StarManager for PlaceholderStarManager
 #[async_trait]
 pub trait StarManagerFactory: Sync+Send
 {
-    async fn create(&self, info: StarData) -> mpsc::Sender<StarManagerCommand>;
+    async fn create(&self) -> mpsc::Sender<StarManagerCommand>;
 }
 
 
@@ -2183,38 +2180,38 @@ pub struct StarManagerFactoryDefault
 {
 }
 
-impl StarManagerFactoryDefault
-{
-    fn create_inner(&self, data: &StarData, manager_tx: mpsc::Sender<StarManagerCommand>) -> Box<dyn StarManager>
-    {
-        if let StarKind::Central = data.info.kind
-        {
-            return Box::new(CentralManager::new(data.clone(), manager_tx) );
-        }
-        else if let StarKind::Supervisor= data.info.kind
-        {
-            return Box::new(SupervisorManager::new(data.clone()));
-        }
-        else if let StarKind::Server(_)= data.info.kind
-        {
-            return Box::new(ServerManager::new(data.clone()));
-        }
-        else {
-            Box::new(PlaceholderStarManager::new(data.clone()))
-        }
-    }
-}
-
 #[async_trait]
 impl StarManagerFactory for StarManagerFactoryDefault
 {
-    async fn create(&self, data: StarData) -> mpsc::Sender<StarManagerCommand>
+    async fn create(&self) -> mpsc::Sender<StarManagerCommand>
     {
         let (mut tx,mut rx) = mpsc::channel(32);
-        let mut manager:Box<dyn StarManager> = self.create_inner(&data, tx.clone());
 
-        let kind = data.info.kind.clone();
         tokio::spawn( async move {
+            let mut manager:Box<dyn StarManager> = loop {
+                if let Option::Some(StarManagerCommand::StarData(data)) = rx.recv().await
+                {
+                    if let StarKind::Central = data.info.kind
+                    {
+                        break Box::new(CentralManager::new(data.clone() ) );
+                    }
+                    else if let StarKind::Supervisor= data.info.kind
+                    {
+                        break Box::new(SupervisorManager::new(data.clone()));
+                    }
+                    else if let StarKind::Server(_)= data.info.kind
+                    {
+                        break Box::new(ServerManager::new(data.clone()));
+                    }
+                    else {
+                        break Box::new(PlaceholderStarManager::new(data.clone()))
+                    }
+                }
+                else {
+                    eprintln!("must send StarData, before manager commands can be processed")
+                }
+            };
+
             while let Option::Some(command) = rx.recv().await
             {
                 manager.handle(command).await;
@@ -2232,6 +2229,7 @@ pub struct StarData
     pub info: StarInfo,
     pub sequence: Arc<IdSeq>,
     pub star_tx: mpsc::Sender<StarCommand>,
+    pub manager_tx: mpsc::Sender<StarManagerCommand>,
     pub flags: Flags,
     pub logger: Logger
 }

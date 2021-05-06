@@ -1,7 +1,7 @@
 use tokio::sync::{broadcast, mpsc};
 
 use crate::frame::{WindUp, WindDown};
-use crate::star::{StarKey, StarKind, StarData};
+use crate::star::{StarKey, StarKind, StarInfo};
 use std::sync::{Arc, Mutex, PoisonError, RwLock};
 use std::collections::{HashSet, HashMap};
 use serde::{Deserialize, Serialize};
@@ -206,10 +206,10 @@ pub struct StarLog
 
 impl StarLog
 {
-    pub fn new(data: &StarData, payload: StarLogPayload  ) -> Self {
+    pub fn new(data: &StarInfo, payload: StarLogPayload  ) -> Self {
         StarLog{
-            star: data.info.star.clone(),
-            kind: data.info.kind.clone(),
+            star: data.star.clone(),
+            kind: data.kind.clone(),
             payload: payload
         }
     }

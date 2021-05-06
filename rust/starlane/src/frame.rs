@@ -7,7 +7,7 @@ use tokio::time::Instant;
 
 use crate::actor::{ActorKey, ActorLocation};
 use crate::id::Id;
-use crate::star::{StarKey, StarKind, StarWatchInfo, StarNotify, Star, StarCommand, StarData};
+use crate::star::{StarKey, StarKind, StarWatchInfo, StarNotify, Star, StarCommand, StarInfo};
 use crate::label::Labels;
 use crate::message::{MessageResult, ProtoMessage, MessageExpect, MessageUpdate};
 use tokio::sync::{oneshot, broadcast, mpsc};
@@ -175,7 +175,6 @@ impl WindUp
         self.hops.push( hop );
         self.transactions.push(transaction);
     }
-
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -190,17 +189,17 @@ pub enum StarPattern
 
 impl StarPattern
 {
-    pub fn is_match(&self, data: &StarData) -> bool
+    pub fn is_match(&self, info: &StarInfo) -> bool
     {
         match self
         {
             StarPattern::Any => {true}
             StarPattern::None => {false}
             StarPattern::StarKey(star) => {
-                *star == data.info.star
+                *star == info.star
             }
             StarPattern::StarKind(kind) => {
-                *kind == data.info.kind
+                *kind == info.kind
             }
         }
     }

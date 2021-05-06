@@ -19,7 +19,7 @@ use crate::error::Error;
 use crate::frame::{Frame, ProtoFrame, WindHit, StarMessage, StarMessagePayload, WindUp, StarPattern, WindDown, SequenceMessage, ProtoEvolution, ProtoSequence};
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelReceiver, TunnelSender, TunnelSenderState};
-use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarData, StarKernel, StarKey, StarKind, StarManagerFactory, StarSearchTransaction, Transaction, StarInfo};
+use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarKernel, StarKey, StarKind, StarManagerFactory, StarSearchTransaction, Transaction, StarInfo, StarData, StarManagerCommand};
 use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
 use crate::logger::{Logger, Flags, Flag, StarFlag, Log, ProtoStarLog, ProtoStarLogPayload};
@@ -77,22 +77,26 @@ impl ProtoStar
             let sequence = Arc::new(IdSeq::new(0));
             self.star_key = Option::Some(StarKey::central());
             self.sequence = Option::Some(sequence.clone());
-            let data = StarData {
-                info: StarInfo{
+            let info = StarInfo{
                 star: self.star_key.as_ref().unwrap().clone(),
-                kind: self.kind.clone()},
+                kind: self.kind.clone()};
+            let manager_tx= self.star_manager_factory.create().await;
+            let data = StarData{
+
+                info: info,
                 sequence: self.sequence.as_ref().unwrap().clone(),
                 star_tx: self.command_tx.clone(),
+                manager_tx: manager_tx.clone(),
                 logger: self.logger.clone(),
                 flags: self.flags.clone()
             };
 
-            let manager_tx= self.star_manager_factory.create(data.clone() ).await;
-            let core_tx = self.star_core_factory.create(&data.info.kind, manager_tx.clone());
+            manager_tx.send(StarManagerCommand::StarData(data.clone()) ).await;
+
+            let core_tx = self.star_core_factory.create(&data.info.kind, data.manager_tx.clone());
 
             return Ok(Star::from_proto(data.clone(),
                                        self.command_rx,
-                                       manager_tx,
                                        core_tx,
                                        self.lanes,
                                        self.connector_ctrls,
@@ -200,25 +204,28 @@ impl ProtoStar
                                     self.logger.log( Log::ProtoStar(ProtoStarLog::new(self.kind.clone(), ProtoStarLogPayload::SequenceReplyRecv )));
                                 }
 
+                                let info = StarInfo {
+                                    star: self.star_key.as_ref().unwrap().clone(),
+                                    kind: self.kind.clone(),
+                                };
                                 self.sequence = Option::Some(Arc::new(IdSeq::new(sequence)));
-                                let data = StarData {
-                                    info: StarInfo {
-                                        star: self.star_key.as_ref().unwrap().clone(),
-                                        kind: self.kind.clone(),
-                                    },
+                                let manager_tx= self.star_manager_factory.create().await;
+                                let data = StarData{
+                                    info: info,
                                     sequence: self.sequence.as_ref().unwrap().clone(),
                                     star_tx: self.command_tx.clone(),
+                                    manager_tx: manager_tx.clone(),
                                     logger: self.logger.clone(),
                                     flags: self.flags.clone()
                                 };
 
-                                let manager_tx= self.star_manager_factory.create(data.clone() ).await;
-                                let core_tx = self.star_core_factory.create(&data.info.kind, manager_tx.clone());
+                                manager_tx.send(StarManagerCommand::StarData(data.clone()) ).await;
+
+                                let core_tx = self.star_core_factory.create(&data.info.kind, data.manager_tx.clone());
 
 
                                 return Ok(Star::from_proto(data.clone(),
                                                            self.command_rx,
-                                                           manager_tx,
                                                            core_tx,
                                                            self.lanes,
                                                            self.connector_ctrls,
