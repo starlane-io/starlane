@@ -49,12 +49,14 @@ impl SupervisorManager
 
         if self.data.flags.check(Flag::Star(StarFlag::DiagnosePledge))
         {
+println!("Supervisor: PledgeSent");
             self.data.logger.log( Log::Star( StarLog::new( &self.data.info, StarLogPayload::PledgeSent )));
             let mut data = self.data.clone();
             tokio::spawn(async move {
                 let payload = rx.await;
                 if let Ok(StarMessagePayload::Ok) = payload
                 {
+println!("Supervisor: PledgeOkRecv");
                     data.logger.log( Log::Star( StarLog::new( &data.info, StarLogPayload::PledgeOkRecv )))
                 }
             });
@@ -106,9 +108,12 @@ impl StarManager for SupervisorManager
                       self.backing.add_server(message.from.clone());
                       self.reply_ok(message).await;
                       if self.data.flags.check( Flag::Star(StarFlag::DiagnosePledge )) {
+
+println!("Supervisor: PledgeRecv");
                           self.data.logger.log( Log::Star(StarLog::new(&self.data.info, StarLogPayload::PledgeRecv )));
                       }
                   }
+                  StarMessagePayload::Ok=>{}
                   what => {
                       eprintln!("supervisor manager doesn't handle {}", what )
                   }

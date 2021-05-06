@@ -402,7 +402,6 @@ mod test
     pub fn starlane()
     {
 
-        println!("starlane");
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
 
@@ -412,7 +411,6 @@ mod test
             agg.watch(starlane.logger.clone()).await;
             let tx = starlane.tx.clone();
 
-            println!("running starlane");
             let handle = tokio::spawn( async move {
                 starlane.run().await;
             } );
@@ -425,14 +423,17 @@ mod test
                     Ok(result) => {
                         match result {
                             Ok(_) => {println!("template ok.")}
-                            Err(e) => {println!("{}", e)}
+                            Err(e) => {
+                           //     println!("error: {}", e)
+                            }
                         }
                     }
-                    Err(e) => {println!("{}", e)}
+                    Err(e) => {
+                        println!("error: {}", e)
+                    }
                 }
             }
 
-            println!("getting mesh ctrl");
             let mesh_ctrl = {
                 let (request,rx) = StarControlRequestByName::new("standalone".to_owned(), "mesh".to_owned());
                 tx.send(StarlaneCommand::StarControlRequestByName(request)).await;
@@ -440,9 +441,7 @@ mod test
            };
 
 
-            println!("got mesh_ctrl");
             tokio::time::sleep(Duration::from_secs(1)).await;
-
             assert_eq!(agg.count( |log| match log{
                 Log::Star(star_log) => {
                     if let StarKind::Server(_) = star_log.kind
@@ -480,6 +479,7 @@ mod test
             } ),1);
 
 
+            /*
             tokio::time::sleep(Duration::from_secs(1)).await;
             match mesh_ctrl.create_app(Option::None,"default".to_string(), vec!() ).await
             {
@@ -498,6 +498,7 @@ mod test
             tx.send(StarlaneCommand::Destroy ).await;
 
             handle.await;
+             */
 
         });
 

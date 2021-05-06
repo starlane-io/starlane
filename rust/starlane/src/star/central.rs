@@ -186,6 +186,7 @@ impl StarManager for CentralManager
                     self.backing.add_supervisor(message.from.clone());
                     self.reply_ok(message).await;
                     if self.data.flags.check( Flag::Star(StarFlag::DiagnosePledge )) {
+println!("Central: PledgeRecv");
                         self.data.logger.log( Log::Star(StarLog::new(&self.data.info, StarLogPayload::PledgeRecv )));
                     }
                 }
