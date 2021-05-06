@@ -12,6 +12,7 @@ use crate::app::{AppLocation, Application};
 use crate::keys::AppKey;
 use crate::message::{ProtoMessage, MessageExpect};
 use crate::logger::{Flag, StarFlag, Log, StarLog, StarLogPayload};
+use tokio::sync::mpsc::error::SendError;
 
 pub enum SupervisorCommand
 {
@@ -35,6 +36,58 @@ impl SupervisorManager
     }
 }
 
+impl SupervisorManager
+{
+    async fn pledge( &mut self )
+    {
+        let mut proto = ProtoMessage::new();
+        proto.to = Option::Some(StarKey::central());
+        proto.payload = StarMessagePayload::Pledge(self.data.info.kind.clone());
+        proto.expect = MessageExpect::RetryUntilOk;
+        let rx = proto.get_ok_result().await;
+        self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+
+        if self.data.flags.check(Flag::Star(StarFlag::DiagnosePledge))
+        {
+            self.data.logger.log( Log::Star( StarLog::new( &self.data.info, StarLogPayload::PledgeSent )));
+            let mut data = self.data.clone();
+            tokio::spawn(async move {
+                let payload = rx.await;
+                if let Ok(StarMessagePayload::Ok) = payload
+                {
+                    data.logger.log( Log::Star( StarLog::new( &data.info, StarLogPayload::PledgeOkRecv )))
+                }
+            });
+        }
+    }
+
+    pub fn unwrap(&self, result: Result<(), SendError<StarCommand>>)
+    {
+        match result
+        {
+            Ok(_) => {}
+            Err(error) => {
+                eprintln!("could not send starcommand from manager to star: {}", error);
+            }
+        }
+    }
+
+    pub async fn reply_ok(&self, message: StarMessage)
+    {
+        let mut proto = message.reply(StarMessagePayload::Ok);
+        let result = self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+        self.unwrap(result);
+    }
+
+    pub async fn reply_error(&self, mut message: StarMessage, error_message: String )
+    {
+        message.reply(StarMessagePayload::Error(error_message.to_string()));
+        let result = self.data.star_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await;
+        self.unwrap(result);
+    }
+
+}
+
 #[async_trait]
 impl StarManager for SupervisorManager
 {
@@ -44,29 +97,28 @@ impl StarManager for SupervisorManager
         {
 
            StarManagerCommand::Init => {
+               self.pledge().await;
+           }
+           StarManagerCommand::StarMessage(message)=>{
+              match &message.payload
+              {
+                  StarMessagePayload::Pledge(kind) => {
+                      self.backing.add_server(message.from.clone());
+                      self.reply_ok(message).await;
+                      if self.data.flags.check( Flag::Star(StarFlag::DiagnosePledge )) {
+                          self.data.logger.log( Log::Star(StarLog::new(&self.data.info, StarLogPayload::PledgeRecv )));
+                      }
+                  }
+                  what => {
+                      eprintln!("supervisor manager doesn't handle {}", what )
+                  }
+              }
            }
            StarManagerCommand::SupervisorCommand(command) => {
                 match command{
                     SupervisorCommand::Pledge => {
-                        let mut proto = ProtoMessage::new();
-                        proto.to = Option::Some(StarKey::central());
-                        proto.payload = StarMessagePayload::Pledge;
-                        proto.expect = MessageExpect::RetryUntilOk;
-                        let rx = proto.get_ok_result().await;
-                        self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                        self.pledge().await;
 
-                        if self.data.flags.check(Flag::Star(StarFlag::DiagnosePledge))
-                        {
-                            self.data.logger.log( Log::Star( StarLog::new( &self.data.info, StarLogPayload::PledgeSent )));
-                            let mut data = self.data.clone();
-                            tokio::spawn(async move {
-                                let payload = rx.await;
-                                if let Ok(StarMessagePayload::Ok) = payload
-                                {
-                                    data.logger.log( Log::Star( StarLog::new( &data.info, StarLogPayload::PledgeOkRecv )))
-                                }
-                            });
-                        }
                     }
                 }
             }

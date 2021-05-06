@@ -308,7 +308,7 @@ impl StarMessage
 pub enum StarMessagePayload
 {
    None,
-   Pledge,
+   Pledge(StarKind),
    Space(SpaceMessage),
    Ok,
    Error(String),
@@ -658,7 +658,7 @@ impl fmt::Display for StarMessagePayload{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
             StarMessagePayload::None => "None".to_string(),
-            StarMessagePayload::Pledge =>"Pledge".to_string(),
+            StarMessagePayload::Pledge(kind) =>format!("Pledge({})",kind).to_string(),
             StarMessagePayload::Space(_) => "Space".to_string(),
             StarMessagePayload::Ok => "Ok".to_string(),
             StarMessagePayload::Error(_) => "Error".to_string(),

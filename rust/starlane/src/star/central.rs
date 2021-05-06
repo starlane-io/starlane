@@ -5,7 +5,7 @@ use tokio::sync::{mpsc, oneshot, broadcast};
 use crate::app::{AppInfo, ApplicationStatus, AppCreate, AppLocation};
 use crate::id::Id;
 use crate::label::Labels;
-use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarInfo, StarKey, StarManager, StarManagerCommand, StarNotify, StarData};
+use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarInfo, StarKey, StarManager, StarManagerCommand, StarNotify, StarData, StarKind};
 use crate::user::{AuthToken, AppAccess};
 use crate::message::{ProtoMessage, MessageExpect, MessageUpdate, MessageResult, MessageExpectWait};
 use crate::keys::{AppKey, SubSpaceKey};
@@ -165,7 +165,7 @@ impl StarManager for CentralManager
         {
 
         }
-        if let StarManagerCommand::Frame(Frame::StarMessage(message)) = command
+        if let StarManagerCommand::StarMessage(message) = command
         {
             let mut message = message;
             match &message.payload
@@ -181,7 +181,7 @@ impl StarManager for CentralManager
                        _ => { eprintln!("CentralManager: unexpected message: Sequence message") }
                    }
                 }
-                StarMessagePayload::Pledge => {
+                StarMessagePayload::Pledge(StarKind::Supervisor) => {
 
                     self.backing.add_supervisor(message.from.clone());
                     self.reply_ok(message).await;

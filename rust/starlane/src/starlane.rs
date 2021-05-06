@@ -394,9 +394,9 @@ mod test
     use crate::error::Error;
     use crate::starlane::{ConstellationCreate, Starlane, StarlaneCommand, StarControlRequestByName};
     use crate::template::{ConstellationData, ConstellationTemplate};
-    use crate::star::{StarController, StarKind};
+    use crate::star::{StarController, StarKind, StarInfo, StarKey};
     use crate::app::AppController;
-    use crate::logger::{Flags, Flag, StarFlag, LogAggregate, Log, ProtoStarLog, ProtoStarLogPayload};
+    use crate::logger::{Flags, Flag, StarFlag, LogAggregate, Log, ProtoStarLog, ProtoStarLogPayload, StarLog, StarLogPayload};
 
     #[test]
     pub fn starlane()
@@ -407,7 +407,7 @@ mod test
         rt.block_on(async {
 
             let mut starlane = Starlane::new();
-            starlane.flags.on(Flag::Star(StarFlag::DiagnoseSequence) );
+            starlane.flags.on(Flag::Star(StarFlag::DiagnosePledge) );
             let mut agg = LogAggregate::new();
             agg.watch(starlane.logger.clone()).await;
             let tx = starlane.tx.clone();
@@ -443,17 +443,41 @@ mod test
             println!("got mesh_ctrl");
             tokio::time::sleep(Duration::from_secs(1)).await;
 
-            let rx = mesh_ctrl.set_flags(Flags::new()).await;
+            assert_eq!(agg.count( |log| match log{
+                Log::Star(star_log) => {
+                    if let StarKind::Server(_) = star_log.kind
+                    {
+                        match star_log.payload
+                        {
+                            StarLogPayload::PledgeOkRecv => true,
+                            _ => false
+                        }
+                    }
+                    else
+                    {
+                        false
+                    }
+                }
+                _ => false
+            } ),1);
 
-            timeout(Duration::from_secs(5), rx).await.unwrap().unwrap();
-            println!("set flags confirmed.");
-
-            {
-                let requests= agg.count(&Log::ProtoStar(ProtoStarLog::new(StarKind::Mesh, ProtoStarLogPayload::SequenceRequest)));
-                let replys= agg.count(&Log::ProtoStar(ProtoStarLog::new(StarKind::Mesh, ProtoStarLogPayload::SequenceReplyRecv)));
-                println!("SequenceRequest count: {}", requests);
-                println!("SequenceReply   count: {}", replys);
-            }
+            assert_eq!(agg.count( |log| match log{
+                Log::Star(star_log) => {
+                    if let StarKind::Supervisor = star_log.kind
+                    {
+                        match star_log.payload
+                        {
+                            StarLogPayload::PledgeOkRecv => true,
+                            _ => false
+                        }
+                    }
+                    else
+                    {
+                        false
+                    }
+                }
+                _ => false
+            } ),1);
 
 
             tokio::time::sleep(Duration::from_secs(1)).await;

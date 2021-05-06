@@ -96,13 +96,13 @@ impl LogAggregate
     }
 
 
-    pub fn count(&self, log: &Log) -> usize
+    pub fn count<P>(&self, predicate: P ) -> usize where P: FnMut(&&Log) -> bool
     {
         let lock = self.logs.read();
         match lock
         {
             Ok(logs) => {
-                logs.iter().filter(|l|*l==log).count()
+                logs.iter().filter(predicate).count()
             }
             Err(error) => {
                 println!("LogAggregate: {}",error);
@@ -113,6 +113,8 @@ impl LogAggregate
 
 
 }
+
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct Flags
@@ -199,17 +201,17 @@ pub enum ProtoStarLogPayload
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub struct StarLog
 {
-    star: StarKey,
-    kind: StarKind,
-    payload: StarLogPayload
+    pub star: StarKey,
+    pub kind: StarKind,
+    pub payload: StarLogPayload
 }
 
 impl StarLog
 {
-    pub fn new(data: &StarInfo, payload: StarLogPayload  ) -> Self {
+    pub fn new(info: &StarInfo, payload: StarLogPayload  ) -> Self {
         StarLog{
-            star: data.star.clone(),
-            kind: data.kind.clone(),
+            star: info.star.clone(),
+            kind: info.kind.clone(),
             payload: payload
         }
     }

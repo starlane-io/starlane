@@ -1,7 +1,7 @@
 use std::{cmp, fmt};
 use std::borrow::Borrow;
 use std::cell::Cell;
-use std::cmp::Ordering;
+use std::cmp::{Ordering, min};
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::RandomState;
 use std::future::Future;
@@ -21,25 +21,28 @@ use tokio::time::{Duration, Instant, timeout};
 use tokio::time::error::Elapsed;
 use url::Url;
 
+use server::ServerManager;
+
 use crate::actor::{Actor, ActorKey, ActorKind, ActorLocation, ActorWatcher};
 use crate::app::{AppCommandWrapper, AppController, AppCreate, AppKind, Application, AppLocation};
 use crate::core::StarCoreCommand;
 use crate::error::Error;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, AppAssign, AppCreateRequest, ApplicationSupervisorReport, AppNotifyCreated, AppSupervisorRequest, Event, Frame, ProtoFrame, Rejection, WindHit, StarMessage, StarMessageAck, StarMessagePayload, WindUp, StarPattern, WindDown, Watch, WatchInfo, SequenceMessage, ProtoEvolution, ProtoSequence, WindAction, StarWind, WindResults};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, AppAssign, AppCreateRequest, ApplicationSupervisorReport, AppNotifyCreated, AppSupervisorRequest, Event, Frame, ProtoEvolution, ProtoFrame, ProtoSequence, Rejection, SequenceMessage, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp};
+use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::AppKey;
 use crate::label::Labels;
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
+use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob};
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
+use crate::space::SpaceCommand;
 use crate::star::central::CentralManager;
 use crate::star::supervisor::{SupervisorCommand, SupervisorManager};
-use crate::logger::{Logger, Flags, Flag, StarFlag, ProtoStarLog, Log, ProtoStarLogPayload};
-use crate::space::SpaceCommand;
-use crate::frame::WindAction::SearchHits;
 
 pub mod central;
 pub mod supervisor;
+pub mod server;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
 pub enum StarKind
@@ -212,7 +215,7 @@ impl fmt::Display for ActorLookup {
     }
 }
 
-pub static MAX_HOPS: usize = 16;
+pub static MAX_HOPS: usize = 32;
 
 pub struct Star
 {
@@ -537,15 +540,9 @@ println!("on_app_lifecycle_command: {}",command );
             }
         }
 
-        if wind_up.max_hops > MAX_HOPS
-        {
-            eprintln!("rejecting a search with more than maximum {} hops", MAX_HOPS);
-            return;
-        }
-
         let hit = wind_up.pattern.is_match(&self.data.info);
 
-        if wind_up.hops.len()+1 > wind_up.max_hops || self.lanes.len() <= 1 || !self.data.info.kind.relay()
+        if wind_up.hops.len()+1 > min(wind_up.max_hops,MAX_HOPS) || self.lanes.len() <= 1 || !self.data.info.kind.relay()
         {
 
             let hits = match hit
@@ -1291,7 +1288,7 @@ println!("on_app_lifecycle_command: {}",command );
         }
         else {
             self.process_message_reply(&message).await;
-            Ok(self.data.manager_tx.send( StarManagerCommand::Frame( Frame::StarMessage(message))).await?)
+            Ok(self.data.manager_tx.send( StarManagerCommand::StarMessage( message)).await?)
         }
     }
 
@@ -1409,7 +1406,7 @@ pub enum StarManagerCommand
 {
     StarData(StarData),
     Init,
-    Frame(Frame),
+    StarMessage(StarMessage),
     CentralCommand(CentralCommand),
     SupervisorCommand(SupervisorCommand),
     ServerCommand(ServerCommand),
@@ -1454,7 +1451,7 @@ pub enum StarTest
 impl fmt::Display for StarManagerCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
-            StarManagerCommand::Frame(frame) => format!("Frame({})", frame).to_string(),
+            StarManagerCommand::StarMessage(message) => format!("StarMessage({})", message.payload ).to_string(),
             StarManagerCommand::CentralCommand(_) => "CentralCommand".to_string(),
             StarManagerCommand::SupervisorCommand(_) => "SupervisorCommand".to_string(),
             StarManagerCommand::ServerCommand(_) => "ServerCommand".to_string(),
@@ -2048,94 +2045,10 @@ impl StarKey
    }
 }
 
-pub struct ServerManagerBackingDefault
-{
-    pub supervisor: Option<StarKey>
-}
-
-impl ServerManagerBackingDefault
-{
-   pub fn new()-> Self
-   {
-       ServerManagerBackingDefault{
-           supervisor: Option::None
-       }
-   }
-}
-
-impl ServerManagerBacking for ServerManagerBackingDefault
-{
-    fn set_supervisor(&mut self, supervisor_star: StarKey) {
-        self.supervisor = Option::Some(supervisor_star);
-    }
-
-    fn get_supervisor(&self) -> Option<&StarKey> {
-        self.supervisor.as_ref()
-    }
-}
-
 trait ServerManagerBacking: Send+Sync
 {
     fn set_supervisor( &mut self, supervisor_star: StarKey );
     fn get_supervisor( &self )->Option<&StarKey>;
-}
-
-
-pub struct ServerManager
-{
-    data: StarData,
-    backing: Box<dyn ServerManagerBacking>,
-}
-
-impl ServerManager
-{
-    pub fn new(data: StarData) -> Self
-    {
-        ServerManager
-        {
-            data: data,
-            backing: Box::new(ServerManagerBackingDefault::new())
-        }
-    }
-
-    pub fn set_supervisor( &mut self, supervisor_star: StarKey )
-    {
-        self.backing.set_supervisor(supervisor_star);
-    }
-
-    pub fn get_supervisor( &self )->Option<&StarKey>
-    {
-        self.backing.get_supervisor()
-    }
-
-    async fn pledge(&mut self)->Result<(),Error>
-    {
-        let (search,rx) = Wind::new(StarPattern::StarKind(StarKind::Supervisor), WindAction::SearchHits );
-        self.data.star_tx.send( StarCommand::WindInit( search ) ).await;
-        let result = rx.await?;
-
-
-        if let Option::Some(hit) = result.nearest()
-        {
-           self.set_supervisor(hit.star.clone());
-           let payload = StarMessagePayload::Pledge;
-           let message = StarMessage::new(self.data.sequence.next(), self.data.info.star.clone(), hit.star, payload );
-           self.data.star_tx.send( StarCommand::Frame(Frame::StarMessage(message))).await;
-        }
-        else {
-            eprintln!("could not find a supervisor for Server results:{} ", result.hits.len() );
-        }
-
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl StarManager for ServerManager
-{
-    async fn handle(&mut self, command: StarManagerCommand) {
-
-    }
 }
 
 
@@ -2239,6 +2152,17 @@ pub struct StarInfo
 {
    pub star: StarKey,
    pub kind: StarKind,
+}
+
+impl StarInfo
+{
+    pub fn new( star: StarKey, kind: StarKind ) -> Self
+    {
+        StarInfo{
+            star: star,
+            kind: kind
+        }
+    }
 }
 
 
