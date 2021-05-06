@@ -88,17 +88,14 @@ impl MessageReplyTracker
     {
         match &message.payload {
             StarMessagePayload::Ack(ack) => {
-println!("sending ACK");
               self.tx.send( MessageUpdate::Ack(ack.clone()) );
               TrackerJob::Continue
             }
             StarMessagePayload::Error(error) => {
-println!("sending ERR");
                 self.tx.send(MessageUpdate::Result(MessageResult::Err(error.clone())));
               TrackerJob::Done
             }
             payload => {
-println!("sending Ok({})", payload );
               self.tx.send(MessageUpdate::Result(MessageResult::Ok(payload.clone())));
               TrackerJob::Done
             }
@@ -257,10 +254,8 @@ impl OkResultWaiter
     {
         tokio::spawn( async move {
         loop{
-println!("%%  wait wait wating for OkResultWaiter!");
             if let Ok(MessageUpdate::Result(result)) = self.rx.recv().await
             {
-println!("%%  OkResultWaiter RECEIVED RESULT!");
                 match result
                 {
                     MessageResult::Ok(payload) => {

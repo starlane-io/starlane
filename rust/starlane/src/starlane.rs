@@ -445,7 +445,7 @@ mod test
 
             let rx = mesh_ctrl.set_flags(Flags::new()).await;
 
-            timeout(Duration::from_secs(1), rx).await.unwrap().unwrap();
+            timeout(Duration::from_secs(5), rx).await.unwrap().unwrap();
             println!("set flags confirmed.");
 
             {

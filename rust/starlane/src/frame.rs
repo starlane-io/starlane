@@ -7,7 +7,7 @@ use tokio::time::Instant;
 
 use crate::actor::{ActorKey, ActorLocation};
 use crate::id::Id;
-use crate::star::{StarKey, StarKind, StarWatchInfo, StarNotify, Star, StarCommand, StarInfo};
+use crate::star::{StarKey, StarKind, StarWatchInfo, StarNotify, Star, StarCommand, StarData};
 use crate::label::Labels;
 use crate::message::{MessageResult, ProtoMessage, MessageExpect, MessageUpdate};
 use tokio::sync::{oneshot, broadcast, mpsc};
@@ -190,17 +190,17 @@ pub enum StarPattern
 
 impl StarPattern
 {
-    pub fn is_match( &self, info: &StarInfo ) -> bool
+    pub fn is_match(&self, data: &StarData) -> bool
     {
         match self
         {
             StarPattern::Any => {true}
             StarPattern::None => {false}
             StarPattern::StarKey(star) => {
-                *star == info.star
+                *star == data.info.star
             }
             StarPattern::StarKind(kind) => {
-                *kind == info.kind
+                *kind == data.info.kind
             }
         }
     }

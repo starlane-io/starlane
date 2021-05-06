@@ -3,7 +3,7 @@ use core::option::Option;
 use core::option::Option::{None, Some};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
-use crate::star::{StarInfo, SupervisorManagerBacking, StarManager, StarManagerCommand, StarCommand, StarKey};
+use crate::star::{StarData, SupervisorManagerBacking, StarManager, StarManagerCommand, StarCommand, StarKey};
 use crate::frame::{StarMessagePayload, StarMessage, Frame, AppNotifyCreated, ActorLookup};
 use crate::error::Error;
 use std::collections::HashMap;
@@ -18,13 +18,13 @@ pub enum SupervisorCommand
 
 pub struct SupervisorManager
 {
-    info: StarInfo,
+    info: StarData,
     backing: Box<dyn SupervisorManagerBacking>
 }
 
 impl SupervisorManager
 {
-    pub fn new(info: StarInfo)->Self
+    pub fn new(info: StarData) ->Self
     {
         SupervisorManager{
             info: info.clone(),
@@ -51,7 +51,7 @@ impl SupervisorManager
 
 pub struct SupervisorManagerBackingDefault
 {
-    info: StarInfo,
+    info: StarData,
     servers: Vec<StarKey>,
     server_select_index: usize,
     applications: HashMap<AppKey,Box<dyn Application>>,
@@ -61,7 +61,7 @@ pub struct SupervisorManagerBackingDefault
 
 impl SupervisorManagerBackingDefault
 {
-    pub fn new(info: StarInfo)->Self
+    pub fn new(info: StarData) ->Self
     {
         SupervisorManagerBackingDefault {
             info: info,

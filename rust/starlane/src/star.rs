@@ -216,55 +216,49 @@ pub static MAX_HOPS: usize = 16;
 
 pub struct Star
 {
-    info: StarInfo,
-    command_rx: mpsc::Receiver<StarCommand>,
+    data: StarData,
+    star_rx: mpsc::Receiver<StarCommand>,
     manager_tx: mpsc::Sender<StarManagerCommand>,
     core_tx: mpsc::Sender<StarCoreCommand>,
     lanes: HashMap<StarKey, LaneMeta>,
     connector_ctrls: Vec<ConnectorController>,
     transactions: HashMap<Id,Box<dyn Transaction>>,
     frame_hold: FrameHold,
-    logger: Logger,
     watches: HashMap<ActorKey,HashMap<Id,StarWatchInfo>>,
     actor_locations: LruCache<ActorKey, ActorLocation>,
     app_locations: LruCache<AppKey,StarKey>,
     messages_received: HashMap<Id,Instant>,
     message_reply_trackers: HashMap<Id, MessageReplyTracker>,
     actors: HashSet<ActorKey>,
-    flags: Flags
 }
 
 impl Star
 {
 
-    pub fn from_proto(info: StarInfo,
-                      command_rx: mpsc::Receiver<StarCommand>,
+    pub fn from_proto(data: StarData,
+                      star_rx: mpsc::Receiver<StarCommand>,
                       manager_tx: mpsc::Sender<StarManagerCommand>,
                       core_tx: mpsc::Sender<StarCoreCommand>,
                       lanes: HashMap<StarKey,LaneMeta>,
                       connector_ctrls: Vec<ConnectorController>,
-                      logger: Logger,
-                      frame_hold: FrameHold,
-                      flags: Flags ) ->Self
+                      frame_hold: FrameHold ) ->Self
 
     {
         Star{
-            info: info,
-            command_rx: command_rx,
+            data: data,
+            star_rx: star_rx,
             manager_tx: manager_tx,
             core_tx: core_tx,
             lanes: lanes,
             connector_ctrls: connector_ctrls,
             transactions: HashMap::new(),
             frame_hold: frame_hold,
-            logger: logger,
             watches: HashMap::new(),
             actor_locations: LruCache::new(64*1024 ),
             app_locations: LruCache::new(4*1024 ),
             messages_received: HashMap::new(),
             message_reply_trackers: HashMap::new(),
-            actors: HashSet::new(),
-            flags: flags
+            actors: HashSet::new()
         }
     }
 
@@ -293,7 +287,7 @@ impl Star
             }
 
 
-            futures.push( self.command_rx.recv().boxed());
+            futures.push( self.star_rx.recv().boxed());
 
             let (command,index,_) = select_all(futures).await;
 
@@ -301,8 +295,7 @@ impl Star
             {
                 match command{
                     StarCommand::SetFlags(set_flags ) => {
-                       self.flags = set_flags.flags;
-                       println!("new flags set!");
+                       self.data.flags= set_flags.flags;
                        set_flags.tx.send(());
                     }
                     StarCommand::AddLane(lane) => {
@@ -310,7 +303,7 @@ impl Star
                         {
                             self.lanes.insert(remote_star.clone(), LaneMeta::new(lane));
 
-                            if self.info.kind.is_central()
+                            if self.data.info.kind.is_central()
                             {
                                 self.broadcast( Frame::Proto(ProtoFrame::CentralFound(1)) ).await;
                             }
@@ -426,20 +419,20 @@ impl Star
             return;
         }
 
-        let id = self.info.sequence.next();
+        let id = self.data.sequence.next();
 
         let message = StarMessage{
             id: id,
-            from: self.info.star.clone(),
+            from: self.data.info.star.clone(),
             to: proto.to.unwrap(),
             transaction: proto.transaction,
             payload: proto.payload,
             reply_to: proto.reply_to
         };
 
-        if message.to == self.info.star
+        if message.to == self.data.info.star
         {
-            eprintln!("star {} kind {} cannot send a proto message to itself, payload: {} ", self.info.star, self.info.kind, message.payload );
+            eprintln!("star {} kind {} cannot send a proto message to itself, payload: {} ", self.data.info.star, self.data.info.kind, message.payload );
         }
         else {
             let delivery = StarMessageDeliveryInsurance::with_txrx(message, proto.expect, proto.tx.clone(), proto.tx.subscribe() );
@@ -466,19 +459,19 @@ println!("on_app_lifecycle_command: {}",command );
             max_hops: 16,
             action: WindAction::SearchHits
         };
-        self.info.command_tx.send( StarCommand::WindInit(wind) ).await;
+        self.data.star_tx.send( StarCommand::WindInit(wind) ).await;
     }
 
     async fn do_wind(&mut self, wind: Wind)
     {
         let tx = wind.tx;
-        let wind_up = WindUp::new(self.info.star.clone(), wind.pattern, wind.action );
+        let wind_up = WindUp::new(self.data.info.star.clone(), wind.pattern, wind.action );
         self.do_wind_up(wind_up, tx, Option::None).await;
     }
 
     async fn do_wind_up(&mut self, mut wind: WindUp, tx: oneshot::Sender<WindHits>, exclude: Option<HashSet<StarKey>> )
     {
-        let tid = self.info.sequence.next();
+        let tid = self.data.sequence.next();
 
         let num_excludes:usize = match &exclude
         {
@@ -486,16 +479,16 @@ println!("on_app_lifecycle_command: {}",command );
             Some(exclude) => exclude.len()
         };
 
-        let local_hit = match wind.pattern.is_match(&self.info){
-            true => Option::Some(self.info.star.clone()),
+        let local_hit = match wind.pattern.is_match(&self.data){
+            true => Option::Some(self.data.info.star.clone()),
             false => Option::None
         };
 
-        let transaction = Box::new(StarSearchTransaction::new(wind.pattern.clone(), self.info.command_tx.clone(), tx, self.lanes.len()-num_excludes, local_hit ));
+        let transaction = Box::new(StarSearchTransaction::new(wind.pattern.clone(), self.data.star_tx.clone(), tx, self.lanes.len()-num_excludes, local_hit ));
         self.transactions.insert(tid.clone(), transaction );
 
         wind.transactions.push(tid.clone());
-        wind.hops.push( self.info.star.clone() );
+        wind.hops.push( self.data.info.star.clone() );
 
         self.broadcast_excluding(Frame::StarWind(StarWind::Up(wind)), &exclude ).await;
     }
@@ -506,14 +499,14 @@ println!("on_app_lifecycle_command: {}",command );
     async fn on_wind_up_hop(&mut self, mut wind_up: WindUp, lane_key: StarKey )
     {
 
-        if wind_up.pattern.is_match(&self.info)
+        if wind_up.pattern.is_match(&self.data)
         {
 
             if wind_up.pattern.is_single_match()
             {
 
                 let hit = WindHit {
-                    star: self.info.star.clone(),
+                    star: self.data.info.star.clone(),
                     hops: wind_up.hops.len() + 1
                 };
 
@@ -553,15 +546,15 @@ println!("on_app_lifecycle_command: {}",command );
             return;
         }
 
-        let hit = wind_up.pattern.is_match(&self.info);
+        let hit = wind_up.pattern.is_match(&self.data);
 
-        if wind_up.hops.len()+1 > wind_up.max_hops || self.lanes.len() <= 1 || !self.info.kind.relay()
+        if wind_up.hops.len()+1 > wind_up.max_hops || self.lanes.len() <= 1 || !self.data.info.kind.relay()
         {
 
             let hits = match hit
             {
                 true => {
-                    vec![WindHit {star: self.info.star.clone(), hops: wind_up.hops.len().clone()+1 }]
+                    vec![WindHit {star: self.data.info.star.clone(), hops: wind_up.hops.len().clone()+1 }]
                 }
                 false => {
                     vec!()
@@ -600,7 +593,7 @@ println!("on_app_lifecycle_command: {}",command );
 
         let relay_wind_up = wind_up.clone();
 
-        let command_tx = self.info.command_tx.clone();
+        let command_tx = self.data.star_tx.clone();
         self.do_wind_up(relay_wind_up, tx, Option::Some(exclude) ).await;
 
         tokio::spawn( async move {
@@ -638,7 +631,7 @@ println!("on_app_lifecycle_command: {}",command );
 
     pub fn star_key(&self)->&StarKey
     {
-        &self.info.star
+        &self.data.info.star
     }
 
 
@@ -676,7 +669,7 @@ println!("on_app_lifecycle_command: {}",command );
 
             self.message_reply_trackers.insert(delivery.message.id.clone(), tracker);
 
-            let star_tx = self.info.command_tx.clone();
+            let star_tx = self.data.star_tx.clone();
             tokio::spawn( async move {
                 let mut delivery = delivery;
                 delivery.retries = delivery.expect.retries();
@@ -754,7 +747,7 @@ println!("on_app_lifecycle_command: {}",command );
             let (tx,rx) = oneshot::channel();
 
             self.search_for_star(star.clone(), tx ).await;
-            let command_tx = self.info.command_tx.clone();
+            let command_tx = self.data.star_tx.clone();
             tokio::spawn(async move {
 
                 match rx.await
@@ -943,7 +936,7 @@ println!("on_app_lifecycle_command: {}",command );
                 };
 
 
-                match transaction.on_frame(frame,lane, &mut self.info.command_tx ).await
+                match transaction.on_frame(frame,lane, &mut self.data.star_tx).await
                 {
                     TransactionResult::Continue => {}
                     TransactionResult::Done => {
@@ -958,7 +951,6 @@ println!("on_app_lifecycle_command: {}",command );
     {
         if message.reply_to.is_some() && self.message_reply_trackers.contains_key(message.reply_to.as_ref().unwrap()) {
             if let Some(tracker) = self.message_reply_trackers.get(message.reply_to.as_ref().unwrap()) {
-                println!("MESSGE REPLY MATCH ....");
                 if let TrackerJob::Done = tracker.on_message(message)
                 {
                     self.message_reply_trackers.remove(message.reply_to.as_ref().unwrap());
@@ -976,7 +968,7 @@ println!("on_app_lifecycle_command: {}",command );
               match &proto
               {
                   ProtoFrame::CentralSearch => {
-                      if self.info.kind.is_central()
+                      if self.data.info.kind.is_central()
                       {
                           self.broadcast(Frame::Proto(ProtoFrame::CentralFound(1))).await;
                       } else if let Option::Some(hops) = self.get_hops_to_star(&StarKey::central() )
@@ -987,7 +979,7 @@ println!("on_app_lifecycle_command: {}",command );
                       {
                           let (tx,rx) = oneshot::channel();
                           self.search_for_star(StarKey::central() ,tx ).await;
-                          let command_tx = self.info.command_tx.clone();
+                          let command_tx = self.data.star_tx.clone();
                           tokio::spawn( async move {
                               if let Ok(result) = rx.await
                               {
@@ -1003,8 +995,8 @@ println!("on_app_lifecycle_command: {}",command );
                   ProtoFrame::RequestSubgraphExpansion => {
                       if let Option::Some(lane_key) = lane_key
                       {
-                          let mut subgraph = self.info.star.subgraph.clone();
-                          subgraph.push(self.info.star.index.clone());
+                          let mut subgraph = self.data.info.star.subgraph.clone();
+                          subgraph.push(self.data.info.star.index.clone());
                           self.send_frame(lane_key.clone(), Frame::Proto(ProtoFrame::GrantSubgraphExpansion(subgraph))).await;
                       }
                       else
@@ -1024,10 +1016,9 @@ println!("on_app_lifecycle_command: {}",command );
                       {
                           if let Some(lane) = self.lanes.get(&star)
                           {
-                              if self.info.kind.is_central()
+                              if self.data.info.kind.is_central()
                               {
-                                  println!("{} received SEQUENCE REPLY VIA FRAME....", self.info.kind );
-                                      lane.lane.outgoing.tx.send(LaneCommand::Frame(Frame::Proto(ProtoFrame::Sequence(ProtoSequence::Reply(self.info.sequence.next().index))))).await;
+                                      lane.lane.outgoing.tx.send(LaneCommand::Frame(Frame::Proto(ProtoFrame::Sequence(ProtoSequence::Reply(self.data.sequence.next().index))))).await;
                               }
                               else {
                                   let mut proto = ProtoMessage::new();
@@ -1040,20 +1031,18 @@ println!("on_app_lifecycle_command: {}",command );
                                   tokio::spawn(async move {
                                       if let Ok(StarMessagePayload::Sequence(SequenceMessage::Response(sequence))) = rx.await
                                       {
-                                          println!("received SEQUENCE response...");
                                           lane_tx.send(LaneCommand::Frame(Frame::Proto(ProtoFrame::Sequence(ProtoSequence::Reply(sequence))))).await;
                                       }
                                   });
 
-                                  println!("{} SENT Sequence request PROTO MESSAGE to CENTRAL.", self.info.kind );
-                                  self.info.command_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                                  self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                               }
                           }
                       }
                   }
                   ProtoFrame::Sequence(ProtoSequence::Reply(_))=> {
-                      if self.flags.check(Flag::Star(StarFlag::DiagnoseSequence)){
-                          self.logger.log( Log::ProtoStar(ProtoStarLog::new(self.info.kind.clone(), ProtoStarLogPayload::SequenceReplyRecv )));
+                      if self.data.flags.check(Flag::Star(StarFlag::DiagnoseSequence)){
+                          self.data.logger.log( Log::ProtoStar(ProtoStarLog::new(self.data.info.kind.clone(), ProtoStarLogPayload::SequenceReplyRecv )));
                       }
                   }
 
@@ -1204,7 +1193,7 @@ println!("on_app_lifecycle_command: {}",command );
             else
             {
                 let mut rx = self.find_actor_location(lookup).await;
-                let command_tx = self.info.command_tx.clone();
+                let command_tx = self.data.star_tx.clone();
                 tokio::spawn( async move {
                     if let Option::Some(_) = rx.recv().await
                     {
@@ -1291,16 +1280,16 @@ println!("on_app_lifecycle_command: {}",command );
 
     async fn on_message(&mut self, mut message: StarMessage) -> Result<(),Error>
     {
-        if message.to != self.info.star
+        if message.to != self.data.info.star
         {
-            if self.info.kind.relay() || message.from == self.info.star
+            if self.data.info.kind.relay() || message.from == self.data.info.star
             {
                 //forward the message
                 self.send_frame(message.to.clone(), Frame::StarMessage(message) ).await;
                 return Ok(());
             }
             else {
-                return Err(format!("this star {} does not relay Messages", self.info.kind ).into())
+                return Err(format!("this star {} does not relay Messages", self.data.info.kind ).into())
             }
         }
         else {
@@ -1423,6 +1412,7 @@ pub enum StarManagerCommand
 {
     Init,
     Frame(Frame),
+    StarData(StarData),
     CentralCommand(CentralCommand),
     SupervisorCommand(SupervisorCommand),
     ServerCommand(ServerCommand),
@@ -1472,6 +1462,7 @@ impl fmt::Display for StarManagerCommand {
             StarManagerCommand::SupervisorCommand(_) => "SupervisorCommand".to_string(),
             StarManagerCommand::ServerCommand(_) => "ServerCommand".to_string(),
             StarManagerCommand::Init => "Init".to_string(),
+            StarManagerCommand::StarData(_) => "StarData".to_string()
         };
         write!(f, "{}",r)
     }
@@ -2095,17 +2086,17 @@ trait ServerManagerBacking: Send+Sync
 
 pub struct ServerManager
 {
-    info: StarInfo,
+    data: StarData,
     backing: Box<dyn ServerManagerBacking>,
 }
 
 impl ServerManager
 {
-    pub fn new( info: StarInfo ) -> Self
+    pub fn new(data: StarData) -> Self
     {
         ServerManager
         {
-            info: info,
+            data: data,
             backing: Box::new(ServerManagerBackingDefault::new())
         }
     }
@@ -2123,7 +2114,7 @@ impl ServerManager
     async fn pledge(&mut self)->Result<(),Error>
     {
         let (search,rx) = Wind::new(StarPattern::StarKind(StarKind::Supervisor), WindAction::SearchHits );
-        self.info.command_tx.send( StarCommand::WindInit( search ) ).await;
+        self.data.star_tx.send( StarCommand::WindInit( search ) ).await;
         let result = rx.await?;
 
 
@@ -2131,8 +2122,8 @@ impl ServerManager
         {
            self.set_supervisor(hit.star.clone());
            let payload = StarMessagePayload::Pledge;
-           let message = StarMessage::new(self.info.sequence.next(), self.info.star.clone(), hit.star, payload );
-           self.info.command_tx.send( StarCommand::Frame(Frame::StarMessage(message))).await;
+           let message = StarMessage::new(self.data.sequence.next(), self.data.info.star.clone(), hit.star, payload );
+           self.data.star_tx.send( StarCommand::Frame(Frame::StarMessage(message))).await;
         }
         else {
             eprintln!("could not find a supervisor for Server results:{} ", result.hits.len() );
@@ -2153,16 +2144,16 @@ impl StarManager for ServerManager
 
 pub struct PlaceholderStarManager
 {
-    pub info: StarInfo
+    pub data: StarData
 }
 
 impl PlaceholderStarManager
 {
 
-    pub fn new(info: StarInfo)->Self
+    pub fn new(info: StarData) ->Self
     {
         PlaceholderStarManager{
-            info: info
+            data: info
         }
     }
 }
@@ -2175,7 +2166,7 @@ impl StarManager for PlaceholderStarManager
         {
             StarManagerCommand::Init => {}
             _ => {
-                println!("command {} Placeholder unimplemented for kind: {}",command,self.info.kind);
+                println!("command {} Placeholder unimplemented for kind: {}",command,self.data.info.kind);
             }
         }
     }
@@ -2184,7 +2175,7 @@ impl StarManager for PlaceholderStarManager
 #[async_trait]
 pub trait StarManagerFactory: Sync+Send
 {
-    async fn create( &self, info: StarInfo ) -> mpsc::Sender<StarManagerCommand>;
+    async fn create(&self, info: StarData) -> mpsc::Sender<StarManagerCommand>;
 }
 
 
@@ -2194,22 +2185,22 @@ pub struct StarManagerFactoryDefault
 
 impl StarManagerFactoryDefault
 {
-    fn create_inner( &self, info: &StarInfo, manager_tx: mpsc::Sender<StarManagerCommand>) -> Box<dyn StarManager>
+    fn create_inner(&self, data: &StarData, manager_tx: mpsc::Sender<StarManagerCommand>) -> Box<dyn StarManager>
     {
-        if let StarKind::Central = info.kind
+        if let StarKind::Central = data.info.kind
         {
-            return Box::new(CentralManager::new(info.clone(), manager_tx) );
+            return Box::new(CentralManager::new(data.clone(), manager_tx) );
         }
-        else if let StarKind::Supervisor= info.kind
+        else if let StarKind::Supervisor= data.info.kind
         {
-            return Box::new(SupervisorManager::new(info.clone()));
+            return Box::new(SupervisorManager::new(data.clone()));
         }
-        else if let StarKind::Server(_)= info.kind
+        else if let StarKind::Server(_)= data.info.kind
         {
-            return Box::new(ServerManager::new(info.clone()));
+            return Box::new(ServerManager::new(data.clone()));
         }
         else {
-            Box::new(PlaceholderStarManager::new(info.clone()))
+            Box::new(PlaceholderStarManager::new(data.clone()))
         }
     }
 }
@@ -2217,12 +2208,12 @@ impl StarManagerFactoryDefault
 #[async_trait]
 impl StarManagerFactory for StarManagerFactoryDefault
 {
-    async fn create( &self, info: StarInfo ) -> mpsc::Sender<StarManagerCommand>
+    async fn create(&self, data: StarData) -> mpsc::Sender<StarManagerCommand>
     {
         let (mut tx,mut rx) = mpsc::channel(32);
-        let mut manager:Box<dyn StarManager> = self.create_inner(&info,tx.clone());
+        let mut manager:Box<dyn StarManager> = self.create_inner(&data, tx.clone());
 
-        let kind = info.kind.clone();
+        let kind = data.info.kind.clone();
         tokio::spawn( async move {
             while let Option::Some(command) = rx.recv().await
             {
@@ -2236,12 +2227,20 @@ impl StarManagerFactory for StarManagerFactoryDefault
 
 
 #[derive(Clone)]
+pub struct StarData
+{
+    pub info: StarInfo,
+    pub sequence: Arc<IdSeq>,
+    pub star_tx: mpsc::Sender<StarCommand>,
+    pub flags: Flags,
+    pub logger: Logger
+}
+
+#[derive(Clone)]
 pub struct StarInfo
 {
    pub star: StarKey,
    pub kind: StarKind,
-   pub sequence: Arc<IdSeq>,
-   pub command_tx: mpsc::Sender<StarCommand>
 }
 
 

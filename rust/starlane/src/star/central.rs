@@ -5,7 +5,7 @@ use tokio::sync::{mpsc, oneshot, broadcast};
 use crate::app::{AppInfo, ApplicationStatus, AppCreate, AppLocation};
 use crate::id::Id;
 use crate::label::Labels;
-use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarInfo, StarKey, StarManager, StarManagerCommand, StarNotify};
+use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarData, StarKey, StarManager, StarManagerCommand, StarNotify};
 use crate::user::{AuthToken, AppAccess};
 use crate::message::{ProtoMessage, MessageExpect, MessageUpdate, MessageResult, MessageExpectWait};
 use crate::keys::{AppKey, SubSpaceKey};
@@ -16,10 +16,11 @@ use crate::star::StarCommand::AppLifecycleCommand;
 use tokio::sync::oneshot::error::RecvError;
 use crate::error::Error;
 use crate::frame::{StarMessage, Frame, StarMessagePayload, RequestMessage, SpacePayload, ReportMessage, SpaceMessage, AssignMessage, AppAssign, AppCreateRequest, SequenceMessage};
+use crate::logger::Logger;
 
 pub struct CentralManager
 {
-    info: StarInfo,
+    info: StarData,
     backing: Box<dyn CentralManagerBacking>,
     manager_tx: mpsc::Sender<StarManagerCommand>,
     pub status: CentralStatus,
@@ -27,7 +28,7 @@ pub struct CentralManager
 
 impl CentralManager
 {
-    pub fn new(info: StarInfo, manager_tx: mpsc::Sender<StarManagerCommand>) -> CentralManager
+    pub fn new(info: StarData, manager_tx: mpsc::Sender<StarManagerCommand>) -> CentralManager
     {
 
         CentralManager
@@ -71,7 +72,7 @@ impl CentralManager
 
         let rx = proto.get_ok_result().await;
 
-        self.info.command_tx.send( StarCommand::SendProtoMessage(proto) ).await;
+        self.info.star_tx.send( StarCommand::SendProtoMessage(proto) ).await;
 
         let manager_tx = self.manager_tx.clone();
         tokio::spawn( async move {
@@ -95,14 +96,14 @@ impl CentralManager
     pub async fn reply_ok(&self, message: StarMessage)
     {
         let mut proto = message.reply(StarMessagePayload::Ok);
-        let result = self.info.command_tx.send(StarCommand::SendProtoMessage(proto)).await;
+        let result = self.info.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
         self.unwrap(result);
     }
 
     pub async fn reply_error(&self, mut message: StarMessage, error_message: String )
     {
         message.reply(StarMessagePayload::Error(error_message.to_string()));
-        let result = self.info.command_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await;
+        let result = self.info.star_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await;
         self.unwrap(result);
     }
 
@@ -131,7 +132,7 @@ impl CentralManager
         });
         proto.expect = expect;
 
-        let mut command_tx = self.info.command_tx.clone();
+        let mut command_tx = self.info.star_tx.clone();
         let mut reply_tx = proto.tx.subscribe();
         let (tx, rx) = oneshot::channel();
         tokio::spawn(async move {
@@ -151,7 +152,7 @@ impl CentralManager
             }
         });
 
-        self.info.command_tx.send(StarCommand::SendProtoMessage(proto)).await;
+        self.info.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
 
         Ok(rx)
     }
@@ -177,7 +178,7 @@ impl StarManager for CentralManager
                    {
                        SequenceMessage::Request => {
                            let proto = message.reply(StarMessagePayload::Sequence(SequenceMessage::Response(self.info.sequence.next().index)));
-                           self.info.command_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                           self.info.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                        }
                        _ => { eprintln!("CentralManager: unexpected message: Sequence message") }
                    }
@@ -211,7 +212,7 @@ impl StarManager for CentralManager
                                                                 token: token,
                                                                 payload: SpacePayload::Report(ReportMessage::AppLocation(app_loc))
                                                             }));
-                                                            self.info.command_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                                                            self.info.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                                                         }
                                                         Err(error) => {
                                                             self.reply_error(message, error.to_string());
@@ -280,7 +281,7 @@ trait CentralManagerBacking: Send+Sync
 
 pub struct CentralManagerBackingDefault
 {
-    info: StarInfo,
+    info: StarData,
     init_status: CentralInitStatus,
     supervisors: Vec<StarKey>,
     application_to_supervisor: HashMap<AppKey,StarKey>,
@@ -291,7 +292,7 @@ pub struct CentralManagerBackingDefault
 
 impl CentralManagerBackingDefault
 {
-    pub fn new( info: StarInfo ) -> Self
+    pub fn new(info: StarData) -> Self
     {
         CentralManagerBackingDefault {
             info: info,
