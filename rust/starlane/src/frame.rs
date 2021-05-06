@@ -7,11 +7,11 @@ use tokio::time::Instant;
 
 use crate::actor::{ActorKey, ActorLocation};
 use crate::id::Id;
-use crate::star::{StarKey, StarKind, StarWatchInfo, StarNotify, Star, StarCommand, StarInfo};
+use crate::star::{StarKey, StarKind, StarWatchInfo, StarNotify, Star, StarCommand, StarInfo, StarSubGraphKey};
 use crate::label::Labels;
 use crate::message::{MessageResult, ProtoMessage, MessageExpect, MessageUpdate};
 use tokio::sync::{oneshot, broadcast, mpsc};
-use crate::keys::{AppKey, UserKey, SubSpaceKey};
+use crate::keys::{AppKey, UserKey, SubSpaceKey, MessageId};
 use crate::app::{AppLocation, AppKind, AppInfo};
 use crate::user::AuthToken;
 use crate::logger::Flags;
@@ -43,25 +43,7 @@ pub enum ProtoFrame
     StarLaneProtocolVersion(i32),
     ReportStarKey(StarKey),
     RequestSubgraphExpansion,
-    GrantSubgraphExpansion(Vec<u16>),
-    CentralSearch,
-    CentralFound(usize),
-    Evolution(ProtoEvolution),
-    Sequence(ProtoSequence),
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub enum ProtoEvolution
-{
-    Request,
-    Report
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub enum ProtoSequence
-{
-    Request,
-    Reply(u64)
+    GrantSubgraphExpansion(Vec<StarSubGraphKey>),
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -100,7 +82,7 @@ pub struct WindUp
     pub from: StarKey,
     pub pattern: StarPattern,
     pub hops: Vec<StarKey>,
-    pub transactions: Vec<Id>,
+    pub transactions: Vec<u64>,
     pub max_hops: usize,
     pub action: WindAction
 }
@@ -170,7 +152,7 @@ pub enum WindResults
 
 impl WindUp
 {
-    pub fn inc( &mut self, hop: StarKey, transaction: Id )
+    pub fn inc( &mut self, hop: StarKey, transaction: u64 )
     {
         self.hops.push( hop );
         self.transactions.push(transaction);
@@ -223,7 +205,7 @@ pub struct WindDown
     pub missed: Option<StarKey>,
     pub result: WindResults,
     pub wind_up: WindUp,
-    pub transactions: Vec<Id>,
+    pub transactions: Vec<u64>,
     pub hops : Vec<StarKey>
 }
 
@@ -250,33 +232,32 @@ pub struct StarMessage
 {
    pub from: StarKey,
    pub to: StarKey,
-   pub id: Id,
-   pub transaction: Option<Id>,
+   pub id: MessageId,
+//   pub transaction: Option<Id>,
    pub payload: StarMessagePayload,
-   pub reply_to: Option<Id>
+   pub reply_to: Option<MessageId>
 }
 
 impl StarMessage
 {
-    pub fn new(id:Id, from: StarKey, to: StarKey, payload: StarMessagePayload) -> Self
+    pub fn new(id:MessageId, from: StarKey, to: StarKey, payload: StarMessagePayload) -> Self
     {
         StarMessage {
             id: id,
             from: from,
             to: to,
-            transaction: Option::None,
+ //           transaction: Option::None,
             payload: payload,
             reply_to: Option::None
         }
     }
 
-    pub fn to_central(id:Id, from: StarKey, payload: StarMessagePayload ) -> Self
+    pub fn to_central(id:MessageId, from: StarKey, payload: StarMessagePayload ) -> Self
     {
         StarMessage {
             id: id,
             from: from,
             to: StarKey::central(),
-            transaction: Option::None,
             payload: payload,
             reply_to: Option::None
         }
@@ -313,7 +294,6 @@ pub enum StarMessagePayload
    Ok,
    Error(String),
    Ack(MessageAck),
-   Sequence(SequenceMessage)
 }
 
 impl StarMessagePayload{
@@ -663,7 +643,6 @@ impl fmt::Display for StarMessagePayload{
             StarMessagePayload::Ok => "Ok".to_string(),
             StarMessagePayload::Error(_) => "Error".to_string(),
             StarMessagePayload::Ack(_) => "Ack".to_string(),
-            StarMessagePayload::Sequence(_) => "Sequence".to_string(),
         };
         write!(f, "{}",r)
     }
@@ -715,31 +694,8 @@ impl fmt::Display for ProtoFrame {
             ProtoFrame::ReportStarKey(id) => format!("ReportStarId({})", id).to_string(),
             ProtoFrame::RequestSubgraphExpansion=> format!("RequestSubgraphExpansion").to_string(),
             ProtoFrame::GrantSubgraphExpansion(path) => format!("GrantSubgraphExpansion({:?})", path).to_string(),
-            ProtoFrame::CentralFound(_) => format!("CentralFound").to_string(),
-            ProtoFrame::CentralSearch => format!("CentralSearch").to_string(),
-            ProtoFrame::Evolution(evol) => format!("Evolution({})", evol).to_string(),
-            ProtoFrame::Sequence(seq) => format!("Sequence({})", seq).to_string(),
         };
         write!(f, "{}",r)
     }
 }
 
-impl fmt::Display for ProtoEvolution {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let r = match self {
-            ProtoEvolution::Request => "Request".to_string(),
-            ProtoEvolution::Report => "Report".to_string()
-        };
-        write!(f, "{}", r)
-    }
-}
-
-impl fmt::Display for ProtoSequence{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let r = match self {
-            ProtoSequence::Request => "Request".to_string(),
-            ProtoSequence::Reply(seq)=> format!("Reply({})",seq).to_string()
-        };
-        write!(f, "{}", r)
-    }
-}

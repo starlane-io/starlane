@@ -8,7 +8,7 @@ use crate::label::Labels;
 use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarInfo, StarKey, StarManager, StarManagerCommand, StarNotify, StarData, StarKind};
 use crate::user::{AuthToken, AppAccess};
 use crate::message::{ProtoMessage, MessageExpect, MessageUpdate, MessageResult, MessageExpectWait};
-use crate::keys::{AppKey, SubSpaceKey};
+use crate::keys::{AppKey, SubSpaceKey, AppId};
 use tokio::sync::mpsc::error::SendError;
 use futures::FutureExt;
 use tokio::sync::oneshot::Receiver;
@@ -108,8 +108,7 @@ impl CentralManager
 
     async fn launch_app(&mut self, sub_space: SubSpaceKey, create: AppCreate, expect: MessageExpect) -> Result<oneshot::Receiver<AppLocation>, Error>
     {
-        let app_id = self.data.sequence.next();
-        let app_key = AppKey::new(sub_space.clone(), app_id.index);
+        let app_key = AppKey::new(sub_space.clone() );
         let app = AppInfo::new(app_key.clone(), create.kind.clone());
         let supervisor = self.backing.select_supervisor();
         if let Option::None = supervisor
@@ -171,16 +170,6 @@ impl StarManager for CentralManager
             match &message.payload
             {
 
-                StarMessagePayload::Sequence( seq_message)=> {
-                   match seq_message
-                   {
-                       SequenceMessage::Request => {
-                           let proto = message.reply(StarMessagePayload::Sequence(SequenceMessage::Response(self.data.sequence.next().index)));
-                           self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                       }
-                       _ => { eprintln!("CentralManager: unexpected message: Sequence message") }
-                   }
-                }
                 StarMessagePayload::Pledge(StarKind::Supervisor) => {
 
                     self.backing.add_supervisor(message.from.clone());
@@ -268,7 +257,6 @@ pub enum CentralInitStatus
 
 trait CentralManagerBacking: Send+Sync
 {
-    fn sequence_next(&mut self)->Id;
     fn add_supervisor(&mut self, star: StarKey );
     fn remove_supervisor(&mut self, star: StarKey );
     fn set_supervisor_for_application(&mut self, app: AppKey, supervisor_star: StarKey );
@@ -311,9 +299,6 @@ impl CentralManagerBackingDefault
 
 impl CentralManagerBacking for CentralManagerBackingDefault
 {
-    fn sequence_next(&mut self) -> Id {
-        self.data.sequence.next()
-    }
 
     fn add_supervisor(&mut self, star: StarKey) {
         if !self.supervisors.contains(&star)

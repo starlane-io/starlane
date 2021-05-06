@@ -69,7 +69,7 @@ impl Starlane
                 }
                 StarlaneCommand::ConstellationCreate(command) => {
                     let result = self.constellation_create(command.template, command.data, command.name ).await;
-                    command.oneshot.send(result);
+                    command.tx.send(result);
                 }
                 StarlaneCommand::StarControlRequestByName(request) => {
                    if let Option::Some(key) = self.star_names.get(&request.name)
@@ -110,7 +110,7 @@ impl Starlane
 
         let link = link.unwrap().clone();
         let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
-        let (proto_star, star_ctrl) = ProtoStar::new(Option::None, link.kind.clone(), evolve_tx, self.star_manager_factory.clone(), self.star_core_factory.clone(), self.flags.clone(), self.logger.clone() );
+        let (proto_star, star_ctrl) = ProtoStar::new(Option::None, link.kind.clone(), self.star_manager_factory.clone(), self.star_core_factory.clone(), self.flags.clone(), self.logger.clone() );
 
         println!("created proto star: {:?}", &link.kind);
 
@@ -128,10 +128,12 @@ impl Starlane
                         name: Option::None,
                         template: template,
                         data: data,
-                        oneshot: tx
+                        tx: tx
                     }
                 ));
 
+                evolve_tx.send( ProtoStarEvolution{ star: star.star_key().clone(), controller: StarController { command_tx: star.star_tx() } });
+                
                 star.run().await;
             }
             else {
@@ -200,7 +202,7 @@ impl Starlane
             let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
             evolve_rxs.push(evolve_rx );
 
-            let (proto_star, star_ctrl) = ProtoStar::new(Option::Some(star_key.clone()), star_template.kind.clone(), evolve_tx, self.star_manager_factory.clone(), self.star_core_factory.clone(), self.flags.clone(), self.logger.clone() );
+            let (proto_star, star_ctrl) = ProtoStar::new(Option::Some(star_key.clone()), star_template.kind.clone(), self.star_manager_factory.clone(), self.star_core_factory.clone(), self.flags.clone(), self.logger.clone() );
             self.star_controllers.insert(star_key.clone(), star_ctrl.clone() );
             if name.is_some() && star_template.handle.is_some()
             {
@@ -216,8 +218,18 @@ impl Starlane
                 let star = proto_star.evolve().await;
                 if let Ok(star) = star
                 {
+                    let key = star.star_key().clone();
+                    let star_tx= star.star_tx();
+                    tokio::spawn( async move {
+                        star.run().await;
+                    });
+                    evolve_tx.send( ProtoStarEvolution{
+                        star: key,
+                        controller: StarController{
+                            command_tx: star_tx
+                        }
+                    });
                     println!("created star: {:?} key: {}", &star_template.kind, star_key);
-                    star.run().await;
                 }
                 else {
                     eprintln!("experienced serious error could not evolve the proto_star");
@@ -237,12 +249,25 @@ impl Starlane
             }
         }
 
+
+        // announce that the constellations is now complete
+        for star_template in &template.stars
+        {
+            if let Option::Some(star_ctrl) = self.star_controllers.get_mut(&star_template.key.create(&data)? )
+            {
+                star_ctrl.command_tx.send(StarCommand::ConstellationConstructionComplete).await;
+            }
+        }
+
+
+
         let evolutions = join_all(evolve_rxs).await;
 
         for evolve in evolutions
         {
             if let Ok(evolve) = evolve
             {
+                evolve.controller.command_tx.send(StarCommand::Init).await;
                 self.star_controllers.insert(evolve.star, evolve.controller);
             }
             else if let Err(error) = evolve
@@ -341,7 +366,7 @@ pub struct ConstellationCreate
     name: Option<String>,
     template: ConstellationTemplate,
     data: ConstellationData,
-    oneshot: oneshot::Sender<Result<(),Error>>
+    tx: oneshot::Sender<Result<(),Error>>
 }
 
 pub struct ConnectCommand
@@ -370,7 +395,7 @@ impl ConstellationCreate
             name: name,
             template: template,
             data: data,
-            oneshot: tx
+            tx: tx
         }, rx)
     }
 }
@@ -424,7 +449,7 @@ mod test
                         match result {
                             Ok(_) => {println!("template ok.")}
                             Err(e) => {
-                           //     println!("error: {}", e)
+                                println!("error: {}", e)
                             }
                         }
                     }

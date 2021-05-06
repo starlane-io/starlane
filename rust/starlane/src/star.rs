@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::RandomState;
 use std::future::Future;
 use std::sync::{Arc, Mutex, Weak};
-use std::sync::atomic::{AtomicI32, AtomicI64};
+use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU64};
 
 use futures::future::{BoxFuture, join_all, Map};
 use futures::future::select_all;
@@ -27,10 +27,10 @@ use crate::actor::{Actor, ActorKey, ActorKind, ActorLocation, ActorWatcher};
 use crate::app::{AppCommandWrapper, AppController, AppCreate, AppKind, Application, AppLocation};
 use crate::core::StarCoreCommand;
 use crate::error::Error;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, AppAssign, AppCreateRequest, ApplicationSupervisorReport, AppNotifyCreated, AppSupervisorRequest, Event, Frame, ProtoEvolution, ProtoFrame, ProtoSequence, Rejection, SequenceMessage, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, AppAssign, AppCreateRequest, ApplicationSupervisorReport, AppNotifyCreated, AppSupervisorRequest, Event, Frame,  ProtoFrame, Rejection, SequenceMessage, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
-use crate::keys::AppKey;
+use crate::keys::{AppKey, MessageId};
 use crate::label::Labels;
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
@@ -224,14 +224,15 @@ pub struct Star
     core_tx: mpsc::Sender<StarCoreCommand>,
     lanes: HashMap<StarKey, LaneMeta>,
     connector_ctrls: Vec<ConnectorController>,
-    transactions: HashMap<Id,Box<dyn Transaction>>,
+    transactions: HashMap<u64,Box<dyn Transaction>>,
     frame_hold: FrameHold,
     watches: HashMap<ActorKey,HashMap<Id,StarWatchInfo>>,
     actor_locations: LruCache<ActorKey, ActorLocation>,
     app_locations: LruCache<AppKey,StarKey>,
-    messages_received: HashMap<Id,Instant>,
-    message_reply_trackers: HashMap<Id, MessageReplyTracker>,
+    messages_received: HashMap<MessageId,Instant>,
+    message_reply_trackers: HashMap<MessageId, MessageReplyTracker>,
     actors: HashSet<ActorKey>,
+    star_subgraph_expansion_seq: AtomicU64
 }
 
 impl Star
@@ -258,7 +259,8 @@ impl Star
             app_locations: LruCache::new(4*1024 ),
             messages_received: HashMap::new(),
             message_reply_trackers: HashMap::new(),
-            actors: HashSet::new()
+            actors: HashSet::new(),
+            star_subgraph_expansion_seq: AtomicU64::new(0)
         }
     }
 
@@ -270,10 +272,7 @@ impl Star
 
     pub async fn run(mut self)
     {
-        self.broadcast(Frame::Proto(ProtoFrame::Evolution(ProtoEvolution::Report))).await;
 
-
-        self.data.manager_tx.send(StarManagerCommand::Init ).await;
         loop {
             let mut futures = vec!();
             let mut lanes = vec!();
@@ -294,6 +293,10 @@ impl Star
             if let Some(command) = command
             {
                 match command{
+
+                    StarCommand::Init => {
+                        self.data.manager_tx.send(StarManagerCommand::Init).await;
+                    }
                     StarCommand::SetFlags(set_flags ) => {
                        self.data.flags= set_flags.flags;
                        set_flags.tx.send(());
@@ -302,12 +305,6 @@ impl Star
                         if let Some(remote_star)=lane.remote_star.as_ref()
                         {
                             self.lanes.insert(remote_star.clone(), LaneMeta::new(lane));
-
-                            if self.data.info.kind.is_central()
-                            {
-                                self.broadcast( Frame::Proto(ProtoFrame::CentralFound(1)) ).await;
-                            }
-
                         }
                         else {
                             eprintln!("for star remote star must be set");
@@ -419,13 +416,13 @@ impl Star
             return;
         }
 
-        let id = self.data.sequence.next();
+        let id = MessageId::new_v4();
 
         let message = StarMessage{
             id: id,
             from: self.data.info.star.clone(),
             to: proto.to.unwrap(),
-            transaction: proto.transaction,
+            //transaction: proto.transaction,
             payload: proto.payload,
             reply_to: proto.reply_to
         };
@@ -471,7 +468,7 @@ println!("on_app_lifecycle_command: {}",command );
 
     async fn do_wind_up(&mut self, mut wind: WindUp, tx: oneshot::Sender<WindHits>, exclude: Option<HashSet<StarKey>> )
     {
-        let tid = self.data.sequence.next();
+        let tid = self.data.sequence.fetch_add( 1, std::sync::atomic::Ordering::Relaxed );
 
         let num_excludes:usize = match &exclude
         {
@@ -628,6 +625,10 @@ println!("on_app_lifecycle_command: {}",command );
         &self.data.info.star
     }
 
+    pub fn star_tx(&self)->mpsc::Sender<StarCommand>
+    {
+        self.data.star_tx.clone()
+    }
 
     async fn broadcast(&mut self,  frame: Frame )
     {
@@ -902,9 +903,11 @@ println!("on_app_lifecycle_command: {}",command );
     {
         let tid = match frame
         {
-            Frame::StarMessage(message) => {
+/*            Frame::StarMessage(message) => {
                 message.transaction
             },
+
+ */
             Frame::StarWind(wind) => {
                 match wind{
                     StarWind::Down(wind_down) => {
@@ -961,36 +964,11 @@ println!("on_app_lifecycle_command: {}",command );
             Frame::Proto(proto) => {
               match &proto
               {
-                  ProtoFrame::CentralSearch => {
-                      if self.data.info.kind.is_central()
-                      {
-                          self.broadcast(Frame::Proto(ProtoFrame::CentralFound(1))).await;
-                      } else if let Option::Some(hops) = self.get_hops_to_star(&StarKey::central() )
-                      {
-                          self.broadcast(Frame::Proto(ProtoFrame::CentralFound(hops+1))).await;
-                      }
-                      else
-                      {
-                          let (tx,rx) = oneshot::channel();
-                          self.search_for_star(StarKey::central() ,tx ).await;
-                          let command_tx = self.data.star_tx.clone();
-                          tokio::spawn( async move {
-                              if let Ok(result) = rx.await
-                              {
-                                  if let Some(hit)=result.nearest()
-                                  {
-                                      // we found Central, now broadcast it
-                                      command_tx.send( StarCommand::Frame(Frame::Proto(ProtoFrame::CentralSearch))).await;
-                                  }
-                              }
-                          });
-                      }
-                  },
                   ProtoFrame::RequestSubgraphExpansion => {
                       if let Option::Some(lane_key) = lane_key
                       {
                           let mut subgraph = self.data.info.star.subgraph.clone();
-                          subgraph.push(self.data.info.star.index.clone());
+                          subgraph.push(StarSubGraphKey::Big(self.star_subgraph_expansion_seq.fetch_add(1,std::sync::atomic::Ordering::Relaxed)));
                           self.send_frame(lane_key.clone(), Frame::Proto(ProtoFrame::GrantSubgraphExpansion(subgraph))).await;
                       }
                       else
@@ -999,47 +977,6 @@ println!("on_app_lifecycle_command: {}",command );
                       }
 
                   }
-                  ProtoFrame::Evolution(ProtoEvolution::Request)=> {
-                      self.broadcast(Frame::Proto(ProtoFrame::Evolution(ProtoEvolution::Report) )).await;
-                  }
-                  ProtoFrame::Sequence(ProtoSequence::Request)=> {
-
-
-
-                      if let Option::Some(star) = lane_key.cloned()
-                      {
-                          if let Some(lane) = self.lanes.get(&star)
-                          {
-                              if self.data.info.kind.is_central()
-                              {
-                                      lane.lane.outgoing.tx.send(LaneCommand::Frame(Frame::Proto(ProtoFrame::Sequence(ProtoSequence::Reply(self.data.sequence.next().index))))).await;
-                              }
-                              else {
-                                  let mut proto = ProtoMessage::new();
-                                  proto.to = Option::Some(StarKey::central());
-                                  proto.expect = MessageExpect::RetryUntilOk;
-                                  proto.payload = StarMessagePayload::Sequence(SequenceMessage::Request);
-                                  let mut rx = proto.get_ok_result().await;
-
-                                  let lane_tx = lane.lane.outgoing.tx.clone();
-                                  tokio::spawn(async move {
-                                      if let Ok(StarMessagePayload::Sequence(SequenceMessage::Response(sequence))) = rx.await
-                                      {
-                                          lane_tx.send(LaneCommand::Frame(Frame::Proto(ProtoFrame::Sequence(ProtoSequence::Reply(sequence))))).await;
-                                      }
-                                  });
-
-                                  self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                              }
-                          }
-                      }
-                  }
-                  ProtoFrame::Sequence(ProtoSequence::Reply(_))=> {
-                      if self.data.flags.check(Flag::Star(StarFlag::DiagnoseSequence)){
-                          self.data.logger.log( Log::ProtoStar(ProtoStarLog::new(self.data.info.kind.clone(), ProtoStarLogPayload::SequenceReplyRecv )));
-                      }
-                  }
-
                   _ => {}
 
               }
@@ -1308,6 +1245,8 @@ pub trait StarKernel : Send
 pub enum StarCommand
 {
     AddLane(Lane),
+    ConstellationConstructionComplete,
+    Init,
     AddConnectorController(ConnectorController),
     AddActorLocation(AddEntityLocation),
     AddAppLocation(AddAppLocation),
@@ -1493,6 +1432,8 @@ impl fmt::Display for StarCommand{
             StarCommand::ActorCommand(command) => format!("EntityCommand({})", command).to_string(),
             StarCommand::SendProtoMessage(_) => format!("SendProtoMessage(_)").to_string(),
             StarCommand::SetFlags(_) => format!("SetFlags(_)").to_string(),
+            StarCommand::ConstellationConstructionComplete => "ConstellationConstructionComplete".to_string(),
+            StarCommand::Init => "Init".to_string()
         };
         write!(f, "{}",r)
     }
@@ -1948,10 +1889,18 @@ pub trait SupervisorManagerBacking: Send+Sync
 }
 
 
+#[derive(PartialEq, Eq, Ord, PartialOrd, Hash, Debug, Clone, Serialize, Deserialize)]
+pub enum StarSubGraphKey
+{
+    Big(u64),
+    Small(u16)
+}
+
+
 #[derive(PartialEq, Eq, PartialOrd, Hash, Debug, Clone, Serialize, Deserialize)]
 pub struct StarKey
 {
-    pub subgraph: Vec<u16>,
+    pub subgraph: Vec<StarSubGraphKey>,
     pub index: u16
 }
 
@@ -2011,7 +1960,7 @@ impl StarKey
        }
    }
 
-   pub fn new_with_subgraph(subgraph: Vec<u16>, index: u16) ->Self
+   pub fn new_with_subgraph(subgraph: Vec<StarSubGraphKey>, index: u16) ->Self
    {
       StarKey {
           subgraph,
@@ -2140,11 +2089,11 @@ impl StarManagerFactory for StarManagerFactoryDefault
 pub struct StarData
 {
     pub info: StarInfo,
-    pub sequence: Arc<IdSeq>,
     pub star_tx: mpsc::Sender<StarCommand>,
     pub manager_tx: mpsc::Sender<StarManagerCommand>,
     pub flags: Flags,
-    pub logger: Logger
+    pub logger: Logger,
+    pub sequence: Arc<AtomicU64>
 }
 
 #[derive(Clone)]

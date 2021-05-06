@@ -7,16 +7,16 @@ use crate::id::Id;
 use tokio::sync::{mpsc, oneshot, broadcast};
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::mpsc::Sender;
+use crate::keys::MessageId;
 
 pub struct ProtoMessage
 {
     pub to: Option<StarKey>,
     pub payload: StarMessagePayload,
-    pub transaction: Option< Id >,
     pub tx: broadcast::Sender<MessageUpdate>,
     pub rx: broadcast::Receiver<MessageUpdate>,
     pub expect: MessageExpect,
-    pub reply_to: Option<Id>
+    pub reply_to: Option<MessageId>
 }
 
 impl ProtoMessage
@@ -33,13 +33,23 @@ impl ProtoMessage
         ProtoMessage{
             to: Option::None,
             payload: StarMessagePayload::None,
-            transaction: Option::None,
             tx: tx,
             rx: rx,
             expect: MessageExpect::None,
             reply_to: Option::None
         }
     }
+
+    pub fn to( &mut self, to: StarKey)
+    {
+        self.to = Option::Some(to);
+    }
+
+    pub fn reply_to( &mut self, reply_to: MessageId )
+    {
+        self.reply_to = Option::Some(reply_to);
+    }
+
 
     pub fn validate(&self)->Result<(),Error>
     {
@@ -78,7 +88,7 @@ impl ProtoMessage
 
 pub struct MessageReplyTracker
 {
-    pub reply_to: Id,
+    pub reply_to: MessageId,
     pub tx: broadcast::Sender<MessageUpdate>
 }
 

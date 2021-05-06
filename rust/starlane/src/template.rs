@@ -8,7 +8,7 @@ use crate::lane::{ConnectionInfo, ConnectionKind};
 use crate::layout::ConstellationLayout;
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoStarKernel};
 use crate::proto::ProtoStarKernel::Mesh;
-use crate::star::{StarKey, StarKind, ServerKindExt};
+use crate::star::{StarKey, StarKind, ServerKindExt, StarSubGraphKey};
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct ConstellationTemplate
@@ -100,7 +100,7 @@ impl ConstellationTemplate
 pub struct ConstellationData
 {
     pub exclude_handles: HashSet<String>,
-    pub subgraphs: HashMap<String,Vec<u16>>,
+    pub subgraphs: HashMap<String,Vec<StarSubGraphKey>>,
 }
 
 impl ConstellationData
@@ -180,7 +180,7 @@ pub enum StarKeySubgraphTemplate
 {
     Central,
     SubgraphDataKey(String),
-    Path(Vec<u16>),
+    Path(Vec<StarSubGraphKey>),
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Serialize, Deserialize)]

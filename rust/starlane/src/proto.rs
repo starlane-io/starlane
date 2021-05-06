@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicI32, AtomicI64, Ordering};
+use std::sync::atomic::{AtomicI32, AtomicI64, Ordering, AtomicU64};
 use std::task::Poll;
 
 use futures::future::{err, join_all, ok, select_all};
@@ -16,25 +16,23 @@ use tokio::time::{Duration, Instant};
 use crate::constellation::Constellation;
 use crate::core::StarCoreFactory;
 use crate::error::Error;
-use crate::frame::{Frame, ProtoFrame, WindHit, StarMessage, StarMessagePayload, WindUp, StarPattern, WindDown, SequenceMessage, ProtoEvolution, ProtoSequence};
+use crate::frame::{Frame, ProtoFrame, WindHit, StarMessage, StarMessagePayload, WindUp, StarPattern, WindDown, SequenceMessage} ;
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelReceiver, TunnelSender, TunnelSenderState};
 use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarKernel, StarKey, StarKind, StarManagerFactory, StarSearchTransaction, Transaction, StarInfo, StarData, StarManagerCommand};
 use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
 use crate::logger::{Logger, Flags, Flag, StarFlag, Log, ProtoStarLog, ProtoStarLogPayload};
-use crate::frame::ProtoFrame::Evolution;
 
 pub static MAX_HOPS: i32 = 32;
 
 pub struct ProtoStar
 {
   star_key: Option<StarKey>,
-  sequence: Option<Arc<IdSeq>>,
+  sequence: Arc<AtomicU64>,
   kind: StarKind,
   command_tx: mpsc::Sender<StarCommand>,
   command_rx: mpsc::Receiver<StarCommand>,
-  evolution_tx: oneshot::Sender<ProtoStarEvolution>,
   lanes: HashMap<StarKey, LaneMeta>,
   connector_ctrls: Vec<ConnectorController>,
   star_manager_factory: Arc<dyn StarManagerFactory>,
@@ -47,14 +45,13 @@ pub struct ProtoStar
 
 impl ProtoStar
 {
-    pub fn new(key: Option<StarKey>, kind: StarKind, evolution_tx: oneshot::Sender<ProtoStarEvolution>, star_manager_factory: Arc<dyn StarManagerFactory>, star_core_factory: Arc<dyn StarCoreFactory>, flags: Flags, logger: Logger ) ->(Self, StarController)
+    pub fn new(key: Option<StarKey>, kind: StarKind, star_manager_factory: Arc<dyn StarManagerFactory>, star_core_factory: Arc<dyn StarCoreFactory>, flags: Flags, logger: Logger ) ->(Self, StarController)
     {
         let (command_tx, command_rx) = mpsc::channel(32);
         (ProtoStar{
             star_key: key,
-            sequence: Option::None,
+            sequence: Arc::new(AtomicU64::new(0)),
             kind,
-            evolution_tx,
             command_tx: command_tx.clone(),
             command_rx: command_rx,
             lanes: HashMap::new(),
@@ -74,37 +71,7 @@ impl ProtoStar
     {
         if self.kind.is_central()
         {
-            let sequence = Arc::new(IdSeq::new(0));
-            self.star_key = Option::Some(StarKey::central());
-            self.sequence = Option::Some(sequence.clone());
-            let info = StarInfo{
-                star: self.star_key.as_ref().unwrap().clone(),
-                kind: self.kind.clone()};
-            let manager_tx= self.star_manager_factory.create().await;
-            let data = StarData{
-
-                info: info,
-                sequence: self.sequence.as_ref().unwrap().clone(),
-                star_tx: self.command_tx.clone(),
-                manager_tx: manager_tx.clone(),
-                logger: self.logger.clone(),
-                flags: self.flags.clone()
-            };
-
-            manager_tx.send(StarManagerCommand::StarData(data.clone()) ).await;
-
-            let core_tx = self.star_core_factory.create(&data.info.kind, data.manager_tx.clone());
-
-            return Ok(Star::from_proto(data.clone(),
-                                       self.command_rx,
-                                       core_tx,
-                                       self.lanes,
-                                       self.connector_ctrls,
-                                       self.frame_hold ));
-        }
-        else {
-            self.send_central_search().await;
-        }
+       }
 
         loop {
 
@@ -130,6 +97,33 @@ impl ProtoStar
             if let Some(command) = command
             {
                 match command {
+                    StarCommand::ConstellationConstructionComplete => {
+                        let info = StarInfo{
+                            star: self.star_key.as_ref().unwrap().clone(),
+                            kind: self.kind.clone()};
+                        let manager_tx= self.star_manager_factory.create().await;
+                        let data = StarData{
+
+                            info: info,
+                            sequence: self.sequence.clone(),
+                            star_tx: self.command_tx.clone(),
+                            manager_tx: manager_tx.clone(),
+                            logger: self.logger.clone(),
+                            flags: self.flags.clone()
+                        };
+
+                        manager_tx.send(StarManagerCommand::StarData(data.clone()) ).await;
+
+                        let core_tx = self.star_core_factory.create(&data.info.kind, data.manager_tx.clone());
+
+                        return Ok(Star::from_proto(data.clone(),
+                                                   self.command_rx,
+                                                   core_tx,
+                                                   self.lanes,
+                                                   self.connector_ctrls,
+                                                   self.frame_hold ));
+
+                    }
                     StarCommand::AddLane(lane) => {
                         if let Some(remote_star) = &lane.remote_star
                         {
@@ -143,9 +137,6 @@ impl ProtoStar
                                     self.send_frame(&remote_star, frame ).await;
                                 }
                             }
-
-                            self.broadcast( Frame::Proto(ProtoFrame::CentralSearch), &Option::None ).await;
-                            self.broadcast( Frame::Proto(ProtoFrame::Evolution(ProtoEvolution::Request)), &Option::None ).await;
 
                         } else {
                             eprintln!("cannot add a lane to a star that doesn't have a remote_star");
@@ -162,78 +153,11 @@ impl ProtoStar
                         let lane_key = lanes.get(future_index).unwrap();
                         let lane = self.lanes.get_mut(&lane_key).unwrap();
                         match frame {
-                            Frame::Proto(ProtoFrame::CentralSearch) => {
-                                if let Option::Some(hops) = self.get_hops_to_star(&StarKey::central())
-                                {
-                                    self.broadcast( Frame::Proto(ProtoFrame::CentralFound(hops + 1)), &Option::None ).await;
-                                }
-                           }
-                            Frame::Proto(ProtoFrame::CentralFound(hops)) => {
 
-                                if Option::None == lane.star_paths.get(&StarKey::central())
-                                {
-                                    lane.star_paths.put(StarKey::central(), hops);
-                                    //now tell all the other lanes that CENTRAL is this way...
-                                    {
-                                        let mut exclude = HashSet::new();
-                                        exclude.insert(lane_key.clone());
-                                        let exclude = Option::Some(exclude);
-                                        self.broadcast(Frame::Proto(ProtoFrame::CentralFound(hops + 1)), &exclude).await;
-                                    }
-                                    self.send_sequence_request().await;
-                                }
-                            },
                             Frame::Proto(ProtoFrame::GrantSubgraphExpansion(subgraph)) => {
-                                let key = StarKey::new_with_subgraph(subgraph.to_owned(), 0);
+                                let key = StarKey::new_with_subgraph(subgraph.clone(), 0);
                                 self.star_key = Option::Some(key.clone());
-
-                                self.send_central_search().await;
                             },
-                            Frame::Proto(ProtoFrame::Evolution(ProtoEvolution::Request)) =>
-                            {
-                                // ignore
-                            },
-                            Frame::Proto(ProtoFrame::Evolution(ProtoEvolution::Report)) =>
-                            {
-                                // a nearby evolution triggers a send sequence request
-                                self.send_sequence_request().await;
-                            },
-                            Frame::Proto(ProtoFrame::Sequence(ProtoSequence::Reply(sequence))) =>
-                            {
-                                if self.flags.check(Flag::Star(StarFlag::DiagnoseSequence)){
-                                    self.logger.log( Log::ProtoStar(ProtoStarLog::new(self.kind.clone(), ProtoStarLogPayload::SequenceReplyRecv )));
-                                }
-
-                                let info = StarInfo {
-                                    star: self.star_key.as_ref().unwrap().clone(),
-                                    kind: self.kind.clone(),
-                                };
-                                self.sequence = Option::Some(Arc::new(IdSeq::new(sequence)));
-                                let manager_tx= self.star_manager_factory.create().await;
-                                let data = StarData{
-                                    info: info,
-                                    sequence: self.sequence.as_ref().unwrap().clone(),
-                                    star_tx: self.command_tx.clone(),
-                                    manager_tx: manager_tx.clone(),
-                                    logger: self.logger.clone(),
-                                    flags: self.flags.clone()
-                                };
-
-                                manager_tx.send(StarManagerCommand::StarData(data.clone()) ).await;
-
-                                let core_tx = self.star_core_factory.create(&data.info.kind, data.manager_tx.clone());
-
-
-                                return Ok(Star::from_proto(data.clone(),
-                                                           self.command_rx,
-                                                           core_tx,
-                                                           self.lanes,
-                                                           self.connector_ctrls,
-                                                           self.frame_hold ));
-
-                            },
-
-
                             _ => {
                                 println!("{} frame unsupported by ProtoStar: {}", self.kind, frame);
                             }
@@ -255,23 +179,6 @@ impl ProtoStar
 
     }
 
-    async fn send_central_search(&mut self )
-    {
-        let frame = Frame::Proto(ProtoFrame::CentralSearch);
-        self.tracker.track( frame.clone(),  | frame |{
-            if let Frame::Proto( ProtoFrame::CentralFound(_))  = frame
-            {
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        } );
-
-        self.broadcast(frame, &Option::None ).await;
-    }
-
 
     async fn send_expansion_request( &mut self )
     {
@@ -290,23 +197,12 @@ impl ProtoStar
         self.broadcast(frame, &Option::None ).await;
     }
 
-    async fn send_sequence_request( &mut self )
-    {
-        if self.flags.check(Flag::Star(StarFlag::DiagnoseSequence)){
-            self.logger.log( Log::ProtoStar(ProtoStarLog::new(self.kind.clone(), ProtoStarLogPayload::SequenceRequest )));
-        }
-        self.send_frame(&StarKey::central(), Frame::Proto(ProtoFrame::Sequence(ProtoSequence::Request)) ).await;
-    }
-
     async fn resend(&mut self,  frame: Frame)
     {
         match frame
         {
             Frame::Proto(ProtoFrame::RequestSubgraphExpansion) => {
                 self.broadcast_no_hold(frame, &Option::None ).await;
-            }
-            Frame::Proto(ProtoFrame::CentralSearch) => {
-                self.send_frame_no_hold(&StarKey::central(), frame ).await;
             }
             Frame::StarMessage(message) => {
                 self.send_no_hold(message).await;
