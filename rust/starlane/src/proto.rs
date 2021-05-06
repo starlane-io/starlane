@@ -22,7 +22,7 @@ use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PRO
 use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarManagerFactory, StarSearchTransaction, Transaction};
 use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
-use crate::logger::{Logger, Flags};
+use crate::logger::{Logger, Flags, Flag, StarFlag, Log, ProtoStarLog, ProtoStarLogPayload};
 use crate::frame::ProtoFrame::Evolution;
 
 pub static MAX_HOPS: i32 = 32;
@@ -47,7 +47,7 @@ pub struct ProtoStar
 
 impl ProtoStar
 {
-    pub fn new(key: Option<StarKey>, kind: StarKind, evolution_tx: oneshot::Sender<ProtoStarEvolution>, star_manager_factory: Arc<dyn StarManagerFactory>, star_core_factory: Arc<dyn StarCoreFactory>, flags: Flags ) ->(Self, StarController)
+    pub fn new(key: Option<StarKey>, kind: StarKind, evolution_tx: oneshot::Sender<ProtoStarEvolution>, star_manager_factory: Arc<dyn StarManagerFactory>, star_core_factory: Arc<dyn StarCoreFactory>, flags: Flags, logger: Logger ) ->(Self, StarController)
     {
         let (command_tx, command_rx) = mpsc::channel(32);
         (ProtoStar{
@@ -61,7 +61,7 @@ impl ProtoStar
             connector_ctrls: vec![],
             star_manager_factory: star_manager_factory,
             star_core_factory: star_core_factory,
-            logger: Logger::new(),
+            logger: logger,
             frame_hold: FrameHold::new(),
             tracker: ProtoTracker::new(),
             flags: flags
@@ -78,7 +78,7 @@ impl ProtoStar
             self.star_key = Option::Some(StarKey::central());
             self.sequence = Option::Some(sequence.clone());
             let info = StarInfo{
-                star_key: self.star_key.as_ref().unwrap().clone(),
+                star: self.star_key.as_ref().unwrap().clone(),
                 kind: self.kind.clone(),
                 sequence: self.sequence.as_ref().unwrap().clone(),
                 command_tx: self.command_tx.clone()
@@ -196,9 +196,13 @@ impl ProtoStar
                             },
                             Frame::Proto(ProtoFrame::Sequence(ProtoSequence::Reply(sequence))) =>
                             {
+                                if self.flags.check(Flag::Star(StarFlag::DiagnoseSequence)){
+                                    self.logger.log( Log::ProtoStar(ProtoStarLog::new(self.kind.clone(), ProtoStarLogPayload::SequenceReplyRecv )));
+                                }
+
                                 self.sequence = Option::Some(Arc::new(IdSeq::new(sequence)));
                                 let info = StarInfo{
-                                    star_key: self.star_key.as_ref().unwrap().clone(),
+                                    star: self.star_key.as_ref().unwrap().clone(),
                                     kind: self.kind.clone(),
                                     sequence: self.sequence.as_ref().unwrap().clone(),
                                     command_tx: self.command_tx.clone()
@@ -279,6 +283,9 @@ impl ProtoStar
 
     async fn send_sequence_request( &mut self )
     {
+        if self.flags.check(Flag::Star(StarFlag::DiagnoseSequence)){
+            self.logger.log( Log::ProtoStar(ProtoStarLog::new(self.kind.clone(), ProtoStarLogPayload::SequenceRequest )));
+        }
         self.send_frame(&StarKey::central(), Frame::Proto(ProtoFrame::Sequence(ProtoSequence::Request)) ).await;
     }
 

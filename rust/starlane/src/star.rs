@@ -34,7 +34,7 @@ use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, Mess
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
 use crate::star::central::CentralManager;
 use crate::star::supervisor::{SupervisorCommand, SupervisorManager};
-use crate::logger::{Logger, Flags};
+use crate::logger::{Logger, Flags, Flag, StarFlag, ProtoStarLog, Log, ProtoStarLogPayload};
 use crate::space::SpaceCommand;
 use crate::frame::WindAction::SearchHits;
 
@@ -430,16 +430,16 @@ impl Star
 
         let message = StarMessage{
             id: id,
-            from: self.info.star_key.clone(),
+            from: self.info.star.clone(),
             to: proto.to.unwrap(),
             transaction: proto.transaction,
             payload: proto.payload,
             reply_to: proto.reply_to
         };
 
-        if message.to == self.info.star_key
+        if message.to == self.info.star
         {
-            eprintln!("star {} kind {} cannot send a proto message to itself, payload: {} ", self.info.star_key, self.info.kind, message.payload );
+            eprintln!("star {} kind {} cannot send a proto message to itself, payload: {} ", self.info.star, self.info.kind, message.payload );
         }
         else {
             let delivery = StarMessageDeliveryInsurance::with_txrx(message, proto.expect, proto.tx.clone(), proto.tx.subscribe() );
@@ -472,7 +472,7 @@ println!("on_app_lifecycle_command: {}",command );
     async fn do_wind(&mut self, wind: Wind)
     {
         let tx = wind.tx;
-        let wind_up = WindUp::new(self.info.star_key.clone(), wind.pattern, wind.action );
+        let wind_up = WindUp::new(self.info.star.clone(), wind.pattern, wind.action );
         self.do_wind_up(wind_up, tx, Option::None).await;
     }
 
@@ -487,7 +487,7 @@ println!("on_app_lifecycle_command: {}",command );
         };
 
         let local_hit = match wind.pattern.is_match(&self.info){
-            true => Option::Some(self.info.star_key.clone()),
+            true => Option::Some(self.info.star.clone()),
             false => Option::None
         };
 
@@ -495,7 +495,7 @@ println!("on_app_lifecycle_command: {}",command );
         self.transactions.insert(tid.clone(), transaction );
 
         wind.transactions.push(tid.clone());
-        wind.hops.push( self.info.star_key.clone() );
+        wind.hops.push( self.info.star.clone() );
 
         self.broadcast_excluding(Frame::StarWind(StarWind::Up(wind)), &exclude ).await;
     }
@@ -513,7 +513,7 @@ println!("on_app_lifecycle_command: {}",command );
             {
 
                 let hit = WindHit {
-                    star: self.info.star_key.clone(),
+                    star: self.info.star.clone(),
                     hops: wind_up.hops.len() + 1
                 };
 
@@ -561,7 +561,7 @@ println!("on_app_lifecycle_command: {}",command );
             let hits = match hit
             {
                 true => {
-                    vec![WindHit {star: self.info.star_key.clone(), hops: wind_up.hops.len().clone()+1 }]
+                    vec![WindHit {star: self.info.star.clone(), hops: wind_up.hops.len().clone()+1 }]
                 }
                 false => {
                     vec!()
@@ -638,7 +638,7 @@ println!("on_app_lifecycle_command: {}",command );
 
     pub fn star_key(&self)->&StarKey
     {
-        &self.info.star_key
+        &self.info.star
     }
 
 
@@ -1003,8 +1003,8 @@ println!("on_app_lifecycle_command: {}",command );
                   ProtoFrame::RequestSubgraphExpansion => {
                       if let Option::Some(lane_key) = lane_key
                       {
-                          let mut subgraph = self.info.star_key.subgraph.clone();
-                          subgraph.push(self.info.star_key.index.clone());
+                          let mut subgraph = self.info.star.subgraph.clone();
+                          subgraph.push(self.info.star.index.clone());
                           self.send_frame(lane_key.clone(), Frame::Proto(ProtoFrame::GrantSubgraphExpansion(subgraph))).await;
                       }
                       else
@@ -1049,10 +1049,12 @@ println!("on_app_lifecycle_command: {}",command );
                                   self.info.command_tx.send(StarCommand::SendProtoMessage(proto)).await;
                               }
                           }
-
-
                       }
-
+                  }
+                  ProtoFrame::Sequence(ProtoSequence::Reply(_))=> {
+                      if self.flags.check(Flag::Star(StarFlag::DiagnoseSequence)){
+                          self.logger.log( Log::ProtoStar(ProtoStarLog::new(self.info.kind.clone(), ProtoStarLogPayload::SequenceReplyRecv )));
+                      }
                   }
 
                   _ => {}
@@ -1289,9 +1291,9 @@ println!("on_app_lifecycle_command: {}",command );
 
     async fn on_message(&mut self, mut message: StarMessage) -> Result<(),Error>
     {
-        if message.to != self.info.star_key
+        if message.to != self.info.star
         {
-            if self.info.kind.relay() || message.from == self.info.star_key
+            if self.info.kind.relay() || message.from == self.info.star
             {
                 //forward the message
                 self.send_frame(message.to.clone(), Frame::StarMessage(message) ).await;
@@ -2129,7 +2131,7 @@ impl ServerManager
         {
            self.set_supervisor(hit.star.clone());
            let payload = StarMessagePayload::Pledge;
-           let message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), hit.star, payload );
+           let message = StarMessage::new(self.info.sequence.next(), self.info.star.clone(), hit.star, payload );
            self.info.command_tx.send( StarCommand::Frame(Frame::StarMessage(message))).await;
         }
         else {
@@ -2236,7 +2238,7 @@ impl StarManagerFactory for StarManagerFactoryDefault
 #[derive(Clone)]
 pub struct StarInfo
 {
-   pub star_key: StarKey,
+   pub star: StarKey,
    pub kind: StarKind,
    pub sequence: Arc<IdSeq>,
    pub command_tx: mpsc::Sender<StarCommand>
