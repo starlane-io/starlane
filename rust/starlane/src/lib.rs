@@ -30,4 +30,5 @@ pub mod app;
 pub mod space;
 pub mod keys;
 pub mod logger;
+pub mod crypt;
 

@@ -23,6 +23,7 @@ use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarC
 use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
 use crate::logger::{Logger, Flags, Flag, StarFlag, Log, ProtoStarLog, ProtoStarLogPayload};
+use crate::user::AuthTokenSource;
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -109,7 +110,8 @@ impl ProtoStar
                             star_tx: self.command_tx.clone(),
                             manager_tx: manager_tx.clone(),
                             logger: self.logger.clone(),
-                            flags: self.flags.clone()
+                            flags: self.flags.clone(),
+                            auth_token_source: AuthTokenSource {}
                         };
 
                         manager_tx.send(StarManagerCommand::StarData(data.clone()) ).await;

@@ -1,13 +1,14 @@
 use std::fmt;
 use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
+use crate::user::Priviledges;
 
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum SpaceKey
 {
-    Main,
-    Named(String)
+    Hyper,
+    Space(String)
 }
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
@@ -26,15 +27,58 @@ impl UserKey
             id: UserId::new()
         }
     }
+
+    pub fn with_id(space: SpaceKey, id: UserId) -> Self
+    {
+        UserKey{
+            space,
+            id: id
+        }
+    }
+
+
+    pub fn superuser(space: SpaceKey) -> Self
+    {
+        UserKey::with_id(space,UserId::Super)
+    }
+
+    pub fn annonymous(space: SpaceKey) -> Self
+    {
+        UserKey::with_id(space,UserId::Annonymous)
+    }
+
+
+    pub fn hyperuser(&self)->bool
+    {
+        match self.space{
+            SpaceKey::Hyper => {
+                match self.id
+                {
+                    UserId::Super => true,
+                    _ => false
+                }
+            }
+            _ => false
+        }
+    }
+
+    pub fn privileges(&self) -> Priviledges
+    {
+        if self.hyperuser()
+        {
+            Priviledges::all()
+        }
+        else {
+            Priviledges::new()
+        }
+    }
 }
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum UserId
 {
     Super,
-    Developer,
-    User,
-    Guest,
+    Annonymous,
     Uuid(Uuid)
 }
 
@@ -57,7 +101,7 @@ impl SubSpaceKey
 {
     pub fn main( ) -> Self
     {
-        SubSpaceKey::new( SpaceKey::Main, SubSpaceId::Default )
+        SubSpaceKey::new( SpaceKey::Hyper, SubSpaceId::Default )
     }
 
     pub fn new( space: SpaceKey, id: SubSpaceId ) -> Self
@@ -89,7 +133,7 @@ pub struct AppKey
 #[derive(Clone,Hash,Eq,PartialEq,Serialize,Deserialize)]
 pub enum AppId
 {
-    System,
+    Hyper,
     Uuid(Uuid)
 }
 
@@ -128,7 +172,7 @@ impl fmt::Display for AppId{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let fmt = match self
         {
-            AppId::System => "System".to_string(),
+            AppId::Hyper => "Hyper".to_string(),
             AppId::Uuid(uuid) => uuid.to_string()
         };
         write!(f, "{}", fmt )

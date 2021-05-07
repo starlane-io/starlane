@@ -1,41 +1,31 @@
-use crate::error::Error;
-use crate::label::Labels;
 use std::collections::HashSet;
+
 use serde::{Deserialize, Serialize, Serializer};
-use crate::keys::UserKey;
+
+use crate::crypt::{PrivateKey, JwtDecoder};
+use crate::error::Error;
+use crate::keys::{UserKey, UserId};
+use crate::label::Labels;
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub struct AuthToken
 {
-    user: User,
-    valid: bool
+    pub user: User
 }
 
 impl AuthToken
 {
-    pub fn new( user: User ) -> Self
+    pub fn decode( &self, decoder: JwtDecoder )->Auth
     {
-        AuthToken {
-            user: user,
-            valid: true
+        Auth{
+            user: self.user.clone()
         }
     }
+}
 
-    pub fn get_user(&self)->Result<User,Error>
-    {
-        if !&self.valid
-        {
-            Err("TokenError::Invalid".into())
-        }
-        else {
-            Ok(self.user.clone())
-        }
-    }
-
-    pub fn is_valid(&self) -> bool
-    {
-        self.valid.clone()
-    }
+pub struct Auth
+{
+   pub user: User
 }
 
 pub enum TokenError
@@ -61,6 +51,35 @@ pub enum UserKind
     User,
     Guest,
     Custom(String)
+}
+
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub enum UserRole
+{
+    Owner,
+    Admin,
+    Modify,
+    Query,
+    Observer
+}
+
+pub struct RoleBinding<R>
+{
+    user: UserKey,
+    resource: R,
+    role: UserRole
+}
+
+pub struct Grant<R>
+{
+   resource: R,
+   kind: GrantKind
+}
+
+pub enum GrantKind
+{
+    Access(HashSet<Access>),
+    Role(UserRole)
 }
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
@@ -103,7 +122,7 @@ impl UserPattern
 pub struct Permissions
 {
     pub patterns: Vec<UserPattern>,
-    pub access: HashSet<AccessPriv>
+    pub access: HashSet<Access>
 }
 
 impl Permissions
@@ -121,9 +140,62 @@ impl Permissions
     }
 }
 
-#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
-pub enum AccessPriv
+pub struct Priviledges
 {
+    pub hyper: HashSet<HyperSpaceAccess>,
+    pub space: HashSet<SpaceAccess>,
+    pub app: HashSet<AppAccess>,
+    pub actor: HashSet<ActorAccess>
+}
+
+impl Priviledges
+{
+    pub fn new() -> Self
+    {
+        Priviledges {
+            hyper: HashSet::new(),
+            space: HashSet::new(),
+            app: HashSet::new(),
+            actor: HashSet::new()
+        }
+    }
+
+    pub fn all() -> Self
+    {
+        let mut rtn = Self::new();
+        rtn.hyper.union(&HyperSpaceAccess::all().into_iter().collect() );
+        rtn.space.union(&SpaceAccess::all().into_iter().collect() );
+        rtn.app.union(&AppAccess::all().into_iter().collect() );
+        rtn.actor.union(&ActorAccess::all().into_iter().collect() );
+
+        rtn
+    }
+
+    pub fn new_union(&self, other: &Priviledges) -> Self
+    {
+        let mut rtn = Priviledges::new();
+        rtn.union(self);
+        rtn.union(other);
+        rtn
+    }
+
+    pub fn union( &mut self, other: &Priviledges)
+    {
+        self.hyper.union( &other.hyper.clone() );
+        self.space.union( &other.space.clone() );
+        self.app.union( &other.app.clone() );
+        self.actor.union( &other.actor.clone() );
+    }
+
+}
+
+
+
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub enum Access
+{
+    Hyper(HyperSpaceAccess),
+    Space(SpaceAccess),
     App(AppAccess),
     Actor(ActorAccess)
 }
@@ -131,24 +203,190 @@ pub enum AccessPriv
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub enum AppAccess
 {
-    Create,
-    Message,
+    CreateActor,
+    DestroyActor,
+    DestroyApp,
     Watch,
-    Destroy
+}
+
+impl AppAccess
+{
+    pub fn all() -> Vec<Self>
+    {
+        vec![Self::CreateActor, Self::DestroyActor, Self::DestroyApp, Self::Watch]
+    }
+    pub fn role(role: UserRole) -> Vec<Self>
+    {
+        match role
+        {
+            UserRole::Owner => Self::all(),
+            UserRole::Admin => {
+                vec![Self::CreateActor, Self::DestroyActor, Self::Watch]
+            }
+            UserRole::Modify => {
+                vec![Self::CreateActor, Self::Watch]
+            }
+            _ => {
+                vec![Self::Watch]
+            }
+        }
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub enum HyperSpaceAccess
+{
+    CreateSpaces,
+    DestroySpaces,
+    ViewSpaces,
+    ElevateToHyperUser,
+}
+
+impl HyperSpaceAccess
+{
+    pub fn all()->Vec<Self>
+    {
+        vec![Self::CreateSpaces,Self::ViewSpaces,Self::DestroySpaces,Self::ElevateToHyperUser]
+    }
+
+    pub fn role(role: UserRole)->Vec<Self>
+    {
+        match role
+        {
+            UserRole::Owner => {
+                Self::all()
+            }
+            UserRole::Admin => {
+                vec![Self::CreateSpaces,Self::ViewSpaces,Self::DestroySpaces,Self::ElevateToHyperUser]
+            }
+            UserRole::Modify => {
+                vec![Self::CreateSpaces,Self::ViewSpaces,Self::ElevateToHyperUser]
+            }
+            UserRole::Query => {
+                vec![Self::ViewSpaces]
+            }
+            _ => {
+                vec![]
+            }
+        }
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub enum SpaceAccess
+{
+    CreateUser,
+    ModifyUser,
+    ViewUser,
+    DestroyUser,
+    CreateSubSpace,
+    ViewSubSpace,
+    DestroySubSpace,
+    ElevateToSuperUser,
+}
+
+impl SpaceAccess
+{
+    pub fn all()->Vec<Self>
+    {
+        vec![Self::CreateUser,Self::ModifyUser,Self::ViewUser,Self::DestroyUser,Self::CreateSubSpace,Self::ViewSubSpace,Self::DestroySubSpace,Self::ElevateToSuperUser]
+    }
+
+    pub fn role(role: UserRole)->Vec<Self>
+    {
+        match role
+        {
+            UserRole::Owner => {
+                Self::all()
+            }
+            UserRole::Admin => {
+                vec![Self::CreateUser,Self::ModifyUser,Self::ViewUser,Self::DestroyUser,Self::CreateSubSpace,Self::ViewSubSpace,Self::DestroySubSpace]
+            }
+            UserRole::Modify => {
+                vec![Self::CreateUser,Self::ModifyUser,Self::ViewUser,Self::CreateSubSpace,Self::ViewSubSpace]
+            }
+            _ => {
+                vec![Self::ViewUser,Self::ViewSubSpace]
+            }
+        }
+    }
 }
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub enum ActorAccess
 {
     Create,
+    Modify,
+    Message,
     Watch,
-    Message(MessagePortAccess),
     Destroy
 }
 
-#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
-pub enum MessagePortAccess
+impl ActorAccess
 {
-    Any,
-    Exact(String),
+    pub fn all()->Vec<Self>
+    {
+        vec![Self::Create,Self::Watch,Self::Message,Self::Modify,Self::Destroy]
+    }
+
+    pub fn role(role: UserRole)->Vec<Self>
+    {
+        match role
+        {
+            UserRole::Owner => {
+                Self::all()
+            }
+            UserRole::Admin => {
+                vec![Self::Create,Self::Modify,Self::Message,Self::Watch,Self::Destroy]
+            }
+            UserRole::Modify => {
+                vec![Self::Watch,Self::Message,Self::Modify]
+            }
+            UserRole::Query => {
+                vec![Self::Watch,Self::Message]
+            }
+            UserRole::Observer => {
+                vec![Self::Watch]
+            }
+        }
+    }
 }
+
+#[derive(Clone)]
+pub struct AuthTokenSource
+{
+
+}
+
+
+
+impl AuthTokenSource
+{
+    pub fn new()->Self
+    {
+        AuthTokenSource{}
+    }
+
+    pub fn get( &self, creds: &Credentials ) -> AuthToken
+    {
+        AuthToken{
+            user: User{
+                name: "someuser".to_string(),
+                key: creds.user.clone(),
+                labels: None,
+                kind: match creds.user.id{
+                    UserId::Super => UserKind::Super,
+                    UserId::Annonymous => UserKind::Guest,
+                    UserId::Uuid(_) => UserKind::User
+                }
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Credentials
+{
+    pub user: UserKey
+}
+

@@ -27,7 +27,7 @@ use crate::actor::{Actor, ActorKey, ActorKind, ActorLocation, ActorWatcher};
 use crate::app::{AppCommandWrapper, AppController, AppCreate, AppKind, Application, AppLocation};
 use crate::core::StarCoreCommand;
 use crate::error::Error;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, AppAssign, AppCreateRequest, ApplicationSupervisorReport, AppNotifyCreated, AppSupervisorRequest, Event, Frame,  ProtoFrame, Rejection, SequenceMessage, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, AppAssign, AppCreateRequest, ApplicationSupervisorReport, AppNotifyCreated, AppSupervisorRequest, Event, Frame, ProtoFrame, Rejection, SequenceMessage, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, SpaceMessage};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId};
@@ -39,6 +39,8 @@ use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
 use crate::space::SpaceCommand;
 use crate::star::central::CentralManager;
 use crate::star::supervisor::{SupervisorCommand, SupervisorManager};
+use crate::user::{AuthTokenSource, Credentials, AuthToken, Auth};
+use crate::crypt::{UniqueHash, PublicKey, HashId, Encrypted, HashEncrypted};
 
 pub mod central;
 pub mod supervisor;
@@ -1052,12 +1054,12 @@ println!("on_app_lifecycle_command: {}",command );
                 self.forward_watch(watch).await;
             }
             Watch::Remove(info) => {
-                if let Option::Some(watches) = self.watches.get_mut(&info.entity)
+                if let Option::Some(watches) = self.watches.get_mut(&info.actor)
                 {
                     watches.remove(&info.id);
                     if watches.is_empty()
                     {
-                        self.watches.remove( &info.entity);
+                        self.watches.remove( &info.actor);
                     }
                 }
                 self.forward_watch(watch).await;
@@ -1072,12 +1074,12 @@ println!("on_app_lifecycle_command: {}",command );
             lane: lane_key.clone(),
             timestamp: Instant::now()
         };
-        match self.watches.get_mut(&watch_info.entity)
+        match self.watches.get_mut(&watch_info.actor)
         {
             None => {
                 let mut watches = HashMap::new();
                 watches.insert(watch_info.id.clone(), star_watch);
-                self.watches.insert(watch_info.entity.clone(), watches);
+                self.watches.insert(watch_info.actor.clone(), watches);
             }
             Some(mut watches) => {
                 watches.insert(watch_info.id.clone(), star_watch);
@@ -1090,20 +1092,20 @@ println!("on_app_lifecycle_command: {}",command );
         let has_entity = match &watch
         {
             Watch::Add(info) => {
-                self.has_actor(&info.entity)
+                self.has_actor(&info.actor)
             }
             Watch::Remove(info) => {
-                self.has_actor(&info.entity)
+                self.has_actor(&info.actor)
             }
         };
 
         let entity = match &watch
         {
             Watch::Add(info) => {
-                &info.entity
+                &info.actor
             }
             Watch::Remove(info) => {
-                &info.entity
+                &info.actor
             }
         };
 
@@ -2093,7 +2095,8 @@ pub struct StarData
     pub manager_tx: mpsc::Sender<StarManagerCommand>,
     pub flags: Flags,
     pub logger: Logger,
-    pub sequence: Arc<AtomicU64>
+    pub sequence: Arc<AtomicU64>,
+    pub auth_token_source: AuthTokenSource
 }
 
 #[derive(Clone)]
@@ -2114,6 +2117,40 @@ impl StarInfo
     }
 }
 
+pub struct PublicKeySource
+{
+}
+
+impl PublicKeySource
+{
+    pub fn new()->Self
+    {
+        PublicKeySource{}
+    }
+
+    pub async fn get_public_key_and_hash(&self, star: &StarKey)->(PublicKey,UniqueHash)
+    {
+        (
+            PublicKey{
+                id: Default::default(),
+                data: vec![]
+            },
+            UniqueHash{
+                id: HashId::new_v4(),
+                hash: vec![]
+            }
+        )
+    }
+
+    pub async fn create_encrypted_payloads( &self, creds: &Credentials, star: &StarKey, payload: SpaceMessage ) -> Result<(HashEncrypted<AuthToken>,Encrypted<SpaceMessage>),Error>
+    {
+        let auth_token = AuthTokenSource::new();
+        let (public_key,hash) = self.get_public_key_and_hash(star).await;
+        let auth_token = HashEncrypted::encrypt( &auth_token.get(creds), &hash, &public_key );
+        let payload = Encrypted::encrypt( &payload, &public_key );
+        Ok((auth_token,payload))
+    }
+}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct StarNotify

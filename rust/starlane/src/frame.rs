@@ -13,18 +13,18 @@ use crate::message::{MessageResult, ProtoMessage, MessageExpect, MessageUpdate};
 use tokio::sync::{oneshot, broadcast, mpsc};
 use crate::keys::{AppKey, UserKey, SubSpaceKey, MessageId};
 use crate::app::{AppLocation, AppKind, AppInfo};
-use crate::user::AuthToken;
 use crate::logger::Flags;
 use crate::error::Error;
+use crate::user::{AuthToken, Auth};
+use crate::crypt::{Encrypted, HashEncrypted, HashId};
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Frame
 {
     Close,
     Proto(ProtoFrame),
-    Diagnose(FrameDiagnose),
+    Diagnose(Diagnose),
     StarWind(StarWind),
-//    StarSearchResult(StarSearchResult),
     StarMessage(StarMessage),
     Watch(Watch),
     Event(Event)
@@ -57,7 +57,7 @@ pub enum Watch
 pub struct WatchInfo
 {
     pub id: Id,
-    pub entity: ActorKey,
+    pub actor: ActorKey,
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -69,7 +69,7 @@ pub struct StarMessageAck
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum FrameDiagnose
+pub enum Diagnose
 {
   Ping,
   Pong,
@@ -337,7 +337,7 @@ pub enum MessageAckKind
 pub struct SpaceMessage
 {
     pub sub_space: SubSpaceKey,
-    pub token: AuthToken,
+    pub user: UserKey,
     pub payload: SpacePayload
 }
 
@@ -624,11 +624,11 @@ pub struct ApplicationSupervisorReport
     pub supervisor: StarKey
 }
 
-impl fmt::Display for FrameDiagnose {
+impl fmt::Display for Diagnose {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
-            FrameDiagnose::Ping => "Ping",
-            FrameDiagnose::Pong => "Pong"
+            Diagnose::Ping => "Ping",
+            Diagnose::Pong => "Pong"
         };
         write!(f, "{}",r)
     }

@@ -419,7 +419,7 @@ mod test
 
     use crate::error::Error;
     use crate::id::Id;
-    use crate::frame::{ProtoFrame, FrameDiagnose};
+    use crate::frame::{ProtoFrame, Diagnose};
     use crate::proto::local_tunnels;
     use crate::star::{StarKey, StarCommand};
     use crate::lane::{Lane, LaneCommand};
@@ -460,10 +460,10 @@ mod test
 
             let connector_ctrl = LocalTunnelConnector::new(&high_lane, &low_lane).await.unwrap();
 
-                high_lane.outgoing.tx.send(LaneCommand::Frame(Frame::Diagnose(FrameDiagnose::Ping) ) ).await;
+                high_lane.outgoing.tx.send(LaneCommand::Frame(Frame::Diagnose(Diagnose::Ping) ) ).await;
 
                 let result = low_lane.incoming.recv().await;
-                if let Some(StarCommand::Frame(Frame::Diagnose(FrameDiagnose::Ping))) = result
+                if let Some(StarCommand::Frame(Frame::Diagnose(Diagnose::Ping))) = result
                 {
 println!("RECEIVED PING!");
                     assert!(true);
@@ -477,10 +477,10 @@ println!("RECEIVED NONE");
                     assert!(false);
                 }
             connector_ctrl.command_tx.send(ConnectorCommand::Reset ).await;
-            high_lane.outgoing.tx.send(LaneCommand::Frame(Frame::Diagnose(FrameDiagnose::Pong)) ).await;
+            high_lane.outgoing.tx.send(LaneCommand::Frame(Frame::Diagnose(Diagnose::Pong)) ).await;
             let result = low_lane.incoming.recv().await;
 
-            if let Some(StarCommand::Frame(Frame::Diagnose(FrameDiagnose::Pong))) = result
+            if let Some(StarCommand::Frame(Frame::Diagnose(Diagnose::Pong))) = result
             {
                 println!("RECEIVED PoNG!");
                 assert!(true);

@@ -1,40 +1,43 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use tokio::sync::{mpsc, oneshot, broadcast};
-use crate::app::{AppInfo, ApplicationStatus, AppCreate, AppLocation};
-use crate::id::Id;
-use crate::label::Labels;
-use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarInfo, StarKey, StarManager, StarManagerCommand, StarNotify, StarData, StarKind};
-use crate::user::{AuthToken, AppAccess};
-use crate::message::{ProtoMessage, MessageExpect, MessageUpdate, MessageResult, MessageExpectWait};
-use crate::keys::{AppKey, SubSpaceKey, AppId};
-use tokio::sync::mpsc::error::SendError;
 use futures::FutureExt;
-use tokio::sync::oneshot::Receiver;
-use crate::star::StarCommand::AppLifecycleCommand;
+use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
+use tokio::sync::oneshot::Receiver;
+
+use crate::app::{AppCreate, AppInfo, ApplicationStatus, AppLocation};
 use crate::error::Error;
-use crate::frame::{StarMessage, Frame, StarMessagePayload, RequestMessage, SpacePayload, ReportMessage, SpaceMessage, AssignMessage, AppAssign, AppCreateRequest, SequenceMessage};
-use crate::logger::{Log,Logger, Flag,StarFlag,StarLog,StarLogPayload};
+use crate::frame::{AppAssign, AppCreateRequest, AssignMessage, Frame, ReportMessage, RequestMessage, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload};
+use crate::id::Id;
+use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId};
+use crate::label::Labels;
+use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
+use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage};
+use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarData, StarInfo, StarKey, StarKind, StarManager, StarManagerCommand, StarNotify, PublicKeySource};
+use crate::star::StarCommand::AppLifecycleCommand;
+use crate::user::{AppAccess, AuthToken, User, UserKind};
+use crate::crypt::{PublicKey, CryptKeyId};
 
 pub struct CentralManager
 {
     data: StarData,
     backing: Box<dyn CentralManagerBacking>,
     pub status: CentralStatus,
+    public_key_source: PublicKeySource
 }
 
 impl CentralManager
 {
     pub fn new(data: StarData) -> CentralManager
     {
-
         CentralManager
         {
             data: data.clone(),
             backing: Box::new(CentralManagerBackingDefault::new(data)),
             status: CentralStatus::Launching,
+            public_key_source: PublicKeySource::new()
         }
     }
 
@@ -46,7 +49,7 @@ impl CentralManager
                 if self.backing.has_supervisor()
                 {
                     self.backing.set_init_status(CentralInitStatus::LaunchingSystemApp);
-                    self.launch_system_app().await;
+//                    self.launch_system_app().await;
                 }
             }
             CentralInitStatus::LaunchingSystemApp=> {}
@@ -54,31 +57,6 @@ impl CentralManager
         }
     }
 
-    async fn launch_system_app(&mut self)
-    {
-        let token =  self.backing.get_superuser_token().unwrap();
-        let mut proto = ProtoMessage::new();
-        proto.to = Option::Some(StarKey::central());
-        proto.expect = MessageExpect::RetryUntilOk;
-        proto.payload = StarMessagePayload::Space(SpaceMessage {
-                                                   sub_space:SubSpaceKey::main(),
-                                                   token: token,
-                                                   payload: SpacePayload::Request(RequestMessage::AppCreate(AppCreateRequest{
-                                                   labels: HashMap::new(),
-                                                   kind: "system".to_string(),
-                                                   data: Arc::new(vec![]) }))});
-
-        let rx = proto.get_ok_result().await;
-
-        self.data.star_tx.send( StarCommand::SendProtoMessage(proto) ).await;
-
-        let manager_tx = self.data.manager_tx.clone();
-        tokio::spawn( async move {
-            rx.await;
-            manager_tx.send(StarManagerCommand::Init );
-        } );
-
-    }
 
     pub fn unwrap(&self, result: Result<(), SendError<StarCommand>>)
     {
@@ -117,11 +95,12 @@ impl CentralManager
             unimplemented!()
         }
         let supervisor = supervisor.unwrap();
+
         let mut proto = ProtoMessage::new();
         proto.to = Some(supervisor.clone());
         proto.payload = StarMessagePayload::Space(SpaceMessage {
-            sub_space,
-            token: self.backing.get_superuser_token()?,
+            sub_space: sub_space.clone(),
+            user: UserKey::with_id(sub_space.space.clone(), UserId::Super ),
             payload: SpacePayload::Assign(AssignMessage::App(AppAssign {
                 app: app,
                 data: create.data,
@@ -196,21 +175,15 @@ println!("Central: PledgeRecv");
                                             match rx.await
                                             {
                                                 Ok(app_loc) => {
-                                                    match self.backing.get_superuser_token()
-                                                    {
-                                                        Ok(token) => {
-                                                            let proto = message.reply(StarMessagePayload::Space(SpaceMessage {
+                                                           let proto = message.reply(StarMessagePayload::Space(SpaceMessage {
                                                                 sub_space: tenant_message.sub_space.clone(),
-                                                                token: token,
+                                                                user: UserKey::superuser(tenant_message.sub_space.space.clone()),
                                                                 payload: SpacePayload::Report(ReportMessage::AppLocation(app_loc))
                                                             }));
                                                             self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                                        }
-                                                        Err(error) => {
-                                                            self.reply_error(message, error.to_string());
-                                                        }
+
                                                     }
-                                                }
+
                                                 Err(error) => {
                                                     self.reply_error(message, error.to_string());
                                                 }
@@ -266,7 +239,7 @@ trait CentralManagerBacking: Send+Sync
     fn set_init_status(&self, status: CentralInitStatus );
     fn select_supervisor(&mut self )->Option<StarKey>;
 
-    fn get_superuser_token(&mut self) -> Result<AuthToken,Error>;
+    fn get_public_key_for_star(&self,star:&StarKey) -> Option<PublicKey>;
 }
 
 
@@ -342,8 +315,9 @@ impl CentralManagerBacking for CentralManagerBackingDefault
         }
     }
 
-    fn get_superuser_token(&mut self) -> Result<AuthToken, Error> {
-        todo!()
+
+    fn get_public_key_for_star(&self, star: &StarKey) -> Option<PublicKey> {
+        Option::Some( PublicKey{ id: CryptKeyId::default(), data: vec![] })
     }
 }
 
