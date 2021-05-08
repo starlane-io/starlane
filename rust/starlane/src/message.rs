@@ -8,6 +8,7 @@ use tokio::sync::{mpsc, oneshot, broadcast};
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::mpsc::Sender;
 use crate::keys::MessageId;
+use tokio::sync::broadcast::error::RecvError;
 
 pub struct ProtoMessage
 {
@@ -123,13 +124,13 @@ pub enum TrackerJob
 pub enum MessageUpdate
 {
     Ack(MessageAck),
-    Result(MessageResult)
+    Result(MessageResult<StarMessagePayload>)
 }
 
 #[derive(Clone)]
-pub enum MessageResult
+pub enum MessageResult<OK>
 {
-    Ok(StarMessagePayload),
+    Ok(OK),
     Err(String),
     Timeout
 }
@@ -228,7 +229,7 @@ impl MessageExpectWait {
         match self
         {
             MessageExpectWait::Short => {5}
-            MessageExpectWait::Med => {15}
+            MessageExpectWait::Med => {10}
             MessageExpectWait::Long => {30}
         }
     }
@@ -279,6 +280,36 @@ impl OkResultWaiter
                 break;
             }
         }});
+    }
+}
+
+pub struct ResultWaiter
+{
+    rx: broadcast::Receiver<MessageUpdate>,
+    tx: oneshot::Sender<MessageResult<StarMessagePayload>>
+}
+
+impl ResultWaiter
+{
+    pub fn new( rx: broadcast::Receiver<MessageUpdate> )->(Self,oneshot::Receiver<MessageResult<StarMessagePayload>>)
+    {
+        let (tx,osrx) = oneshot::channel();
+        (ResultWaiter{
+            rx: rx,
+            tx: tx
+        },osrx)
+    }
+
+    pub async fn wait( mut self )
+    {
+        tokio::spawn( async move {
+            loop{
+                if let Ok(MessageUpdate::Result(result)) = self.rx.recv().await
+                {
+                   self.tx.send(result);
+                   break;
+                }
+            }});
     }
 }
 

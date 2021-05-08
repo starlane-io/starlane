@@ -1,7 +1,7 @@
 use std::{cmp, fmt};
 use std::borrow::Borrow;
 use std::cell::Cell;
-use std::cmp::{Ordering, min};
+use std::cmp::{min, Ordering};
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::RandomState;
 use std::future::Future;
@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, oneshot};
 use tokio::sync::broadcast::error::{RecvError, SendError};
 use tokio::sync::mpsc;
+use tokio::sync::mpsc::Receiver;
 use tokio::time::{Duration, Instant, timeout};
 use tokio::time::error::Elapsed;
 use url::Url;
@@ -24,23 +25,24 @@ use url::Url;
 use server::ServerManager;
 
 use crate::actor::{Actor, ActorKey, ActorKind, ActorLocation, ActorWatcher};
-use crate::app::{AppCommandWrapper, AppController, AppCreate, AppKind, Application, AppLocation};
+use crate::app::{AppCommand, AppCommandKind, AppController, AppCreateController, AppInfo, AppKind, Application, AppLocation};
 use crate::core::StarCoreCommand;
+use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, AppAssign, AppCreateRequest, ApplicationSupervisorReport, AppNotifyCreated, AppSupervisorRequest, Event, Frame, ProtoFrame, Rejection, SequenceMessage, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, SpaceMessage};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, AppAssign, ApplicationSupervisorReport, AppMessage, AppMessagePayload, AppNotifyCreated, AppSupervisorRequest, Event, Frame, ProtoFrame, Rejection, ReportMessage, RequestMessage, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
-use crate::keys::{AppKey, MessageId};
+use crate::keys::{AppKey, MessageId, SpaceKey, UserKey};
 use crate::label::Labels;
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob};
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
-use crate::space::SpaceCommand;
+use crate::space::{CreateAppControllerFail, SpaceCommand, SpaceCommandKind, SpaceController};
 use crate::star::central::CentralManager;
 use crate::star::supervisor::{SupervisorCommand, SupervisorManager};
-use crate::user::{AuthTokenSource, Credentials, AuthToken, Auth};
-use crate::crypt::{UniqueHash, PublicKey, HashId, Encrypted, HashEncrypted};
+use crate::user::{Authentication, AuthToken, AuthTokenSource, Credentials};
+use crate::space::SpaceCommandKind::AppGetController;
 
 pub mod central;
 pub mod supervisor;
@@ -342,7 +344,26 @@ impl Star
                             }
                        }
                     }
-                    StarCommand::AppLifecycleCommand(command)=>{
+                    StarCommand::GetSpaceController(get)=>{
+                        let (tx,rx) = mpsc::channel(16);
+                        let star_tx = self.data.star_tx.clone();
+                        let user = get.auth.user.clone();
+                        let ctrl = SpaceController::new( get.auth.user, tx );
+                        tokio::spawn( async move {
+                            let mut rx = rx;
+                            while let Option::Some(command) = rx.recv().await {
+                                if user == command.user
+                                {
+                                    star_tx.send( StarCommand::SpaceCommand(command)).await;
+                                }
+                                else {
+                                    rx.close();
+                                }
+                            }
+                        } );
+                        get.tx.send(Ok(ctrl) );
+                    }
+                    StarCommand::SpaceCommand(command)=>{
                         self.on_space_command(command).await;
                     }
                     StarCommand::AppCommand(command)=>{
@@ -410,6 +431,7 @@ impl Star
         }
     }
 
+
     async fn send_proto_message( &mut self, proto: ProtoMessage )
     {
 
@@ -439,14 +461,77 @@ impl Star
         }
     }
 
-    async fn on_space_command(&mut self, command: SpaceCommand)
+    async fn on_space_command(&mut self, command: SpaceCommand )
     {
-println!("on_app_lifecycle_command: {}",command );
+println!("on_space_command");
+        match command.kind
+        {
+            SpaceCommandKind::AppCreateController(create) => {
+                if command.space != create.info.sub_space.space
+                {
+println!("spaces_do_not_match");
+                    create.tx.send(Err(CreateAppControllerFail::SpacesDoNotMatch) );
+                }
+                else {
+                    // send app create reqeust to central
+                    let space_message = SpaceMessage {
+                        sub_space: create.info.sub_space.clone(),
+                        user: command.user.clone(),
+                        payload: SpacePayload::Request(RequestMessage::AppCreate(create.info.clone()))
+                    };
+
+                    let mut proto = ProtoMessage::new();
+                    proto.to( StarKey::central() );
+                    proto.payload = StarMessagePayload::Space(space_message);
+                    proto.expect = MessageExpect::ReplyErrOrTimeout(MessageExpectWait::Med);
+
+                    let star_tx = self.data.star_tx.clone();
+                    let result= proto.get_ok_result().await;
+
+
+
+println!("proto_message_ready");
+                    let star_tx = self.data.star_tx.clone();
+                    tokio::spawn( async move {
+                        let result = match result.await
+                        {
+                            Ok(payload) => {
+                                match payload
+                                {
+                                    StarMessagePayload::Ok(Reply::App(app)) => {
+                                        let (tx,mut rx) = mpsc::channel(1);
+                                        tokio::spawn( async move {
+                                            while let Option::Some(command) = rx.recv().await
+                                            {
+                                                star_tx.send(StarCommand::AppCommand(command)).await;
+                                            }
+                                        } );
+                                        Ok(AppController{
+                                            app: app,
+                                            tx: tx
+                                        })
+                                    }
+                                    _ => { Result::Err(CreateAppControllerFail::UnexpectedResponse) }
+                                }
+                            }
+                            _ => {
+                                Result::Err(CreateAppControllerFail::UnexpectedResponse)
+                            }
+                        };
+                        create.tx.send(result);
+                    });
+
+println!("sending proto message");
+                    self.send_proto_message(proto).await;
+            }
+            }
+            SpaceCommandKind::AppGetController(_) => {}
+        }
     }
 
-    async fn on_app_command( &mut self, command: AppCommandWrapper)
+    async fn on_app_command( &mut self, command: AppCommand)
     {
-
+        println!("on_app_command!");
     }
 
 
@@ -1264,9 +1349,23 @@ pub enum StarCommand
     ForwardFrame(ForwardFrame),
     FrameTimeout(FrameTimeoutInner),
     FrameError(FrameErrorInner),
-    AppLifecycleCommand(SpaceCommand),
-    AppCommand(AppCommandWrapper),
-    ActorCommand(ActorCommand)
+    SpaceCommand(SpaceCommand),
+    AppCommand(AppCommand),
+    ActorCommand(ActorCommand),
+    GetSpaceController(GetSpaceController)
+}
+
+pub struct GetSpaceController
+{
+    pub space: SpaceKey,
+    pub auth: Authentication,
+    pub tx: oneshot::Sender<Result<SpaceController,GetSpaceControllerFail>>
+}
+
+pub enum GetSpaceControllerFail
+{
+    PermissionDenied,
+    Error(Error)
 }
 
 
@@ -1428,14 +1527,15 @@ impl fmt::Display for StarCommand{
             StarCommand::AddActorLocation(_) => format!("AddResourceLocation").to_string(),
             StarCommand::AddAppLocation(_) => format!("AddAppLocation").to_string(),
             StarCommand::ForwardFrame(_) => format!("ForwardFrame").to_string(),
-            StarCommand::AppLifecycleCommand(_) => format!("AppLifecycleCommand").to_string(),
+            StarCommand::SpaceCommand(_) => format!("AppLifecycleCommand").to_string(),
             StarCommand::AppCommand(_) => format!("AppCommand").to_string(),
             StarCommand::WindDown(_) => format!("SearchReturnResult").to_string(),
             StarCommand::ActorCommand(command) => format!("EntityCommand({})", command).to_string(),
             StarCommand::SendProtoMessage(_) => format!("SendProtoMessage(_)").to_string(),
             StarCommand::SetFlags(_) => format!("SetFlags(_)").to_string(),
             StarCommand::ConstellationConstructionComplete => "ConstellationConstructionComplete".to_string(),
-            StarCommand::Init => "Init".to_string()
+            StarCommand::Init => "Init".to_string(),
+            StarCommand::GetSpaceController(_) => "GetSpaceController".to_string(),
         };
         write!(f, "{}",r)
     }
@@ -1462,34 +1562,23 @@ impl StarController
        rx
    }
 
-   pub async fn create_app(&self, name: Option<String>, kind: AppKind, data: Vec<u8> )->Result<AppController,Error>
+   pub async fn get_space_controller( &self, space: &SpaceKey, authentication: &Authentication ) -> Result<SpaceController,GetSpaceControllerFail>
    {
+       let (tx,rx) = oneshot::channel();
 
-       let (tx,mut rx) = mpsc::channel(1);
+       let get = GetSpaceController{
+           space: space.clone(),
+           auth: authentication.clone(),
+           tx: tx
+       };
 
+       self.command_tx.send( StarCommand::GetSpaceController(get) ).await;
 
-       let app_create = SpaceCommand::AppCreate( AppCreate{
-           kind: kind,
-           data: Arc::new(vec!()),
-           labels: Labels::new()
-       } );
-
-       self.command_tx.send( StarCommand::AppLifecycleCommand(app_create) ).await;
-
-       match timeout(Duration::from_secs(10), rx.recv() ).await
+       match rx.await
        {
-           Ok(opt) => {
-               match opt{
-                   None => {
-                       Err("connection closed before AppController returned".into())
-                   }
-                   Some(ctrl) => {
-                       Ok(ctrl)
-                   }
-               }
-           }
+           Ok(result) => result,
            Err(error) => {
-               Err("timeout when trying to acquire AppController".into())
+               Err(GetSpaceControllerFail::Error(error.into()))
            }
        }
    }
@@ -1872,22 +1961,6 @@ impl FrameHold {
 trait StarManager: Send+Sync
 {
     async fn handle(&mut self, command: StarManagerCommand);
-}
-
-pub trait SupervisorManagerBacking: Send+Sync
-{
-    fn add_server( &mut self, server: StarKey );
-    fn remove_server( &mut self, server: &StarKey );
-    fn select_server(&mut self) -> Option<StarKey>;
-
-    fn add_application(&mut self, app: AppKey, application: Box<dyn Application> );
-    fn get_application(&mut self, app: AppKey ) -> Option<&Box<dyn Application>>;
-
-    fn remove_application(&mut self, app: AppKey );
-
-    fn set_entity_name(&mut self, name: String, key: ActorKey);
-    fn set_entity_location(&mut self, entity: ActorKey, location: ActorLocation);
-    fn get_entity_location(&self, lookup: &ActorLookup) -> Option<&ActorLocation>;
 }
 
 

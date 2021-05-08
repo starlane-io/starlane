@@ -95,7 +95,7 @@ println!("Server: PledgeSent");
             let mut data = self.data.clone();
             tokio::spawn(async move {
                 let payload = rx.await;
-                if let Ok(StarMessagePayload::Ok) = payload
+                if let Ok(StarMessagePayload::Ok(_)) = payload
                 {
 
 println!("Server: PledgeOkRecv");

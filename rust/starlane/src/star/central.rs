@@ -7,18 +7,19 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::oneshot::Receiver;
 
-use crate::app::{AppCreate, AppInfo, ApplicationStatus, AppLocation};
+use crate::app::{AppCreateController, AppInfo, ApplicationStatus, AppLocation, AppCreateInfo};
 use crate::error::Error;
-use crate::frame::{AppAssign, AppCreateRequest, AssignMessage, Frame, ReportMessage, RequestMessage, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload};
+use crate::frame::{AppAssign, AssignMessage, Frame, ReportMessage, RequestMessage, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply};
 use crate::id::Id;
 use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId};
 use crate::label::Labels;
 use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage};
 use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarData, StarInfo, StarKey, StarKind, StarManager, StarManagerCommand, StarNotify, PublicKeySource};
-use crate::star::StarCommand::AppLifecycleCommand;
+use crate::star::StarCommand::SpaceCommand;
 use crate::user::{AppAccess, AuthToken, User, UserKind};
 use crate::crypt::{PublicKey, CryptKeyId};
+use crate::frame::Reply::App;
 
 pub struct CentralManager
 {
@@ -71,7 +72,7 @@ impl CentralManager
 
     pub async fn reply_ok(&self, message: StarMessage)
     {
-        let mut proto = message.reply(StarMessagePayload::Ok);
+        let mut proto = message.reply(StarMessagePayload::Ok(Reply::Empty));
         let result = self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
         self.unwrap(result);
     }
@@ -83,55 +84,6 @@ impl CentralManager
         self.unwrap(result);
     }
 
-
-    async fn launch_app(&mut self, sub_space: SubSpaceKey, create: AppCreate, expect: MessageExpect) -> Result<oneshot::Receiver<AppLocation>, Error>
-    {
-        let app_key = AppKey::new(sub_space.clone() );
-        let app = AppInfo::new(app_key.clone(), create.kind.clone());
-        let supervisor = self.backing.select_supervisor();
-        if let Option::None = supervisor
-        {
-//            Err("could not find supervisor to host application".to_string().into());
-            unimplemented!()
-        }
-        let supervisor = supervisor.unwrap();
-
-        let mut proto = ProtoMessage::new();
-        proto.to = Some(supervisor.clone());
-        proto.payload = StarMessagePayload::Space(SpaceMessage {
-            sub_space: sub_space.clone(),
-            user: UserKey::with_id(sub_space.space.clone(), UserId::Super ),
-            payload: SpacePayload::Assign(AssignMessage::App(AppAssign {
-                app: app,
-                data: create.data,
-            }))
-        });
-        proto.expect = expect;
-
-        let mut command_tx = self.data.star_tx.clone();
-        let mut reply_tx = proto.tx.subscribe();
-        let (tx, rx) = oneshot::channel();
-        tokio::spawn(async move {
-            loop {
-                if let Result::Ok(update) = reply_tx.recv().await
-                {
-                    match update
-                    {
-                        MessageUpdate::Ack(_) => {}
-                        MessageUpdate::Result(result) => {
-                            let app_loc = AppLocation { app: app_key, supervisor };
-                            tx.send(app_loc);
-                            break;
-                        }
-                    }
-                }
-            }
-        });
-
-        self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-
-        Ok(rx)
-    }
 }
 
 
@@ -158,40 +110,40 @@ println!("Central: PledgeRecv");
                         self.data.logger.log( Log::Star(StarLog::new(&self.data.info, StarLogPayload::PledgeRecv )));
                     }
                 }
-                StarMessagePayload::Space(tenant_message) => {
-                    match &tenant_message.payload
+                StarMessagePayload::Space(space_message) => {
+                    match &space_message.payload
                     {
-                        SpacePayload::Request(tenant_payload) => {
-                            match tenant_payload {
-                                RequestMessage::AppCreate(app_create_request) => {
-                                    let create = AppCreate {
-                                        kind: app_create_request.kind.clone(),
-                                        data: app_create_request.data.clone(),
-                                        labels: app_create_request.labels.clone()
-                                    };
-                                    match self.launch_app(tenant_message.sub_space.clone(), create, MessageExpect::ReplyErrOrTimeout(MessageExpectWait::Med)).await
+                        SpacePayload::Request(space_message_payload) => {
+                            match space_message_payload {
+                                RequestMessage::AppCreate(create) => {
+                                    if let Option::Some(supervisor) = self.backing.select_supervisor()
                                     {
-                                        Ok(rx) => {
-                                            match rx.await
-                                            {
-                                                Ok(app_loc) => {
-                                                           let proto = message.reply(StarMessagePayload::Space(SpaceMessage {
-                                                                sub_space: tenant_message.sub_space.clone(),
-                                                                user: UserKey::superuser(tenant_message.sub_space.space.clone()),
-                                                                payload: SpacePayload::Report(ReportMessage::AppLocation(app_loc))
-                                                            }));
-                                                            self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-
-                                                    }
-
-                                                Err(error) => {
-                                                    self.reply_error(message, error.to_string());
-                                                }
+                                        let mut proto = ProtoMessage::new();
+                                        let app = AppKey::new( create.sub_space.clone() );
+                                        proto.payload = StarMessagePayload::Space( space_message.with_payload(SpacePayload::Assign(AssignMessage::App(AppAssign{app:app.clone(),info:create.clone()}))));
+                                        proto.to = Option::Some(supervisor);
+                                        let reply = proto.get_ok_result().await;
+                                        self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                                        match reply.await
+                                        {
+                                            Ok(StarMessagePayload::Ok(Empty)) => {
+                                                let proto = message.reply(StarMessagePayload::Ok(App(app.clone())) );
+                                                self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                                            }
+                                            Err(error) => {
+                                                let proto = message.reply(StarMessagePayload::Error(format!("central: receiving error: {}.",error).into()));
+                                                self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                                            }
+                                            _ => {
+                                                let proto = message.reply(StarMessagePayload::Error(format!("central: unexpected response").into()));
+                                                self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                                             }
                                         }
-                                        Err(error) => {
-                                            self.reply_error(message, error.to_string());
-                                        }
+                                    }
+                                    else
+                                    {
+                                        let proto = message.reply(StarMessagePayload::Error("central: no supervisors selected.".into()));
+                                        self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                                     }
                                 }
                                 RequestMessage::AppSupervisor(_) => {}

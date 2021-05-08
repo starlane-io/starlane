@@ -15,17 +15,26 @@ pub struct AuthToken
 
 impl AuthToken
 {
-    pub fn decode( &self, decoder: JwtDecoder )->Auth
+    pub fn decode( &self, decoder: JwtDecoder )-> Authentication
     {
-        Auth{
-            user: self.user.clone()
-        }
+        unimplemented!();
     }
 }
 
-pub struct Auth
+#[derive(Clone)]
+pub struct Authentication
 {
-   pub user: User
+   pub user: UserKey
+}
+
+impl Authentication
+{
+    pub fn mock(user: UserKey)->Self
+    {
+        Authentication{
+            user: user
+        }
+    }
 }
 
 pub enum TokenError
@@ -388,5 +397,15 @@ impl AuthTokenSource
 pub struct Credentials
 {
     pub user: UserKey
+}
+
+impl Credentials
+{
+    pub fn mock( user: UserKey ) -> Self
+    {
+        Credentials{
+            user: user
+        }
+    }
 }
 

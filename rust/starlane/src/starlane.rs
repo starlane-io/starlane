@@ -420,8 +420,13 @@ mod test
     use crate::starlane::{ConstellationCreate, Starlane, StarlaneCommand, StarControlRequestByName};
     use crate::template::{ConstellationData, ConstellationTemplate};
     use crate::star::{StarController, StarKind, StarInfo, StarKey};
-    use crate::app::AppController;
+    use crate::app::{AppController, AppKind};
     use crate::logger::{Flags, Flag, StarFlag, LogAggregate, Log, ProtoStarLog, ProtoStarLogPayload, StarLog, StarLogPayload};
+    use crate::keys::{SpaceKey, UserKey, SubSpaceKey};
+    use crate::user::Authentication;
+    use std::sync::Arc;
+    use crate::label::Labels;
+    use crate::space::CreateAppControllerFail;
 
     #[test]
     pub fn starlane()
@@ -504,19 +509,45 @@ mod test
             } ),1);
 
 
-            /*
             tokio::time::sleep(Duration::from_secs(1)).await;
-            match mesh_ctrl.create_app(Option::None,"default".to_string(), vec!() ).await
+            if let Ok(space_ctrl) = mesh_ctrl.get_space_controller( &SpaceKey::Hyper, &Authentication::mock(UserKey::hyperuser() ) ).await
             {
-                Ok(app_ctrl) => {
-                    println!("got app_ctrl!");
+                let app_ctrl_result = space_ctrl.create_app( &"someapp".to_string(), &SubSpaceKey::hyper_default(), &Arc::new(vec![]), &Labels::new() ).await;
+                let app_ctrl_result = app_ctrl_result.await;
+                let app_ctrl = app_ctrl_result.unwrap();
+println!("some kind of weird result: ");
+                match app_ctrl
+                {
+                    Ok(app_ctrl) => {
+                        println!("got app_ctrl!")
+                    }
+                    Err(fail) => {
+                        match fail
+                        {
+                            CreateAppControllerFail::PermissionDenied => {
+                                panic!("AppController: PermissionDenied")
+                            }
+                            CreateAppControllerFail::SpacesDoNotMatch => {
+                                panic!("AppController: SpacesDoNotMatch")
+                            }
+                            CreateAppControllerFail::UnexpectedResponse => {
+                                panic!("AppController: UnexpectedResponse")
+                            }
+                            CreateAppControllerFail::Timeout => {
+                                panic!("AppController: Timeout")
+                            }
+                            CreateAppControllerFail::Error(error) => {
+                                panic!("{}",error)
+                            }
+                        }
+                    }
                 }
-                Err(error) => {
-                    eprintln!("{}",error);
-                    assert!(false);
-                }
+
             }
 
+
+
+            /*
             tokio::time::sleep(Duration::from_secs(10)).await;
 
             println!("sending Destroy command.");

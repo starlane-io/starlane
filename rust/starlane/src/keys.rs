@@ -36,6 +36,11 @@ impl UserKey
         }
     }
 
+    pub fn hyperuser() -> Self
+    {
+        UserKey::with_id(SpaceKey::Hyper,UserId::Super)
+    }
+
 
     pub fn superuser(space: SpaceKey) -> Self
     {
@@ -48,7 +53,7 @@ impl UserKey
     }
 
 
-    pub fn hyperuser(&self)->bool
+    pub fn is_hyperuser(&self)->bool
     {
         match self.space{
             SpaceKey::Hyper => {
@@ -64,7 +69,7 @@ impl UserKey
 
     pub fn privileges(&self) -> Priviledges
     {
-        if self.hyperuser()
+        if self.is_hyperuser()
         {
             Priviledges::all()
         }
@@ -99,7 +104,7 @@ pub struct SubSpaceKey
 
 impl SubSpaceKey
 {
-    pub fn main( ) -> Self
+    pub fn hyper_default( ) -> Self
     {
         SubSpaceKey::new( SpaceKey::Hyper, SubSpaceId::Default )
     }

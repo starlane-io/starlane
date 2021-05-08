@@ -1,18 +1,19 @@
-use async_trait::async_trait;
 use core::option::Option;
 use core::option::Option::{None, Some};
 use core::result::Result;
-use core::result::Result::{Err, Ok};
-use crate::star::{StarData,StarInfo, SupervisorManagerBacking, StarManager, StarManagerCommand, StarCommand, StarKey};
-use crate::frame::{StarMessagePayload, StarMessage, Frame, AppNotifyCreated, ActorLookup};
-use crate::error::Error;
-use std::collections::HashMap;
-use crate::actor::{ActorKey, ActorLocation};
-use crate::app::{AppLocation, Application};
-use crate::keys::AppKey;
-use crate::message::{ProtoMessage, MessageExpect};
-use crate::logger::{Flag, StarFlag, Log, StarLog, StarLogPayload};
+use std::collections::{HashMap, HashSet};
+
+use async_trait::async_trait;
 use tokio::sync::mpsc::error::SendError;
+
+use crate::actor::{ActorKey, ActorLocation};
+use crate::app::{AppInfo, Application, AppLocation};
+use crate::error::Error;
+use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload};
+use crate::keys::AppKey;
+use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
+use crate::message::{MessageExpect, ProtoMessage};
+use crate::star::{StarCommand, StarData, StarInfo, StarKey, StarManager, StarManagerCommand};
 
 pub enum SupervisorCommand
 {
@@ -54,7 +55,7 @@ println!("Supervisor: PledgeSent");
             let mut data = self.data.clone();
             tokio::spawn(async move {
                 let payload = rx.await;
-                if let Ok(StarMessagePayload::Ok) = payload
+                if let Ok(StarMessagePayload::Ok(_)) = payload
                 {
 println!("Supervisor: PledgeOkRecv");
                     data.logger.log( Log::Star( StarLog::new( &data.info, StarLogPayload::PledgeOkRecv )))
@@ -76,7 +77,7 @@ println!("Supervisor: PledgeOkRecv");
 
     pub async fn reply_ok(&self, message: StarMessage)
     {
-        let mut proto = message.reply(StarMessagePayload::Ok);
+        let mut proto = message.reply(StarMessagePayload::Ok(Reply::Empty));
         let result = self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
         self.unwrap(result);
     }
@@ -113,7 +114,34 @@ println!("Supervisor: PledgeRecv");
                           self.data.logger.log( Log::Star(StarLog::new(&self.data.info, StarLogPayload::PledgeRecv )));
                       }
                   }
-                  StarMessagePayload::Ok=>{}
+                  StarMessagePayload::Space(space_message) =>
+                  {
+                      match &space_message.payload
+                      {
+                          SpacePayload::Assign(assign) => {
+                              match assign
+                              {
+                                  AssignMessage::App(app_assign) => {
+                                      let data = AppData{
+                                          info: AppInfo{
+                                              key: app_assign.app.clone(),
+                                              kind: app_assign.info.kind.clone()
+                                          },
+                                          servers: HashSet::new()
+                                      };
+                                      self.backing.add_application(app_assign.app.clone(), data );
+                                      let proto = message.reply(StarMessagePayload::Ok(Reply::Empty));
+                                      self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                                  }
+                              }
+                          }
+                          _ => {
+                              eprintln!("supervisor manager doesn't handle ..." );
+                          }
+                      }
+
+                  }
+                  StarMessagePayload::Ok(_)=>{}
                   what => {
                       eprintln!("supervisor manager doesn't handle {}", what )
                   }
@@ -148,9 +176,8 @@ pub struct SupervisorManagerBackingDefault
     data: StarData,
     servers: Vec<StarKey>,
     server_select_index: usize,
-    applications: HashMap<AppKey,Box<dyn Application>>,
-    name_to_entity: HashMap<String, ActorKey>,
-    entity_location: HashMap<ActorKey, ActorLocation>
+    applications: HashMap<AppKey,AppData>,
+    actor_location: HashMap<ActorKey, ActorLocation>
 }
 
 impl SupervisorManagerBackingDefault
@@ -162,8 +189,7 @@ impl SupervisorManagerBackingDefault
             servers: vec![],
             server_select_index: 0,
             applications: HashMap::new(),
-            name_to_entity: HashMap::new(),
-            entity_location: HashMap::new(),
+            actor_location: HashMap::new(),
         }
     }
 }
@@ -188,32 +214,61 @@ impl SupervisorManagerBacking for SupervisorManagerBackingDefault
         Option::Some(server.clone())
     }
 
-    fn add_application(&mut self, app: AppKey, application: Box<dyn Application>) {
-        self.applications.insert(app, application);
+    fn add_application(&mut self, app: AppKey, data: AppData ) {
+        self.applications.insert(app, data );
     }
 
-    fn get_application(&mut self, app: AppKey) -> Option<&Box<dyn Application>> {
-        self.applications.get(&app)
+    fn get_application(&mut self, app: AppKey) -> Option<&AppData> {
+        self.applications.get(&app )
     }
 
     fn remove_application(&mut self, app: AppKey) {
         self.applications.remove(&app);
     }
 
-    fn set_entity_name(&mut self, name: String, key: ActorKey) {
-        self.name_to_entity.insert(name, key );
+
+    fn set_actor_location(&mut self, entity: ActorKey, location: ActorLocation) {
+        self.actor_location.insert(entity, location );
     }
 
-    fn set_entity_location(&mut self, entity: ActorKey, location: ActorLocation) {
-        self.entity_location.insert(entity, location );
-    }
-
-    fn get_entity_location(&self, lookup: &ActorLookup) -> Option<&ActorLocation> {
+    fn get_actor_location(&self, lookup: &ActorLookup) -> Option<&ActorLocation> {
         match lookup
         {
             ActorLookup::Key(key) => {
-                return self.entity_location.get(key)
+                return self.actor_location.get(key)
             }
         }
     }
+}
+
+pub struct AppData
+{
+    pub info: AppInfo,
+    pub servers: HashSet<StarKey>
+}
+
+impl AppData
+{
+    pub fn new(info: AppInfo)->Self
+    {
+        AppData{
+            info: info,
+            servers: HashSet::new()
+        }
+    }
+}
+
+pub trait SupervisorManagerBacking: Send+Sync
+{
+    fn add_server( &mut self, server: StarKey );
+    fn remove_server( &mut self, server: &StarKey );
+    fn select_server(&mut self) -> Option<StarKey>;
+
+    fn add_application(&mut self, app: AppKey, app_data: AppData );
+    fn get_application(&mut self, app: AppKey ) -> Option<&AppData>;
+
+    fn remove_application(&mut self, app: AppKey );
+
+    fn set_actor_location(&mut self, entity: ActorKey, location: ActorLocation);
+    fn get_actor_location(&self, lookup: &ActorLookup) -> Option<&ActorLocation>;
 }
