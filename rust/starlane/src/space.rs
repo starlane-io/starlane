@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::fmt;
 use tokio::sync::{mpsc, oneshot};
 use std::sync::Arc;
-use crate::user::Authentication;
+use crate::permissions::Authentication;
 use crate::error::Error;
 use crate::label::Labels;
 

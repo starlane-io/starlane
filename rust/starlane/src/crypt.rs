@@ -1,7 +1,7 @@
 use uuid::Uuid;
 
 use crate::error::Error;
-use crate::user::{AuthToken, User};
+use crate::permissions::{AuthToken, User};
 use serde::{Deserialize, Serialize, Serializer};
 use std::marker::PhantomData;
 

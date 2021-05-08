@@ -1,8 +1,10 @@
 use std::fmt;
+
 use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
-use crate::user::Priviledges;
 
+use crate::permissions::Priviledges;
+use crate::actor::ActorKey;
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum SpaceKey
@@ -197,3 +199,12 @@ impl fmt::Display for SubSpaceId{
 }
 
 pub type MessageId = Uuid;
+
+pub enum ResourceKey
+{
+    Space(SpaceKey),
+    SubSpace(SubSpaceKey),
+    App(AppKey),
+    Actor(ActorKey),
+    User(UserKey)
+}

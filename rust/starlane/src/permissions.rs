@@ -2,9 +2,9 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize, Serializer};
 
-use crate::crypt::{PrivateKey, JwtDecoder};
+use crate::crypt::{JwtDecoder, PrivateKey};
 use crate::error::Error;
-use crate::keys::{UserKey, UserId};
+use crate::keys::{SpaceKey, UserId, UserKey, ResourceKey};
 use crate::label::Labels;
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
@@ -66,26 +66,27 @@ pub enum UserKind
 pub enum UserRole
 {
     Owner,
-    Admin,
-    Modify,
-    Query,
+    Developer,
+    User,
+    Guest,
     Observer
 }
 
-pub struct RoleBinding<R>
+pub struct RoleBinding
 {
     user: UserKey,
-    resource: R,
+    resource: ResourceKey,
     role: UserRole
 }
 
-pub struct Grant<R>
+pub struct Grant
 {
-   resource: R,
-   kind: GrantKind
+   pub user: UserKey,
+   pub resource: ResourceKey,
+   pub priviledge: Priviledge
 }
 
-pub enum GrantKind
+pub enum Priviledge
 {
     Access(HashSet<Access>),
     Role(UserRole)
@@ -229,10 +230,10 @@ impl AppAccess
         match role
         {
             UserRole::Owner => Self::all(),
-            UserRole::Admin => {
+            UserRole::Developer => {
                 vec![Self::CreateActor, Self::DestroyActor, Self::Watch]
             }
-            UserRole::Modify => {
+            UserRole::User => {
                 vec![Self::CreateActor, Self::Watch]
             }
             _ => {
@@ -265,13 +266,13 @@ impl HyperSpaceAccess
             UserRole::Owner => {
                 Self::all()
             }
-            UserRole::Admin => {
+            UserRole::Developer => {
                 vec![Self::CreateSpaces,Self::ViewSpaces,Self::DestroySpaces,Self::ElevateToHyperUser]
             }
-            UserRole::Modify => {
+            UserRole::User => {
                 vec![Self::CreateSpaces,Self::ViewSpaces,Self::ElevateToHyperUser]
             }
-            UserRole::Query => {
+            UserRole::Guest => {
                 vec![Self::ViewSpaces]
             }
             _ => {
@@ -308,10 +309,10 @@ impl SpaceAccess
             UserRole::Owner => {
                 Self::all()
             }
-            UserRole::Admin => {
+            UserRole::Developer => {
                 vec![Self::CreateUser,Self::ModifyUser,Self::ViewUser,Self::DestroyUser,Self::CreateSubSpace,Self::ViewSubSpace,Self::DestroySubSpace]
             }
-            UserRole::Modify => {
+            UserRole::User => {
                 vec![Self::CreateUser,Self::ModifyUser,Self::ViewUser,Self::CreateSubSpace,Self::ViewSubSpace]
             }
             _ => {
@@ -345,13 +346,13 @@ impl ActorAccess
             UserRole::Owner => {
                 Self::all()
             }
-            UserRole::Admin => {
+            UserRole::Developer => {
                 vec![Self::Create,Self::Modify,Self::Message,Self::Watch,Self::Destroy]
             }
-            UserRole::Modify => {
+            UserRole::User => {
                 vec![Self::Watch,Self::Message,Self::Modify]
             }
-            UserRole::Query => {
+            UserRole::Guest => {
                 vec![Self::Watch,Self::Message]
             }
             UserRole::Observer => {

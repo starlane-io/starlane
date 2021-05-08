@@ -423,7 +423,7 @@ mod test
     use crate::app::{AppController, AppKind};
     use crate::logger::{Flags, Flag, StarFlag, LogAggregate, Log, ProtoStarLog, ProtoStarLogPayload, StarLog, StarLogPayload};
     use crate::keys::{SpaceKey, UserKey, SubSpaceKey};
-    use crate::user::Authentication;
+    use crate::permissions::Authentication;
     use std::sync::Arc;
     use crate::label::Labels;
     use crate::space::CreateAppControllerFail;

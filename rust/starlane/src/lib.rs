@@ -22,7 +22,7 @@ pub mod starlane;
 pub mod actor;
 pub mod server;
 pub mod core;
-pub mod user;
+pub mod permissions;
 pub mod service;
 pub mod label;
 pub mod message;

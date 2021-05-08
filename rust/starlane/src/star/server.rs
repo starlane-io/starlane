@@ -61,7 +61,6 @@ impl ServerManager
 
     async fn pledge(&mut self)->Result<(),Error>
     {
-println!("Server: Pledging");
         let supervisor = match self.get_supervisor(){
             None => {
                 loop
@@ -90,15 +89,12 @@ println!("Server: Could not find Supervisor... waiting 5 seconds to try again...
 
         if self.data.flags.check(Flag::Star(StarFlag::DiagnosePledge))
         {
-println!("Server: PledgeSent");
             self.data.logger.log( Log::Star( StarLog::new( &self.data.info, StarLogPayload::PledgeSent )));
             let mut data = self.data.clone();
             tokio::spawn(async move {
                 let payload = rx.await;
                 if let Ok(StarMessagePayload::Ok(_)) = payload
                 {
-
-println!("Server: PledgeOkRecv");
                     data.logger.log( Log::Star( StarLog::new( &data.info, StarLogPayload::PledgeOkRecv )))
                 }
             });

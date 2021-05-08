@@ -41,7 +41,7 @@ use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
 use crate::space::{CreateAppControllerFail, SpaceCommand, SpaceCommandKind, SpaceController};
 use crate::star::central::CentralManager;
 use crate::star::supervisor::{SupervisorCommand, SupervisorManager};
-use crate::user::{Authentication, AuthToken, AuthTokenSource, Credentials};
+use crate::permissions::{Authentication, AuthToken, AuthTokenSource, Credentials};
 use crate::space::SpaceCommandKind::AppGetController;
 
 pub mod central;
@@ -485,12 +485,7 @@ println!("spaces_do_not_match");
                     proto.payload = StarMessagePayload::Space(space_message);
                     proto.expect = MessageExpect::ReplyErrOrTimeout(MessageExpectWait::Med);
 
-                    let star_tx = self.data.star_tx.clone();
                     let result= proto.get_ok_result().await;
-
-
-
-println!("proto_message_ready");
                     let star_tx = self.data.star_tx.clone();
                     tokio::spawn( async move {
                         let result = match result.await
@@ -520,8 +515,6 @@ println!("proto_message_ready");
                         };
                         create.tx.send(result);
                     });
-
-println!("sending proto message");
                     self.send_proto_message(proto).await;
             }
             }
@@ -535,7 +528,7 @@ println!("sending proto message");
     }
 
 
-    async fn search_for_star( &mut self, star: StarKey, tx: oneshot::Sender<WindHits> )
+   async fn search_for_star( &mut self, star: StarKey, tx: oneshot::Sender<WindHits> )
    {
         let wind = Wind {
             pattern: StarPattern::StarKey(star),
@@ -2096,9 +2089,19 @@ impl PlaceholderStarManager
 impl StarManager for PlaceholderStarManager
 {
     async fn handle(&mut self, command: StarManagerCommand)  {
-        match command
+        match &command
         {
             StarManagerCommand::Init => {}
+            StarManagerCommand::StarMessage(message)=>{
+                match &message.payload{
+                    StarMessagePayload::Ok(_) => {}
+                    StarMessagePayload::Error(_) => {}
+                    StarMessagePayload::Ack(_) => {}
+                    _ => {
+                        println!("command {} Placeholder unimplemented for kind: {}",command,self.data.info.kind);
+                    }
+                }
+            }
             _ => {
                 println!("command {} Placeholder unimplemented for kind: {}",command,self.data.info.kind);
             }

@@ -17,7 +17,7 @@ use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage};
 use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarData, StarInfo, StarKey, StarKind, StarManager, StarManagerCommand, StarNotify, PublicKeySource};
 use crate::star::StarCommand::SpaceCommand;
-use crate::user::{AppAccess, AuthToken, User, UserKind};
+use crate::permissions::{AppAccess, AuthToken, User, UserKind};
 use crate::crypt::{PublicKey, CryptKeyId};
 use crate::frame::Reply::App;
 
@@ -106,7 +106,6 @@ impl StarManager for CentralManager
                     self.backing.add_supervisor(message.from.clone());
                     self.reply_ok(message).await;
                     if self.data.flags.check( Flag::Star(StarFlag::DiagnosePledge )) {
-println!("Central: PledgeRecv");
                         self.data.logger.log( Log::Star(StarLog::new(&self.data.info, StarLogPayload::PledgeRecv )));
                     }
                 }
@@ -154,6 +153,8 @@ println!("Central: PledgeRecv");
                         _ => {}
                     }
                 }
+                StarMessagePayload::Ok(_)=>{},
+                StarMessagePayload::Error(_)=>{},
                 unexpected => { eprintln!("CentralManager: unexpected message: {} ", unexpected) }
             }
         }

@@ -21,3 +21,4 @@ async-trait = "0.1.48"
 url = "2.2.1"
 lru = "0.6.5"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }
+sqlite = "0.26.0"

@@ -15,7 +15,7 @@ use crate::keys::{AppKey, UserKey, SubSpaceKey, MessageId};
 use crate::app::{AppLocation, AppKind, AppInfo, AppCreateInfo};
 use crate::logger::Flags;
 use crate::error::Error;
-use crate::user::{AuthToken, Authentication};
+use crate::permissions::{AuthToken, Authentication};
 use crate::crypt::{Encrypted, HashEncrypted, HashId};
 
 #[derive(Clone,Serialize,Deserialize)]

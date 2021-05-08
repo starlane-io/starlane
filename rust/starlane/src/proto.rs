@@ -23,7 +23,7 @@ use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarC
 use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
 use crate::logger::{Logger, Flags, Flag, StarFlag, Log, ProtoStarLog, ProtoStarLogPayload};
-use crate::user::AuthTokenSource;
+use crate::permissions::AuthTokenSource;
 
 pub static MAX_HOPS: i32 = 32;
 
