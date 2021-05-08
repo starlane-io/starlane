@@ -223,7 +223,7 @@ pub static MAX_HOPS: usize = 32;
 
 pub struct Star
 {
-    data: StarData,
+    data: StarSkel,
     star_rx: mpsc::Receiver<StarCommand>,
     core_tx: mpsc::Sender<StarCoreCommand>,
     lanes: HashMap<StarKey, LaneMeta>,
@@ -242,7 +242,7 @@ pub struct Star
 impl Star
 {
 
-    pub fn from_proto(data: StarData,
+    pub fn from_proto(data: StarSkel,
                       star_rx: mpsc::Receiver<StarCommand>,
                       core_tx: mpsc::Sender<StarCoreCommand>,
                       lanes: HashMap<StarKey,LaneMeta>,
@@ -1437,7 +1437,7 @@ impl Wind
 
 pub enum StarManagerCommand
 {
-    StarData(StarData),
+    StarData(StarSkel),
     Init,
     StarMessage(StarMessage),
     CentralCommand(CentralCommand),
@@ -2071,13 +2071,13 @@ trait ServerManagerBacking: Send+Sync
 
 pub struct PlaceholderStarManager
 {
-    pub data: StarData
+    pub data: StarSkel
 }
 
 impl PlaceholderStarManager
 {
 
-    pub fn new(info: StarData) ->Self
+    pub fn new(info: StarSkel) ->Self
     {
         PlaceholderStarManager{
             data: info
@@ -2164,10 +2164,11 @@ impl StarManagerFactory for StarManagerFactoryDefault
 
 
 #[derive(Clone)]
-pub struct StarData
+pub struct StarSkel
 {
     pub info: StarInfo,
     pub star_tx: mpsc::Sender<StarCommand>,
+    pub core_tx: mpsc::Sender<StarCoreCommand>,
     pub manager_tx: mpsc::Sender<StarManagerCommand>,
     pub flags: Flags,
     pub logger: Logger,
@@ -2220,11 +2221,14 @@ impl PublicKeySource
 
     pub async fn create_encrypted_payloads( &self, creds: &Credentials, star: &StarKey, payload: SpaceMessage ) -> Result<(HashEncrypted<AuthToken>,Encrypted<SpaceMessage>),Error>
     {
+        unimplemented!();
+        /*
         let auth_token = AuthTokenSource::new();
         let (public_key,hash) = self.get_public_key_and_hash(star).await;
-        let auth_token = HashEncrypted::encrypt( &auth_token.get(creds), &hash, &public_key );
+        let auth_token = HashEncrypted::encrypt(&auth_token.auth(creds).unwrap(), &hash, &public_key );
         let payload = Encrypted::encrypt( &payload, &public_key );
         Ok((auth_token,payload))
+         */
     }
 }
 

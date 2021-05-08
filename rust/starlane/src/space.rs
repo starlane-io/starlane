@@ -1,4 +1,4 @@
-use crate::app::{AppCreateController, AppSelect, AppController, AppKind, AppCreateInfo};
+use crate::app::{AppCreateController, AppSelect, AppController, AppKind, AppCreateData};
 use crate::keys::{SpaceKey, UserKey, AppKey, SubSpaceKey};
 use serde::{Deserialize, Serialize, Serializer};
 use std::fmt;
@@ -41,7 +41,7 @@ impl SpaceController
    {
        let (tx,rx) = oneshot::channel();
 
-       let create = AppCreateInfo{
+       let create = AppCreateData {
            owner: self.user.clone(),
            sub_space: sub_space.clone(),
            kind: kind.clone(),

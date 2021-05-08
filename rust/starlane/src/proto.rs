@@ -14,12 +14,12 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{Duration, Instant};
 
 use crate::constellation::Constellation;
-use crate::core::StarCoreFactory;
+use crate::core::{StarCoreFactory, CoreRunner, StarCore, StarCoreCommand};
 use crate::error::Error;
 use crate::frame::{Frame, ProtoFrame, WindHit, StarMessage, StarMessagePayload, WindUp, StarPattern, WindDown, SequenceMessage} ;
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelReceiver, TunnelSender, TunnelSenderState};
-use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarKernel, StarKey, StarKind, StarManagerFactory, StarSearchTransaction, Transaction, StarInfo, StarData, StarManagerCommand};
+use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarKernel, StarKey, StarKind, StarManagerFactory, StarSearchTransaction, Transaction, StarInfo, StarSkel, StarManagerCommand};
 use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
 use crate::logger::{Logger, Flags, Flag, StarFlag, Log, ProtoStarLog, ProtoStarLogPayload};
@@ -37,7 +37,7 @@ pub struct ProtoStar
   lanes: HashMap<StarKey, LaneMeta>,
   connector_ctrls: Vec<ConnectorController>,
   star_manager_factory: Arc<dyn StarManagerFactory>,
-  star_core_factory: Arc<dyn StarCoreFactory>,
+  core_runner: Arc<CoreRunner>,
   logger: Logger,
   frame_hold: FrameHold,
   flags: Flags,
@@ -46,7 +46,7 @@ pub struct ProtoStar
 
 impl ProtoStar
 {
-    pub fn new(key: Option<StarKey>, kind: StarKind, star_manager_factory: Arc<dyn StarManagerFactory>, star_core_factory: Arc<dyn StarCoreFactory>, flags: Flags, logger: Logger ) ->(Self, StarController)
+    pub fn new(key: Option<StarKey>, kind: StarKind, star_manager_factory: Arc<dyn StarManagerFactory>, core_runner: Arc<CoreRunner>, flags: Flags, logger: Logger ) ->(Self, StarController)
     {
         let (command_tx, command_rx) = mpsc::channel(32);
         (ProtoStar{
@@ -58,7 +58,7 @@ impl ProtoStar
             lanes: HashMap::new(),
             connector_ctrls: vec![],
             star_manager_factory: star_manager_factory,
-            star_core_factory: star_core_factory,
+            core_runner: core_runner,
             logger: logger,
             frame_hold: FrameHold::new(),
             tracker: ProtoTracker::new(),
@@ -103,20 +103,25 @@ impl ProtoStar
                             star: self.star_key.as_ref().unwrap().clone(),
                             kind: self.kind.clone()};
                         let manager_tx= self.star_manager_factory.create().await;
-                        let data = StarData{
 
+                        let star_core_factory = StarCoreFactory::new();
+                        let (core,core_tx) = star_core_factory.create(&self.kind);
+                        self.core_runner.run(core).await;
+
+                        let data = StarSkel {
                             info: info,
                             sequence: self.sequence.clone(),
                             star_tx: self.command_tx.clone(),
+                            core_tx: core_tx.clone(),
                             manager_tx: manager_tx.clone(),
                             logger: self.logger.clone(),
                             flags: self.flags.clone(),
                             auth_token_source: AuthTokenSource {}
                         };
 
+                        // now send star data to manager and core... tricky!
                         manager_tx.send(StarManagerCommand::StarData(data.clone()) ).await;
-
-                        let core_tx = self.star_core_factory.create(&data.info.kind, data.manager_tx.clone());
+                        core_tx.send(StarCoreCommand::StarSkel(data.clone()) ).await;
 
                         return Ok(Star::from_proto(data.clone(),
                                                    self.command_rx,

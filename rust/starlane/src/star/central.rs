@@ -7,7 +7,7 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::oneshot::Receiver;
 
-use crate::app::{AppCreateController, AppInfo, ApplicationStatus, AppLocation, AppCreateInfo};
+use crate::app::{AppCreateController, AppInfo, ApplicationStatus, AppLocation, AppCreateData};
 use crate::error::Error;
 use crate::frame::{AppAssign, AssignMessage, Frame, ReportMessage, RequestMessage, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply};
 use crate::id::Id;
@@ -15,7 +15,7 @@ use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId};
 use crate::label::Labels;
 use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage};
-use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarData, StarInfo, StarKey, StarKind, StarManager, StarManagerCommand, StarNotify, PublicKeySource};
+use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarManager, StarManagerCommand, StarNotify, PublicKeySource};
 use crate::star::StarCommand::SpaceCommand;
 use crate::permissions::{AppAccess, AuthToken, User, UserKind};
 use crate::crypt::{PublicKey, CryptKeyId};
@@ -23,7 +23,7 @@ use crate::frame::Reply::App;
 
 pub struct CentralManager
 {
-    data: StarData,
+    data: StarSkel,
     backing: Box<dyn CentralManagerBacking>,
     pub status: CentralStatus,
     public_key_source: PublicKeySource
@@ -31,7 +31,7 @@ pub struct CentralManager
 
 impl CentralManager
 {
-    pub fn new(data: StarData) -> CentralManager
+    pub fn new(data: StarSkel) -> CentralManager
     {
         CentralManager
         {
@@ -198,7 +198,7 @@ trait CentralManagerBacking: Send+Sync
 
 pub struct CentralManagerBackingDefault
 {
-    data: StarData,
+    data: StarSkel,
     init_status: CentralInitStatus,
     supervisors: Vec<StarKey>,
     application_to_supervisor: HashMap<AppKey,StarKey>,
@@ -209,7 +209,7 @@ pub struct CentralManagerBackingDefault
 
 impl CentralManagerBackingDefault
 {
-    pub fn new(data: StarData) -> Self
+    pub fn new(data: StarSkel) -> Self
     {
         CentralManagerBackingDefault {
             data: data,

@@ -1,148 +1,158 @@
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::future::Future;
+use std::ops::Deref;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::sync::mpsc::Receiver;
+use std::thread;
 
+use futures::future::BoxFuture;
+use futures::FutureExt;
+use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
+use tokio::sync::mpsc::Sender;
+use tokio::time::Duration;
 
+
+use crate::actor::{Actor, ActorKey};
 use crate::app::ApplicationStatus;
 use crate::error::Error;
-use crate::frame::{ActorMessage, StarMessage, StarMessagePayload,  Watch, WatchInfo};
+use crate::frame::{ActorMessage, AppCreate, AppMessage, StarMessage, StarMessagePayload, Watch, WatchInfo};
 use crate::id::{Id, IdSeq};
-use crate::actor::{ActorKey, Actor};
-use crate::star::{StarCommand, StarKey, StarKind, ActorCommand, ActorCreate, StarManagerCommand};
-use std::sync::mpsc::Receiver;
-use tokio::sync::mpsc::Sender;
-use tokio::runtime::Runtime;
-use tokio::time::Duration;
-use std::future::Future;
-use futures::FutureExt;
+use crate::star::{ActorCommand, ActorCreate, StarCommand, StarKey, StarKind, StarManagerCommand, StarSkel};
+use crate::core::server::{ServerStarCore, ServerStarCoreExt, ExampleServerStarCoreExt};
 
+pub mod server;
 
 pub enum StarCoreCommand
 {
+    StarExt(StarExt),
+    StarSkel(StarSkel),
     Message(ActorMessage),
     Watch(Watch),
     Actor(ActorCommand)
 }
 
+pub enum StarExt
+{
+    None,
+    Server(Box<dyn ServerStarCoreExt>)
+}
+
+pub enum CoreRunnerCommand
+{
+    Core(Box<dyn StarCore>),
+    Shutdown
+}
 
 pub struct CoreRunner
 {
-    runtime: Option<Runtime>,
-    factory: Box<dyn StarCoreFactory>
+    tx: mpsc::Sender<CoreRunnerCommand>
 }
 
 impl CoreRunner
 {
-    pub fn start(&mut self)
+    pub fn new()->Self
     {
-        if self.runtime.is_some()
-        {
-            return;
-        }
+      let (tx,mut rx) = mpsc::channel(1);
+      thread::spawn( move || {
+         let runtime = Runtime::new().unwrap();
+         runtime.block_on( async move {
+            while let Option::Some(CoreRunnerCommand::Core(mut core)) = rx.recv().await
+            {
+               tokio::spawn( async move { core.run().await } );
+            }
+         } );
+         runtime.shutdown_background();
+      } );
 
-        self.runtime = Option::Some(Runtime::new().unwrap());
+      CoreRunner
+      {
+          tx: tx
+      }
     }
 
-    pub fn stop(&mut self)
-    {
-        if let Some(runtime) = &self.runtime
-        {
-            unimplemented!();
-            //runtime.shutdown_timeout(Duration::from_secs(15));
-            self.runtime = Option::None;
-        }
-    }
-
-    fn run(&mut self, future: Box<dyn Future<Output=()>>) ->Result<(),Error>
-    {
-        if let Some(runtime)=&mut self.runtime
-        {
-            unimplemented!();
-/*            let runtime = self.runtime.unwrap();
-            runtime.spawn(future);
-
- */
-            Ok(())
-        }
-        else {
-            Err("CoreRunner: runtime has not been started.".into())
-        }
-    }
-
-    pub fn create(&mut self, kind: &StarKind )->mpsc::Sender<StarCoreCommand>
-    {
-        let (tx,rx) = mpsc::channel(32);
-        self.factory.create(kind,tx)
+    pub async fn run( &self, core: Box<dyn StarCore> ) {
+        self.tx.send( CoreRunnerCommand::Core(core) ).await;
     }
 }
 
 
+#[async_trait]
 pub trait StarCoreExt: Sync+Send
 {
-}
-
-pub trait EntityStarCoreExt: StarCoreExt
-{
-    fn create_entity(&mut self, create: ActorCreate) -> Result<ActorKey,Error>;
-    fn message(&mut self, message: ActorMessage) -> Result<(),Error>;
-    fn watch( &mut self, watch: Watch ) -> Result<(),Error>;
-}
-
-
-#[async_trait]
-pub trait StarCoreFactory: Sync+Send
-{
-    fn create( &self, kind: &StarKind, star_tx: mpsc::Sender<StarManagerCommand> ) -> mpsc::Sender<StarCoreCommand>;
-}
-
-pub struct StarCoreFactoryDefault
-{
+    async fn star_skel(&mut self, data: StarSkel);
 }
 
 #[async_trait]
-impl StarCoreFactory for StarCoreFactoryDefault
+pub trait StarCore: Sync+Send
 {
-    fn create(&self, kind: &StarKind, star_tx: mpsc::Sender<StarManagerCommand>) -> Sender<StarCoreCommand> {
-       let (tx,rx) = mpsc::channel(32);
-       let mut core = ServerStarCore{
-           command_rx: rx
-       };
+    async fn run(&mut self);
+}
 
-      // instance runtime here
+pub struct StarCoreFactory
+{
 
-       tx
+}
+
+impl StarCoreFactory
+{
+    pub fn new()->Self
+    {
+        StarCoreFactory{}
+    }
+
+    pub fn create( &self, kind: &StarKind ) -> (Box<dyn StarCore>,Sender<StarCoreCommand>)
+    {
+        let ( tx, rx ) = mpsc::channel(16);
+        let core:Box<dyn StarCore> = match kind
+        {
+            StarKind::Server(_) => {
+                Box::new(ServerStarCore::new(rx))
+            }
+            _ => Box::new(InertStarCore::new())
+        };
+
+        (core,tx)
     }
 }
 
-
-
-pub struct ServerStarCore
-{
-    command_rx: mpsc::Receiver<StarCoreCommand>
+pub struct InertStarCore {
 }
 
-impl ServerStarCore
+#[async_trait]
+impl StarCore for InertStarCore
 {
+    async fn run(&mut self) {
+        // do nothing
+    }
+}
 
-    async fn run(&mut self)
-    {
-        while let Option::Some(command) = self.command_rx.recv().await
+impl InertStarCore {
+    pub fn new()->Self {
+        InertStarCore {}
+    }
+}
+
+pub trait StarCoreExtFactory
+{
+    fn create( &self, kind: &StarKind ) -> StarExt;
+}
+
+pub struct ExampleStarCoreExtFactory
+{
+}
+
+impl StarCoreExtFactory for ExampleStarCoreExtFactory
+{
+    fn create(&self, kind: &StarKind) -> StarExt {
+        match kind
         {
-            match &command
-            {
-                StarCoreCommand::Message(_) => {}
-                StarCoreCommand::Watch(_) => {}
-                StarCoreCommand::Actor(actor_command) => {
-                    match actor_command
-                    {
-                        ActorCommand::Create(create) => {
-
-                            // need to communicate with Ext here...
-
-                        }
-                    }
-                }
+            StarKind::Server(_) => {
+                StarExt::Server( Box::new(ExampleServerStarCoreExt::new() ) )
             }
+            _ => StarExt::None
         }
     }
 }

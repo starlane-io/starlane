@@ -54,7 +54,7 @@ pub struct AppSelect
 
 pub struct AppCreateController
 {
-    pub info: AppCreateInfo,
+    pub info: AppCreateData,
     pub tx: oneshot::Sender<Result<AppController,CreateAppControllerFail>>
 }
 
@@ -120,7 +120,7 @@ pub struct AppContext
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct AppCreateInfo
+pub struct AppCreateData
 {
     pub owner: UserKey,
     pub sub_space: SubSpaceKey,

@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, AppMessagePayload, Reply};
-use crate::star::{ServerManagerBacking, StarCommand, StarData, StarKey, StarKind, StarManager, StarManagerCommand, Wind, ServerCommand};
+use crate::star::{ServerManagerBacking, StarCommand, StarSkel, StarKey, StarKind, StarManager, StarManagerCommand, Wind, ServerCommand};
 use crate::message::{ProtoMessage, MessageExpect};
 use crate::logger::{Flag, StarFlag, StarLog, StarLogPayload, Log};
 use tokio::time::{sleep, Duration};
@@ -34,13 +34,13 @@ impl ServerManagerBacking for ServerManagerBackingDefault
 
 pub struct ServerManager
 {
-    data: StarData,
+    data: StarSkel,
     backing: Box<dyn ServerManagerBacking>,
 }
 
 impl ServerManager
 {
-    pub fn new(data: StarData) -> Self
+    pub fn new(data: StarSkel) -> Self
     {
         ServerManager
         {

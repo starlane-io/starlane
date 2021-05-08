@@ -13,7 +13,7 @@ use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, S
 use crate::keys::AppKey;
 use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait};
-use crate::star::{StarCommand, StarData, StarInfo, StarKey, StarManager, StarManagerCommand};
+use crate::star::{StarCommand, StarSkel, StarInfo, StarKey, StarManager, StarManagerCommand};
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::oneshot::error::RecvError;
 
@@ -31,13 +31,13 @@ pub struct SetAppStatus
 
 pub struct SupervisorManager
 {
-    data: StarData,
+    data: StarSkel,
     backing: Box<dyn SupervisorManagerBacking>
 }
 
 impl SupervisorManager
 {
-    pub fn new(data: StarData) ->Self
+    pub fn new(data: StarSkel) ->Self
     {
         SupervisorManager{
             data: data.clone(),
@@ -220,7 +220,7 @@ impl SupervisorManager
 
 pub struct SupervisorManagerBackingDefault
 {
-    data: StarData,
+    data: StarSkel,
     servers: Vec<StarKey>,
     server_select_index: usize,
     applications: HashMap<AppKey,AppData>,
@@ -229,7 +229,7 @@ pub struct SupervisorManagerBackingDefault
 
 impl SupervisorManagerBackingDefault
 {
-    pub fn new(data: StarData ) ->Self
+    pub fn new(data: StarSkel) ->Self
     {
         SupervisorManagerBackingDefault {
             data: data,

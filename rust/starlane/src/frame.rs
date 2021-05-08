@@ -12,7 +12,7 @@ use crate::label::Labels;
 use crate::message::{MessageResult, ProtoMessage, MessageExpect, MessageUpdate};
 use tokio::sync::{oneshot, broadcast, mpsc};
 use crate::keys::{AppKey, UserKey, SubSpaceKey, MessageId};
-use crate::app::{AppLocation, AppKind, AppInfo, AppCreateInfo};
+use crate::app::{AppLocation, AppKind, AppInfo, AppCreateData};
 use crate::logger::Flags;
 use crate::error::Error;
 use crate::permissions::{AuthToken, Authentication};
@@ -390,7 +390,7 @@ pub enum AssignMessage
 #[derive(Clone,Serialize,Deserialize)]
 pub enum RequestMessage
 {
-    AppCreate(AppCreateInfo),
+    AppCreate(AppCreateData),
     AppSupervisor(AppSupervisorRequest),
     AppLookup(AppLookup),
     AppMessage(AppMessage),
@@ -412,10 +412,17 @@ pub struct AppMessage
 }
 
 #[derive(Clone,Serialize,Deserialize)]
+pub struct AppCreate
+{
+    pub app: AppKey,
+    pub data: AppCreateData
+}
+
+#[derive(Clone,Serialize,Deserialize)]
 pub enum AppMessagePayload
 {
    None,
-   Launch(AppCreateInfo)
+   Launch(AppCreateData)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -622,7 +629,7 @@ pub struct AppLookup
 pub struct AppAssign
 {
     pub app: AppKey,
-    pub info: AppCreateInfo
+    pub info: AppCreateData
 }
 
 #[derive(Clone,Serialize,Deserialize)]

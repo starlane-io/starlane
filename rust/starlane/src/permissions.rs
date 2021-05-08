@@ -377,9 +377,9 @@ impl AuthTokenSource
         AuthTokenSource{}
     }
 
-    pub fn get( &self, creds: &Credentials ) -> AuthToken
+    pub async fn auth(&self, creds: &Credentials ) -> Result<AuthToken,Error>
     {
-        AuthToken{
+        Ok(AuthToken{
             user: User{
                 name: "someuser".to_string(),
                 key: creds.user.clone(),
@@ -390,7 +390,7 @@ impl AuthTokenSource
                     UserId::Uuid(_) => UserKind::User
                 }
             }
-        }
+        })
     }
 }
 
