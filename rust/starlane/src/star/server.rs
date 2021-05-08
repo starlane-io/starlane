@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction};
+use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, AppMessagePayload, Reply};
 use crate::star::{ServerManagerBacking, StarCommand, StarData, StarKey, StarKind, StarManager, StarManagerCommand, Wind, ServerCommand};
 use crate::message::{ProtoMessage, MessageExpect};
 use crate::logger::{Flag, StarFlag, StarLog, StarLogPayload, Log};
@@ -115,7 +115,29 @@ impl StarManager for ServerManager
             StarManagerCommand::Init => {
                 self.pledge().await;
             }
-            StarManagerCommand::StarMessage(_) => {}
+            StarManagerCommand::StarMessage(star_message) => {
+                match &star_message.payload
+                {
+                    StarMessagePayload::Space(space_message) => {
+                        match &space_message.payload
+                        {
+                            SpacePayload::App(app_message) => {
+                                match &app_message.payload
+                                {
+                                    AppMessagePayload::Launch(data) => {
+                                        println!("Launching APP!");
+                                        let proto = star_message.reply(StarMessagePayload::Ok(Reply::Empty));
+                                        self.data.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => {}
+                }
+            }
             StarManagerCommand::CentralCommand(_) => {}
             StarManagerCommand::SupervisorCommand(_) => {}
             StarManagerCommand::ServerCommand(command) => {

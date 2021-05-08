@@ -9,8 +9,33 @@ use crate::actor::ActorKey;
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum SpaceKey
 {
-    Hyper,
-    Space(String)
+    HyperSpace,
+    Space(u32)
+}
+
+impl SpaceKey
+{
+
+    pub fn from_index(index: u32) -> Self
+    {
+        if index == 0
+        {
+            SpaceKey::HyperSpace
+        }
+        else
+        {
+            SpaceKey::Space(index)
+        }
+    }
+
+    pub fn index(&self)->u32
+    {
+        match self
+        {
+            SpaceKey::HyperSpace => 0,
+            SpaceKey::Space(index) => index.clone()
+        }
+    }
 }
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
@@ -40,7 +65,7 @@ impl UserKey
 
     pub fn hyperuser() -> Self
     {
-        UserKey::with_id(SpaceKey::Hyper,UserId::Super)
+        UserKey::with_id(SpaceKey::HyperSpace, UserId::Super)
     }
 
 
@@ -58,7 +83,7 @@ impl UserKey
     pub fn is_hyperuser(&self)->bool
     {
         match self.space{
-            SpaceKey::Hyper => {
+            SpaceKey::HyperSpace => {
                 match self.id
                 {
                     UserId::Super => true,
@@ -108,7 +133,7 @@ impl SubSpaceKey
 {
     pub fn hyper_default( ) -> Self
     {
-        SubSpaceKey::new( SpaceKey::Hyper, SubSpaceId::Default )
+        SubSpaceKey::new(SpaceKey::HyperSpace, SubSpaceId::Default )
     }
 
     pub fn new( space: SpaceKey, id: SubSpaceId ) -> Self
@@ -125,7 +150,31 @@ impl SubSpaceKey
 pub enum SubSpaceId
 {
     Default,
-    Uuid(Uuid)
+    Index(u32)
+}
+
+impl SubSpaceId
+{
+    pub fn from_index(index: u32) -> Self
+    {
+        if index == 0
+        {
+            Self::Default
+        }
+        else
+        {
+            Self::Index(index)
+        }
+    }
+
+    pub fn index(&self)->u32
+    {
+        match self
+        {
+            SubSpaceId::Default => 0,
+            SubSpaceId::Index(index) => index.clone()
+        }
+    }
 }
 
 
@@ -140,7 +189,7 @@ pub struct AppKey
 #[derive(Clone,Hash,Eq,PartialEq,Serialize,Deserialize)]
 pub enum AppId
 {
-    Hyper,
+    HyperApp,
     Uuid(Uuid)
 }
 
@@ -179,7 +228,7 @@ impl fmt::Display for AppId{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let fmt = match self
         {
-            AppId::Hyper => "Hyper".to_string(),
+            AppId::HyperApp => "HyperApp".to_string(),
             AppId::Uuid(uuid) => uuid.to_string()
         };
         write!(f, "{}", fmt )
@@ -192,7 +241,7 @@ impl fmt::Display for SubSpaceId{
         let str = match self
         {
             SubSpaceId::Default => "Default".to_string(),
-            SubSpaceId::Uuid(uuid) => uuid.to_string()
+            SubSpaceId::Index(index) => index.to_string()
         };
         write!(f, "{}", str )
     }

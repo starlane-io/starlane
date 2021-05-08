@@ -10,6 +10,7 @@ use crate::keys::{AppKey, UserKey, SubSpaceKey};
 use serde::{Deserialize, Serialize, Serializer};
 use crate::space::{CreateAppControllerFail };
 use tokio::sync::{oneshot, mpsc};
+use std::fmt;
 
 
 pub mod system;
@@ -105,6 +106,11 @@ pub struct AppController
     pub tx: mpsc::Sender<AppCommand>
 }
 
+impl AppController
+{
+
+}
+
 pub type Apps = HashMap<AppKind,Box<dyn Application>>;
 
 pub struct AppContext
@@ -131,3 +137,60 @@ pub trait Application: Send+Sync
     async fn handle_app_command(&self, context: &AppContext, command: AppCommand) -> Result<(),Error>;
     async fn handle_actor_message( &self, context: &AppContext, actor: &mut Actor, message: ActorMessage  ) -> Result<(),Error>;
 }
+
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum AppStatus
+{
+    Unknown,
+    Waiting,
+    Launching,
+    Ready(AppStatusReady),
+    Suspended,
+    Resuming,
+    Panic(PanicDesc),
+    Halting(HaltReason),
+    Exited
+}
+
+
+impl fmt::Display for AppStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let r = match self {
+            AppStatus::Unknown => "Unknown".to_string(),
+            AppStatus::Waiting => "Waiting".to_string(),
+            AppStatus::Launching => "Launching".to_string(),
+            AppStatus::Ready(_) => "Ready".to_string(),
+            AppStatus::Suspended => "Suspended".to_string(),
+            AppStatus::Resuming => "Resuming".to_string(),
+            AppStatus::Panic(_) => "Panic".to_string(),
+            AppStatus::Halting(_) => "Halting".to_string(),
+            AppStatus::Exited => "Exited".to_string()
+        };
+        write!(f, "{}",r)
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum HaltReason
+{
+    Planned,
+    Crashing
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum AppStatusReady
+{
+    Nominal,
+    Alert(Alert)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum Alert
+{
+    Red(AlertDesc),
+    Yellow(AlertDesc)
+}
+
+pub type AlertDesc = String;
+pub type PanicDesc= String;

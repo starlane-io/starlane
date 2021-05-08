@@ -452,7 +452,7 @@ mod test
                 match result {
                     Ok(result) => {
                         match result {
-                            Ok(_) => {println!("template ok.")}
+                            Ok(_) => {}
                             Err(e) => {
                                 println!("error: {}", e)
                             }
@@ -510,15 +510,15 @@ mod test
 
 
             tokio::time::sleep(Duration::from_secs(1)).await;
-            if let Ok(space_ctrl) = mesh_ctrl.get_space_controller( &SpaceKey::Hyper, &Authentication::mock(UserKey::hyperuser() ) ).await
+            if let Ok(space_ctrl) = mesh_ctrl.get_space_controller(&SpaceKey::HyperSpace, &Authentication::mock(UserKey::hyperuser() ) ).await
             {
                 let app_ctrl_result = space_ctrl.create_app( &"someapp".to_string(), &SubSpaceKey::hyper_default(), &Arc::new(vec![]), &Labels::new() ).await;
                 let app_ctrl_result = app_ctrl_result.await;
                 let app_ctrl = app_ctrl_result.unwrap();
-println!("some kind of weird result: ");
                 match app_ctrl
                 {
                     Ok(app_ctrl) => {
+
                         println!("got app_ctrl!")
                     }
                     Err(fail) => {

@@ -414,7 +414,8 @@ pub struct AppMessage
 #[derive(Clone,Serialize,Deserialize)]
 pub enum AppMessagePayload
 {
-   None
+   None,
+   Launch(AppCreateInfo)
 }
 
 #[derive(Clone,Serialize,Deserialize)]

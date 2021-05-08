@@ -7,17 +7,26 @@ use async_trait::async_trait;
 use tokio::sync::mpsc::error::SendError;
 
 use crate::actor::{ActorKey, ActorLocation};
-use crate::app::{AppInfo, Application, AppLocation};
+use crate::app::{AppInfo, Application, AppLocation, AppStatus, AppStatusReady};
 use crate::error::Error;
-use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload};
+use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, AppMessage, AppMessagePayload};
 use crate::keys::AppKey;
 use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
-use crate::message::{MessageExpect, ProtoMessage};
+use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait};
 use crate::star::{StarCommand, StarData, StarInfo, StarKey, StarManager, StarManagerCommand};
+use tokio::sync::oneshot::Receiver;
+use tokio::sync::oneshot::error::RecvError;
 
 pub enum SupervisorCommand
 {
-    Pledge
+    Pledge,
+    SetAppStatus(SetAppStatus)
+}
+
+pub struct SetAppStatus
+{
+    pub app: AppKey,
+    pub status: AppStatus
 }
 
 pub struct SupervisorManager
@@ -119,6 +128,7 @@ impl StarManager for SupervisorManager
                               match assign
                               {
                                   AssignMessage::App(app_assign) => {
+                                      let app = app_assign.app.clone();
                                       let data = AppData{
                                           info: AppInfo{
                                               key: app_assign.app.clone(),
@@ -126,9 +136,47 @@ impl StarManager for SupervisorManager
                                           },
                                           servers: HashSet::new()
                                       };
-                                      self.backing.add_application(app_assign.app.clone(), data );
+                                      self.backing.add_application(app.clone(), data );
                                       let proto = message.reply(StarMessagePayload::Ok(Reply::Empty));
                                       self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+
+                                      if let Option::Some(server)=self.backing.select_server()
+                                      {
+                                          self.backing.set_app_status(app.clone(), AppStatus::Launching );
+                                          let launch_app_message = space_message.with_payload(SpacePayload::App(AppMessage { app: app.clone(), payload: AppMessagePayload::Launch(app_assign.info.clone()) }));
+                                          let mut proto = ProtoMessage::new();
+                                          proto.to = Option::Some(server);
+                                          proto.payload = StarMessagePayload::Space(launch_app_message);
+                                          proto.expect = MessageExpect::ReplyErrOrTimeout(MessageExpectWait::Med);
+                                          let result = proto.get_ok_result().await;
+
+                                          let manager_tx = self.data.manager_tx.clone();
+                                          tokio::spawn( async move {
+
+                                              match result.await
+                                              {
+                                                  Ok(payload) => {
+                                                      match payload {
+                                                          StarMessagePayload::Ok(Reply::Empty) => {
+                                                              manager_tx.send( StarManagerCommand::SupervisorCommand(SupervisorCommand::SetAppStatus(SetAppStatus{app: app.clone(), status: AppStatus::Ready(AppStatusReady::Nominal)}))).await;
+                                                          }
+                                                          _ => {
+                                                              manager_tx.send( StarManagerCommand::SupervisorCommand(SupervisorCommand::SetAppStatus(SetAppStatus{app: app.clone(), status: AppStatus::Panic( "unexpected replay from server...".to_string() )}))).await;
+                                                          }
+                                                      }
+                                                  }
+                                                  Err(error) => {
+                                                      manager_tx.send( StarManagerCommand::SupervisorCommand(SupervisorCommand::SetAppStatus(SetAppStatus{app: app.clone(), status: AppStatus::Panic( error.to_string() )}))).await;
+                                                  }
+                                              }
+
+                                          } );
+                                          self.data.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
+                                      }
+                                      else {
+                                          self.backing.set_app_status(app_assign.app.clone(), AppStatus::Waiting )
+                                      }
+
                                   }
                               }
                           }
@@ -148,7 +196,9 @@ impl StarManager for SupervisorManager
                 match command{
                     SupervisorCommand::Pledge => {
                         self.pledge().await;
-
+                    }
+                    SupervisorCommand::SetAppStatus(set_app_status) => {
+                        self.backing.set_app_status(set_app_status.app,set_app_status.status)
                     }
                 }
             }
@@ -219,6 +269,14 @@ impl SupervisorManagerBacking for SupervisorManagerBackingDefault
         self.applications.get(&app )
     }
 
+    fn set_app_status(&mut self, app: AppKey, status: AppStatus){
+println!("SET APP STATUS: {}", status );
+    }
+
+    fn get_app_status(&mut self, app: AppKey) -> AppStatus {
+        AppStatus::Unknown
+    }
+
     fn remove_application(&mut self, app: AppKey) {
         self.applications.remove(&app);
     }
@@ -263,6 +321,8 @@ pub trait SupervisorManagerBacking: Send+Sync
 
     fn add_application(&mut self, app: AppKey, app_data: AppData );
     fn get_application(&mut self, app: AppKey ) -> Option<&AppData>;
+    fn set_app_status(&mut self, app: AppKey, status: AppStatus );
+    fn get_app_status(&mut self, app: AppKey) -> AppStatus;
 
     fn remove_application(&mut self, app: AppKey );
 
