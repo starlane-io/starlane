@@ -136,7 +136,9 @@ impl StarManager for ServerManager
                             SpacePayload::App(app_message) =>
                             {
                                 let (tx,rx) = oneshot::channel();
-                                self.skel.core_tx.send(StarCoreCommand::AppMessage(StarCoreAppMessage{ message: app_message.clone(), tx: tx })).await;
+
+//                                self.skel.core_tx.send(StarCoreCommand::AppMessage(StarCoreAppMessage{ message: app_message.clone(), tx: tx })).await;
+
                                 let star_tx = self.skel.star_tx.clone();
                                 tokio::spawn( async move {
                                     let result = rx.await;

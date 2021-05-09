@@ -18,6 +18,7 @@ pub struct ServerStarCore
     pub skel: StarSkel,
     pub apps: HashMap<AppKey,AppSlice>,
     pub ext: Box<dyn ServerStarCoreExt>,
+    pub supervisor: Option<StarKey>,
     pub core_rx: mpsc::Receiver<StarCoreCommand>
 }
 
@@ -30,6 +31,7 @@ impl ServerStarCore
             skel: skel,
             apps: HashMap::new(),
             ext: ext,
+            supervisor: Option::None,
             core_rx: core_rx
         }
     }
@@ -44,6 +46,7 @@ impl ServerStarCore
 
     pub async fn add( &mut self, key: ActorKey, actor: Box<dyn Actor>, labels: Option<Labels>)
     {
+println!("ADD.... ACTOR....");
         /*
         if let Option::Some(app) = self.apps.get_mut(&key.app )
         {
@@ -68,18 +71,13 @@ impl StarCore for ServerStarCore
         {
             match command
             {
+                StarCoreCommand::SetSupervisor(supervisor) => {
+                    self.supervisor = Option::Some(supervisor);
+                }
                 StarCoreCommand::Watch(_) => {}
 
                 StarCoreCommand::AppMessage(message) => {
-                    match message.message.payload
-                    {
-                        AppMessagePayload::None => {}
-                        AppMessagePayload::Launch(create) => {
-//                                let result = self.ext.app_create_factory_ext( &self.skel.info.kind );
-                            unimplemented!();
 
-                        }
-                    }
                 }
                 _ => {
                 eprintln!("unexpected star command");
@@ -87,12 +85,6 @@ impl StarCore for ServerStarCore
             }
         }
     }
-}
-
-struct Registration
-{
-    pub actor: Box<dyn Actor>,
-    pub labels: Option<Labels>
 }
 
 #[derive(Clone)]
@@ -138,21 +130,39 @@ impl AppContext
 
 }
 
-pub trait AppCreateExt
+#[async_trait]
+pub trait AppLauncher
 {
-    fn create( &self, context: &AppContext, key: AppKey, data: AppCreateData ) -> AppCreateResult;
+    async fn launch(&self, context: &AppContext, key: AppKey, data: AppCreateData ) -> Result<(),AppLaunchError>;
 }
 
+#[async_trait]
 pub trait AppExt
 {
-    fn app_message( &self, context: &AppContext, message: AppMessage ) -> AppMessageResult;
-    fn actor_message( &self, context: &AppContext, message: ActorMessage ) -> ActorMessageResult;
+    async fn app_message( &self, context: &AppContext, message: AppMessage ) ->  Result<(),AppMessageError>;
+    async fn actor_message( &self, context: &AppContext, message: ActorMessage ) -> Result<(),ActorMessageResult>;
 }
 
 pub trait ServerStarCoreExt: StarCoreExt
 {
-    fn app_create_factory_ext(&self, kind: &AppKind) -> Result<Box<dyn AppCreateExt>,AppCreateExtFactoryError>;
+    fn app_launcher(&self, kind: &AppKind) -> Result<Box<dyn AppLauncher>, AppLauncherFactoryError>;
 }
+
+pub enum AppLaunchError
+{
+    Error(String)
+}
+
+pub enum AppMessageError
+{
+    Error(String)
+}
+
+pub enum ActorMessageError
+{
+    Error(String)
+}
+
 
 
 pub struct ExampleServerStarCoreExt
@@ -178,18 +188,18 @@ impl StarCoreExt for ExampleServerStarCoreExt
 #[async_trait]
 impl ServerStarCoreExt for ExampleServerStarCoreExt
 {
-    fn app_create_factory_ext(&self, kind: &AppKind) -> Result<Box<dyn AppCreateExt>,AppCreateExtFactoryError> {
+    fn app_launcher(&self, kind: &AppKind) -> Result<Box<dyn AppLauncher>, AppLauncherFactoryError> {
         match kind.as_str()
         {
             "test"=>Ok(Box::new(TestAppCreateExt::new())),
             _ => {
-                Err(AppCreateExtFactoryError::DoNotServerAppKind(kind.clone()))
+                Err(AppLauncherFactoryError::DoNotServerAppKind(kind.clone()))
             }
         }
     }
 }
 
-pub enum AppCreateExtFactoryError
+pub enum AppLauncherFactoryError
 {
     DoNotServerAppKind(AppKind)
 }
@@ -211,11 +221,12 @@ impl TestAppCreateExt
     }
 }
 
-impl AppCreateExt for TestAppCreateExt
+#[async_trait]
+impl AppLauncher for TestAppCreateExt
 {
-    fn create(&self, context: &AppContext, key: AppKey, data: AppCreateData) -> AppCreateResult {
+    async fn launch(&self, context: &AppContext, key: AppKey, data: AppCreateData) -> Result<(),AppLaunchError>{
         let actor = TestActor::new();
-        AppCreateResult::Ok
+        Ok(())
     }
 }
 
