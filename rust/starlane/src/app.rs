@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::actor::{Actor, ActorCreate, ActorKey, ActorKind, ActorSelect};
 use crate::error::Error;
-use crate::frame::ActorMessage;
+use crate::frame::{ActorMessage, AppCreate, AppMessage};
 use crate::label::{Labels, LabelSelectionCriteria};
 use crate::star::{ActorCommand, StarCommand, StarKey};
 use crate::keys::{AppKey, UserKey, SubSpaceKey};
@@ -19,32 +19,17 @@ pub type AppKind = String;
 
 
 
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct AppCommand
-{
-    pub app: AppKey,
-    pub user: UserKey,
-    pub payload: AppCommandKind
-}
-
 #[derive(Clone,Serialize,Deserialize)]
 pub enum AppCommandKind
 {
-    AppMessageExt(AppMessageExt),
-    ActorCreate(ActorCreate),
-    ActorSelect(ActorSelect),
-    ActorDestroy(ActorKey)
+    AppMessage(AppMessage),
+    Suspend,
+    Resume,
+    Exit
 }
 
 pub type AppMessageKind = String;
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct AppMessageExt
-{
-    pub kind: AppMessageKind,
-    pub data: Arc<Vec<u8>>
-}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct AppSelect
@@ -103,7 +88,7 @@ pub struct AppLocation
 pub struct AppController
 {
     pub app: AppKey,
-    pub tx: mpsc::Sender<AppCommand>
+    pub tx: mpsc::Sender<AppMessage>
 }
 
 impl AppController
@@ -134,7 +119,7 @@ pub trait Application: Send+Sync
 {
     async fn create(&self, context: &AppContext, create: AppCreateController) -> Result<Labels,Error>;
     async fn destroy( &self, context: &AppContext, destroy: AppDestroy ) -> Result<(),Error>;
-    async fn handle_app_command(&self, context: &AppContext, command: AppCommand) -> Result<(),Error>;
+    async fn handle_app_command(&self, context: &AppContext, command: AppMessage) -> Result<(),Error>;
     async fn handle_actor_message( &self, context: &AppContext, actor: &mut Actor, message: ActorMessage  ) -> Result<(),Error>;
 }
 
@@ -145,10 +130,10 @@ pub enum AppStatus
     Unknown,
     Waiting,
     Launching,
-    Ready(AppStatusReady),
+    Ready(AppReadyStatus),
     Suspended,
     Resuming,
-    Panic(PanicDesc),
+    Panic(AppPanicReason),
     Halting(HaltReason),
     Exited
 }
@@ -179,7 +164,7 @@ pub enum HaltReason
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum AppStatusReady
+pub enum AppReadyStatus
 {
     Nominal,
     Alert(Alert)
@@ -188,9 +173,15 @@ pub enum AppStatusReady
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Alert
 {
-    Red(AlertDesc),
-    Yellow(AlertDesc)
+    Red(AppAlertReason),
+    Yellow(AppAlertReason)
 }
 
-pub type AlertDesc = String;
-pub type PanicDesc= String;
+pub type AppAlertReason = String;
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum AppPanicReason
+{
+    Desc(String)
+}
+

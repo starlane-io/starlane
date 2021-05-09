@@ -514,7 +514,7 @@ mod test
             tokio::time::sleep(Duration::from_secs(1)).await;
             if let Ok(space_ctrl) = mesh_ctrl.get_space_controller(&SpaceKey::HyperSpace, &Authentication::mock(UserKey::hyperuser() ) ).await
             {
-                let app_ctrl_result = space_ctrl.create_app( &"someapp".to_string(), &SubSpaceKey::hyper_default(), &Arc::new(vec![]), &Labels::new() ).await;
+                let app_ctrl_result = space_ctrl.create_app( &"test".to_string(), &SubSpaceKey::hyper_default(), &Arc::new(vec![]), &Labels::new() ).await;
                 let app_ctrl_result = app_ctrl_result.await;
                 let app_ctrl = app_ctrl_result.unwrap();
                 match app_ctrl

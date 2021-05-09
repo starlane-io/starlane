@@ -279,6 +279,25 @@ impl StarMessage
         proto
     }
 
+    pub fn reply_err(&self, err: String )->ProtoMessage
+    {
+        let mut proto = ProtoMessage::new();
+        proto.to = Option::Some(self.from.clone());
+        proto.reply_to = Option::Some(self.id.clone());
+        proto.payload = StarMessagePayload::Error(err);
+        proto
+    }
+
+    pub fn reply_ok(&self, reply: Reply )->ProtoMessage
+    {
+        let mut proto = ProtoMessage::new();
+        proto.to = Option::Some(self.from.clone());
+        proto.reply_to = Option::Some(self.id.clone());
+        proto.payload = StarMessagePayload::Ok(reply);
+        proto
+    }
+
+
     pub fn resubmit(self, expect: MessageExpect, tx: broadcast::Sender<MessageUpdate>, rx: broadcast::Receiver<MessageUpdate> ) -> ProtoMessage
     {
         let mut proto = ProtoMessage::with_txrx(tx,rx);
@@ -422,7 +441,7 @@ pub struct AppCreate
 pub enum AppMessagePayload
 {
    None,
-   Launch(AppCreateData)
+   Launch(AppCreateData),
 }
 
 #[derive(Clone,Serialize,Deserialize)]

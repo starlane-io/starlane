@@ -1,10 +1,10 @@
 use tokio::sync::mpsc;
 
 use crate::actor::ActorKey;
-use crate::app::Alert;
-use crate::core::{StarCore, StarCoreCommand, StarCoreExt, StarExt};
+use crate::app::{Alert, AppCommandKind};
+use crate::core::{StarCore, StarCoreCommand, StarCoreExt, StarExt, AppCommandResult};
 use crate::error::Error;
-use crate::frame::{ActorMessage, AppCreate, AppMessage, Watch};
+use crate::frame::{ActorMessage, AppCreate, AppMessage, Watch, AppMessagePayload};
 use crate::star::{ActorCommand, ActorCreate, StarSkel};
 
 pub struct ServerStarCore
@@ -62,15 +62,27 @@ impl StarCore for ServerStarCore
                         }
                     }
                 }
-                StarCoreCommand::Message(_) => {}
                 StarCoreCommand::Watch(_) => {}
-                StarCoreCommand::Actor(actor_command) => {
-                    match actor_command
+
+                StarCoreCommand::AppMessage(message) => {
+                    match message.message.payload
                     {
-                        ActorCommand::Create(create) => {
-
-                            // need to communicate with Ext here...
-
+                        AppMessagePayload::None => {}
+                        AppMessagePayload::Launch(create) => {
+                            match &self.ext
+                            {
+                                None => {
+                                    // fire alert
+                                    self.alert( Alert::Red("ServerStarCore: cannot launch app because StarExt is None".into())).await;
+                                }
+                                Some(ext) => {
+                                    let result = ext.app_create(AppCreate{
+                                        app: message.message.app.clone(),
+                                        data: create
+                                    }).await;
+                                    message.tx.send(result);
+                                }
+                            }
                         }
                     }
                 }
@@ -82,32 +94,10 @@ impl StarCore for ServerStarCore
 #[async_trait]
 pub trait ServerStarCoreExt: StarCoreExt
 {
-    async fn actor_create(&self, create: ActorCreate) -> ActorCreateResult;
-    async fn actor_message(&self, message: ActorMessage) -> ActorMessageResult;
-    async fn app_create(&self, message: AppCreate )->Result<(),Error>;
-    async fn app_message(&self, message: AppMessage ) -> AppMessageResult;
+    async fn app_create(&self, message: AppCreate )-> AppCommandResult;
+    async fn app_message(&self, message: AppMessage ) -> AppCommandResult;
+    async fn actor_message(&self, message: ActorMessage) -> AppCommandResult;
     async fn watch( &self, watch: Watch );
-}
-
-pub enum ActorCreateResult
-{
-    Ok(ActorKey),
-    Error(String)
-}
-
-pub enum ActorMessageResult
-{
-    Ok,
-    ActorNotPresent,
-    Error(String)
-}
-
-pub enum AppMessageResult
-{
-    Ok,
-    AppNotPresent,
-    AppNotReady,
-    Error(String)
 }
 
 
@@ -137,19 +127,26 @@ impl StarCoreExt for ExampleServerStarCoreExt
 #[async_trait]
 impl ServerStarCoreExt for ExampleServerStarCoreExt
 {
-    async fn actor_create(&self, create: ActorCreate) -> ActorCreateResult {
+    async fn app_create(&self, create: AppCreate) -> AppCommandResult {
+        println!("ExampleServer AppCreate");
+        match create.data.kind.as_str()
+        {
+            "test" => {
+println!("creation of the test app...");
+                AppCommandResult::Ok
+            }
+            unexpected => {
+println!("donot know how to create: {}",unexpected);
+                AppCommandResult::Error(format!("do not know how to create app kind {}",unexpected).into())
+            }
+        }
+    }
+
+    async fn actor_message(&self, message: ActorMessage) -> AppCommandResult{
         todo!()
     }
 
-    async fn actor_message(&self, message: ActorMessage) -> ActorMessageResult {
-        todo!()
-    }
-
-    async fn app_create(&self, message: AppCreate) -> Result<(), Error> {
-        todo!()
-    }
-
-    async fn app_message(&self, message: AppMessage) -> AppMessageResult {
+    async fn app_message(&self, message: AppMessage) -> AppCommandResult {
         todo!()
     }
 

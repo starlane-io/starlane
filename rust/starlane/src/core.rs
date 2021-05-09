@@ -10,13 +10,13 @@ use std::thread;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use tokio::runtime::Runtime;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tokio::sync::mpsc::Sender;
 use tokio::time::Duration;
 
 
 use crate::actor::{Actor, ActorKey};
-use crate::app::ApplicationStatus;
+use crate::app::{ApplicationStatus};
 use crate::error::Error;
 use crate::frame::{ActorMessage, AppCreate, AppMessage, StarMessage, StarMessagePayload, Watch, WatchInfo};
 use crate::id::{Id, IdSeq};
@@ -29,9 +29,27 @@ pub enum StarCoreCommand
 {
     StarExt(StarExt),
     StarSkel(StarSkel),
-    Message(ActorMessage),
+    AppMessage(StarCoreAppMessage),
     Watch(Watch),
-    Actor(ActorCommand)
+}
+
+pub struct StarCoreAppMessage
+{
+    pub message: AppMessage,
+    pub tx: oneshot::Sender<AppCommandResult>
+}
+
+pub enum AppCommandResult
+{
+    Ok,
+    Actor(ActorKey),
+    Error(String)
+}
+
+
+pub enum StarCoreMessagePayload
+{
+    AppCommand(AppMessage)
 }
 
 pub enum StarExt

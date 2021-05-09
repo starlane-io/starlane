@@ -2,7 +2,7 @@ use crate::star::central::AppCentral;
 use crate::star::{CentralCommand, ActorCommand};
 use crate::error::Error;
 use std::sync::Arc;
-use crate::app::{AppInfo, Application, AppCommand, AppCreateController, AppContext, AppDestroy};
+use crate::app::{AppInfo, Application, AppMessage, AppCreateController, AppContext, AppDestroy};
 use crate::label::Labels;
 use crate::frame::ActorMessage;
 use crate::actor::Actor;
@@ -24,7 +24,7 @@ impl Application for SystemAppCentral
         Ok(())
     }
 
-    async fn handle_app_command(&self, context: &AppContext, command: AppCommand) -> Result<(), Error> {
+    async fn handle_app_command(&self, context: &AppContext, command: AppMessage) -> Result<(), Error> {
         Ok(())
     }
 

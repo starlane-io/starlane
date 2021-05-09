@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use tokio::sync::mpsc::error::SendError;
 
 use crate::actor::{ActorKey, ActorLocation};
-use crate::app::{AppInfo, Application, AppLocation, AppStatus, AppStatusReady};
+use crate::app::{AppInfo, Application, AppLocation, AppStatus, AppReadyStatus, AppPanicReason};
 use crate::error::Error;
 use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, AppMessage, AppMessagePayload};
 use crate::keys::AppKey;
@@ -158,15 +158,15 @@ impl StarManager for SupervisorManager
                                                   Ok(payload) => {
                                                       match payload {
                                                           StarMessagePayload::Ok(Reply::Empty) => {
-                                                              manager_tx.send( StarManagerCommand::SupervisorCommand(SupervisorCommand::SetAppStatus(SetAppStatus{app: app.clone(), status: AppStatus::Ready(AppStatusReady::Nominal)}))).await;
+                                                              manager_tx.send( StarManagerCommand::SupervisorCommand(SupervisorCommand::SetAppStatus(SetAppStatus{app: app.clone(), status: AppStatus::Ready(AppReadyStatus::Nominal)}))).await;
                                                           }
                                                           _ => {
-                                                              manager_tx.send( StarManagerCommand::SupervisorCommand(SupervisorCommand::SetAppStatus(SetAppStatus{app: app.clone(), status: AppStatus::Panic( "unexpected replay from server...".to_string() )}))).await;
+                                                              manager_tx.send( StarManagerCommand::SupervisorCommand(SupervisorCommand::SetAppStatus(SetAppStatus{app: app.clone(), status: AppStatus::Panic( AppPanicReason::Desc("unexpected replay from server...".to_string()) )}))).await;
                                                           }
                                                       }
                                                   }
                                                   Err(error) => {
-                                                      manager_tx.send( StarManagerCommand::SupervisorCommand(SupervisorCommand::SetAppStatus(SetAppStatus{app: app.clone(), status: AppStatus::Panic( error.to_string() )}))).await;
+                                                      manager_tx.send( StarManagerCommand::SupervisorCommand(SupervisorCommand::SetAppStatus(SetAppStatus{app: app.clone(), status: AppStatus::Panic( AppPanicReason::Desc(error.to_string()) )}))).await;
                                                   }
                                               }
 

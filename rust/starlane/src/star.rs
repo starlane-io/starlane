@@ -25,7 +25,7 @@ use url::Url;
 use server::ServerManager;
 
 use crate::actor::{Actor, ActorKey, ActorKind, ActorLocation, ActorWatcher};
-use crate::app::{AppCommand, AppCommandKind, AppController, AppCreateController, AppInfo, AppKind, Application, AppLocation};
+use crate::app::{AppCommandKind, AppController, AppCreateController, AppInfo, AppKind, Application, AppLocation};
 use crate::core::StarCoreCommand;
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
@@ -414,9 +414,6 @@ impl Star
                     StarCommand::ForwardFrame(forward) => {
                         self.send_frame( forward.to.clone(), forward.frame ).await;
                     }
-                    StarCommand::ActorCommand(command) => {
-                        self.core_tx.send( StarCoreCommand::Actor(command)).await;
-                    }
                     _ => {
                         eprintln!("cannot process command: {}",command);
                     }
@@ -522,7 +519,7 @@ println!("spaces_do_not_match");
         }
     }
 
-    async fn on_app_command( &mut self, command: AppCommand)
+    async fn on_app_command( &mut self, command: AppMessage)
     {
         println!("on_app_command!");
     }
@@ -1343,7 +1340,7 @@ pub enum StarCommand
     FrameTimeout(FrameTimeoutInner),
     FrameError(FrameErrorInner),
     SpaceCommand(SpaceCommand),
-    AppCommand(AppCommand),
+    AppCommand(AppMessage),
     ActorCommand(ActorCommand),
     GetSpaceController(GetSpaceController)
 }
