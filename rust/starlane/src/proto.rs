@@ -14,7 +14,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{Duration, Instant};
 
 use crate::constellation::Constellation;
-use crate::core::{StarCoreFactory, CoreRunner, StarCore, StarCoreCommand};
+use crate::core::{StarCoreFactory, CoreRunner, StarCore, StarCoreCommand, StarCoreExtFactory};
 use crate::error::Error;
 use crate::frame::{Frame, ProtoFrame, WindHit, StarMessage, StarMessagePayload, WindUp, StarPattern, WindDown, SequenceMessage} ;
 use crate::id::{Id, IdSeq};
@@ -37,6 +37,7 @@ pub struct ProtoStar
   lanes: HashMap<StarKey, LaneMeta>,
   connector_ctrls: Vec<ConnectorController>,
   star_manager_factory: Arc<dyn StarManagerFactory>,
+  star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
   core_runner: Arc<CoreRunner>,
   logger: Logger,
   frame_hold: FrameHold,
@@ -46,7 +47,7 @@ pub struct ProtoStar
 
 impl ProtoStar
 {
-    pub fn new(key: Option<StarKey>, kind: StarKind, star_manager_factory: Arc<dyn StarManagerFactory>, core_runner: Arc<CoreRunner>, flags: Flags, logger: Logger ) ->(Self, StarController)
+    pub fn new(key: Option<StarKey>, kind: StarKind, star_manager_factory: Arc<dyn StarManagerFactory>, core_runner: Arc<CoreRunner>, star_core_ext_factory: Arc<dyn StarCoreExtFactory>, flags: Flags, logger: Logger ) ->(Self, StarController)
     {
         let (command_tx, command_rx) = mpsc::channel(32);
         (ProtoStar{
@@ -58,6 +59,7 @@ impl ProtoStar
             lanes: HashMap::new(),
             connector_ctrls: vec![],
             star_manager_factory: star_manager_factory,
+            star_core_ext_factory: star_core_ext_factory,
             core_runner: core_runner,
             logger: logger,
             frame_hold: FrameHold::new(),
@@ -119,9 +121,12 @@ impl ProtoStar
                             auth_token_source: AuthTokenSource {}
                         };
 
+                        let ext = self.star_core_ext_factory.create(&self.kind);
+                        core_tx.send(StarCoreCommand::StarExt(ext)).await;
+
                         // now send star data to manager and core... tricky!
-                        manager_tx.send(StarManagerCommand::StarData(data.clone()) ).await;
                         core_tx.send(StarCoreCommand::StarSkel(data.clone()) ).await;
+                        manager_tx.send(StarManagerCommand::StarData(data.clone()) ).await;
 
                         return Ok(Star::from_proto(data.clone(),
                                                    self.command_rx,

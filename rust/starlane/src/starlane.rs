@@ -16,7 +16,7 @@ use crate::proto::{local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolu
 use crate::provision::Provisioner;
 use crate::star::{Star, StarCommand, StarController, StarKey, StarManagerFactory, StarManagerFactoryDefault, StarName};
 use crate::template::{ConstellationData, ConstellationTemplate, StarKeyIndexTemplate, StarKeySubgraphTemplate, StarKeyTemplate};
-use crate::core::{StarCoreFactory, CoreRunner};
+use crate::core::{StarCoreFactory, CoreRunner, StarCoreExtFactory, ExampleStarCoreExtFactory};
 use crate::logger::{Flags, Logger};
 
 pub struct Starlane
@@ -26,6 +26,7 @@ pub struct Starlane
     star_controllers: HashMap<StarKey,StarController>,
     star_names: HashMap<StarName,StarKey>,
     star_manager_factory: Arc<dyn StarManagerFactory>,
+    star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
     core_runner: Arc<CoreRunner>,
     constellation_names: HashSet<String>,
     pub logger: Logger,
@@ -44,6 +45,7 @@ impl Starlane
             tx: tx,
             rx: rx,
             star_manager_factory: Arc::new( StarManagerFactoryDefault{} ),
+            star_core_ext_factory: Arc::new(ExampleStarCoreExtFactory::new() ),
             core_runner: Arc::new(CoreRunner::new()),
             logger: Logger::new(),
             flags: Flags::new()
@@ -110,7 +112,7 @@ impl Starlane
 
         let link = link.unwrap().clone();
         let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
-        let (proto_star, star_ctrl) = ProtoStar::new(Option::None, link.kind.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.flags.clone(), self.logger.clone() );
+        let (proto_star, star_ctrl) = ProtoStar::new(Option::None, link.kind.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.star_core_ext_factory.clone(), self.flags.clone(), self.logger.clone() );
 
         println!("created proto star: {:?}", &link.kind);
 
@@ -202,7 +204,7 @@ impl Starlane
             let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
             evolve_rxs.push(evolve_rx );
 
-            let (proto_star, star_ctrl) = ProtoStar::new(Option::Some(star_key.clone()), star_template.kind.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.flags.clone(), self.logger.clone() );
+            let (proto_star, star_ctrl) = ProtoStar::new(Option::Some(star_key.clone()), star_template.kind.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.star_core_ext_factory.clone(), self.flags.clone(), self.logger.clone() );
             self.star_controllers.insert(star_key.clone(), star_ctrl.clone() );
             if name.is_some() && star_template.handle.is_some()
             {

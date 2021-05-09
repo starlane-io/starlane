@@ -135,13 +135,21 @@ impl InertStarCore {
     }
 }
 
-pub trait StarCoreExtFactory
+pub trait StarCoreExtFactory: Send+Sync
 {
     fn create( &self, kind: &StarKind ) -> StarExt;
 }
 
 pub struct ExampleStarCoreExtFactory
 {
+}
+
+impl ExampleStarCoreExtFactory
+{
+    pub fn new()->Self
+    {
+        ExampleStarCoreExtFactory{}
+    }
 }
 
 impl StarCoreExtFactory for ExampleStarCoreExtFactory
