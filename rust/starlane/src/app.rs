@@ -5,7 +5,7 @@ use crate::actor::{Actor, ActorCreate, ActorKey, ActorKind, ActorSelect};
 use crate::error::Error;
 use crate::frame::{ActorMessage, AppCreate, AppMessage};
 use crate::label::{Labels, LabelSelectionCriteria};
-use crate::star::{ActorCommand, StarCommand, StarKey};
+use crate::star::{StarCommand, StarKey};
 use crate::keys::{AppKey, UserKey, SubSpaceKey};
 use serde::{Deserialize, Serialize, Serializer};
 use crate::space::{CreateAppControllerFail };
@@ -17,6 +17,13 @@ pub mod system;
 
 pub type AppKind = String;
 
+/**
+  * represents part of an app on one Server or Client star
+  */
+pub struct AppSlice
+{
+    pub actors: HashMap<ActorKey,Box<dyn Actor>>
+}
 
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -183,5 +190,27 @@ pub type AppAlertReason = String;
 pub enum AppPanicReason
 {
     Desc(String)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum AppCreateResult
+{
+    Ok,
+    CannotCreateAppOfKind(AppKind),
+    Error(String)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum AppMessageResult
+{
+    Ok,
+    Error(String)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ActorMessageResult
+{
+    Ok,
+    Error(String)
 }
 

@@ -9,9 +9,10 @@ use tokio::sync::broadcast::Sender;
 use crate::error::Error;
 use crate::frame::{Event, ActorMessage, ActorState};
 use crate::id::Id;
-use crate::label::LabelSelectionCriteria;
+use crate::label::{LabelSelectionCriteria, Labels};
 use crate::star::StarKey;
 use crate::keys::AppKey;
+use crate::core::server::ActorContext;
 
 pub static DEFAULT_ENTITY_KIND_EXT: &str = "default";
 pub static DEFAULT_GATHERING_KIND_EXT: &str = "default";
@@ -21,6 +22,13 @@ pub struct ActorInfo
 {
     pub key: ActorKey,
     pub kind: ActorKind
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ActorProfile
+{
+    pub info: ActorInfo,
+    pub labels: Labels,
 }
 
 #[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
@@ -34,7 +42,7 @@ pub struct ActorKey
 #[async_trait]
 pub trait Actor: Sync+Send
 {
-    async fn handle_message(&mut self, message: ActorMessage );
+    async fn handle_message(&mut self, actor_context: &ActorContext, message: ActorMessage );
 }
 
 pub type ActorKindExt = String;
@@ -144,3 +152,8 @@ pub struct ActorSelect
     criteria: Vec<LabelSelectionCriteria>
 }
 
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ActorStatus
+{
+    Unknown
+}

@@ -106,11 +106,10 @@ impl ProtoStar
                             kind: self.kind.clone()};
                         let manager_tx= self.star_manager_factory.create().await;
 
-                        let star_core_factory = StarCoreFactory::new();
-                        let (core,core_tx) = star_core_factory.create(&self.kind);
-                        self.core_runner.run(core).await;
 
-                        let data = StarSkel {
+                        let (core_tx,core_rx) = mpsc::channel(16);
+
+                        let skel = StarSkel {
                             info: info,
                             sequence: self.sequence.clone(),
                             star_tx: self.command_tx.clone(),
@@ -121,14 +120,15 @@ impl ProtoStar
                             auth_token_source: AuthTokenSource {}
                         };
 
-                        let ext = self.star_core_ext_factory.create(&self.kind);
-                        core_tx.send(StarCoreCommand::StarExt(ext)).await;
+                        let core_ext = self.star_core_ext_factory.create(&skel );
+                        let star_core_factory = StarCoreFactory::new();
+                        let core = star_core_factory.create(skel.clone(), core_ext, core_rx )?;
+                        self.core_runner.run(core).await;
 
                         // now send star data to manager and core... tricky!
-                        core_tx.send(StarCoreCommand::StarSkel(data.clone()) ).await;
-                        manager_tx.send(StarManagerCommand::StarData(data.clone()) ).await;
+                        manager_tx.send(StarManagerCommand::StarData(skel.clone()) ).await;
 
-                        return Ok(Star::from_proto(data.clone(),
+                        return Ok(Star::from_proto(skel.clone(),
                                                    self.command_rx,
                                                    core_tx,
                                                    self.lanes,

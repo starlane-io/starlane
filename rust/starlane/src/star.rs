@@ -1341,7 +1341,8 @@ pub enum StarCommand
     FrameError(FrameErrorInner),
     SpaceCommand(SpaceCommand),
     AppCommand(AppMessage),
-    ActorCommand(ActorCommand),
+    ActorMessage(ActorMessage),
+    AppMessage(AppMessage),
     GetSpaceController(GetSpaceController)
 }
 
@@ -1366,10 +1367,6 @@ pub struct SetFlags
 }
 
 
-pub enum ActorCommand
-{
-   Create(ActorCreate)
-}
 
 pub struct ActorCreate
 {
@@ -1492,14 +1489,7 @@ impl fmt::Display for StarManagerCommand {
     }
 }
 
-impl fmt::Display for ActorCommand {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let r = match self {
-            ActorCommand::Create(_) => format!("Create(_)").to_string()
-        };
-        write!(f, "{}",r)
-    }
-}
+
 
 impl fmt::Display for StarCommand{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1520,12 +1510,13 @@ impl fmt::Display for StarCommand{
             StarCommand::SpaceCommand(_) => format!("AppLifecycleCommand").to_string(),
             StarCommand::AppCommand(_) => format!("AppCommand").to_string(),
             StarCommand::WindDown(_) => format!("SearchReturnResult").to_string(),
-            StarCommand::ActorCommand(command) => format!("EntityCommand({})", command).to_string(),
             StarCommand::SendProtoMessage(_) => format!("SendProtoMessage(_)").to_string(),
             StarCommand::SetFlags(_) => format!("SetFlags(_)").to_string(),
             StarCommand::ConstellationConstructionComplete => "ConstellationConstructionComplete".to_string(),
             StarCommand::Init => "Init".to_string(),
             StarCommand::GetSpaceController(_) => "GetSpaceController".to_string(),
+            StarCommand::ActorMessage(_) => "ActorMessage".to_string(),
+            StarCommand::AppMessage(_) => "AppMessage".to_string()
         };
         write!(f, "{}",r)
     }

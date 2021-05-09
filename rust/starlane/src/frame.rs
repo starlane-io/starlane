@@ -5,7 +5,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize, Serializer};
 use tokio::time::Instant;
 
-use crate::actor::{ActorKey, ActorLocation};
+use crate::actor::{ActorKey, ActorLocation, ActorProfile, ActorStatus};
 use crate::id::Id;
 use crate::star::{StarKey, StarKind, StarWatchInfo, StarNotify, Star, StarCommand, StarInfo, StarSubGraphKey};
 use crate::label::Labels;
@@ -413,8 +413,13 @@ pub enum RequestMessage
     AppSupervisor(AppSupervisorRequest),
     AppLookup(AppLookup),
     AppMessage(AppMessage),
-    AppLabel(AppLabelRequest)
+    AppLabel(AppLabelRequest),
+    ActorRegister(ActorProfile),
+    ActorUnRegister(ActorKey),
+    ActorStatus(ActorStatus)
 }
+
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct AppLabelRequest

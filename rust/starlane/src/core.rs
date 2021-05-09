@@ -20,15 +20,14 @@ use crate::app::{ApplicationStatus};
 use crate::error::Error;
 use crate::frame::{ActorMessage, AppCreate, AppMessage, StarMessage, StarMessagePayload, Watch, WatchInfo};
 use crate::id::{Id, IdSeq};
-use crate::star::{ActorCommand, ActorCreate, StarCommand, StarKey, StarKind, StarManagerCommand, StarSkel};
+use crate::star::{ActorCreate, StarCommand, StarKey, StarKind, StarManagerCommand, StarSkel};
 use crate::core::server::{ServerStarCore, ServerStarCoreExt, ExampleServerStarCoreExt};
+use std::marker::PhantomData;
 
 pub mod server;
 
 pub enum StarCoreCommand
 {
-    StarExt(StarExt),
-    StarSkel(StarSkel),
     AppMessage(StarCoreAppMessage),
     Watch(Watch),
 }
@@ -52,7 +51,7 @@ pub enum StarCoreMessagePayload
     AppCommand(AppMessage)
 }
 
-pub enum StarExt
+pub enum StarCoreExtKind
 {
     None,
     Server(Box<dyn ServerStarCoreExt>)
@@ -79,10 +78,11 @@ impl CoreRunner
          runtime.block_on( async move {
             while let Option::Some(CoreRunnerCommand::Core(mut core)) = rx.recv().await
             {
-               tokio::spawn( async move { core.run().await } );
+               tokio::spawn( async move {
+                   core.run().await
+               } );
             }
          } );
-         runtime.shutdown_background();
       } );
 
       CoreRunner
@@ -100,7 +100,6 @@ impl CoreRunner
 #[async_trait]
 pub trait StarCoreExt: Sync+Send
 {
-    async fn star_skel(&mut self, data: StarSkel);
 }
 
 #[async_trait]
@@ -121,18 +120,22 @@ impl StarCoreFactory
         StarCoreFactory{}
     }
 
-    pub fn create( &self, kind: &StarKind ) -> (Box<dyn StarCore>,Sender<StarCoreCommand>)
+    pub fn create(&self, skel: StarSkel, ext: StarCoreExtKind, core_rx: mpsc::Receiver<StarCoreCommand> ) -> Result<Box<dyn StarCore>,Error>
     {
-        let ( tx, rx ) = mpsc::channel(16);
-        let core:Box<dyn StarCore> = match kind
+        match skel.info.kind
         {
             StarKind::Server(_) => {
-                Box::new(ServerStarCore::new(rx))
+                if let StarCoreExtKind::Server(ext) = ext
+                {
+                    Ok(Box::new(ServerStarCore::new(skel, ext, core_rx)))
+                }
+                else
+                {
+                    Err("expected ServerCoreExt".into())
+                }
             }
-            _ => Box::new(InertStarCore::new())
-        };
-
-        (core,tx)
+            _ => Ok(Box::new(InertStarCore::new()))
+        }
     }
 }
 
@@ -142,8 +145,7 @@ pub struct InertStarCore {
 #[async_trait]
 impl StarCore for InertStarCore
 {
-    async fn run(&mut self) {
-        // do nothing
+    async fn run(&mut self){
     }
 }
 
@@ -155,7 +157,7 @@ impl InertStarCore {
 
 pub trait StarCoreExtFactory: Send+Sync
 {
-    fn create( &self, kind: &StarKind ) -> StarExt;
+    fn create( &self, skell: &StarSkel ) -> StarCoreExtKind;
 }
 
 pub struct ExampleStarCoreExtFactory
@@ -172,13 +174,18 @@ impl ExampleStarCoreExtFactory
 
 impl StarCoreExtFactory for ExampleStarCoreExtFactory
 {
-    fn create(&self, kind: &StarKind) -> StarExt {
-        match kind
+    fn create(&self, skel: &StarSkel ) -> StarCoreExtKind {
+        match skel.info.kind
         {
             StarKind::Server(_) => {
-                StarExt::Server( Box::new(ExampleServerStarCoreExt::new() ) )
+                StarCoreExtKind::Server( Box::new(ExampleServerStarCoreExt::new(skel.clone()) ) )
             }
-            _ => StarExt::None
+            _ => StarCoreExtKind::None
         }
     }
 }
+
+
+
+
+
