@@ -13,7 +13,6 @@ use tokio::sync::{oneshot, mpsc};
 use std::fmt;
 use crate::id::{IdSeq, Id};
 use crate::core::StarCoreCommand;
-use crate::frame::RequestMessage::AppSequenceRequest;
 use tokio::time::Duration;
 use crate::core::server::AppExt;
 use crate::actor;
@@ -24,12 +23,6 @@ pub mod system;
 
 pub type AppKind = Name;
 
-
-pub struct AppArchetype
-{
-    pub config: Artifact,
-    pub kind: AppKind
-}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum AppConfigSrc
@@ -54,8 +47,7 @@ pub enum AppInitData
   */
 pub struct AppSlice
 {
-    pub info: AppInfo,
-    pub owner: UserKey,
+    pub meta: AppMeta,
     pub actors: HashMap<ActorKey,Arc<ActorRef>>,
     sequence: Option<Arc<IdSeq>>,
     skel: StarSkel,
@@ -64,11 +56,10 @@ pub struct AppSlice
 
 impl AppSlice
 {
-    pub fn new( info: AppInfo, owner: UserKey, skel: StarSkel, ext: Box<dyn AppExt> )->Self
+    pub fn new(assign: AppMeta, skel: StarSkel, ext: Box<dyn AppExt> ) ->Self
     {
         AppSlice{
-            info: info,
-            owner: owner,
+            meta: assign,
             actors: HashMap::new(),
             sequence: Option::None,
             skel: skel,
@@ -80,7 +71,7 @@ impl AppSlice
     {
         let (tx,rx) = oneshot::channel();
         self.skel.manager_tx.send(StarManagerCommand::CoreRequest( CoreRequest::AppSequenceRequest(CoreAppSequenceRequest{
-            app: self.info.key.clone(),
+            app: self.meta.app.clone(),
             user: user.clone(),
             tx: tx
         }) )).await;
@@ -101,7 +92,7 @@ impl AppSlice
     {
         if let Option::None = self.sequence
         {
-            let rx = self.unique_seq(self.owner.clone()).await;
+            let rx = self.unique_seq(self.meta.owner.clone()).await;
             let seq = rx.await?;
             self.sequence = Option::Some(seq);
         }
@@ -171,7 +162,7 @@ pub struct AppSelect
 
 pub struct AppCreateController
 {
-    pub info: AppCreateData,
+    pub archetype: AppArchetype,
     pub tx: oneshot::Sender<Result<AppController,CreateAppControllerFail>>
 }
 
@@ -191,22 +182,33 @@ pub enum ApplicationStatus
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct AppInfo
+pub struct AppMeta
 {
-    pub key: AppKey,
-    pub config: AppConfigSrc
+    pub app: AppKey,
+    pub kind: AppKind,
+    pub config: AppConfigSrc,
+    pub owner: UserKey
 }
 
-impl AppInfo
+impl AppMeta
 {
-    pub fn new( key: AppKey, config: AppConfigSrc) -> Self
+    pub fn new( app: AppKey, kind: AppKind, config: AppConfigSrc, owner:UserKey) -> Self
     {
-        AppInfo
+        AppMeta
         {
-            key: key,
-            config: config
+            app: app,
+            kind: kind,
+            config: config,
+            owner: owner
         }
     }
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct AppLaunch
+{
+    pub app: AppKey,
+    pub archetype: AppArchetype
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -233,11 +235,12 @@ pub type Apps = HashMap<AppKind,Box<dyn Application>>;
 pub struct AppContext
 {
 //    pub star_tx: mpsc::Sender<AppCommandWrapper>,
-    pub info: AppInfo
+    pub info: AppMeta
 }
 
+// this is everything describes what an App should be minus it's instance data (instance data like AppKey)
 #[derive(Clone,Serialize,Deserialize)]
-pub struct AppCreateData
+pub struct AppArchetype
 {
     pub owner: UserKey,
     pub sub_space: SubSpaceKey,

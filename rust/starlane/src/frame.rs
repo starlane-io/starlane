@@ -12,7 +12,7 @@ use crate::label::Labels;
 use crate::message::{MessageResult, ProtoMessage, MessageExpect, MessageUpdate};
 use tokio::sync::{oneshot, broadcast, mpsc};
 use crate::keys::{AppKey, UserKey, SubSpaceKey, MessageId};
-use crate::app::{AppLocation, AppKind, AppInfo, AppCreateData};
+use crate::app::{AppLocation, AppKind, AppMeta, AppArchetype, AppConfigSrc, AppLaunch};
 use crate::logger::Flags;
 use crate::error::Error;
 use crate::permissions::{AuthToken, Authentication};
@@ -233,7 +233,6 @@ pub struct StarMessage
    pub from: StarKey,
    pub to: StarKey,
    pub id: MessageId,
-//   pub transaction: Option<Id>,
    pub payload: StarMessagePayload,
    pub reply_to: Option<MessageId>
 }
@@ -284,7 +283,7 @@ impl StarMessage
         let mut proto = ProtoMessage::new();
         proto.to = Option::Some(self.from.clone());
         proto.reply_to = Option::Some(self.id.clone());
-        proto.payload = StarMessagePayload::Error(err);
+        proto.payload = StarMessagePayload::Reply(StarMessageReply::Error(err));
         proto
     }
 
@@ -293,7 +292,7 @@ impl StarMessage
         let mut proto = ProtoMessage::new();
         proto.to = Option::Some(self.from.clone());
         proto.reply_to = Option::Some(self.id.clone());
-        proto.payload = StarMessagePayload::Ok(reply);
+        proto.payload = StarMessagePayload::Reply(StarMessageReply::Ok(reply));
         proto
     }
 
@@ -314,23 +313,44 @@ impl StarMessage
 pub enum StarMessagePayload
 {
    None,
-   Pledge(StarKind),
+   Central(StarMessageCentral),
    Space(SpaceMessage),
-   Ok(Reply),
-   Error(String),
-   Ack(MessageAck),
+   Reply(StarMessageReply),
 }
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum StarMessageCentral
+{
+    Pledge(StarKind)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum StarMessageReply
+{
+    Ok(Reply),
+    Error(String),
+    Ack(MessageAck)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum SimpleReply
+{
+    Ok(Reply),
+    Error(String)
+}
+
 
 impl StarMessagePayload{
     pub fn is_ack(&self)->bool
     {
         match self{
-            StarMessagePayload::Ack(_) => {
-                true
+            StarMessagePayload::Reply(reply) => {
+                match reply{
+                    StarMessageReply::Ack(_) => true,
+                    _ => false,
+                }
             }
-            _ => {
-                false
-            }
+            _ => false
         }
     }
 }
@@ -389,39 +409,48 @@ impl SpaceMessage
 #[derive(Clone,Serialize,Deserialize)]
 pub enum SpacePayload
 {
-    App(AppMessage),
-    Request(RequestMessage),
-    Report(ReportMessage),
-    Assign(AssignMessage),
+    Reply(SpaceReply),
+    Central(CentralPayload),
+    Server(ServerPayload),
+    Supervisor(SupervisorPayload)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum ReportMessage
+pub enum CentralPayload
 {
-   AppLocation(AppLocation),
-   AppSequenceResponse(u64)
+    AppCreate(AppArchetype),
+    AppSupervisorLocationRequest(AppSupervisorLocationRequest),
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum AssignMessage
+pub enum SupervisorPayload
 {
-    App(AppLaunch)
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub enum RequestMessage
-{
-    AppCreate(AppCreateData),
-    AppSupervisor(AppSupervisorRequest),
-    AppLookup(AppLookup),
-    AppMessage(AppMessage),
-    AppLabel(AppLabelRequest),
     AppSequenceRequest(AppKey),
     ActorRegister(ActorProfile),
     ActorUnRegister(ActorKey),
     ActorStatus(ActorStatus)
 }
 
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ServerPayload
+{
+    AppAssign(AppMeta),
+    AppLaunch(AppLaunch),
+    SequenceResponse(u64)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum SpaceReply
+{
+   AppLocation(AppLocation),
+   AppSequenceResponse(u64),
+   Reply(SimpleReply)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum AssignMessage
+{
+}
 
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -434,19 +463,17 @@ pub struct AppLabelRequest
 #[derive(Clone,Serialize,Deserialize)]
 pub struct AppMessage
 {
-    pub app: AppKey,
-    pub payload: AppMessagePayload
+    pub app: AppKey
 }
 
 
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum AppMessagePayload
+pub enum ServerAppPayload
 {
    None,
-   Create(AppCreateData),
-   Host(AppInfo),
-   Launch(AppLaunch)
+   Assign(AppMeta),
+   Launch(AppMeta)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -455,8 +482,6 @@ pub enum ResponseMessage
     AppNotifyCreated(AppNotifyCreated),
     AppSupervisorReport(ApplicationSupervisorReport),
 }
-
-
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Event
@@ -633,20 +658,10 @@ pub struct Rejection
     pub message: String,
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct AppLookup
-{
-    pub name: String
-}
 
 
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct AppLaunch
-{
-    pub app: AppKey,
-    pub info: AppCreateData
-}
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct AppNotifyCreated
@@ -655,7 +670,7 @@ pub struct AppNotifyCreated
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct AppSupervisorRequest
+pub struct AppSupervisorLocationRequest
 {
     pub app: AppKey,
 }
@@ -681,11 +696,9 @@ impl fmt::Display for StarMessagePayload{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
             StarMessagePayload::None => "None".to_string(),
-            StarMessagePayload::Pledge(kind) =>format!("Pledge({})",kind).to_string(),
             StarMessagePayload::Space(_) => "Space".to_string(),
-            StarMessagePayload::Ok(_) => "Ok".to_string(),
-            StarMessagePayload::Error(_) => "Error".to_string(),
-            StarMessagePayload::Ack(_) => "Ack".to_string(),
+            StarMessagePayload::Central(_) => "Central".to_string(),
+            StarMessagePayload::Reply(_) => "Reply".to_string()
         };
         write!(f, "{}",r)
     }

@@ -1,14 +1,14 @@
 use crate::error::Error;
-use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, AppMessagePayload, Reply, AppMessage, SpaceMessage, RequestMessage};
+use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, ServerAppPayload, Reply, AppMessage, SpaceMessage, ServerPayload, StarMessageCentral, StarMessageReply};
 use crate::star::{ServerManagerBacking, StarCommand, StarSkel, StarKey, StarKind, StarManager, StarManagerCommand, Wind, ServerCommand, CoreRequest};
 use crate::message::{ProtoMessage, MessageExpect};
 use crate::logger::{Flag, StarFlag, StarLog, StarLogPayload, Log};
 use tokio::time::{sleep, Duration};
-use crate::core::{StarCoreCommand, StarCoreAppMessage, AppCommandResult, StarCoreAppMessagePayload, StarCoreAppLaunch, StarCoreAppHost};
+use crate::core::{StarCoreCommand, StarCoreAppMessage, AppCommandResult, StarCoreAppMessagePayload, StarCoreAppLaunch, StarCoreAppAssign};
 use crate::app::{AppCommandKind};
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
-use crate::core::server::AppLaunchError;
+use crate::core::server::AppExtError;
 use crate::keys::{AppKey, UserKey};
 
 pub struct ServerManagerBackingDefault
@@ -89,7 +89,7 @@ println!("Server: Could not find Supervisor... waiting 5 seconds to try again...
 
         let mut proto = ProtoMessage::new();
         proto.to = Option::Some(supervisor);
-        proto.payload = StarMessagePayload::Pledge(self.skel.info.kind.clone());
+        proto.payload = StarMessagePayload::Central(StarMessageCentral::Pledge(self.skel.info.kind.clone()));
         proto.expect = MessageExpect::RetryUntilOk;
         let rx = proto.get_ok_result().await;
         self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
@@ -100,7 +100,7 @@ println!("Server: Could not find Supervisor... waiting 5 seconds to try again...
             let mut data = self.skel.clone();
             tokio::spawn(async move {
                 let payload = rx.await;
-                if let Ok(StarMessagePayload::Ok(_)) = payload
+                if let Ok(StarMessagePayload::Reply(StarMessageReply::Ok(_))) = payload
                 {
                     data.logger.log( Log::Star( StarLog::new( &data.info, StarLogPayload::PledgeOkRecv )))
                 }
@@ -125,6 +125,44 @@ impl ServerManager
 impl StarManager for ServerManager
 {
     async fn handle(&mut self, command: StarManagerCommand) {
+       match command
+       {
+           StarManagerCommand::Init => {
+               self.pledge().await;
+           }
+           StarManagerCommand::StarMessage(star_message) => {
+               match star_message.payload{
+                   StarMessagePayload::Space(space_message) => {
+                       match space_message.payload
+                       {
+                           SpacePayload::Server(server_space_message) => {
+                               match server_space_message
+                               {
+                                   ServerPayload::AppAssign(meta) => {
+
+                                   }
+                                   ServerPayload::SequenceResponse(_) => {}
+                                   ServerPayload::AppLaunch(launch) => {}
+                               }
+                           }
+                           _ => {}
+                       }
+                   }
+                   _ => {}
+               }
+           }
+           StarManagerCommand::ServerCommand(command) => {
+               match command
+               {
+                   ServerCommand::PledgeToSupervisor => {}
+               }
+           }
+           _ => {}
+       }
+    }
+
+        /*
+    async fn handle(&mut self, command: StarManagerCommand) {
         match command {
             StarManagerCommand::StarSkel(_) => {}
             StarManagerCommand::Init => {
@@ -140,13 +178,13 @@ impl StarManager for ServerManager
                             {
                                 match &app_message.payload
                                 {
-                                    AppMessagePayload::None => {
+                                    ServerAppPayload::None => {
                                         // do nothing
                                     }
-                                    AppMessagePayload::Host(info) => {
+                                    ServerAppPayload::Assign(info) => {
                                         let (tx,rx) = oneshot::channel();
-                                        let payload = StarCoreAppMessagePayload::Host(StarCoreAppHost{
-                                            info: info.clone(),
+                                        let payload = StarCoreAppMessagePayload::Assign(StarCoreAppAssign {
+                                            assign: info.clone(),
                                             tx: tx
                                         }) ;
                                         let message = StarCoreAppMessage{ app: app_message.app.clone(), payload: payload };
@@ -177,7 +215,7 @@ impl StarManager for ServerManager
                                             }
                                         } );
                                     }
-                                    AppMessagePayload::Launch(launch) => {
+                                    ServerAppPayload::Launch(launch) => {
 println!("AppMessagePayload::Create...");
                                        let (tx,rx) = oneshot::channel();
                                        let payload = StarCoreAppMessagePayload::Launch(StarCoreAppLaunch{
@@ -212,7 +250,6 @@ println!("AppMessagePayload::Create...");
                                            }
                                        } );
                                     }
-
                                     _ => {}
                                 }
                             }
@@ -270,4 +307,6 @@ println!("AppMessagePayload::Create...");
             }
         }
     }
+
+         */
 }

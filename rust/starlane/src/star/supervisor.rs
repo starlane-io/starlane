@@ -7,9 +7,9 @@ use async_trait::async_trait;
 use tokio::sync::mpsc::error::SendError;
 
 use crate::actor::{ActorKey, ActorLocation};
-use crate::app::{AppInfo, Application, AppLocation, AppStatus, AppReadyStatus, AppPanicReason};
+use crate::app::{AppMeta, Application, AppLocation, AppStatus, AppReadyStatus, AppPanicReason};
 use crate::error::Error;
-use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, AppMessage, AppMessagePayload, RequestMessage, ReportMessage};
+use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, AppMessage, ServerAppPayload, SpaceReply, StarMessageCentral, StarMessageReply, SupervisorPayload};
 use crate::keys::AppKey;
 use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait};
@@ -20,7 +20,8 @@ use tokio::sync::oneshot::error::RecvError;
 pub enum SupervisorCommand
 {
     Pledge,
-    SetAppStatus(SetAppStatus)
+    SetAppStatus(SetAppStatus),
+    AppAssignmentAcceptedNowLaunch()
 }
 
 pub struct SetAppStatus
@@ -52,7 +53,7 @@ impl SupervisorManager
     {
         let mut proto = ProtoMessage::new();
         proto.to = Option::Some(StarKey::central());
-        proto.payload = StarMessagePayload::Pledge(self.skel.info.kind.clone());
+        proto.payload = StarMessagePayload::Central(StarMessageCentral::Pledge(self.skel.info.kind.clone()));
         proto.expect = MessageExpect::RetryUntilOk;
         let rx = proto.get_ok_result().await;
         self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
@@ -63,7 +64,7 @@ impl SupervisorManager
             let mut data = self.skel.clone();
             tokio::spawn(async move {
                 let payload = rx.await;
-                if let Ok(StarMessagePayload::Ok(_)) = payload
+                if let Ok(StarMessagePayload::Reply(StarMessageReply::Ok(_))) = payload
                 {
                     data.logger.log( Log::Star( StarLog::new( &data.info, StarLogPayload::PledgeOkRecv )))
                 }
@@ -84,14 +85,14 @@ impl SupervisorManager
 
     pub async fn reply_ok(&self, message: StarMessage)
     {
-        let mut proto = message.reply(StarMessagePayload::Ok(Reply::Empty));
+        let mut proto = message.reply(StarMessagePayload::Reply(StarMessageReply::Ok(Reply::Empty)));
         let result = self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
         self.unwrap(result);
     }
 
     pub async fn reply_error(&self, mut message: StarMessage, error_message: String )
     {
-        message.reply(StarMessagePayload::Error(error_message.to_string()));
+        message.reply(StarMessagePayload::Reply(StarMessageReply::Error(error_message.to_string())));
         let result = self.skel.star_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await;
         self.unwrap(result);
     }
@@ -101,9 +102,23 @@ impl SupervisorManager
 #[async_trait]
 impl StarManager for SupervisorManager
 {
+    async fn handle(&mut self, command: StarManagerCommand) {
+        match &command
+        {
+            StarManagerCommand::StarSkel(_) => {}
+            StarManagerCommand::Init => {}
+            StarManagerCommand::CoreRequest(_) => {}
+            StarManagerCommand::StarMessage(_) => {}
+            StarManagerCommand::CentralCommand(_) => {}
+            StarManagerCommand::SupervisorCommand(_) => {}
+            StarManagerCommand::ServerCommand(_) => {}
+        }
+    }
+
+    /*
     async fn handle(&mut self, command: StarManagerCommand)  {
 
-        match command
+        match &command
         {
 
            StarManagerCommand::Init => {
@@ -112,119 +127,74 @@ impl StarManager for SupervisorManager
            StarManagerCommand::StarMessage(message)=>{
               match &message.payload
               {
-                  StarMessagePayload::Pledge(kind) => {
-                      self.backing.add_server(message.from.clone());
-                      self.reply_ok(message).await;
-                      if self.skel.flags.check( Flag::Star(StarFlag::DiagnosePledge )) {
+                  StarMessagePayload::Central(central) => {
 
-                          self.skel.logger.log( Log::Star(StarLog::new(&self.skel.info, StarLogPayload::PledgeRecv )));
+                      match central
+                      {
+                          StarMessageCentral::Pledge(_) => {
+                              self.backing.add_server(message.from.clone());
+                              self.reply_ok(message.clone()).await;
+                              if self.skel.flags.check( Flag::Star(StarFlag::DiagnosePledge )) {
+
+                                  self.skel.logger.log( Log::Star(StarLog::new(&self.skel.info, StarLogPayload::PledgeRecv )));
+                              }
+                          }
                       }
                   }
                   StarMessagePayload::Space(space_message) =>
                   {
                       match &space_message.payload
                       {
-                          SpacePayload::Assign(assign) => {
+                      /*    SpacePayload::Assign(assign) => {
                               match assign
                               {
-                                  AssignMessage::App(app_assign) => {
-                                      let app = app_assign.app.clone();
-                                      let data = AppData{
-                                          info: AppInfo{
-                                              key: app_assign.app.clone(),
-                                              config : app_assign.info.config.clone()
-                                          },
-                                          servers: HashSet::new()
-                                      };
-                                      self.backing.add_application(app.clone(), data );
-                                      let proto = message.reply(StarMessagePayload::Ok(Reply::Empty));
-                                      self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-
-                                      if let Option::Some(server)=self.backing.select_server()
-                                      {
-                                          self.backing.set_app_status(app.clone(), AppStatus::Launching );
-                                          let launch_app_message = space_message.with_payload(SpacePayload::App(AppMessage { app: app.clone(), payload: AppMessagePayload::Create(app_assign.info.clone()) }));
-                                          let mut proto = ProtoMessage::new();
-                                          proto.to = Option::Some(server);
-                                          proto.payload = StarMessagePayload::Space(launch_app_message);
-                                          proto.expect = MessageExpect::ReplyErrOrTimeout(MessageExpectWait::Med);
-                                          let result = proto.get_ok_result().await;
-
-                                          let manager_tx = self.skel.manager_tx.clone();
-                                          tokio::spawn( async move {
-
-                                              match result.await
-                                              {
-                                                  Ok(payload) => {
-                                                      match payload {
-                                                          StarMessagePayload::Ok(Reply::Empty) => {
-                                                              manager_tx.send( StarManagerCommand::SupervisorCommand(SupervisorCommand::SetAppStatus(SetAppStatus{app: app.clone(), status: AppStatus::Ready(AppReadyStatus::Nominal)}))).await;
-                                                          }
-                                                          _ => {
-                                                              manager_tx.send( StarManagerCommand::SupervisorCommand(SupervisorCommand::SetAppStatus(SetAppStatus{app: app.clone(), status: AppStatus::Panic( AppPanicReason::Desc("unexpected replay from server...".to_string()) )}))).await;
-                                                          }
-                                                      }
-                                                  }
-                                                  Err(error) => {
-                                                      manager_tx.send( StarManagerCommand::SupervisorCommand(SupervisorCommand::SetAppStatus(SetAppStatus{app: app.clone(), status: AppStatus::Panic( AppPanicReason::Desc(error.to_string()) )}))).await;
-                                                  }
-                                              }
-
-                                          } );
-                                          self.skel.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
-                                      }
-                                      else {
-                                          self.backing.set_app_status(app_assign.app.clone(), AppStatus::Waiting )
-                                      }
+                                  AssignMessage::App(launch) => {
 
                                   }
                               }
-                          }
-                          SpacePayload::Request(request)=>
-                          {
-                              match request
+
+                       */
+                          SpacePayload::Supervisor(payload) => {
+                              match payload
                               {
-                                  RequestMessage::AppSequenceRequest(app) => {
-                                     let seq = self.backing.app_sequence_next(app);
-                                     let proto = message.reply(StarMessagePayload::Space(space_message.with_payload(SpacePayload::Report(ReportMessage::AppSequenceResponse(seq)))));
-                                     self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                                  SupervisorPayload::AppSequenceRequest(_) => {
+                                      unimplemented!()
                                   }
-                                  _ => {
-
-                                      eprintln!("supervisor manager doesn't handle this request..." );
+                                  SupervisorPayload::ActorRegister(_) => {
+                                      unimplemented!();
+                                  }
+                                  SupervisorPayload::ActorUnRegister(_) => {
+                                      unimplemented!();
+                                  }
+                                  SupervisorPayload::ActorStatus(_) => {
+                                      unimplemented!();
                                   }
                               }
-                          }
 
-                          _ => {
-                              eprintln!("supervisor manager doesn't handle ..." );
                           }
+                          _ => {}
                       }
 
-                  }
-                  StarMessagePayload::Ok(_)=>{}
-                  what => {
-                      eprintln!("supervisor manager doesn't handle {}", what )
-                  }
+                      }
+
+                  StarMessagePayload::None => {}
+                  StarMessagePayload::Reply(_) => {}
               }
-           }
-           StarManagerCommand::SupervisorCommand(command) => {
-                match command{
-                    SupervisorCommand::Pledge => {
-                        self.pledge().await;
-                    }
-                    SupervisorCommand::SetAppStatus(set_app_status) => {
-                        self.backing.set_app_status(set_app_status.app,set_app_status.status)
-                    }
-                }
-            }
-            what => {
-                eprintln!("supervisor manager doesn't handle {}", what )
-            }
+
+              }
+            StarManagerCommand::StarSkel(_) => {}
+            StarManagerCommand::CoreRequest(_) => {}
+            StarManagerCommand::CentralCommand(_) => {}
+            StarManagerCommand::SupervisorCommand(_) => {}
+            StarManagerCommand::ServerCommand(_) => {}
         }
 
-    }
+
+
+    }}
+     */
 }
+
 
 
 impl SupervisorManager
@@ -319,13 +289,13 @@ println!("SET APP STATUS: {}", status );
 
 pub struct AppData
 {
-    pub info: AppInfo,
+    pub info: AppMeta,
     pub servers: HashSet<StarKey>
 }
 
 impl AppData
 {
-    pub fn new(info: AppInfo)->Self
+    pub fn new(info: AppMeta) ->Self
     {
         AppData{
             info: info,

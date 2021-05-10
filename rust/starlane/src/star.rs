@@ -25,11 +25,11 @@ use url::Url;
 use server::ServerManager;
 
 use crate::actor::{Actor, ActorKey, ActorKind, ActorLocation, ActorWatcher};
-use crate::app::{AppCommandKind, AppController, AppCreateController, AppInfo, AppKind, Application, AppLocation};
+use crate::app::{AppCommandKind, AppController, AppCreateController, AppMeta, AppKind, Application, AppLocation};
 use crate::core::StarCoreCommand;
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, AppLaunch, ApplicationSupervisorReport, AppMessage, AppMessagePayload, AppNotifyCreated, AppSupervisorRequest, Event, Frame, ProtoFrame, Rejection, ReportMessage, RequestMessage, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, ApplicationSupervisorReport, AppMessage, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, CentralPayload};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId, SpaceKey, UserKey};
@@ -465,7 +465,7 @@ println!("on_space_command");
         match command.kind
         {
             SpaceCommandKind::AppCreateController(create) => {
-                if command.space != create.info.sub_space.space
+                if command.space != create.archetype.sub_space.space
                 {
 println!("spaces_do_not_match");
                     create.tx.send(Err(CreateAppControllerFail::SpacesDoNotMatch) );
@@ -473,9 +473,9 @@ println!("spaces_do_not_match");
                 else {
                     // send app create reqeust to central
                     let space_message = SpaceMessage {
-                        sub_space: create.info.sub_space.clone(),
+                        sub_space: create.archetype.sub_space.clone(),
                         user: command.user.clone(),
-                        payload: SpacePayload::Request(RequestMessage::AppCreate(create.info.clone()))
+                        payload: SpacePayload::Central(CentralPayload::AppCreate(create.archetype.clone()))
                     };
 
                     let mut proto = ProtoMessage::new();
@@ -486,6 +486,8 @@ println!("spaces_do_not_match");
                     let result= proto.get_ok_result().await;
                     let star_tx = self.data.star_tx.clone();
                     tokio::spawn( async move {
+unimplemented!()
+/*
                         let result = match result.await
                         {
                             Ok(payload) => {
@@ -512,6 +514,8 @@ println!("spaces_do_not_match");
                             }
                         };
                         create.tx.send(result);
+
+ */
                     });
                     self.send_proto_message(proto).await;
             }
@@ -2099,9 +2103,7 @@ impl StarManager for PlaceholderStarManager
             StarManagerCommand::Init => {}
             StarManagerCommand::StarMessage(message)=>{
                 match &message.payload{
-                    StarMessagePayload::Ok(_) => {}
-                    StarMessagePayload::Error(_) => {}
-                    StarMessagePayload::Ack(_) => {}
+                    StarMessagePayload::Reply(_) => {}
                     _ => {
                         println!("command {} Placeholder unimplemented for kind: {}",command,self.data.info.kind);
                     }

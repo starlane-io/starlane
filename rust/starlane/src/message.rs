@@ -1,5 +1,5 @@
 use crate::star::{StarKey, StarSearchTransaction, Transaction, TransactionResult, StarCommand};
-use crate::frame::{StarMessagePayload, Frame, StarMessage, MessageAck};
+use crate::frame::{StarMessagePayload, Frame, StarMessage, MessageAck, StarMessageReply};
 use crate::error::Error;
 use crate::lane::LaneMeta;
 use std::cell::Cell;
@@ -7,8 +7,9 @@ use crate::id::Id;
 use tokio::sync::{mpsc, oneshot, broadcast};
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::mpsc::Sender;
-use crate::keys::MessageId;
+use crate::keys::{MessageId, SubSpaceKey, UserKey};
 use tokio::sync::broadcast::error::RecvError;
+use serde::{Serialize, Deserialize};
 
 pub struct ProtoMessage
 {
@@ -84,6 +85,9 @@ impl ProtoMessage
         waiter.wait().await;
         rx
     }
+
+
+
 }
 
 
@@ -98,17 +102,25 @@ impl MessageReplyTracker
     pub fn on_message(&self, message: &StarMessage ) -> TrackerJob
     {
         match &message.payload {
-            StarMessagePayload::Ack(ack) => {
-              self.tx.send( MessageUpdate::Ack(ack.clone()) );
-              TrackerJob::Continue
+            StarMessagePayload::Reply(reply) => {
+                match reply
+                {
+                    StarMessageReply::Ok(reply) => {
+                        self.tx.send(MessageUpdate::Result(MessageResult::Ok(message.payload.clone())));
+                        TrackerJob::Done
+                    }
+                    StarMessageReply::Error(error) => {
+                        self.tx.send(MessageUpdate::Result(MessageResult::Err(error.clone())));
+                        TrackerJob::Done
+                    }
+                    StarMessageReply::Ack(ack) => {
+                        self.tx.send( MessageUpdate::Ack(ack.clone()) );
+                        TrackerJob::Continue
+                    }
+                }
             }
-            StarMessagePayload::Error(error) => {
-                self.tx.send(MessageUpdate::Result(MessageResult::Err(error.clone())));
-              TrackerJob::Done
-            }
-            payload => {
-              self.tx.send(MessageUpdate::Result(MessageResult::Ok(payload.clone())));
-              TrackerJob::Done
+            _ => {
+                TrackerJob::Continue
             }
        }
     }
@@ -312,4 +324,7 @@ impl ResultWaiter
             }});
     }
 }
+
+
+
 

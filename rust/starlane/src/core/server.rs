@@ -1,10 +1,10 @@
 use tokio::sync::mpsc;
 
 use crate::actor::{ActorKey, Actor, ActorInfo, ActorProfile, NewActor, ActorAssign, ActorKind, ActorKindExt, ActorContext, ActorRef};
-use crate::app::{Alert, AppCommandKind, AppKind, AppCreateData, AppInfo, AppCreateResult, AppMessageResult, ActorMessageResult, AppSlice};
+use crate::app::{Alert, AppCommandKind, AppKind, AppArchetype, AppMeta, AppCreateResult, AppMessageResult, ActorMessageResult, AppSlice};
 use crate::core::{StarCore, StarCoreCommand, StarCoreExt, StarCoreExtKind, AppCommandResult, StarCoreAppMessagePayload};
 use crate::error::Error;
-use crate::frame::{ActorMessage, AppMessage, Watch, AppMessagePayload, StarMessagePayload, SpaceMessage, SpacePayload, RequestMessage};
+use crate::frame::{ActorMessage, AppMessage, Watch, ServerAppPayload, StarMessagePayload, SpaceMessage, SpacePayload };
 use crate::star::{ActorCreate, StarSkel, StarCommand, StarKey};
 use crate::keys::{AppKey, SubSpaceKey, UserKey};
 use crate::message::ProtoMessage;
@@ -86,12 +86,24 @@ impl StarCore for ServerStarCore
                         match message.payload
                         {
                             StarCoreAppMessagePayload::None => {}
-                            StarCoreAppMessagePayload::Host(host) => {
-                                unimplemented!()
+                            StarCoreAppMessagePayload::Assign(assign ) => {
+                                match self.ext.app_ext(&assign.assign.kind)
+                                {
+                                    Ok(app_ext) => {
+                                        let app_slice = AppSlice::new(assign.assign,self.skel.clone(), app_ext );
+                                        self.apps.insert( app.clone(), app_slice );
+                                    }
+                                    Err(error) => {
+                                        assign.tx.send(Result::Err(error));
+
+                                    }
+                                }
                             }
                             StarCoreAppMessagePayload::Launch(launch) => {
 
-                                let launcher = self.ext.app_launcher(&launch.launch.info.kind);
+                                unimplemented!()
+                                /*
+                                let launcher = self.ext.app_launcher(&launch.launch.data.kind);
                                 match launcher
                                 {
                                     Ok(launcher) => {
@@ -114,6 +126,7 @@ impl StarCore for ServerStarCore
                                         launch.tx.send(Result::Err(error));
                                     }
                                 }
+                                 */
                             }
 
                         }
@@ -128,15 +141,11 @@ println!("StarCore received app message!");
     }
 }
 
-#[async_trait]
-pub trait AppLauncher: Send+Sync
-{
-    async fn launch(&self, app: &mut AppSlice, data: AppCreateData ) -> Result<(),AppLaunchError>;
-}
 
 #[async_trait]
 pub trait AppExt : Sync+Send
 {
+    async fn launch(&self, app: &mut AppSlice, archetype: AppArchetype) -> Result<(), AppExtError>;
     async fn actor_create(&self, app: &mut AppSlice, assign: ActorAssign ) -> Result<Box<dyn Actor>,ActorCreateError>;
     async fn app_message( &self, app: &mut AppSlice, message: AppMessage ) ->  Result<(),AppMessageError>;
     async fn actor_message( &self, app: &mut AppSlice, message: ActorMessage ) -> Result<(),ActorMessageResult>;
@@ -149,10 +158,10 @@ pub enum ActorCreateError
 
 pub trait ServerStarCoreExt: StarCoreExt
 {
-    fn app_launcher( &self, kind: &AppKind ) -> Result<Box<dyn AppLauncher>, AppLaunchError>;
+    fn app_ext( &self, kind: &AppKind ) -> Result<Box<dyn AppExt>, AppExtError>;
 }
 
-pub enum AppLaunchError
+pub enum AppExtError
 {
     DoNotKnowAppKind(AppKind),
     Error(String)
@@ -193,15 +202,13 @@ impl StarCoreExt for ExampleServerStarCoreExt
 #[async_trait]
 impl ServerStarCoreExt for ExampleServerStarCoreExt
 {
-    fn app_launcher(&self, kind: &AppKind) -> Result<Box<dyn AppLauncher>, AppLaunchError> {
-println!("ServerStarCoreExt::app_launcher()");
-
+    fn app_ext(&self, kind: &AppKind) -> Result<Box<dyn AppExt>, AppExtError> {
         if *kind == crate::names::TEST_APP_KIND.as_name()
         {
             Ok(Box::new(TestAppCreateExt::new()))
         }
         else {
-            Err(AppLaunchError::DoNotKnowAppKind(kind.clone()))
+            Err(AppExtError::DoNotKnowAppKind(kind.clone()))
         }
     }
 }
@@ -225,12 +232,12 @@ impl TestAppCreateExt
 }
 
 #[async_trait]
-impl AppLauncher for TestAppCreateExt
+impl AppExt for TestAppCreateExt
 {
-    async fn launch(&self, app: &mut AppSlice, data: AppCreateData ) -> Result<(),AppLaunchError>
+    async fn launch(&self, app: &mut AppSlice, archetype: AppArchetype) -> Result<(), AppExtError>
     {
         let actor = app.actor_create(actor::MakeMeAnActor {
-            app: app.info.key.clone(),
+            app: app.meta.app.clone(),
             kind: crate::names::TEST_ACTOR_KIND.as_kind(),
             data: Arc::new(vec![]),
             labels: Default::default()
@@ -242,9 +249,21 @@ impl AppLauncher for TestAppCreateExt
                 Ok(())
             }
             Err(err) => {
-                Err(AppLaunchError::Error(err.to_string()))
+                Err(AppExtError::Error(err.to_string()))
             }
         }
+    }
+
+    async fn actor_create(&self, app: &mut AppSlice, assign: ActorAssign) -> Result<Box<dyn Actor>, ActorCreateError> {
+        todo!()
+    }
+
+    async fn app_message(&self, app: &mut AppSlice, message: AppMessage) -> Result<(), AppMessageError> {
+        todo!()
+    }
+
+    async fn actor_message(&self, app: &mut AppSlice, message: ActorMessage) -> Result<(), ActorMessageResult> {
+        todo!()
     }
 }
 

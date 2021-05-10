@@ -16,12 +16,12 @@ use tokio::time::Duration;
 
 
 use crate::actor::{Actor, ActorKey};
-use crate::app::{ApplicationStatus, AppCreateData, AppInfo};
+use crate::app::{ApplicationStatus, AppArchetype, AppMeta};
 use crate::error::Error;
-use crate::frame::{ActorMessage, AppMessage, StarMessage, StarMessagePayload, Watch, WatchInfo, AppMessagePayload, AppLaunch};
+use crate::frame::{ActorMessage, AppMessage, StarMessage, StarMessagePayload, Watch, WatchInfo, ServerAppPayload};
 use crate::id::{Id, IdSeq};
 use crate::star::{ActorCreate, StarCommand, StarKey, StarKind, StarManagerCommand, StarSkel};
-use crate::core::server::{ServerStarCore, ServerStarCoreExt, ExampleServerStarCoreExt, AppLaunchError};
+use crate::core::server::{ServerStarCore, ServerStarCoreExt, ExampleServerStarCoreExt, AppExtError};
 use std::marker::PhantomData;
 use crate::keys::AppKey;
 use crate::artifact::{Artifact, ArtifactKey};
@@ -44,20 +44,20 @@ pub struct StarCoreAppMessage
 pub enum StarCoreAppMessagePayload
 {
     None,
-    Host(StarCoreAppHost),
+    Assign(StarCoreAppAssign),
     Launch(StarCoreAppLaunch)
 }
 
-pub struct StarCoreAppHost
+pub struct StarCoreAppAssign
 {
-    pub info: AppInfo,
-    pub tx: oneshot::Sender<Result<(),AppLaunchError>>
+    pub assign: AppMeta,
+    pub tx: oneshot::Sender<Result<(), AppExtError>>
 }
 
 pub struct StarCoreAppLaunch
 {
-    pub launch: AppLaunch,
-    pub tx: oneshot::Sender<Result<(),AppLaunchError>>
+    pub launch: AppMeta,
+    pub tx: oneshot::Sender<Result<(), AppExtError>>
 }
 
 pub enum AppCommandResult

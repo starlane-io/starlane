@@ -7,9 +7,9 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::oneshot::Receiver;
 
-use crate::app::{AppCreateController, AppInfo, ApplicationStatus, AppLocation, AppCreateData};
+use crate::app::{AppCreateController, AppMeta, ApplicationStatus, AppLocation, AppArchetype};
 use crate::error::Error;
-use crate::frame::{AppLaunch, AssignMessage, Frame, ReportMessage, RequestMessage, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply};
+use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, CentralPayload, StarMessageCentral, ServerPayload, StarMessageReply};
 use crate::id::Id;
 use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId};
 use crate::label::Labels;
@@ -20,6 +20,7 @@ use crate::star::StarCommand::SpaceCommand;
 use crate::permissions::{AppAccess, AuthToken, User, UserKind};
 use crate::crypt::{PublicKey, CryptKeyId};
 use crate::frame::Reply::App;
+use crate::frame::CentralPayload::AppCreate;
 
 pub struct CentralManager
 {
@@ -72,15 +73,15 @@ impl CentralManager
 
     pub async fn reply_ok(&self, message: StarMessage)
     {
-        let mut proto = message.reply(StarMessagePayload::Ok(Reply::Empty));
+        let mut proto = message.reply(StarMessagePayload::Reply(StarMessageReply::Ok(Reply::Empty)));
         let result = self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
         self.unwrap(result);
     }
 
     pub async fn reply_error(&self, mut message: StarMessage, error_message: String )
     {
-        message.reply(StarMessagePayload::Error(error_message.to_string()));
-        let result = self.data.star_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await;
+        let mut proto = message.reply(StarMessagePayload::Reply(StarMessageReply::Error(error_message)));
+        let result = self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
         self.unwrap(result);
     }
 
@@ -90,7 +91,10 @@ impl CentralManager
 #[async_trait]
 impl StarManager for CentralManager
 {
-    async fn handle(&mut self, command: StarManagerCommand) {
+    async fn handle(&mut self, command: StarManagerCommand)
+    {}
+
+    /*async fn handle(&mut self, command: StarManagerCommand) {
         if let StarManagerCommand::Init = command
         {
 
@@ -100,37 +104,29 @@ impl StarManager for CentralManager
             let mut message = message;
             match &message.payload
             {
-
-                StarMessagePayload::Pledge(StarKind::Supervisor) => {
-
-                    self.backing.add_supervisor(message.from.clone());
-                    self.reply_ok(message).await;
-                    if self.data.flags.check( Flag::Star(StarFlag::DiagnosePledge )) {
-                        self.data.logger.log( Log::Star(StarLog::new(&self.data.info, StarLogPayload::PledgeRecv )));
-                    }
-                }
                 StarMessagePayload::Space(space_message) => {
                     match &space_message.payload
                     {
-                        SpacePayload::Request(space_message_payload) => {
-                            match space_message_payload {
-                                RequestMessage::AppCreate(create) => {
+                        SpacePayload::Central(central_payload) => {
+                            match central_payload {
+                                CentralPayload::AppCreate(archetype) => {
                                     if let Option::Some(supervisor) = self.backing.select_supervisor()
                                     {
                                         let mut proto = ProtoMessage::new();
-                                        let app = AppKey::new( create.sub_space.clone() );
-                                        proto.payload = StarMessagePayload::Space( space_message.with_payload(SpacePayload::Assign(AssignMessage::App(AppLaunch {app:app.clone(),info:create.clone()}))));
-                                        proto.to = Option::Some(supervisor);
+                                        let app = AppKey::new(create.sub_space.clone());
+                                        let assign = AppMeta::new(app, archetype.kind.clone(), archetype.config.clone(), archetype.owner.clone() );
+                                        proto.payload = StarMessagePayload::Space(space_message.with_payload(SpacePayload::Server(ServerPayload::AppAssign(assign))));
+                                        proto.to(supervisor);
                                         let reply = proto.get_ok_result().await;
                                         self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                                         match reply.await
                                         {
                                             Ok(StarMessagePayload::Ok(Empty)) => {
-                                                let proto = message.reply(StarMessagePayload::Ok(App(app.clone())) );
+                                                let proto = message.reply(StarMessagePayload::Ok(App(app.clone())));
                                                 self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                                             }
                                             Err(error) => {
-                                                let proto = message.reply(StarMessagePayload::Error(format!("central: receiving error: {}.",error).into()));
+                                                let proto = message.reply(StarMessagePayload::Error(format!("central: receiving error: {}.", error).into()));
                                                 self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                                             }
                                             _ => {
@@ -138,32 +134,42 @@ impl StarManager for CentralManager
                                                 self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                                             }
                                         }
-                                    }
-                                    else
-                                    {
+                                    } else {
                                         let proto = message.reply(StarMessagePayload::Error("central: no supervisors selected.".into()));
                                         self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                                     }
                                 }
-                                RequestMessage::AppSupervisor(_) => {}
-                                RequestMessage::AppLookup(_) => {}
-                                _ => {}
+                                CentralPayload::AppSupervisorLocationRequest(_) => {}
                             }
                         }
                         _ => {}
                     }
                 }
-                StarMessagePayload::Ok(_)=>{},
-                StarMessagePayload::Error(_)=>{},
-                unexpected => { eprintln!("CentralManager: unexpected message: {} ", unexpected) }
+                StarMessagePayload::Central(central) => {
+                    match central {
+                        StarMessageCentral::Pledge(supervisor) => {
+                            self.backing.add_supervisor(message.from.clone());
+                            self.reply_ok(message).await;
+                            if self.data.flags.check(Flag::Star(StarFlag::DiagnosePledge)) {
+                                self.data.logger.log(Log::Star(StarLog::new(&self.data.info, StarLogPayload::PledgeRecv)));
+                            }
+                        }
+                    }
+                }
+                _ => {}
             }
         }
-    }
+    }*/
 
+}
+/*
+StarMessagePayload::Pledge(StarKind::Supervisor) => {
 
 
 }
+}
 
+ */
 
 #[derive(Clone)]
 pub enum CentralStatus
@@ -202,7 +208,7 @@ pub struct CentralManagerBackingDefault
     init_status: CentralInitStatus,
     supervisors: Vec<StarKey>,
     application_to_supervisor: HashMap<AppKey,StarKey>,
-    application_name_to_app_id : HashMap<String,AppInfo>,
+    application_name_to_app_id : HashMap<String, AppMeta>,
     application_state: HashMap<AppKey, ApplicationStatus>,
     supervisor_index: usize
 }
@@ -277,5 +283,5 @@ impl CentralManagerBacking for CentralManagerBackingDefault
 #[async_trait]
 pub trait AppCentral
 {
-    async fn create( &self, info: AppInfo, data: Arc<Vec<u8>> ) -> Result<Labels,Error>;
+    async fn create(&self, info: AppMeta, data: Arc<Vec<u8>> ) -> Result<Labels,Error>;
 }
