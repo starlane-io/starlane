@@ -314,12 +314,19 @@ pub enum StarMessagePayload
 {
    None,
    Central(StarMessageCentral),
+   Supervisor(StarMessageSupervisor),
    Space(SpaceMessage),
    Reply(StarMessageReply),
 }
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum StarMessageCentral
+{
+    Pledge(StarKind)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum StarMessageSupervisor
 {
     Pledge(StarKind)
 }
@@ -428,7 +435,7 @@ pub enum SupervisorPayload
     AppSequenceRequest(AppKey),
     ActorRegister(ActorProfile),
     ActorUnRegister(ActorKey),
-    ActorStatus(ActorStatus)
+    ActorStatus(ActorStatus),
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -698,7 +705,8 @@ impl fmt::Display for StarMessagePayload{
             StarMessagePayload::None => "None".to_string(),
             StarMessagePayload::Space(_) => "Space".to_string(),
             StarMessagePayload::Central(_) => "Central".to_string(),
-            StarMessagePayload::Reply(_) => "Reply".to_string()
+            StarMessagePayload::Reply(_) => "Reply".to_string(),
+            StarMessagePayload::Supervisor(_) => "Supervisor".to_string()
         };
         write!(f, "{}",r)
     }

@@ -29,7 +29,7 @@ use crate::app::{AppCommandKind, AppController, AppCreateController, AppMeta, Ap
 use crate::core::StarCoreCommand;
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, ApplicationSupervisorReport, AppMessage, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, CentralPayload};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, ApplicationSupervisorReport, AppMessage, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, CentralPayload, StarMessageReply};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId, SpaceKey, UserKey};
@@ -461,7 +461,6 @@ impl Star
 
     async fn on_space_command(&mut self, command: SpaceCommand )
     {
-println!("on_space_command");
         match command.kind
         {
             SpaceCommandKind::AppCreateController(create) => {
@@ -471,7 +470,8 @@ println!("spaces_do_not_match");
                     create.tx.send(Err(CreateAppControllerFail::SpacesDoNotMatch) );
                 }
                 else {
-                    // send app create reqeust to central
+println!("Received AppCreateController!");
+                    // send app create request to central
                     let space_message = SpaceMessage {
                         sub_space: create.archetype.sub_space.clone(),
                         user: command.user.clone(),
@@ -486,36 +486,23 @@ println!("spaces_do_not_match");
                     let result= proto.get_ok_result().await;
                     let star_tx = self.data.star_tx.clone();
                     tokio::spawn( async move {
-unimplemented!()
-/*
-                        let result = match result.await
-                        {
-                            Ok(payload) => {
-                                match payload
-                                {
-                                    StarMessagePayload::Ok(Reply::App(app)) => {
-                                        let (tx,mut rx) = mpsc::channel(1);
-                                        tokio::spawn( async move {
-                                            while let Option::Some(command) = rx.recv().await
-                                            {
-                                                star_tx.send(StarCommand::AppCommand(command)).await;
-                                            }
-                                        } );
-                                        Ok(AppController{
-                                            app: app,
-                                            tx: tx
-                                        })
-                                    }
-                                    _ => { Result::Err(CreateAppControllerFail::UnexpectedResponse) }
-                                }
-                            }
-                            _ => {
-                                Result::Err(CreateAppControllerFail::UnexpectedResponse)
-                            }
-                        };
-                        create.tx.send(result);
 
- */
+                        if let Result::Ok(Result::Ok(StarMessagePayload::Reply(StarMessageReply::Ok(Reply::App(app))))) = tokio::time::timeout(Duration::from_secs(5), result).await
+                        {
+                            let (tx,mut rx) = mpsc::channel(1);
+                            tokio::spawn( async move {
+                                while let Option::Some(command) = rx.recv().await
+                                {
+                                    star_tx.send(StarCommand::AppCommand(command)).await;
+                                }
+                            } );
+
+                            create.tx.send(
+                                Ok(AppController{
+                                    app: app,
+                                    tx: tx
+                                }));
+                        }
                     });
                     self.send_proto_message(proto).await;
             }

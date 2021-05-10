@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, ServerAppPayload, Reply, AppMessage, SpaceMessage, ServerPayload, StarMessageCentral, StarMessageReply};
+use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, ServerAppPayload, Reply, AppMessage, SpaceMessage, ServerPayload, StarMessageCentral, StarMessageReply, StarMessageSupervisor};
 use crate::star::{ServerManagerBacking, StarCommand, StarSkel, StarKey, StarKind, StarManager, StarManagerCommand, Wind, ServerCommand, CoreRequest};
 use crate::message::{ProtoMessage, MessageExpect};
 use crate::logger::{Flag, StarFlag, StarLog, StarLogPayload, Log};
@@ -67,7 +67,6 @@ impl ServerManager
 
     async fn pledge(&mut self)->Result<(),Error>
     {
-println!("Pledge to supervisor!");
         let supervisor = match self.get_supervisor(){
             None => {
                 loop
@@ -90,7 +89,7 @@ println!("Server: Could not find Supervisor... waiting 5 seconds to try again...
 
         let mut proto = ProtoMessage::new();
         proto.to = Option::Some(supervisor);
-        proto.payload = StarMessagePayload::Central(StarMessageCentral::Pledge(self.skel.info.kind.clone()));
+        proto.payload = StarMessagePayload::Supervisor(StarMessageSupervisor::Pledge(self.skel.info.kind.clone()));
         proto.expect = MessageExpect::RetryUntilOk;
         let rx = proto.get_ok_result().await;
         self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;

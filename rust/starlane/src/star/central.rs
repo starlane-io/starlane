@@ -103,7 +103,6 @@ impl StarManager for CentralManager
                        match central_message
                        {
                            StarMessageCentral::Pledge(kind) => {
-println!("Central REceived Supervisor Pledge!");
                                if kind.is_supervisor()
                                {
                                    self.backing.add_supervisor(star_message.from.clone());

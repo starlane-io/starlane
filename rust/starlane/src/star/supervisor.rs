@@ -9,7 +9,7 @@ use tokio::sync::mpsc::error::SendError;
 use crate::actor::{ActorKey, ActorLocation};
 use crate::app::{AppMeta, Application, AppLocation, AppStatus, AppReadyStatus, AppPanicReason};
 use crate::error::Error;
-use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, AppMessage, ServerAppPayload, SpaceReply, StarMessageCentral, StarMessageReply, SupervisorPayload};
+use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, AppMessage, ServerAppPayload, SpaceReply, StarMessageCentral, StarMessageReply, SupervisorPayload, StarMessageSupervisor};
 use crate::keys::AppKey;
 use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait};
@@ -144,6 +144,19 @@ impl StarManager for SupervisorManager
                             }
                             _ => {}
                         }
+                    }
+                    StarMessagePayload::Supervisor(star_message_supervisor)=> {
+                            match star_message_supervisor
+                            {
+                                StarMessageSupervisor::Pledge(kind) => {
+                                    self.backing.add_server(star_message.from.clone());
+                                    self.reply_ok(star_message.clone()).await;
+                                    if self.skel.flags.check( Flag::Star(StarFlag::DiagnosePledge )) {
+
+                                        self.skel.logger.log( Log::Star(StarLog::new(&self.skel.info, StarLogPayload::PledgeRecv )));
+                                    }
+                                }
+                            }
                     }
                     _ => {}
                 }
