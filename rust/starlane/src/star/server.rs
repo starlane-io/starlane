@@ -67,6 +67,7 @@ impl ServerManager
 
     async fn pledge(&mut self)->Result<(),Error>
     {
+println!("Pledge to supervisor!");
         let supervisor = match self.get_supervisor(){
             None => {
                 loop
@@ -154,7 +155,9 @@ impl StarManager for ServerManager
            StarManagerCommand::ServerCommand(command) => {
                match command
                {
-                   ServerCommand::PledgeToSupervisor => {}
+                   ServerCommand::PledgeToSupervisor => {
+                       self.pledge().await;
+                   }
                }
            }
            _ => {}

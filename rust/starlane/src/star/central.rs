@@ -92,7 +92,41 @@ impl CentralManager
 impl StarManager for CentralManager
 {
     async fn handle(&mut self, command: StarManagerCommand)
-    {}
+    {
+        match &command
+        {
+            StarManagerCommand::Init => {}
+            StarManagerCommand::StarMessage(star_message) => {
+               match &star_message.payload
+               {
+                   StarMessagePayload::Central(central_message) => {
+                       match central_message
+                       {
+                           StarMessageCentral::Pledge(kind) => {
+println!("Central REceived Supervisor Pledge!");
+                               if kind.is_supervisor()
+                               {
+                                   self.backing.add_supervisor(star_message.from.clone());
+                                   self.reply_ok(star_message.clone()).await;
+                                   if self.data.flags.check(Flag::Star(StarFlag::DiagnosePledge)) {
+                                       self.data.logger.log(Log::Star(StarLog::new(&self.data.info, StarLogPayload::PledgeRecv)));
+                                   }
+                               }
+                               else
+                               {
+                                   self.reply_error(star_message.clone(),format!("expected Supervisor kind got {}",kind)).await;
+                               }
+                           }
+                       }
+                   }
+                   StarMessagePayload::Space(_) => {}
+                   _ => {}
+               }
+            }
+            StarManagerCommand::CentralCommand(_) => {}
+            _ => {}
+        }
+    }
 
     /*async fn handle(&mut self, command: StarManagerCommand) {
         if let StarManagerCommand::Init = command

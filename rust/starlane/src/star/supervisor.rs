@@ -105,13 +105,50 @@ impl StarManager for SupervisorManager
     async fn handle(&mut self, command: StarManagerCommand) {
         match &command
         {
-            StarManagerCommand::StarSkel(_) => {}
-            StarManagerCommand::Init => {}
-            StarManagerCommand::CoreRequest(_) => {}
-            StarManagerCommand::StarMessage(_) => {}
-            StarManagerCommand::CentralCommand(_) => {}
-            StarManagerCommand::SupervisorCommand(_) => {}
-            StarManagerCommand::ServerCommand(_) => {}
+            StarManagerCommand::Init => {
+                self.pledge().await;
+            }
+            StarManagerCommand::SupervisorCommand(supervisor_command) => {
+                match supervisor_command
+                {
+                    SupervisorCommand::Pledge => {
+                        self.pledge().await;
+                    }
+                    SupervisorCommand::SetAppStatus(set_app_status) => {
+                        self.backing.set_app_status(set_app_status.app.clone(), set_app_status.status.clone());
+                    }
+                    SupervisorCommand::AppAssignmentAcceptedNowLaunch() => {
+                        unimplemented!();
+                    }
+                }
+            }
+            StarManagerCommand::StarMessage( star_message) =>
+            {
+                match &star_message.payload
+                {
+                    StarMessagePayload::Space(space_message) => {
+                        match &space_message.payload
+                        {
+                            SpacePayload::Supervisor(supervisor_payload) => {
+                                match supervisor_payload
+                                {
+                                    SupervisorPayload::AppSequenceRequest(app_key) => {
+                                        let index = self.backing.app_sequence_next(app_key);
+                                        let reply = star_message.reply(StarMessagePayload::Reply(StarMessageReply::Ok(Reply::Seq(index))));
+                                        self.skel.star_tx.send(StarCommand::SendProtoMessage(reply)).await;
+                                    }
+                                    SupervisorPayload::ActorRegister(_) => {}
+                                    SupervisorPayload::ActorUnRegister(_) => {}
+                                    SupervisorPayload::ActorStatus(_) => {}
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
         }
     }
 
