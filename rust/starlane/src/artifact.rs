@@ -3,6 +3,8 @@ use crate::error::Error;
 use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
 use std::str::Split;
+use crate::actor::{ActorKindExt, ActorKind};
+use crate::app::AppKind;
 
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct Artifact
@@ -11,13 +13,18 @@ pub struct Artifact
     pub kind: ArtifactKind
 }
 
+
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub enum ArtifactKind
 {
     File,
-    AppExt(Name),
-    ActorExt(Name)
+    AppConfig(AppKind),
+    ActorConfig(ActorKind),
+    ActorInit(ActorKind),
+    Ext(ArtifactKindExt)
 }
+
+pub type ArtifactKindExt = Name;
 
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct ArtifactKey
@@ -26,11 +33,17 @@ pub struct ArtifactKey
     pub id: u64
 }
 
+#[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
+pub struct NameKey
+{
+    pub sub_space: SubSpaceKey,
+    pub id: u64
+}
 
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct ArtifactBundle
 {
-    pub hyper: String,
+    pub domain: String,
     pub space: String,
     pub sub_space: String,
     pub bundle: String,
@@ -45,7 +58,7 @@ impl ArtifactBundle
 
         Ok((ArtifactBundle
         {
-            hyper: parts.next().ok_or("hyper")?.to_string(),
+            domain: parts.next().ok_or("hyper")?.to_string(),
             space: parts.next().ok_or("space")?.to_string(),
             sub_space: parts.next().ok_or("sub_space")?.to_string(),
             bundle: parts.next().ok_or("bundle")?.to_string(),
@@ -61,7 +74,7 @@ impl ArtifactBundle
 
     pub fn to(&self) -> String {
         let mut rtn = String::new();
-        rtn.push_str(self.hyper.as_str()); rtn.push_str(":");
+        rtn.push_str(self.domain.as_str()); rtn.push_str(":");
         rtn.push_str(self.space.as_str()); rtn.push_str(":");
         rtn.push_str(self.sub_space.to_string().as_str()); rtn.push_str(":");
         rtn.push_str(self.bundle.to_string().as_str()); rtn.push_str(":");
@@ -134,35 +147,40 @@ impl Name
         rtn.push_str(self.path.as_str());
         return rtn;
     }
+
+    pub fn as_name(&self)->Self
+    {
+        self.clone()
+    }
 }
 
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
-pub struct HyperName
+pub struct DomainName
 {
-    pub hyper: String
+    pub domain: String
 }
 
-impl HyperName
+impl DomainName
 {
     pub fn more(string: &str) -> Result<(Self,Split<&str>),Error>
     {
         let mut parts = string.split(":");
 
-        Ok((HyperName
+        Ok((DomainName
             {
-                hyper: parts.next().ok_or("hyper")?.to_string(),
-            },parts))
+                domain: parts.next().ok_or("hyper")?.to_string(),
+            }, parts))
     }
 
     pub fn from(string: &str) -> Result<Self,Error>
     {
-        let (hyper,_) = HyperName::more(string)?;
+        let (hyper,_) = DomainName::more(string)?;
         Ok(hyper)
     }
 
     pub fn to(&self) -> String {
         let mut rtn = String::new();
-        rtn.push_str(self.hyper.as_str());
+        rtn.push_str(self.domain.as_str());
         return rtn;
     }
 }
@@ -170,7 +188,7 @@ impl HyperName
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct SpaceName
 {
-    pub hyper: HyperName,
+    pub hyper: DomainName,
     pub space: String
 }
 
@@ -178,7 +196,7 @@ impl SpaceName
 {
     pub fn more(string: &str) -> Result<(Self,Split<&str>),Error>
     {
-        let (hyper,mut parts) = HyperName::more(string)?;
+        let (hyper,mut parts) = DomainName::more(string)?;
 
         Ok((SpaceName
             {

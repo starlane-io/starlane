@@ -422,13 +422,14 @@ mod test
     use crate::starlane::{ConstellationCreate, Starlane, StarlaneCommand, StarControlRequestByName};
     use crate::template::{ConstellationData, ConstellationTemplate};
     use crate::star::{StarController, StarKind, StarInfo, StarKey};
-    use crate::app::{AppController, AppKind};
+    use crate::app::{AppController, AppKind, AppInitData, AppConfigSrc};
     use crate::logger::{Flags, Flag, StarFlag, LogAggregate, Log, ProtoStarLog, ProtoStarLogPayload, StarLog, StarLogPayload};
     use crate::keys::{SpaceKey, UserKey, SubSpaceKey};
     use crate::permissions::Authentication;
     use std::sync::Arc;
     use crate::label::Labels;
     use crate::space::CreateAppControllerFail;
+    use crate::artifact::{Artifact, ArtifactId, ArtifactKind, Name};
 
     #[test]
     pub fn starlane()
@@ -514,7 +515,8 @@ mod test
             tokio::time::sleep(Duration::from_secs(1)).await;
             if let Ok(space_ctrl) = mesh_ctrl.get_space_controller(&SpaceKey::HyperSpace, &Authentication::mock(UserKey::hyperuser() ) ).await
             {
-                let app_ctrl_result = space_ctrl.create_app( &"test".to_string(), &SubSpaceKey::hyper_default(), &Arc::new(vec![]), &Labels::new() ).await;
+
+                let app_ctrl_result = space_ctrl.create_app( &crate::names::TEST_APP_KIND.clone(), &AppConfigSrc::None, &AppInitData::None, &SubSpaceKey::hyper_default(), &Labels::new() ).await;
                 let app_ctrl_result = app_ctrl_result.await;
                 let app_ctrl = app_ctrl_result.unwrap();
                 match app_ctrl

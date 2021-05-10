@@ -4,7 +4,7 @@ use crate::actor::{ActorKey, Actor, ActorInfo, ActorProfile, NewActor, ActorAssi
 use crate::app::{Alert, AppCommandKind, AppKind, AppCreateData, AppInfo, AppCreateResult, AppMessageResult, ActorMessageResult, AppSlice};
 use crate::core::{StarCore, StarCoreCommand, StarCoreExt, StarCoreExtKind, AppCommandResult, StarCoreAppMessagePayload};
 use crate::error::Error;
-use crate::frame::{ActorMessage, AppCreate, AppMessage, Watch, AppMessagePayload, StarMessagePayload, SpaceMessage, SpacePayload, RequestMessage};
+use crate::frame::{ActorMessage, AppMessage, Watch, AppMessagePayload, StarMessagePayload, SpaceMessage, SpacePayload, RequestMessage};
 use crate::star::{ActorCreate, StarSkel, StarCommand, StarKey};
 use crate::keys::{AppKey, SubSpaceKey, UserKey};
 use crate::message::ProtoMessage;
@@ -13,6 +13,7 @@ use crate::label::Labels;
 use crate::id::IdSeq;
 use std::sync::Arc;
 use crate::actor;
+use crate::artifact::Artifact;
 
 
 pub struct ServerStarCore
@@ -85,6 +86,9 @@ impl StarCore for ServerStarCore
                         match message.payload
                         {
                             StarCoreAppMessagePayload::None => {}
+                            StarCoreAppMessagePayload::Host(host) => {
+                                unimplemented!()
+                            }
                             StarCoreAppMessagePayload::Launch(launch) => {
 
                                 let launcher = self.ext.app_launcher(&launch.create.kind);
@@ -111,9 +115,7 @@ impl StarCore for ServerStarCore
                                     }
                                 }
                             }
-                            StarCoreAppMessagePayload::Host(_) => {
-                                unimplemented!()
-                            }
+
                         }
                     }
 println!("StarCore received app message!");
@@ -147,7 +149,7 @@ pub enum ActorCreateError
 
 pub trait ServerStarCoreExt: StarCoreExt
 {
-    fn app_launcher(&self, kind: &AppKind) -> Result<Box<dyn AppLauncher>, AppLaunchError>;
+    fn app_launcher( &self, kind: &AppKind ) -> Result<Box<dyn AppLauncher>, AppLaunchError>;
 }
 
 pub enum AppLaunchError
@@ -193,12 +195,13 @@ impl ServerStarCoreExt for ExampleServerStarCoreExt
 {
     fn app_launcher(&self, kind: &AppKind) -> Result<Box<dyn AppLauncher>, AppLaunchError> {
 println!("ServerStarCoreExt::app_launcher()");
-        match kind.as_str()
+
+        if *kind == crate::names::TEST_APP_KIND.as_name()
         {
-            "test"=>Ok(Box::new(TestAppCreateExt::new())),
-            _ => {
-                Err(AppLaunchError::DoNotKnowAppKind(kind.clone()))
-            }
+            Ok(Box::new(TestAppCreateExt::new()))
+        }
+        else {
+            Err(AppLaunchError::DoNotKnowAppKind(kind.clone()))
         }
     }
 }
@@ -228,7 +231,7 @@ impl AppLauncher for TestAppCreateExt
     {
         let actor = app.actor_create(actor::MakeMeAnActor {
             app: app.info.key.clone(),
-            kind: ActorKind::Actor("test".to_string()),
+            kind: crate::names::TEST_ACTOR_KIND.as_kind(),
             data: Arc::new(vec![]),
             labels: Default::default()
         }).await;

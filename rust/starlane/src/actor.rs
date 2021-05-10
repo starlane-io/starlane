@@ -12,9 +12,7 @@ use crate::id::Id;
 use crate::label::{LabelSelectionCriteria, Labels};
 use crate::star::StarKey;
 use crate::keys::AppKey;
-
-pub static DEFAULT_ENTITY_KIND_EXT: &str = "default";
-pub static DEFAULT_GATHERING_KIND_EXT: &str = "default";
+use crate::artifact::Name;
 
 pub struct ActorContext
 {
@@ -56,7 +54,7 @@ pub trait Actor: Sync+Send
     async fn handle_message(&mut self, actor_context: &ActorContext, message: ActorMessage );
 }
 
-pub type ActorKindExt = String;
+pub type ActorKindExt = Name;
 pub type GatheringKindExt = String;
 
 #[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
@@ -68,14 +66,13 @@ pub enum ActorKind
 
 impl ActorKind
 {
-    pub fn default_entity()->Self {
-        ActorKind::Actor(DEFAULT_ENTITY_KIND_EXT.to_string())
-    }
-
-    pub fn default_gathering()-> Self {
-        ActorKind::Actor(DEFAULT_GATHERING_KIND_EXT.to_string())
+    // it looks a little pointless but helps get around a compiler problem with static_lazy values
+    pub fn as_kind(&self)->Self
+    {
+       self.clone()
     }
 }
+
 
 impl fmt::Display for ActorKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

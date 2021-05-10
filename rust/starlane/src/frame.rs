@@ -438,12 +438,7 @@ pub struct AppMessage
     pub payload: AppMessagePayload
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct AppCreate
-{
-    pub app: AppKey,
-    pub data: AppCreateData
-}
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum AppMessagePayload

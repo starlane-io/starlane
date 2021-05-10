@@ -1,4 +1,4 @@
-use crate::app::{AppCreateController, AppSelect, AppController, AppKind, AppCreateData};
+use crate::app::{AppCreateController, AppSelect, AppController, AppKind, AppCreateData, AppInitData, AppConfigSrc};
 use crate::keys::{SpaceKey, UserKey, AppKey, SubSpaceKey};
 use serde::{Deserialize, Serialize, Serializer};
 use std::fmt;
@@ -7,6 +7,7 @@ use std::sync::Arc;
 use crate::permissions::Authentication;
 use crate::error::Error;
 use crate::label::Labels;
+use crate::artifact::Artifact;
 
 pub struct SpaceCommand
 {
@@ -37,7 +38,7 @@ impl SpaceController
        }
    }
 
-   pub async fn create_app( &self, kind: &AppKind, sub_space: &SubSpaceKey, data: &Arc<Vec<u8>>, labels: &Labels ) -> oneshot::Receiver<Result<AppController,CreateAppControllerFail>>
+   pub async fn create_app( &self, kind: &AppKind, config: &AppConfigSrc, init: &AppInitData, sub_space: &SubSpaceKey,  labels: &Labels ) -> oneshot::Receiver<Result<AppController,CreateAppControllerFail>>
    {
        let (tx,rx) = oneshot::channel();
 
@@ -45,7 +46,8 @@ impl SpaceController
            owner: self.user.clone(),
            sub_space: sub_space.clone(),
            kind: kind.clone(),
-           data: data.clone(),
+           config: config.clone(),
+           init: init.clone(),
            labels: labels.clone(),
        };
 

@@ -18,12 +18,13 @@ use tokio::time::Duration;
 use crate::actor::{Actor, ActorKey};
 use crate::app::{ApplicationStatus, AppCreateData};
 use crate::error::Error;
-use crate::frame::{ActorMessage, AppCreate, AppMessage, StarMessage, StarMessagePayload, Watch, WatchInfo, AppMessagePayload};
+use crate::frame::{ActorMessage, AppMessage, StarMessage, StarMessagePayload, Watch, WatchInfo, AppMessagePayload};
 use crate::id::{Id, IdSeq};
 use crate::star::{ActorCreate, StarCommand, StarKey, StarKind, StarManagerCommand, StarSkel};
 use crate::core::server::{ServerStarCore, ServerStarCoreExt, ExampleServerStarCoreExt, AppLaunchError};
 use std::marker::PhantomData;
 use crate::keys::AppKey;
+use crate::artifact::{Artifact, ArtifactKey};
 
 pub mod server;
 
@@ -43,13 +44,13 @@ pub struct StarCoreAppMessage
 pub enum StarCoreAppMessagePayload
 {
     None,
-    Host(StarCoreAppLaunch),
+    Host(StarCoreAppHost),
     Launch(StarCoreAppLaunch)
 }
 
 pub struct StarCoreAppHost
 {
-
+    artifact: ArtifactKey
 }
 
 pub struct StarCoreAppLaunch

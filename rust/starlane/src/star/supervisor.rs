@@ -132,7 +132,7 @@ impl StarManager for SupervisorManager
                                       let data = AppData{
                                           info: AppInfo{
                                               key: app_assign.app.clone(),
-                                              kind: app_assign.info.kind.clone()
+                                              config : app_assign.info.config.clone()
                                           },
                                           servers: HashSet::new()
                                       };

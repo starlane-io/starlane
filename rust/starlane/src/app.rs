@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::actor::{Actor, MakeMeAnActor, ActorKey, ActorKind, ActorSelect, ActorRef, NewActor, ActorAssign};
 use crate::error::Error;
-use crate::frame::{ActorMessage, AppCreate, AppMessage};
+use crate::frame::{ActorMessage, AppMessage};
 use crate::label::{Labels, LabelSelectionCriteria};
 use crate::star::{StarCommand, StarKey, StarSkel, StarManagerCommand, CoreRequest, CoreAppSequenceRequest, ActorCreate};
 use crate::keys::{AppKey, UserKey, SubSpaceKey};
@@ -17,15 +17,34 @@ use crate::frame::RequestMessage::AppSequenceRequest;
 use tokio::time::Duration;
 use crate::core::server::AppExt;
 use crate::actor;
+use crate::artifact::{ArtifactKey, Artifact, Name};
+use crate::filesystem::File;
 
 pub mod system;
 
-pub type AppKind = String;
+pub type AppKind = Name;
 
 
 pub struct AppArchetype
 {
+    pub config: Artifact,
+    pub kind: AppKind
+}
 
+#[derive(Clone,Serialize,Deserialize)]
+pub enum AppConfigSrc
+{
+    None,
+    Artifact(Artifact)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum AppInitData
+{
+    None,
+    Artifact(Artifact),
+    Raw(Arc<Vec<u8>>),
+    File(File)
 }
 
 
@@ -175,17 +194,17 @@ pub enum ApplicationStatus
 pub struct AppInfo
 {
     pub key: AppKey,
-    pub kind: AppKind
+    pub config: AppConfigSrc
 }
 
 impl AppInfo
 {
-    pub fn new( key: AppKey, kind: AppKind ) -> Self
+    pub fn new( key: AppKey, config: AppConfigSrc) -> Self
     {
         AppInfo
         {
             key: key,
-            kind: kind
+            config: config
         }
     }
 }
@@ -223,7 +242,8 @@ pub struct AppCreateData
     pub owner: UserKey,
     pub sub_space: SubSpaceKey,
     pub kind: AppKind,
-    pub data: Arc<Vec<u8>>,
+    pub config: AppConfigSrc,
+    pub init: AppInitData,
     pub labels: Labels
 }
 

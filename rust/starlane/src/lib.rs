@@ -7,6 +7,8 @@ extern crate log;
 #[macro_use]
 extern crate async_trait;
 
+#[macro_use]
+extern crate lazy_static;
 
 pub mod star;
 pub mod lane;
@@ -33,4 +35,7 @@ pub mod logger;
 pub mod crypt;
 pub mod util;
 pub mod artifact;
+pub mod config;
+pub mod names;
+pub mod filesystem;
 
