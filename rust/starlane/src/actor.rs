@@ -12,10 +12,14 @@ use crate::id::Id;
 use crate::label::{LabelSelectionCriteria, Labels};
 use crate::star::StarKey;
 use crate::keys::AppKey;
-use crate::core::server::ActorContext;
 
 pub static DEFAULT_ENTITY_KIND_EXT: &str = "default";
 pub static DEFAULT_GATHERING_KIND_EXT: &str = "default";
+
+pub struct ActorContext
+{
+
+}
 
 #[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
 pub struct ActorInfo
@@ -38,6 +42,13 @@ pub struct ActorKey
     pub id: Id,
 }
 
+
+pub struct ActorRef
+{
+    pub key: ActorKey,
+    pub kind: ActorKind,
+    pub actor: Box<dyn Actor>
+}
 
 #[async_trait]
 pub trait Actor: Sync+Send
@@ -138,12 +149,27 @@ impl ActorWatcher
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ActorCreate
+pub struct MakeMeAnActor
 {
     pub app: AppKey,
     pub kind: ActorKind,
     pub data: Arc<Vec<u8>>,
-    pub labels: HashMap<String,String>
+    pub labels: Labels
+}
+
+pub struct NewActor
+{
+    pub kind: ActorKind,
+    pub data: Arc<Vec<u8>>,
+    pub labels: Labels
+}
+
+pub struct ActorAssign
+{
+    pub key: ActorKey,
+    pub kind: ActorKind,
+    pub data: Arc<Vec<u8>>,
+    pub labels: Labels
 }
 
 #[derive(Clone,Serialize,Deserialize)]

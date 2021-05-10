@@ -339,7 +339,8 @@ impl StarMessagePayload{
 pub enum Reply
 {
     Empty,
-    App(AppKey)
+    App(AppKey),
+    Seq(u64)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -397,7 +398,8 @@ pub enum SpacePayload
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ReportMessage
 {
-   AppLocation(AppLocation)
+   AppLocation(AppLocation),
+   AppSequenceResponse(u64)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -414,6 +416,7 @@ pub enum RequestMessage
     AppLookup(AppLookup),
     AppMessage(AppMessage),
     AppLabel(AppLabelRequest),
+    AppSequenceRequest(AppKey),
     ActorRegister(ActorProfile),
     ActorUnRegister(ActorKey),
     ActorStatus(ActorStatus)
@@ -446,7 +449,7 @@ pub struct AppCreate
 pub enum AppMessagePayload
 {
    None,
-   Launch(AppCreateData),
+   Create(AppCreateData),
 }
 
 #[derive(Clone,Serialize,Deserialize)]

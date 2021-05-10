@@ -9,7 +9,7 @@ use tokio::sync::mpsc::error::SendError;
 use crate::actor::{ActorKey, ActorLocation};
 use crate::app::{AppInfo, Application, AppLocation, AppStatus, AppReadyStatus, AppPanicReason};
 use crate::error::Error;
-use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, AppMessage, AppMessagePayload};
+use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, AppMessage, AppMessagePayload, RequestMessage, ReportMessage};
 use crate::keys::AppKey;
 use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait};
@@ -31,7 +31,7 @@ pub struct SetAppStatus
 
 pub struct SupervisorManager
 {
-    data: StarSkel,
+    skel: StarSkel,
     backing: Box<dyn SupervisorManagerBacking>
 }
 
@@ -40,7 +40,7 @@ impl SupervisorManager
     pub fn new(data: StarSkel) ->Self
     {
         SupervisorManager{
-            data: data.clone(),
+            skel: data.clone(),
             backing: Box::new(SupervisorManagerBackingDefault::new(data)),
         }
     }
@@ -52,15 +52,15 @@ impl SupervisorManager
     {
         let mut proto = ProtoMessage::new();
         proto.to = Option::Some(StarKey::central());
-        proto.payload = StarMessagePayload::Pledge(self.data.info.kind.clone());
+        proto.payload = StarMessagePayload::Pledge(self.skel.info.kind.clone());
         proto.expect = MessageExpect::RetryUntilOk;
         let rx = proto.get_ok_result().await;
-        self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+        self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
 
-        if self.data.flags.check(Flag::Star(StarFlag::DiagnosePledge))
+        if self.skel.flags.check(Flag::Star(StarFlag::DiagnosePledge))
         {
-            self.data.logger.log( Log::Star( StarLog::new( &self.data.info, StarLogPayload::PledgeSent )));
-            let mut data = self.data.clone();
+            self.skel.logger.log( Log::Star( StarLog::new(&self.skel.info, StarLogPayload::PledgeSent )));
+            let mut data = self.skel.clone();
             tokio::spawn(async move {
                 let payload = rx.await;
                 if let Ok(StarMessagePayload::Ok(_)) = payload
@@ -85,14 +85,14 @@ impl SupervisorManager
     pub async fn reply_ok(&self, message: StarMessage)
     {
         let mut proto = message.reply(StarMessagePayload::Ok(Reply::Empty));
-        let result = self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+        let result = self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
         self.unwrap(result);
     }
 
     pub async fn reply_error(&self, mut message: StarMessage, error_message: String )
     {
         message.reply(StarMessagePayload::Error(error_message.to_string()));
-        let result = self.data.star_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await;
+        let result = self.skel.star_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await;
         self.unwrap(result);
     }
 
@@ -115,9 +115,9 @@ impl StarManager for SupervisorManager
                   StarMessagePayload::Pledge(kind) => {
                       self.backing.add_server(message.from.clone());
                       self.reply_ok(message).await;
-                      if self.data.flags.check( Flag::Star(StarFlag::DiagnosePledge )) {
+                      if self.skel.flags.check( Flag::Star(StarFlag::DiagnosePledge )) {
 
-                          self.data.logger.log( Log::Star(StarLog::new(&self.data.info, StarLogPayload::PledgeRecv )));
+                          self.skel.logger.log( Log::Star(StarLog::new(&self.skel.info, StarLogPayload::PledgeRecv )));
                       }
                   }
                   StarMessagePayload::Space(space_message) =>
@@ -138,19 +138,19 @@ impl StarManager for SupervisorManager
                                       };
                                       self.backing.add_application(app.clone(), data );
                                       let proto = message.reply(StarMessagePayload::Ok(Reply::Empty));
-                                      self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                                      self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
 
                                       if let Option::Some(server)=self.backing.select_server()
                                       {
                                           self.backing.set_app_status(app.clone(), AppStatus::Launching );
-                                          let launch_app_message = space_message.with_payload(SpacePayload::App(AppMessage { app: app.clone(), payload: AppMessagePayload::Launch(app_assign.info.clone()) }));
+                                          let launch_app_message = space_message.with_payload(SpacePayload::App(AppMessage { app: app.clone(), payload: AppMessagePayload::Create(app_assign.info.clone()) }));
                                           let mut proto = ProtoMessage::new();
                                           proto.to = Option::Some(server);
                                           proto.payload = StarMessagePayload::Space(launch_app_message);
                                           proto.expect = MessageExpect::ReplyErrOrTimeout(MessageExpectWait::Med);
                                           let result = proto.get_ok_result().await;
 
-                                          let manager_tx = self.data.manager_tx.clone();
+                                          let manager_tx = self.skel.manager_tx.clone();
                                           tokio::spawn( async move {
 
                                               match result.await
@@ -171,7 +171,7 @@ impl StarManager for SupervisorManager
                                               }
 
                                           } );
-                                          self.data.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
+                                          self.skel.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
                                       }
                                       else {
                                           self.backing.set_app_status(app_assign.app.clone(), AppStatus::Waiting )
@@ -180,6 +180,22 @@ impl StarManager for SupervisorManager
                                   }
                               }
                           }
+                          SpacePayload::Request(request)=>
+                          {
+                              match request
+                              {
+                                  RequestMessage::AppSequenceRequest(app) => {
+                                     let seq = self.backing.app_sequence_next(app);
+                                     let proto = message.reply(StarMessagePayload::Space(space_message.with_payload(SpacePayload::Report(ReportMessage::AppSequenceResponse(seq)))));
+                                     self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                                  }
+                                  _ => {
+
+                                      eprintln!("supervisor manager doesn't handle this request..." );
+                                  }
+                              }
+                          }
+
                           _ => {
                               eprintln!("supervisor manager doesn't handle ..." );
                           }
@@ -265,7 +281,7 @@ impl SupervisorManagerBacking for SupervisorManagerBackingDefault
         self.applications.insert(app, data );
     }
 
-    fn get_application(&mut self, app: AppKey) -> Option<&AppData> {
+    fn get_application(&mut self, app: &AppKey) -> Option<&AppData> {
         self.applications.get(&app )
     }
 
@@ -273,12 +289,17 @@ impl SupervisorManagerBacking for SupervisorManagerBackingDefault
 println!("SET APP STATUS: {}", status );
     }
 
-    fn get_app_status(&mut self, app: AppKey) -> AppStatus {
+    fn get_app_status(&mut self, app: &AppKey) -> AppStatus {
         AppStatus::Unknown
     }
 
-    fn remove_application(&mut self, app: AppKey) {
-        self.applications.remove(&app);
+    fn app_sequence_next(&mut self, app: &AppKey) -> u64 {
+       // HACK (we will be changing the backing to SqlLite very soon)
+       0
+    }
+
+    fn remove_application(&mut self, app: &AppKey) {
+        self.applications.remove(app);
     }
 
 
@@ -320,12 +341,13 @@ pub trait SupervisorManagerBacking: Send+Sync
     fn select_server(&mut self) -> Option<StarKey>;
 
     fn add_application(&mut self, app: AppKey, app_data: AppData );
-    fn get_application(&mut self, app: AppKey ) -> Option<&AppData>;
+    fn get_application(&mut self, app: &AppKey ) -> Option<&AppData>;
     fn set_app_status(&mut self, app: AppKey, status: AppStatus );
-    fn get_app_status(&mut self, app: AppKey) -> AppStatus;
+    fn get_app_status(&mut self, app: &AppKey) -> AppStatus;
+    fn app_sequence_next(&mut self, app: &AppKey ) -> u64;
 
-    fn remove_application(&mut self, app: AppKey );
+    fn remove_application(&mut self, app: &AppKey );
 
-    fn set_actor_location(&mut self, entity: ActorKey, location: ActorLocation);
+    fn set_actor_location(&mut self, actor: ActorKey, location: ActorLocation);
     fn get_actor_location(&self, lookup: &ActorLookup) -> Option<&ActorLocation>;
 }

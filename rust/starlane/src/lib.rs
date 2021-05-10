@@ -32,4 +32,5 @@ pub mod keys;
 pub mod logger;
 pub mod crypt;
 pub mod util;
+pub mod artifact;
 

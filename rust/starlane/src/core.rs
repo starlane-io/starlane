@@ -21,7 +21,7 @@ use crate::error::Error;
 use crate::frame::{ActorMessage, AppCreate, AppMessage, StarMessage, StarMessagePayload, Watch, WatchInfo, AppMessagePayload};
 use crate::id::{Id, IdSeq};
 use crate::star::{ActorCreate, StarCommand, StarKey, StarKind, StarManagerCommand, StarSkel};
-use crate::core::server::{ServerStarCore, ServerStarCoreExt, ExampleServerStarCoreExt};
+use crate::core::server::{ServerStarCore, ServerStarCoreExt, ExampleServerStarCoreExt, AppLaunchError};
 use std::marker::PhantomData;
 use crate::keys::AppKey;
 
@@ -40,17 +40,22 @@ pub struct StarCoreAppMessage
     pub payload: StarCoreAppMessagePayload
 }
 
-
-
 pub enum StarCoreAppMessagePayload
 {
     None,
+    Host(StarCoreAppLaunch),
     Launch(StarCoreAppLaunch)
+}
+
+pub struct StarCoreAppHost
+{
+
 }
 
 pub struct StarCoreAppLaunch
 {
-    pub create: AppCreateData
+    pub create: AppCreateData,
+    pub tx: oneshot::Sender<Result<(),AppLaunchError>>
 }
 
 pub enum AppCommandResult

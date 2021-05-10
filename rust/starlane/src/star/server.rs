@@ -1,13 +1,15 @@
 use crate::error::Error;
-use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, AppMessagePayload, Reply, AppMessage};
-use crate::star::{ServerManagerBacking, StarCommand, StarSkel, StarKey, StarKind, StarManager, StarManagerCommand, Wind, ServerCommand};
+use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, AppMessagePayload, Reply, AppMessage, SpaceMessage, RequestMessage};
+use crate::star::{ServerManagerBacking, StarCommand, StarSkel, StarKey, StarKind, StarManager, StarManagerCommand, Wind, ServerCommand, CoreRequest};
 use crate::message::{ProtoMessage, MessageExpect};
 use crate::logger::{Flag, StarFlag, StarLog, StarLogPayload, Log};
 use tokio::time::{sleep, Duration};
-use crate::core::{StarCoreCommand, StarCoreAppMessage, AppCommandResult};
+use crate::core::{StarCoreCommand, StarCoreAppMessage, AppCommandResult, StarCoreAppMessagePayload, StarCoreAppLaunch};
 use crate::app::{AppCommandKind};
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
+use crate::core::server::AppLaunchError;
+use crate::keys::{AppKey, UserKey};
 
 pub struct ServerManagerBackingDefault
 {
@@ -83,6 +85,7 @@ println!("Server: Could not find Supervisor... waiting 5 seconds to try again...
         };
 
         self.set_supervisor(supervisor.clone());
+        self.skel.core_tx.send( StarCoreCommand::SetSupervisor(supervisor.clone() )).await;
 
         let mut proto = ProtoMessage::new();
         proto.to = Option::Some(supervisor);
@@ -123,7 +126,7 @@ impl StarManager for ServerManager
 {
     async fn handle(&mut self, command: StarManagerCommand) {
         match command {
-            StarManagerCommand::StarData(_) => {}
+            StarManagerCommand::StarSkel(_) => {}
             StarManagerCommand::Init => {
                 self.pledge().await;
             }
@@ -135,38 +138,47 @@ impl StarManager for ServerManager
                         {
                             SpacePayload::App(app_message) =>
                             {
-                                let (tx,rx) = oneshot::channel();
-
-//                                self.skel.core_tx.send(StarCoreCommand::AppMessage(StarCoreAppMessage{ message: app_message.clone(), tx: tx })).await;
-
-                                let star_tx = self.skel.star_tx.clone();
-                                tokio::spawn( async move {
-                                    let result = rx.await;
-                                    match result
-                                    {
-                                        Ok(result) => {
-                                            match result
-                                            {
-                                                AppCommandResult::Ok => {
-                                                    let proto = star_message.reply_ok(Reply::Empty );
-                                                    star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                                }
-                                                AppCommandResult::Error(err) => {
-                                                    let proto = star_message.reply_err(err);
-                                                    star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                                }
-                                                _ => {
-                                                    let proto = star_message.reply_err("unexpected result".to_string());
-                                                    star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                                }
-                                            }
-                                        }
-                                        Err(err) => {
-                                            let proto = star_message.reply_err(err.to_string() );
-                                            star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                        }
+                                match &app_message.payload
+                                {
+                                    AppMessagePayload::None => {
+                                        // do nothing
                                     }
-                                } );
+                                    AppMessagePayload::Create(create) => {
+println!("AppMessagePayload::Create...");
+                                       let (tx,rx) = oneshot::channel();
+                                       let payload = StarCoreAppMessagePayload::Launch(StarCoreAppLaunch{
+                                           create: create.clone(),
+                                           tx: tx
+                                       }) ;
+                                       let message = StarCoreAppMessage{ app: app_message.app.clone(), payload: payload };
+                                       self.skel.core_tx.send( StarCoreCommand::AppMessage(message)).await;
+                                       let star_tx = self.skel.star_tx.clone();
+                                       tokio::spawn( async move {
+                                           let result = rx.await;
+
+                                           match result
+                                           {
+                                               Ok(result) => {
+                                                   match result
+                                                   {
+                                                       Ok(_) => {
+                                                           let proto = star_message.reply( StarMessagePayload::Ok(Reply::Empty) );
+                                                           star_tx.send(StarCommand::SendProtoMessage(proto) ).await;
+                                                       }
+                                                       Err(error) => {
+                                                           let proto = star_message.reply( StarMessagePayload::Error("App Launch Error.".into()) );
+                                                           star_tx.send(StarCommand::SendProtoMessage(proto) ).await;
+                                                       }
+                                                   }
+                                               }
+                                               Err(error) => {
+                                                   let proto = star_message.reply( StarMessagePayload::Error(error.to_string()) );
+                                                   star_tx.send(StarCommand::SendProtoMessage(proto) ).await;
+                                               }
+                                           }
+                                       } );
+                                    }
+                                }
                             }
                             _ => {}
 
@@ -182,6 +194,41 @@ impl StarManager for ServerManager
                 {
                     ServerCommand::PledgeToSupervisor => {
                         self.pledge().await;
+                    }
+                }
+            }
+            StarManagerCommand::CoreRequest(request) => {
+                match request
+                {
+                    CoreRequest::AppSequenceRequest(request) => {
+                        if let Option::Some(supervisor) = self.get_supervisor()
+                        {
+                            let app = request.app.clone();
+                            let mut proto = ProtoMessage::new();
+                            proto.to = Option::Some(supervisor.clone());
+                            proto.payload = StarMessagePayload::Space(SpaceMessage{ sub_space: app.sub_space.clone(), user: request.user.clone(), payload:SpacePayload::Request(RequestMessage::AppSequenceRequest(app))});
+                            let ok_result = proto.get_ok_result().await;
+                            tokio::spawn( async move {
+                                // need to timeout here just in case
+                                if let Result::Ok(result) = tokio::time::timeout(Duration::from_secs(30), ok_result).await {
+                                match result
+                                {
+                                    Ok(payload) => {
+                                        match payload{
+                                            StarMessagePayload::Ok(reply) => {
+                                                if let Reply::Seq(seq) = reply
+                                                {
+                                                    request.tx.send(seq);
+                                                }
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                    Err(_) => {}
+                                }}
+                            } );
+                            self.skel.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
+                        }
                     }
                 }
             }

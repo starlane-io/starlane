@@ -43,6 +43,7 @@ use crate::star::central::CentralManager;
 use crate::star::supervisor::{SupervisorCommand, SupervisorManager};
 use crate::permissions::{Authentication, AuthToken, AuthTokenSource, Credentials};
 use crate::space::SpaceCommandKind::AppGetController;
+use tokio::sync::oneshot::Sender;
 
 pub mod central;
 pub mod supervisor;
@@ -1372,8 +1373,10 @@ pub struct ActorCreate
 {
     pub app: AppKey,
     pub kind: ActorKind,
-    pub data: Vec<u8>
+    pub data: Arc<Vec<u8>>
 }
+
+
 
 impl ActorCreate
 {
@@ -1382,7 +1385,7 @@ impl ActorCreate
         ActorCreate {
             app: app,
             kind: kind,
-            data: data
+            data: Arc::new(data)
         }
     }
 }
@@ -1431,12 +1434,25 @@ impl Wind
 
 pub enum StarManagerCommand
 {
-    StarData(StarSkel),
+    StarSkel(StarSkel),
     Init,
+    CoreRequest(CoreRequest),
     StarMessage(StarMessage),
     CentralCommand(CentralCommand),
     SupervisorCommand(SupervisorCommand),
     ServerCommand(ServerCommand),
+}
+
+pub enum CoreRequest
+{
+    AppSequenceRequest(CoreAppSequenceRequest)
+}
+
+pub struct CoreAppSequenceRequest
+{
+    pub app: AppKey,
+    pub user: UserKey,
+    pub tx: Sender<u64>
 }
 
 pub enum CentralCommand
@@ -1483,7 +1499,8 @@ impl fmt::Display for StarManagerCommand {
             StarManagerCommand::SupervisorCommand(_) => "SupervisorCommand".to_string(),
             StarManagerCommand::ServerCommand(_) => "ServerCommand".to_string(),
             StarManagerCommand::Init => "Init".to_string(),
-            StarManagerCommand::StarData(_) => "StarData".to_string()
+            StarManagerCommand::StarSkel(_) => "StarData".to_string(),
+            StarManagerCommand::CoreRequest(_) => "CoreRequest".to_string()
         };
         write!(f, "{}",r)
     }
@@ -2117,7 +2134,7 @@ impl StarManagerFactory for StarManagerFactoryDefault
 
         tokio::spawn( async move {
             let mut manager:Box<dyn StarManager> = loop {
-                if let Option::Some(StarManagerCommand::StarData(data)) = rx.recv().await
+                if let Option::Some(StarManagerCommand::StarSkel(data)) = rx.recv().await
                 {
                     if let StarKind::Central = data.info.kind
                     {

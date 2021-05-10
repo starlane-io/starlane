@@ -1,28 +1,134 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::actor::{Actor, ActorCreate, ActorKey, ActorKind, ActorSelect};
+use crate::actor::{Actor, MakeMeAnActor, ActorKey, ActorKind, ActorSelect, ActorRef, NewActor, ActorAssign};
 use crate::error::Error;
 use crate::frame::{ActorMessage, AppCreate, AppMessage};
 use crate::label::{Labels, LabelSelectionCriteria};
-use crate::star::{StarCommand, StarKey};
+use crate::star::{StarCommand, StarKey, StarSkel, StarManagerCommand, CoreRequest, CoreAppSequenceRequest, ActorCreate};
 use crate::keys::{AppKey, UserKey, SubSpaceKey};
 use serde::{Deserialize, Serialize, Serializer};
 use crate::space::{CreateAppControllerFail };
 use tokio::sync::{oneshot, mpsc};
 use std::fmt;
-
+use crate::id::{IdSeq, Id};
+use crate::core::StarCoreCommand;
+use crate::frame::RequestMessage::AppSequenceRequest;
+use tokio::time::Duration;
+use crate::core::server::AppExt;
+use crate::actor;
 
 pub mod system;
 
 pub type AppKind = String;
+
+
+pub struct AppArchetype
+{
+
+}
+
+
 
 /**
   * represents part of an app on one Server or Client star
   */
 pub struct AppSlice
 {
-    pub actors: HashMap<ActorKey,Box<dyn Actor>>
+    pub info: AppInfo,
+    pub owner: UserKey,
+    pub actors: HashMap<ActorKey,Arc<ActorRef>>,
+    sequence: Option<Arc<IdSeq>>,
+    skel: StarSkel,
+    ext: Box<dyn AppExt>
+}
+
+impl AppSlice
+{
+    pub fn new( info: AppInfo, owner: UserKey, skel: StarSkel, ext: Box<dyn AppExt> )->Self
+    {
+        AppSlice{
+            info: info,
+            owner: owner,
+            actors: HashMap::new(),
+            sequence: Option::None,
+            skel: skel,
+            ext: ext
+        }
+    }
+
+    pub async fn unique_seq(&self,user: UserKey)-> oneshot::Receiver<Arc<IdSeq>>
+    {
+        let (tx,rx) = oneshot::channel();
+        self.skel.manager_tx.send(StarManagerCommand::CoreRequest( CoreRequest::AppSequenceRequest(CoreAppSequenceRequest{
+            app: self.info.key.clone(),
+            user: user.clone(),
+            tx: tx
+        }) )).await;
+
+        let (seq_tx, seq_rx) = oneshot::channel();
+
+        tokio::spawn( async move {
+            if let Result::Ok(Result::Ok(seq)) = tokio::time::timeout(Duration::from_secs(15), rx).await
+            {
+                seq_tx.send( Arc::new( IdSeq::new(seq)));
+            }
+        });
+
+        seq_rx
+    }
+
+    pub async fn seq(&mut self)->Result<Arc<IdSeq>,Error>
+    {
+        if let Option::None = self.sequence
+        {
+            let rx = self.unique_seq(self.owner.clone()).await;
+            let seq = rx.await?;
+            self.sequence = Option::Some(seq);
+        }
+
+        Ok(self.sequence.as_ref().unwrap().clone())
+    }
+
+
+    pub async fn next_id(&mut self)->Result<Id,Error>
+    {
+        Ok(self.seq().await?.next())
+    }
+
+    pub async fn actor_create(&mut self, create: actor::MakeMeAnActor) ->Result<Arc<ActorRef>,Error>
+    {
+        unimplemented!()
+        /*
+        let key = ActorKey{
+            app: self.app.clone(),
+            id: self.next_id()?
+        };
+
+        let kind  = create.kind.clone();
+
+        let assign = ActorAssign{
+            key: key,
+            kind: create.kind,
+            data: create.data,
+            labels: create.labels
+        };
+
+        let actor= self.ext.actor_create(self, assign).await?;
+
+        let actor_ref = Arc::new(ActorRef{
+            key: key.clone(),
+            kind: kind.clone(),
+            actor: actor
+        });
+
+        self.actors.insert( key.clone(), actor_ref.clone() );
+
+        Ok( actor_ref )
+
+         */
+    }
+
 }
 
 

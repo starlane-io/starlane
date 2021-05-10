@@ -126,7 +126,7 @@ impl ProtoStar
                         self.core_runner.run(core).await;
 
                         // now send star data to manager and core... tricky!
-                        manager_tx.send(StarManagerCommand::StarData(skel.clone()) ).await;
+                        manager_tx.send(StarManagerCommand::StarSkel(skel.clone()) ).await;
 
                         return Ok(Star::from_proto(skel.clone(),
                                                    self.command_rx,
