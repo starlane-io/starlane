@@ -405,7 +405,7 @@ pub enum ReportMessage
 #[derive(Clone,Serialize,Deserialize)]
 pub enum AssignMessage
 {
-    App(AppAssign)
+    App(AppLaunch)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -445,6 +445,8 @@ pub enum AppMessagePayload
 {
    None,
    Create(AppCreateData),
+   Host(AppInfo),
+   Launch(AppLaunch)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -626,14 +628,6 @@ pub struct ActorBind
 
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ApplicationLaunchRequest
-{
-    pub app_id: Id,
-    pub data: Vec<u8>
-}
-
-
-#[derive(Clone,Serialize,Deserialize)]
 pub struct Rejection
 {
     pub message: String,
@@ -648,7 +642,7 @@ pub struct AppLookup
 
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct AppAssign
+pub struct AppLaunch
 {
     pub app: AppKey,
     pub info: AppCreateData

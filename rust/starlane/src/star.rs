@@ -29,7 +29,7 @@ use crate::app::{AppCommandKind, AppController, AppCreateController, AppInfo, Ap
 use crate::core::StarCoreCommand;
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, AppAssign, ApplicationSupervisorReport, AppMessage, AppMessagePayload, AppNotifyCreated, AppSupervisorRequest, Event, Frame, ProtoFrame, Rejection, ReportMessage, RequestMessage, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, AppLaunch, ApplicationSupervisorReport, AppMessage, AppMessagePayload, AppNotifyCreated, AppSupervisorRequest, Event, Frame, ProtoFrame, Rejection, ReportMessage, RequestMessage, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId, SpaceKey, UserKey};

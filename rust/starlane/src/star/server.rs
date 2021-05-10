@@ -4,7 +4,7 @@ use crate::star::{ServerManagerBacking, StarCommand, StarSkel, StarKey, StarKind
 use crate::message::{ProtoMessage, MessageExpect};
 use crate::logger::{Flag, StarFlag, StarLog, StarLogPayload, Log};
 use tokio::time::{sleep, Duration};
-use crate::core::{StarCoreCommand, StarCoreAppMessage, AppCommandResult, StarCoreAppMessagePayload, StarCoreAppLaunch};
+use crate::core::{StarCoreCommand, StarCoreAppMessage, AppCommandResult, StarCoreAppMessagePayload, StarCoreAppLaunch, StarCoreAppHost};
 use crate::app::{AppCommandKind};
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
@@ -143,11 +143,45 @@ impl StarManager for ServerManager
                                     AppMessagePayload::None => {
                                         // do nothing
                                     }
-                                    AppMessagePayload::Create(create) => {
+                                    AppMessagePayload::Host(info) => {
+                                        let (tx,rx) = oneshot::channel();
+                                        let payload = StarCoreAppMessagePayload::Host(StarCoreAppHost{
+                                            info: info.clone(),
+                                            tx: tx
+                                        }) ;
+                                        let message = StarCoreAppMessage{ app: app_message.app.clone(), payload: payload };
+                                        self.skel.core_tx.send( StarCoreCommand::AppMessage(message)).await;
+                                        let star_tx = self.skel.star_tx.clone();
+                                        tokio::spawn( async move {
+                                            let result = rx.await;
+
+                                            match result
+                                            {
+                                                Ok(result) => {
+                                                    match result
+                                                    {
+                                                        Ok(_) => {
+                                                            let proto = star_message.reply( StarMessagePayload::Ok(Reply::Empty) );
+                                                            star_tx.send(StarCommand::SendProtoMessage(proto) ).await;
+                                                        }
+                                                        Err(error) => {
+                                                            let proto = star_message.reply( StarMessagePayload::Error("App Host Assign Error.".into()) );
+                                                            star_tx.send(StarCommand::SendProtoMessage(proto) ).await;
+                                                        }
+                                                    }
+                                                }
+                                                Err(error) => {
+                                                    let proto = star_message.reply( StarMessagePayload::Error(error.to_string()) );
+                                                    star_tx.send(StarCommand::SendProtoMessage(proto) ).await;
+                                                }
+                                            }
+                                        } );
+                                    }
+                                    AppMessagePayload::Launch(launch) => {
 println!("AppMessagePayload::Create...");
                                        let (tx,rx) = oneshot::channel();
                                        let payload = StarCoreAppMessagePayload::Launch(StarCoreAppLaunch{
-                                           create: create.clone(),
+                                           launch: launch.clone(),
                                            tx: tx
                                        }) ;
                                        let message = StarCoreAppMessage{ app: app_message.app.clone(), payload: payload };
@@ -178,6 +212,8 @@ println!("AppMessagePayload::Create...");
                                            }
                                        } );
                                     }
+
+                                    _ => {}
                                 }
                             }
                             _ => {}

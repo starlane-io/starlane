@@ -91,7 +91,7 @@ impl StarCore for ServerStarCore
                             }
                             StarCoreAppMessagePayload::Launch(launch) => {
 
-                                let launcher = self.ext.app_launcher(&launch.create.kind);
+                                let launcher = self.ext.app_launcher(&launch.launch.info.kind);
                                 match launcher
                                 {
                                     Ok(launcher) => {

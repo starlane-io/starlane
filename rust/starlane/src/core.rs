@@ -16,9 +16,9 @@ use tokio::time::Duration;
 
 
 use crate::actor::{Actor, ActorKey};
-use crate::app::{ApplicationStatus, AppCreateData};
+use crate::app::{ApplicationStatus, AppCreateData, AppInfo};
 use crate::error::Error;
-use crate::frame::{ActorMessage, AppMessage, StarMessage, StarMessagePayload, Watch, WatchInfo, AppMessagePayload};
+use crate::frame::{ActorMessage, AppMessage, StarMessage, StarMessagePayload, Watch, WatchInfo, AppMessagePayload, AppLaunch};
 use crate::id::{Id, IdSeq};
 use crate::star::{ActorCreate, StarCommand, StarKey, StarKind, StarManagerCommand, StarSkel};
 use crate::core::server::{ServerStarCore, ServerStarCoreExt, ExampleServerStarCoreExt, AppLaunchError};
@@ -50,12 +50,13 @@ pub enum StarCoreAppMessagePayload
 
 pub struct StarCoreAppHost
 {
-    artifact: ArtifactKey
+    pub info: AppInfo,
+    pub tx: oneshot::Sender<Result<(),AppLaunchError>>
 }
 
 pub struct StarCoreAppLaunch
 {
-    pub create: AppCreateData,
+    pub launch: AppLaunch,
     pub tx: oneshot::Sender<Result<(),AppLaunchError>>
 }
 

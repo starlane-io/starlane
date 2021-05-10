@@ -9,7 +9,7 @@ use tokio::sync::oneshot::Receiver;
 
 use crate::app::{AppCreateController, AppInfo, ApplicationStatus, AppLocation, AppCreateData};
 use crate::error::Error;
-use crate::frame::{AppAssign, AssignMessage, Frame, ReportMessage, RequestMessage, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply};
+use crate::frame::{AppLaunch, AssignMessage, Frame, ReportMessage, RequestMessage, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply};
 use crate::id::Id;
 use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId};
 use crate::label::Labels;
@@ -119,7 +119,7 @@ impl StarManager for CentralManager
                                     {
                                         let mut proto = ProtoMessage::new();
                                         let app = AppKey::new( create.sub_space.clone() );
-                                        proto.payload = StarMessagePayload::Space( space_message.with_payload(SpacePayload::Assign(AssignMessage::App(AppAssign{app:app.clone(),info:create.clone()}))));
+                                        proto.payload = StarMessagePayload::Space( space_message.with_payload(SpacePayload::Assign(AssignMessage::App(AppLaunch {app:app.clone(),info:create.clone()}))));
                                         proto.to = Option::Some(supervisor);
                                         let reply = proto.get_ok_result().await;
                                         self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
