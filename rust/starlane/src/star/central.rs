@@ -124,7 +124,6 @@ impl StarManager for CentralManager
                                match central_payload
                                {
                                    CentralPayload::AppCreate(archetype) => {
-println!("Central: Received AppCreate request ");
                                        if let Option::Some(supervisor) = self.backing.select_supervisor()
                                        {
                                            let mut proto = ProtoMessage::new();
@@ -133,12 +132,10 @@ println!("Central: Received AppCreate request ");
                                            proto.to(supervisor);
                                            let reply = proto.get_ok_result().await;
                                            self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-println!("Central: Sent create message...");
                                            match reply.await
                                            {
                                                Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty))) => {
                                                    let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::App(app))));
-println!("Central: Sent CREATE reply...");
                                                    self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                                                }
                                                Err(error) => {

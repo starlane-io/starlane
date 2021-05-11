@@ -88,7 +88,6 @@ impl StarCore for ServerStarCore
                         {
                             StarCoreAppMessagePayload::None => {}
                             StarCoreAppMessagePayload::Assign(assign ) => {
-println!("ServerCore received StarCoreAppAssign command");
                                 match self.ext.app_ext(&assign.meta.kind)
                                 {
                                     Ok(app_ext) => {
@@ -102,13 +101,11 @@ println!("ServerCore received StarCoreAppAssign command");
                                 }
                             }
                             StarCoreAppMessagePayload::Launch(launch) => {
-println!("ServerCore received StarCoreAppLaunch command");
                                 if let Option::Some(app) = self.apps.get_mut(&launch.app.key )
                                 {
                                     let mut context = app.context();
                                     let ext = app.ext().await;
                                     let result = ext.launch(&mut context,launch.app.archetype).await;
-                                    println!("got result....");
                                     match result
                                     {
                                         Ok(_) => {
@@ -122,14 +119,12 @@ println!("ServerCore received StarCoreAppLaunch command");
                                 }
                                 else
                                 {
-println!("ServerCore couldn't find....");
                                     launch.tx.send( Result::Err(AppLaunchError::Error("Cannot findn app".to_string())));
                                 }
                             }
 
                         }
                     }
-println!("StarCore received app message!");
                 }
                 _ => {
                 eprintln!("unexpected star command");
@@ -246,9 +241,7 @@ impl AppExt for TestAppCreateExt
 {
     async fn launch(&self, context: &mut AppContext, archetype: AppArchetype) -> Result<(), AppLaunchError>
     {
-        println!("getting meta...");
         let meta = context.meta().await;
-        println!("creating actor...");
         let actor = context.actor_create(ActorArchetype {
             owner: meta.owner,
             kind: crate::names::TEST_ACTOR_KIND.as_kind(),
@@ -256,7 +249,6 @@ impl AppExt for TestAppCreateExt
             init: InitData::None,
             labels: Labels::new()
         }).await;
-        println!("got actor...");
 
         //kind: crate::names::TEST_ACTOR_KIND.as_kind(),
         match actor

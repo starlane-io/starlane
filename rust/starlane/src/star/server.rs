@@ -139,7 +139,6 @@ impl StarManager for ServerManager
                                match server_space_message
                                {
                                    ServerPayload::AppAssign(meta) => {
-println!("Server: Received AppAssign");
                                        let (tx,rx) = oneshot::channel();
                                        let payload = StarCoreAppMessagePayload::Assign(StarCoreAppAssign {
                                            meta: meta.clone(),
@@ -149,7 +148,6 @@ println!("Server: Received AppAssign");
                                        self.skel.core_tx.send( StarCoreCommand::AppMessage(message)).await;
                                        let star_tx = self.skel.star_tx.clone();
                                        tokio::spawn( async move {
-println!("RECEIVED RESPONSE FOR APP ASSIGN");
                                            match rx.await
                                            {
                                                Ok(result) => {
@@ -174,7 +172,6 @@ println!("RECEIVED RESPONSE FOR APP ASSIGN");
                                    }
                                    ServerPayload::SequenceResponse(_) => {}
                                    ServerPayload::AppLaunch(launch) => {
-println!("Server: AppLaunch received!");
                                        let (tx,rx) = oneshot::channel();
                                        let payload = StarCoreAppMessagePayload::Launch(StarCoreAppLaunch{
                                            app: launch.clone(),
@@ -187,7 +184,6 @@ println!("Server: AppLaunch received!");
                                            match rx.await
                                            {
                                                Ok(result) => {
-                                                   println!("RECEIVED ok RESPONSE FOR APP LAUNCH");
                                                    match result
                                                    {
                                                        Ok(_) => {
@@ -201,7 +197,6 @@ println!("Server: AppLaunch received!");
                                                    }
                                                }
                                                Err(err) => {
-println!("RECEIVED err RESPONSE FOR APP LAUNCH");
                                                    let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Error(err.to_string())));
                                                    star_tx.send( StarCommand::SendProtoMessage(proto)).await;
                                                }

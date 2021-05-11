@@ -470,7 +470,6 @@ println!("spaces_do_not_match");
                     create.tx.send(Err(CreateAppControllerFail::SpacesDoNotMatch) );
                 }
                 else {
-println!("Received AppCreateController!");
                     // send app create request to central
                     let space_message = SpaceMessage {
                         sub_space: create.archetype.sub_space.clone(),
@@ -487,11 +486,9 @@ println!("Received AppCreateController!");
                     let star_tx = self.data.star_tx.clone();
                     tokio::spawn( async move {
 
-println!("AppController wating for appKey");
                         let result = tokio::time::timeout(Duration::from_secs(30), result).await;
                         if let Result::Ok(Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::App(app))))) = result
                         {
-println!("AppController got ok result...");
                             let (tx,mut rx) = mpsc::channel(1);
                             tokio::spawn( async move {
                                 while let Option::Some(command) = rx.recv().await
@@ -507,7 +504,6 @@ println!("AppController got ok result...");
                                 }));
                         }
                         else {
-println!("AppController ERROR result...");
 
                             match result {
                                 Ok(result) => {

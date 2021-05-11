@@ -174,7 +174,6 @@ impl StarManager for SupervisorManager
                         }
                     }
                     SupervisorCommand::SetAppServerStatus(set_status) => {
-println!("SetAppServerStatus {}", set_status.status);
                         self.backing.set_app_server_status(set_status.app.clone(),set_status.server.clone(), set_status.status.clone() );
                         if self.backing.get_app_status(&set_status.app) == AppStatus::Pending
                         {
@@ -183,7 +182,6 @@ println!("SetAppServerStatus {}", set_status.status);
                         }
                     }
                     SupervisorCommand::AppLaunch(app_key) => {
-println!("SUpervisor AppLaunch");
                         let archetype = self.backing.get_application(&app_key).cloned();
                         let server = self.backing.select_server(&app_key);
 
@@ -224,7 +222,6 @@ println!("SUpervisor AppLaunch");
                                                 app: app_key,
                                                 status: AppStatus::Ready(AppReadyStatus::Nominal)
                                             }))).await;
-                                            println!("~~~ >   app status set to READY!!! ");
                                         }
                                         Err(error) => {
                                             eprintln!("{}", error);
@@ -247,7 +244,6 @@ println!("SUpervisor AppLaunch");
                                 match supervisor_payload
                                 {
                                     SupervisorPayload::AppCreate(archetype) => {
-println!("Supervisor: Received App Create");
                                         let app_key = AppKey::new(space_message.sub_space.clone());
                                         self.backing.add_application(app_key.clone(), archetype.clone() );
                                         self.backing.set_app_status(app_key.clone(), AppStatus::Pending);
@@ -445,7 +441,6 @@ impl SupervisorManagerBacking for SupervisorManagerBackingDefault
     }
 
     fn set_app_server_status(&mut self, app: AppKey, server: StarKey, status: AppServerStatus) {
-println!("AppServerStatus: {}",status);
         self.app_server_status.insert( (app,server), status );
     }
 
