@@ -237,7 +237,7 @@ impl AppExt for TestAppCreateExt
     async fn launch(&self, app: &mut AppSlice, archetype: AppArchetype) -> Result<(), AppExtError>
     {
         let actor = app.actor_create(actor::MakeMeAnActor {
-            app: app.meta.app.clone(),
+            app: app.meta.key.clone(),
             kind: crate::names::TEST_ACTOR_KIND.as_kind(),
             data: Arc::new(vec![]),
             labels: Default::default()

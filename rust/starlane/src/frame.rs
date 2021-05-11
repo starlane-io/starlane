@@ -12,7 +12,7 @@ use crate::label::Labels;
 use crate::message::{MessageResult, ProtoMessage, MessageExpect, MessageUpdate};
 use tokio::sync::{oneshot, broadcast, mpsc};
 use crate::keys::{AppKey, UserKey, SubSpaceKey, MessageId};
-use crate::app::{AppLocation, AppKind, AppMeta, AppArchetype, AppConfigSrc, AppLaunch, AppCreateResult};
+use crate::app::{AppLocation, AppKind, AppMeta, AppArchetype, AppConfigSrc, App, AppCreateResult};
 use crate::logger::Flags;
 use crate::error::Error;
 use crate::permissions::{AuthToken, Authentication};
@@ -460,7 +460,7 @@ pub enum SupervisorPayload
 pub enum ServerPayload
 {
     AppAssign(AppMeta),
-    AppLaunch(AppLaunch),
+    AppLaunch(App),
     SequenceResponse(u64)
 }
 

@@ -145,7 +145,7 @@ println!("Server: Received AppAssign");
                                            meta: meta.clone(),
                                            tx: tx
                                        });
-                                       let message = StarCoreAppMessage{ app: meta.app.clone(), payload: payload };
+                                       let message = StarCoreAppMessage{ app: meta.key.clone(), payload: payload };
                                        self.skel.core_tx.send( StarCoreCommand::AppMessage(message)).await;
                                        let star_tx = self.skel.star_tx.clone();
                                        tokio::spawn( async move {
@@ -173,7 +173,9 @@ println!("RECEIVED RESPONSE FOR APP ASSIGN");
                                        } );
                                    }
                                    ServerPayload::SequenceResponse(_) => {}
-                                   ServerPayload::AppLaunch(launch) => {}
+                                   ServerPayload::AppLaunch(launch) => {
+println!("Server: AppLaunch received!");
+                                   }
                                }
                            }
                            _ => {}

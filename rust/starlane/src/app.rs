@@ -71,7 +71,7 @@ impl AppSlice
     {
         let (tx,rx) = oneshot::channel();
         self.skel.manager_tx.send(StarManagerCommand::CoreRequest( CoreRequest::AppSequenceRequest(CoreAppSequenceRequest{
-            app: self.meta.app.clone(),
+            app: self.meta.key.clone(),
             user: user.clone(),
             tx: tx
         }) )).await;
@@ -184,7 +184,7 @@ pub enum ApplicationStatus
 #[derive(Clone,Serialize,Deserialize)]
 pub struct AppMeta
 {
-    pub app: AppKey,
+    pub key: AppKey,
     pub kind: AppKind,
     pub config: AppConfigSrc,
     pub owner: UserKey
@@ -196,7 +196,7 @@ impl AppMeta
     {
         AppMeta
         {
-            app: app,
+            key: app,
             kind: kind,
             config: config,
             owner: owner
@@ -205,10 +205,23 @@ impl AppMeta
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct AppLaunch
+pub struct App
 {
-    pub app: AppKey,
+    pub key: AppKey,
     pub archetype: AppArchetype
+}
+
+impl App
+{
+    pub fn meta(&self)->AppMeta
+    {
+        AppMeta{
+            key: self.key.clone(),
+            kind: self.archetype.kind.clone(),
+            config: self.archetype.config.clone(),
+            owner: self.archetype.owner.clone()
+        }
+    }
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -260,11 +273,11 @@ pub trait Application: Send+Sync
 }
 
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub enum AppStatus
 {
     Unknown,
-    Waiting,
+    Pending,
     Launching,
     Ready(AppReadyStatus),
     Suspended,
@@ -275,38 +288,23 @@ pub enum AppStatus
 }
 
 
-impl fmt::Display for AppStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let r = match self {
-            AppStatus::Unknown => "Unknown".to_string(),
-            AppStatus::Waiting => "Waiting".to_string(),
-            AppStatus::Launching => "Launching".to_string(),
-            AppStatus::Ready(_) => "Ready".to_string(),
-            AppStatus::Suspended => "Suspended".to_string(),
-            AppStatus::Resuming => "Resuming".to_string(),
-            AppStatus::Panic(_) => "Panic".to_string(),
-            AppStatus::Halting(_) => "Halting".to_string(),
-            AppStatus::Exited => "Exited".to_string()
-        };
-        write!(f, "{}",r)
-    }
-}
 
-#[derive(Clone,Serialize,Deserialize)]
+
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub enum HaltReason
 {
     Planned,
     Crashing
 }
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub enum AppReadyStatus
 {
     Nominal,
     Alert(Alert)
 }
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub enum Alert
 {
     Red(AppAlertReason),
@@ -315,7 +313,7 @@ pub enum Alert
 
 pub type AppAlertReason = String;
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub enum AppPanicReason
 {
     Desc(String)
@@ -343,3 +341,49 @@ pub enum ActorMessageResult
     Error(String)
 }
 
+impl fmt::Display for AppStatus{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let r = match self {
+            AppStatus::Unknown => "Unknown".to_string(),
+            AppStatus::Pending => "Pending".to_string(),
+            AppStatus::Launching => "Launching".to_string(),
+            AppStatus::Ready(status) => format!("Ready({})",status,).to_string(),
+            AppStatus::Suspended => "Suspended".to_string(),
+            AppStatus::Resuming => "Resuming".to_string(),
+            AppStatus::Panic(_) => "Panic".to_string(),
+            AppStatus::Halting(halting) => format!("Halting({})",halting).to_string(),
+            AppStatus::Exited => "Unknown".to_string(),
+        };
+        write!(f, "{}",r)
+    }
+}
+
+impl fmt::Display for AppReadyStatus{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let r = match self {
+            AppReadyStatus::Nominal => "Nominal".to_string(),
+            AppReadyStatus::Alert(alert) => format!("Alert({})",alert).to_string()
+        };
+        write!(f, "{}",r)
+    }
+}
+
+impl fmt::Display for Alert{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let r = match self {
+            Alert::Red(_) => "Red".to_string(),
+            Alert::Yellow(_) => "Yellow".to_string()
+        };
+        write!(f, "{}",r)
+    }
+}
+
+impl fmt::Display for HaltReason{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let r = match self {
+            HaltReason::Planned => "Planned".to_string(),
+            HaltReason::Crashing => "Crashing".to_string()
+        };
+        write!(f, "{}",r)
+    }
+}
