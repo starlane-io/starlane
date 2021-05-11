@@ -2,10 +2,11 @@ use crate::star::central::AppCentral;
 use crate::star::{CentralCommand};
 use crate::error::Error;
 use std::sync::Arc;
-use crate::app::{AppMeta, Application, AppMessage, AppCreateController, AppContext, AppDestroy};
+use crate::app::{AppMeta, Application, AppMessage, AppCreateController, AppDestroy};
 use crate::label::Labels;
 use crate::frame::ActorMessage;
 use crate::actor::Actor;
+use crate::app::AppContext;
 
 pub struct SystemAppCentral
 {

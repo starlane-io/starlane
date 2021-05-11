@@ -175,6 +175,39 @@ println!("RECEIVED RESPONSE FOR APP ASSIGN");
                                    ServerPayload::SequenceResponse(_) => {}
                                    ServerPayload::AppLaunch(launch) => {
 println!("Server: AppLaunch received!");
+                                       let (tx,rx) = oneshot::channel();
+                                       let payload = StarCoreAppMessagePayload::Launch(StarCoreAppLaunch{
+                                           app: launch.clone(),
+                                           tx: tx
+                                       });
+                                       let message = StarCoreAppMessage{ app: launch.key.clone(), payload: payload };
+                                       self.skel.core_tx.send( StarCoreCommand::AppMessage(message)).await;
+                                       let star_tx = self.skel.star_tx.clone();
+                                       tokio::spawn( async move {
+                                           match rx.await
+                                           {
+                                               Ok(result) => {
+                                                   println!("RECEIVED ok RESPONSE FOR APP LAUNCH");
+                                                   match result
+                                                   {
+                                                       Ok(_) => {
+                                                           let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
+                                                           star_tx.send( StarCommand::SendProtoMessage(proto)).await;
+                                                       }
+                                                       Err(error) => {
+                                                           let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Error("AppExtError".to_string())));
+                                                           star_tx.send( StarCommand::SendProtoMessage(proto)).await;
+                                                       }
+                                                   }
+                                               }
+                                               Err(err) => {
+println!("RECEIVED err RESPONSE FOR APP LAUNCH");
+                                                   let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Error(err.to_string())));
+                                                   star_tx.send( StarCommand::SendProtoMessage(proto)).await;
+                                               }
+                                           }
+                                       } );
+
                                    }
                                }
                            }

@@ -11,13 +11,60 @@ use crate::frame::{Event, ActorMessage, ActorState};
 use crate::id::Id;
 use crate::label::{LabelSelectionCriteria, Labels};
 use crate::star::StarKey;
-use crate::keys::AppKey;
+use crate::keys::{AppKey, UserKey, SubSpaceKey};
 use crate::artifact::Name;
+use crate::app::{InitData, ConfigSrc};
+use crate::app::AppContext;
 
 pub struct ActorContext
 {
-
+   pub meta: ActorMeta,
+   pub app: AppContext
 }
+
+impl ActorContext
+{
+    pub fn new( meta: ActorMeta, app: AppContext )->Self
+    {
+        ActorContext{
+            meta: meta,
+            app: app
+        }
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ActorArchetype
+{
+    pub owner: UserKey,
+    pub kind: ActorKind,
+    pub config: ConfigSrc,
+    pub init: InitData,
+    pub labels: Labels
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ActorMeta
+{
+    pub key: ActorKey,
+    pub kind: ActorKind,
+    pub config: ConfigSrc,
+}
+
+impl ActorMeta
+{
+    pub fn new( key: ActorKey, kind: ActorKind, config: ConfigSrc ) -> Self
+    {
+        ActorMeta{
+            key: key,
+            kind: kind,
+            config: config
+        }
+    }
+}
+
+
+
 
 #[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
 pub struct ActorInfo
@@ -41,11 +88,12 @@ pub struct ActorKey
 }
 
 
+#[derive(Clone)]
 pub struct ActorRef
 {
     pub key: ActorKey,
     pub kind: ActorKind,
-    pub actor: Box<dyn Actor>
+    pub actor: Arc<dyn Actor>
 }
 
 #[async_trait]

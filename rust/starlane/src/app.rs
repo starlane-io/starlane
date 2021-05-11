@@ -1,23 +1,24 @@
 use std::collections::HashMap;
+use std::fmt;
 use std::sync::Arc;
 
-use crate::actor::{Actor, MakeMeAnActor, ActorKey, ActorKind, ActorSelect, ActorRef, NewActor, ActorAssign};
-use crate::error::Error;
-use crate::frame::{ActorMessage, AppMessage};
-use crate::label::{Labels, LabelSelectionCriteria};
-use crate::star::{StarCommand, StarKey, StarSkel, StarManagerCommand, CoreRequest, CoreAppSequenceRequest, ActorCreate};
-use crate::keys::{AppKey, UserKey, SubSpaceKey};
 use serde::{Deserialize, Serialize, Serializer};
-use crate::space::{CreateAppControllerFail };
-use tokio::sync::{oneshot, mpsc};
-use std::fmt;
-use crate::id::{IdSeq, Id};
-use crate::core::StarCoreCommand;
+use tokio::sync::{mpsc, Mutex, oneshot};
 use tokio::time::Duration;
-use crate::core::server::AppExt;
+
+use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorKey, ActorKind, ActorMeta, ActorRef, ActorSelect, MakeMeAnActor, NewActor};
 use crate::actor;
-use crate::artifact::{ArtifactKey, Artifact, Name};
+use crate::artifact::{Artifact, ArtifactKey, Name};
+use crate::core::{AppLaunchError, StarCoreCommand};
+use crate::core::server::{AppExt, ActorCreateError};
+use crate::error::Error;
 use crate::filesystem::File;
+use crate::frame::{ActorMessage, AppMessage};
+use crate::id::{Id, IdSeq};
+use crate::keys::{AppKey, SubSpaceKey, UserKey};
+use crate::label::{Labels, LabelSelectionCriteria};
+use crate::space::CreateAppControllerFail;
+use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarManagerCommand, StarSkel};
 
 pub mod system;
 
@@ -25,14 +26,14 @@ pub type AppKind = Name;
 
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum AppConfigSrc
+pub enum ConfigSrc
 {
     None,
     Artifact(Artifact)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum AppInitData
+pub enum InitData
 {
     None,
     Artifact(Artifact),
@@ -41,32 +42,86 @@ pub enum AppInitData
 }
 
 
-
-/**
-  * represents part of an app on one Server or Client star
-  */
 pub struct AppSlice
 {
-    pub meta: AppMeta,
-    pub actors: HashMap<ActorKey,Arc<ActorRef>>,
-    sequence: Option<Arc<IdSeq>>,
-    skel: StarSkel,
-    ext: Box<dyn AppExt>
+    inner: Arc<Mutex<AppSliceInner>>
 }
 
 impl AppSlice
 {
-    pub fn new(assign: AppMeta, skel: StarSkel, ext: Box<dyn AppExt> ) ->Self
+    pub fn new(assign: AppMeta, skel: StarSkel, ext: Arc<dyn AppExt>) -> Self
     {
-        AppSlice{
-            meta: assign,
-            actors: HashMap::new(),
-            sequence: Option::None,
-            skel: skel,
-            ext: ext
+        AppSlice {
+            inner: Arc::new( Mutex::new(AppSliceInner {
+                meta: assign,
+                actors: HashMap::new(),
+                sequence: Option::None,
+                skel: skel,
+                ext: ext
+            }))
         }
     }
 
+    pub fn context(&self)->AppContext
+    {
+        AppContext::new(self.inner.clone() )
+    }
+
+    pub async fn ext(&self)->Arc<AppExt>
+    {
+        let lock = self.inner.lock().await;
+        lock.ext.clone()
+    }
+
+}
+
+impl AppSlice
+{
+    async fn unique_seq(&self,user: UserKey)-> oneshot::Receiver<Arc<IdSeq>>
+    {
+        let lock = self.inner.lock().await;
+        lock.unique_seq(user).await
+    }
+
+    async fn seq(&mut self)->Result<Arc<IdSeq>,Error>
+    {
+        let mut lock = self.inner.lock().await;
+        (*lock).seq().await
+    }
+
+
+    async fn next_id(&mut self)->Result<Id,Error>
+    {
+        let mut lock = self.inner.lock().await;
+        (*lock).next_id().await
+    }
+
+    async fn actor_create(&mut self, archetype: ActorArchetype) ->Result<ActorRef,ActorCreateError> {
+        let context = AppContext::new( self.inner.clone() );
+        let mut lock = self.inner.lock().await;
+        (*lock).actor_create(context, archetype).await
+    }
+
+    async fn meta(&self) -> AppMeta {
+        let lock = self.inner.lock().await;
+        lock.meta.clone()
+    }
+}
+
+/**
+  * represents part of an app on one Server or Client star
+  */
+pub struct AppSliceInner
+{
+    pub meta: AppMeta,
+    pub actors: HashMap<ActorKey,ActorRef>,
+    pub sequence: Option<Arc<IdSeq>>,
+    pub skel: StarSkel,
+    pub ext: Arc<dyn AppExt>
+}
+
+impl AppSliceInner
+{
     pub async fn unique_seq(&self,user: UserKey)-> oneshot::Receiver<Arc<IdSeq>>
     {
         let (tx,rx) = oneshot::channel();
@@ -88,6 +143,7 @@ impl AppSlice
         seq_rx
     }
 
+
     pub async fn seq(&mut self)->Result<Arc<IdSeq>,Error>
     {
         if let Option::None = self.sequence
@@ -106,39 +162,42 @@ impl AppSlice
         Ok(self.seq().await?.next())
     }
 
-    pub async fn actor_create(&mut self, create: actor::MakeMeAnActor) ->Result<Arc<ActorRef>,Error>
+    pub async fn actor_create(&mut self, context: AppContext, archetype: ActorArchetype) ->Result<ActorRef,ActorCreateError>
     {
-        unimplemented!()
-        /*
+        let actor_id = self.next_id().await;
+        if actor_id.is_err()
+        {
+            return Err(ActorCreateError::Error(actor_id.err().unwrap().to_string()));
+        }
+
+        let actor_id = actor_id.unwrap();
+
         let key = ActorKey{
-            app: self.app.clone(),
-            id: self.next_id()?
+            app: self.meta.key.clone(),
+            id: actor_id
         };
 
-        let kind  = create.kind.clone();
+        let meta = ActorMeta::new(key.clone(), archetype.kind.clone(), archetype.config.clone() );
 
-        let assign = ActorAssign{
-            key: key,
-            kind: create.kind,
-            data: create.data,
-            labels: create.labels
-        };
+        let mut context = ActorContext::new( meta, context );
 
-        let actor= self.ext.actor_create(self, assign).await?;
+        let actor = self.ext.actor_create( &mut context, archetype.clone() ).await?;
 
-        let actor_ref = Arc::new(ActorRef{
+        let actor_ref = ActorRef{
             key: key.clone(),
-            kind: kind.clone(),
+            kind: archetype.kind.clone(),
             actor: actor
-        });
+        };
 
         self.actors.insert( key.clone(), actor_ref.clone() );
 
         Ok( actor_ref )
 
-         */
     }
 
+    pub fn meta(&self) -> AppMeta {
+       self.meta.clone()
+    }
 }
 
 
@@ -186,13 +245,13 @@ pub struct AppMeta
 {
     pub key: AppKey,
     pub kind: AppKind,
-    pub config: AppConfigSrc,
+    pub config: ConfigSrc,
     pub owner: UserKey
 }
 
 impl AppMeta
 {
-    pub fn new( app: AppKey, kind: AppKind, config: AppConfigSrc, owner:UserKey) -> Self
+    pub fn new(app: AppKey, kind: AppKind, config: ConfigSrc, owner:UserKey) -> Self
     {
         AppMeta
         {
@@ -224,6 +283,7 @@ impl App
     }
 }
 
+
 #[derive(Clone,Serialize,Deserialize)]
 pub struct AppLocation
 {
@@ -245,11 +305,8 @@ impl AppController
 
 pub type Apps = HashMap<AppKind,Box<dyn Application>>;
 
-pub struct AppContext
-{
-//    pub star_tx: mpsc::Sender<AppCommandWrapper>,
-    pub info: AppMeta
-}
+
+
 
 // this is everything describes what an App should be minus it's instance data (instance data like AppKey)
 #[derive(Clone,Serialize,Deserialize)]
@@ -258,8 +315,8 @@ pub struct AppArchetype
     pub owner: UserKey,
     pub sub_space: SubSpaceKey,
     pub kind: AppKind,
-    pub config: AppConfigSrc,
-    pub init: AppInitData,
+    pub config: ConfigSrc,
+    pub init: InitData,
     pub labels: Labels
 }
 
@@ -386,4 +443,48 @@ impl fmt::Display for HaltReason{
         };
         write!(f, "{}",r)
     }
+}
+
+impl AppContext
+{
+    pub fn new( app: Arc<Mutex<AppSliceInner>> )->AppContext
+    {
+        AppContext{
+            app: app
+        }
+    }
+
+    pub async fn meta(&mut self)->AppMeta {
+        let app = self.app.lock().await;
+        app.meta().clone()
+    }
+
+    pub async fn unique_seq(&self,user: UserKey)-> oneshot::Receiver<Arc<IdSeq>> {
+        let app = self.app.lock().await;
+        app.unique_seq(user).await
+    }
+
+    pub async fn seq(&mut self)->Result<Arc<IdSeq>,Error> {
+        let mut app = self.app.lock().await;
+        app.seq().await
+    }
+
+    pub async fn next_id(&mut self)->Result<Id,Error>
+    {
+        let mut app = self.app.lock().await;
+        app.next_id().await
+    }
+
+    pub async fn actor_create( &mut self , archetype: ActorArchetype) -> Result<ActorRef,ActorCreateError>
+    {
+        let context = AppContext::new(self.app.clone());
+        let mut app = self.app.lock().await;
+        app.actor_create(context, archetype).await
+    }
+}
+
+
+pub struct AppContext
+{
+    app: Arc<Mutex<AppSliceInner>>
 }
