@@ -1,5 +1,5 @@
 use crate::star::{StarKey, StarSearchTransaction, Transaction, TransactionResult, StarCommand};
-use crate::frame::{StarMessagePayload, Frame, StarMessage, MessageAck, StarMessageReply};
+use crate::frame::{StarMessagePayload, Frame, StarMessage, MessageAck, SimpleReply};
 use crate::error::Error;
 use crate::lane::LaneMeta;
 use std::cell::Cell;
@@ -105,15 +105,15 @@ impl MessageReplyTracker
             StarMessagePayload::Reply(reply) => {
                 match reply
                 {
-                    StarMessageReply::Ok(reply) => {
+                    SimpleReply::Ok(reply) => {
                         self.tx.send(MessageUpdate::Result(MessageResult::Ok(message.payload.clone())));
                         TrackerJob::Done
                     }
-                    StarMessageReply::Error(error) => {
+                    SimpleReply::Error(error) => {
                         self.tx.send(MessageUpdate::Result(MessageResult::Err(error.clone())));
                         TrackerJob::Done
                     }
-                    StarMessageReply::Ack(ack) => {
+                    SimpleReply::Ack(ack) => {
                         self.tx.send( MessageUpdate::Ack(ack.clone()) );
                         TrackerJob::Continue
                     }

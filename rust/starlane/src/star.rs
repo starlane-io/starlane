@@ -29,7 +29,7 @@ use crate::app::{AppCommandKind, AppController, AppCreateController, AppMeta, Ap
 use crate::core::StarCoreCommand;
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, ApplicationSupervisorReport, AppMessage, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, CentralPayload, StarMessageReply};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, ApplicationSupervisorReport, AppMessage, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, CentralPayload, SimpleReply};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId, SpaceKey, UserKey};
@@ -487,8 +487,11 @@ println!("Received AppCreateController!");
                     let star_tx = self.data.star_tx.clone();
                     tokio::spawn( async move {
 
-                        if let Result::Ok(Result::Ok(StarMessagePayload::Reply(StarMessageReply::Ok(Reply::App(app))))) = tokio::time::timeout(Duration::from_secs(5), result).await
+println!("AppController wating for appKey");
+                        let result = tokio::time::timeout(Duration::from_secs(30), result).await;
+                        if let Result::Ok(Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::App(app))))) = result
                         {
+println!("AppController got ok result...");
                             let (tx,mut rx) = mpsc::channel(1);
                             tokio::spawn( async move {
                                 while let Option::Some(command) = rx.recv().await
@@ -503,6 +506,30 @@ println!("Received AppCreateController!");
                                     tx: tx
                                 }));
                         }
+                        else {
+println!("AppController ERROR result...");
+
+                            match result {
+                                Ok(result) => {
+                                    match result
+                                    {
+                                        Ok(StarMessagePayload::Reply( SimpleReply::Error(error))) => {
+                                            eprintln!("{}",error);
+                                        }
+                                        Ok(_) => {
+                                            eprintln!("unexpected OK");
+                                        }
+                                        Err(error) => {
+                                            eprintln!("{}",error);
+                                        }
+                                    }
+                                }
+                                Err(error) => {
+                                    eprintln!("{}", error);
+                                }
+                            }
+                        }
+
                     });
                     self.send_proto_message(proto).await;
             }

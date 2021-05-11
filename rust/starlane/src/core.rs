@@ -50,7 +50,7 @@ pub enum StarCoreAppMessagePayload
 
 pub struct StarCoreAppAssign
 {
-    pub assign: AppMeta,
+    pub meta: AppMeta,
     pub tx: oneshot::Sender<Result<(), AppExtError>>
 }
 

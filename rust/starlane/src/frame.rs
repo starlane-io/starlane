@@ -12,11 +12,12 @@ use crate::label::Labels;
 use crate::message::{MessageResult, ProtoMessage, MessageExpect, MessageUpdate};
 use tokio::sync::{oneshot, broadcast, mpsc};
 use crate::keys::{AppKey, UserKey, SubSpaceKey, MessageId};
-use crate::app::{AppLocation, AppKind, AppMeta, AppArchetype, AppConfigSrc, AppLaunch};
+use crate::app::{AppLocation, AppKind, AppMeta, AppArchetype, AppConfigSrc, AppLaunch, AppCreateResult};
 use crate::logger::Flags;
 use crate::error::Error;
 use crate::permissions::{AuthToken, Authentication};
 use crate::crypt::{Encrypted, HashEncrypted, HashId};
+use tokio::sync::oneshot::error::RecvError;
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Frame
@@ -269,6 +270,28 @@ impl StarMessage
         proto
     }
 
+    pub async fn reply_tx(self, star_tx: mpsc::Sender<StarCommand> )->oneshot::Sender<StarMessagePayload>
+    {
+        let message = self;
+        let( tx, rx ) = oneshot::channel();
+        tokio::spawn(async move {
+            match rx.await
+            {
+                Ok(payload) => {
+                    let proto = message.reply( payload );
+                    star_tx.send( StarCommand::SendProtoMessage(proto));
+                }
+                Err(error) => {
+                    let proto = message.reply_err( "no reply".to_string() );
+                    star_tx.send( StarCommand::SendProtoMessage(proto));
+                }
+            }
+        } );
+
+        tx
+    }
+
+
     pub fn reply(&self, payload: StarMessagePayload)->ProtoMessage
     {
         let mut proto = ProtoMessage::new();
@@ -283,7 +306,7 @@ impl StarMessage
         let mut proto = ProtoMessage::new();
         proto.to = Option::Some(self.from.clone());
         proto.reply_to = Option::Some(self.id.clone());
-        proto.payload = StarMessagePayload::Reply(StarMessageReply::Error(err));
+        proto.payload = StarMessagePayload::Reply(SimpleReply::Error(err));
         proto
     }
 
@@ -292,7 +315,7 @@ impl StarMessage
         let mut proto = ProtoMessage::new();
         proto.to = Option::Some(self.from.clone());
         proto.reply_to = Option::Some(self.id.clone());
-        proto.payload = StarMessagePayload::Reply(StarMessageReply::Ok(reply));
+        proto.payload = StarMessagePayload::Reply(SimpleReply::Ok(reply));
         proto
     }
 
@@ -316,7 +339,7 @@ pub enum StarMessagePayload
    Central(StarMessageCentral),
    Supervisor(StarMessageSupervisor),
    Space(SpaceMessage),
-   Reply(StarMessageReply),
+   Reply(SimpleReply),
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -332,19 +355,13 @@ pub enum StarMessageSupervisor
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum StarMessageReply
+pub enum SimpleReply
 {
     Ok(Reply),
     Error(String),
     Ack(MessageAck)
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub enum SimpleReply
-{
-    Ok(Reply),
-    Error(String)
-}
 
 
 impl StarMessagePayload{
@@ -353,7 +370,7 @@ impl StarMessagePayload{
         match self{
             StarMessagePayload::Reply(reply) => {
                 match reply{
-                    StarMessageReply::Ack(_) => true,
+                    SimpleReply::Ack(_) => true,
                     _ => false,
                 }
             }
@@ -432,6 +449,7 @@ pub enum CentralPayload
 #[derive(Clone,Serialize,Deserialize)]
 pub enum SupervisorPayload
 {
+    AppCreate(AppArchetype),
     AppSequenceRequest(AppKey),
     ActorRegister(ActorProfile),
     ActorUnRegister(ActorKey),
@@ -451,7 +469,6 @@ pub enum SpaceReply
 {
    AppLocation(AppLocation),
    AppSequenceResponse(u64),
-   Reply(SimpleReply)
 }
 
 #[derive(Clone,Serialize,Deserialize)]

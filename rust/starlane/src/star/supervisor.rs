@@ -7,9 +7,9 @@ use async_trait::async_trait;
 use tokio::sync::mpsc::error::SendError;
 
 use crate::actor::{ActorKey, ActorLocation};
-use crate::app::{AppMeta, Application, AppLocation, AppStatus, AppReadyStatus, AppPanicReason};
+use crate::app::{AppMeta, Application, AppLocation, AppStatus, AppReadyStatus, AppPanicReason, AppArchetype};
 use crate::error::Error;
-use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, AppMessage, ServerAppPayload, SpaceReply, StarMessageCentral, StarMessageReply, SupervisorPayload, StarMessageSupervisor};
+use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, AppMessage, ServerAppPayload, SpaceReply, StarMessageCentral, SimpleReply, SupervisorPayload, StarMessageSupervisor};
 use crate::keys::AppKey;
 use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait};
@@ -64,7 +64,7 @@ impl SupervisorManager
             let mut data = self.skel.clone();
             tokio::spawn(async move {
                 let payload = rx.await;
-                if let Ok(StarMessagePayload::Reply(StarMessageReply::Ok(_))) = payload
+                if let Ok(StarMessagePayload::Reply(SimpleReply::Ok(_))) = payload
                 {
                     data.logger.log( Log::Star( StarLog::new( &data.info, StarLogPayload::PledgeOkRecv )))
                 }
@@ -85,14 +85,14 @@ impl SupervisorManager
 
     pub async fn reply_ok(&self, message: StarMessage)
     {
-        let mut proto = message.reply(StarMessagePayload::Reply(StarMessageReply::Ok(Reply::Empty)));
+        let mut proto = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
         let result = self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
         self.unwrap(result);
     }
 
     pub async fn reply_error(&self, mut message: StarMessage, error_message: String )
     {
-        message.reply(StarMessagePayload::Reply(StarMessageReply::Error(error_message.to_string())));
+        message.reply(StarMessagePayload::Reply(SimpleReply::Error(error_message.to_string())));
         let result = self.skel.star_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await;
         self.unwrap(result);
     }
@@ -132,9 +132,25 @@ impl StarManager for SupervisorManager
                             SpacePayload::Supervisor(supervisor_payload) => {
                                 match supervisor_payload
                                 {
+                                    SupervisorPayload::AppCreate(archetype) => {
+println!("Supervisor: Received App Create");
+                                        if let Option::Some(server) = self.backing.select_server()
+                                        {
+                                            let app = AppKey::new(space_message.sub_space.clone());
+                                            self.backing.add_application( app.clone(), archetype.clone() );
+                                            self.backing.set_app_status( app, AppStatus::Waiting );
+                                            let proto = star_message.reply( StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
+                                            self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                                        }
+                                        else
+                                        {
+                                            let proto = star_message.reply( StarMessagePayload::Reply(SimpleReply::Error("Supervisor: no servers available.".into())));
+                                            self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                                        }
+                                    }
                                     SupervisorPayload::AppSequenceRequest(app_key) => {
                                         let index = self.backing.app_sequence_next(app_key);
-                                        let reply = star_message.reply(StarMessagePayload::Reply(StarMessageReply::Ok(Reply::Seq(index))));
+                                        let reply = star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Seq(index))));
                                         self.skel.star_tx.send(StarCommand::SendProtoMessage(reply)).await;
                                     }
                                     SupervisorPayload::ActorRegister(_) => {}
@@ -259,7 +275,7 @@ pub struct SupervisorManagerBackingDefault
     data: StarSkel,
     servers: Vec<StarKey>,
     server_select_index: usize,
-    applications: HashMap<AppKey,AppData>,
+    applications: HashMap<AppKey, AppArchetype>,
     actor_location: HashMap<ActorKey, ActorLocation>
 }
 
@@ -297,11 +313,11 @@ impl SupervisorManagerBacking for SupervisorManagerBackingDefault
         Option::Some(server.clone())
     }
 
-    fn add_application(&mut self, app: AppKey, data: AppData ) {
+    fn add_application(&mut self, app: AppKey, data: AppArchetype) {
         self.applications.insert(app, data );
     }
 
-    fn get_application(&mut self, app: &AppKey) -> Option<&AppData> {
+    fn get_application(&mut self, app: &AppKey) -> Option<&AppArchetype> {
         self.applications.get(&app )
     }
 
@@ -337,22 +353,7 @@ println!("SET APP STATUS: {}", status );
     }
 }
 
-pub struct AppData
-{
-    pub info: AppMeta,
-    pub servers: HashSet<StarKey>
-}
 
-impl AppData
-{
-    pub fn new(info: AppMeta) ->Self
-    {
-        AppData{
-            info: info,
-            servers: HashSet::new()
-        }
-    }
-}
 
 pub trait SupervisorManagerBacking: Send+Sync
 {
@@ -360,8 +361,8 @@ pub trait SupervisorManagerBacking: Send+Sync
     fn remove_server( &mut self, server: &StarKey );
     fn select_server(&mut self) -> Option<StarKey>;
 
-    fn add_application(&mut self, app: AppKey, app_data: AppData );
-    fn get_application(&mut self, app: &AppKey ) -> Option<&AppData>;
+    fn add_application(&mut self, app: AppKey, archetype: AppArchetype);
+    fn get_application(&mut self, app: &AppKey ) -> Option<&AppArchetype>;
     fn set_app_status(&mut self, app: AppKey, status: AppStatus );
     fn get_app_status(&mut self, app: &AppKey) -> AppStatus;
     fn app_sequence_next(&mut self, app: &AppKey ) -> u64;

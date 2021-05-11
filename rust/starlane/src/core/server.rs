@@ -87,15 +87,15 @@ impl StarCore for ServerStarCore
                         {
                             StarCoreAppMessagePayload::None => {}
                             StarCoreAppMessagePayload::Assign(assign ) => {
-                                match self.ext.app_ext(&assign.assign.kind)
+println!("ServerCore received StarCoreAppAssign command");
+                                match self.ext.app_ext(&assign.meta.kind)
                                 {
                                     Ok(app_ext) => {
-                                        let app_slice = AppSlice::new(assign.assign,self.skel.clone(), app_ext );
+                                        let app_slice = AppSlice::new(assign.meta, self.skel.clone(), app_ext );
                                         self.apps.insert( app.clone(), app_slice );
                                     }
                                     Err(error) => {
                                         assign.tx.send(Result::Err(error));
-
                                     }
                                 }
                             }

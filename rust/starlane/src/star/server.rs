@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, ServerAppPayload, Reply, AppMessage, SpaceMessage, ServerPayload, StarMessageCentral, StarMessageReply, StarMessageSupervisor};
+use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, ServerAppPayload, Reply, AppMessage, SpaceMessage, ServerPayload, StarMessageCentral, SimpleReply, StarMessageSupervisor};
 use crate::star::{ServerManagerBacking, StarCommand, StarSkel, StarKey, StarKind, StarManager, StarManagerCommand, Wind, ServerCommand, CoreRequest};
 use crate::message::{ProtoMessage, MessageExpect};
 use crate::logger::{Flag, StarFlag, StarLog, StarLogPayload, Log};
@@ -100,7 +100,7 @@ println!("Server: Could not find Supervisor... waiting 5 seconds to try again...
             let mut data = self.skel.clone();
             tokio::spawn(async move {
                 let payload = rx.await;
-                if let Ok(StarMessagePayload::Reply(StarMessageReply::Ok(_))) = payload
+                if let Ok(StarMessagePayload::Reply(SimpleReply::Ok(_))) = payload
                 {
                     data.logger.log( Log::Star( StarLog::new( &data.info, StarLogPayload::PledgeOkRecv )))
                 }
@@ -131,15 +131,46 @@ impl StarManager for ServerManager
                self.pledge().await;
            }
            StarManagerCommand::StarMessage(star_message) => {
-               match star_message.payload{
+               match &star_message.payload{
                    StarMessagePayload::Space(space_message) => {
-                       match space_message.payload
+                       match &space_message.payload
                        {
                            SpacePayload::Server(server_space_message) => {
                                match server_space_message
                                {
                                    ServerPayload::AppAssign(meta) => {
-
+println!("Server: Received AppAssign");
+                                       let (tx,rx) = oneshot::channel();
+                                       let payload = StarCoreAppMessagePayload::Assign(StarCoreAppAssign {
+                                           meta: meta.clone(),
+                                           tx: tx
+                                       });
+                                       let message = StarCoreAppMessage{ app: meta.app.clone(), payload: payload };
+                                       self.skel.core_tx.send( StarCoreCommand::AppMessage(message)).await;
+                                       let star_tx = self.skel.star_tx.clone();
+                                       tokio::spawn( async move {
+println!("RECEIVED RESPONSE FOR APP ASSIGN");
+                                           match rx.await
+                                           {
+                                               Ok(result) => {
+                                                   match result
+                                                   {
+                                                       Ok(_) => {
+                                                           let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
+                                                           star_tx.send( StarCommand::SendProtoMessage(proto)).await;
+                                                       }
+                                                       Err(error) => {
+                                                           let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Error("AppExtError".to_string())));
+                                                           star_tx.send( StarCommand::SendProtoMessage(proto)).await;
+                                                       }
+                                                   }
+                                               }
+                                               Err(err) => {
+                                                   let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Error(err.to_string())));
+                                                   star_tx.send( StarCommand::SendProtoMessage(proto)).await;
+                                               }
+                                           }
+                                       } );
                                    }
                                    ServerPayload::SequenceResponse(_) => {}
                                    ServerPayload::AppLaunch(launch) => {}
