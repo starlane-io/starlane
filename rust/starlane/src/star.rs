@@ -2000,6 +2000,7 @@ impl StarKey
             index: 0
         }
     }
+
 }
 
 impl cmp::Ord for StarKey

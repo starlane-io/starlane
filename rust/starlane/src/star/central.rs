@@ -22,6 +22,7 @@ use crate::crypt::{PublicKey, CryptKeyId};
 use crate::frame::Reply::App;
 use crate::frame::CentralPayload::AppCreate;
 use rusqlite::Connection;
+use bincode::ErrorKind;
 
 pub struct CentralStarVariant
 {
@@ -46,6 +47,7 @@ impl CentralStarVariant
 
     async fn init(&mut self)
     {
+        /*
         match self.backing.get_init_status()
         {
             CentralInitStatus::None => {
@@ -58,6 +60,8 @@ impl CentralStarVariant
             CentralInitStatus::LaunchingSystemApp=> {}
             CentralInitStatus::Ready => {}
         }
+
+         */
     }
 
 
@@ -106,7 +110,7 @@ impl StarVariant for CentralStarVariant
                            StarMessageCentral::Pledge(kind) => {
                                if kind.is_supervisor()
                                {
-                                   self.backing.add_supervisor(star_message.from.clone());
+                                   self.backing.add_supervisor(star_message.from.clone()).await;
                                    self.reply_ok(star_message.clone()).await;
                                    if self.data.flags.check(Flag::Star(StarFlag::DiagnosePledge)) {
                                        self.data.logger.log(Log::Star(StarLog::new(&self.data.info, StarLogPayload::PledgeRecv)));
@@ -125,17 +129,18 @@ impl StarVariant for CentralStarVariant
                                match central_payload
                                {
                                    CentralPayload::AppCreate(archetype) => {
-                                       if let Option::Some(supervisor) = self.backing.select_supervisor()
+                                       if let Option::Some(supervisor) = self.backing.select_supervisor().await
                                        {
                                            let mut proto = ProtoMessage::new();
                                            let app = AppKey::new(space_message.sub_space.clone());
                                            proto.payload = StarMessagePayload::Space(space_message.with_payload(SpacePayload::Supervisor(SupervisorPayload::AppCreate(archetype.clone()))));
-                                           proto.to(supervisor);
+                                           proto.to(supervisor.clone());
                                            let reply = proto.get_ok_result().await;
                                            self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                                            match reply.await
                                            {
                                                Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty))) => {
+                                                   self.backing.set_supervisor_for_application(app.clone(),supervisor.clone()).await;
                                                    let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::App(app))));
                                                    self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                                                }
@@ -260,21 +265,18 @@ pub enum CentralInitStatus
     Ready
 }
 
+#[async_trait]
 trait CentralStarVariantBacking: Send+Sync
 {
-    fn add_supervisor(&mut self, star: StarKey );
-    fn remove_supervisor(&mut self, star: StarKey );
-    fn set_supervisor_for_application(&mut self, app: AppKey, supervisor_star: StarKey );
-    fn get_supervisor_for_application(&self, app: &AppKey) -> Option<&StarKey>;
-    fn has_supervisor(&self)->bool;
-    fn get_init_status(&self) -> CentralInitStatus;
-    fn set_init_status(&self, status: CentralInitStatus );
-    fn select_supervisor(&mut self )->Option<StarKey>;
-
-    fn get_public_key_for_star(&self,star:&StarKey) -> Option<PublicKey>;
+    async fn add_supervisor(&mut self, star: StarKey )->Result<(),Error>;
+    async fn remove_supervisor(&mut self, star: StarKey )->Result<(),Error>;
+    async fn set_supervisor_for_application(&mut self, app: AppKey, supervisor_star: StarKey )->Result<(),Error>;
+    async fn get_supervisor_for_application(&self, app: &AppKey) -> Option<StarKey>;
+    async fn has_supervisor(&self)->bool;
+    async fn select_supervisor(&mut self )->Option<StarKey>;
 }
 
-
+/*
 pub struct CentralStarVariantBackingDefault
 {
     data: StarSkel,
@@ -302,10 +304,11 @@ impl CentralStarVariantBackingDefault
     }
 }
 
+#[async_trait]
 impl CentralStarVariantBacking for CentralStarVariantBackingDefault
 {
 
-    fn add_supervisor(&mut self, star: StarKey) {
+    async fn add_supervisor(&mut self, star: StarKey) {
         if !self.supervisors.contains(&star)
         {
             self.supervisors.push(star);
@@ -352,10 +355,13 @@ impl CentralStarVariantBacking for CentralStarVariantBackingDefault
     }
 }
 
+ */
+
 
 struct CentralStarVariantBackingSqlLite
 {
     label_db: mpsc::Sender<LabelRequest>,
+    central_db: mpsc::Sender<CentralDbRequest>
 }
 
 impl CentralStarVariantBackingSqlLite
@@ -363,65 +369,166 @@ impl CentralStarVariantBackingSqlLite
     pub async fn new()->Self
     {
         CentralStarVariantBackingSqlLite{
-            label_db: LabelDb::new().await
+            label_db: LabelDb::new().await,
+            central_db: CentralDb::new().await
         }
     }
 
+    pub fn handle( &self, result: Result<Result<CentralDbResult,Error>,RecvError>)->Result<(),Error>
+    {
+        match result
+        {
+            Ok(ok) => {
+                match ok{
+                    Ok(_) => {
+                        Ok(())
+                    }
+                    Err(error) => {
+                        Err(error)
+                    }
+                }
+            }
+            Err(error) => {
+                Err(error.into())
+            }
+        }
+    }
 }
 
+#[async_trait]
 impl CentralStarVariantBacking for CentralStarVariantBackingSqlLite
 {
-    fn add_supervisor(&mut self, star: StarKey) {
-        todo!()
+    async fn add_supervisor(&mut self, star: StarKey) -> Result<(), Error> {
+        let (request,rx) = CentralDbRequest::new( CentralDbCommand::AddSupervisor(star));
+        self.central_db.send( request ).await;
+        self.handle(rx.await)
     }
 
-    fn remove_supervisor(&mut self, star: StarKey) {
-        todo!()
+    async fn remove_supervisor(&mut self, star: StarKey) -> Result<(), Error> {
+        let (request,rx) = CentralDbRequest::new( CentralDbCommand::RemoveSupervisor(star));
+        self.central_db.send( request ).await;
+        self.handle(rx.await)
     }
 
-    fn set_supervisor_for_application(&mut self, app: AppKey, supervisor_star: StarKey) {
-        todo!()
+    async fn set_supervisor_for_application(&mut self, app: AppKey, supervisor_star: StarKey) -> Result<(), Error> {
+        let (request,rx) = CentralDbRequest::new( CentralDbCommand::SetSupervisorForApplication((supervisor_star,app)));
+        self.central_db.send( request ).await;
+        self.handle(rx.await)
     }
 
-    fn get_supervisor_for_application(&self, app: &AppKey) -> Option<&StarKey> {
-        todo!()
+    async fn get_supervisor_for_application(&self, app: &AppKey) -> Option<StarKey> {
+        let (request,rx) = CentralDbRequest::new( CentralDbCommand::GetSupervisorForApplication(app.clone()));
+        self.central_db.send( request ).await;
+        match rx.await
+        {
+            Ok(ok) => {
+                match ok
+                {
+                    Ok(ok) => {
+                        match ok
+                        {
+                            CentralDbResult::Supervisor(supervisor) => {supervisor}
+                            _ => Option::None
+                        }
+                    }
+                    Err(_) => {
+                        Option::None
+                    }
+                }
+            }
+            Err(error) => {
+                Option::None
+            }
+        }
     }
 
-    fn has_supervisor(&self) -> bool {
-        todo!()
+    async fn has_supervisor(&self) -> bool {
+        let (request,rx) = CentralDbRequest::new( CentralDbCommand::HasSupervisor);
+        self.central_db.send( request ).await;
+        match rx.await
+        {
+            Ok(ok) => {
+                match ok
+                {
+                    Ok(result) => {
+                        match result
+                        {
+                            CentralDbResult::HasSupervisor(rtn) => {rtn}
+                            _ => false
+                        }
+                    }
+                    Err(err) => {
+                        false
+                    }
+                }
+            }
+            Err(error) => {false}
+        }
     }
 
-    fn get_init_status(&self) -> CentralInitStatus {
-        todo!()
-    }
+    async fn select_supervisor(&mut self) -> Option<StarKey> {
 
-    fn set_init_status(&self, status: CentralInitStatus) {
-        todo!()
-    }
-
-    fn select_supervisor(&mut self) -> Option<StarKey> {
-        todo!()
-    }
-
-    fn get_public_key_for_star(&self, star: &StarKey) -> Option<PublicKey> {
-        todo!()
+        let (request,rx) = CentralDbRequest::new( CentralDbCommand::SelectSupervisor );
+        self.central_db.send( request ).await;
+        match rx.await
+        {
+            Ok(ok) => {
+                match ok
+                {
+                    Ok(result) => {
+                        match result
+                        {
+                            CentralDbResult::Supervisor(rtn) => {rtn}
+                            _ => Option::None
+                        }
+                    }
+                    Err(err) => {
+                        Option::None
+                    }
+                }
+            }
+            Err(error) => {Option::None}
+        }
     }
 }
 
 pub struct CentralDbRequest
 {
     pub command: CentralDbCommand,
-    pub tx: oneshot::Sender<CentralDbResult>
+    pub tx: oneshot::Sender<Result<CentralDbResult,Error>>
+}
+
+impl CentralDbRequest
+{
+    pub fn new(command: CentralDbCommand)->(Self,oneshot::Receiver<Result<CentralDbResult,Error>>)
+    {
+        let (tx,rx) = oneshot::channel();
+        (CentralDbRequest
+        {
+            command: command,
+            tx: tx
+        },
+        rx)
+    }
 }
 
 pub enum CentralDbCommand
 {
-    Close
+    Close,
+    AddSupervisor(StarKey),
+    RemoveSupervisor(StarKey),
+    SetSupervisorForApplication((StarKey,AppKey)),
+    GetSupervisorForApplication(AppKey),
+    HasSupervisor,
+    SelectSupervisor,
 }
 
 pub enum CentralDbResult
 {
-    Ok
+    Ok,
+    SupervisorForApplication(Option<StarKey>),
+    HasSupervisor(bool),
+    Supervisor(Option<StarKey>)
 }
 
 pub struct CentralDb {
@@ -462,6 +569,123 @@ impl CentralDb {
                CentralDbCommand::Close => {
                    break;
                }
+               CentralDbCommand::AddSupervisor(key) => {
+                   let blob = bincode::serialize(&key).unwrap();
+                   let result = self.conn.execute("INSERT INTO supervisors (key) VALUES (?1)", [blob]);
+                   match result
+                   {
+                       Ok(_) => {
+                           request.tx.send(Result::Ok(CentralDbResult::Ok) );
+                       }
+                       Err(e) => {
+                           request.tx.send(Result::Err(e.into()) );
+                       }
+                   }
+               }
+               CentralDbCommand::RemoveSupervisor(key) => {
+                   let blob = bincode::serialize(&key).unwrap();
+                   let result = self.conn.execute("DELETE FROM supervisors WHERE key=?", [blob]);
+                   match result
+                   {
+                       Ok(_) => {
+                           request.tx.send(Result::Ok(CentralDbResult::Ok) );
+                       }
+                       Err(e) => {
+                           request.tx.send(Result::Err(e.into()) );
+                       }
+                   }
+               }
+               CentralDbCommand::HasSupervisor => {
+                   let result = self.conn.query_row("SELECT count(*) FROM supervisors", [], |row| {
+                          let count:usize = row.get(0)?;
+                          Ok(count)
+                       });
+                   match result
+                   {
+                       Ok(count) => {
+                           request.tx.send(Result::Ok(CentralDbResult::HasSupervisor(count>0)) );
+                       }
+                       Err(e) => {
+                           request.tx.send(Result::Err(e.into()) );
+                       }
+                   }
+               }
+               CentralDbCommand::SelectSupervisor => {
+println!("SELECT SUPERVISOR:... ");
+                   let result= self.conn.query_row("SELECT * FROM supervisors", [], |row| {
+                       let rtn:Vec<u8> = row.get(0)?;
+                       Ok(bincode::deserialize::<StarKey>(rtn.as_slice()))
+                   } );
+                   match result
+                   {
+                       Ok(result) => {
+                           match result
+                           {
+                               Ok(star) => {
+
+                                   request.tx.send( Result::Ok(CentralDbResult::Supervisor(Option::Some(star))));
+                               }
+                               Err(error) => {
+println!("(1)error: {}",error );
+                                   request.tx.send( Result::Ok(CentralDbResult::Supervisor(Option::None)));
+                               }
+                           }
+                       }
+                       Err(err) => {
+println!("(2)error: {}",err );
+                           request.tx.send( Result::Ok(CentralDbResult::Supervisor(Option::None)));
+                       }
+                   }
+
+               }
+               CentralDbCommand::GetSupervisorForApplication(app) => {
+                   let app= bincode::serialize(&app).unwrap();
+                   let result= self.conn.query_row("SELECT supervisors.key FROM supervisors,apps_to_supervisors WHERE apps_to_supervisors.app_key=?1 AND apps_to_supervisors.supervisor_key=supervisors.key", [app], |row| {
+                       let rtn:Vec<u8> = row.get(0)?;
+                       Ok(bincode::deserialize::<StarKey>(rtn.as_slice()))
+                   } );
+                   match result
+                   {
+                       Ok(result) => {
+                           match result
+                           {
+                               Ok(star) => {
+
+                                   request.tx.send( Result::Ok(CentralDbResult::Supervisor(Option::Some(star))));
+                               }
+                               Err(error) => {
+                                   println!("(1)error: {}",error );
+                                   request.tx.send( Result::Ok(CentralDbResult::Supervisor(Option::None)));
+                               }
+                           }
+                       }
+                       Err(err) => {
+                           println!("(2)error: {}",err );
+                           request.tx.send( Result::Ok(CentralDbResult::Supervisor(Option::None)));
+                       }
+                   }
+               }
+               CentralDbCommand::SetSupervisorForApplication((supervisor,app)) => {
+                   let supervisor= bincode::serialize(&supervisor ).unwrap();
+                   let app= bincode::serialize(&app).unwrap();
+
+                   self.conn.execute("BEGIN TRANSACTION", [] );
+                   self.conn.execute( "INSERT INTO apps (key) VALUES (?1)", [app.clone()]);
+                   self.conn.execute( "INSERT INTO apps_to_supervisors (app_key,supervisor_key) VALUES (?2,?3)", [app.clone(),supervisor]);
+                   let result = self.conn.execute("COMMIT TRANSACTION", [] );
+
+                   match result
+                   {
+                       Ok(_) => {
+println!("Supervisor set for application!");
+                           request.tx.send(Result::Ok(CentralDbResult::Ok) );
+                       }
+                       Err(e) => {
+println!("ERROR setting supervisor app: {}",e);
+                           request.tx.send(Result::Err(e.into()) );
+                       }
+                   }
+               }
            }
        }
 
@@ -470,6 +694,34 @@ impl CentralDb {
 
     pub fn setup(&self)
     {
+        let setup = r#"
+       CREATE TABLE supervisors(
+	      key BLOB PRIMARY KEY
+        );
+
+       CREATE TABLE apps (
+         key BLOB PRIMARY KEY
+        );
+
+        CREATE TABLE apps_to_supervisors
+        {
+           supervisor_key BLOB,
+           app_key BLOB,
+           PRIMARY KEY (supervisor_key, app_key),
+           FOREIGN KEY (supervisors_key)
+              REFERENCES supervisors (key)
+                  ON DELETE CASCADE,
+                  ON UPDATE NO ACTION,
+           FOREIGN KEY (app_key)
+              REFERENCES apps (key)
+                  ON DELETE CASCADE,
+                  ON UPDATE NO ACTION,
+        };
+        "#;
+
+
+        self.conn.execute(setup, []).unwrap();
+
     }
 
 }
