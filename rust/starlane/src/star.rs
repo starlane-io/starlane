@@ -22,7 +22,7 @@ use tokio::time::{Duration, Instant, timeout};
 use tokio::time::error::Elapsed;
 use url::Url;
 
-use server::ServerManager;
+use server::ServerStarVariant;
 
 use crate::actor::{Actor, ActorKey, ActorKind, ActorLocation, ActorWatcher};
 use crate::app::{AppCommandKind, AppController, AppCreateController, AppMeta, AppKind, Application, AppLocation};
@@ -39,7 +39,7 @@ use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload,
 use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob};
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
 use crate::space::{CreateAppControllerFail, SpaceCommand, SpaceCommandKind, SpaceController};
-use crate::star::central::CentralManager;
+use crate::star::central::CentralStarVariant;
 use crate::star::supervisor::{SupervisorCommand, SupervisorManager};
 use crate::permissions::{Authentication, AuthToken, AuthTokenSource, Credentials};
 use crate::space::SpaceCommandKind::AppGetController;
@@ -300,7 +300,7 @@ impl Star
                 match command{
 
                     StarCommand::Init => {
-                        self.data.manager_tx.send(StarManagerCommand::Init).await;
+                        self.data.manager_tx.send(StarVariantCommand::Init).await;
                     }
                     StarCommand::SetFlags(set_flags ) => {
                        self.data.flags= set_flags.flags;
@@ -1317,7 +1317,7 @@ println!("spaces_do_not_match");
         }
         else {
             self.process_message_reply(&message).await;
-            Ok(self.data.manager_tx.send( StarManagerCommand::StarMessage( message)).await?)
+            Ok(self.data.manager_tx.send( StarVariantCommand::StarMessage( message)).await?)
         }
     }
 
@@ -1446,7 +1446,7 @@ impl Wind
     }
 }
 
-pub enum StarManagerCommand
+pub enum StarVariantCommand
 {
     StarSkel(StarSkel),
     Init,
@@ -1505,16 +1505,16 @@ pub enum StarTest
 }
 
 
-impl fmt::Display for StarManagerCommand {
+impl fmt::Display for StarVariantCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
-            StarManagerCommand::StarMessage(message) => format!("StarMessage({})", message.payload ).to_string(),
-            StarManagerCommand::CentralCommand(_) => "CentralCommand".to_string(),
-            StarManagerCommand::SupervisorCommand(_) => "SupervisorCommand".to_string(),
-            StarManagerCommand::ServerCommand(_) => "ServerCommand".to_string(),
-            StarManagerCommand::Init => "Init".to_string(),
-            StarManagerCommand::StarSkel(_) => "StarData".to_string(),
-            StarManagerCommand::CoreRequest(_) => "CoreRequest".to_string()
+            StarVariantCommand::StarMessage(message) => format!("StarMessage({})", message.payload ).to_string(),
+            StarVariantCommand::CentralCommand(_) => "CentralCommand".to_string(),
+            StarVariantCommand::SupervisorCommand(_) => "SupervisorCommand".to_string(),
+            StarVariantCommand::ServerCommand(_) => "ServerCommand".to_string(),
+            StarVariantCommand::Init => "Init".to_string(),
+            StarVariantCommand::StarSkel(_) => "StarData".to_string(),
+            StarVariantCommand::CoreRequest(_) => "CoreRequest".to_string()
         };
         write!(f, "{}",r)
     }
@@ -1970,9 +1970,9 @@ impl FrameHold {
 
 
 #[async_trait]
-trait StarManager: Send+Sync
+trait StarVariant: Send+Sync
 {
-    async fn handle(&mut self, command: StarManagerCommand);
+    async fn handle(&mut self, command: StarVariantCommand);
 }
 
 
@@ -2081,7 +2081,7 @@ impl StarKey
    }
 }
 
-trait ServerManagerBacking: Send+Sync
+trait ServerVariantBacking: Send+Sync
 {
     fn set_supervisor( &mut self, supervisor_star: StarKey );
     fn get_supervisor( &self )->Option<&StarKey>;
@@ -2105,13 +2105,13 @@ impl PlaceholderStarManager
 }
 
 #[async_trait]
-impl StarManager for PlaceholderStarManager
+impl StarVariant for PlaceholderStarManager
 {
-    async fn handle(&mut self, command: StarManagerCommand)  {
+    async fn handle(&mut self, command: StarVariantCommand)  {
         match &command
         {
-            StarManagerCommand::Init => {}
-            StarManagerCommand::StarMessage(message)=>{
+            StarVariantCommand::Init => {}
+            StarVariantCommand::StarMessage(message)=>{
                 match &message.payload{
                     StarMessagePayload::Reply(_) => {}
                     _ => {
@@ -2129,7 +2129,7 @@ impl StarManager for PlaceholderStarManager
 #[async_trait]
 pub trait StarManagerFactory: Sync+Send
 {
-    async fn create(&self) -> mpsc::Sender<StarManagerCommand>;
+    async fn create(&self) -> mpsc::Sender<StarVariantCommand>;
 }
 
 
@@ -2140,17 +2140,17 @@ pub struct StarManagerFactoryDefault
 #[async_trait]
 impl StarManagerFactory for StarManagerFactoryDefault
 {
-    async fn create(&self) -> mpsc::Sender<StarManagerCommand>
+    async fn create(&self) -> mpsc::Sender<StarVariantCommand>
     {
         let (mut tx,mut rx) = mpsc::channel(32);
 
         tokio::spawn( async move {
-            let mut manager:Box<dyn StarManager> = loop {
-                if let Option::Some(StarManagerCommand::StarSkel(data)) = rx.recv().await
+            let mut manager:Box<dyn StarVariant> = loop {
+                if let Option::Some(StarVariantCommand::StarSkel(data)) = rx.recv().await
                 {
                     if let StarKind::Central = data.info.kind
                     {
-                        break Box::new(CentralManager::new(data.clone() ) );
+                        break Box::new(CentralStarVariant::new(data.clone() ).await );
                     }
                     else if let StarKind::Supervisor= data.info.kind
                     {
@@ -2158,7 +2158,7 @@ impl StarManagerFactory for StarManagerFactoryDefault
                     }
                     else if let StarKind::Server(_)= data.info.kind
                     {
-                        break Box::new(ServerManager::new(data.clone()));
+                        break Box::new(ServerStarVariant::new(data.clone()));
                     }
                     else {
                         break Box::new(PlaceholderStarManager::new(data.clone()))
@@ -2186,7 +2186,7 @@ pub struct StarSkel
     pub info: StarInfo,
     pub star_tx: mpsc::Sender<StarCommand>,
     pub core_tx: mpsc::Sender<StarCoreCommand>,
-    pub manager_tx: mpsc::Sender<StarManagerCommand>,
+    pub manager_tx: mpsc::Sender<StarVariantCommand>,
     pub flags: Flags,
     pub logger: Logger,
     pub sequence: Arc<AtomicU64>,

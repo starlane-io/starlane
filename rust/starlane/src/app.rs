@@ -18,7 +18,7 @@ use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, SubSpaceKey, UserKey};
 use crate::label::{Labels, LabelSelectionCriteria};
 use crate::space::CreateAppControllerFail;
-use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarManagerCommand, StarSkel};
+use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarVariantCommand, StarSkel};
 
 pub mod system;
 
@@ -125,7 +125,7 @@ impl AppSliceInner
     pub async fn unique_seq(&self,user: UserKey)-> oneshot::Receiver<Arc<IdSeq>>
     {
         let (tx,rx) = oneshot::channel();
-        self.skel.manager_tx.send(StarManagerCommand::CoreRequest( CoreRequest::AppSequenceRequest(CoreAppSequenceRequest{
+        self.skel.manager_tx.send(StarVariantCommand::CoreRequest( CoreRequest::AppSequenceRequest(CoreAppSequenceRequest{
             app: self.meta.key.clone(),
             user: user.clone(),
             tx: tx

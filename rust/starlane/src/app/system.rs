@@ -1,4 +1,3 @@
-use crate::star::central::AppCentral;
 use crate::star::{CentralCommand};
 use crate::error::Error;
 use std::sync::Arc;

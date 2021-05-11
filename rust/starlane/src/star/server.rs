@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, ServerAppPayload, Reply, AppMessage, SpaceMessage, ServerPayload, StarMessageCentral, SimpleReply, StarMessageSupervisor};
-use crate::star::{ServerManagerBacking, StarCommand, StarSkel, StarKey, StarKind, StarManager, StarManagerCommand, Wind, ServerCommand, CoreRequest};
+use crate::star::{ServerVariantBacking, StarCommand, StarSkel, StarKey, StarKind, StarVariant, StarVariantCommand, Wind, ServerCommand, CoreRequest};
 use crate::message::{ProtoMessage, MessageExpect};
 use crate::logger::{Flag, StarFlag, StarLog, StarLogPayload, Log};
 use tokio::time::{sleep, Duration};
@@ -11,22 +11,23 @@ use tokio::sync::oneshot::error::RecvError;
 use crate::core::server::AppExtError;
 use crate::keys::{AppKey, UserKey};
 
-pub struct ServerManagerBackingDefault
+
+pub struct ServerVariantBackingDefault
 {
     pub supervisor: Option<StarKey>
 }
 
-impl ServerManagerBackingDefault
+impl ServerVariantBackingDefault
 {
    pub fn new()-> Self
    {
-       ServerManagerBackingDefault{
+       ServerVariantBackingDefault {
            supervisor: Option::None
        }
    }
 }
 
-impl ServerManagerBacking for ServerManagerBackingDefault
+impl ServerVariantBacking for ServerVariantBackingDefault
 {
     fn set_supervisor(&mut self, supervisor_star: StarKey) {
         self.supervisor = Option::Some(supervisor_star);
@@ -38,20 +39,20 @@ impl ServerManagerBacking for ServerManagerBackingDefault
 }
 
 
-pub struct ServerManager
+pub struct ServerStarVariant
 {
     skel: StarSkel,
-    backing: Box<dyn ServerManagerBacking>,
+    backing: Box<dyn ServerVariantBacking>,
 }
 
-impl ServerManager
+impl ServerStarVariant
 {
     pub fn new(data: StarSkel) -> Self
     {
-        ServerManager
+        ServerStarVariant
         {
             skel: data,
-            backing: Box::new(ServerManagerBackingDefault::new())
+            backing: Box::new(ServerVariantBackingDefault::new())
         }
     }
 
@@ -113,7 +114,7 @@ println!("Server: Could not find Supervisor... waiting 5 seconds to try again...
 
 }
 
-impl ServerManager
+impl ServerStarVariant
 {
     async fn send_proto( &self, proto: ProtoMessage )
     {
@@ -122,15 +123,15 @@ impl ServerManager
 }
 
 #[async_trait]
-impl StarManager for ServerManager
+impl StarVariant for ServerStarVariant
 {
-    async fn handle(&mut self, command: StarManagerCommand) {
+    async fn handle(&mut self, command: StarVariantCommand) {
        match command
        {
-           StarManagerCommand::Init => {
+           StarVariantCommand::Init => {
                self.pledge().await;
            }
-           StarManagerCommand::StarMessage(star_message) => {
+           StarVariantCommand::StarMessage(star_message) => {
                match &star_message.payload{
                    StarMessagePayload::Space(space_message) => {
                        match &space_message.payload
@@ -212,7 +213,7 @@ impl StarManager for ServerManager
                    _ => {}
                }
            }
-           StarManagerCommand::ServerCommand(command) => {
+           StarVariantCommand::ServerCommand(command) => {
                match command
                {
                    ServerCommand::PledgeToSupervisor => {

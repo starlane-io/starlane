@@ -21,5 +21,8 @@ async-trait = "0.1.48"
 url = "2.2.1"
 lru = "0.6.5"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }
-sqlite = "0.26.0"
+#sqlx = { version = "0.5", features = [ "runtime-tokio-rustls", "sqlite" ] }
+#sqlite = "0.26.0"
+rusqlite = "0.25.3"
+#quaint = { version="0.2.0-alpha.13", features=["single-sqlite"] }
 lazy_static = "1.4.0"

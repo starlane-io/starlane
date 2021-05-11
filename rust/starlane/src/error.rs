@@ -16,6 +16,13 @@ impl fmt::Display for Error{
     }
 }
 
+impl From<rusqlite::Error> for Error{
+    fn from(e: rusqlite::Error) -> Self {
+        Error{
+            error: format!("{}",e.to_string())
+        }
+    }
+}
 
 impl From<tokio::sync::oneshot::error::RecvError> for Error{
     fn from(e: tokio::sync::oneshot::error::RecvError) -> Self {

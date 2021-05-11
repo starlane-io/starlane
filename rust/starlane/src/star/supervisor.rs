@@ -13,7 +13,7 @@ use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, S
 use crate::keys::{AppKey, UserKey};
 use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait};
-use crate::star::{StarCommand, StarSkel, StarInfo, StarKey, StarManager, StarManagerCommand};
+use crate::star::{StarCommand, StarSkel, StarInfo, StarKey, StarVariant, StarVariantCommand};
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::oneshot::error::RecvError;
 use crate::star::supervisor::SupervisorCommand::AppAssign;
@@ -114,15 +114,15 @@ impl SupervisorManager
 }
 
 #[async_trait]
-impl StarManager for SupervisorManager
+impl StarVariant for SupervisorManager
 {
-    async fn handle(&mut self, command: StarManagerCommand) {
+    async fn handle(&mut self, command: StarVariantCommand) {
         match command
         {
-            StarManagerCommand::Init => {
+            StarVariantCommand::Init => {
                 self.pledge().await;
             }
-            StarManagerCommand::SupervisorCommand(supervisor_command) => {
+            StarVariantCommand::SupervisorCommand(supervisor_command) => {
                 match supervisor_command
                 {
                     SupervisorCommand::Pledge => {
@@ -154,7 +154,7 @@ impl StarManager for SupervisorManager
                                     match result.await
                                     {
                                         Ok(_) => {
-                                            manager_tx.send(StarManagerCommand::SupervisorCommand(SupervisorCommand::SetAppServerStatus(SetAppServerStatus{
+                                            manager_tx.send(StarVariantCommand::SupervisorCommand(SupervisorCommand::SetAppServerStatus(SetAppServerStatus{
                                                 app: app.key.clone(),
                                                 server: server.clone(),
                                                 status: AppServerStatus::Ready
@@ -178,7 +178,7 @@ impl StarManager for SupervisorManager
                         if self.backing.get_app_status(&set_status.app) == AppStatus::Pending
                         {
                             self.backing.set_app_status(set_status.app.clone(),  AppStatus::Launching );
-                            self.skel.manager_tx.send(StarManagerCommand::SupervisorCommand(SupervisorCommand::AppLaunch(set_status.app.clone()))).await;
+                            self.skel.manager_tx.send(StarVariantCommand::SupervisorCommand(SupervisorCommand::AppLaunch(set_status.app.clone()))).await;
                         }
                     }
                     SupervisorCommand::AppLaunch(app_key) => {
@@ -218,7 +218,7 @@ impl StarManager for SupervisorManager
                                     match result.await
                                     {
                                         Ok(_) => {
-                                            manager_tx.send(StarManagerCommand::SupervisorCommand(SupervisorCommand::SetAppStatus(SetAppStatus {
+                                            manager_tx.send(StarVariantCommand::SupervisorCommand(SupervisorCommand::SetAppStatus(SetAppStatus {
                                                 app: app_key,
                                                 status: AppStatus::Ready(AppReadyStatus::Nominal)
                                             }))).await;
@@ -233,7 +233,7 @@ impl StarManager for SupervisorManager
                     }
                 }
             }
-            StarManagerCommand::StarMessage( star_message) =>
+            StarVariantCommand::StarMessage(star_message) =>
             {
                 match &star_message.payload
                 {
@@ -253,7 +253,7 @@ impl StarManager for SupervisorManager
                                             key: app_key,
                                             archetype: archetype.clone()
                                         };
-                                        self.skel.manager_tx.send( StarManagerCommand::SupervisorCommand(SupervisorCommand::AppAssign(app))).await;
+                                        self.skel.manager_tx.send( StarVariantCommand::SupervisorCommand(SupervisorCommand::AppAssign(app))).await;
                                     }
                                     SupervisorPayload::AppSequenceRequest(app_key) => {
                                         let index = self.backing.app_sequence_next(app_key);

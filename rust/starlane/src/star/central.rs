@@ -12,32 +12,33 @@ use crate::error::Error;
 use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, CentralPayload, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload};
 use crate::id::Id;
 use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId};
-use crate::label::Labels;
+use crate::label::{Labels, LabelDb, LabelRequest};
 use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage};
-use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarManager, StarManagerCommand, StarNotify, PublicKeySource};
+use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource};
 use crate::star::StarCommand::SpaceCommand;
 use crate::permissions::{AppAccess, AuthToken, User, UserKind};
 use crate::crypt::{PublicKey, CryptKeyId};
 use crate::frame::Reply::App;
 use crate::frame::CentralPayload::AppCreate;
+use rusqlite::Connection;
 
-pub struct CentralManager
+pub struct CentralStarVariant
 {
     data: StarSkel,
-    backing: Box<dyn CentralManagerBacking>,
+    backing: Box<dyn CentralStarVariantBacking>,
     pub status: CentralStatus,
     public_key_source: PublicKeySource
 }
 
-impl CentralManager
+impl CentralStarVariant
 {
-    pub fn new(data: StarSkel) -> CentralManager
+    pub async fn new(data: StarSkel) -> CentralStarVariant
     {
-        CentralManager
+        CentralStarVariant
         {
             data: data.clone(),
-            backing: Box::new(CentralManagerBackingDefault::new(data)),
+            backing: Box::new(CentralStarVariantBackingSqlLite::new().await ),
             status: CentralStatus::Launching,
             public_key_source: PublicKeySource::new()
         }
@@ -89,14 +90,14 @@ impl CentralManager
 
 
 #[async_trait]
-impl StarManager for CentralManager
+impl StarVariant for CentralStarVariant
 {
-    async fn handle(&mut self, command: StarManagerCommand)
+    async fn handle(&mut self, command: StarVariantCommand)
     {
         match &command
         {
-            StarManagerCommand::Init => {}
-            StarManagerCommand::StarMessage(star_message) => {
+            StarVariantCommand::Init => {}
+            StarVariantCommand::StarMessage(star_message) => {
                match &star_message.payload
                {
                    StarMessagePayload::Central(central_message) => {
@@ -161,7 +162,7 @@ impl StarManager for CentralManager
                    _ => {}
                }
             }
-            StarManagerCommand::CentralCommand(_) => {}
+            StarVariantCommand::CentralCommand(_) => {}
             _ => {}
         }
     }
@@ -259,7 +260,7 @@ pub enum CentralInitStatus
     Ready
 }
 
-trait CentralManagerBacking: Send+Sync
+trait CentralStarVariantBacking: Send+Sync
 {
     fn add_supervisor(&mut self, star: StarKey );
     fn remove_supervisor(&mut self, star: StarKey );
@@ -274,7 +275,7 @@ trait CentralManagerBacking: Send+Sync
 }
 
 
-pub struct CentralManagerBackingDefault
+pub struct CentralStarVariantBackingDefault
 {
     data: StarSkel,
     init_status: CentralInitStatus,
@@ -285,11 +286,11 @@ pub struct CentralManagerBackingDefault
     supervisor_index: usize
 }
 
-impl CentralManagerBackingDefault
+impl CentralStarVariantBackingDefault
 {
     pub fn new(data: StarSkel) -> Self
     {
-        CentralManagerBackingDefault {
+        CentralStarVariantBackingDefault {
             data: data,
             init_status: CentralInitStatus::None,
             supervisors: vec![],
@@ -301,7 +302,7 @@ impl CentralManagerBackingDefault
     }
 }
 
-impl CentralManagerBacking for CentralManagerBackingDefault
+impl CentralStarVariantBacking for CentralStarVariantBackingDefault
 {
 
     fn add_supervisor(&mut self, star: StarKey) {
@@ -346,14 +347,129 @@ impl CentralManagerBacking for CentralManagerBackingDefault
         }
     }
 
-
     fn get_public_key_for_star(&self, star: &StarKey) -> Option<PublicKey> {
         Option::Some( PublicKey{ id: CryptKeyId::default(), data: vec![] })
     }
 }
 
-#[async_trait]
-pub trait AppCentral
+
+struct CentralStarVariantBackingSqlLite
 {
-    async fn create(&self, info: AppMeta, data: Arc<Vec<u8>> ) -> Result<Labels,Error>;
+    label_db: mpsc::Sender<LabelRequest>,
+}
+
+impl CentralStarVariantBackingSqlLite
+{
+    pub async fn new()->Self
+    {
+        CentralStarVariantBackingSqlLite{
+            label_db: LabelDb::new().await
+        }
+    }
+
+}
+
+impl CentralStarVariantBacking for CentralStarVariantBackingSqlLite
+{
+    fn add_supervisor(&mut self, star: StarKey) {
+        todo!()
+    }
+
+    fn remove_supervisor(&mut self, star: StarKey) {
+        todo!()
+    }
+
+    fn set_supervisor_for_application(&mut self, app: AppKey, supervisor_star: StarKey) {
+        todo!()
+    }
+
+    fn get_supervisor_for_application(&self, app: &AppKey) -> Option<&StarKey> {
+        todo!()
+    }
+
+    fn has_supervisor(&self) -> bool {
+        todo!()
+    }
+
+    fn get_init_status(&self) -> CentralInitStatus {
+        todo!()
+    }
+
+    fn set_init_status(&self, status: CentralInitStatus) {
+        todo!()
+    }
+
+    fn select_supervisor(&mut self) -> Option<StarKey> {
+        todo!()
+    }
+
+    fn get_public_key_for_star(&self, star: &StarKey) -> Option<PublicKey> {
+        todo!()
+    }
+}
+
+pub struct CentralDbRequest
+{
+    pub command: CentralDbCommand,
+    pub tx: oneshot::Sender<CentralDbResult>
+}
+
+pub enum CentralDbCommand
+{
+    Close
+}
+
+pub enum CentralDbResult
+{
+    Ok
+}
+
+pub struct CentralDb {
+    conn: Connection,
+    rx: mpsc::Receiver<CentralDbRequest>
+}
+
+impl CentralDb {
+
+    pub async fn new() -> mpsc::Sender<CentralDbRequest> {
+        let (tx,rx) = mpsc::channel(2*1024);
+        tokio::spawn( async move {
+          let conn = Connection::open_in_memory();
+          if conn.is_ok()
+          {
+              let mut db = CentralDb
+              {
+                  conn: conn.unwrap(),
+                  rx: rx
+              };
+
+              db.run().await;
+          }
+
+        });
+
+        tx
+    }
+
+    pub async fn run(&mut self)->Result<(),Error>
+    {
+       self.setup();
+
+       while let Option::Some(request) = self.rx.recv().await
+       {
+           match request.command
+           {
+               CentralDbCommand::Close => {
+                   break;
+               }
+           }
+       }
+
+       Ok(())
+    }
+
+    pub fn setup(&self)
+    {
+    }
+
 }

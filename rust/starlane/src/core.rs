@@ -20,7 +20,7 @@ use crate::app::{ApplicationStatus, AppArchetype, AppMeta, App};
 use crate::error::Error;
 use crate::frame::{ActorMessage, AppMessage, StarMessage, StarMessagePayload, Watch, WatchInfo, ServerAppPayload};
 use crate::id::{Id, IdSeq};
-use crate::star::{ActorCreate, StarCommand, StarKey, StarKind, StarManagerCommand, StarSkel};
+use crate::star::{ActorCreate, StarCommand, StarKey, StarKind, StarVariantCommand, StarSkel};
 use crate::core::server::{ServerStarCore, ServerStarCoreExt, ExampleServerStarCoreExt, AppExtError};
 use std::marker::PhantomData;
 use crate::keys::AppKey;

@@ -19,7 +19,7 @@ use crate::error::Error;
 use crate::frame::{Frame, ProtoFrame, WindHit, StarMessage, StarMessagePayload, WindUp, StarPattern, WindDown, SequenceMessage} ;
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelReceiver, TunnelSender, TunnelSenderState};
-use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarKernel, StarKey, StarKind, StarManagerFactory, StarSearchTransaction, Transaction, StarInfo, StarSkel, StarManagerCommand};
+use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarKernel, StarKey, StarKind, StarManagerFactory, StarSearchTransaction, Transaction, StarInfo, StarSkel, StarVariantCommand};
 use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
 use crate::logger::{Logger, Flags, Flag, StarFlag, Log, ProtoStarLog, ProtoStarLogPayload};
@@ -126,7 +126,7 @@ impl ProtoStar
                         self.core_runner.run(core).await;
 
                         // now send star data to manager and core... tricky!
-                        manager_tx.send(StarManagerCommand::StarSkel(skel.clone()) ).await;
+                        manager_tx.send(StarVariantCommand::StarSkel(skel.clone()) ).await;
 
                         return Ok(Star::from_proto(skel.clone(),
                                                    self.command_rx,
