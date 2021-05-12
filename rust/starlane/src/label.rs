@@ -14,8 +14,16 @@ use bincode::ErrorKind;
 
 pub type Labels = HashMap<String,String>;
 
+pub struct ResourceSave
+{
+    pub resource: Resource,
+    pub labels: Labels,
+    pub name: Option<String>,
+}
+
 pub struct Selector
 {
+    pub name: Option<String>,
     pub fields: HashSet<FieldSelection>,
     pub labels: HashSet<LabelSelection>
 }
@@ -23,6 +31,7 @@ pub struct Selector
 impl Selector {
     pub fn new()->Self {
         Selector {
+            name: Option::None,
             fields: HashSet::new(),
             labels: HashSet::new()
         }
@@ -30,6 +39,11 @@ impl Selector {
 
     pub fn and( &mut self, field: FieldSelection ) {
         self.fields.insert(field);
+    }
+
+    pub fn name( &mut self, name: String )
+    {
+        self.name = Option::Some(name);
     }
 }
 
@@ -71,7 +85,33 @@ pub enum FieldSelection
     Owner(UserKey),
     Space(SpaceKey),
     SubSpace(SubSpaceKey),
+    App(AppKey),
 }
+
+
+impl ToSql for Name
+{
+    fn to_sql(&self) -> Result<ToSqlOutput<'_>, rusqlite::Error> {
+        Ok(ToSqlOutput::Owned(Value::Text(self.to())))
+    }
+}
+
+impl ToSql for AppKey
+{
+    fn to_sql(&self) -> Result<ToSqlOutput<'_>, rusqlite::Error> {
+        let blob= bincode::serialize(self);
+        match blob
+        {
+            Ok(blob) => {
+                Ok(ToSqlOutput::Owned(Value::Blob(blob)))
+            }
+            Err(error) => {
+                Err(rusqlite::Error::InvalidQuery)
+            }
+        }
+    }
+}
+
 
 impl ToSql for FieldSelection
 {
@@ -88,7 +128,7 @@ impl ToSql for FieldSelection
                 Ok(ToSqlOutput::Owned(Value::Text(specific.to_string())))
             }
             FieldSelection::Owner(owner) => {
-                let owner = bincode::serialize(&owner );
+                let owner = bincode::serialize(owner );
                 match owner
                 {
                     Ok(owner) => {
@@ -105,40 +145,21 @@ impl ToSql for FieldSelection
             FieldSelection::SubSpace(sub_space) => {
                 Ok(ToSqlOutput::Owned(Value::Integer(sub_space.id.index() as _)))
             }
+            FieldSelection::App(app) => {
+                let app = bincode::serialize(app);
+                match app
+                {
+                    Ok(app) => {
+                        Ok(ToSqlOutput::Owned(Value::Blob(app)))
+                    }
+                    Err(error) => {
+                        Err(rusqlite::Error::InvalidQuery)
+                    }
+                }
+            }
         }
     }
 }
-
-/*impl FieldSelection
-{
-    pub fn to_sql(&self)->Result<ToSqlOutput,Error>
-    {
-       Ok(match self
-       {
-           FieldSelection::Type(resource_type) => {
-               ToSqlOutput::Owned(Value::Text(resource_type.to_string()))
-           }
-           FieldSelection::Kind(kind) => {
-               ToSqlOutput::Owned(Value::Text(kind.to_string()))
-           }
-           FieldSelection::Specific(specific) => {
-               ToSqlOutput::Owned(Value::Text(specific.to_string()))
-           }
-           FieldSelection::Owner(owner) => {
-               let owner = bincode::serialize(&owner )?;
-               ToSqlOutput::Owned(Value::Blob(owner))
-           }
-           FieldSelection::Space(space) => {
-               ToSqlOutput::Owned(Value::Integer(space.index() as _))
-           }
-           FieldSelection::SubSpace(sub_space) => {
-               ToSqlOutput::Owned(Value::Integer(sub_space.id.index() as _))
-           }
-       })
-    }
-
-}
- */
 
 pub struct Label
 {
@@ -171,7 +192,7 @@ impl LabelRequest
 pub enum LabelCommand
 {
     Close,
-    Save(Resource,Labels),
+    Save(ResourceSave),
     Select(Selector),
 }
 
@@ -237,14 +258,12 @@ impl LabelDb {
             LabelCommand::Close => {
                 Ok(LabelResult::Ok)
             }
-            LabelCommand::Save(resource, labels) => {
+            LabelCommand::Save(save) => {
+                let resource = save.resource;
+                let labels = save.labels;
                 let key = bincode::serialize(&resource.key)?;
                 let resource_type = format!("{}", &resource.key.resource_type());
                 let kind = format!("{}", &resource.kind);
-                let specific = match resource.specific {
-                    None => Option::None,
-                    Some(specific) => { Option::Some(specific.to_string()) }
-                };
 
                 let owner = bincode::serialize(&resource.owner)?;
                 let space = resource.key.space().index();
@@ -252,21 +271,15 @@ impl LabelDb {
 
                 let trans = self.conn.transaction()?;
                 trans.execute("DELETE FROM labels, resources, labels_to_resources WHERE resources.key=?1 AND resources.key=labels_to_resources.resource_key AND labels.key=labels_to_resources.label_key", [key.clone()])?;
+                trans.execute("DELETE FROM names WHERE resources.key=?1", [key.clone()])?;
 
-                match specific
-                {
-                    None => {
-                        trans.execute("INSERT INTO resources (key,type,kind,space,sub_space,owner) VALUES (?1,?2,?3,?4,?5,?6)", params![key.clone(),resource_type,kind,space,sub_space,owner])?;
-                    }
-                    Some(specific) => {
-                        trans.execute("INSERT INTO resources (key,type,kind,specific,space,sub_space,owner) VALUES (?1,?2,?3,?4,?5,?6,?7)", params![key.clone(),resource_type,kind,specific,space,sub_space,owner])?;
-                    }
-                }
+                trans.execute("INSERT INTO resources (key,type,kind,specific,space,sub_space,owner,app) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)", params![key.clone(),resource_type,kind,resource.specific.clone(),space,sub_space,owner,resource.app()])?;
+                trans.execute("INSERT INTO names (key,name,type,kind,specific,space,sub_space,owner,app) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)", params![key.clone(),save.name.unwrap(),resource_type,kind,resource.specific.clone(),space,sub_space,owner,resource.app()])?;
 
                 for (name, value) in labels
                 {
                     trans.execute("INSERT INTO resources (name,value) VALUES (?1,?2)", [name, value]);
-                    trans.execute("INSERT INTO labels_to_resources (label_key,resource_key) VALUES (SELECT last_insert_rowid(),?2)", params![key]);
+                    trans.execute("INSERT INTO labels_to_resources (label_key,resource_key) VALUES (SELECT last_insert_rowid(),?1)", params![key]);
                 }
 
                 trans.commit()?;
@@ -300,6 +313,10 @@ impl LabelDb {
                         FieldSelection::SubSpace(_) => {
                             format!("sub_space=?{}", index + 1)
                         }
+                        FieldSelection::App(_) => {
+                            format!("app=?{}", index + 1)
+                        }
+
                     };
                     where_clause.push_str(f.as_str());
                     params.push(field);
@@ -354,16 +371,32 @@ impl LabelDb {
 	      key INTEGER PRIMARY KEY AUTOINCREMENT,
 	      name TEXT NOT NULL,
 	      value TEXT NOT NULL,
+          UNIQUE(key,name)
         )"#;
 
-      let resources = r#"CREATE TABLE IF NOT EXISTS resources (
+        let names= r#"
+       CREATE TABLE IF NOT EXISTS names(
+          key BLOB PRIMARY KEY,
+	      name TEXT NOT NULL,
+	      type TEXT NOT NULL,
+          kind BLOB NOT NULL,
+          specific TEXT
+          space INTEGER NOT NULL,
+          sub_space INTEGER NOT NULL,
+          app TEXT,
+          UNIQUE(name,type,kind,specific,space,sub_space,app)
+        )"#;
+
+
+        let resources = r#"CREATE TABLE IF NOT EXISTS resources (
          key BLOB PRIMARY KEY,
          type TEXT NOT NULL,
          kind BLOB NOT NULL,
          specific TEXT
          space INTEGER NOT NULL,
          sub_space INTEGER NOT NULL,
-         owner BLOB
+         app TEXT,
+         owner BLOB,
         )"#;
 
       let labels_to_resources = r#"CREATE TABLE IF NOT EXISTS labels_to_resources
@@ -380,6 +413,7 @@ impl LabelDb {
 
         let transaction = self.conn.transaction()?;
         transaction.execute(labels, [])?;
+        transaction.execute(names, [])?;
         transaction.execute(resources, [])?;
         transaction.execute(labels_to_resources, [])?;
         transaction.commit();

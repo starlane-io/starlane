@@ -11,6 +11,7 @@ use crate::names::Name;
 use crate::permissions::{Priviledges, User, UserKind};
 use std::str::FromStr;
 use crate::error::Error;
+use crate::label::Labels;
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum SpaceKey
@@ -412,12 +413,38 @@ impl fmt::Display for ResourceType {
 }
 
 
+
+pub struct ResourceMeta
+{
+    name: Option<String>,
+    labels: Labels
+}
+
 pub struct Resource
 {
     pub key: ResourceKey,
-    pub specific: Option<Name>,
     pub owner: UserKey,
-    pub kind: ResourceKind
+    pub kind: ResourceKind,
+    pub specific: Option<Name>,
+}
+
+impl Resource
+{
+    pub fn app(&self)->Option<AppKey>
+    {
+        match &self.key
+        {
+            ResourceKey::Space(_) => Option::None,
+            ResourceKey::SubSpace(_) => Option::None,
+            ResourceKey::App(_) => Option::None,
+            ResourceKey::Actor(actor) => {
+                Option::Some(actor.app.clone())
+            }
+            ResourceKey::User(_) => Option::None,
+            ResourceKey::File(_) => Option::None,
+            ResourceKey::Artifact(_) => Option::None
+        }
+    }
 }
 
 impl From<AppKind> for ResourceKind{
