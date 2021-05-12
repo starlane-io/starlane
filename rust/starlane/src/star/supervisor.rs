@@ -7,18 +7,21 @@ use async_trait::async_trait;
 use tokio::sync::mpsc::error::SendError;
 
 use crate::actor::{ActorKey, ActorLocation};
-use crate::app::{AppMeta, Application, AppLocation, AppStatus, AppReadyStatus, AppPanicReason, AppArchetype, InitData, AppCreateResult, App};
+use crate::app::{AppMeta, AppLocation, AppStatus, AppReadyStatus, AppPanicReason, AppArchetype, InitData, AppCreateResult, App};
 use crate::error::Error;
-use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, AppMessage, ServerAppPayload, SpaceReply, StarMessageCentral, SimpleReply, SupervisorPayload, StarMessageSupervisor, ServerPayload};
+use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, AppMessage, ServerAppPayload, SpaceReply, StarMessageCentral, SimpleReply, SupervisorPayload, StarMessageSupervisor, ServerPayload, StarPattern};
 use crate::keys::{AppKey, UserKey};
 use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait};
-use crate::star::{StarCommand, StarSkel, StarInfo, StarKey, StarVariant, StarVariantCommand};
+use crate::star::{StarCommand, StarSkel, StarInfo, StarKey, StarVariant, StarVariantCommand, StarKind};
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::oneshot::error::RecvError;
 use crate::star::supervisor::SupervisorCommand::AppAssign;
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
+use tokio::sync::{oneshot, mpsc};
+use rusqlite::{Connection,params};
+use std::str::FromStr;
 
 pub enum SupervisorCommand
 {
@@ -44,24 +47,24 @@ pub struct SetAppStatus
     pub status: AppStatus
 }
 
-pub struct SupervisorManager
+pub struct SupervisorVariant
 {
     skel: StarSkel,
     backing: Box<dyn SupervisorManagerBacking>
 }
 
-impl SupervisorManager
+impl SupervisorVariant
 {
-    pub fn new(data: StarSkel) ->Self
+    pub async fn new(data: StarSkel) ->Self
     {
-        SupervisorManager{
+        SupervisorVariant {
             skel: data.clone(),
-            backing: Box::new(SupervisorManagerBackingDefault::new(data)),
+            backing: Box::new(SupervisorStarVariantBackingSqLite::new().await ),
         }
     }
 }
 
-impl SupervisorManager
+impl SupervisorVariant
 {
     async fn pledge( &mut self )
     {
@@ -114,7 +117,7 @@ impl SupervisorManager
 }
 
 #[async_trait]
-impl StarVariant for SupervisorManager
+impl StarVariant for SupervisorVariant
 {
     async fn handle(&mut self, command: StarVariantCommand) {
         match command
@@ -132,7 +135,7 @@ impl StarVariant for SupervisorManager
                         self.backing.set_app_status(set_app_status.app.clone(), set_app_status.status.clone());
                     }
                     SupervisorCommand::AppAssign(app) => {
-                        let servers = self.backing.servers();
+                        let servers = self.backing.select_servers(StarPattern::Any).await;
                         if !servers.is_empty()
                         {
                             for server in servers
@@ -174,31 +177,32 @@ impl StarVariant for SupervisorManager
                         }
                     }
                     SupervisorCommand::SetAppServerStatus(set_status) => {
-                        self.backing.set_app_server_status(set_status.app.clone(),set_status.server.clone(), set_status.status.clone() );
-                        if self.backing.get_app_status(&set_status.app) == AppStatus::Pending
+                        self.backing.set_app_server_status(set_status.app.clone(),set_status.server.clone(), set_status.status.clone() ).await;
+                        if self.backing.get_app_status(&set_status.app).await == AppStatus::Pending
                         {
-                            self.backing.set_app_status(set_status.app.clone(),  AppStatus::Launching );
+                            self.backing.set_app_status(set_status.app.clone(),  AppStatus::Launching ).await;
                             self.skel.manager_tx.send(StarVariantCommand::SupervisorCommand(SupervisorCommand::AppLaunch(set_status.app.clone()))).await;
                         }
                     }
                     SupervisorCommand::AppLaunch(app_key) => {
-                        let archetype = self.backing.get_application(&app_key).cloned();
-                        let server = self.backing.select_server(&app_key);
+                        let archetype = self.backing.get_application(&app_key).await.cloned();
+                        let servers = self.backing.get_servers_for_app(&app_key).await;
 
                         if archetype.is_none()
                         {
                             eprintln!("cannot find archetype for app: {}",app_key);
                         }
 
-                        if server.is_none()
+                        if servers.is_empty()
                         {
                             eprintln!("cannot select a server for app: {}",app_key);
+                            return;
                         }
+
+                        let server = servers.get(0).cloned().unwrap();
 
                         if let Option::Some(archetype) = archetype
                         {
-                            if let Option::Some(server) = server
-                            {
                                 let app = App {
                                     key: app_key.clone(),
                                     archetype: archetype.clone()
@@ -220,7 +224,7 @@ impl StarVariant for SupervisorManager
                                         Ok(_) => {
                                             manager_tx.send(StarVariantCommand::SupervisorCommand(SupervisorCommand::SetAppStatus(SetAppStatus {
                                                 app: app_key,
-                                                status: AppStatus::Ready(AppReadyStatus::Nominal)
+                                                status: AppStatus::Ready
                                             }))).await;
                                         }
                                         Err(error) => {
@@ -228,7 +232,6 @@ impl StarVariant for SupervisorManager
                                         }
                                     }
                                 });
-                            }
                         }
                     }
                 }
@@ -256,9 +259,20 @@ impl StarVariant for SupervisorManager
                                         self.skel.manager_tx.send( StarVariantCommand::SupervisorCommand(SupervisorCommand::AppAssign(app))).await;
                                     }
                                     SupervisorPayload::AppSequenceRequest(app_key) => {
-                                        let index = self.backing.app_sequence_next(app_key);
-                                        let reply = star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Seq(index))));
-                                        self.skel.star_tx.send(StarCommand::SendProtoMessage(reply)).await;
+println!("AppSEquenceRequest!");
+                                        let index = self.backing.app_sequence_next(app_key).await;
+                                        match index
+                                        {
+                                            Ok(index) => {
+                                                let reply = star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Seq(index))));
+                                                self.skel.star_tx.send(StarCommand::SendProtoMessage(reply)).await;
+                                            }
+                                            Err(error) => {
+                                                let reply = star_message.reply(StarMessagePayload::Reply(SimpleReply::Error("could not generate sequence".to_string())));
+                                                self.skel.star_tx.send(StarCommand::SendProtoMessage(reply)).await;
+                                            }
+                                        }
+
                                     }
                                     SupervisorPayload::ActorRegister(_) => {}
                                     SupervisorPayload::ActorUnRegister(_) => {}
@@ -272,7 +286,8 @@ impl StarVariant for SupervisorManager
                             match star_message_supervisor
                             {
                                 StarMessageSupervisor::Pledge(kind) => {
-                                    self.backing.add_server(star_message.from.clone());
+                                    let info = StarInfo::new(star_message.from.clone(),kind.clone() );
+                                    self.backing.add_server(info).await;
                                     self.reply_ok(star_message.clone()).await;
                                     if self.skel.flags.check( Flag::Star(StarFlag::DiagnosePledge )) {
 
@@ -370,7 +385,7 @@ impl StarVariant for SupervisorManager
 
 
 
-impl SupervisorManager
+impl SupervisorVariant
 {
     async fn handle_message(&mut self, message: StarMessage) {
 
@@ -408,133 +423,28 @@ impl SupervisorManagerBackingDefault
     }
 }
 
-impl SupervisorManagerBacking for SupervisorManagerBackingDefault
-{
-    fn add_server(&mut self, server: StarKey) {
-        self.servers.push(server);
-    }
-
-    fn remove_server(&mut self, server: &StarKey) {
-        self.servers.retain(|star| star != server );
-    }
-
-    fn select_server(&mut self, app: &AppKey ) -> Option<StarKey> {
-        if self.servers.len() == 0
-        {
-            return Option::None;
-        }
-        self.server_select_index = &self.server_select_index +1;
-        let server = self.servers.get( &self.server_select_index % self.servers.len() ).unwrap();
-        Option::Some(server.clone())
-    }
-
-    fn servers(&mut self) -> Vec<StarKey> {
-        self.servers.clone()
-    }
-
-    fn add_application(&mut self, app: AppKey, data: AppArchetype) {
-        self.applications.insert(app, data );
-    }
-
-    fn get_application(&mut self, app: &AppKey) -> Option<&AppArchetype> {
-        self.applications.get(&app )
-    }
-
-    fn set_app_server_status(&mut self, app: AppKey, server: StarKey, status: AppServerStatus) {
-        self.app_server_status.insert( (app,server), status );
-    }
-
-    fn get_app_server_status(&mut self, app: &AppKey, server: &StarKey) -> AppServerStatus {
-        if let Option::Some(status) = self.app_server_status.get( &(app.clone(),server.clone()) )
-        {
-            status.clone()
-        }
-        else
-        {
-            AppServerStatus::Unknown
-        }
-    }
-
-    fn set_app_status(&mut self, app: AppKey, status: AppStatus){
-        self.app_status.insert( app, status );
-    }
-
-    fn get_app_status(&mut self, app: &AppKey) -> AppStatus {
-        match self.app_status.get( &app,)
-        {
-            Some(status) => status.clone(),
-            None => AppStatus::Unknown
-        }
-    }
-
-    fn add_app_to_server(&mut self, app: AppKey, server: StarKey) {
-        if !self.app_to_servers.contains_key( &app )
-        {
-            let mut servers = HashSet::new();
-            self.app_to_servers.insert( app.clone(), servers );
-        }
-
-        let mut servers = self.app_to_servers.get_mut(&app).unwrap();
-        servers.insert(server);
-    }
-
-
-    fn get_servers_for_app(&mut self, app: &AppKey) -> Vec<StarKey> {
-        let servers = self.app_to_servers.get(&app).unwrap();
-        servers.clone().iter().map(|i|i.clone()).collect()
-    }
-
-    fn app_sequence_next(&mut self, app: &AppKey) -> u64 {
-        if !self.app_sequence.contains_key(&app)
-        {
-            self.app_sequence.insert( app.clone(), AtomicU64::new(0) );
-        }
-        let atomic = self.app_sequence.get_mut(app).unwrap();
-        atomic.fetch_add(1, Ordering::Relaxed )
-    }
-
-    fn remove_application(&mut self, app: &AppKey) {
-        self.applications.remove(app);
-    }
-
-    fn set_actor_location(&mut self, entity: ActorKey, location: ActorLocation) {
-        self.actor_location.insert(entity, location );
-    }
-
-    fn get_actor_location(&self, lookup: &ActorLookup) -> Option<&ActorLocation> {
-        match lookup
-        {
-            ActorLookup::Key(key) => {
-                return self.actor_location.get(key)
-            }
-        }
-    }
-}
 
 
 
+#[async_trait]
 pub trait SupervisorManagerBacking: Send+Sync
 {
-    fn add_server( &mut self, server: StarKey );
-    fn remove_server( &mut self, server: &StarKey );
-    fn select_server(&mut self, app:  &AppKey ) -> Option<StarKey>;
-    fn servers(&mut self) -> Vec<StarKey>;
+    async fn add_server( &mut self, info: StarInfo ) -> Result<(),Error>;
+    async fn select_servers(&mut self, pattern: StarPattern ) -> Vec<StarKey>;
 
-    fn add_application(&mut self, app: AppKey, archetype: AppArchetype);
-    fn get_application(&mut self, app: &AppKey ) -> Option<&AppArchetype>;
-    fn set_app_server_status(&mut self, app: AppKey, server: StarKey, status: AppServerStatus);
-    fn get_app_server_status(&mut self, app: &AppKey, server: &StarKey) ->AppServerStatus;
-    fn set_app_status(&mut self, app: AppKey, status: AppStatus );
-    fn get_app_status(&mut self, app: &AppKey) -> AppStatus;
-    fn add_app_to_server(&mut self, app: AppKey, server: StarKey);
-    fn get_servers_for_app(&mut self, app: &AppKey ) -> Vec<StarKey>;
+    async fn add_application(&mut self, app: AppKey, archetype: AppArchetype) -> Result<(),Error>;
+    async fn get_application(&mut self, app: &AppKey ) -> Option<&AppArchetype>;
+    async fn set_app_server_status(&mut self, app: AppKey, server: StarKey, status: AppServerStatus) -> Result<(),Error>;
+    async fn get_app_server_status(&mut self, app: &AppKey, server: &StarKey) ->AppServerStatus;
+    async fn set_app_status(&mut self, app: AppKey, status: AppStatus )-> Result<(),Error>;
+    async fn get_app_status(&mut self, app: &AppKey) -> AppStatus;
+    async fn add_app_to_server(&mut self, app: AppKey, server: StarKey)-> Result<(),Error>;
+    async fn get_servers_for_app(&mut self, app: &AppKey ) -> Vec<StarKey>;
 
-    fn app_sequence_next(&mut self, app: &AppKey ) -> u64;
+    async fn app_sequence_next(&mut self, app: &AppKey ) -> Result<u64,Error>;
 
-    fn remove_application(&mut self, app: &AppKey );
-
-    fn set_actor_location(&mut self, actor: ActorKey, location: ActorLocation);
-    fn get_actor_location(&self, lookup: &ActorLookup) -> Option<&ActorLocation>;
+    async fn set_actor_location(&mut self, actor: ActorKey, location: ActorLocation)-> Result<(),Error>;
+    async fn get_actor_location(&self, lookup: &ActorLookup) -> Option<&ActorLocation>;
 }
 
 
@@ -556,4 +466,494 @@ impl fmt::Display for AppServerStatus{
         };
         write!(f, "{}",r)
     }
+}
+
+pub struct SupervisorStarVariantBackingSqLite
+{
+    pub supervisor_db: mpsc::Sender<SupervisorDbRequest>
+}
+
+impl SupervisorStarVariantBackingSqLite
+{
+    pub async fn new()->Self
+    {
+        SupervisorStarVariantBackingSqLite {
+            supervisor_db: SupervisorDb::new().await
+        }
+    }
+
+    pub fn handle( &self, result: Result<Result<SupervisorDbResult,Error>,RecvError>)->Result<(),Error>
+    {
+        match result
+        {
+            Ok(ok) => {
+                match ok{
+                    Ok(_) => {
+                        Ok(())
+                    }
+                    Err(error) => {
+                        Err(error)
+                    }
+                }
+            }
+            Err(error) => {
+                Err(error.into())
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl SupervisorManagerBacking for SupervisorStarVariantBackingSqLite
+{
+    async fn add_server(&mut self, info: StarInfo ) -> Result<(), Error> {
+        let (request,rx) = SupervisorDbRequest::new( SupervisorDbCommand::AddServer(info));
+        self.supervisor_db.send( request ).await;
+        self.handle(rx.await)
+    }
+
+    async fn select_servers(&mut self, pattern: StarPattern) -> Vec<StarKey> {
+println!("SELECT SERVERS!");
+        let (request,rx) = SupervisorDbRequest::new( SupervisorDbCommand::StarSelect(pattern));
+        self.supervisor_db.send( request ).await;
+        match rx.await
+        {
+            Ok(result) => {
+                match result
+                {
+                    Ok(ok) => {
+                        match ok
+                        {
+                            SupervisorDbResult::Servers(servers) => {
+
+                                println!("rtn servers: {}", servers.len() );
+                                servers
+                            }
+                            _ => vec![]
+                        }
+                    }
+                    Err(err) => {
+                        eprintln!("{}",err);
+                        vec![]
+                    }
+                }
+            }
+            Err(err) => {
+                eprintln!("{}",err);
+                vec![]
+            }
+        }
+    }
+
+    async fn add_application(&mut self, app: AppKey, archetype: AppArchetype) -> Result<(), Error> {
+        todo!()
+    }
+
+    async fn get_application(&mut self, app: &AppKey) -> Option<&AppArchetype> {
+        todo!()
+    }
+
+    async fn set_app_server_status(&mut self, app: AppKey, server: StarKey, status: AppServerStatus) -> Result<(), Error> {
+        let (request,rx) = SupervisorDbRequest::new( SupervisorDbCommand::SetAppServerStatus(app,server,status));
+        self.supervisor_db.send( request ).await;
+        self.handle(rx.await)
+    }
+
+    async fn get_app_server_status(&mut self, app: &AppKey, server: &StarKey) -> AppServerStatus {
+        let (request,rx) = SupervisorDbRequest::new( SupervisorDbCommand::GetAppServerStatus(app.clone(),server.clone()));
+        self.supervisor_db.send( request ).await;
+        match rx.await
+        {
+            Ok(result) => {
+                match result
+                {
+                    Ok(ok) => {
+                        match ok
+                        {
+                            SupervisorDbResult::AppServerStatus(status) => {
+                                status
+                            }
+                            _ => AppServerStatus::Unknown
+                        }
+                    }
+                    Err(err) => {
+                        AppServerStatus::Unknown
+                    }
+                }
+            }
+            Err(err) => {
+                AppServerStatus::Unknown
+            }
+        }
+    }
+
+    async fn set_app_status(&mut self, app: AppKey, status: AppStatus) -> Result<(), Error> {
+        let (request,rx) = SupervisorDbRequest::new( SupervisorDbCommand::SetAppStatus(app,status));
+        self.supervisor_db.send( request ).await;
+        self.handle(rx.await)
+    }
+
+    async fn get_app_status(&mut self, app: &AppKey) -> AppStatus {
+        let (request,rx) = SupervisorDbRequest::new( SupervisorDbCommand::GetAppStatus(app.clone()));
+        self.supervisor_db.send( request ).await;
+        match rx.await
+        {
+            Ok(result) => {
+                match result
+                {
+                    Ok(ok) => {
+                        match ok
+                        {
+                            SupervisorDbResult::AppStatus(status) => {
+                               status
+                            }
+                            _ => AppStatus::Unknown
+                        }
+                    }
+                    Err(err) => {
+                        eprintln!("{}",err);
+                        AppStatus::Unknown
+                    }
+                }
+            }
+            Err(err) => {
+                eprintln!("{}",err);
+                AppStatus::Unknown
+            }
+        }
+    }
+
+    async fn add_app_to_server(&mut self, app: AppKey, server: StarKey) -> Result<(), Error> {
+        todo!()
+    }
+
+    async fn get_servers_for_app(&mut self, app: &AppKey) -> Vec<StarKey> {
+        todo!()
+    }
+
+    async fn app_sequence_next(&mut self, app: &AppKey) -> Result<u64, Error> {
+        let (request,rx) = SupervisorDbRequest::new( SupervisorDbCommand::AppSequenceNext(app.clone()));
+        self.supervisor_db.send( request ).await;
+        match rx.await
+        {
+            Ok(result) => {
+                match result
+                {
+                    Ok(ok) => {
+                        match ok
+                        {
+                            SupervisorDbResult::AppSequenceNext(seq) => {
+                                Ok(seq)
+                            }
+                            _ => Err("unexpected when trying to get seq".into())
+                        }
+                    }
+                    Err(err) => {
+                        eprintln!("{}",err);
+                        Err("unexpected when trying to get seq".into())
+                    }
+                }
+            }
+            Err(err) => {
+                eprintln!("{}",err);
+                Err("unexpected when trying to get seq".into())
+            }
+        }
+    }
+
+    async fn set_actor_location(&mut self, actor: ActorKey, location: ActorLocation) -> Result<(), Error> {
+        todo!()
+    }
+
+    async fn get_actor_location(&self, lookup: &ActorLookup) -> Option<&ActorLocation> {
+        todo!()
+    }
+}
+
+pub struct SupervisorDbRequest
+{
+    pub command: SupervisorDbCommand,
+    pub tx: oneshot::Sender<Result<SupervisorDbResult,Error>>
+}
+
+impl SupervisorDbRequest
+{
+    pub fn new(command: SupervisorDbCommand)->(Self,oneshot::Receiver<Result<SupervisorDbResult,Error>>)
+    {
+        let (tx,rx) = oneshot::channel();
+        (SupervisorDbRequest
+         {
+             command: command,
+             tx: tx
+         },
+         rx)
+    }
+}
+
+pub enum SupervisorDbCommand
+{
+    Close,
+    AddServer(StarInfo),
+    StarSelect(StarPattern),
+    AddApplicationToServer(StarKey,AppKey),
+    GetAppArchetype(AppKey),
+    SetAppStatus(AppKey,AppStatus),
+    SetAppServerStatus(AppKey,StarKey,AppServerStatus),
+    GetAppServerStatus(AppKey,StarKey),
+    GetAppStatus(AppKey),
+    GetServersForApp(AppKey),
+    AppSequenceNext(AppKey),
+    SetActorLocation(ActorLocation),
+    GetActorLocation(ActorKey)
+}
+
+pub enum SupervisorDbResult
+{
+    Ok,
+    Server(Option<StarKey>),
+    Servers(Vec<StarKey>),
+    Supervisor(Option<StarKey>),
+    AppArchetype(AppArchetype),
+    AppStatus(AppStatus),
+    AppServerStatus(AppServerStatus),
+    AppSequenceNext(u64),
+    ActorLocation(ActorLocation)
+}
+
+pub struct SupervisorDb {
+    conn: Connection,
+    rx: mpsc::Receiver<SupervisorDbRequest>
+}
+
+impl SupervisorDb {
+
+    pub async fn new() -> mpsc::Sender<SupervisorDbRequest> {
+        let (tx,rx) = mpsc::channel(2*1024);
+        tokio::spawn( async move {
+            let conn = Connection::open_in_memory();
+            if conn.is_ok()
+            {
+                let mut db = SupervisorDb
+                {
+                    conn: conn.unwrap(),
+                    rx: rx
+                };
+
+                db.run().await;
+            }
+
+        });
+
+        tx
+    }
+
+    pub async fn run(&mut self)->Result<(),Error>
+    {
+        self.setup();
+
+        while let Option::Some(request) = self.rx.recv().await
+        {
+            match request.command
+            {
+                SupervisorDbCommand::Close => {
+                    break;
+                }
+                SupervisorDbCommand::AddServer(info) => {
+                    let server = bincode::serialize(&info.star ).unwrap();
+                    let result = self.conn.execute("INSERT INTO servers (key,kind) VALUES (?1,?2)", params![server,info.kind.to_string()]);
+                    match result
+                    {
+                        Ok(_) => {
+                            request.tx.send(Result::Ok(SupervisorDbResult::Ok) );
+                        }
+                        Err(e) => {
+                            request.tx.send(Result::Err(e.into()) );
+                        }
+                    }
+                }
+                SupervisorDbCommand::StarSelect(pattern) => {
+println!("Star SELECT ");
+                    let mut statement = self.conn.prepare("SELECT key,kind FROM servers");
+                    if let Result::Ok(mut statement) = statement
+                    {
+                        println!("got here");
+                        let servers = statement.query_map( params![], |row|{
+                            let key: Vec<u8> = row.get(0).unwrap();
+                            if let Result::Ok(key) = bincode::deserialize::<StarKey>(key.as_slice()){
+                                let kind: String = row.get(1).unwrap();
+                                let kind =   StarKind::from_str(kind.as_str() ).unwrap();
+                                let info = StarInfo::new(key,kind);
+                                Ok(info)
+                            }
+                            else
+                            {
+                                Err(rusqlite::Error::ExecuteReturnedResults)
+                            }
+                        } ).unwrap();
+
+                        let mut rtn = vec![];
+                        for server in servers
+                        {
+                            if let Result::Ok(server) = server
+                            {
+                                if pattern.is_match(&server)
+                                {
+println!("adding server...");
+                                    rtn.push(server.star );
+                                }
+                            }
+                        }
+
+
+                        request.tx.send( Result::Ok( SupervisorDbResult::Servers(rtn)));
+println!("blah returning... ...");
+
+                    }
+
+                }
+                SupervisorDbCommand::SetAppServerStatus(app, server,status ) => {
+                    let server= bincode::serialize(&server).unwrap();
+                    let app = bincode::serialize(&app).unwrap();
+
+                    self.conn.execute("BEGIN TRANSACTION", []);
+                    self.conn.execute("REPLACE INTO apps (key) VALUES (?1)", [app.clone()]);
+                    self.conn.execute("REPLACE INTO apps_to_servers (app_key,server_key,status) VALUES (?1,?2,?3)", params![app.clone(), server.clone(),status.to_string()]);
+                    let result = self.conn.execute("COMMIT TRANSACTION", []);
+
+                    match result
+                    {
+                        Ok(_) => {
+                            println!("Server set for application!");
+                            request.tx.send(Result::Ok(SupervisorDbResult::Ok));
+                        }
+
+                        Err(e) => {
+                            println!("ERROR setting server app: {}", e);
+                            request.tx.send(Result::Err(e.into()));
+                        }
+                    }
+                }
+
+                SupervisorDbCommand::SetAppStatus(app, status) => {
+                    let app= bincode::serialize(&app).unwrap();
+
+                    let result = self.conn.execute("REPLACE INTO apps_status (key,status) VALUES (?1,?2)", params![app.clone(),status.to_string()]);
+
+                    match result
+                    {
+                        Ok(_) => {
+                            println!("app status SET");
+                            request.tx.send(Result::Ok(SupervisorDbResult::Ok));
+                        }
+                        Err(e) => {
+println!("SET APP STATUS ERROR");
+                            request.tx.send(Result::Err(e.into()));
+                        }
+                    }
+
+                }
+                SupervisorDbCommand::GetAppStatus(app) => {
+                    let app = bincode::serialize(&app ).unwrap();
+                    let result = self.conn.query_row("SELECT status FROM apps_status WHERE key=?1", params![app], |row|
+                        {
+                            let status:String = row.get(0).unwrap();
+                            let status:AppStatus = AppStatus::from_str(status.as_str()).unwrap();
+                            Ok(status)
+                        });
+                    match result
+                    {
+                        Ok(status) => {
+                            request.tx.send(Result::Ok(SupervisorDbResult::AppStatus(status)) );
+                        }
+                        Err(rusqlite::Error::QueryReturnedNoRows) => {
+                            request.tx.send(Result::Ok(SupervisorDbResult::AppStatus(AppStatus::Unknown)) );
+                        }
+                        Err(e) => {
+println!("GET APP STATUS ERROR: {}",e);
+                            request.tx.send(Result::Err(e.into()) );
+                        }
+                    }
+                }
+
+                SupervisorDbCommand::AppSequenceNext(app) => {
+                    let app = bincode::serialize(&app).unwrap();
+
+                    self.conn.execute("BEGIN TRANSACTION", []);
+                    self.conn.execute("UPDATE apps SET sequence=sequence+1 WHERE key=?1", [app.clone()]);
+                    let result = self.conn.query_row("SELECT key FROM apps WHERE key=?1", params![app.clone()], |row| {
+                        let rtn: u64 = row.get(0).unwrap();
+                        Ok(rtn)
+                    });
+                    match result
+                    {
+                        Ok(result) => {
+                            println!("incremented app sequence!!!");
+                            request.tx.send(Result::Ok(SupervisorDbResult::AppSequenceNext(result)));
+                        }
+
+                        Err(e) => {
+                            println!("ERROR APP SEQUENCE NEXT: {}", e);
+                            request.tx.send(Result::Err(e.into()));
+                        }
+                    }
+                }
+
+                SupervisorDbCommand::GetServersForApp(_) => {}
+                SupervisorDbCommand::AddApplicationToServer(_, _) => {}
+                SupervisorDbCommand::GetAppArchetype(_) => {}
+
+                SupervisorDbCommand::SetActorLocation(_) => {}
+                SupervisorDbCommand::GetActorLocation(_) => {}
+
+                SupervisorDbCommand::GetAppServerStatus(_, _) => {}
+            }
+
+        }
+
+        Ok(())
+    }
+
+    pub fn setup(&self)
+    {
+        let servers= r#"
+       CREATE TABLE servers(
+	      key BLOB PRIMARY KEY,
+	      kind TEXT NOT NULL
+        );"#;
+
+       let apps = r#"CREATE TABLE apps (
+         key BLOB PRIMARY KEY,
+         sequence INTEGER DEFAULT 0
+        );"#;
+
+        let apps_status = r#"CREATE TABLE apps_status (
+         key BLOB PRIMARY KEY,
+         status TEXT NOT NULL
+        );"#;
+
+
+       let actors = r#"CREATE TABLE actors (
+         key BLOB PRIMARY KEY
+        );"#;
+
+        let apps_to_servers = r#"CREATE TABLE apps_to_servers
+        (
+           server_key BLOB,
+           app_key BLOB,
+           status TEXT NOT NULL,
+           PRIMARY KEY (server_key, app_key),
+           FOREIGN KEY (server_key) REFERENCES servers (key),
+           FOREIGN KEY (app_key) REFERENCES apps (key)
+        );"#;
+
+        self.conn.execute("BEGIN TRANSACTION", []).unwrap();
+        self.conn.execute(servers, []).unwrap();
+        self.conn.execute(apps, []).unwrap();
+        self.conn.execute(apps_status, []).unwrap();
+        self.conn.execute(actors, []).unwrap();
+        self.conn.execute(apps_to_servers, []).unwrap();
+        self.conn.execute("COMMIT TRANSACTION", []).unwrap();
+
+    }
+
 }

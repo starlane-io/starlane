@@ -560,134 +560,128 @@ impl CentralDb {
 
     pub async fn run(&mut self)->Result<(),Error>
     {
-       self.setup();
+        self.setup();
 
-       while let Option::Some(request) = self.rx.recv().await
-       {
-           match request.command
-           {
-               CentralDbCommand::Close => {
-                   break;
-               }
-               CentralDbCommand::AddSupervisor(key) => {
-                   let blob = bincode::serialize(&key).unwrap();
-                   let result = self.conn.execute("INSERT INTO supervisors (key) VALUES (?1)", [blob]);
-                   match result
-                   {
-                       Ok(_) => {
-                           request.tx.send(Result::Ok(CentralDbResult::Ok) );
-                       }
-                       Err(e) => {
-                           request.tx.send(Result::Err(e.into()) );
-                       }
-                   }
-               }
-               CentralDbCommand::RemoveSupervisor(key) => {
-                   let blob = bincode::serialize(&key).unwrap();
-                   let result = self.conn.execute("DELETE FROM supervisors WHERE key=?", [blob]);
-                   match result
-                   {
-                       Ok(_) => {
-                           request.tx.send(Result::Ok(CentralDbResult::Ok) );
-                       }
-                       Err(e) => {
-                           request.tx.send(Result::Err(e.into()) );
-                       }
-                   }
-               }
-               CentralDbCommand::HasSupervisor => {
-                   let result = self.conn.query_row("SELECT count(*) FROM supervisors", [], |row| {
-                          let count:usize = row.get(0)?;
-                          Ok(count)
-                       });
-                   match result
-                   {
-                       Ok(count) => {
-                           request.tx.send(Result::Ok(CentralDbResult::HasSupervisor(count>0)) );
-                       }
-                       Err(e) => {
-                           request.tx.send(Result::Err(e.into()) );
-                       }
-                   }
-               }
-               CentralDbCommand::SelectSupervisor => {
-println!("SELECT SUPERVISOR:... ");
-                   let result= self.conn.query_row("SELECT * FROM supervisors", [], |row| {
-                       let rtn:Vec<u8> = row.get(0)?;
-                       Ok(bincode::deserialize::<StarKey>(rtn.as_slice()))
-                   } );
-                   match result
-                   {
-                       Ok(result) => {
-                           match result
-                           {
-                               Ok(star) => {
+        while let Option::Some(request) = self.rx.recv().await
+        {
+            match request.command
+            {
+                CentralDbCommand::Close => {
+                    break;
+                }
+                CentralDbCommand::AddSupervisor(key) => {
+                    let blob = bincode::serialize(&key).unwrap();
+                    let result = self.conn.execute("INSERT INTO supervisors (key) VALUES (?1)", [blob]);
+                    match result
+                    {
+                        Ok(_) => {
+                            request.tx.send(Result::Ok(CentralDbResult::Ok));
+                        }
+                        Err(e) => {
+                            request.tx.send(Result::Err(e.into()));
+                        }
+                    }
+                }
+                CentralDbCommand::RemoveSupervisor(key) => {
+                    let blob = bincode::serialize(&key).unwrap();
+                    let result = self.conn.execute("DELETE FROM supervisors WHERE key=?", [blob]);
+                    match result
+                    {
+                        Ok(_) => {
+                            request.tx.send(Result::Ok(CentralDbResult::Ok));
+                        }
+                        Err(e) => {
+                            request.tx.send(Result::Err(e.into()));
+                        }
+                    }
+                }
+                CentralDbCommand::HasSupervisor => {
+                    let result = self.conn.query_row("SELECT count(*) FROM supervisors", [], |row| {
+                        let count: usize = row.get(0)?;
+                        Ok(count)
+                    });
+                    match result
+                    {
+                        Ok(count) => {
+                            request.tx.send(Result::Ok(CentralDbResult::HasSupervisor(count > 0)));
+                        }
+                        Err(e) => {
+                            request.tx.send(Result::Err(e.into()));
+                        }
+                    }
+                }
+                CentralDbCommand::SelectSupervisor => {
+                    let result = self.conn.query_row("SELECT * FROM supervisors", [], |row| {
+                        let rtn: Vec<u8> = row.get(0)?;
+                        Ok(bincode::deserialize::<StarKey>(rtn.as_slice()))
+                    });
+                    match result
+                    {
+                        Ok(result) => {
+                            match result
+                            {
+                                Ok(star) => {
+                                    request.tx.send(Result::Ok(CentralDbResult::Supervisor(Option::Some(star))));
+                                }
+                                Err(error) => {
+                                    request.tx.send(Result::Ok(CentralDbResult::Supervisor(Option::None)));
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            request.tx.send(Result::Ok(CentralDbResult::Supervisor(Option::None)));
+                        }
+                    }
+                }
+                CentralDbCommand::GetSupervisorForApplication(app) => {
+                    let app = bincode::serialize(&app).unwrap();
+                    let result = self.conn.query_row("SELECT supervisors.key FROM supervisors,apps_to_supervisors WHERE apps_to_supervisors.app_key=?1 AND apps_to_supervisors.supervisor_key=supervisors.key", [app], |row| {
+                        let rtn: Vec<u8> = row.get(0)?;
+                        Ok(bincode::deserialize::<StarKey>(rtn.as_slice()))
+                    });
+                    match result
+                    {
+                        Ok(result) => {
+                            match result
+                            {
+                                Ok(star) => {
+                                    request.tx.send(Result::Ok(CentralDbResult::Supervisor(Option::Some(star))));
+                                }
+                                Err(error) => {
+                                    println!("(1)error: {}", error);
+                                    request.tx.send(Result::Ok(CentralDbResult::Supervisor(Option::None)));
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            println!("(2)error: {}", err);
+                            request.tx.send(Result::Ok(CentralDbResult::Supervisor(Option::None)));
+                        }
+                    }
+                }
+                CentralDbCommand::SetSupervisorForApplication((supervisor, app)) => {
+                    let supervisor = bincode::serialize(&supervisor).unwrap();
+                    let app = bincode::serialize(&app).unwrap();
 
-                                   request.tx.send( Result::Ok(CentralDbResult::Supervisor(Option::Some(star))));
-                               }
-                               Err(error) => {
-println!("(1)error: {}",error );
-                                   request.tx.send( Result::Ok(CentralDbResult::Supervisor(Option::None)));
-                               }
-                           }
-                       }
-                       Err(err) => {
-println!("(2)error: {}",err );
-                           request.tx.send( Result::Ok(CentralDbResult::Supervisor(Option::None)));
-                       }
-                   }
+                    self.conn.execute("BEGIN TRANSACTION", []);
+                    self.conn.execute("INSERT INTO apps (key) VALUES (?1)", [app.clone()]);
+                    self.conn.execute("INSERT INTO apps_to_supervisors (app_key,supervisor_key) VALUES (?1,?2)", [app.clone(), supervisor]);
+                    let result = self.conn.execute("COMMIT TRANSACTION", []);
 
-               }
-               CentralDbCommand::GetSupervisorForApplication(app) => {
-                   let app= bincode::serialize(&app).unwrap();
-                   let result= self.conn.query_row("SELECT supervisors.key FROM supervisors,apps_to_supervisors WHERE apps_to_supervisors.app_key=?1 AND apps_to_supervisors.supervisor_key=supervisors.key", [app], |row| {
-                       let rtn:Vec<u8> = row.get(0)?;
-                       Ok(bincode::deserialize::<StarKey>(rtn.as_slice()))
-                   } );
-                   match result
-                   {
-                       Ok(result) => {
-                           match result
-                           {
-                               Ok(star) => {
-
-                                   request.tx.send( Result::Ok(CentralDbResult::Supervisor(Option::Some(star))));
-                               }
-                               Err(error) => {
-                                   println!("(1)error: {}",error );
-                                   request.tx.send( Result::Ok(CentralDbResult::Supervisor(Option::None)));
-                               }
-                           }
-                       }
-                       Err(err) => {
-                           println!("(2)error: {}",err );
-                           request.tx.send( Result::Ok(CentralDbResult::Supervisor(Option::None)));
-                       }
-                   }
-               }
-               CentralDbCommand::SetSupervisorForApplication((supervisor,app)) => {
-                   let supervisor= bincode::serialize(&supervisor ).unwrap();
-                   let app= bincode::serialize(&app).unwrap();
-
-                   self.conn.execute("BEGIN TRANSACTION", [] );
-                   self.conn.execute( "INSERT INTO apps (key) VALUES (?1)", [app.clone()]);
-                   self.conn.execute( "INSERT INTO apps_to_supervisors (app_key,supervisor_key) VALUES (?2,?3)", [app.clone(),supervisor]);
-                   let result = self.conn.execute("COMMIT TRANSACTION", [] );
-
-                   match result
-                   {
-                       Ok(_) => {
-println!("Supervisor set for application!");
-                           request.tx.send(Result::Ok(CentralDbResult::Ok) );
-                       }
-                       Err(e) => {
-println!("ERROR setting supervisor app: {}",e);
-                           request.tx.send(Result::Err(e.into()) );
-                       }
-                   }
-               }
-           }
-       }
+                    match result
+                    {
+                        Ok(_) => {
+                            println!("Supervisor set for application!");
+                            request.tx.send(Result::Ok(CentralDbResult::Ok));
+                        }
+                        Err(e) => {
+                            println!("ERROR setting supervisor app: {}", e);
+                            request.tx.send(Result::Err(e.into()));
+                        }
+                    }
+                }
+            }
+        }
 
        Ok(())
     }

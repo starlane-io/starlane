@@ -19,8 +19,8 @@ use crate::keys::{AppKey, SubSpaceKey, UserKey};
 use crate::label::{Labels, LabelSelectionCriteria};
 use crate::space::CreateAppControllerFail;
 use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarVariantCommand, StarSkel};
+use std::str::FromStr;
 
-pub mod system;
 
 pub type AppKind = Name;
 
@@ -303,10 +303,6 @@ impl AppController
 
 }
 
-pub type Apps = HashMap<AppKind,Box<dyn Application>>;
-
-
-
 
 // this is everything describes what an App should be minus it's instance data (instance data like AppKey)
 #[derive(Clone,Serialize,Deserialize)]
@@ -320,14 +316,7 @@ pub struct AppArchetype
     pub labels: Labels
 }
 
-#[async_trait]
-pub trait Application: Send+Sync
-{
-    async fn create(&self, context: &AppContext, create: AppCreateController) -> Result<Labels,Error>;
-    async fn destroy( &self, context: &AppContext, destroy: AppDestroy ) -> Result<(),Error>;
-    async fn handle_app_command(&self, context: &AppContext, command: AppMessage) -> Result<(),Error>;
-    async fn handle_actor_message( &self, context: &AppContext, actor: &mut Actor, message: ActorMessage  ) -> Result<(),Error>;
-}
+
 
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
@@ -336,15 +325,33 @@ pub enum AppStatus
     Unknown,
     Pending,
     Launching,
-    Ready(AppReadyStatus),
+    Ready,
     Suspended,
     Resuming,
-    Panic(AppPanicReason),
-    Halting(HaltReason),
+    Panic,
+    Halting,
     Exited
 }
 
+impl FromStr for AppStatus{
 
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<AppStatus, Self::Err> {
+        match input {
+            "Unknown"  => Ok(AppStatus::Unknown),
+            "Pending"  => Ok(AppStatus::Pending),
+            "Launching"  => Ok(AppStatus::Launching),
+            "Ready"  => Ok(AppStatus::Ready),
+            "Suspended"  => Ok(AppStatus::Suspended),
+            "Resuming"  => Ok(AppStatus::Resuming),
+            "Panic"  => Ok(AppStatus::Panic),
+            "Halting"  => Ok(AppStatus::Halting),
+            "Exited"  => Ok(AppStatus::Exited),
+            _      => Err(()),
+        }
+    }
+}
 
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
@@ -404,11 +411,11 @@ impl fmt::Display for AppStatus{
             AppStatus::Unknown => "Unknown".to_string(),
             AppStatus::Pending => "Pending".to_string(),
             AppStatus::Launching => "Launching".to_string(),
-            AppStatus::Ready(status) => format!("Ready({})",status,).to_string(),
+            AppStatus::Ready => "Ready".to_string(),
             AppStatus::Suspended => "Suspended".to_string(),
             AppStatus::Resuming => "Resuming".to_string(),
-            AppStatus::Panic(_) => "Panic".to_string(),
-            AppStatus::Halting(halting) => format!("Halting({})",halting).to_string(),
+            AppStatus::Panic => "Panic".to_string(),
+            AppStatus::Halting => "Halting".to_string(),
             AppStatus::Exited => "Unknown".to_string(),
         };
         write!(f, "{}",r)

@@ -151,7 +151,7 @@ impl StarCoreFactory
     {
         match skel.info.kind
         {
-            StarKind::Server(_) => {
+            StarKind::Server => {
                 if let StarCoreExtKind::Server(ext) = ext
                 {
                     Ok(Box::new(ServerStarCore::new(skel, ext, core_rx)))
@@ -204,7 +204,7 @@ impl StarCoreExtFactory for ExampleStarCoreExtFactory
     fn create(&self, skel: &StarSkel ) -> StarCoreExtKind {
         match skel.info.kind
         {
-            StarKind::Server(_) => {
+            StarKind::Server => {
                 StarCoreExtKind::Server( Box::new(ExampleServerStarCoreExt::new(skel.clone()) ) )
             }
             _ => StarCoreExtKind::None

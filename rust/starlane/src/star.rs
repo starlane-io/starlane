@@ -25,7 +25,7 @@ use url::Url;
 use server::ServerStarVariant;
 
 use crate::actor::{Actor, ActorKey, ActorKind, ActorLocation, ActorWatcher};
-use crate::app::{AppCommandKind, AppController, AppCreateController, AppMeta, AppKind, Application, AppLocation};
+use crate::app::{AppCommandKind, AppController, AppCreateController, AppMeta, AppKind, AppLocation};
 use crate::core::StarCoreCommand;
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
@@ -40,10 +40,11 @@ use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, Mess
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
 use crate::space::{CreateAppControllerFail, SpaceCommand, SpaceCommandKind, SpaceController};
 use crate::star::central::CentralStarVariant;
-use crate::star::supervisor::{SupervisorCommand, SupervisorManager};
+use crate::star::supervisor::{SupervisorCommand, SupervisorVariant};
 use crate::permissions::{Authentication, AuthToken, AuthTokenSource, Credentials};
 use crate::space::SpaceCommandKind::AppGetController;
 use tokio::sync::oneshot::Sender;
+use std::str::FromStr;
 
 pub mod central;
 pub mod supervisor;
@@ -55,12 +56,32 @@ pub enum StarKind
     Central,
     Mesh,
     Supervisor,
-    Server(ServerKindExt),
-    Store(StoreKindExt),
+    Server,
+    Store,
     Gateway,
     Link,
     Client
 }
+
+impl FromStr for StarKind{
+
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<StarKind, Self::Err> {
+        match input {
+            "Central"  => Ok(StarKind::Central),
+            "Mesh"  => Ok(StarKind::Mesh),
+            "Supervisor"  => Ok(StarKind::Supervisor),
+            "Server"  => Ok(StarKind::Server),
+            "Store"  => Ok(StarKind::Store),
+            "Gateway"  => Ok(StarKind::Gateway),
+            "Link"  => Ok(StarKind::Link),
+            "Client"  => Ok(StarKind::Client),
+            _      => Err(()),
+        }
+    }
+}
+
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
 pub struct ServerKindExt
@@ -155,7 +176,7 @@ impl StarKind
 
     pub fn server_result(&self)->Result<(),Error>
     {
-        if let StarKind::Server(_)= self
+        if let StarKind::Server= self
         {
             Ok(())
         }
@@ -184,11 +205,11 @@ impl StarKind
             StarKind::Central => false,
             StarKind::Mesh => true,
             StarKind::Supervisor => false,
-            StarKind::Server(_) => true,
+            StarKind::Server => true,
             StarKind::Gateway => true,
             StarKind::Client => true,
             StarKind::Link => true,
-            StarKind::Store(_) => false
+            StarKind::Store => false
         }
     }
 }
@@ -200,8 +221,8 @@ impl fmt::Display for StarKind{
             StarKind::Central => "Central".to_string(),
             StarKind::Mesh => "Mesh".to_string(),
             StarKind::Supervisor => "Supervisor".to_string(),
-            StarKind::Server(ext) => format!("Server({})",ext.name).to_string(),
-            StarKind::Store(ext) => format!("Store({})",ext.name).to_string(),
+            StarKind::Server => "Server".to_string(),
+            StarKind::Store => "Store".to_string(),
             StarKind::Gateway => "Gateway".to_string(),
             StarKind::Link => "Link".to_string(),
             StarKind::Client => "Client".to_string(),
@@ -2155,9 +2176,9 @@ impl StarManagerFactory for StarManagerFactoryDefault
                     }
                     else if let StarKind::Supervisor= data.info.kind
                     {
-                        break Box::new(SupervisorManager::new(data.clone()));
+                        break Box::new(SupervisorVariant::new(data.clone()).await );
                     }
-                    else if let StarKind::Server(_)= data.info.kind
+                    else if let StarKind::Server= data.info.kind
                     {
                         break Box::new(ServerStarVariant::new(data.clone()));
                     }
