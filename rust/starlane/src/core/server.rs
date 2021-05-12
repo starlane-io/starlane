@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use tokio::sync::{mpsc, Mutex, oneshot};
 
-use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorInfo, ActorKey, ActorKind, ActorKindExt, ActorProfile, ActorRef, NewActor};
+use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorInfo, ActorKey, ActorKind, ActorSpecific, ActorProfile, ActorRef, NewActor};
 use crate::actor;
-use crate::app::{ActorMessageResult, Alert, AppArchetype, AppCommandKind, AppContext, AppCreateResult, AppKind, AppMessageResult, AppMeta, AppSlice, AppSliceInner, ConfigSrc, InitData};
+use crate::app::{ActorMessageResult, Alert, AppArchetype, AppCommandKind, AppContext, AppCreateResult, AppSpecific, AppMessageResult, AppMeta, AppSlice, AppSliceInner, ConfigSrc, InitData};
 use crate::artifact::Artifact;
 use crate::core::{AppCommandResult, AppLaunchError, StarCore, StarCoreAppMessagePayload, StarCoreCommand, StarCoreExt, StarCoreExtKind};
 use crate::error::Error;
@@ -88,7 +88,7 @@ impl StarCore for ServerStarCore
                         {
                             StarCoreAppMessagePayload::None => {}
                             StarCoreAppMessagePayload::Assign(assign ) => {
-                                match self.ext.app_ext(&assign.meta.kind)
+                                match self.ext.app_ext(&assign.meta.specific)
                                 {
                                     Ok(app_ext) => {
                                         let app_slice = AppSlice::new(assign.meta, self.skel.clone(), app_ext );
@@ -163,12 +163,12 @@ impl ActorCreateError
 
 pub trait ServerStarCoreExt: StarCoreExt
 {
-    fn app_ext( &self, kind: &AppKind ) -> Result<Arc<dyn AppExt>, AppExtError>;
+    fn app_ext(&self, kind: &AppSpecific) -> Result<Arc<dyn AppExt>, AppExtError>;
 }
 
 pub enum AppExtError
 {
-    DoNotKnowAppKind(AppKind),
+    DoNotKnowAppKind(AppSpecific),
     Error(String)
 }
 
@@ -207,13 +207,13 @@ impl StarCoreExt for ExampleServerStarCoreExt
 #[async_trait]
 impl ServerStarCoreExt for ExampleServerStarCoreExt
 {
-    fn app_ext(&self, kind: &AppKind) -> Result<Arc<dyn AppExt>, AppExtError> {
-        if *kind == crate::names::TEST_APP_KIND.as_name()
+    fn app_ext(&self, spec: &AppSpecific) -> Result<Arc<dyn AppExt>, AppExtError> {
+        if *spec == crate::names::TEST_APP_SPEC.as_name()
         {
             Ok(Arc::new(TestAppCreateExt::new()))
         }
         else {
-            Err(AppExtError::DoNotKnowAppKind(kind.clone()))
+            Err(AppExtError::DoNotKnowAppKind(spec.clone()))
         }
     }
 }
@@ -221,7 +221,7 @@ impl ServerStarCoreExt for ExampleServerStarCoreExt
 
 pub enum AppExtFactoryError
 {
-    DoNotServerAppKind(AppKind)
+    DoNotServerAppKind(AppSpecific)
 }
 
 pub struct TestAppCreateExt
@@ -244,7 +244,8 @@ impl AppExt for TestAppCreateExt
         let meta = context.meta().await;
         let actor = context.actor_create(ActorArchetype {
             owner: meta.owner,
-            kind: crate::names::TEST_ACTOR_KIND.as_kind(),
+            kind: ActorKind::Actor(crate::names::TEST_ACTOR_SPEC.clone()),
+            specific: crate::names::TEST_ACTOR_SPEC.clone(),
             config: ConfigSrc::None,
             init: InitData::None,
             labels: Labels::new()

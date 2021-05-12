@@ -25,7 +25,7 @@ use url::Url;
 use server::ServerStarVariant;
 
 use crate::actor::{Actor, ActorKey, ActorKind, ActorLocation, ActorWatcher};
-use crate::app::{AppCommandKind, AppController, AppCreateController, AppMeta, AppKind, AppLocation};
+use crate::app::{AppCommandKind, AppController, AppCreateController, AppMeta, AppSpecific, AppLocation};
 use crate::core::StarCoreCommand;
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;

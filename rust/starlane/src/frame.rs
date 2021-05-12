@@ -12,7 +12,7 @@ use crate::label::Labels;
 use crate::message::{MessageResult, ProtoMessage, MessageExpect, MessageUpdate};
 use tokio::sync::{oneshot, broadcast, mpsc};
 use crate::keys::{AppKey, UserKey, SubSpaceKey, MessageId};
-use crate::app::{AppLocation, AppKind, AppMeta, AppArchetype, ConfigSrc, App, AppCreateResult};
+use crate::app::{AppLocation, AppSpecific, AppMeta, AppArchetype, ConfigSrc, App, AppCreateResult};
 use crate::logger::Flags;
 use crate::error::Error;
 use crate::permissions::{AuthToken, Authentication};

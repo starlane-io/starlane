@@ -38,6 +38,7 @@ pub struct ActorArchetype
 {
     pub owner: UserKey,
     pub kind: ActorKind,
+    pub specific: ActorSpecific,
     pub config: ConfigSrc,
     pub init: InitData,
     pub labels: Labels
@@ -92,7 +93,7 @@ pub struct ActorKey
 pub struct ActorRef
 {
     pub key: ActorKey,
-    pub kind: ActorKind,
+    pub archetype: ActorArchetype,
     pub actor: Arc<dyn Actor>
 }
 
@@ -102,14 +103,14 @@ pub trait Actor: Sync+Send
     async fn handle_message(&mut self, actor_context: &ActorContext, message: ActorMessage );
 }
 
-pub type ActorKindExt = Name;
-pub type GatheringKindExt = String;
+pub type ActorSpecific = Name;
+pub type GatheringSpecific = String;
 
 #[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
 pub enum ActorKind
 {
-    Actor(ActorKindExt),
-    Gathering(GatheringKindExt)
+    Actor(ActorSpecific),
+    Gathering(GatheringSpecific)
 }
 
 impl ActorKind
@@ -120,6 +121,16 @@ impl ActorKind
        self.clone()
     }
 }
+impl fmt::Display for ActorKind{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"{}",
+                match self{
+                    ActorKind::Actor(_) => "Actor".to_string(),
+                    ActorKind::Gathering(_) => "Gathering".to_string()
+                })
+    }
+}
+
 
 
 impl fmt::Display for ActorKey {

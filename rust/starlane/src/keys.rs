@@ -3,8 +3,11 @@ use std::fmt;
 use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
 
-use crate::permissions::Priviledges;
-use crate::actor::ActorKey;
+use crate::permissions::{Priviledges, User, UserKind};
+use crate::actor::{ActorKey, Actor, ActorRef, ActorKind};
+use crate::filesystem::FileKey;
+use crate::artifact::{ArtifactKey, Name, ArtifactKind};
+use crate::app::{App, AppKind};
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum SpaceKey
@@ -249,11 +252,174 @@ impl fmt::Display for SubSpaceId{
 
 pub type MessageId = Uuid;
 
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum ResourceKey
 {
     Space(SpaceKey),
     SubSpace(SubSpaceKey),
     App(AppKey),
     Actor(ActorKey),
-    User(UserKey)
+    User(UserKey),
+    File(FileKey),
+    Artifact(ArtifactKey)
 }
+
+impl ResourceKey
+{
+    pub fn kind(&self)-> ResourceType
+    {
+        match self
+        {
+            ResourceKey::Space(_) => ResourceType::Space,
+            ResourceKey::SubSpace(_) => ResourceType::SubSpace,
+            ResourceKey::App(_) => ResourceType::App,
+            ResourceKey::Actor(_) => ResourceType::Actor,
+            ResourceKey::User(_) => ResourceType::User,
+            ResourceKey::File(_) => ResourceType::File,
+            ResourceKey::Artifact(_) => ResourceType::Artifact
+        }
+    }
+
+    pub fn sub_space(&self)->SubSpaceKey
+    {
+        match self
+        {
+            ResourceKey::Space(_) => SubSpaceKey::hyper_default(),
+            ResourceKey::SubSpace(_) => SubSpaceKey::hyper_default(),
+            ResourceKey::App(app) => app.sub_space.clone(),
+            ResourceKey::Actor(actor) => actor.app.sub_space.clone(),
+            ResourceKey::User(user) => SubSpaceKey::new( user.space.clone(), SubSpaceId::Default ),
+            ResourceKey::File(file) => file.sub_space.clone(),
+            ResourceKey::Artifact(artifact) => artifact.sub_space.clone()
+        }
+    }
+
+
+
+    pub fn space(&self)->SpaceKey
+    {
+        self.sub_space().space
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub enum ResourceKind
+{
+    Space,
+    SubSpace,
+    App(AppKind),
+    Actor(ActorKind),
+    User,
+    File,
+    Artifact(ArtifactKind)
+}
+
+impl fmt::Display for ResourceKind{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"{}",
+                match self{
+                    ResourceKind::Space=> "Space".to_string(),
+                    ResourceKind::SubSpace=> "SubSpace".to_string(),
+                    ResourceKind::App(kind)=> format!("{}",kind).to_string(),
+                    ResourceKind::Actor(kind)=> format!("{}",kind).to_string(),
+                    ResourceKind::User=> "User".to_string(),
+                    ResourceKind::File=> "File".to_string(),
+                    ResourceKind::Artifact(kind)=>format!("{}",kind).to_string()
+                })
+    }
+}
+
+
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub enum ResourceType
+{
+    Space,
+    SubSpace,
+    App,
+    Actor,
+    User,
+    File,
+    Artifact
+}
+
+impl ResourceType
+{
+    pub fn has_specific(&self)->bool
+    {
+        match self
+        {
+            ResourceType::Space => false,
+            ResourceType::SubSpace => false,
+            ResourceType::App => true,
+            ResourceType::Actor => true,
+            ResourceType::User => false,
+            ResourceType::File => false,
+            ResourceType::Artifact => true
+        }
+    }
+}
+
+
+impl fmt::Display for ResourceType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"{}",
+                match self{
+                    ResourceType::Space=> "Space".to_string(),
+                    ResourceType::SubSpace=> "SubSpace".to_string(),
+                    ResourceType::App=> "App".to_string(),
+                    ResourceType::Actor=> "Actor".to_string(),
+                    ResourceType::User=> "User".to_string(),
+                    ResourceType::File=> "File".to_string(),
+                    ResourceType::Artifact=> "Artifact".to_string(),
+                })
+    }
+}
+
+
+pub struct Resource
+{
+    pub key: ResourceKey,
+    pub specific: Option<Name>,
+    pub owner: Option<UserKey>
+}
+
+impl From<App> for Resource{
+    fn from(e: App) -> Self {
+        Resource{
+            key: ResourceKey::App(e.key),
+            specific: Option::Some(e.archetype.specific),
+            owner: Option::Some(e.archetype.owner)
+        }
+    }
+}
+
+impl From<ActorRef> for Resource{
+    fn from(e: ActorRef) -> Self {
+        Resource{
+            key: ResourceKey::Actor(e.key),
+            specific: Option::Some(e.archetype.specific),
+            owner: Option::Some(e.archetype.owner)
+        }
+    }
+}
+
+impl From<User> for Resource{
+    fn from(e: User) -> Self {
+        Resource{
+            key: ResourceKey::User(e.key),
+            specific: Option::None,
+            owner: Option::None
+        }
+    }
+}
+
+impl From<SpaceKey> for Resource{
+    fn from(e: SpaceKey) -> Self {
+        Resource{
+            key: ResourceKey::Space(e),
+            specific: Option::None,
+            owner: Option::None
+        }
+    }
+}
+

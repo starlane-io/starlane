@@ -22,7 +22,22 @@ use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand,
 use std::str::FromStr;
 
 
-pub type AppKind = Name;
+pub type AppSpecific = Name;
+
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub enum AppKind
+{
+    Normal
+}
+
+impl fmt::Display for AppKind{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"{}",
+                match self{
+                    AppKind::Normal => "Normal".to_string(),
+                })
+    }
+}
 
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -37,9 +52,33 @@ pub enum InitData
 {
     None,
     Artifact(Artifact),
-    Raw(Arc<Vec<u8>>),
+    Memory(Memory),
     File(File)
 }
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct Memory
+{
+    data: Arc<Vec<u8>>
+}
+
+impl Memory
+{
+    pub fn new(data: Vec<u8>)->Result<Self,Error>
+    {
+       if data.len() > 32*1024
+       {
+           Err(format!("in memory data limit is {}",(32*1024)).into())
+       }
+       else {
+           Ok(Memory{
+               data: Arc::new(data)
+           })
+       }
+    }
+}
+
+
 
 
 pub struct AppSlice
@@ -185,7 +224,7 @@ impl AppSliceInner
 
         let actor_ref = ActorRef{
             key: key.clone(),
-            kind: archetype.kind.clone(),
+            archetype: archetype.clone(),
             actor: actor
         };
 
@@ -245,18 +284,20 @@ pub struct AppMeta
 {
     pub key: AppKey,
     pub kind: AppKind,
+    pub specific: AppSpecific,
     pub config: ConfigSrc,
     pub owner: UserKey
 }
 
 impl AppMeta
 {
-    pub fn new(app: AppKey, kind: AppKind, config: ConfigSrc, owner:UserKey) -> Self
+    pub fn new(app: AppKey, kind: AppKind, specific: AppSpecific, config: ConfigSrc, owner:UserKey) -> Self
     {
         AppMeta
         {
             key: app,
             kind: kind,
+            specific: specific,
             config: config,
             owner: owner
         }
@@ -277,6 +318,7 @@ impl App
         AppMeta{
             key: self.key.clone(),
             kind: self.archetype.kind.clone(),
+            specific: self.archetype.specific.clone(),
             config: self.archetype.config.clone(),
             owner: self.archetype.owner.clone()
         }
@@ -311,6 +353,7 @@ pub struct AppArchetype
     pub owner: UserKey,
     pub sub_space: SubSpaceKey,
     pub kind: AppKind,
+    pub specific: AppSpecific,
     pub config: ConfigSrc,
     pub init: InitData,
     pub labels: Labels
@@ -387,7 +430,7 @@ pub enum AppPanicReason
 pub enum AppCreateResult
 {
     Ok,
-    CannotCreateAppOfKind(AppKind),
+    CannotCreateAppOfKind(AppSpecific),
     Error(String)
 }
 

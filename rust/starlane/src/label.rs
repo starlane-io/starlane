@@ -4,6 +4,8 @@ use std::collections::HashMap;
 use crate::error::Error;
 use tokio::sync::{mpsc, oneshot};
 use rusqlite::Connection;
+use crate::keys::{ResourceKey, ResourceType, UserKey, AppKey, Resource};
+use crate::artifact::Name;
 
 pub type Labels = HashMap<String,String>;
 
@@ -64,6 +66,8 @@ impl RegexLabelSelectionCriteria
     }
 }
 
+
+
 pub struct LabelRequest
 {
     pub tx: oneshot::Sender<LabelResult>,
@@ -81,7 +85,8 @@ impl LabelRequest
 
 pub enum LabelCommand
 {
-    Close
+    Close,
+    Save(Resource,Labels),
 }
 
 pub enum LabelResult
@@ -123,46 +128,63 @@ impl LabelDb {
     {
         self.setup()?;
 
-        while let Option::Some(r)= self.rx.recv().await{
+        while let Option::Some(request)= self.rx.recv().await{
+            match request.command
+            {
+                LabelCommand::Close => {
+                    break;
+                }
+                LabelCommand::Save(resource,labels) => {
+                    let resource_key = bincode::serialize(&resource.key ).unwrap();
+                    let trans = self.conn.transaction()?;
+                    trans.execute("DELETE FROM labels, resources, labels_to_resources WHERE resources.key=?1 AND resources.key=labels_to_resources.resource_key AND labels.key=labels_to_resources.label_key", [resource_key]).unwrap();
+
+                    trans.execute( "INSERT INTO resources (key,) VALUES ()", [] );
+
+                    trans.commit();
+                }
+            }
         }
 
         Ok(())
     }
 
-    pub fn setup(&self)->Result<(),Error>
+    pub fn setup(&mut self)->Result<(),Error>
     {
-      let setup = r#"
-       CREATE TABLE labels (
-	      id INTEGER PRIMARY KEY,
+      let labels= r#"
+       CREATE TABLE IF NOT EXISTS labels (
+	      key INTEGER PRIMARY KEY AUTOINCREMENT,
 	      name TEXT NOT NULL,
-	      value TEXT NOT NULL
-        ) [WITHOUT ROWID];
+	      value TEXT NOT NULL,
+        )"#;
 
-       CREATE TABLE resources (
-         id TEXT PRIMARY KEY,
-         type INTEGER NOT NULL,
-         kind TEXT
-        ) [WITHOUT ROWID];
+      let resources = r#"CREATE TABLE IF NOT EXISTS resources (
+         key BLOB PRIMARY KEY,
+         type TEXT NOT NULL,
+         kind BLOB NOT NULL,
+         specific TEXT
+         space INTEGER NOT NULL,
+         sub_space INTEGER NOT NULL,
+         owner BLOB
+        )"#;
 
-        CREATE TABLE labels_to_resources
-        {
-           resource_id BLOB,
-           label_id INTEGER,
-           type: TEXT NOT NULL,
+      let labels_to_resources = r#"CREATE TABLE IF NOT EXISTS labels_to_resources
+        (
+           resource_key BLOB,
+           label_key INTEGER,
            kind: TEXT NOT NULL,
-           PRIMARY KEY (resource_id, label_id),
-           FOREIGN KEY (resource_id)
-              REFERENCES resources (id)
-                  ON DELETE CASCADE,
-                  ON UPDATE NO ACTION,
-           FOREIGN KEY (label_id)
-              REFERENCES labels (id)
-                  ON DELETE CASCADE,
-                  ON UPDATE NO ACTION,
-        }  [WITHOUT ROWID];
+           specific: TEXT NOT NULL,
+           PRIMARY KEY (resource_key, label_key),
+           FOREIGN KEY (resource_key) REFERENCES resources (key),
+           FOREIGN KEY (label_key) REFERENCES labels (key)
+        )
         "#;
 
-        self.conn.execute(setup, [])?;
+        let transaction = self.conn.transaction()?;
+        transaction.execute(labels, [])?;
+        transaction.execute(resources, [])?;
+        transaction.execute(labels_to_resources, [])?;
+        transaction.commit();
 
         Ok(())
     }

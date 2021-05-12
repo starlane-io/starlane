@@ -1,4 +1,4 @@
-use crate::app::{AppCreateController, AppSelect, AppController, AppKind, AppArchetype, InitData, ConfigSrc};
+use crate::app::{AppCreateController, AppSelect, AppController, AppSpecific, AppArchetype, InitData, ConfigSrc, AppKind};
 use crate::keys::{SpaceKey, UserKey, AppKey, SubSpaceKey};
 use serde::{Deserialize, Serialize, Serializer};
 use std::fmt;
@@ -38,7 +38,7 @@ impl SpaceController
        }
    }
 
-   pub async fn create_app(&self, kind: &AppKind, config: &ConfigSrc, init: &InitData, sub_space: &SubSpaceKey, labels: &Labels ) -> oneshot::Receiver<Result<AppController,CreateAppControllerFail>>
+   pub async fn create_app(&self, kind: &AppKind, specific: &AppSpecific, config: &ConfigSrc, init: &InitData, sub_space: &SubSpaceKey, labels: &Labels ) -> oneshot::Receiver<Result<AppController,CreateAppControllerFail>>
    {
        let (tx,rx) = oneshot::channel();
 
@@ -46,6 +46,7 @@ impl SpaceController
            owner: self.user.clone(),
            sub_space: sub_space.clone(),
            kind: kind.clone(),
+           specific: specific.clone(),
            config: config.clone(),
            init: init.clone(),
            labels: labels.clone(),

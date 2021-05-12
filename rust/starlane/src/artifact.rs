@@ -3,8 +3,9 @@ use crate::error::Error;
 use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
 use std::str::Split;
-use crate::actor::{ActorKindExt, ActorKind};
-use crate::app::AppKind;
+use crate::actor::{ActorSpecific, ActorKind};
+use crate::app::AppSpecific;
+use std::fmt;
 
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct Artifact
@@ -18,11 +19,25 @@ pub struct Artifact
 pub enum ArtifactKind
 {
     File,
-    AppConfig(AppKind),
+    AppConfig(AppSpecific),
     ActorConfig(ActorKind),
     ActorInit(ActorKind),
     Ext(ArtifactKindExt)
 }
+
+impl fmt::Display for ArtifactKind{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"{}",
+                match self{
+                    ArtifactKind::File => "File".to_string(),
+                    ArtifactKind::AppConfig(_) => "AppConfig".to_string(),
+                    ArtifactKind::ActorConfig(_) => "ActorConfig".to_string(),
+                    ArtifactKind::ActorInit(_) => "ActorInit".to_string(),
+                    ArtifactKind::Ext(_) => "Ext".to_string(),
+                })
+    }
+}
+
 
 pub type ArtifactKindExt = Name;
 
