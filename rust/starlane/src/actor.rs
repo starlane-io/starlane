@@ -89,6 +89,15 @@ pub struct ActorKey
     pub id: Id,
 }
 
+impl ActorKey
+{
+    pub fn new( app: AppKey, id: Id ) -> Self {
+        ActorKey {
+            app: app,
+            id: id
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct ActorRef

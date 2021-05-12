@@ -1,4 +1,3 @@
-use std::fmt;
 use std::str::{Split, FromStr};
 
 use serde::{Deserialize, Serialize, Serializer};
@@ -9,6 +8,7 @@ use crate::app::AppSpecific;
 use crate::error::Error;
 use crate::keys::SubSpaceKey;
 use crate::names::{Name, Specific};
+use std::fmt;
 
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct Artifact
@@ -63,6 +63,13 @@ pub struct ArtifactKey
 {
     pub sub_space: SubSpaceKey,
     pub id: u64
+}
+
+impl fmt::Display for ArtifactKey{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"[{},{}]",self.sub_space.to_string(),self.id )
+    }
+
 }
 
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]

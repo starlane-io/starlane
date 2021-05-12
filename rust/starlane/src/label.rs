@@ -214,16 +214,15 @@ impl LabelDb {
         let (tx, rx) = mpsc::channel(8 * 1024);
 
         tokio::spawn(async move {
+
             let conn = Connection::open_in_memory();
-            if conn.is_err()
+            if conn.is_ok()
             {
                 let mut db = LabelDb {
                     conn: conn.unwrap(),
                     rx: rx
                 };
-                tokio::spawn(async move {
-                    db.run().await;
-                });
+                db.run().await.unwrap();
             }
         });
         tx
@@ -244,6 +243,7 @@ impl LabelDb {
                     request.tx.send(ok);
                 }
                 Err(err) => {
+                    eprintln!("{}",err);
                     request.tx.send(LabelResult::Error(err.to_string()));
                 }
             }
@@ -270,16 +270,18 @@ impl LabelDb {
                 let sub_space = resource.key.sub_space().id.index();
 
                 let trans = self.conn.transaction()?;
-                trans.execute("DELETE FROM labels, resources, labels_to_resources WHERE resources.key=?1 AND resources.key=labels_to_resources.resource_key AND labels.key=labels_to_resources.label_key", [key.clone()])?;
-                trans.execute("DELETE FROM names WHERE resources.key=?1", [key.clone()])?;
+                trans.execute("DELETE FROM labels WHERE labels.resource_key=?1", [key.clone()]);
+               // trans.execute("DELETE FROM names WHERE resources.key=?1", [key.clone()])?;
 
-                trans.execute("INSERT INTO resources (key,type,kind,specific,space,sub_space,owner,app) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)", params![key.clone(),resource_type,kind,resource.specific.clone(),space,sub_space,owner,resource.app()])?;
-                trans.execute("INSERT INTO names (key,name,type,kind,specific,space,sub_space,owner,app) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)", params![key.clone(),save.name.unwrap(),resource_type,kind,resource.specific.clone(),space,sub_space,owner,resource.app()])?;
+                trans.execute("INSERT INTO resources (key,resource_type,kind,specific,space,sub_space,owner,app) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)", params![key.clone(),resource_type,kind,resource.specific.clone(),space,sub_space,owner,resource.app()])?;
+                if save.name.is_some()
+                {
+                    trans.execute("INSERT INTO names (key,name,resource_type,kind,specific,space,sub_space,app) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)", params![key.clone(),save.name,resource_type,kind,resource.specific.clone(),space,sub_space,resource.app()])?;
+                }
 
                 for (name, value) in labels
                 {
-                    trans.execute("INSERT INTO resources (name,value) VALUES (?1,?2)", [name, value]);
-                    trans.execute("INSERT INTO labels_to_resources (label_key,resource_key) VALUES (SELECT last_insert_rowid(),?1)", params![key]);
+                    trans.execute("INSERT INTO labels (resource_key,name,value) VALUES (?1,?2,?3)", params![key.clone(),name, value])?;
                 }
 
                 trans.commit()?;
@@ -322,12 +324,15 @@ impl LabelDb {
                     params.push(field);
                 }
 
-                let statement = format!(r#"SELECT resources.key,resources.kind,resources.specific,resources.owner
-                              FROM resources,labels,labels_to_resources
+                let statement = format!(r#"SELECT DISTINCT resources.key,resources.kind,resources.specific,resources.owner
+                              FROM resources
+                              INNER JOIN labels ON labels.resource_key=resources.key
                               WHERE {}"#, where_clause);
+//                let statement = format!(r#"SELECT * FROM resources"#);
 
                 let mut statement = self.conn.prepare(statement.as_str())?;
                 let mut rows= statement.query( params_from_iter(params.iter() ) )?;
+                //let mut rows= statement.query( [] )?;
                 let mut resources = vec![];
                 while let Option::Some(row) = rows.next()?
                 {
@@ -369,56 +374,168 @@ impl LabelDb {
       let labels= r#"
        CREATE TABLE IF NOT EXISTS labels (
 	      key INTEGER PRIMARY KEY AUTOINCREMENT,
+	      resource_key BLOB,
 	      name TEXT NOT NULL,
 	      value TEXT NOT NULL,
-          UNIQUE(key,name)
+          UNIQUE(key,name),
+          FOREIGN KEY (resource_key) REFERENCES resources (key)
         )"#;
 
         let names= r#"
        CREATE TABLE IF NOT EXISTS names(
           key BLOB PRIMARY KEY,
 	      name TEXT NOT NULL,
-	      type TEXT NOT NULL,
+	      resource_type TEXT NOT NULL,
           kind BLOB NOT NULL,
-          specific TEXT
+          specific TEXT,
           space INTEGER NOT NULL,
           sub_space INTEGER NOT NULL,
           app TEXT,
-          UNIQUE(name,type,kind,specific,space,sub_space,app)
+          UNIQUE(name,resource_type,kind,specific,space,sub_space,app)
         )"#;
 
 
         let resources = r#"CREATE TABLE IF NOT EXISTS resources (
          key BLOB PRIMARY KEY,
-         type TEXT NOT NULL,
+         resource_type TEXT NOT NULL,
          kind BLOB NOT NULL,
-         specific TEXT
+         specific TEXT,
          space INTEGER NOT NULL,
          sub_space INTEGER NOT NULL,
          app TEXT,
-         owner BLOB,
+         owner BLOB
         )"#;
 
+        /*
       let labels_to_resources = r#"CREATE TABLE IF NOT EXISTS labels_to_resources
         (
            resource_key BLOB,
            label_key INTEGER,
-           kind: TEXT NOT NULL,
-           specific: TEXT NOT NULL,
            PRIMARY KEY (resource_key, label_key),
            FOREIGN KEY (resource_key) REFERENCES resources (key),
            FOREIGN KEY (label_key) REFERENCES labels (key)
         )
         "#;
 
+         */
+
         let transaction = self.conn.transaction()?;
         transaction.execute(labels, [])?;
         transaction.execute(names, [])?;
         transaction.execute(resources, [])?;
-        transaction.execute(labels_to_resources, [])?;
+       // transaction.execute(labels_to_resources, [])?;
         transaction.commit();
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test
+{
+    use std::sync::Arc;
+
+    use tokio::runtime::Runtime;
+    use tokio::sync::oneshot::error::RecvError;
+    use tokio::time::Duration;
+    use tokio::time::timeout;
+
+    use crate::app::{AppController, AppKind, AppSpecific, ConfigSrc, InitData};
+    use crate::artifact::{Artifact, ArtifactId, ArtifactKind};
+    use crate::error::Error;
+    use crate::keys::{SpaceKey, SubSpaceKey, UserKey, ResourceType, Resource, ResourceKind};
+    use crate::label::{Labels, LabelDb, ResourceSave, LabelRequest, LabelCommand, Selectors, LabelResult};
+    use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
+    use crate::names::{Name, Specific};
+    use crate::permissions::Authentication;
+    use crate::space::CreateAppControllerFail;
+    use crate::star::{StarController, StarInfo, StarKey, StarKind};
+    use crate::starlane::{ConstellationCreate, StarControlRequestByName, Starlane, StarlaneCommand};
+    use crate::template::{ConstellationData, ConstellationTemplate};
+    use crate::label::LabelResult::Resources;
+    use tokio::sync::mpsc;
+    use crate::actor::ActorKind;
+
+    fn create( index: usize, kind: ResourceKind, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey ) -> ResourceSave
+    {
+        if index == 0
+        {
+          eprintln!("don't use 0 index, it messes up the tests.  Start with 1");
+          assert!(false)
+        }
+        let key = kind.test_key(sub_space,index);
+
+        let resource = Resource{
+            key: key,
+            owner: owner,
+            kind: kind,
+            specific: specific
+        };
+
+        let parity = match (index%2)==0 {
+            true => "Even",
+            false => "Odd"
+        };
+
+        let name = match index
+        {
+            1 => Option::Some("Lowest".to_string()),
+            10 => Option::Some("Highest".to_string()),
+            _ => Option::None
+        };
+
+        let mut labels = Labels::new();
+        labels.insert( "parity".to_string(), parity.to_string() );
+        labels.insert( "index".to_string(), index.to_string() );
+
+        let save = ResourceSave{
+            resource: resource,
+            labels: labels,
+            name: name
+        };
+        save
+    }
+
+    async fn create_10( tx: mpsc::Sender<LabelRequest>, kind: ResourceKind, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey )
+    {
+        for index in 1..11
+        {
+            let save = create(index,kind.clone(),specific.clone(),sub_space.clone(),owner.clone());
+            let (request,rx) =LabelRequest::new(LabelCommand::Save(save));
+            tx.send( request ).await;
+            timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
+        }
+    }
+
+
+    #[test]
+    pub fn test10()
+    {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let tx = LabelDb::new().await;
+            create_10(tx.clone(), ResourceKind::App(AppKind::Normal),Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
+            let mut selector = Selectors::app_selector();
+            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            tx.send(request).await;
+            let response = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
+
+            if let LabelResult::Resources(resources) = response
+            {
+                assert_eq!(resources.len(),10);
+            }
+            else if let LabelResult::Error(error) = response
+            {
+               eprintln!("ERROR: {}",error);
+                assert!(false);
+            }
+            else
+            {
+                assert!(false);
+            }
+
+
+        });
     }
 }
 

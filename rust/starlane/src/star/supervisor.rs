@@ -146,7 +146,7 @@ impl StarVariant for SupervisorVariant
                                 proto.to(server.clone());
                                 proto.payload = StarMessagePayload::Space(SpaceMessage{
                                     sub_space: app.key.sub_space.clone(),
-                                    user: UserKey::hyperuser(),
+                                    user: UserKey::hyper_user(),
                                     payload: SpacePayload::Server(ServerPayload::AppAssign(app.meta()))
                                 });
                                 let result = proto.get_ok_result().await;
@@ -212,7 +212,7 @@ impl StarVariant for SupervisorVariant
                                 proto.to(server.clone());
                                 proto.payload = StarMessagePayload::Space(SpaceMessage {
                                     sub_space: app.key.sub_space.clone(),
-                                    user: UserKey::hyperuser(),
+                                    user: UserKey::hyper_user(),
                                     payload: SpacePayload::Server(ServerPayload::AppLaunch(app))
                                 });
                                 let result = proto.get_ok_result().await;

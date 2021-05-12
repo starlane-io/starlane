@@ -27,7 +27,9 @@ pub type AppSpecific = Name;
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum AppKind
 {
-    Normal
+    Normal,
+    Worker,
+    Daemon
 }
 
 
@@ -36,6 +38,8 @@ impl fmt::Display for AppKind{
         write!( f,"{}",
                 match self{
                     AppKind::Normal => "Normal".to_string(),
+                    AppKind::Worker=> "Worker".to_string(),
+                    AppKind::Daemon=> "Daemon".to_string(),
                 })
     }
 }
@@ -49,6 +53,8 @@ impl FromStr for AppKind
         match s
         {
             "Normal" => Ok(AppKind::Normal),
+            "Worker" => Ok(AppKind::Worker),
+            "Daemon" => Ok(AppKind::Daemon),
             _ => Err(format!("could not find AppKind: {}",s).into())
         }
     }

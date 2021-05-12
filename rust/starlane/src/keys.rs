@@ -1,17 +1,18 @@
-use std::fmt;
 
 use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
 
 use crate::actor::{Actor, ActorKey, ActorKind, ActorRef};
 use crate::app::{App, AppKind};
-use crate::artifact::{ArtifactKey, ArtifactKind};
+use crate::artifact::{ArtifactKey, ArtifactKind, Artifact};
 use crate::filesystem::FileKey;
 use crate::names::Name;
 use crate::permissions::{Priviledges, User, UserKind};
 use std::str::FromStr;
 use crate::error::Error;
 use crate::label::Labels;
+use crate::id::Id;
+use std::fmt;
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum SpaceKey
@@ -45,6 +46,18 @@ impl SpaceKey
     }
 }
 
+impl fmt::Display for SpaceKey{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"{}",
+                match self{
+                    SpaceKey::HyperSpace => "HyperSpace".to_string(),
+                    SpaceKey::Space(index) => index.to_string()
+                })
+    }
+
+}
+
+
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct UserKey
 {
@@ -70,13 +83,13 @@ impl UserKey
         }
     }
 
-    pub fn hyperuser() -> Self
+    pub fn hyper_user() -> Self
     {
         UserKey::with_id(SpaceKey::HyperSpace, UserId::Super)
     }
 
 
-    pub fn superuser(space: SpaceKey) -> Self
+    pub fn super_user(space: SpaceKey) -> Self
     {
         UserKey::with_id(space,UserId::Super)
     }
@@ -113,6 +126,14 @@ impl UserKey
     }
 }
 
+impl fmt::Display for UserKey{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"({},{})",self.space, self.id)
+    }
+
+}
+
+
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum UserId
 {
@@ -127,6 +148,17 @@ impl UserId
     {
         Self::Uuid(Uuid::new_v4())
     }
+}
+
+impl fmt::Display for UserId{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"{}",match self{
+            UserId::Super => "Super".to_string(),
+            UserId::Annonymous => "Annonymous".to_string(),
+            UserId::Uuid(uuid) => uuid.to_string()
+        })
+    }
+
 }
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
@@ -150,6 +182,14 @@ impl SubSpaceKey
             id: id
         }
     }
+}
+
+
+impl fmt::Display for SubSpaceKey{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"({},{})",self.space, self.id)
+    }
+
 }
 
 
@@ -208,11 +248,7 @@ impl AppId
     }
 }
 
-impl fmt::Display for SubSpaceKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.id)
-    }
-}
+
 
 impl AppKey
 {
@@ -266,6 +302,22 @@ pub enum ResourceKey
     User(UserKey),
     File(FileKey),
     Artifact(ArtifactKey)
+}
+
+impl fmt::Display for ResourceKey{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"{}",
+                match self{
+                    ResourceKey::Space(key) => format!("SpaceKey:{}",key),
+                    ResourceKey::SubSpace(key) => format!("SubSpaceKey:{}",key),
+                    ResourceKey::App(key)  => format!("AppKey:{}",key),
+                    ResourceKey::Actor(key) => format!("ActorKey:{}",key),
+                    ResourceKey::User(key) => format!("UserKey:{}",key),
+                    ResourceKey::File(key) => format!("FileKey:{}",key),
+                    ResourceKey::Artifact(key) => format!("ArtifactKey:{}",key),
+                })
+    }
+
 }
 
 impl ResourceKey
@@ -331,6 +383,45 @@ impl fmt::Display for ResourceKind{
                     ResourceKind::File=> "File".to_string(),
                     ResourceKind::Artifact(kind)=>format!("Artifact:{}",kind).to_string()
                 })
+    }
+
+}
+
+impl ResourceKind {
+    pub fn test_key(&self, sub_space: SubSpaceKey, index: usize )->ResourceKey
+    {
+        match self
+        {
+            ResourceKind::Space => {
+                ResourceKey::Space(SpaceKey::from_index(index as u32 ))
+            }
+            ResourceKind::SubSpace => {
+                ResourceKey::SubSpace(SubSpaceKey::new( sub_space.space, SubSpaceId::Index(index as u32)))
+            }
+            ResourceKind::App(_) => {
+                ResourceKey::App(AppKey::new(sub_space))
+            }
+            ResourceKind::Actor(_) => {
+                let app = AppKey::new(sub_space);
+                ResourceKey::Actor(ActorKey::new(app, Id::new(0,index as _)))
+            }
+            ResourceKind::User => {
+                ResourceKey::User(UserKey::new(sub_space.space))
+            }
+            ResourceKind::File => {
+                ResourceKey::File(FileKey{
+                    sub_space: sub_space,
+                    filesystem: 0,
+                    path: index as _
+                } )
+            }
+            ResourceKind::Artifact(_) => {
+                ResourceKey::Artifact(ArtifactKey{
+                    sub_space: sub_space,
+                    id: index as _
+                })
+            }
+        }
     }
 }
 
@@ -509,7 +600,7 @@ impl From<SpaceKey> for Resource{
         Resource{
             key: ResourceKey::Space(e),
             specific: Option::None,
-            owner: UserKey::hyperuser(),
+            owner: UserKey::hyper_user(),
             kind: ResourceKind::Space
         }
     }
