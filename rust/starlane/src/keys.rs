@@ -511,11 +511,12 @@ pub struct ResourceMeta
     labels: Labels
 }
 
+#[derive(Clone)]
 pub struct Resource
 {
     pub key: ResourceKey,
-    pub owner: UserKey,
     pub kind: ResourceKind,
+    pub owner: Option<UserKey>,
     pub specific: Option<Name>,
 }
 
