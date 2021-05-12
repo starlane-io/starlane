@@ -42,7 +42,6 @@ use crate::space::{CreateAppControllerFail, SpaceCommand, SpaceCommandKind, Spac
 use crate::star::central::CentralStarVariant;
 use crate::star::supervisor::{SupervisorCommand, SupervisorVariant};
 use crate::permissions::{Authentication, AuthToken, AuthTokenSource, Credentials};
-use crate::space::SpaceCommandKind::AppGetController;
 use tokio::sync::oneshot::Sender;
 use std::str::FromStr;
 
@@ -551,7 +550,6 @@ println!("spaces_do_not_match");
                     self.send_proto_message(proto).await;
             }
             }
-            SpaceCommandKind::AppGetController(_) => {}
         }
     }
 

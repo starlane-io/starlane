@@ -1,26 +1,26 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize, Serializer};
 use tokio::sync::{mpsc, Mutex, oneshot};
 use tokio::time::Duration;
 
-use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorKey, ActorKind, ActorMeta, ActorRef, ActorSelect, MakeMeAnActor, NewActor};
+use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorKey, ActorKind, ActorMeta, ActorRef, MakeMeAnActor, NewActor};
 use crate::actor;
-use crate::artifact::{Artifact, ArtifactKey, Name};
+use crate::artifact::{Artifact, ArtifactKey};
 use crate::core::{AppLaunchError, StarCoreCommand};
-use crate::core::server::{AppExt, ActorCreateError};
+use crate::core::server::{ActorCreateError, AppExt};
 use crate::error::Error;
 use crate::filesystem::File;
 use crate::frame::{ActorMessage, AppMessage};
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, SubSpaceKey, UserKey};
-use crate::label::{Labels, LabelSelectionCriteria};
+use crate::label::{Labels};
+use crate::names::Name;
 use crate::space::CreateAppControllerFail;
-use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarVariantCommand, StarSkel};
-use std::str::FromStr;
-
+use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarSkel, StarVariantCommand};
 
 pub type AppSpecific = Name;
 
@@ -29,6 +29,7 @@ pub enum AppKind
 {
     Normal
 }
+
 
 impl fmt::Display for AppKind{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -40,7 +41,21 @@ impl fmt::Display for AppKind{
 }
 
 
-#[derive(Clone,Serialize,Deserialize)]
+impl FromStr for AppKind
+{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s
+        {
+            "Normal" => Ok(AppKind::Normal),
+            _ => Err(format!("could not find AppKind: {}",s).into())
+        }
+    }
+}
+
+
+        #[derive(Clone,Serialize,Deserialize)]
 pub enum ConfigSrc
 {
     None,
@@ -252,11 +267,7 @@ pub enum AppCommandKind
 pub type AppMessageKind = String;
 
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct AppSelect
-{
-    criteria: Vec<LabelSelectionCriteria>
-}
+
 
 pub struct AppCreateController
 {

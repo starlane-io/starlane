@@ -9,12 +9,13 @@ use tokio::sync::broadcast::Sender;
 use crate::error::Error;
 use crate::frame::{Event, ActorMessage, ActorState};
 use crate::id::Id;
-use crate::label::{LabelSelectionCriteria, Labels};
 use crate::star::StarKey;
 use crate::keys::{AppKey, UserKey, SubSpaceKey};
-use crate::artifact::Name;
+use crate::names::Name;
 use crate::app::{InitData, ConfigSrc};
 use crate::app::AppContext;
+use crate::label::Labels;
+use std::str::FromStr;
 
 pub struct ActorContext
 {
@@ -109,8 +110,8 @@ pub type GatheringSpecific = String;
 #[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
 pub enum ActorKind
 {
-    Actor(ActorSpecific),
-    Gathering(GatheringSpecific)
+    Single,
+    Gathering
 }
 
 impl ActorKind
@@ -121,16 +122,30 @@ impl ActorKind
        self.clone()
     }
 }
+
 impl fmt::Display for ActorKind{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!( f,"{}",
                 match self{
-                    ActorKind::Actor(_) => "Actor".to_string(),
-                    ActorKind::Gathering(_) => "Gathering".to_string()
+                    ActorKind::Single => "Single".to_string(),
+                    ActorKind::Gathering => "Gathering".to_string()
                 })
     }
 }
 
+impl FromStr for ActorKind
+{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s
+        {
+            "Single" => Ok(ActorKind::Single),
+            "Gathering" => Ok(ActorKind::Gathering),
+            _ => Err(format!("could not find ActorKind: {}",s).into())
+        }
+    }
+}
 
 
 impl fmt::Display for ActorKey {
@@ -228,11 +243,6 @@ pub struct ActorAssign
     pub labels: Labels
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct ActorSelect
-{
-    criteria: Vec<LabelSelectionCriteria>
-}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ActorStatus

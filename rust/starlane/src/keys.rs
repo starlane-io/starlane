@@ -3,11 +3,14 @@ use std::fmt;
 use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
 
-use crate::permissions::{Priviledges, User, UserKind};
-use crate::actor::{ActorKey, Actor, ActorRef, ActorKind};
-use crate::filesystem::FileKey;
-use crate::artifact::{ArtifactKey, Name, ArtifactKind};
+use crate::actor::{Actor, ActorKey, ActorKind, ActorRef};
 use crate::app::{App, AppKind};
+use crate::artifact::{ArtifactKey, ArtifactKind};
+use crate::filesystem::FileKey;
+use crate::names::Name;
+use crate::permissions::{Priviledges, User, UserKind};
+use std::str::FromStr;
+use crate::error::Error;
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum SpaceKey
@@ -266,7 +269,7 @@ pub enum ResourceKey
 
 impl ResourceKey
 {
-    pub fn rtype(&self) -> ResourceType
+    pub fn resource_type(&self) -> ResourceType
     {
         match self
         {
@@ -321,16 +324,48 @@ impl fmt::Display for ResourceKind{
                 match self{
                     ResourceKind::Space=> "Space".to_string(),
                     ResourceKind::SubSpace=> "SubSpace".to_string(),
-                    ResourceKind::App(kind)=> format!("{}",kind).to_string(),
-                    ResourceKind::Actor(kind)=> format!("{}",kind).to_string(),
+                    ResourceKind::App(kind)=> format!("App:{}",kind).to_string(),
+                    ResourceKind::Actor(kind)=> format!("Actor:{}",kind).to_string(),
                     ResourceKind::User=> "User".to_string(),
                     ResourceKind::File=> "File".to_string(),
-                    ResourceKind::Artifact(kind)=>format!("{}",kind).to_string()
+                    ResourceKind::Artifact(kind)=>format!("Artifact:{}",kind).to_string()
                 })
     }
 }
 
+impl FromStr for ResourceKind
+{
+    type Err = Error;
 
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+
+        if s.starts_with("App:") {
+            let mut split = s.split(":");
+            split.next().ok_or("error")?;
+            return Ok( ResourceKind::App( AppKind::from_str(split.next().ok_or("error")?)? ));
+        } else if s.starts_with("Actor:") {
+            let mut split = s.split(":");
+            split.next().ok_or("error")?;
+            return Ok( ResourceKind::Actor( ActorKind::from_str(split.next().ok_or("error")?)? ) );
+        } else if s.starts_with("Artifact:") {
+            let mut split = s.split(":");
+            split.next().ok_or("error")?;
+            return Ok( ResourceKind::Artifact( ArtifactKind::from_str(split.next().ok_or("error")?)? ) );
+        }
+
+
+        match s
+        {
+            "Space" => Ok(ResourceKind::Space),
+            "SubSpace" => Ok(ResourceKind::SubSpace),
+            "User" => Ok(ResourceKind::User),
+            "File" => Ok(ResourceKind::File),
+            _ => {
+                Err(format!("cannot match ResourceKind: {}", s).into())
+            }
+        }
+    }
+}
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum ResourceType
 {
@@ -381,7 +416,7 @@ pub struct Resource
 {
     pub key: ResourceKey,
     pub specific: Option<Name>,
-    pub owner: Option<UserKey>,
+    pub owner: UserKey,
     pub kind: ResourceKind
 }
 
@@ -414,7 +449,7 @@ impl From<App> for Resource{
         Resource{
             key: ResourceKey::App(e.key.clone()),
             specific: Option::Some(e.archetype.specific.clone()),
-            owner: Option::Some(e.archetype.owner.clone()),
+            owner: e.archetype.owner.clone(),
             kind: e.into()
         }
     }
@@ -425,7 +460,7 @@ impl From<ActorRef> for Resource{
         Resource{
             key: ResourceKey::Actor(e.key),
             specific: Option::Some(e.archetype.specific),
-            owner: Option::Some(e.archetype.owner),
+            owner: e.archetype.owner,
             kind: e.archetype.kind.into()
         }
     }
@@ -434,9 +469,9 @@ impl From<ActorRef> for Resource{
 impl From<User> for Resource{
     fn from(e: User) -> Self {
         Resource{
-            key: ResourceKey::User(e.key),
+            key: ResourceKey::User(e.key.clone()),
             specific: Option::None,
-            owner: Option::None,
+            owner: e.key,
             kind: ResourceKind::User
         }
     }
@@ -447,7 +482,7 @@ impl From<SpaceKey> for Resource{
         Resource{
             key: ResourceKey::Space(e),
             specific: Option::None,
-            owner: Option::None,
+            owner: UserKey::hyperuser(),
             kind: ResourceKind::Space
         }
     }

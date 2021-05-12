@@ -16,6 +16,22 @@ impl fmt::Display for Error{
     }
 }
 
+impl From<bincode::ErrorKind> for Error{
+    fn from(e: bincode::ErrorKind) -> Self {
+        Error{
+            error: format!("{}",e.to_string())
+        }
+    }
+}
+
+impl From<Box<bincode::ErrorKind>> for Error{
+    fn from(e: Box<bincode::ErrorKind>) -> Self {
+        Error{
+            error: format!("{}",e.to_string())
+        }
+    }
+}
+
 impl From<rusqlite::Error> for Error{
     fn from(e: rusqlite::Error) -> Self {
         Error{

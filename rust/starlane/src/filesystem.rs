@@ -1,4 +1,4 @@
-use crate::artifact::Name;
+use crate::names::Name;
 use serde::{Deserialize, Serialize};
 use crate::keys::SubSpaceKey;
 use std::sync::Arc;

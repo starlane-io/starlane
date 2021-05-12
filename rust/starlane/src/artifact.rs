@@ -1,28 +1,30 @@
-use crate::keys::SubSpaceKey;
-use crate::error::Error;
+use std::fmt;
+use std::str::{Split, FromStr};
+
 use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
-use std::str::Split;
-use crate::actor::{ActorSpecific, ActorKind};
+
+use crate::actor::{ActorKind, ActorSpecific};
 use crate::app::AppSpecific;
-use std::fmt;
+use crate::error::Error;
+use crate::keys::SubSpaceKey;
+use crate::names::{Name, Specific};
 
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct Artifact
 {
     pub id: ArtifactId,
-    pub kind: ArtifactKind
+    pub kind: ArtifactKind,
+    pub specific: Option<Specific>
 }
-
 
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub enum ArtifactKind
 {
     File,
-    AppConfig(AppSpecific),
-    ActorConfig(ActorKind),
-    ActorInit(ActorKind),
-    Ext(ArtifactKindExt)
+    AppConfig,
+    ActorConfig,
+    ActorInit
 }
 
 impl fmt::Display for ArtifactKind{
@@ -30,11 +32,26 @@ impl fmt::Display for ArtifactKind{
         write!( f,"{}",
                 match self{
                     ArtifactKind::File => "File".to_string(),
-                    ArtifactKind::AppConfig(_) => "AppConfig".to_string(),
-                    ArtifactKind::ActorConfig(_) => "ActorConfig".to_string(),
-                    ArtifactKind::ActorInit(_) => "ActorInit".to_string(),
-                    ArtifactKind::Ext(_) => "Ext".to_string(),
+                    ArtifactKind::AppConfig => "AppConfig".to_string(),
+                    ArtifactKind::ActorConfig => "ActorConfig".to_string(),
+                    ArtifactKind::ActorInit => "ActorInit".to_string(),
                 })
+    }
+}
+
+impl FromStr for ArtifactKind
+{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s
+        {
+            "File" => Ok(ArtifactKind::File),
+            "AppConfig" => Ok(ArtifactKind::AppConfig),
+            "ActorConfig" => Ok(ArtifactKind::ActorConfig),
+            "ActorInit" => Ok(ArtifactKind::ActorInit),
+            _ => Err(format!("could not find ArtifactKind: {}",s).into())
+        }
     }
 }
 
@@ -123,56 +140,6 @@ impl ArtifactId
         rtn.push_str(self.path.to_string().as_str());
         return rtn;
     }
-}
-
-
-
-
-
-#[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
-pub struct Name
-{
-    pub sub_space: SubSpaceName,
-    pub path: String,
-}
-
-
-impl Name
-{
-    pub fn more(string: &str) -> Result<(Self,Split<&str>),Error>
-    {
-        let (sub_space,mut parts) = SubSpaceName::more(string)?;
-
-        Ok((Name
-            {
-                sub_space: sub_space,
-                path: parts.next().ok_or("sub_space")?.to_string(),
-            },parts))
-    }
-
-    pub fn from(string: &str) -> Result<Self,Error>
-    {
-        let (name,_) = Name::more(string)?;
-        Ok(name)
-    }
-
-    pub fn to(&self) -> String {
-        let mut rtn= String::new();
-        rtn.push_str(self.sub_space.to().as_str()); rtn.push_str(":");
-        rtn.push_str(self.path.as_str());
-        return rtn;
-    }
-
-    pub fn as_name(&self)->Self
-    {
-        self.clone()
-    }
-}
-
-
-impl fmt::Display for Name {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!( f,"{}", self.to()) }
 }
 
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]

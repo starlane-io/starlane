@@ -244,7 +244,7 @@ impl AppExt for TestAppCreateExt
         let meta = context.meta().await;
         let actor = context.actor_create(ActorArchetype {
             owner: meta.owner,
-            kind: ActorKind::Actor(crate::names::TEST_ACTOR_SPEC.clone()),
+            kind: ActorKind::Single,
             specific: crate::names::TEST_ACTOR_SPEC.clone(),
             config: ConfigSrc::None,
             init: InitData::None,

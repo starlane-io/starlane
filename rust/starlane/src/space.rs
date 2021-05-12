@@ -1,4 +1,4 @@
-use crate::app::{AppCreateController, AppSelect, AppController, AppSpecific, AppArchetype, InitData, ConfigSrc, AppKind};
+use crate::app::{AppCreateController,  AppController, AppSpecific, AppArchetype, InitData, ConfigSrc, AppKind};
 use crate::keys::{SpaceKey, UserKey, AppKey, SubSpaceKey};
 use serde::{Deserialize, Serialize, Serializer};
 use std::fmt;
@@ -19,7 +19,6 @@ pub struct SpaceCommand
 pub enum SpaceCommandKind
 {
     AppCreateController(AppCreateController),
-    AppGetController(AppSelect)
 }
 
 pub struct SpaceController
@@ -75,7 +74,6 @@ impl fmt::Display for SpaceCommandKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
             SpaceCommandKind::AppCreateController(_) => "AppCreate".to_string(),
-            SpaceCommandKind::AppGetController(_) => "AppSelect".to_string(),
         };
         write!(f, "{}",r)
     }

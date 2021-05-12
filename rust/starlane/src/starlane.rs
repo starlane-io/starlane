@@ -8,16 +8,16 @@ use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 
+use crate::core::{CoreRunner, ExampleStarCoreExtFactory, StarCoreExtFactory, StarCoreFactory};
 use crate::error::Error;
 use crate::frame::Frame;
 use crate::lane::{ConnectionInfo, ConnectionKind, Lane, LocalTunnelConnector};
 use crate::layout::ConstellationLayout;
+use crate::logger::{Flags, Logger};
 use crate::proto::{local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoTunnel};
 use crate::provision::Provisioner;
 use crate::star::{Star, StarCommand, StarController, StarKey, StarManagerFactory, StarManagerFactoryDefault, StarName};
 use crate::template::{ConstellationData, ConstellationTemplate, StarKeyIndexTemplate, StarKeySubgraphTemplate, StarKeyTemplate};
-use crate::core::{StarCoreFactory, CoreRunner, StarCoreExtFactory, ExampleStarCoreExtFactory};
-use crate::logger::{Flags, Logger};
 
 pub struct Starlane
 {
@@ -413,23 +413,25 @@ pub enum StarAddress
 #[cfg(test)]
 mod test
 {
+    use std::sync::Arc;
+
     use tokio::runtime::Runtime;
     use tokio::sync::oneshot::error::RecvError;
     use tokio::time::Duration;
     use tokio::time::timeout;
 
+    use crate::app::{AppController, AppKind, AppSpecific, ConfigSrc, InitData};
+    use crate::artifact::{Artifact, ArtifactId, ArtifactKind};
     use crate::error::Error;
-    use crate::starlane::{ConstellationCreate, Starlane, StarlaneCommand, StarControlRequestByName};
-    use crate::template::{ConstellationData, ConstellationTemplate};
-    use crate::star::{StarController, StarKind, StarInfo, StarKey};
-    use crate::app::{AppController, AppSpecific, InitData, ConfigSrc, AppKind};
-    use crate::logger::{Flags, Flag, StarFlag, LogAggregate, Log, ProtoStarLog, ProtoStarLogPayload, StarLog, StarLogPayload};
-    use crate::keys::{SpaceKey, UserKey, SubSpaceKey};
-    use crate::permissions::Authentication;
-    use std::sync::Arc;
+    use crate::keys::{SpaceKey, SubSpaceKey, UserKey};
     use crate::label::Labels;
+    use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
+    use crate::names::Name;
+    use crate::permissions::Authentication;
     use crate::space::CreateAppControllerFail;
-    use crate::artifact::{Artifact, ArtifactId, ArtifactKind, Name};
+    use crate::star::{StarController, StarInfo, StarKey, StarKind};
+    use crate::starlane::{ConstellationCreate, StarControlRequestByName, Starlane, StarlaneCommand};
+    use crate::template::{ConstellationData, ConstellationTemplate};
 
     #[test]
     pub fn starlane()
