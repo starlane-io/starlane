@@ -663,10 +663,10 @@ impl CentralDb {
                     let supervisor = bincode::serialize(&supervisor).unwrap();
                     let app = bincode::serialize(&app).unwrap();
 
-                    self.conn.execute("BEGIN TRANSACTION", []);
-                    self.conn.execute("INSERT INTO apps (key) VALUES (?1)", [app.clone()]);
-                    self.conn.execute("INSERT INTO apps_to_supervisors (app_key,supervisor_key) VALUES (?1,?2)", [app.clone(), supervisor]);
-                    let result = self.conn.execute("COMMIT TRANSACTION", []);
+                    let transaction = self.conn.transaction().unwrap();
+                    transaction.execute("INSERT INTO apps (key) VALUES (?1)", [app.clone()]);
+                    transaction.execute("INSERT INTO apps_to_supervisors (app_key,supervisor_key) VALUES (?1,?2)", [app.clone(), supervisor]);
+                    let result = transaction.commit();
 
                     match result
                     {
@@ -686,35 +686,34 @@ impl CentralDb {
        Ok(())
     }
 
-    pub fn setup(&self)
+    pub fn setup(&mut self)
     {
-        let setup = r#"
-       CREATE TABLE supervisors(
+        let supervisors= r#"
+       CREATE TABLE IF NOT EXISTS supervisors(
 	      key BLOB PRIMARY KEY
-        );
+        );"#;
 
-       CREATE TABLE apps (
+       let apps = r#"CREATE TABLE IF NOT EXISTS apps (
          key BLOB PRIMARY KEY
-        );
+        );"#;
 
-        CREATE TABLE apps_to_supervisors
-        {
+        let apps_to_supervisors = r#"CREATE TABLE IF NOT EXISTS apps_to_supervisors
+        (
            supervisor_key BLOB,
            app_key BLOB,
            PRIMARY KEY (supervisor_key, app_key),
-           FOREIGN KEY (supervisors_key)
-              REFERENCES supervisors (key)
-                  ON DELETE CASCADE,
-                  ON UPDATE NO ACTION,
-           FOREIGN KEY (app_key)
-              REFERENCES apps (key)
-                  ON DELETE CASCADE,
-                  ON UPDATE NO ACTION,
-        };
+           FOREIGN KEY (supervisor_key) REFERENCES supervisors (key),
+           FOREIGN KEY (app_key) REFERENCES apps (key)
+        );
         "#;
 
 
-        self.conn.execute(setup, []).unwrap();
+
+        let transaction = self.conn.transaction().unwrap();
+        transaction.execute(supervisors, []).unwrap();
+        transaction.execute(apps, []).unwrap();
+        transaction.execute(apps_to_supervisors, []).unwrap();
+        transaction.commit();
 
     }
 

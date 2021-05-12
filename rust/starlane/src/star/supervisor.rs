@@ -22,6 +22,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::{oneshot, mpsc};
 use rusqlite::{Connection,params};
 use std::str::FromStr;
+use serde::{Deserialize, Serialize};
 
 pub enum SupervisorCommand
 {
@@ -185,7 +186,7 @@ impl StarVariant for SupervisorVariant
                         }
                     }
                     SupervisorCommand::AppLaunch(app_key) => {
-                        let archetype = self.backing.get_application(&app_key).await.cloned();
+                        let archetype = self.backing.get_application(&app_key).await;
                         let servers = self.backing.get_servers_for_app(&app_key).await;
 
                         if archetype.is_none()
@@ -248,7 +249,7 @@ impl StarVariant for SupervisorVariant
                                 {
                                     SupervisorPayload::AppCreate(archetype) => {
                                         let app_key = AppKey::new(space_message.sub_space.clone());
-                                        self.backing.add_application(app_key.clone(), archetype.clone() );
+                                        self.backing.set_application(app_key.clone(), archetype.clone() );
                                         self.backing.set_app_status(app_key.clone(), AppStatus::Pending);
                                         let proto = star_message.reply( StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
                                         self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
@@ -432,8 +433,8 @@ pub trait SupervisorManagerBacking: Send+Sync
     async fn add_server( &mut self, info: StarInfo ) -> Result<(),Error>;
     async fn select_servers(&mut self, pattern: StarPattern ) -> Vec<StarKey>;
 
-    async fn add_application(&mut self, app: AppKey, archetype: AppArchetype) -> Result<(),Error>;
-    async fn get_application(&mut self, app: &AppKey ) -> Option<&AppArchetype>;
+    async fn set_application(&mut self, app: AppKey, archetype: AppArchetype) -> Result<(),Error>;
+    async fn get_application(&mut self, app: &AppKey ) -> Option<AppArchetype>;
     async fn set_app_server_status(&mut self, app: AppKey, server: StarKey, status: AppServerStatus) -> Result<(),Error>;
     async fn get_app_server_status(&mut self, app: &AppKey, server: &StarKey) ->AppServerStatus;
     async fn set_app_status(&mut self, app: AppKey, status: AppStatus )-> Result<(),Error>;
@@ -443,12 +444,12 @@ pub trait SupervisorManagerBacking: Send+Sync
 
     async fn app_sequence_next(&mut self, app: &AppKey ) -> Result<u64,Error>;
 
-    async fn set_actor_location(&mut self, actor: ActorKey, location: ActorLocation)-> Result<(),Error>;
-    async fn get_actor_location(&self, lookup: &ActorLookup) -> Option<&ActorLocation>;
+    async fn set_actor_location(&mut self, location: ActorLocation)-> Result<(),Error>;
+    async fn get_actor_location(&self, actor: &ActorKey) -> Option<ActorLocation>;
 }
 
 
-#[derive(Clone)]
+#[derive(Clone,Serialize,Deserialize)]
 pub enum AppServerStatus
 {
     Unknown,
@@ -545,12 +546,38 @@ println!("SELECT SERVERS!");
         }
     }
 
-    async fn add_application(&mut self, app: AppKey, archetype: AppArchetype) -> Result<(), Error> {
-        todo!()
+    async fn set_application(&mut self, app: AppKey, archetype: AppArchetype) -> Result<(), Error> {
+        let (request,rx) = SupervisorDbRequest::new( SupervisorDbCommand::SetAppArchetype(app, archetype));
+        self.supervisor_db.send( request ).await;
+        self.handle(rx.await)
     }
 
-    async fn get_application(&mut self, app: &AppKey) -> Option<&AppArchetype> {
-        todo!()
+    async fn get_application(&mut self, app: &AppKey) -> Option<AppArchetype> {
+        let (request,rx) = SupervisorDbRequest::new( SupervisorDbCommand::GetAppArchetype(app.clone()));
+        self.supervisor_db.send( request ).await;
+        match rx.await
+        {
+            Ok(result) => {
+                match result
+                {
+                    Ok(ok) => {
+                        match ok
+                        {
+                            SupervisorDbResult::AppArchetype(archetype) => {
+                                Option::Some(archetype)
+                            }
+                            _ => Option::None
+                        }
+                    }
+                    Err(err) => {
+                        Option::None
+                    }
+                }
+            }
+            Err(err) => {
+                Option::None
+            }
+        }
     }
 
     async fn set_app_server_status(&mut self, app: AppKey, server: StarKey, status: AppServerStatus) -> Result<(), Error> {
@@ -624,11 +651,39 @@ println!("SELECT SERVERS!");
     }
 
     async fn add_app_to_server(&mut self, app: AppKey, server: StarKey) -> Result<(), Error> {
-        todo!()
+        let (request,rx) = SupervisorDbRequest::new( SupervisorDbCommand::AddAppToServer(app, server));
+        self.supervisor_db.send( request ).await;
+        self.handle(rx.await)
     }
 
     async fn get_servers_for_app(&mut self, app: &AppKey) -> Vec<StarKey> {
-        todo!()
+        let (request,rx) = SupervisorDbRequest::new( SupervisorDbCommand::GetServersForApp(app.clone()));
+        self.supervisor_db.send( request ).await;
+        match rx.await
+        {
+            Ok(result) => {
+                match result
+                {
+                    Ok(ok) => {
+                        match ok
+                        {
+                            SupervisorDbResult::Servers(servers) => {
+                                servers
+                            }
+                            _ => vec![]
+                        }
+                    }
+                    Err(err) => {
+                        eprintln!("{}",err);
+                        vec![]
+                    }
+                }
+            }
+            Err(err) => {
+                eprintln!("{}",err);
+                vec![]
+            }
+        }
     }
 
     async fn app_sequence_next(&mut self, app: &AppKey) -> Result<u64, Error> {
@@ -661,12 +716,38 @@ println!("SELECT SERVERS!");
         }
     }
 
-    async fn set_actor_location(&mut self, actor: ActorKey, location: ActorLocation) -> Result<(), Error> {
-        todo!()
+    async fn set_actor_location(&mut self, location: ActorLocation) -> Result<(), Error> {
+        let (request,rx) = SupervisorDbRequest::new( SupervisorDbCommand::SetActorLocation(location));
+        self.supervisor_db.send( request ).await;
+        self.handle(rx.await)
     }
 
-    async fn get_actor_location(&self, lookup: &ActorLookup) -> Option<&ActorLocation> {
-        todo!()
+    async fn get_actor_location(&self, actor: &ActorKey) -> Option<ActorLocation> {
+        let (request,rx) = SupervisorDbRequest::new( SupervisorDbCommand::GetActorLocation(actor.clone()));
+        self.supervisor_db.send( request ).await;
+        match rx.await
+        {
+            Ok(result) => {
+                match result
+                {
+                    Ok(ok) => {
+                        match ok
+                        {
+                            SupervisorDbResult::ActorLocation(location ) => {
+                                Option::Some(location)
+                            }
+                            _ => Option::None
+                        }
+                    }
+                    Err(err) => {
+                        Option::None
+                    }
+                }
+            }
+            Err(err) => {
+                Option::None
+            }
+        }
     }
 }
 
@@ -695,7 +776,8 @@ pub enum SupervisorDbCommand
     Close,
     AddServer(StarInfo),
     StarSelect(StarPattern),
-    AddApplicationToServer(StarKey,AppKey),
+    AddAppToServer( AppKey, StarKey),
+    SetAppArchetype(AppKey,AppArchetype),
     GetAppArchetype(AppKey),
     SetAppStatus(AppKey,AppStatus),
     SetAppServerStatus(AppKey,StarKey,AppServerStatus),
@@ -710,6 +792,7 @@ pub enum SupervisorDbCommand
 pub enum SupervisorDbResult
 {
     Ok,
+    Error(String),
     Server(Option<StarKey>),
     Servers(Vec<StarKey>),
     Supervisor(Option<StarKey>),
@@ -815,10 +898,10 @@ println!("blah returning... ...");
                     let server= bincode::serialize(&server).unwrap();
                     let app = bincode::serialize(&app).unwrap();
 
-                    self.conn.execute("BEGIN TRANSACTION", []);
-                    self.conn.execute("REPLACE INTO apps (key) VALUES (?1)", [app.clone()]);
-                    self.conn.execute("REPLACE INTO apps_to_servers (app_key,server_key,status) VALUES (?1,?2,?3)", params![app.clone(), server.clone(),status.to_string()]);
-                    let result = self.conn.execute("COMMIT TRANSACTION", []);
+                    let transaction = self.conn.transaction().unwrap();
+                    transaction.execute("REPLACE INTO apps (key) VALUES (?1)", [app.clone()]);
+                    transaction.execute("REPLACE INTO apps_to_servers (app_key,server_key,status) VALUES (?1,?2,?3)", params![app.clone(), server.clone(),status.to_string()]);
+                    let result = transaction.commit();
 
                     match result
                     {
@@ -878,12 +961,22 @@ println!("GET APP STATUS ERROR: {}",e);
                 SupervisorDbCommand::AppSequenceNext(app) => {
                     let app = bincode::serialize(&app).unwrap();
 
-                    self.conn.execute("BEGIN TRANSACTION", []);
-                    self.conn.execute("UPDATE apps SET sequence=sequence+1 WHERE key=?1", [app.clone()]);
-                    let result = self.conn.query_row("SELECT key FROM apps WHERE key=?1", params![app.clone()], |row| {
-                        let rtn: u64 = row.get(0).unwrap();
-                        Ok(rtn)
-                    });
+                    let result = {
+                        let transaction = self.conn.transaction().unwrap();
+                        transaction.execute("UPDATE apps SET sequence=sequence+1 WHERE key=?1", [app.clone()]);
+                        let result = transaction.query_row("SELECT sequence FROM apps WHERE key=?1", params![app.clone()], |row| {
+                            let rtn: u64 = row.get(0).unwrap();
+                            Ok(rtn)
+                        });
+                        let trans_result= transaction.commit();
+                        if trans_result.is_err()
+                        {
+                            Err(trans_result.err().unwrap())
+                        }
+                        else {
+                            result
+                        }
+                    };
                     match result
                     {
                         Ok(result) => {
@@ -898,14 +991,146 @@ println!("GET APP STATUS ERROR: {}",e);
                     }
                 }
 
-                SupervisorDbCommand::GetServersForApp(_) => {}
-                SupervisorDbCommand::AddApplicationToServer(_, _) => {}
-                SupervisorDbCommand::GetAppArchetype(_) => {}
+                SupervisorDbCommand::GetServersForApp(app) => {
+                    println!("Get Servers For App");
+                    let app = bincode::serialize(&app).unwrap();
+                    let mut statement = self.conn.prepare("SELECT server_key FROM apps_to_servers WHERE app_key=?1 AND status='Ready'");
+                    if let Result::Ok(mut statement) = statement
+                    {
+                        println!("got here");
+                        let servers = statement.query_map( params![app], |row|{
+                            let key: Vec<u8> = row.get(0).unwrap();
+                            if let Result::Ok(key) = bincode::deserialize::<StarKey>(key.as_slice()){
+                                Ok(key)
+                            }
+                            else
+                            {
+                                Err(rusqlite::Error::ExecuteReturnedResults)
+                            }
+                        } ).unwrap();
 
-                SupervisorDbCommand::SetActorLocation(_) => {}
-                SupervisorDbCommand::GetActorLocation(_) => {}
+                        let mut rtn = vec![];
+                        let servers:Vec<StarKey> = servers.into_iter().map(|r|r.unwrap()).collect();
+                        request.tx.send( Result::Ok( SupervisorDbResult::Servers(rtn)));
+                        println!("blah returning from GEtServers...... ...");
+                    }
+                }
+                SupervisorDbCommand::AddAppToServer(server, app) => {
+                    let app = bincode::serialize(&app).unwrap();
+                    let server = bincode::serialize(&server).unwrap();
 
-                SupervisorDbCommand::GetAppServerStatus(_, _) => {}
+                    let result = self.conn.execute("REPLACE INTO apps_to_servers (app_key,server_key) VALUES (?1,?2)", params![app,server]);
+                    match result
+                    {
+                        Ok(_) => {
+                            request.tx.send(Result::Ok(SupervisorDbResult::Ok));
+                        }
+                        Err(e) => {
+                            request.tx.send(Result::Ok(SupervisorDbResult::Error("AddApplicationToServer failed".into())));
+                        }
+                    }
+                }
+                SupervisorDbCommand::SetAppArchetype(app,archetype) => {
+                    let app = bincode::serialize(&app).unwrap();
+                    let archetype = bincode::serialize(&archetype).unwrap();
+
+                    let result = self.conn.execute("REPLACE INTO apps (key,archetype) VALUES (?1,?2)", params![app,archetype]);
+                    match result
+                    {
+                        Ok(_) => {
+                            request.tx.send(Result::Ok(SupervisorDbResult::Ok));
+                        }
+                        Err(e) => {
+                            request.tx.send(Result::Ok(SupervisorDbResult::Error("AddApplicationToServer failed".into())));
+                        }
+                    }
+                }
+                SupervisorDbCommand::GetAppArchetype(app) => {
+                    let app = bincode::serialize(&app).unwrap();
+                    let result = self.conn.query_row("SELECT archetype FROM apps WHERE key=?1", params![app], |row|
+                        {
+                            let archetype: Vec<u8>= row.get(0).unwrap();
+                            if let Result::Ok(archetype) = bincode::deserialize::<AppArchetype>(archetype.as_slice()) {
+                                Ok(archetype)
+                            }
+                            else
+                            {
+                                Err(rusqlite::Error::ExecuteReturnedResults)
+                            }
+                        });
+                    match result
+                    {
+                        Ok(archetype) => {
+                            request.tx.send(Ok(SupervisorDbResult::AppArchetype(archetype)));
+                        }
+                        Err(_) => {
+                            request.tx.send(Ok(SupervisorDbResult::Error("could not find archetype".to_string())));
+                        }
+                    }
+                }
+                SupervisorDbCommand::GetAppServerStatus(app, server) => {
+                    let app = bincode::serialize(&app).unwrap();
+                    let server = bincode::serialize(&server).unwrap();
+                    let result = self.conn.query_row("SELECT status FROM apps_to_servers WHERE app_key=?1 AND server_key=?2", params![app,server], |row|
+                        {
+                            let status: Vec<u8>= row.get(0).unwrap();
+                            if let Result::Ok(status) = bincode::deserialize::<AppServerStatus>(status.as_slice()) {
+                                Ok(status)
+                            }
+                            else
+                            {
+                                Err(rusqlite::Error::ExecuteReturnedResults)
+                            }
+                        });
+                    match result
+                    {
+                        Ok(status) => {
+                            request.tx.send(Ok(SupervisorDbResult::AppServerStatus(status)));
+                        }
+                        Err(_) => {
+                            request.tx.send(Ok(SupervisorDbResult::AppServerStatus(AppServerStatus::Unknown)));
+                        }
+                    }
+                }
+                SupervisorDbCommand::SetActorLocation(loc) => {
+                    let actor = bincode::serialize(&loc.actor ).unwrap();
+                    let location = bincode::serialize(&loc).unwrap();
+
+                    let result = self.conn.execute("REPLACE INTO actors (key,location) VALUES (?1,?2)", params![actor,location]);
+                    match result
+                    {
+                        Ok(_) => {
+                            request.tx.send(Result::Ok(SupervisorDbResult::Ok));
+                        }
+                        Err(e) => {
+                            request.tx.send(Result::Ok(SupervisorDbResult::Error("SetActorLocation failed".into())));
+                        }
+                    }
+                }
+                SupervisorDbCommand::GetActorLocation(actor) => {
+                    let actor= bincode::serialize(&actor).unwrap();
+                    let result = self.conn.query_row("SELECT location FROM actors WHERE key=?1", params![actor], |row|
+                        {
+                            let location : Vec<u8>= row.get(0).unwrap();
+                            if let Result::Ok(location) = bincode::deserialize::<ActorLocation>(location.as_slice()) {
+                                Ok(location)
+                            }
+                            else
+                            {
+                                Err(rusqlite::Error::ExecuteReturnedResults)
+                            }
+                        });
+                    match result
+                    {
+                        Ok(location) => {
+                            request.tx.send(Ok(SupervisorDbResult::ActorLocation(location)));
+                        }
+                        Err(_) => {
+                            request.tx.send(Ok(SupervisorDbResult::Error("could not find actor location".to_string())));
+                        }
+                    }
+                }
+
             }
 
         }
@@ -913,46 +1138,50 @@ println!("GET APP STATUS ERROR: {}",e);
         Ok(())
     }
 
-    pub fn setup(&self)
+    pub fn setup(&mut self)
     {
         let servers= r#"
-       CREATE TABLE servers(
+       CREATE TABLE IF NOT EXISTS servers(
 	      key BLOB PRIMARY KEY,
 	      kind TEXT NOT NULL
         );"#;
 
-       let apps = r#"CREATE TABLE apps (
+       let apps = r#"CREATE TABLE IF NOT EXISTS apps (
          key BLOB PRIMARY KEY,
+         archetype BLOB,
          sequence INTEGER DEFAULT 0
         );"#;
 
-        let apps_status = r#"CREATE TABLE apps_status (
+        let apps_status = r#"CREATE TABLE IF NOT EXISTS apps_status (
          key BLOB PRIMARY KEY,
          status TEXT NOT NULL
         );"#;
 
 
-       let actors = r#"CREATE TABLE actors (
-         key BLOB PRIMARY KEY
+        let actors = r#"CREATE TABLE IF NOT EXISTS actors (
+         key BLOB PRIMARY KEY,
+         location BLOB NOT NULL
         );"#;
 
-        let apps_to_servers = r#"CREATE TABLE apps_to_servers
+        let apps_to_servers = r#"CREATE TABLE IF NOT EXISTS apps_to_servers
         (
            server_key BLOB,
            app_key BLOB,
-           status TEXT NOT NULL,
+           status TEXT NOT NULL DEFAULT 'Unknown',
            PRIMARY KEY (server_key, app_key),
            FOREIGN KEY (server_key) REFERENCES servers (key),
            FOREIGN KEY (app_key) REFERENCES apps (key)
         );"#;
 
-        self.conn.execute("BEGIN TRANSACTION", []).unwrap();
-        self.conn.execute(servers, []).unwrap();
-        self.conn.execute(apps, []).unwrap();
-        self.conn.execute(apps_status, []).unwrap();
-        self.conn.execute(actors, []).unwrap();
-        self.conn.execute(apps_to_servers, []).unwrap();
-        self.conn.execute("COMMIT TRANSACTION", []).unwrap();
+        {
+            let transaction = self.conn.transaction().unwrap();
+            transaction.execute(servers, []).unwrap();
+            transaction.execute(apps, []).unwrap();
+            transaction.execute(apps_status, []).unwrap();
+            transaction.execute(actors, []).unwrap();
+            transaction.execute(apps_to_servers, []).unwrap();
+            transaction.commit();
+        }
 
     }
 
