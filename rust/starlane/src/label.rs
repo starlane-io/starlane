@@ -48,6 +48,26 @@ impl Selector {
         }
     }
 
+    pub fn is_empty(&self) -> bool
+    {
+        if !self.fields.is_empty()
+        {
+            return false;
+        }
+
+        match &self.meta
+        {
+            MetaSelector::None => {
+                return true;
+            }
+            MetaSelector::Name(_) => {
+                return false;
+            }
+            MetaSelector::Label(labels) => {
+                return labels.labels.is_empty();
+            }
+        };
+    }
 
     pub fn and( &mut self, field: FieldSelection ) {
         self.fields.insert(field);
@@ -251,6 +271,7 @@ impl LabelRequest
 pub enum LabelCommand
 {
     Close,
+    Clear,
     Save(ResourceSave),
     Select(Selector),
 }
@@ -318,6 +339,15 @@ impl LabelDb {
             LabelCommand::Close => {
                 Ok(LabelResult::Ok)
             }
+            LabelCommand::Clear => {
+                let trans = self.conn.transaction()?;
+                trans.execute("DELETE FROM labels", [] )?;
+                trans.execute("DELETE FROM names", [] )?;
+                trans.execute("DELETE FROM resources", [])?;
+                trans.commit();
+
+                Ok(LabelResult::Ok)
+            }
             LabelCommand::Save(save) => {
                 let resource = save.resource;
                 let labels = save.labels;
@@ -325,7 +355,13 @@ impl LabelDb {
                 let resource_type = format!("{}", &resource.key.resource_type());
                 let kind = format!("{}", &resource.kind);
 
-                let owner = bincode::serialize(&resource.owner)?;
+                let owner = match &resource.owner{
+                    None => Option::None,
+                    Some(owner) => {
+                        Option::Some(bincode::serialize(owner)?)
+                    }
+                };
+
                 let space = resource.key.space().index();
                 let sub_space = resource.key.sub_space().id.index();
 
@@ -352,7 +388,7 @@ impl LabelDb {
                 let mut params = vec![];
                 let mut where_clause = String::new();
 
-                for (index, field) in Vec::from_iter(selector.fields).iter().map(|x| x.clone() ).enumerate()
+                for (index, field) in Vec::from_iter(selector.fields.clone()).iter().map(|x| x.clone() ).enumerate()
                 {
                     if index != 0 {
                         where_clause.push_str(", ");
@@ -388,12 +424,7 @@ impl LabelDb {
 
 
 
-                let mut statement = format!(r#"SELECT DISTINCT r.key,r.kind,r.specific,r.owner
-                              FROM {} as r
-                              WHERE {}"#, "{}", where_clause );
-
-
-                let mut statement = match selector.meta
+                let mut statement = match &selector.meta
                 {
                     MetaSelector::None => {
                         format!("SELECT DISTINCT r.key,r.kind,r.specific,r.owner FROM resources as r WHERE {}", where_clause )
@@ -412,9 +443,21 @@ impl LabelDb {
                         format!("SELECT DISTINCT r.key,r.kind,r.specific,r.owner FROM resources as r WHERE {} {}", where_clause, labels )
                     }
                     MetaSelector::Name(name) => {
-                        format!("SELECT DISTINCT r.key,r.kind,r.specific,r.owner FROM names as r WHERE {} AND r.name='{}'", where_clause, name )
+                        if where_clause.is_empty() {
+                            format!("SELECT DISTINCT r.key,r.kind,r.specific,r.owner FROM names as r WHERE r.name='{}'", name)
+                        }
+                        else {
+                            format!("SELECT DISTINCT r.key,r.kind,r.specific,r.owner FROM names as r WHERE {} AND r.name='{}'", where_clause, name)
+                        }
                     }
                 };
+
+                // in case this search was for EVERYTHING
+                if selector.is_empty()
+                {
+                    statement = "SELECT DISTINCT r.key,r.kind,r.specific,r.owner FROM resources as r".to_string();
+                }
+
                 println!("STATEMENT {}",statement);
 
                 let mut statement = self.conn.prepare(statement.as_str())?;
@@ -517,7 +560,6 @@ impl LabelDb {
         transaction.execute(labels, [])?;
         transaction.execute(names, [])?;
         transaction.execute(resources, [])?;
-       // transaction.execute(labels_to_resources, [])?;
         transaction.commit();
 
         Ok(())
@@ -538,7 +580,7 @@ mod test
     use crate::artifact::{Artifact, ArtifactId, ArtifactKind};
     use crate::error::Error;
     use crate::keys::{SpaceKey, SubSpaceKey, UserKey, ResourceType, Resource, ResourceKind, ResourceKey};
-    use crate::label::{Labels, LabelDb, ResourceSave, LabelRequest, LabelCommand, Selectors, LabelResult, FieldSelection, LabelSelection};
+    use crate::label::{Labels, LabelDb, ResourceSave, LabelRequest, LabelCommand, Selectors, LabelResult, FieldSelection, LabelSelection, Selector};
     use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
     use crate::names::{Name, Specific};
     use crate::permissions::Authentication;
@@ -561,7 +603,7 @@ mod test
 
         let resource = Resource{
             key: key,
-            owner: owner,
+            owner: Option::Some(owner),
             kind: kind,
             specific: specific
         };
@@ -639,9 +681,56 @@ mod test
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result,1);
 
-
+            let mut selector = Selectors::actor_selector();
+            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            tx.send(request).await;
+            let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
+            assert_result_count(result,0);
         });
     }
+
+    #[test]
+    pub fn test20()
+    {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let tx = LabelDb::new().await;
+
+            create_10(tx.clone(), ResourceKind::App(AppKind::Normal),Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
+            create_10(tx.clone(), ResourceKind::Actor(ActorKind::Single),Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
+
+            let mut selector = Selector::new();
+            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            tx.send(request).await;
+            let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
+            assert_result_count(result,20);
+
+            let mut selector = Selectors::app_selector();
+            selector.add_label( LabelSelection::exact("parity", "Even") );
+            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            tx.send(request).await;
+            let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
+            assert_result_count(result.clone(),5);
+
+            let mut selector = Selectors::app_selector();
+            selector.add_label( LabelSelection::exact("parity", "Odd") );
+            selector.add_label( LabelSelection::exact("index", "3") );
+            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            tx.send(request).await;
+            let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
+            assert_result_count(result,1);
+
+
+            let mut selector = Selector::new();
+            selector.name("Highest".to_string()).unwrap();
+            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            tx.send(request).await;
+            let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
+            assert_result_count(result,2);
+        });
+    }
+
+
 
     fn results( result:LabelResult )->Vec<Resource>
     {

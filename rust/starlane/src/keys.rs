@@ -568,7 +568,7 @@ impl From<App> for Resource{
         Resource{
             key: ResourceKey::App(e.key.clone()),
             specific: Option::Some(e.archetype.specific.clone()),
-            owner: e.archetype.owner.clone(),
+            owner: Option::Some(e.archetype.owner.clone()),
             kind: e.into()
         }
     }
@@ -579,7 +579,7 @@ impl From<ActorRef> for Resource{
         Resource{
             key: ResourceKey::Actor(e.key),
             specific: Option::Some(e.archetype.specific),
-            owner: e.archetype.owner,
+            owner: Option::Some(e.archetype.owner),
             kind: e.archetype.kind.into()
         }
     }
@@ -590,7 +590,7 @@ impl From<User> for Resource{
         Resource{
             key: ResourceKey::User(e.key.clone()),
             specific: Option::None,
-            owner: e.key,
+            owner: Option::Some(e.key),
             kind: ResourceKind::User
         }
     }
@@ -601,7 +601,7 @@ impl From<SpaceKey> for Resource{
         Resource{
             key: ResourceKey::Space(e),
             specific: Option::None,
-            owner: UserKey::hyper_user(),
+            owner: Option::Some(UserKey::hyper_user()),
             kind: ResourceKind::Space
         }
     }
