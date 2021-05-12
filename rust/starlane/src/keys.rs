@@ -266,7 +266,7 @@ pub enum ResourceKey
 
 impl ResourceKey
 {
-    pub fn kind(&self)-> ResourceType
+    pub fn rtype(&self) -> ResourceType
     {
         match self
         {
@@ -293,6 +293,7 @@ impl ResourceKey
             ResourceKey::Artifact(artifact) => artifact.sub_space.clone()
         }
     }
+
 
 
 
@@ -380,15 +381,41 @@ pub struct Resource
 {
     pub key: ResourceKey,
     pub specific: Option<Name>,
-    pub owner: Option<UserKey>
+    pub owner: Option<UserKey>,
+    pub kind: ResourceKind
+}
+
+impl From<AppKind> for ResourceKind{
+    fn from(e: AppKind) -> Self {
+        ResourceKind::App(e)
+    }
+}
+
+impl From<App> for ResourceKind{
+    fn from(e: App) -> Self {
+        ResourceKind::App(e.archetype.kind)
+    }
+}
+
+impl From<ActorKind> for ResourceKind{
+    fn from(e: ActorKind) -> Self {
+        ResourceKind::Actor(e)
+    }
+}
+
+impl From<ArtifactKind> for ResourceKind{
+    fn from(e: ArtifactKind) -> Self {
+        ResourceKind::Artifact(e)
+    }
 }
 
 impl From<App> for Resource{
     fn from(e: App) -> Self {
         Resource{
-            key: ResourceKey::App(e.key),
-            specific: Option::Some(e.archetype.specific),
-            owner: Option::Some(e.archetype.owner)
+            key: ResourceKey::App(e.key.clone()),
+            specific: Option::Some(e.archetype.specific.clone()),
+            owner: Option::Some(e.archetype.owner.clone()),
+            kind: e.into()
         }
     }
 }
@@ -398,7 +425,8 @@ impl From<ActorRef> for Resource{
         Resource{
             key: ResourceKey::Actor(e.key),
             specific: Option::Some(e.archetype.specific),
-            owner: Option::Some(e.archetype.owner)
+            owner: Option::Some(e.archetype.owner),
+            kind: e.archetype.kind.into()
         }
     }
 }
@@ -408,7 +436,8 @@ impl From<User> for Resource{
         Resource{
             key: ResourceKey::User(e.key),
             specific: Option::None,
-            owner: Option::None
+            owner: Option::None,
+            kind: ResourceKind::User
         }
     }
 }
@@ -418,7 +447,8 @@ impl From<SpaceKey> for Resource{
         Resource{
             key: ResourceKey::Space(e),
             specific: Option::None,
-            owner: Option::None
+            owner: Option::None,
+            kind: ResourceKind::Space
         }
     }
 }

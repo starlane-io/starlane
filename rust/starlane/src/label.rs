@@ -3,9 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use crate::error::Error;
 use tokio::sync::{mpsc, oneshot};
-use rusqlite::Connection;
 use crate::keys::{ResourceKey, ResourceType, UserKey, AppKey, Resource};
 use crate::artifact::Name;
+use rusqlite::{Connection,params};
 
 pub type Labels = HashMap<String,String>;
 
@@ -135,11 +135,36 @@ impl LabelDb {
                     break;
                 }
                 LabelCommand::Save(resource,labels) => {
-                    let resource_key = bincode::serialize(&resource.key ).unwrap();
-                    let trans = self.conn.transaction()?;
-                    trans.execute("DELETE FROM labels, resources, labels_to_resources WHERE resources.key=?1 AND resources.key=labels_to_resources.resource_key AND labels.key=labels_to_resources.label_key", [resource_key]).unwrap();
+                    let key = bincode::serialize(&resource.key ).unwrap();
+                    let resource_type = format!("{}", &resource.key.rtype() );
+                    let kind = format!("{}", &resource.kind );
+                    let specific = match resource.specific{
+                        None => Option::None,
+                        Some(specific) => { Option::Some(specific.to_string()) }
+                    };
 
-                    trans.execute( "INSERT INTO resources (key,) VALUES ()", [] );
+                    let owner = bincode::serialize(&resource.owner ).unwrap();
+                    let space = resource.key.space().index();
+                    let sub_space = resource.key.sub_space().id.index();
+
+                    let trans = self.conn.transaction()?;
+                    trans.execute("DELETE FROM labels, resources, labels_to_resources WHERE resources.key=?1 AND resources.key=labels_to_resources.resource_key AND labels.key=labels_to_resources.label_key", [key.clone()]);
+
+                    match specific
+                    {
+                        None => {
+                            trans.execute( "INSERT INTO resources (key,type,kind,space,sub_space,owner) VALUES (?1,?2,?3,?4,?5,?6)", params![key.clone(),resource_type,kind,space,sub_space,owner] );
+                        }
+                        Some(specific) => {
+                            trans.execute( "INSERT INTO resources (key,type,kind,specific,space,sub_space,owner) VALUES (?1,?2,?3,?4,?5,?6,?7)", params![key.clone(),resource_type,kind,specific,space,sub_space,owner] );
+                        }
+                    }
+
+                    for (name,value) in labels
+                    {
+                        trans.execute( "INSERT INTO resources (name,value) VALUES (?1,?2)", [name,value] );
+                        trans.execute( "INSERT INTO labels_to_resources (label_key,resrouce_key) VALUES (SELECT last_insert_rowid(),?2)", params![key] );
+                    }
 
                     trans.commit();
                 }

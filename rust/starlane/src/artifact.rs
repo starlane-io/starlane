@@ -169,6 +169,12 @@ impl Name
     }
 }
 
+
+impl fmt::Display for Name {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"{}", self.to()) }
+}
+
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct DomainName
 {
