@@ -13,7 +13,7 @@ use std::fmt;
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct Artifact
 {
-    pub id: ArtifactId,
+    pub location: ArtifactLocation,
     pub kind: ArtifactKind,
     pub specific: Option<Specific>
 }
@@ -123,19 +123,19 @@ impl ArtifactBundle
 }
 
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
-pub struct ArtifactId
+pub struct ArtifactLocation
 {
     pub bundle: ArtifactBundle,
     pub path: String
 }
 
-impl ArtifactId
+impl ArtifactLocation
 {
     pub fn from(string: &str) -> Result<Self,Error>
     {
         let (bundle,mut parts) = ArtifactBundle::more(string)?;
         let path = parts.next().ok_or("path")?.to_string();
-        Ok(ArtifactId{
+        Ok(ArtifactLocation {
            bundle: bundle,
            path: path
         })

@@ -421,7 +421,7 @@ mod test
     use tokio::time::timeout;
 
     use crate::app::{AppController, AppKind, AppSpecific, ConfigSrc, InitData};
-    use crate::artifact::{Artifact, ArtifactId, ArtifactKind};
+    use crate::artifact::{Artifact, ArtifactLocation, ArtifactKind};
     use crate::error::Error;
     use crate::keys::{SpaceKey, SubSpaceKey, UserKey};
     use crate::label::Labels;

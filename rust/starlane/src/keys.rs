@@ -563,6 +563,30 @@ impl From<ArtifactKind> for ResourceKind{
     }
 }
 
+impl From<SpaceKey> for Resource{
+    fn from(e: SpaceKey) -> Self {
+        Resource{
+            key: ResourceKey::Space(e),
+            kind: ResourceKind::Space,
+            owner: Option::Some(UserKey::hyper_user()),
+            specific: None
+        }
+    }
+}
+
+impl From<SubSpaceKey> for Resource{
+    fn from(e: SubSpaceKey) -> Self {
+        Resource{
+            key: ResourceKey::SubSpace(e.clone()),
+            kind: ResourceKind::SubSpace,
+            owner: Option::Some(UserKey::super_user(e.space.clone())),
+            specific: None
+        }
+    }
+}
+
+
+
 impl From<App> for Resource{
     fn from(e: App) -> Self {
         Resource{
@@ -596,14 +620,4 @@ impl From<User> for Resource{
     }
 }
 
-impl From<SpaceKey> for Resource{
-    fn from(e: SpaceKey) -> Self {
-        Resource{
-            key: ResourceKey::Space(e),
-            specific: Option::None,
-            owner: Option::Some(UserKey::hyper_user()),
-            kind: ResourceKind::Space
-        }
-    }
-}
 

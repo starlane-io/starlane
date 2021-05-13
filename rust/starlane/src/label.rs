@@ -221,7 +221,16 @@ impl ToSql for FieldSelection
                 Ok(ToSqlOutput::Owned(Value::Integer(space.index() as _)))
             }
             FieldSelection::SubSpace(sub_space) => {
-                Ok(ToSqlOutput::Owned(Value::Integer(sub_space.id.index() as _)))
+                let sub_space= bincode::serialize(sub_space );
+                match sub_space
+                {
+                    Ok(sub_space) => {
+                        Ok(ToSqlOutput::Owned(Value::Blob(sub_space)))
+                    }
+                    Err(error) => {
+                        Err(rusqlite::Error::InvalidQuery)
+                    }
+                }
             }
             FieldSelection::App(app) => {
                 let app = bincode::serialize(app);
@@ -363,7 +372,7 @@ impl LabelDb {
                 };
 
                 let space = resource.key.space().index();
-                let sub_space = resource.key.sub_space().id.index();
+                let sub_space = bincode::serialize(&resource.key.sub_space())?;
 
                 let trans = self.conn.transaction()?;
                 trans.execute("DELETE FROM labels WHERE labels.resource_key=?1", [key.clone()]);
@@ -391,7 +400,7 @@ impl LabelDb {
                 for (index, field) in Vec::from_iter(selector.fields.clone()).iter().map(|x| x.clone() ).enumerate()
                 {
                     if index != 0 {
-                        where_clause.push_str(", ");
+                        where_clause.push_str(" AND ");
                     }
 
                     let f = match field {
@@ -525,7 +534,7 @@ impl LabelDb {
           kind BLOB NOT NULL,
           specific TEXT,
           space INTEGER NOT NULL,
-          sub_space INTEGER NOT NULL,
+          sub_space BLOB NOT NULL,
           app TEXT,
           owner BLOB,
           UNIQUE(name,resource_type,kind,specific,space,sub_space,app)
@@ -538,7 +547,7 @@ impl LabelDb {
          kind BLOB NOT NULL,
          specific TEXT,
          space INTEGER NOT NULL,
-         sub_space INTEGER NOT NULL,
+         sub_space BLOB NOT NULL,
          app TEXT,
          owner BLOB
         )"#;
@@ -577,9 +586,9 @@ mod test
     use tokio::time::timeout;
 
     use crate::app::{AppController, AppKind, AppSpecific, ConfigSrc, InitData};
-    use crate::artifact::{Artifact, ArtifactId, ArtifactKind};
+    use crate::artifact::{Artifact, ArtifactLocation, ArtifactKind};
     use crate::error::Error;
-    use crate::keys::{SpaceKey, SubSpaceKey, UserKey, ResourceType, Resource, ResourceKind, ResourceKey};
+    use crate::keys::{SpaceKey, SubSpaceKey, UserKey, ResourceType, Resource, ResourceKind, ResourceKey, SubSpaceId};
     use crate::label::{Labels, LabelDb, ResourceSave, LabelRequest, LabelCommand, Selectors, LabelResult, FieldSelection, LabelSelection, Selector};
     use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
     use crate::names::{Name, Specific};
@@ -591,23 +600,13 @@ mod test
     use crate::label::LabelResult::Resources;
     use tokio::sync::mpsc;
     use crate::actor::ActorKind;
-
-    fn create( index: usize, kind: ResourceKind, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey ) -> ResourceSave
+    fn create_save( index: usize, resource: Resource ) -> ResourceSave
     {
         if index == 0
         {
-          eprintln!("don't use 0 index, it messes up the tests.  Start with 1");
-          assert!(false)
+            eprintln!("don't use 0 index, it messes up the tests.  Start with 1");
+            assert!(false)
         }
-        let key = kind.test_key(sub_space,index);
-
-        let resource = Resource{
-            key: key,
-            owner: Option::Some(owner),
-            kind: kind,
-            specific: specific
-        };
-
         let parity = match (index%2)==0 {
             true => "Even",
             false => "Odd"
@@ -632,6 +631,25 @@ mod test
         save
     }
 
+    fn create( index: usize, kind: ResourceKind, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey ) -> ResourceSave
+    {
+        if index == 0
+        {
+          eprintln!("don't use 0 index, it messes up the tests.  Start with 1");
+          assert!(false)
+        }
+        let key = kind.test_key(sub_space,index);
+
+        let resource = Resource{
+            key: key,
+            owner: Option::Some(owner),
+            kind: kind,
+            specific: specific
+        };
+
+        create_save(index,resource)
+    }
+
     async fn create_10( tx: mpsc::Sender<LabelRequest>, kind: ResourceKind, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey )
     {
         for index in 1..11
@@ -641,6 +659,39 @@ mod test
             tx.send( request ).await;
             timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
         }
+    }
+
+    async fn create_10_spaces( tx: mpsc::Sender<LabelRequest> )->Vec<SpaceKey>
+    {
+        let mut spaces = vec!();
+        for index in 1..11
+        {
+            let space = SpaceKey::from_index(index as _);
+            let resource: Resource = space.clone().into();
+
+            let save = create_save(index,resource);
+            let (request,rx) =LabelRequest::new(LabelCommand::Save(save));
+            tx.send( request ).await;
+            timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
+            spaces.push(space)
+        }
+        spaces
+    }
+
+    async fn create_10_sub_spaces( tx: mpsc::Sender<LabelRequest>, space: SpaceKey )->Vec<SubSpaceKey>
+    {
+        let mut sub_spaces = vec!();
+        for index in 1..11
+        {
+            let sub_space = SubSpaceKey::new(space.clone(), SubSpaceId::from_index(index as _) );
+            let resource: Resource = sub_space.clone().into();
+            let save = create_save(index,resource);
+            let (request,rx) =LabelRequest::new(LabelCommand::Save(save));
+            tx.send( request ).await;
+            timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
+            sub_spaces.push(sub_space)
+        }
+        sub_spaces
     }
 
 
@@ -730,7 +781,41 @@ mod test
         });
     }
 
+    #[test]
+    pub fn test_spaces()
+    {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let tx = LabelDb::new().await;
 
+            let spaces = create_10_spaces(tx.clone() ).await;
+            let mut sub_spaces = vec![];
+            for space in spaces.clone() {
+                sub_spaces.append( &mut create_10_sub_spaces(tx.clone(), space ).await );
+            }
+
+            for sub_space in sub_spaces.clone()
+            {
+                create_10(tx.clone(), ResourceKind::App(AppKind::Normal),Option::None,sub_space, UserKey::hyper_user() ).await;
+            }
+
+            let mut selector = Selectors::app_selector();
+            selector.fields.insert(FieldSelection::Space(spaces.get(0).cloned().unwrap()));
+            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            tx.send(request).await;
+            let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
+            assert_result_count(result,100);
+
+            let mut selector = Selectors::app_selector();
+            selector.fields.insert(FieldSelection::SubSpace(sub_spaces.get(0).cloned().unwrap()));
+            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            tx.send(request).await;
+            let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
+            assert_result_count(result,10);
+
+
+        });
+    }
 
     fn results( result:LabelResult )->Vec<Resource>
     {

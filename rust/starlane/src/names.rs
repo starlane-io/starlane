@@ -5,7 +5,7 @@ use crate::actor::ActorKind;
 use crate::actor::ActorSpecific;
 use crate::app::AppSpecific;
 use crate::artifact::{Artifact, SubSpaceName};
-use crate::artifact::ArtifactId;
+use crate::artifact::ArtifactLocation;
 use crate::artifact::ArtifactKind;
 use crate::error::Error;
 
@@ -18,14 +18,14 @@ lazy_static!
 
     pub static ref TEST_APP_CONFIG_ARTIFACT: Artifact = Artifact
     {
-                    id: ArtifactId::from("starlane.io:starlane:core:test:1.0.0:/test/test_app.yaml").unwrap(),
+                    location: ArtifactLocation::from("starlane.io:starlane:core:test:1.0.0:/test/test_app.yaml").unwrap(),
                     kind: ArtifactKind::AppConfig,
                     specific: Option::Some(AppSpecific::from_str("starlane.io:starlane:core:test:/test/test_app").unwrap())
     };
 
     pub static ref TEST_ACTOR_CONFIG_ARTIFACT: Artifact = Artifact
     {
-                    id: ArtifactId::from("starlane.io:starlane:core:test:1.0.0:/test/test_actor.yaml").unwrap(),
+                    location: ArtifactLocation::from("starlane.io:starlane:core:test:1.0.0:/test/test_actor.yaml").unwrap(),
                     kind: ArtifactKind::ActorConfig,
                     specific:Option::Some(ActorSpecific::from_str("starlane.io:starlane:core:test:/test/test_actor").unwrap())
     };
