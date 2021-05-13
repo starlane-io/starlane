@@ -5,7 +5,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize, Serializer};
 use tokio::time::Instant;
 
-use crate::actor::{ActorKey, ActorLocation, ActorProfile, ActorStatus};
+use crate::actor::{ActorKey, ActorLocation, ResourceRegistration, ActorStatus};
 use crate::id::Id;
 use crate::star::{StarKey, StarKind, StarWatchInfo, StarNotify, Star, StarCommand, StarInfo, StarSubGraphKey};
 use crate::label::Labels;
@@ -444,6 +444,7 @@ pub enum CentralPayload
 {
     AppCreate(AppArchetype),
     AppSupervisorLocationRequest(AppSupervisorLocationRequest),
+    AppRegister(ResourceRegistration),
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -451,7 +452,7 @@ pub enum SupervisorPayload
 {
     AppCreate(AppArchetype),
     AppSequenceRequest(AppKey),
-    ActorRegister(ActorProfile),
+    ActorRegister(ResourceRegistration),
     ActorUnRegister(ActorKey),
     ActorStatus(ActorStatus),
 }

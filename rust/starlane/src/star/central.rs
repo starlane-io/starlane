@@ -9,10 +9,10 @@ use tokio::sync::oneshot::Receiver;
 
 use crate::app::{AppCreateController, AppMeta, ApplicationStatus, AppLocation, AppArchetype};
 use crate::error::Error;
-use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, CentralPayload, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload};
+use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, CentralPayload, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest};
 use crate::id::Id;
-use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId};
-use crate::label::{Labels, LabelDb, LabelRequest};
+use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, Resource};
+use crate::label::{Labels, LabelDb, LabelRequest, Selector, LabelResult, LabelCommand};
 use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage};
 use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource};
@@ -23,6 +23,8 @@ use crate::frame::Reply::App;
 use crate::frame::CentralPayload::AppCreate;
 use rusqlite::Connection;
 use bincode::ErrorKind;
+use crate::actor::ResourceRegistration;
+use tokio::time::Duration;
 
 pub struct CentralStarVariant
 {
@@ -159,6 +161,12 @@ impl StarVariant for CentralStarVariant
                                        }
                                    }
                                    CentralPayload::AppSupervisorLocationRequest(_) => {}
+                                   CentralPayload::AppRegister(registration) => {
+
+
+                                       let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
+                                       self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                                   }
                                }
                            }
                            _ => {}
@@ -274,6 +282,8 @@ trait CentralStarVariantBacking: Send+Sync
     async fn get_supervisor_for_application(&self, app: &AppKey) -> Option<StarKey>;
     async fn has_supervisor(&self)->bool;
     async fn select_supervisor(&mut self )->Option<StarKey>;
+    async fn register(&self, registration: ResourceRegistration)->Result<(),Error>;
+    async fn select(&self, select: Selector)->Result<Vec<Resource>,Error>;
 }
 
 /*
@@ -488,6 +498,27 @@ impl CentralStarVariantBacking for CentralStarVariantBackingSqlLite
                 }
             }
             Err(error) => {Option::None}
+        }
+    }
+
+    async fn register(&self,registration: ResourceRegistration) -> Result<(), Error> {
+        let (request,rx) =LabelRequest::new(LabelCommand::Register(registration));
+        self.label_db.send( request ).await;
+        tokio::time::timeout( Duration::from_secs(5),rx).await?;
+        Ok(())
+    }
+
+    async fn select(&self,selector: Selector) -> Result<Vec<Resource>, Error> {
+        let (request,rx) =LabelRequest::new(LabelCommand::Select(selector));
+        self.label_db.send( request ).await;
+        match tokio::time::timeout( Duration::from_secs(5),rx).await??
+        {
+            LabelResult::Resources(resources) => {
+                Ok(resources)
+            }
+            _ => {
+                Err("Central: select resource unexpected result".into())
+            }
         }
     }
 }

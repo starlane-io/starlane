@@ -576,7 +576,7 @@ pub struct ResourceMeta
     labels: Labels
 }
 
-#[derive(Clone)]
+#[derive(Clone,Serialize,Deserialize)]
 pub struct Resource
 {
     pub key: ResourceKey,

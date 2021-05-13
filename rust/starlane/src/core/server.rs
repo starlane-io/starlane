@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use tokio::sync::{mpsc, Mutex, oneshot};
 
-use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorInfo, ActorKey, ActorKind, ActorSpecific, ActorProfile, ActorRef, NewActor};
+use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorInfo, ActorKey, ActorKind, ActorSpecific, ResourceRegistration, ActorRef, NewActor};
 use crate::actor;
 use crate::app::{ActorMessageResult, Alert, AppArchetype, AppCommandKind, AppContext, AppCreateResult, AppSpecific, AppMessageResult, AppMeta, AppSlice, AppSliceInner, ConfigSrc, InitData};
 use crate::artifact::Artifact;

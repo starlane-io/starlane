@@ -4,6 +4,7 @@ use crate::frame::ProtoFrame;
 use tokio::sync::mpsc::error::SendError;
 use futures::channel::oneshot::Canceled;
 use tokio::sync::broadcast;
+use tokio::time::error::Elapsed;
 
 #[derive(Debug, Clone)]
 pub struct Error{
@@ -13,6 +14,14 @@ pub struct Error{
 impl fmt::Display for Error{
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}",self.error)
+    }
+}
+
+impl From<Elapsed> for Error{
+    fn from(e: Elapsed) -> Self {
+        Error{
+            error: format!("{}",e.to_string())
+        }
     }
 }
 

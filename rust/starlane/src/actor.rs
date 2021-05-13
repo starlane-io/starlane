@@ -10,7 +10,7 @@ use crate::error::Error;
 use crate::frame::{Event, ActorMessage, ActorState};
 use crate::id::Id;
 use crate::star::StarKey;
-use crate::keys::{AppKey, UserKey, SubSpaceKey};
+use crate::keys::{AppKey, UserKey, SubSpaceKey, Resource};
 use crate::names::Name;
 use crate::app::{InitData, ConfigSrc};
 use crate::app::AppContext;
@@ -76,9 +76,10 @@ pub struct ActorInfo
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ActorProfile
+pub struct ResourceRegistration
 {
-    pub info: ActorInfo,
+    pub resource: Resource,
+    pub name: Option<String>,
     pub labels: Labels,
 }
 

@@ -11,23 +11,20 @@ use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 use std::iter::FromIterator;
 use std::str::FromStr;
 use bincode::ErrorKind;
+use crate::actor::ResourceRegistration;
 
 pub type Labels = HashMap<String,String>;
 
-pub struct ResourceSave
-{
-    pub resource: Resource,
-    pub labels: Labels,
-    pub name: Option<String>,
-}
 
 
+#[derive(Clone,Serialize,Deserialize)]
 pub struct Selector
 {
     pub meta: MetaSelector,
     pub fields: HashSet<FieldSelection>
 }
 
+#[derive(Clone,Serialize,Deserialize)]
 pub enum MetaSelector
 {
     None,
@@ -35,6 +32,7 @@ pub enum MetaSelector
     Label(LabelSelector)
 }
 
+#[derive(Clone,Serialize,Deserialize)]
 pub struct LabelSelector
 {
     pub labels: HashSet<LabelSelection>
@@ -137,7 +135,7 @@ impl Selector {
 
 }
 
-#[derive(Clone,Hash,Eq,PartialEq)]
+#[derive(Clone,Hash,Eq,PartialEq,Serialize,Deserialize)]
 pub enum LabelSelection
 {
     Exact(Label)
@@ -155,7 +153,7 @@ impl LabelSelection
 }
 
 
-#[derive(Clone,Hash,Eq,PartialEq)]
+#[derive(Clone,Hash,Eq,PartialEq,Serialize,Deserialize)]
 pub enum FieldSelection
 {
     Type(ResourceType),
@@ -233,7 +231,7 @@ impl ToSql for FieldSelection
     }
 }
 
-#[derive(Clone,Hash,Eq,PartialEq)]
+#[derive(Clone,Hash,Eq,PartialEq,Serialize,Deserialize)]
 pub struct Label
 {
     pub name: String,
@@ -266,11 +264,11 @@ pub enum LabelCommand
 {
     Close,
     Clear,
-    Save(ResourceSave),
+    Register(ResourceRegistration),
     Select(Selector),
 }
 
-#[derive(Clone)]
+#[derive(Clone,Serialize,Deserialize)]
 pub enum LabelResult
 {
     Ok,
@@ -342,7 +340,7 @@ impl LabelDb {
 
                 Ok(LabelResult::Ok)
             }
-            LabelCommand::Save(save) => {
+            LabelCommand::Register(save) => {
                 let resource = save.resource;
                 let labels = save.labels;
                 let key = resource.key.bin()?;
@@ -583,7 +581,7 @@ mod test
     use crate::artifact::{Artifact, ArtifactLocation, ArtifactKind};
     use crate::error::Error;
     use crate::keys::{SpaceKey, SubSpaceKey, UserKey, ResourceType, Resource, ResourceKind, ResourceKey, SubSpaceId, AppKey};
-    use crate::label::{Labels, LabelDb, ResourceSave, LabelRequest, LabelCommand,  LabelResult, FieldSelection, LabelSelection, Selector};
+    use crate::label::{Labels, LabelDb, ResourceRegistration, LabelRequest, LabelCommand,  LabelResult, FieldSelection, LabelSelection, Selector};
     use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
     use crate::names::{Name, Specific};
     use crate::permissions::Authentication;
@@ -593,11 +591,11 @@ mod test
     use crate::template::{ConstellationData, ConstellationTemplate};
     use crate::label::LabelResult::Resources;
     use tokio::sync::mpsc;
-    use crate::actor::{ActorKind, ActorKey};
+    use crate::actor::{ActorKind, ActorKey };
     use crate::id::Id;
     use crate::label::FieldSelection::SubSpace;
 
-    fn create_save( index: usize, resource: Resource ) -> ResourceSave
+    fn create_save( index: usize, resource: Resource ) -> ResourceRegistration
     {
         if index == 0
         {
@@ -620,7 +618,7 @@ mod test
         labels.insert( "parity".to_string(), parity.to_string() );
         labels.insert( "index".to_string(), index.to_string() );
 
-        let save = ResourceSave{
+        let save = ResourceRegistration{
             resource: resource,
             labels: labels,
             name: name
@@ -628,7 +626,7 @@ mod test
         save
     }
 
-    fn create_with_key(  key: ResourceKey, kind: ResourceKind, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey ) -> ResourceSave
+    fn create_with_key(  key: ResourceKey, kind: ResourceKind, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey ) -> ResourceRegistration
     {
         let resource = Resource{
             key: key,
@@ -637,7 +635,7 @@ mod test
             specific: specific
         };
 
-        let save = ResourceSave{
+        let save = ResourceRegistration{
             resource: resource,
             labels: Labels::new(),
             name: Option::None
@@ -647,7 +645,7 @@ mod test
     }
 
 
-    fn create( index: usize, kind: ResourceKind, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey ) -> ResourceSave
+    fn create( index: usize, kind: ResourceKind, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey ) -> ResourceRegistration
     {
         if index == 0
         {
@@ -671,7 +669,7 @@ mod test
         for index in 1..11
         {
             let save = create(index,kind.clone(),specific.clone(),sub_space.clone(),owner.clone());
-            let (request,rx) =LabelRequest::new(LabelCommand::Save(save));
+            let (request,rx) =LabelRequest::new(LabelCommand::Register(save));
             tx.send( request ).await;
             timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
         }
@@ -686,7 +684,7 @@ mod test
             let resource: Resource = space.clone().into();
 
             let save = create_save(index,resource);
-            let (request,rx) =LabelRequest::new(LabelCommand::Save(save));
+            let (request,rx) =LabelRequest::new(LabelCommand::Register(save));
             tx.send( request ).await;
             timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             spaces.push(space)
@@ -701,7 +699,7 @@ mod test
         {
             let actor_key = ResourceKey::Actor(ActorKey::new(app.clone(), Id::new(0,index)));
             let save = create_with_key(actor_key,ResourceKind::Actor(ActorKind::Single),specific.clone(),sub_space.clone(),owner.clone());
-            let (request,rx) =LabelRequest::new(LabelCommand::Save(save));
+            let (request,rx) =LabelRequest::new(LabelCommand::Register(save));
             tx.send( request ).await;
             timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
         }
@@ -716,7 +714,7 @@ mod test
             let sub_space = SubSpaceKey::new(space.clone(), SubSpaceId::from_index(index as _) );
             let resource: Resource = sub_space.clone().into();
             let save = create_save(index,resource);
-            let (request,rx) =LabelRequest::new(LabelCommand::Save(save));
+            let (request,rx) =LabelRequest::new(LabelCommand::Register(save));
             tx.send( request ).await;
             timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             sub_spaces.push(sub_space)
