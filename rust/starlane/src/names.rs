@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize, Serializer};
 
 lazy_static!
 {
-    pub static ref TEST_APP_SPEC: AppSpecific = AppSpecific::from("starlane.io:starlane:core:test:/test/test_app").unwrap();
-    pub static ref TEST_ACTOR_SPEC: ActorSpecific = ActorSpecific::from("starlane.io:starlane:core:test:/test/test_actor").unwrap();
+    pub static ref TEST_APP_SPEC: AppSpecific = AppSpecific::from("starlane.io:starlane:core:/test/test_app").unwrap();
+    pub static ref TEST_ACTOR_SPEC: ActorSpecific = ActorSpecific::from("starlane.io:starlane:core:/test/test_actor").unwrap();
 
     pub static ref TEST_APP_CONFIG_ARTIFACT: Artifact = Artifact
     {
@@ -52,7 +52,7 @@ impl Name
         Ok((Name
             {
                 sub_space: sub_space,
-                path: parts.next().ok_or("sub_space")?.to_string(),
+                path: parts.next().ok_or("path")?.to_string(),
             },parts))
     }
 

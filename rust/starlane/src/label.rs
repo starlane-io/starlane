@@ -110,17 +110,18 @@ impl Selector {
                 Ok(())
             }
         }
+    }
 
+    pub fn add_field( &mut self, field: FieldSelection )
+    {
+        self.fields.insert(field);
     }
 }
 
 pub type AppSelector = Selector;
 pub type ActorSelector = Selector;
 
-pub struct Selectors {
-}
-
-impl Selectors {
+impl Selector {
 
     pub fn app_selector()->AppSelector {
       let mut selector = AppSelector::new();
@@ -171,22 +172,6 @@ impl ToSql for Name
 {
     fn to_sql(&self) -> Result<ToSqlOutput<'_>, rusqlite::Error> {
         Ok(ToSqlOutput::Owned(Value::Text(self.to())))
-    }
-}
-
-impl ToSql for AppKey
-{
-    fn to_sql(&self) -> Result<ToSqlOutput<'_>, rusqlite::Error> {
-        let blob= bincode::serialize(self);
-        match blob
-        {
-            Ok(blob) => {
-                Ok(ToSqlOutput::Owned(Value::Blob(blob)))
-            }
-            Err(error) => {
-                Err(rusqlite::Error::InvalidQuery)
-            }
-        }
     }
 }
 
@@ -360,7 +345,8 @@ impl LabelDb {
             LabelCommand::Save(save) => {
                 let resource = save.resource;
                 let labels = save.labels;
-                let key = bincode::serialize(&resource.key)?;
+                let key = resource.key.bin()?;
+
                 let resource_type = format!("{}", &resource.key.resource_type());
                 let kind = format!("{}", &resource.kind);
 
@@ -371,6 +357,14 @@ impl LabelDb {
                     }
                 };
 
+                let app = match &resource.app() {
+                    None => Option::None,
+                    Some(app) => {
+                        Option::Some(app.bin()?)
+                    }
+                };
+
+
                 let space = resource.key.space().index();
                 let sub_space = bincode::serialize(&resource.key.sub_space())?;
 
@@ -379,10 +373,10 @@ impl LabelDb {
                 trans.execute("DELETE FROM names WHERE key=?1", [key.clone()])?;
                 trans.execute("DELETE FROM resources WHERE key=?1", [key.clone()])?;
 
-                trans.execute("INSERT INTO resources (key,resource_type,kind,specific,space,sub_space,owner,app) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)", params![key.clone(),resource_type,kind,resource.specific.clone(),space,sub_space,owner,resource.app()])?;
+                trans.execute("INSERT INTO resources (key,resource_type,kind,specific,space,sub_space,owner,app) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)", params![key.clone(),resource_type,kind,resource.specific.clone(),space,sub_space,owner,app])?;
                 if save.name.is_some()
                 {
-                    trans.execute("INSERT INTO names (key,name,resource_type,kind,specific,space,sub_space,owner,app) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)", params![key.clone(),save.name,resource_type,kind,resource.specific.clone(),space,sub_space,owner,resource.app()])?;
+                    trans.execute("INSERT INTO names (key,name,resource_type,kind,specific,space,sub_space,owner,app) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)", params![key.clone(),save.name,resource_type,kind,resource.specific.clone(),space,sub_space,owner,app])?;
                 }
 
                 for (name, value) in labels
@@ -476,7 +470,7 @@ impl LabelDb {
                 while let Option::Some(row) = rows.next()?
                 {
                     let key:Vec<u8> = row.get(0)?;
-                    let key = bincode::deserialize::<ResourceKey>(key.as_slice() )?;
+                    let key = ResourceKey::from_bin(key)?;
 
                     let kind:String = row.get(1)?;
                     let kind= ResourceKind::from_str(kind.as_str())?;
@@ -588,8 +582,8 @@ mod test
     use crate::app::{AppController, AppKind, AppSpecific, ConfigSrc, InitData};
     use crate::artifact::{Artifact, ArtifactLocation, ArtifactKind};
     use crate::error::Error;
-    use crate::keys::{SpaceKey, SubSpaceKey, UserKey, ResourceType, Resource, ResourceKind, ResourceKey, SubSpaceId};
-    use crate::label::{Labels, LabelDb, ResourceSave, LabelRequest, LabelCommand, Selectors, LabelResult, FieldSelection, LabelSelection, Selector};
+    use crate::keys::{SpaceKey, SubSpaceKey, UserKey, ResourceType, Resource, ResourceKind, ResourceKey, SubSpaceId, AppKey};
+    use crate::label::{Labels, LabelDb, ResourceSave, LabelRequest, LabelCommand,  LabelResult, FieldSelection, LabelSelection, Selector};
     use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
     use crate::names::{Name, Specific};
     use crate::permissions::Authentication;
@@ -599,7 +593,10 @@ mod test
     use crate::template::{ConstellationData, ConstellationTemplate};
     use crate::label::LabelResult::Resources;
     use tokio::sync::mpsc;
-    use crate::actor::ActorKind;
+    use crate::actor::{ActorKind, ActorKey};
+    use crate::id::Id;
+    use crate::label::FieldSelection::SubSpace;
+
     fn create_save( index: usize, resource: Resource ) -> ResourceSave
     {
         if index == 0
@@ -630,6 +627,25 @@ mod test
         };
         save
     }
+
+    fn create_with_key(  key: ResourceKey, kind: ResourceKind, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey ) -> ResourceSave
+    {
+        let resource = Resource{
+            key: key,
+            owner: Option::Some(owner),
+            kind: kind,
+            specific: specific
+        };
+
+        let save = ResourceSave{
+            resource: resource,
+            labels: Labels::new(),
+            name: Option::None
+        };
+
+        save
+    }
+
 
     fn create( index: usize, kind: ResourceKind, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey ) -> ResourceSave
     {
@@ -678,6 +694,20 @@ mod test
         spaces
     }
 
+
+    async fn create_10_actors( tx: mpsc::Sender<LabelRequest>, app: AppKey, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey )
+    {
+        for index in 1..11
+        {
+            let actor_key = ResourceKey::Actor(ActorKey::new(app.clone(), Id::new(0,index)));
+            let save = create_with_key(actor_key,ResourceKind::Actor(ActorKind::Single),specific.clone(),sub_space.clone(),owner.clone());
+            let (request,rx) =LabelRequest::new(LabelCommand::Save(save));
+            tx.send( request ).await;
+            timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
+        }
+    }
+
+
     async fn create_10_sub_spaces( tx: mpsc::Sender<LabelRequest>, space: SpaceKey )->Vec<SubSpaceKey>
     {
         let mut sub_spaces = vec!();
@@ -703,20 +733,20 @@ mod test
             let tx = LabelDb::new().await;
 
             create_10(tx.clone(), ResourceKind::App(AppKind::Normal),Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
-            let mut selector = Selectors::app_selector();
+            let mut selector = Selector::app_selector();
             let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result,10);
 
-            let mut selector = Selectors::app_selector();
+            let mut selector = Selector::app_selector();
             selector.add_label( LabelSelection::exact("parity", "Even") );
             let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result.clone(),5);
 
-            let mut selector = Selectors::app_selector();
+            let mut selector = Selector::app_selector();
             selector.add_label( LabelSelection::exact("parity", "Odd") );
             selector.add_label( LabelSelection::exact("index", "3") );
             let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
@@ -725,14 +755,14 @@ mod test
             assert_result_count(result,1);
 
 
-            let mut selector = Selectors::app_selector();
+            let mut selector = Selector::app_selector();
             selector.name("Highest".to_string()).unwrap();
             let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result,1);
 
-            let mut selector = Selectors::actor_selector();
+            let mut selector = Selector::actor_selector();
             let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
@@ -756,14 +786,14 @@ mod test
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result,20);
 
-            let mut selector = Selectors::app_selector();
+            let mut selector = Selector::app_selector();
             selector.add_label( LabelSelection::exact("parity", "Even") );
             let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result.clone(),5);
 
-            let mut selector = Selectors::app_selector();
+            let mut selector = Selector::app_selector();
             selector.add_label( LabelSelection::exact("parity", "Odd") );
             selector.add_label( LabelSelection::exact("index", "3") );
             let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
@@ -799,14 +829,14 @@ mod test
                 create_10(tx.clone(), ResourceKind::App(AppKind::Normal),Option::None,sub_space, UserKey::hyper_user() ).await;
             }
 
-            let mut selector = Selectors::app_selector();
+            let mut selector = Selector::app_selector();
             selector.fields.insert(FieldSelection::Space(spaces.get(0).cloned().unwrap()));
             let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result,100);
 
-            let mut selector = Selectors::app_selector();
+            let mut selector = Selector::app_selector();
             selector.fields.insert(FieldSelection::SubSpace(sub_spaces.get(0).cloned().unwrap()));
             let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
             tx.send(request).await;
@@ -814,6 +844,62 @@ mod test
             assert_result_count(result,10);
 
 
+        });
+    }
+
+    #[test]
+    pub fn test_specific()
+    {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let tx = LabelDb::new().await;
+
+
+            create_10(tx.clone(), ResourceKind::App(AppKind::Normal),Option::Some(crate::names::TEST_APP_SPEC.clone()), SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
+            create_10(tx.clone(), ResourceKind::App(AppKind::Normal),Option::Some(crate::names::TEST_ACTOR_SPEC.clone()), SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
+
+            let mut selector = Selector::app_selector();
+            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            tx.send(request).await;
+            let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
+            assert_result_count(result,20);
+
+            let mut selector = Selector::app_selector();
+            selector.fields.insert(FieldSelection::Specific(crate::names::TEST_APP_SPEC.clone()));
+            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            tx.send(request).await;
+            let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
+            assert_result_count(result,10);
+
+
+        });
+    }
+    #[test]
+    pub fn test_app()
+    {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let tx = LabelDb::new().await;
+
+            let sub_space = SubSpaceKey::hyper_default();
+            let app1 = AppKey::new(sub_space.clone());
+            create_10_actors(tx.clone(), app1.clone(), Option::None, sub_space.clone(), UserKey::hyper_user() ).await;
+
+            let app2 = AppKey::new(sub_space.clone());
+            create_10_actors(tx.clone(), app2.clone(), Option::None, sub_space.clone(), UserKey::hyper_user() ).await;
+
+            let mut selector = Selector::actor_selector();
+            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            tx.send(request).await;
+            let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
+            assert_result_count(result,20);
+
+            let mut selector = Selector::actor_selector();
+            selector.add_field(FieldSelection::App(app1.clone()));
+            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            tx.send(request).await;
+            let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
+            assert_result_count(result,10);
         });
     }
 

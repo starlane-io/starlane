@@ -13,6 +13,7 @@ use crate::error::Error;
 use crate::label::Labels;
 use crate::id::Id;
 use std::fmt;
+use bincode::deserialize;
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum SpaceKey
@@ -233,6 +234,22 @@ pub struct AppKey
 }
 
 
+impl AppKey
+{
+    pub fn bin(&self)->Result<Vec<u8>,Error>
+    {
+        let mut bin= bincode::serialize(self)?;
+        Ok(bin)
+    }
+
+    pub fn from_bin(mut bin: Vec<u8> )->Result<AppKey,Error>
+    {
+        let mut key = bincode::deserialize::<AppKey>(bin.as_slice() )?;
+        Ok(key)
+    }
+
+}
+
 #[derive(Clone,Hash,Eq,PartialEq,Serialize,Deserialize)]
 pub enum AppId
 {
@@ -304,6 +321,8 @@ pub enum ResourceKey
     Artifact(ArtifactKey)
 }
 
+
+
 impl fmt::Display for ResourceKey{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!( f,"{}",
@@ -351,6 +370,20 @@ impl ResourceKey
     }
 
 
+    pub fn bin(&self)->Result<Vec<u8>,Error>
+    {
+        let mut bin= bincode::serialize(self)?;
+        bin.insert(0, self.resource_type().magic() );
+        Ok(bin)
+    }
+
+    pub fn from_bin(mut bin: Vec<u8> )->Result<ResourceKey,Error>
+    {
+        bin.remove(0);
+        let mut key = bincode::deserialize::<ResourceKey>(bin.as_slice() )?;
+        Ok(key)
+    }
+
 
 
     pub fn space(&self)->SpaceKey
@@ -369,6 +402,38 @@ pub enum ResourceKind
     User,
     File,
     Artifact(ArtifactKind)
+}
+
+impl ResourceType
+{
+    pub fn magic(&self) -> u8
+    {
+        match self
+        {
+            ResourceType::Space => 0,
+            ResourceType::SubSpace => 1,
+            ResourceType::App => 2,
+            ResourceType::Actor => 3,
+            ResourceType::User => 4,
+            ResourceType::File => 5,
+            ResourceType::Artifact => 6
+        }
+    }
+
+    pub fn from_magic(magic: u8)->Result<Self,Error>
+    {
+        match magic
+        {
+            0 => Ok(ResourceType::Space),
+            1 => Ok(ResourceType::SubSpace),
+            2 => Ok(ResourceType::App),
+            3 => Ok(ResourceType::Actor),
+            4 => Ok(ResourceType::User),
+            5 => Ok(ResourceType::File),
+            6 => Ok(ResourceType::Artifact),
+            _ => Err(format!("no resource type for magic number {}",magic).into())
+        }
+    }
 }
 
 impl fmt::Display for ResourceKind{
@@ -528,7 +593,7 @@ impl Resource
         {
             ResourceKey::Space(_) => Option::None,
             ResourceKey::SubSpace(_) => Option::None,
-            ResourceKey::App(_) => Option::None,
+            ResourceKey::App(app) => Option::Some(app.clone()),
             ResourceKey::Actor(actor) => {
                 Option::Some(actor.app.clone())
             }
