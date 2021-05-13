@@ -432,6 +432,7 @@ mod test
     use crate::star::{StarController, StarInfo, StarKey, StarKind};
     use crate::starlane::{ConstellationCreate, StarControlRequestByName, Starlane, StarlaneCommand};
     use crate::template::{ConstellationData, ConstellationTemplate};
+    use std::str::FromStr;
 
     #[test]
     pub fn starlane()
@@ -518,7 +519,7 @@ mod test
             if let Ok(space_ctrl) = mesh_ctrl.get_space_controller(&SpaceKey::HyperSpace, &Authentication::mock(UserKey::hyper_user() ) ).await
             {
 
-                let app_ctrl_result = space_ctrl.create_app(&AppKind::Normal, &crate::names::TEST_APP_SPEC.clone(), &ConfigSrc::None, &InitData::None, &SubSpaceKey::hyper_default(), &Labels::new() ).await;
+                let app_ctrl_result = space_ctrl.create_app(&AppKind::Normal, &crate::names::TEST_APP_SPEC.clone(), &ConfigSrc::None, &InitData::None, &SubSpaceKey::hyper_default(), Option::Some("MyApp".to_string()), &Labels::new() ).await;
                 let app_ctrl_result = app_ctrl_result.await;
                 let app_ctrl = app_ctrl_result.unwrap();
                 match app_ctrl

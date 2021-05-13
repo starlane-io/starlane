@@ -331,7 +331,8 @@ pub enum Fail
 {
     Timeout,
     Error(String),
-    Reject(Reject)
+    Reject(Reject),
+    Unexpected
 }
 
 
@@ -353,3 +354,9 @@ pub enum RejectKind
 
 
 
+impl From<tokio::sync::oneshot::error::RecvError> for Fail
+{
+    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
+        Fail::Timeout
+    }
+}

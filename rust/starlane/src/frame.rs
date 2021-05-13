@@ -8,10 +8,10 @@ use tokio::time::Instant;
 use crate::actor::{ActorKey, ActorLocation, ResourceRegistration, ActorStatus};
 use crate::id::Id;
 use crate::star::{StarKey, StarKind, StarWatchInfo, StarNotify, Star, StarCommand, StarInfo, StarSubGraphKey};
-use crate::label::Labels;
+use crate::label::{Labels, Selector};
 use crate::message::{MessageResult, ProtoMessage, MessageExpect, MessageUpdate, Fail};
 use tokio::sync::{oneshot, broadcast, mpsc};
-use crate::keys::{AppKey, UserKey, SubSpaceKey, MessageId};
+use crate::keys::{AppKey, UserKey, SubSpaceKey, MessageId, ResourceKey, Resource};
 use crate::app::{AppLocation, AppSpecific, AppMeta, AppArchetype, ConfigSrc, App, AppCreateResult};
 use crate::logger::Flags;
 use crate::error::Error;
@@ -292,6 +292,16 @@ impl StarMessage
         tx
     }
 
+    pub fn fail(&self, fail: Fail )->ProtoMessage
+    {
+        self.reply( StarMessagePayload::Reply(SimpleReply::Fail(fail)))
+    }
+
+    pub fn ok(&self, reply: Reply )->ProtoMessage
+    {
+        self.reply( StarMessagePayload::Reply(SimpleReply::Ok(reply)))
+    }
+
 
     pub fn reply(&self, payload: StarMessagePayload)->ProtoMessage
     {
@@ -346,7 +356,8 @@ pub enum StarMessagePayload
 #[derive(Clone,Serialize,Deserialize)]
 pub enum StarMessageCentral
 {
-    Pledge(StarKind)
+    Pledge(StarKind),
+    AppSelect(Selector)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -384,7 +395,8 @@ impl StarMessagePayload{
 pub enum Reply
 {
     Empty,
-    App(AppKey),
+    Key(ResourceKey),
+    Keys(Vec<ResourceKey>),
     Seq(u64)
 }
 
@@ -446,6 +458,7 @@ pub enum CentralPayload
     AppCreate(AppArchetype),
     AppSupervisorLocationRequest(AppSupervisorLocationRequest),
     AppRegister(ResourceRegistration),
+    AppLookup(Selector)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -793,3 +806,72 @@ impl From<Elapsed> for Fail{
         Fail::Timeout
     }
 }
+
+
+impl From<Vec<ResourceKey>> for Reply
+{
+    fn from(keys: Vec<ResourceKey>) -> Self {
+        Reply::Keys(keys)
+    }
+}
+
+
+impl From<Vec<AppKey>> for Reply
+{
+    fn from(keys: Vec<AppKey>) -> Self {
+        Reply::Keys(keys.iter().map(|k|ResourceKey::App(k.clone())).collect())
+    }
+}
+
+pub trait FromReply<T,E>: Sized
+{
+    fn from_reply( t: Result<T,E> )->Result<Self,Fail>;
+}
+
+
+
+impl FromReply<Vec<Resource>,Fail> for Reply
+{
+    fn from_reply(t: Result<Vec<Resource>,Fail>) -> Result<Self,Fail> {
+        match t
+        {
+            Ok(ok) => {
+                Ok(ok.into())
+            }
+            Err(e) => {
+                Err(e)
+            }
+        }
+    }
+}
+
+impl FromReply<Vec<Resource>,Error> for Reply
+{
+    fn from_reply(t: Result<Vec<Resource>,Error>) -> Result<Self,Fail> {
+        match t
+        {
+            Ok(ok) => {
+                Ok(ok.into())
+            }
+            Err(e) => {
+                Err(Fail::Error(format!("{}",e)))
+            }
+        }
+    }
+}
+
+
+
+impl From<&str> for Fail
+{
+    fn from(str: &str) -> Self {
+        Fail::Error(str.to_string())
+    }
+}
+impl From<String> for Fail
+{
+    fn from(str: String) -> Self {
+        Fail::Error(str)
+    }
+}
+

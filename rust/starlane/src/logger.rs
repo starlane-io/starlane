@@ -5,6 +5,7 @@ use crate::star::{StarKey, StarKind, StarInfo};
 use std::sync::{Arc, Mutex, PoisonError, RwLock};
 use std::collections::{HashSet, HashMap};
 use serde::{Deserialize, Serialize};
+use crate::keys::ResourceKey;
 
 #[derive(Clone)]
 pub struct Logger

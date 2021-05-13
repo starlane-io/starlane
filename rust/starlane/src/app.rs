@@ -16,7 +16,7 @@ use crate::error::Error;
 use crate::filesystem::File;
 use crate::frame::{ActorMessage, AppMessage};
 use crate::id::{Id, IdSeq};
-use crate::keys::{AppKey, SubSpaceKey, UserKey};
+use crate::keys::{AppKey, SubSpaceKey, UserKey, Resource, ResourceKey, ResourceKind};
 use crate::label::{Labels};
 use crate::names::Name;
 use crate::space::CreateAppControllerFail;
@@ -296,6 +296,7 @@ pub enum ApplicationStatus
     Ready
 }
 
+
 #[derive(Clone,Serialize,Deserialize)]
 pub struct AppMeta
 {
@@ -330,6 +331,14 @@ pub struct App
 
 impl App
 {
+    pub fn new(key: AppKey, archetype: AppArchetype ) -> Self
+    {
+        App{
+            key: key,
+            archetype: archetype
+        }
+    }
+
     pub fn meta(&self)->AppMeta
     {
         AppMeta{
@@ -342,6 +351,17 @@ impl App
     }
 }
 
+impl From<App> for Resource
+{
+    fn from(app: App) -> Self {
+        Resource{
+            key: ResourceKey::App(app.key.clone()),
+            kind: ResourceKind::App(app.archetype.kind),
+            owner: Option::Some(app.archetype.owner),
+            specific: Option::Some(app.archetype.specific)
+        }
+    }
+}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct AppLocation
@@ -373,6 +393,7 @@ pub struct AppArchetype
     pub specific: AppSpecific,
     pub config: ConfigSrc,
     pub init: InitData,
+    pub name: Option<String>,
     pub labels: Labels
 }
 

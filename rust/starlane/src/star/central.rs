@@ -1,30 +1,30 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use futures::FutureExt;
+use futures::{FutureExt, TryFutureExt};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::oneshot::Receiver;
 
-use crate::app::{AppCreateController, AppMeta, ApplicationStatus, AppLocation, AppArchetype};
+use crate::app::{AppCreateController, AppMeta, ApplicationStatus, AppLocation, AppArchetype, App};
 use crate::error::Error;
-use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, CentralPayload, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest};
+use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, CentralPayload, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply};
 use crate::id::Id;
-use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, Resource};
-use crate::label::{Labels, LabelDb, LabelRequest, Selector, LabelResult, LabelCommand};
+use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, Resource, ResourceType, ResourceKey};
+use crate::label::{Labels, LabelDb, LabelRequest, Selector, LabelResult, LabelCommand, FieldSelection};
 use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage, Fail};
-use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource, ReplyUtil, SetSupervisorForApp};
+use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource, SetSupervisorForApp};
 use crate::star::StarCommand::SpaceCommand;
 use crate::permissions::{AppAccess, AuthToken, User, UserKind};
 use crate::crypt::{PublicKey, CryptKeyId};
-use crate::frame::Reply::App;
 use crate::frame::CentralPayload::AppCreate;
 use rusqlite::Connection;
 use bincode::ErrorKind;
 use crate::actor::ResourceRegistration;
 use tokio::time::Duration;
+use std::future::Future;
 
 pub struct CentralStarVariant
 {
@@ -123,6 +123,12 @@ impl StarVariant for CentralStarVariant
                                    self.reply_error(star_message.clone(),format!("expected Supervisor kind got {}",kind)).await;
                                }
                            }
+                           StarMessageCentral::AppSelect(selector) => {
+                               let mut selector = selector.clone();
+                               selector.add( FieldSelection::Type(ResourceType::App));
+                               let result = self.backing.select(selector).await;
+                               self.skel.comm().reply_result(star_message.clone(),Reply::from_reply(result)).await;
+                           }
                        }
                    }
                    StarMessagePayload::Space(space_message) => {
@@ -134,12 +140,23 @@ impl StarVariant for CentralStarVariant
                                        if let Option::Some(supervisor) = self.backing.select_supervisor().await
                                        {
                                            let mut proto = ProtoMessage::new();
-                                           let app = AppKey::new(space_message.sub_space.clone());
-                                           proto.payload = StarMessagePayload::Space(space_message.with_payload(SpacePayload::Supervisor(SupervisorPayload::AppCreate(archetype.clone()))));
-                                           proto.to(supervisor.clone());
-                                           let rx = proto.get_ok_result().await;
-                                           ReplyUtil::relay_trigger(self.skel.comm(), star_message.clone(), rx, Option::Some(StarVariantCommand::CentralCommand(CentralCommand::SerSupervisorForApp(SetSupervisorForApp::new(supervisor.clone(), app.clone() )))), Option::Some(Reply::App(app)) );
-                                           self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                                           let app_key = AppKey::new(space_message.sub_space.clone());
+                                           let app = App::new(app_key.clone(), archetype.clone());
+                                           let register = ResourceRegistration::new(app.into(), archetype.name.clone(), archetype.labels.clone() );
+                                           match self.backing.register(register).await
+                                           {
+                                               Ok(_) => {
+                                                   proto.payload = StarMessagePayload::Space(space_message.with_payload(SpacePayload::Supervisor(SupervisorPayload::AppCreate(archetype.clone()))));
+                                                   proto.to(supervisor.clone());
+                                                   let rx = proto.get_ok_result().await;
+                                                   self.skel.comm().relay_trigger(star_message.clone(), rx, Option::Some(StarVariantCommand::CentralCommand(CentralCommand::SerSupervisorForApp(SetSupervisorForApp::new(supervisor.clone(), app_key.clone() )))), Option::Some(Reply::Key(ResourceKey::App(app_key.clone()))) );
+                                                   self.skel.comm().send(proto).await;
+                                               }
+                                               Err(fail) => {
+                                                   self.skel.star_tx.send( StarCommand::SendProtoMessage( star_message.fail(fail) ) ).await;
+                                               }
+                                           }
+
                                        } else {
                                            let proto = star_message.reply(StarMessagePayload::Reply( SimpleReply:: Fail(Fail::Error("central: no supervisors selected.".into()))));
                                            self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
@@ -148,7 +165,14 @@ impl StarVariant for CentralStarVariant
                                    CentralPayload::AppSupervisorLocationRequest(_) => {}
                                    CentralPayload::AppRegister(registration) => {
                                        let result = self.backing.register(registration.clone()).await;
-                                       ReplyUtil::reply(self.skel.comm(), star_message.clone(), result ).await;
+                                       self.skel.comm().reply_result(star_message.clone(), result ).await;
+                                   }
+                                   CentralPayload::AppLookup(selector) => {
+                                       let mut selector = selector.clone();
+                                       selector.add( FieldSelection::Type(ResourceType::App));
+                                       selector.add( FieldSelection::Space(space_message.sub_space.space.clone()) );
+                                       selector.add( FieldSelection::SubSpace(space_message.sub_space.clone()) );
+                                       let result = self.backing.select(selector).await;
                                    }
                                }
                            }
@@ -266,7 +290,7 @@ trait CentralStarVariantBacking: Send+Sync
     async fn has_supervisor(&self)->bool;
     async fn select_supervisor(&mut self )->Option<StarKey>;
     async fn register(&self, registration: ResourceRegistration)->Result<Reply,Fail>;
-    async fn select(&self, select: Selector)->Result<Vec<Resource>,Error>;
+    async fn select(&self, select: Selector)->Result<Vec<Resource>,Fail>;
 }
 
 /*
@@ -491,7 +515,7 @@ impl CentralStarVariantBacking for CentralStarVariantBackingSqlLite
         Ok(Reply::Empty)
     }
 
-    async fn select(&self,selector: Selector) -> Result<Vec<Resource>, Error> {
+    async fn select(&self, selector: Selector) ->Result<Vec<Resource>,Fail> {
         let (request,rx) =LabelRequest::new(LabelCommand::Select(selector));
         self.label_db.send( request ).await;
         match tokio::time::timeout( Duration::from_secs(5),rx).await??

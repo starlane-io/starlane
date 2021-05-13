@@ -14,6 +14,8 @@ use crate::label::Labels;
 use crate::id::Id;
 use std::fmt;
 use bincode::deserialize;
+use crate::frame::Reply;
+use crate::message::Fail;
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum SpaceKey
@@ -652,16 +654,6 @@ impl From<SubSpaceKey> for Resource{
 
 
 
-impl From<App> for Resource{
-    fn from(e: App) -> Self {
-        Resource{
-            key: ResourceKey::App(e.key.clone()),
-            specific: Option::Some(e.archetype.specific.clone()),
-            owner: Option::Some(e.archetype.owner.clone()),
-            kind: e.into()
-        }
-    }
-}
 
 impl From<ActorRef> for Resource{
     fn from(e: ActorRef) -> Self {
@@ -684,5 +676,14 @@ impl From<User> for Resource{
         }
     }
 }
+
+impl From<Vec<Resource>> for Reply
+{
+    fn from(resources: Vec<Resource>) -> Self {
+        Reply::Keys(resources.iter().map(|r|r.key.clone()).collect())
+    }
+}
+
+
 
 

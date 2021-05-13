@@ -83,6 +83,18 @@ pub struct ResourceRegistration
     pub labels: Labels,
 }
 
+impl ResourceRegistration
+{
+    pub fn new( resource: Resource, name: Option<String>, labels: Labels )->Self
+    {
+        ResourceRegistration{
+            resource: resource,
+            name: name,
+            labels: labels
+        }
+    }
+}
+
 #[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
 pub struct ActorKey
 {

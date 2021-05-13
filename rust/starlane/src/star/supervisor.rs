@@ -273,7 +273,6 @@ println!("AppSEquenceRequest!");
                                                 self.skel.star_tx.send(StarCommand::SendProtoMessage(reply)).await;
                                             }
                                         }
-
                                     }
                                     SupervisorPayload::ActorRegister(_) => {}
                                     SupervisorPayload::ActorUnRegister(_) => {}

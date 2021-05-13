@@ -46,6 +46,12 @@ impl Selector {
         }
     }
 
+    pub fn add( &mut self, field: FieldSelection )
+    {
+        self.fields.retain( |f| !f.is_matching_kind(&field));
+        self.fields.insert(field);
+    }
+
     pub fn is_empty(&self) -> bool
     {
         if !self.fields.is_empty()
@@ -65,10 +71,6 @@ impl Selector {
                 return labels.labels.is_empty();
             }
         };
-    }
-
-    pub fn and( &mut self, field: FieldSelection ) {
-        self.fields.insert(field);
     }
 
     pub fn name( &mut self, name: String ) -> Result<(),Error>
@@ -123,13 +125,13 @@ impl Selector {
 
     pub fn app_selector()->AppSelector {
       let mut selector = AppSelector::new();
-      selector.and(FieldSelection::Type(ResourceType::App));
+      selector.add(FieldSelection::Type(ResourceType::App));
       selector
     }
 
     pub fn actor_selector()->ActorSelector {
         let mut selector = ActorSelector::new();
-        selector.and(FieldSelection::Type(ResourceType::Actor));
+        selector.add(FieldSelection::Type(ResourceType::Actor));
         selector
     }
 
@@ -173,6 +175,51 @@ impl ToSql for Name
     }
 }
 
+impl FieldSelection
+{
+    pub fn is_matching_kind(&self, field: &FieldSelection ) ->bool
+    {
+        match self
+        {
+            FieldSelection::Type(_) => {
+                if let FieldSelection::Type(_) = field {
+                    return true;
+                }
+            }
+            FieldSelection::Kind(_) => {
+                if let FieldSelection::Kind(_) = field {
+                    return true;
+                }
+            }
+            FieldSelection::Specific(_) => {
+                if let FieldSelection::Specific(_) = field {
+                    return true;
+                }
+            }
+            FieldSelection::Owner(_) => {
+                if let FieldSelection::Owner(_) = field {
+                    return true;
+                }
+            }
+            FieldSelection::Space(_) => {
+                if let FieldSelection::Space(_) = field {
+                    return true;
+                }
+            }
+            FieldSelection::SubSpace(_) => {
+                if let FieldSelection::SubSpace(_) = field {
+                    return true;
+                }
+            }
+            FieldSelection::App(_) => {
+                if let FieldSelection::App(_) = field {
+                    return true;
+                }
+            }
+        };
+        return false;
+    }
+}
 
 impl ToSql for FieldSelection
 {
