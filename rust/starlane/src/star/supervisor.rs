@@ -12,7 +12,7 @@ use crate::error::Error;
 use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, AppMessage, ServerAppPayload, SpaceReply, StarMessageCentral, SimpleReply, SupervisorPayload, StarMessageSupervisor, ServerPayload, StarPattern};
 use crate::keys::{AppKey, UserKey};
 use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
-use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait};
+use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait, Fail};
 use crate::star::{StarCommand, StarSkel, StarInfo, StarKey, StarVariant, StarVariantCommand, StarKind};
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::oneshot::error::RecvError;
@@ -110,7 +110,7 @@ impl SupervisorVariant
 
     pub async fn reply_error(&self, mut message: StarMessage, error_message: String )
     {
-        message.reply(StarMessagePayload::Reply(SimpleReply::Error(error_message.to_string())));
+        message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error(error_message.to_string()))));
         let result = self.skel.star_tx.send(StarCommand::Frame(Frame::StarMessage(message))).await;
         self.unwrap(result);
     }
@@ -151,7 +151,7 @@ impl StarVariant for SupervisorVariant
                                 });
                                 let result = proto.get_ok_result().await;
                                 self.skel.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
-                                let manager_tx = self.skel.manager_tx.clone();
+                                let manager_tx = self.skel.variant_tx.clone();
                                 let app = app.clone();
                                 let server= server.clone();
                                 tokio::spawn( async move {
@@ -182,7 +182,7 @@ impl StarVariant for SupervisorVariant
                         if self.backing.get_app_status(&set_status.app).await == AppStatus::Pending
                         {
                             self.backing.set_app_status(set_status.app.clone(),  AppStatus::Launching ).await;
-                            self.skel.manager_tx.send(StarVariantCommand::SupervisorCommand(SupervisorCommand::AppLaunch(set_status.app.clone()))).await;
+                            self.skel.variant_tx.send(StarVariantCommand::SupervisorCommand(SupervisorCommand::AppLaunch(set_status.app.clone()))).await;
                         }
                     }
                     SupervisorCommand::AppLaunch(app_key) => {
@@ -218,7 +218,7 @@ impl StarVariant for SupervisorVariant
                                 let result = proto.get_ok_result().await;
                                 self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
 
-                                let manager_tx = self.skel.manager_tx.clone();
+                                let manager_tx = self.skel.variant_tx.clone();
                                 tokio::spawn(async move {
                                     match result.await
                                     {
@@ -257,7 +257,7 @@ impl StarVariant for SupervisorVariant
                                             key: app_key,
                                             archetype: archetype.clone()
                                         };
-                                        self.skel.manager_tx.send( StarVariantCommand::SupervisorCommand(SupervisorCommand::AppAssign(app))).await;
+                                        self.skel.variant_tx.send( StarVariantCommand::SupervisorCommand(SupervisorCommand::AppAssign(app))).await;
                                     }
                                     SupervisorPayload::AppSequenceRequest(app_key) => {
 println!("AppSEquenceRequest!");
@@ -269,7 +269,7 @@ println!("AppSEquenceRequest!");
                                                 self.skel.star_tx.send(StarCommand::SendProtoMessage(reply)).await;
                                             }
                                             Err(error) => {
-                                                let reply = star_message.reply(StarMessagePayload::Reply(SimpleReply::Error("could not generate sequence".to_string())));
+                                                let reply = star_message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error("could not generate sequence".to_string()))));
                                                 self.skel.star_tx.send(StarCommand::SendProtoMessage(reply)).await;
                                             }
                                         }

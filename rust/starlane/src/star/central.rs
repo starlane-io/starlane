@@ -14,8 +14,8 @@ use crate::id::Id;
 use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, Resource};
 use crate::label::{Labels, LabelDb, LabelRequest, Selector, LabelResult, LabelCommand};
 use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
-use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage};
-use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource};
+use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage, Fail};
+use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource, ReplyUtil, SetSupervisorForApp};
 use crate::star::StarCommand::SpaceCommand;
 use crate::permissions::{AppAccess, AuthToken, User, UserKind};
 use crate::crypt::{PublicKey, CryptKeyId};
@@ -28,7 +28,7 @@ use tokio::time::Duration;
 
 pub struct CentralStarVariant
 {
-    data: StarSkel,
+    skel: StarSkel,
     backing: Box<dyn CentralStarVariantBacking>,
     pub status: CentralStatus,
     public_key_source: PublicKeySource
@@ -40,7 +40,7 @@ impl CentralStarVariant
     {
         CentralStarVariant
         {
-            data: data.clone(),
+            skel: data.clone(),
             backing: Box::new(CentralStarVariantBackingSqlLite::new().await ),
             status: CentralStatus::Launching,
             public_key_source: PublicKeySource::new()
@@ -81,14 +81,14 @@ impl CentralStarVariant
     pub async fn reply_ok(&self, message: StarMessage)
     {
         let mut proto = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
-        let result = self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+        let result = self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
         self.unwrap(result);
     }
 
     pub async fn reply_error(&self, mut message: StarMessage, error_message: String )
     {
-        let mut proto = message.reply(StarMessagePayload::Reply(SimpleReply::Error(error_message)));
-        let result = self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+        let mut proto = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error(error_message))));
+        let result = self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
         self.unwrap(result);
     }
 
@@ -114,8 +114,8 @@ impl StarVariant for CentralStarVariant
                                {
                                    self.backing.add_supervisor(star_message.from.clone()).await;
                                    self.reply_ok(star_message.clone()).await;
-                                   if self.data.flags.check(Flag::Star(StarFlag::DiagnosePledge)) {
-                                       self.data.logger.log(Log::Star(StarLog::new(&self.data.info, StarLogPayload::PledgeRecv)));
+                                   if self.skel.flags.check(Flag::Star(StarFlag::DiagnosePledge)) {
+                                       self.skel.logger.log(Log::Star(StarLog::new(&self.skel.info, StarLogPayload::PledgeRecv)));
                                    }
                                }
                                else
@@ -137,35 +137,18 @@ impl StarVariant for CentralStarVariant
                                            let app = AppKey::new(space_message.sub_space.clone());
                                            proto.payload = StarMessagePayload::Space(space_message.with_payload(SpacePayload::Supervisor(SupervisorPayload::AppCreate(archetype.clone()))));
                                            proto.to(supervisor.clone());
-                                           let reply = proto.get_ok_result().await;
-                                           self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                           match reply.await
-                                           {
-                                               Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty))) => {
-                                                   self.backing.set_supervisor_for_application(app.clone(),supervisor.clone()).await;
-                                                   let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::App(app))));
-                                                   self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                               }
-                                               Err(error) => {
-                                                   let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Error(format!("central: receiving error: {}.", error.to_string()).into())));
-                                                   self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                               }
-                                               _ => {
-                                                   let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Error("central: unexpected response".into())));
-                                                   self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                               }
-                                           }
+                                           let rx = proto.get_ok_result().await;
+                                           ReplyUtil::relay_trigger(self.skel.comm(), star_message.clone(), rx, Option::Some(StarVariantCommand::CentralCommand(CentralCommand::SerSupervisorForApp(SetSupervisorForApp::new(supervisor.clone(), app.clone() )))), Option::Some(Reply::App(app)) );
+                                           self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                                        } else {
-                                           let proto = star_message.reply(StarMessagePayload::Reply( SimpleReply:: Error("central: no supervisors selected.".into())));
-                                           self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                                           let proto = star_message.reply(StarMessagePayload::Reply( SimpleReply:: Fail(Fail::Error("central: no supervisors selected.".into()))));
+                                           self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                                        }
                                    }
                                    CentralPayload::AppSupervisorLocationRequest(_) => {}
                                    CentralPayload::AppRegister(registration) => {
-
-
-                                       let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
-                                       self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                                       let result = self.backing.register(registration.clone()).await;
+                                       ReplyUtil::reply(self.skel.comm(), star_message.clone(), result ).await;
                                    }
                                }
                            }
@@ -282,7 +265,7 @@ trait CentralStarVariantBacking: Send+Sync
     async fn get_supervisor_for_application(&self, app: &AppKey) -> Option<StarKey>;
     async fn has_supervisor(&self)->bool;
     async fn select_supervisor(&mut self )->Option<StarKey>;
-    async fn register(&self, registration: ResourceRegistration)->Result<(),Error>;
+    async fn register(&self, registration: ResourceRegistration)->Result<Reply,Fail>;
     async fn select(&self, select: Selector)->Result<Vec<Resource>,Error>;
 }
 
@@ -501,11 +484,11 @@ impl CentralStarVariantBacking for CentralStarVariantBackingSqlLite
         }
     }
 
-    async fn register(&self,registration: ResourceRegistration) -> Result<(), Error> {
+    async fn register(&self,registration: ResourceRegistration) -> Result<Reply, Fail> {
         let (request,rx) =LabelRequest::new(LabelCommand::Register(registration));
         self.label_db.send( request ).await;
         tokio::time::timeout( Duration::from_secs(5),rx).await?;
-        Ok(())
+        Ok(Reply::Empty)
     }
 
     async fn select(&self,selector: Selector) -> Result<Vec<Resource>, Error> {

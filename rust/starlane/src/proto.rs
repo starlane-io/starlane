@@ -114,7 +114,7 @@ impl ProtoStar
                             sequence: self.sequence.clone(),
                             star_tx: self.command_tx.clone(),
                             core_tx: core_tx.clone(),
-                            manager_tx: manager_tx.clone(),
+                            variant_tx: manager_tx.clone(),
                             logger: self.logger.clone(),
                             flags: self.flags.clone(),
                             auth_token_source: AuthTokenSource {}

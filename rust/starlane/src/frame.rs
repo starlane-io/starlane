@@ -9,7 +9,7 @@ use crate::actor::{ActorKey, ActorLocation, ResourceRegistration, ActorStatus};
 use crate::id::Id;
 use crate::star::{StarKey, StarKind, StarWatchInfo, StarNotify, Star, StarCommand, StarInfo, StarSubGraphKey};
 use crate::label::Labels;
-use crate::message::{MessageResult, ProtoMessage, MessageExpect, MessageUpdate};
+use crate::message::{MessageResult, ProtoMessage, MessageExpect, MessageUpdate, Fail};
 use tokio::sync::{oneshot, broadcast, mpsc};
 use crate::keys::{AppKey, UserKey, SubSpaceKey, MessageId};
 use crate::app::{AppLocation, AppSpecific, AppMeta, AppArchetype, ConfigSrc, App, AppCreateResult};
@@ -18,6 +18,7 @@ use crate::error::Error;
 use crate::permissions::{AuthToken, Authentication};
 use crate::crypt::{Encrypted, HashEncrypted, HashId};
 use tokio::sync::oneshot::error::RecvError;
+use tokio::time::error::Elapsed;
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Frame
@@ -306,7 +307,7 @@ impl StarMessage
         let mut proto = ProtoMessage::new();
         proto.to = Option::Some(self.from.clone());
         proto.reply_to = Option::Some(self.id.clone());
-        proto.payload = StarMessagePayload::Reply(SimpleReply::Error(err));
+        proto.payload = StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error(err)));
         proto
     }
 
@@ -358,7 +359,7 @@ pub enum StarMessageSupervisor
 pub enum SimpleReply
 {
     Ok(Reply),
-    Error(String),
+    Fail(Fail),
     Ack(MessageAck)
 }
 
@@ -781,3 +782,14 @@ impl fmt::Display for ProtoFrame {
     }
 }
 
+impl From<Error> for Fail{
+    fn from(e: Error) -> Self {
+        Fail::Error(format!("{}",e.to_string()))
+    }
+}
+
+impl From<Elapsed> for Fail{
+    fn from(e: Elapsed) -> Self {
+        Fail::Timeout
+    }
+}

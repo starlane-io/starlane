@@ -109,8 +109,8 @@ impl MessageReplyTracker
                         self.tx.send(MessageUpdate::Result(MessageResult::Ok(message.payload.clone())));
                         TrackerJob::Done
                     }
-                    SimpleReply::Error(error) => {
-                        self.tx.send(MessageUpdate::Result(MessageResult::Err(error.clone())));
+                    SimpleReply::Fail(fail) => {
+                        self.tx.send(MessageUpdate::Result(MessageResult::Err("fail".to_string())));
                         TrackerJob::Done
                     }
                     SimpleReply::Ack(ack) => {
@@ -325,6 +325,31 @@ impl ResultWaiter
     }
 }
 
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum Fail
+{
+    Timeout,
+    Error(String),
+    Reject(Reject)
+}
+
+
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct Reject
+{
+    pub reason: String,
+    pub kind: RejectKind
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum RejectKind
+{
+    Error,
+    Denied,
+    BadRequest
+}
 
 
 

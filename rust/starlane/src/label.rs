@@ -84,7 +84,7 @@ impl Selector {
                 Ok(())
             }
             MetaSelector::Label(selector) => {
-                Err("Selector is already set to a label meta selector".into())
+                Err("Selector is already set to a LABEL meta selector".into())
 
             }
         }
@@ -101,7 +101,7 @@ impl Selector {
                 self.add_label(label)
             }
             MetaSelector::Name(_) => {
-                Err("Selector is already set to a named meta selector".into())
+                Err("Selector is already set to a NAME meta selector".into())
             }
             MetaSelector::Label(selector) => {
                 selector.labels.insert( label );
@@ -340,9 +340,9 @@ impl LabelDb {
 
                 Ok(LabelResult::Ok)
             }
-            LabelCommand::Register(save) => {
-                let resource = save.resource;
-                let labels = save.labels;
+            LabelCommand::Register(register) => {
+                let resource = register.resource;
+                let labels = register.labels;
                 let key = resource.key.bin()?;
 
                 let resource_type = format!("{}", &resource.key.resource_type());
@@ -372,9 +372,9 @@ impl LabelDb {
                 trans.execute("DELETE FROM resources WHERE key=?1", [key.clone()])?;
 
                 trans.execute("INSERT INTO resources (key,resource_type,kind,specific,space,sub_space,owner,app) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)", params![key.clone(),resource_type,kind,resource.specific.clone(),space,sub_space,owner,app])?;
-                if save.name.is_some()
+                if register.name.is_some()
                 {
-                    trans.execute("INSERT INTO names (key,name,resource_type,kind,specific,space,sub_space,owner,app) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)", params![key.clone(),save.name,resource_type,kind,resource.specific.clone(),space,sub_space,owner,app])?;
+                    trans.execute("INSERT INTO names (key,name,resource_type,kind,specific,space,sub_space,owner,app) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)", params![key.clone(),register.name,resource_type,kind,resource.specific.clone(),space,sub_space,owner,app])?;
                 }
 
                 for (name, value) in labels

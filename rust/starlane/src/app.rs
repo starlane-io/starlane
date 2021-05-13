@@ -185,7 +185,7 @@ impl AppSliceInner
     pub async fn unique_seq(&self,user: UserKey)-> oneshot::Receiver<Arc<IdSeq>>
     {
         let (tx,rx) = oneshot::channel();
-        self.skel.manager_tx.send(StarVariantCommand::CoreRequest( CoreRequest::AppSequenceRequest(CoreAppSequenceRequest{
+        self.skel.variant_tx.send(StarVariantCommand::CoreRequest( CoreRequest::AppSequenceRequest(CoreAppSequenceRequest{
             app: self.meta.key.clone(),
             user: user.clone(),
             tx: tx

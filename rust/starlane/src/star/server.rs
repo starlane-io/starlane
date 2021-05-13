@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, ServerAppPayload, Reply, AppMessage, SpaceMessage, ServerPayload, StarMessageCentral, SimpleReply, StarMessageSupervisor};
 use crate::star::{ServerVariantBacking, StarCommand, StarSkel, StarKey, StarKind, StarVariant, StarVariantCommand, Wind, ServerCommand, CoreRequest};
-use crate::message::{ProtoMessage, MessageExpect};
+use crate::message::{ProtoMessage, MessageExpect, Fail};
 use crate::logger::{Flag, StarFlag, StarLog, StarLogPayload, Log};
 use tokio::time::{sleep, Duration};
 use crate::core::{StarCoreCommand, StarCoreAppMessage, AppCommandResult, StarCoreAppMessagePayload, StarCoreAppLaunch, StarCoreAppAssign};
@@ -159,13 +159,13 @@ impl StarVariant for ServerStarVariant
                                                            star_tx.send( StarCommand::SendProtoMessage(proto)).await;
                                                        }
                                                        Err(error) => {
-                                                           let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Error("AppExtError".to_string())));
+                                                           let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error("ApExtError".to_string()))));
                                                            star_tx.send( StarCommand::SendProtoMessage(proto)).await;
                                                        }
                                                    }
                                                }
                                                Err(err) => {
-                                                   let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Error(err.to_string())));
+                                                   let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error(err.to_string()))));
                                                    star_tx.send( StarCommand::SendProtoMessage(proto)).await;
                                                }
                                            }
@@ -192,13 +192,13 @@ impl StarVariant for ServerStarVariant
                                                            star_tx.send( StarCommand::SendProtoMessage(proto)).await;
                                                        }
                                                        Err(error) => {
-                                                           let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Error("AppExtError".to_string())));
+                                                           let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error("AppExtError".to_string()))));
                                                            star_tx.send( StarCommand::SendProtoMessage(proto)).await;
                                                        }
                                                    }
                                                }
                                                Err(err) => {
-                                                   let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Error(err.to_string())));
+                                                   let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error(err.to_string()))));
                                                    star_tx.send( StarCommand::SendProtoMessage(proto)).await;
                                                }
                                            }

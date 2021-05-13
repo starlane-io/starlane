@@ -36,7 +36,7 @@ use crate::keys::{AppKey, MessageId, SpaceKey, UserKey};
 use crate::label::Labels;
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
-use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob};
+use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob, Fail};
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
 use crate::space::{CreateAppControllerFail, SpaceCommand, SpaceCommandKind, SpaceController};
 use crate::star::central::CentralStarVariant;
@@ -320,7 +320,7 @@ impl Star
                 match command{
 
                     StarCommand::Init => {
-                        self.data.manager_tx.send(StarVariantCommand::Init).await;
+                        self.data.variant_tx.send(StarVariantCommand::Init).await;
                     }
                     StarCommand::SetFlags(set_flags ) => {
                        self.data.flags= set_flags.flags;
@@ -524,12 +524,11 @@ println!("spaces_do_not_match");
                                 }));
                         }
                         else {
-
                             match result {
                                 Ok(result) => {
                                     match result
                                     {
-                                        Ok(StarMessagePayload::Reply( SimpleReply::Error(error))) => {
+                                        Ok(StarMessagePayload::Reply( SimpleReply::Fail(Fail::Error(error)))) => {
                                             eprintln!("{}",error);
                                         }
                                         Ok(_) => {
@@ -1336,7 +1335,7 @@ println!("spaces_do_not_match");
         }
         else {
             self.process_message_reply(&message).await;
-            Ok(self.data.manager_tx.send( StarVariantCommand::StarMessage( message)).await?)
+            Ok(self.data.variant_tx.send( StarVariantCommand::StarMessage( message)).await?)
         }
     }
 
@@ -1491,7 +1490,25 @@ pub struct CoreAppSequenceRequest
 pub enum CentralCommand
 {
   SequenceRequest,
-  SupervisorSelect(SupervisorSelect)
+  SupervisorSelect(SupervisorSelect),
+  SerSupervisorForApp(SetSupervisorForApp)
+}
+
+pub struct SetSupervisorForApp
+{
+    pub supervisor: StarKey,
+    pub app: AppKey
+}
+
+impl SetSupervisorForApp
+{
+    pub fn new( supervisor: StarKey, app: AppKey ) -> Self
+    {
+        SetSupervisorForApp {
+            supervisor: supervisor,
+            app: app
+        }
+    }
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -2206,11 +2223,23 @@ pub struct StarSkel
     pub info: StarInfo,
     pub star_tx: mpsc::Sender<StarCommand>,
     pub core_tx: mpsc::Sender<StarCoreCommand>,
-    pub manager_tx: mpsc::Sender<StarVariantCommand>,
+    pub variant_tx: mpsc::Sender<StarVariantCommand>,
     pub flags: Flags,
     pub logger: Logger,
     pub sequence: Arc<AtomicU64>,
     pub auth_token_source: AuthTokenSource
+}
+
+impl StarSkel
+{
+    pub fn comm(&self) -> StarComm
+    {
+        StarComm{
+            star_tx: self.star_tx.clone(),
+            variant_tx: self.variant_tx.clone(),
+            core_tx: self.core_tx.clone(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -2285,4 +2314,91 @@ impl StarNotify
             transaction: transaction
         }
     }
+}
+
+pub struct ReplyUtil
+{
+}
+
+impl ReplyUtil
+{
+
+    pub async fn reply( comm: StarComm, message: StarMessage, result: Result<Reply,Fail>)
+    {
+        match result
+        {
+            Ok(reply) => {
+                let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(reply)));
+                comm.star_tx.send( StarCommand::SendProtoMessage(proto) ).await;
+            }
+            Err(fail) => {
+                let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(fail)));
+                comm.star_tx.send( StarCommand::SendProtoMessage(proto) ).await;
+            }
+        }
+    }
+
+    pub async fn relay( comm: StarComm, message: StarMessage, rx: oneshot::Receiver<StarMessagePayload> )
+    {
+        Self::relay_trigger(comm,message,rx, Option::None, Option::None).await;
+    }
+
+    pub async fn relay_trigger(comm: StarComm, message: StarMessage, rx: oneshot::Receiver<StarMessagePayload>, trigger: Option<StarVariantCommand>, trigger_reply: Option<Reply> )
+    {
+        tokio::spawn(async move {
+            let proto = match rx.await
+            {
+                Ok(payload) => {
+                    if let Option::Some(command) = trigger {
+                        comm.variant_tx.send(command).await;
+                    }
+                    Self::relay_payload(message,payload,trigger_reply)
+               }
+                Err(err) => {
+                    message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error("rx recv error".to_string()))))
+                }
+            };
+            comm.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
+        });
+    }
+
+
+
+    fn relay_payload(message: StarMessage, payload: StarMessagePayload, trigger_reply: Option<Reply> ) -> ProtoMessage
+   {
+        match payload
+        {
+            StarMessagePayload::Reply(payload_reply) => {
+                match payload_reply
+                {
+                    SimpleReply::Ok(_) => {
+                        match trigger_reply
+                        {
+                            None => {
+                                message.reply(StarMessagePayload::Reply(payload_reply) )
+                            }
+                            Some(reply) => {
+                                message.reply(StarMessagePayload::Reply(SimpleReply::Ok(reply)) )
+                            }
+                        }
+                    }
+                    _ => {
+                        message.reply(StarMessagePayload::Reply(payload_reply) )
+                    }
+                }
+            }
+            _ => {
+                message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error("unexpected response".to_string()))))
+            }
+        }
+   }
+
+
+}
+
+pub struct StarComm
+{
+    pub star_tx: mpsc::Sender<StarCommand>,
+    pub variant_tx: mpsc::Sender<StarVariantCommand>,
+    pub core_tx: mpsc::Sender<StarCoreCommand>
 }
