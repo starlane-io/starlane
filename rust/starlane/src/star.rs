@@ -33,7 +33,7 @@ use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequ
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId, SpaceKey, UserKey, ResourceKey};
-use crate::label::Labels;
+use crate::resource::{Labels, ResourceRegistration, Selector, Resource, RegistryAction, RegistryCommand, RegistryResult, Registry};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob, Fail};
@@ -2424,6 +2424,11 @@ impl StarComm
 
     }
 
+    pub async fn simple_reply(&self, message: StarMessage, reply: SimpleReply )
+    {
+      let proto = message.reply(StarMessagePayload::Reply(reply));
+      self.send(proto).await;
+    }
 
 
     pub async fn reply_result(&self, message: StarMessage, result: Result<Reply,Fail>)
@@ -2499,4 +2504,52 @@ impl StarComm
     }
 
 
+}
+
+#[async_trait]
+pub trait RegistryBacking : Sync+Send {
+    async fn register(&self, registration: ResourceRegistration)->Result<(),Fail>;
+    async fn select(&self, select: Selector)->Result<Vec<Resource>,Fail>;
+}
+
+pub struct RegistryBackingSqlLite
+{
+    registry: mpsc::Sender<RegistryAction>
+}
+
+impl RegistryBackingSqlLite
+{
+    pub async fn new()->Self
+    {
+        RegistryBackingSqlLite
+        {
+            registry: Registry::new().await
+        }
+    }
+}
+
+#[async_trait]
+impl RegistryBacking for RegistryBackingSqlLite
+{
+
+    async fn register(&self,registration: ResourceRegistration) -> Result<(),Fail> {
+        let (request,rx) = RegistryAction::new(RegistryCommand::Register(registration));
+        self.registry.send( request ).await;
+        tokio::time::timeout( Duration::from_secs(5),rx).await?;
+        Ok(())
+    }
+
+    async fn select(&self, selector: Selector) ->Result<Vec<Resource>,Fail>{
+        let (request,rx) = RegistryAction::new(RegistryCommand::Select(selector));
+        self.registry.send( request ).await;
+        match tokio::time::timeout( Duration::from_secs(5),rx).await??
+        {
+            RegistryResult::Resources(resources) => {
+                Result::Ok(resources.into())
+            }
+            _ => {
+                Result::Err(Fail::Timeout)
+            }
+        }
+    }
 }

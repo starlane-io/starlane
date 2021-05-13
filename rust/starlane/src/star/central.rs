@@ -11,18 +11,17 @@ use crate::app::{AppCreateController, AppMeta, ApplicationStatus, AppLocation, A
 use crate::error::Error;
 use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, CentralPayload, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply};
 use crate::id::Id;
-use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, Resource, ResourceType, ResourceKey};
-use crate::label::{Labels, LabelDb, LabelRequest, Selector, LabelResult, LabelCommand, FieldSelection};
+use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, ResourceKey};
+use crate::resource::{Labels, Registry, RegistryAction, Selector, RegistryResult, RegistryCommand, FieldSelection, Resource, ResourceType, ResourceRegistration};
 use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage, Fail};
-use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource, SetSupervisorForApp};
+use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource, SetSupervisorForApp, RegistryBacking, RegistryBackingSqlLite};
 use crate::star::StarCommand::SpaceCommand;
 use crate::permissions::{AppAccess, AuthToken, User, UserKind};
 use crate::crypt::{PublicKey, CryptKeyId};
 use crate::frame::CentralPayload::AppCreate;
 use rusqlite::Connection;
 use bincode::ErrorKind;
-use crate::actor::ResourceRegistration;
 use tokio::time::Duration;
 use std::future::Future;
 
@@ -30,6 +29,7 @@ pub struct CentralStarVariant
 {
     skel: StarSkel,
     backing: Box<dyn CentralStarVariantBacking>,
+    registry: Box<dyn RegistryBacking>,
     pub status: CentralStatus,
     public_key_source: PublicKeySource
 }
@@ -42,6 +42,7 @@ impl CentralStarVariant
         {
             skel: data.clone(),
             backing: Box::new(CentralStarVariantBackingSqlLite::new().await ),
+            registry: Box::new( RegistryBackingSqlLite::new().await ),
             status: CentralStatus::Launching,
             public_key_source: PublicKeySource::new()
         }
@@ -126,8 +127,8 @@ impl StarVariant for CentralStarVariant
                            StarMessageCentral::AppSelect(selector) => {
                                let mut selector = selector.clone();
                                selector.add( FieldSelection::Type(ResourceType::App));
-                               let result = self.backing.select(selector).await;
-                               self.skel.comm().reply_result(star_message.clone(),Reply::from_reply(result)).await;
+                               let reply = self.registry.select(selector).await;
+                               self.skel.comm().reply_result(star_message.clone(),Reply::from_result(reply)).await;
                            }
                        }
                    }
@@ -143,17 +144,17 @@ impl StarVariant for CentralStarVariant
                                            let app_key = AppKey::new(space_message.sub_space.clone());
                                            let app = App::new(app_key.clone(), archetype.clone());
                                            let register = ResourceRegistration::new(app.into(), archetype.name.clone(), archetype.labels.clone() );
-                                           match self.backing.register(register).await
+                                           match self.registry.register(register).await
                                            {
-                                               Ok(_) => {
+                                               Result::Ok(_) => {
                                                    proto.payload = StarMessagePayload::Space(space_message.with_payload(SpacePayload::Supervisor(SupervisorPayload::AppCreate(archetype.clone()))));
                                                    proto.to(supervisor.clone());
                                                    let rx = proto.get_ok_result().await;
                                                    self.skel.comm().relay_trigger(star_message.clone(), rx, Option::Some(StarVariantCommand::CentralCommand(CentralCommand::SerSupervisorForApp(SetSupervisorForApp::new(supervisor.clone(), app_key.clone() )))), Option::Some(Reply::Key(ResourceKey::App(app_key.clone()))) );
                                                    self.skel.comm().send(proto).await;
                                                }
-                                               Err(fail) => {
-                                                   self.skel.star_tx.send( StarCommand::SendProtoMessage( star_message.fail(fail) ) ).await;
+                                               Result::Err(fail) => {
+                                                   self.skel.comm().simple_reply(star_message.clone(),SimpleReply::Fail(fail)).await;
                                                }
                                            }
 
@@ -164,15 +165,16 @@ impl StarVariant for CentralStarVariant
                                    }
                                    CentralPayload::AppSupervisorLocationRequest(_) => {}
                                    CentralPayload::AppRegister(registration) => {
-                                       let result = self.backing.register(registration.clone()).await;
-                                       self.skel.comm().reply_result(star_message.clone(), result ).await;
+                                       let result = self.registry.register(registration.clone()).await;
+                                       self.skel.comm().reply_result(star_message.clone(), Reply::from_result(result) ).await;
                                    }
                                    CentralPayload::AppLookup(selector) => {
                                        let mut selector = selector.clone();
                                        selector.add( FieldSelection::Type(ResourceType::App));
                                        selector.add( FieldSelection::Space(space_message.sub_space.space.clone()) );
                                        selector.add( FieldSelection::SubSpace(space_message.sub_space.clone()) );
-                                       let result = self.backing.select(selector).await;
+                                       let result = self.registry.select(selector).await;
+                                       self.skel.comm().reply_result(star_message.clone(),Reply::from_result(result)).await;
                                    }
                                }
                            }
@@ -289,8 +291,6 @@ trait CentralStarVariantBacking: Send+Sync
     async fn get_supervisor_for_application(&self, app: &AppKey) -> Option<StarKey>;
     async fn has_supervisor(&self)->bool;
     async fn select_supervisor(&mut self )->Option<StarKey>;
-    async fn register(&self, registration: ResourceRegistration)->Result<Reply,Fail>;
-    async fn select(&self, select: Selector)->Result<Vec<Resource>,Fail>;
 }
 
 /*
@@ -377,7 +377,6 @@ impl CentralStarVariantBacking for CentralStarVariantBackingDefault
 
 struct CentralStarVariantBackingSqlLite
 {
-    label_db: mpsc::Sender<LabelRequest>,
     central_db: mpsc::Sender<CentralDbRequest>
 }
 
@@ -386,7 +385,6 @@ impl CentralStarVariantBackingSqlLite
     pub async fn new()->Self
     {
         CentralStarVariantBackingSqlLite{
-            label_db: LabelDb::new().await,
             central_db: CentralDb::new().await
         }
     }
@@ -416,26 +414,26 @@ impl CentralStarVariantBackingSqlLite
 impl CentralStarVariantBacking for CentralStarVariantBackingSqlLite
 {
     async fn add_supervisor(&mut self, star: StarKey) -> Result<(), Error> {
-        let (request,rx) = CentralDbRequest::new( CentralDbCommand::AddSupervisor(star));
-        self.central_db.send( request ).await;
+        let (request, rx) = CentralDbRequest::new(CentralDbCommand::AddSupervisor(star));
+        self.central_db.send(request).await;
         self.handle(rx.await)
     }
 
     async fn remove_supervisor(&mut self, star: StarKey) -> Result<(), Error> {
-        let (request,rx) = CentralDbRequest::new( CentralDbCommand::RemoveSupervisor(star));
-        self.central_db.send( request ).await;
+        let (request, rx) = CentralDbRequest::new(CentralDbCommand::RemoveSupervisor(star));
+        self.central_db.send(request).await;
         self.handle(rx.await)
     }
 
     async fn set_supervisor_for_application(&mut self, app: AppKey, supervisor_star: StarKey) -> Result<(), Error> {
-        let (request,rx) = CentralDbRequest::new( CentralDbCommand::SetSupervisorForApplication((supervisor_star,app)));
-        self.central_db.send( request ).await;
+        let (request, rx) = CentralDbRequest::new(CentralDbCommand::SetSupervisorForApplication((supervisor_star, app)));
+        self.central_db.send(request).await;
         self.handle(rx.await)
     }
 
     async fn get_supervisor_for_application(&self, app: &AppKey) -> Option<StarKey> {
-        let (request,rx) = CentralDbRequest::new( CentralDbCommand::GetSupervisorForApplication(app.clone()));
-        self.central_db.send( request ).await;
+        let (request, rx) = CentralDbRequest::new(CentralDbCommand::GetSupervisorForApplication(app.clone()));
+        self.central_db.send(request).await;
         match rx.await
         {
             Ok(ok) => {
@@ -444,7 +442,7 @@ impl CentralStarVariantBacking for CentralStarVariantBackingSqlLite
                     Ok(ok) => {
                         match ok
                         {
-                            CentralDbResult::Supervisor(supervisor) => {supervisor}
+                            CentralDbResult::Supervisor(supervisor) => { supervisor }
                             _ => Option::None
                         }
                     }
@@ -460,8 +458,8 @@ impl CentralStarVariantBacking for CentralStarVariantBackingSqlLite
     }
 
     async fn has_supervisor(&self) -> bool {
-        let (request,rx) = CentralDbRequest::new( CentralDbCommand::HasSupervisor);
-        self.central_db.send( request ).await;
+        let (request, rx) = CentralDbRequest::new(CentralDbCommand::HasSupervisor);
+        self.central_db.send(request).await;
         match rx.await
         {
             Ok(ok) => {
@@ -470,7 +468,7 @@ impl CentralStarVariantBacking for CentralStarVariantBackingSqlLite
                     Ok(result) => {
                         match result
                         {
-                            CentralDbResult::HasSupervisor(rtn) => {rtn}
+                            CentralDbResult::HasSupervisor(rtn) => { rtn }
                             _ => false
                         }
                     }
@@ -479,14 +477,13 @@ impl CentralStarVariantBacking for CentralStarVariantBackingSqlLite
                     }
                 }
             }
-            Err(error) => {false}
+            Err(error) => { false }
         }
     }
 
     async fn select_supervisor(&mut self) -> Option<StarKey> {
-
-        let (request,rx) = CentralDbRequest::new( CentralDbCommand::SelectSupervisor );
-        self.central_db.send( request ).await;
+        let (request, rx) = CentralDbRequest::new(CentralDbCommand::SelectSupervisor);
+        self.central_db.send(request).await;
         match rx.await
         {
             Ok(ok) => {
@@ -495,7 +492,7 @@ impl CentralStarVariantBacking for CentralStarVariantBackingSqlLite
                     Ok(result) => {
                         match result
                         {
-                            CentralDbResult::Supervisor(rtn) => {rtn}
+                            CentralDbResult::Supervisor(rtn) => { rtn }
                             _ => Option::None
                         }
                     }
@@ -504,31 +501,12 @@ impl CentralStarVariantBacking for CentralStarVariantBackingSqlLite
                     }
                 }
             }
-            Err(error) => {Option::None}
-        }
-    }
-
-    async fn register(&self,registration: ResourceRegistration) -> Result<Reply, Fail> {
-        let (request,rx) =LabelRequest::new(LabelCommand::Register(registration));
-        self.label_db.send( request ).await;
-        tokio::time::timeout( Duration::from_secs(5),rx).await?;
-        Ok(Reply::Empty)
-    }
-
-    async fn select(&self, selector: Selector) ->Result<Vec<Resource>,Fail> {
-        let (request,rx) =LabelRequest::new(LabelCommand::Select(selector));
-        self.label_db.send( request ).await;
-        match tokio::time::timeout( Duration::from_secs(5),rx).await??
-        {
-            LabelResult::Resources(resources) => {
-                Ok(resources)
-            }
-            _ => {
-                Err("Central: select resource unexpected result".into())
-            }
+            Err(error) => { Option::None }
         }
     }
 }
+
+
 
 pub struct CentralDbRequest
 {

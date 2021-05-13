@@ -424,7 +424,7 @@ mod test
     use crate::artifact::{Artifact, ArtifactLocation, ArtifactKind};
     use crate::error::Error;
     use crate::keys::{SpaceKey, SubSpaceKey, UserKey};
-    use crate::label::Labels;
+    use crate::resource::Labels;
     use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
     use crate::names::Name;
     use crate::permissions::Authentication;

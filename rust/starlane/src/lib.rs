@@ -26,7 +26,7 @@ pub mod server;
 pub mod core;
 pub mod permissions;
 pub mod service;
-pub mod label;
+pub mod resource;
 pub mod message;
 pub mod app;
 pub mod space;

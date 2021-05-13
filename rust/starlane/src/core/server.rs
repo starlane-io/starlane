@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use tokio::sync::{mpsc, Mutex, oneshot};
 
-use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorInfo, ActorKey, ActorKind, ActorSpecific, ResourceRegistration, ActorRef, NewActor};
+use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorInfo, ActorKey, ActorKind, ActorSpecific, ActorRef, NewActor};
 use crate::actor;
 use crate::app::{ActorMessageResult, Alert, AppArchetype, AppCommandKind, AppContext, AppCreateResult, AppSpecific, AppMessageResult, AppMeta, AppSlice, AppSliceInner, ConfigSrc, InitData};
 use crate::artifact::Artifact;
@@ -13,7 +13,7 @@ use crate::frame::{ActorMessage, AppMessage, ServerAppPayload, SpaceMessage, Spa
 use crate::frame::ServerPayload::AppLaunch;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, SubSpaceKey, UserKey};
-use crate::label::Labels;
+use crate::resource::{Labels, ResourceRegistration};
 use crate::message::ProtoMessage;
 use crate::star::{ActorCreate, StarCommand, StarKey, StarSkel};
 
@@ -242,14 +242,11 @@ impl AppExt for TestAppCreateExt
     async fn launch(&self, context: &mut AppContext, archetype: AppArchetype) -> Result<(), AppLaunchError>
     {
         let meta = context.meta().await;
-        let actor = context.actor_create(ActorArchetype {
-            owner: meta.owner,
-            kind: ActorKind::Single,
-            specific: crate::names::TEST_ACTOR_SPEC.clone(),
-            config: ConfigSrc::None,
-            init: InitData::None,
-            labels: Labels::new()
-        }).await;
+        let mut archetype = ActorArchetype::new( ActorKind::Single, crate::names::TEST_ACTOR_SPEC.clone(), meta.owner );
+        archetype.register = true;
+        archetype.name = Option::Some("main".to_string());
+
+        let actor = context.actor_create(archetype).await;
 
         //kind: crate::names::TEST_ACTOR_KIND.as_kind(),
         match actor

@@ -1,17 +1,23 @@
-
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use crate::error::Error;
-use tokio::sync::{mpsc, oneshot};
-use crate::keys::{ResourceKey, ResourceType, UserKey, AppKey, Resource, ResourceKind, SpaceKey, SubSpaceKey};
-use crate::names::{Name, Specific};
-use rusqlite::{Connection, params, ToSql, Statement, Rows, params_from_iter};
-
-use rusqlite::types::{ToSqlOutput, Value, ValueRef};
+use std::fmt;
 use std::iter::FromIterator;
 use std::str::FromStr;
+
 use bincode::ErrorKind;
-use crate::actor::ResourceRegistration;
+use rusqlite::{Connection, params, params_from_iter, Rows, Statement, ToSql};
+use rusqlite::types::{ToSqlOutput, Value, ValueRef};
+use serde::{Deserialize, Serialize};
+use tokio::sync::{mpsc, oneshot};
+
+use crate::actor::{ActorKey, ActorKind, ActorRef};
+use crate::app::{App, AppKind};
+use crate::artifact::{ArtifactKey, ArtifactKind};
+use crate::error::Error;
+use crate::filesystem::FileKey;
+use crate::id::Id;
+use crate::names::{Name, Specific};
+use crate::permissions::User;
+use crate::keys::{SubSpaceKey, ResourceKey, AppKey, SubSpaceId, SpaceKey, UserKey};
 
 pub type Labels = HashMap<String,String>;
 
@@ -292,22 +298,22 @@ pub struct LabelConfig
     pub index: bool
 }
 
-pub struct LabelRequest
+pub struct RegistryAction
 {
-    pub tx: oneshot::Sender<LabelResult>,
-    pub command: LabelCommand
+    pub tx: oneshot::Sender<RegistryResult>,
+    pub command: RegistryCommand
 }
 
-impl LabelRequest
+impl RegistryAction
 {
-    pub fn new( command: LabelCommand )->(Self,oneshot::Receiver<LabelResult>)
+    pub fn new(command: RegistryCommand) ->(Self, oneshot::Receiver<RegistryResult>)
     {
         let (tx,rx) = oneshot::channel();
-        (LabelRequest{ tx: tx, command: command },rx)
+        (RegistryAction { tx: tx, command: command }, rx)
     }
 }
 
-pub enum LabelCommand
+pub enum RegistryCommand
 {
     Close,
     Clear,
@@ -316,20 +322,20 @@ pub enum LabelCommand
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum LabelResult
+pub enum RegistryResult
 {
     Ok,
     Error(String),
     Resources(Vec<Resource>)
 }
 
-pub struct LabelDb {
+pub struct Registry {
    pub conn: Connection,
-   pub rx: mpsc::Receiver<LabelRequest>
+   pub rx: mpsc::Receiver<RegistryAction>
 }
 
-impl LabelDb {
-    pub async fn new() -> mpsc::Sender<LabelRequest>
+impl Registry {
+    pub async fn new() -> mpsc::Sender<RegistryAction>
     {
         let (tx, rx) = mpsc::channel(8 * 1024);
 
@@ -338,7 +344,7 @@ impl LabelDb {
             let conn = Connection::open_in_memory();
             if conn.is_ok()
             {
-                let mut db = LabelDb {
+                let mut db = Registry {
                     conn: conn.unwrap(),
                     rx: rx
                 };
@@ -353,7 +359,7 @@ impl LabelDb {
         self.setup()?;
 
         while let Option::Some(request) = self.rx.recv().await {
-            if let LabelCommand::Close = request.command
+            if let RegistryCommand::Close = request.command
             {
                 break;
             }
@@ -364,7 +370,7 @@ impl LabelDb {
                 }
                 Err(err) => {
                     eprintln!("{}",err);
-                    request.tx.send(LabelResult::Error(err.to_string()));
+                    request.tx.send(RegistryResult::Error(err.to_string()));
                 }
             }
         }
@@ -372,22 +378,22 @@ impl LabelDb {
         Ok(())
     }
 
-    fn process(&mut self, command: LabelCommand ) -> Result<LabelResult, Error> {
+    fn process(&mut self, command: RegistryCommand) -> Result<RegistryResult, Error> {
         match command
         {
-            LabelCommand::Close => {
-                Ok(LabelResult::Ok)
+            RegistryCommand::Close => {
+                Ok(RegistryResult::Ok)
             }
-            LabelCommand::Clear => {
+            RegistryCommand::Clear => {
                 let trans = self.conn.transaction()?;
                 trans.execute("DELETE FROM labels", [] )?;
                 trans.execute("DELETE FROM names", [] )?;
                 trans.execute("DELETE FROM resources", [])?;
                 trans.commit();
 
-                Ok(LabelResult::Ok)
+                Ok(RegistryResult::Ok)
             }
-            LabelCommand::Register(register) => {
+            RegistryCommand::Register(register) => {
                 let resource = register.resource;
                 let labels = register.labels;
                 let key = resource.key.bin()?;
@@ -430,9 +436,9 @@ impl LabelDb {
                 }
 
                 trans.commit()?;
-                Ok(LabelResult::Ok)
+                Ok(RegistryResult::Ok)
             }
-            LabelCommand::Select(selector) => {
+            RegistryCommand::Select(selector) => {
                 let mut params = vec![];
                 let mut where_clause = String::new();
 
@@ -546,7 +552,7 @@ impl LabelDb {
                     };
                     resources.push(resource);
                 }
-                Ok(LabelResult::Resources(resources) )
+                Ok(RegistryResult::Resources(resources) )
             }
         }
     }
@@ -620,27 +626,27 @@ mod test
     use std::sync::Arc;
 
     use tokio::runtime::Runtime;
+    use tokio::sync::mpsc;
     use tokio::sync::oneshot::error::RecvError;
     use tokio::time::Duration;
     use tokio::time::timeout;
 
+    use crate::actor::{ActorKey, ActorKind};
     use crate::app::{AppController, AppKind, AppSpecific, ConfigSrc, InitData};
-    use crate::artifact::{Artifact, ArtifactLocation, ArtifactKind};
+    use crate::artifact::{Artifact, ArtifactKind, ArtifactLocation};
     use crate::error::Error;
-    use crate::keys::{SpaceKey, SubSpaceKey, UserKey, ResourceType, Resource, ResourceKind, ResourceKey, SubSpaceId, AppKey};
-    use crate::label::{Labels, LabelDb, ResourceRegistration, LabelRequest, LabelCommand,  LabelResult, FieldSelection, LabelSelection, Selector};
+    use crate::id::Id;
+    use crate::keys::{AppKey, ResourceKey, SpaceKey, SubSpaceId, SubSpaceKey, UserKey};
     use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
     use crate::names::{Name, Specific};
     use crate::permissions::Authentication;
+    use crate::resource::{FieldSelection, Labels, LabelSelection, Registry, RegistryAction, RegistryCommand, RegistryResult, Resource, ResourceKind, ResourceType, Selector, ResourceRegistration};
+    use crate::resource::FieldSelection::SubSpace;
+    use crate::resource::RegistryResult::Resources;
     use crate::space::CreateAppControllerFail;
     use crate::star::{StarController, StarInfo, StarKey, StarKind};
     use crate::starlane::{ConstellationCreate, StarControlRequestByName, Starlane, StarlaneCommand};
     use crate::template::{ConstellationData, ConstellationTemplate};
-    use crate::label::LabelResult::Resources;
-    use tokio::sync::mpsc;
-    use crate::actor::{ActorKind, ActorKey };
-    use crate::id::Id;
-    use crate::label::FieldSelection::SubSpace;
 
     fn create_save( index: usize, resource: Resource ) -> ResourceRegistration
     {
@@ -711,18 +717,18 @@ mod test
         create_save(index,resource)
     }
 
-    async fn create_10( tx: mpsc::Sender<LabelRequest>, kind: ResourceKind, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey )
+    async fn create_10(tx: mpsc::Sender<RegistryAction>, kind: ResourceKind, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey )
     {
         for index in 1..11
         {
             let save = create(index,kind.clone(),specific.clone(),sub_space.clone(),owner.clone());
-            let (request,rx) =LabelRequest::new(LabelCommand::Register(save));
+            let (request,rx) = RegistryAction::new(RegistryCommand::Register(save));
             tx.send( request ).await;
             timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
         }
     }
 
-    async fn create_10_spaces( tx: mpsc::Sender<LabelRequest> )->Vec<SpaceKey>
+    async fn create_10_spaces(tx: mpsc::Sender<RegistryAction> ) ->Vec<SpaceKey>
     {
         let mut spaces = vec!();
         for index in 1..11
@@ -731,7 +737,7 @@ mod test
             let resource: Resource = space.clone().into();
 
             let save = create_save(index,resource);
-            let (request,rx) =LabelRequest::new(LabelCommand::Register(save));
+            let (request,rx) = RegistryAction::new(RegistryCommand::Register(save));
             tx.send( request ).await;
             timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             spaces.push(space)
@@ -740,20 +746,20 @@ mod test
     }
 
 
-    async fn create_10_actors( tx: mpsc::Sender<LabelRequest>, app: AppKey, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey )
+    async fn create_10_actors(tx: mpsc::Sender<RegistryAction>, app: AppKey, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey )
     {
         for index in 1..11
         {
             let actor_key = ResourceKey::Actor(ActorKey::new(app.clone(), Id::new(0,index)));
             let save = create_with_key(actor_key,ResourceKind::Actor(ActorKind::Single),specific.clone(),sub_space.clone(),owner.clone());
-            let (request,rx) =LabelRequest::new(LabelCommand::Register(save));
+            let (request,rx) = RegistryAction::new(RegistryCommand::Register(save));
             tx.send( request ).await;
             timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
         }
     }
 
 
-    async fn create_10_sub_spaces( tx: mpsc::Sender<LabelRequest>, space: SpaceKey )->Vec<SubSpaceKey>
+    async fn create_10_sub_spaces(tx: mpsc::Sender<RegistryAction>, space: SpaceKey ) ->Vec<SubSpaceKey>
     {
         let mut sub_spaces = vec!();
         for index in 1..11
@@ -761,7 +767,7 @@ mod test
             let sub_space = SubSpaceKey::new(space.clone(), SubSpaceId::from_index(index as _) );
             let resource: Resource = sub_space.clone().into();
             let save = create_save(index,resource);
-            let (request,rx) =LabelRequest::new(LabelCommand::Register(save));
+            let (request,rx) = RegistryAction::new(RegistryCommand::Register(save));
             tx.send( request ).await;
             timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             sub_spaces.push(sub_space)
@@ -775,18 +781,18 @@ mod test
     {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = LabelDb::new().await;
+            let tx = Registry::new().await;
 
             create_10(tx.clone(), ResourceKind::App(AppKind::Normal),Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
             let mut selector = Selector::app_selector();
-            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            let (request,rx) = RegistryAction::new(RegistryCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result,10);
 
             let mut selector = Selector::app_selector();
             selector.add_label( LabelSelection::exact("parity", "Even") );
-            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            let (request,rx) = RegistryAction::new(RegistryCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result.clone(),5);
@@ -794,7 +800,7 @@ mod test
             let mut selector = Selector::app_selector();
             selector.add_label( LabelSelection::exact("parity", "Odd") );
             selector.add_label( LabelSelection::exact("index", "3") );
-            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            let (request,rx) = RegistryAction::new(RegistryCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result,1);
@@ -802,13 +808,13 @@ mod test
 
             let mut selector = Selector::app_selector();
             selector.name("Highest".to_string()).unwrap();
-            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            let (request,rx) = RegistryAction::new(RegistryCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result,1);
 
             let mut selector = Selector::actor_selector();
-            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            let (request,rx) = RegistryAction::new(RegistryCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result,0);
@@ -820,20 +826,20 @@ mod test
     {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = LabelDb::new().await;
+            let tx = Registry::new().await;
 
             create_10(tx.clone(), ResourceKind::App(AppKind::Normal),Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
             create_10(tx.clone(), ResourceKind::Actor(ActorKind::Single),Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
 
             let mut selector = Selector::new();
-            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            let (request,rx) = RegistryAction::new(RegistryCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result,20);
 
             let mut selector = Selector::app_selector();
             selector.add_label( LabelSelection::exact("parity", "Even") );
-            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            let (request,rx) = RegistryAction::new(RegistryCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result.clone(),5);
@@ -841,7 +847,7 @@ mod test
             let mut selector = Selector::app_selector();
             selector.add_label( LabelSelection::exact("parity", "Odd") );
             selector.add_label( LabelSelection::exact("index", "3") );
-            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            let (request,rx) = RegistryAction::new(RegistryCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result,1);
@@ -849,7 +855,7 @@ mod test
 
             let mut selector = Selector::new();
             selector.name("Highest".to_string()).unwrap();
-            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            let (request,rx) = RegistryAction::new(RegistryCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result,2);
@@ -861,7 +867,7 @@ mod test
     {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = LabelDb::new().await;
+            let tx = Registry::new().await;
 
             let spaces = create_10_spaces(tx.clone() ).await;
             let mut sub_spaces = vec![];
@@ -876,14 +882,14 @@ mod test
 
             let mut selector = Selector::app_selector();
             selector.fields.insert(FieldSelection::Space(spaces.get(0).cloned().unwrap()));
-            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            let (request,rx) = RegistryAction::new(RegistryCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result,100);
 
             let mut selector = Selector::app_selector();
             selector.fields.insert(FieldSelection::SubSpace(sub_spaces.get(0).cloned().unwrap()));
-            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            let (request,rx) = RegistryAction::new(RegistryCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result,10);
@@ -897,21 +903,21 @@ mod test
     {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = LabelDb::new().await;
+            let tx = Registry::new().await;
 
 
             create_10(tx.clone(), ResourceKind::App(AppKind::Normal),Option::Some(crate::names::TEST_APP_SPEC.clone()), SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
             create_10(tx.clone(), ResourceKind::App(AppKind::Normal),Option::Some(crate::names::TEST_ACTOR_SPEC.clone()), SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
 
             let mut selector = Selector::app_selector();
-            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            let (request,rx) = RegistryAction::new(RegistryCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result,20);
 
             let mut selector = Selector::app_selector();
             selector.fields.insert(FieldSelection::Specific(crate::names::TEST_APP_SPEC.clone()));
-            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            let (request,rx) = RegistryAction::new(RegistryCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result,10);
@@ -924,7 +930,7 @@ mod test
     {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = LabelDb::new().await;
+            let tx = Registry::new().await;
 
             let sub_space = SubSpaceKey::hyper_default();
             let app1 = AppKey::new(sub_space.clone());
@@ -934,23 +940,23 @@ mod test
             create_10_actors(tx.clone(), app2.clone(), Option::None, sub_space.clone(), UserKey::hyper_user() ).await;
 
             let mut selector = Selector::actor_selector();
-            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            let (request,rx) = RegistryAction::new(RegistryCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result,20);
 
             let mut selector = Selector::actor_selector();
             selector.add_field(FieldSelection::App(app1.clone()));
-            let (request,rx) = LabelRequest::new(LabelCommand::Select(selector) );
+            let (request,rx) = RegistryAction::new(RegistryCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             assert_result_count(result,10);
         });
     }
 
-    fn results( result:LabelResult )->Vec<Resource>
+    fn results(result: RegistryResult) ->Vec<Resource>
     {
-        if let LabelResult::Resources(resources) = result
+        if let RegistryResult::Resources(resources) = result
         {
             resources
         }
@@ -962,14 +968,14 @@ mod test
     }
 
 
-    fn assert_result_count( result: LabelResult, count: usize )
+    fn assert_result_count(result: RegistryResult, count: usize )
     {
-        if let LabelResult::Resources(resources) = result
+        if let RegistryResult::Resources(resources) = result
         {
             assert_eq!(resources.len(),count);
 println!("PASS");
         }
-        else if let LabelResult::Error(error) = result
+        else if let RegistryResult::Error(error) = result
         {
 eprintln!("FAIL: {}",error);
             assert!(false);
@@ -978,6 +984,307 @@ eprintln!("FAIL: {}",error);
         {
 eprintln!("FAIL");
             assert!(false);
+        }
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub enum ResourceKind
+{
+    Space,
+    SubSpace,
+    App(AppKind),
+    Actor(ActorKind),
+    User,
+    File,
+    Artifact(ArtifactKind)
+}
+
+impl ResourceType
+{
+    pub fn magic(&self) -> u8
+    {
+        match self
+        {
+            ResourceType::Space => 0,
+            ResourceType::SubSpace => 1,
+            ResourceType::App => 2,
+            ResourceType::Actor => 3,
+            ResourceType::User => 4,
+            ResourceType::File => 5,
+            ResourceType::Artifact => 6
+        }
+    }
+
+    pub fn from_magic(magic: u8)->Result<Self,Error>
+    {
+        match magic
+        {
+            0 => Ok(ResourceType::Space),
+            1 => Ok(ResourceType::SubSpace),
+            2 => Ok(ResourceType::App),
+            3 => Ok(ResourceType::Actor),
+            4 => Ok(ResourceType::User),
+            5 => Ok(ResourceType::File),
+            6 => Ok(ResourceType::Artifact),
+            _ => Err(format!("no resource type for magic number {}",magic).into())
+        }
+    }
+}
+
+impl fmt::Display for ResourceKind{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"{}",
+                match self{
+                    ResourceKind::Space=> "Space".to_string(),
+                    ResourceKind::SubSpace=> "SubSpace".to_string(),
+                    ResourceKind::App(kind)=> format!("App:{}",kind).to_string(),
+                    ResourceKind::Actor(kind)=> format!("Actor:{}",kind).to_string(),
+                    ResourceKind::User=> "User".to_string(),
+                    ResourceKind::File=> "File".to_string(),
+                    ResourceKind::Artifact(kind)=>format!("Artifact:{}",kind).to_string()
+                })
+    }
+
+}
+
+impl ResourceKind {
+    pub fn test_key(&self, sub_space: SubSpaceKey, index: usize )->ResourceKey
+    {
+        match self
+        {
+            ResourceKind::Space => {
+                ResourceKey::Space(SpaceKey::from_index(index as u32 ))
+            }
+            ResourceKind::SubSpace => {
+                ResourceKey::SubSpace(SubSpaceKey::new( sub_space.space, SubSpaceId::Index(index as u32)))
+            }
+            ResourceKind::App(_) => {
+                ResourceKey::App(AppKey::new(sub_space))
+            }
+            ResourceKind::Actor(_) => {
+                let app = AppKey::new(sub_space);
+                ResourceKey::Actor(ActorKey::new(app, Id::new(0,index as _)))
+            }
+            ResourceKind::User => {
+                ResourceKey::User(UserKey::new(sub_space.space))
+            }
+            ResourceKind::File => {
+                ResourceKey::File(FileKey{
+                    sub_space: sub_space,
+                    filesystem: 0,
+                    path: index as _
+                } )
+            }
+            ResourceKind::Artifact(_) => {
+                ResourceKey::Artifact(ArtifactKey{
+                    sub_space: sub_space,
+                    id: index as _
+                })
+            }
+        }
+    }
+}
+
+impl FromStr for ResourceKind
+{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+
+        if s.starts_with("App:") {
+            let mut split = s.split(":");
+            split.next().ok_or("error")?;
+            return Ok( ResourceKind::App( AppKind::from_str(split.next().ok_or("error")?)? ));
+        } else if s.starts_with("Actor:") {
+            let mut split = s.split(":");
+            split.next().ok_or("error")?;
+            return Ok( ResourceKind::Actor( ActorKind::from_str(split.next().ok_or("error")?)? ) );
+        } else if s.starts_with("Artifact:") {
+            let mut split = s.split(":");
+            split.next().ok_or("error")?;
+            return Ok( ResourceKind::Artifact( ArtifactKind::from_str(split.next().ok_or("error")?)? ) );
+        }
+
+
+        match s
+        {
+            "Space" => Ok(ResourceKind::Space),
+            "SubSpace" => Ok(ResourceKind::SubSpace),
+            "User" => Ok(ResourceKind::User),
+            "File" => Ok(ResourceKind::File),
+            _ => {
+                Err(format!("cannot match ResourceKind: {}", s).into())
+            }
+        }
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub enum ResourceType
+{
+    Space,
+    SubSpace,
+    App,
+    Actor,
+    User,
+    File,
+    Artifact
+}
+
+impl ResourceType
+{
+    pub fn has_specific(&self)->bool
+    {
+        match self
+        {
+            ResourceType::Space => false,
+            ResourceType::SubSpace => false,
+            ResourceType::App => true,
+            ResourceType::Actor => true,
+            ResourceType::User => false,
+            ResourceType::File => false,
+            ResourceType::Artifact => true
+        }
+    }
+}
+
+
+impl fmt::Display for ResourceType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"{}",
+                match self{
+                    ResourceType::Space=> "Space".to_string(),
+                    ResourceType::SubSpace=> "SubSpace".to_string(),
+                    ResourceType::App=> "App".to_string(),
+                    ResourceType::Actor=> "Actor".to_string(),
+                    ResourceType::User=> "User".to_string(),
+                    ResourceType::File=> "File".to_string(),
+                    ResourceType::Artifact=> "Artifact".to_string(),
+                })
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct Resource
+{
+    pub key: ResourceKey,
+    pub kind: ResourceKind,
+    pub owner: Option<UserKey>,
+    pub specific: Option<Name>,
+}
+
+impl Resource
+{
+    pub fn app(&self)->Option<AppKey>
+    {
+        match &self.key
+        {
+            ResourceKey::Space(_) => Option::None,
+            ResourceKey::SubSpace(_) => Option::None,
+            ResourceKey::App(app) => Option::Some(app.clone()),
+            ResourceKey::Actor(actor) => {
+                Option::Some(actor.app.clone())
+            }
+            ResourceKey::User(_) => Option::None,
+            ResourceKey::File(_) => Option::None,
+            ResourceKey::Artifact(_) => Option::None
+        }
+    }
+}
+
+impl From<AppKind> for ResourceKind{
+    fn from(e: AppKind) -> Self {
+        ResourceKind::App(e)
+    }
+}
+
+impl From<App> for ResourceKind{
+    fn from(e: App) -> Self {
+        ResourceKind::App(e.archetype.kind)
+    }
+}
+
+impl From<ActorKind> for ResourceKind{
+    fn from(e: ActorKind) -> Self {
+        ResourceKind::Actor(e)
+    }
+}
+
+impl From<ArtifactKind> for ResourceKind{
+    fn from(e: ArtifactKind) -> Self {
+        ResourceKind::Artifact(e)
+    }
+}
+
+impl From<SpaceKey> for Resource{
+    fn from(e: SpaceKey) -> Self {
+        Resource{
+            key: ResourceKey::Space(e),
+            kind: ResourceKind::Space,
+            owner: Option::Some(UserKey::hyper_user()),
+            specific: None
+        }
+    }
+}
+
+impl From<SubSpaceKey> for Resource{
+    fn from(e: SubSpaceKey) -> Self {
+        Resource{
+            key: ResourceKey::SubSpace(e.clone()),
+            kind: ResourceKind::SubSpace,
+            owner: Option::Some(UserKey::super_user(e.space.clone())),
+            specific: None
+        }
+    }
+}
+
+
+impl From<ActorRef> for Resource{
+    fn from(e: ActorRef) -> Self {
+        Resource{
+            key: ResourceKey::Actor(e.key),
+            specific: Option::Some(e.archetype.specific),
+            owner: Option::Some(e.archetype.owner),
+            kind: e.archetype.kind.into()
+        }
+    }
+}
+
+impl From<User> for Resource{
+    fn from(e: User) -> Self {
+        Resource{
+            key: ResourceKey::User(e.key.clone()),
+            specific: Option::None,
+            owner: Option::Some(e.key),
+            kind: ResourceKind::User
+        }
+    }
+}
+
+
+pub struct ResourceMeta
+{
+    name: Option<String>,
+    labels: Labels
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceRegistration
+{
+    pub resource: Resource,
+    pub name: Option<String>,
+    pub labels: Labels,
+}
+
+impl ResourceRegistration
+{
+    pub fn new( resource: Resource, name: Option<String>, labels: Labels )->Self
+    {
+        ResourceRegistration{
+            resource: resource,
+            name: name,
+            labels: labels
         }
     }
 }

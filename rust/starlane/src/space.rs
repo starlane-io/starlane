@@ -6,7 +6,7 @@ use tokio::sync::{mpsc, oneshot};
 use std::sync::Arc;
 use crate::permissions::Authentication;
 use crate::error::Error;
-use crate::label::{Labels, Selector};
+use crate::resource::{Labels, Selector};
 use crate::artifact::Artifact;
 use crate::names::Name;
 use crate::message::Fail;

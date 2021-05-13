@@ -9,11 +9,11 @@ use tokio::sync::mpsc::error::SendError;
 use crate::actor::{ActorKey, ActorLocation};
 use crate::app::{AppMeta, AppLocation, AppStatus, AppReadyStatus, AppPanicReason, AppArchetype, InitData, AppCreateResult, App};
 use crate::error::Error;
-use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, AppMessage, ServerAppPayload, SpaceReply, StarMessageCentral, SimpleReply, SupervisorPayload, StarMessageSupervisor, ServerPayload, StarPattern};
+use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, AppMessage, ServerAppPayload, SpaceReply, StarMessageCentral, SimpleReply, SupervisorPayload, StarMessageSupervisor, ServerPayload, StarPattern, FromReply};
 use crate::keys::{AppKey, UserKey};
 use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait, Fail};
-use crate::star::{StarCommand, StarSkel, StarInfo, StarKey, StarVariant, StarVariantCommand, StarKind};
+use crate::star::{StarCommand, StarSkel, StarInfo, StarKey, StarVariant, StarVariantCommand, StarKind, RegistryBacking, RegistryBackingSqlLite};
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::oneshot::error::RecvError;
 use crate::star::supervisor::SupervisorCommand::AppAssign;
@@ -23,6 +23,7 @@ use tokio::sync::{oneshot, mpsc};
 use rusqlite::{Connection,params};
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
+use crate::resource::{RegistryAction, Registry, FieldSelection};
 
 pub enum SupervisorCommand
 {
@@ -51,7 +52,8 @@ pub struct SetAppStatus
 pub struct SupervisorVariant
 {
     skel: StarSkel,
-    backing: Box<dyn SupervisorManagerBacking>
+    backing: Box<dyn SupervisorManagerBacking>,
+    registry: Box<dyn RegistryBacking>
 }
 
 impl SupervisorVariant
@@ -61,6 +63,7 @@ impl SupervisorVariant
         SupervisorVariant {
             skel: data.clone(),
             backing: Box::new(SupervisorStarVariantBackingSqLite::new().await ),
+            registry: Box::new(RegistryBackingSqlLite::new().await ),
         }
     }
 }
@@ -274,9 +277,19 @@ println!("AppSEquenceRequest!");
                                             }
                                         }
                                     }
-                                    SupervisorPayload::ActorRegister(_) => {}
                                     SupervisorPayload::ActorUnRegister(_) => {}
                                     SupervisorPayload::ActorStatus(_) => {}
+                                    SupervisorPayload::Register(register) => {
+                                        let result = self.registry.register(register.clone() ).await;
+                                        self.skel.comm().reply_result(star_message, Reply::from_result(result) );
+                                    }
+                                    SupervisorPayload::Select(selector) => {
+                                        let mut selector = selector.clone();
+                                        selector.add(FieldSelection::Space(space_message.sub_space.space.clone()));
+                                        selector.add(FieldSelection::SubSpace(space_message.sub_space.clone()));
+                                        let result = self.registry.select(selector).await;
+                                        self.skel.comm().reply_result(star_message,Reply::from_result(result)).await;
+                                    }
                                 }
                             }
                             _ => {}
@@ -470,7 +483,8 @@ impl fmt::Display for AppServerStatus{
 
 pub struct SupervisorStarVariantBackingSqLite
 {
-    pub supervisor_db: mpsc::Sender<SupervisorDbRequest>
+    pub supervisor_db: mpsc::Sender<SupervisorDbRequest>,
+    pub registry: mpsc::Sender<RegistryAction>
 }
 
 impl SupervisorStarVariantBackingSqLite
@@ -478,7 +492,9 @@ impl SupervisorStarVariantBackingSqLite
     pub async fn new()->Self
     {
         SupervisorStarVariantBackingSqLite {
-            supervisor_db: SupervisorDb::new().await
+            supervisor_db: SupervisorDb::new().await,
+            registry: Registry::new().await
+
         }
     }
 

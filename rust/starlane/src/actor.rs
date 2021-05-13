@@ -10,11 +10,11 @@ use crate::error::Error;
 use crate::frame::{Event, ActorMessage, ActorState};
 use crate::id::Id;
 use crate::star::StarKey;
-use crate::keys::{AppKey, UserKey, SubSpaceKey, Resource};
+use crate::keys::{AppKey, UserKey, SubSpaceKey};
 use crate::names::Name;
 use crate::app::{InitData, ConfigSrc};
 use crate::app::AppContext;
-use crate::label::Labels;
+use crate::resource::{Labels, Resource};
 use std::str::FromStr;
 
 pub struct ActorContext
@@ -42,7 +42,26 @@ pub struct ActorArchetype
     pub specific: ActorSpecific,
     pub config: ConfigSrc,
     pub init: InitData,
-    pub labels: Labels
+    pub labels: Labels,
+    pub name: Option<String>,
+    pub register: bool
+}
+
+impl ActorArchetype
+{
+  pub fn new( kind: ActorKind, specific: ActorSpecific, owner: UserKey )->Self
+  {
+      ActorArchetype{
+          kind: kind,
+          specific: specific,
+          owner: owner,
+          config: ConfigSrc::None,
+          init: InitData::None,
+          labels: Labels::new(),
+          name: Option::None,
+          register: false
+      }
+  }
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -73,26 +92,6 @@ pub struct ActorInfo
 {
     pub key: ActorKey,
     pub kind: ActorKind
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceRegistration
-{
-    pub resource: Resource,
-    pub name: Option<String>,
-    pub labels: Labels,
-}
-
-impl ResourceRegistration
-{
-    pub fn new( resource: Resource, name: Option<String>, labels: Labels )->Self
-    {
-        ResourceRegistration{
-            resource: resource,
-            name: name,
-            labels: labels
-        }
-    }
 }
 
 #[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]

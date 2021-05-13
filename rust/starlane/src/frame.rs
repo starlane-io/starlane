@@ -5,13 +5,13 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize, Serializer};
 use tokio::time::Instant;
 
-use crate::actor::{ActorKey, ActorLocation, ResourceRegistration, ActorStatus};
+use crate::actor::{ActorKey, ActorLocation, ActorStatus};
 use crate::id::Id;
 use crate::star::{StarKey, StarKind, StarWatchInfo, StarNotify, Star, StarCommand, StarInfo, StarSubGraphKey};
-use crate::label::{Labels, Selector};
+use crate::resource::{Labels, Selector, Resource, ResourceRegistration};
 use crate::message::{MessageResult, ProtoMessage, MessageExpect, MessageUpdate, Fail};
 use tokio::sync::{oneshot, broadcast, mpsc};
-use crate::keys::{AppKey, UserKey, SubSpaceKey, MessageId, ResourceKey, Resource};
+use crate::keys::{AppKey, UserKey, SubSpaceKey, MessageId, ResourceKey};
 use crate::app::{AppLocation, AppSpecific, AppMeta, AppArchetype, ConfigSrc, App, AppCreateResult};
 use crate::logger::Flags;
 use crate::error::Error;
@@ -466,7 +466,8 @@ pub enum SupervisorPayload
 {
     AppCreate(AppArchetype),
     AppSequenceRequest(AppKey),
-    ActorRegister(ResourceRegistration),
+    Register(ResourceRegistration),
+    Select(Selector),
     ActorUnRegister(ActorKey),
     ActorStatus(ActorStatus),
 }
@@ -825,14 +826,27 @@ impl From<Vec<AppKey>> for Reply
 
 pub trait FromReply<T,E>: Sized
 {
-    fn from_reply( t: Result<T,E> )->Result<Self,Fail>;
+    fn from_result(t: Result<T,E> ) ->Result<Self,Fail>;
 }
 
-
+impl FromReply<(),Fail> for Reply
+{
+    fn from_result(t: Result<(),Fail>) -> Result<Self,Fail> {
+        match t
+        {
+            Ok(ok) => {
+                Ok(Reply::Empty)
+            }
+            Err(e) => {
+                Err(e)
+            }
+        }
+    }
+}
 
 impl FromReply<Vec<Resource>,Fail> for Reply
 {
-    fn from_reply(t: Result<Vec<Resource>,Fail>) -> Result<Self,Fail> {
+    fn from_result(t: Result<Vec<Resource>,Fail>) -> Result<Self,Fail> {
         match t
         {
             Ok(ok) => {
@@ -847,7 +861,7 @@ impl FromReply<Vec<Resource>,Fail> for Reply
 
 impl FromReply<Vec<Resource>,Error> for Reply
 {
-    fn from_reply(t: Result<Vec<Resource>,Error>) -> Result<Self,Fail> {
+    fn from_result(t: Result<Vec<Resource>,Error>) -> Result<Self,Fail> {
         match t
         {
             Ok(ok) => {
