@@ -17,7 +17,7 @@ use crate::filesystem::FileKey;
 use crate::id::Id;
 use crate::names::{Name, Specific};
 use crate::permissions::User;
-use crate::keys::{SubSpaceKey, ResourceKey, AppKey, SubSpaceId, SpaceKey, UserKey, GatheringKey};
+use crate::keys::{SubSpaceKey, ResourceKey, AppKey, SubSpaceId, SpaceKey, UserKey, GatheringKey, FilesystemKey, AppFilesystemKey, SubSpaceFilesystemKey};
 use crate::star::StarKey;
 
 pub type Labels = HashMap<String,String>;
@@ -749,7 +749,15 @@ pub enum ResourceKind
     Actor(ActorKind),
     User,
     File,
+    Filesystem(FilesystemKind),
     Artifact(ArtifactKind)
+}
+
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub enum FilesystemKind
+{
+    App,
+    SubSpace
 }
 
 impl ResourceType
@@ -764,7 +772,8 @@ impl ResourceType
             ResourceType::Actor => 3,
             ResourceType::User => 4,
             ResourceType::File => 5,
-            ResourceType::Artifact => 6
+            ResourceType::Artifact => 6,
+            ResourceType::Filesystem => 7
         }
     }
 
@@ -779,6 +788,7 @@ impl ResourceType
             4 => Ok(ResourceType::User),
             5 => Ok(ResourceType::File),
             6 => Ok(ResourceType::Artifact),
+            7 => Ok(ResourceType::Filesystem),
             _ => Err(format!("no resource type for magic number {}",magic).into())
         }
     }
@@ -794,6 +804,7 @@ impl fmt::Display for ResourceKind{
                     ResourceKind::Actor(kind)=> format!("Actor:{}",kind).to_string(),
                     ResourceKind::User=> "User".to_string(),
                     ResourceKind::File=> "File".to_string(),
+                    ResourceKind::Filesystem(kind)=> format!("Filesystem:{}",kind).to_string(),
                     ResourceKind::Artifact(kind)=>format!("Artifact:{}",kind).to_string()
                 })
     }
@@ -833,6 +844,25 @@ impl ResourceKind {
                     sub_space: sub_space,
                     id: index as _
                 })
+            }
+            ResourceKind::Filesystem(kind) => {
+                match kind
+                {
+                    FilesystemKind::App => {
+                        ResourceKey::Filesystem(FilesystemKey::App(AppFilesystemKey{
+                            app:AppKey::new(sub_space),
+                            id: index as _
+                        }))
+                    }
+                    FilesystemKind::SubSpace => {
+                        ResourceKey::Filesystem(FilesystemKey::SubSpace(SubSpaceFilesystemKey{
+                            sub_space: sub_space,
+                            id: index as _
+                        }))
+
+                    }
+                }
+
             }
         }
     }
@@ -880,6 +910,7 @@ pub enum ResourceType
     App,
     Actor,
     User,
+    Filesystem,
     File,
     Artifact
 }
@@ -896,6 +927,7 @@ impl ResourceType
             ResourceType::Actor => true,
             ResourceType::User => false,
             ResourceType::File => false,
+            ResourceType::Filesystem => false,
             ResourceType::Artifact => true
         }
     }
@@ -912,11 +944,21 @@ impl fmt::Display for ResourceType {
                     ResourceType::Actor=> "Actor".to_string(),
                     ResourceType::User=> "User".to_string(),
                     ResourceType::File=> "File".to_string(),
+                    ResourceType::Filesystem=> "Filesystem".to_string(),
                     ResourceType::Artifact=> "Artifact".to_string(),
                 })
     }
 }
 
+impl fmt::Display for FilesystemKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"{}",
+                match self{
+                    FilesystemKind::App => "App".to_string(),
+                    FilesystemKind::SubSpace => "SubSpace".to_string()
+                })
+    }
+}
 #[derive(Clone,Serialize,Deserialize)]
 pub struct Resource
 {
@@ -940,7 +982,18 @@ impl Resource
             }
             ResourceKey::User(_) => Option::None,
             ResourceKey::File(_) => Option::None,
-            ResourceKey::Artifact(_) => Option::None
+            ResourceKey::Artifact(_) => Option::None,
+            ResourceKey::Filesystem(filesystem) => {
+                match filesystem
+                {
+                    FilesystemKey::App(app) => {
+                        Option::Some(app.app.clone())
+                    }
+                    FilesystemKey::SubSpace(_) => {
+                        Option::None
+                    }
+                }
+            }
         }
     }
 }

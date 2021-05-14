@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use futures::{FutureExt, TryFutureExt};
@@ -24,6 +24,7 @@ use rusqlite::Connection;
 use bincode::ErrorKind;
 use tokio::time::Duration;
 use std::future::Future;
+use std::iter::FromIterator;
 
 pub struct CentralStarVariant
 {
@@ -103,7 +104,15 @@ impl StarVariant for CentralStarVariant
     {
         match &command
         {
-            StarVariantCommand::Init => {}
+            StarVariantCommand::Init => {
+                let mut accept = HashSet::new();
+                accept.insert(ResourceType::Space);
+                accept.insert(ResourceType::App);
+                accept.insert(ResourceType::User);
+                accept.insert(ResourceType::File);
+                accept.insert(ResourceType::Artifact);
+                self.registry.accept(accept);
+            }
             StarVariantCommand::StarMessage(star_message) => {
                match &star_message.payload
                {

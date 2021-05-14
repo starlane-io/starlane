@@ -319,8 +319,9 @@ pub enum ResourceKey
     App(AppKey),
     Actor(ActorKey),
     User(UserKey),
+    Artifact(ArtifactKey),
     File(FileKey),
-    Artifact(ArtifactKey)
+    Filesystem(FilesystemKey),
 }
 
 impl ResourceKey
@@ -353,9 +354,43 @@ impl ResourceKey
                 //ResourceManagerKey::Key(ResourceKey::Space(artifact.sub_space.space.clone()))
                 ResourceManagerKey::Central
             }
+            ResourceKey::Filesystem(key) => {
+                match key
+                {
+                    FilesystemKey::App(app) => {
+                        //ResourceManagerKey::Key(ResourceKey::Space(app.sub_space.space.clone()))
+                        ResourceManagerKey::Central
+                    }
+                    FilesystemKey::SubSpace(sub_space) => {
+                        //ResourceManagerKey::Key(ResourceKey::Space(app.sub_space.space.clone()))
+                        ResourceManagerKey::Central
+                    }
+                }
+            }
         }
 
     }
+}
+
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub enum FilesystemKey
+{
+    App(AppFilesystemKey),
+    SubSpace(SubSpaceFilesystemKey)
+}
+
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub struct AppFilesystemKey
+{
+    pub app: AppKey,
+    pub id: u32
+}
+
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub struct SubSpaceFilesystemKey
+{
+    pub sub_space: SubSpaceKey,
+    pub id: u32
 }
 
 
@@ -390,6 +425,7 @@ impl fmt::Display for ResourceKey{
                     ResourceKey::User(key) => format!("UserKey:{}",key),
                     ResourceKey::File(key) => format!("FileKey:{}",key),
                     ResourceKey::Artifact(key) => format!("ArtifactKey:{}",key),
+                    ResourceKey::Filesystem(key) => format!("FilesystemKey:{}",key),
                 })
     }
 }
@@ -406,7 +442,8 @@ impl ResourceKey
             ResourceKey::Actor(_) => ResourceType::Actor,
             ResourceKey::User(_) => ResourceType::User,
             ResourceKey::File(_) => ResourceType::File,
-            ResourceKey::Artifact(_) => ResourceType::Artifact
+            ResourceKey::Artifact(_) => ResourceType::Artifact,
+            ResourceKey::Filesystem(_) => ResourceType::Filesystem
         }
     }
 
@@ -420,7 +457,17 @@ impl ResourceKey
             ResourceKey::Actor(actor) => actor.app.sub_space.clone(),
             ResourceKey::User(user) => SubSpaceKey::new( user.space.clone(), SubSpaceId::Default ),
             ResourceKey::File(file) => file.sub_space.clone(),
-            ResourceKey::Artifact(artifact) => artifact.sub_space.clone()
+            ResourceKey::Artifact(artifact) => artifact.sub_space.clone(),
+            ResourceKey::Filesystem(filesystem) => {
+                match filesystem{
+                    FilesystemKey::App(app) => {
+                        app.app.sub_space.clone()
+                    }
+                    FilesystemKey::SubSpace(sub_space) => {
+                        sub_space.sub_space.clone()
+                    }
+                }
+            }
         }
     }
 
@@ -457,3 +504,12 @@ impl From<Vec<Resource>> for Reply
 
 
 
+impl fmt::Display for FilesystemKey{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"{}",
+                match self{
+                    FilesystemKey::App(_) => "App",
+                    FilesystemKey::SubSpace(_) => "SubSpace"
+                })
+    }
+}
