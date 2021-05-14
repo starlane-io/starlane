@@ -17,7 +17,8 @@ use crate::filesystem::FileKey;
 use crate::id::Id;
 use crate::names::{Name, Specific};
 use crate::permissions::User;
-use crate::keys::{SubSpaceKey, ResourceKey, AppKey, SubSpaceId, SpaceKey, UserKey};
+use crate::keys::{SubSpaceKey, ResourceKey, AppKey, SubSpaceId, SpaceKey, UserKey, GatheringKey};
+use crate::star::StarKey;
 
 pub type Labels = HashMap<String,String>;
 
@@ -50,6 +51,19 @@ impl Selector {
             meta: MetaSelector::None,
             fields: HashSet::new()
         }
+    }
+
+    pub fn resource_types(&self)->HashSet<ResourceType>
+    {
+        let mut rtn = HashSet::new();
+        for field in &self.fields
+        {
+            if let FieldSelection::Type(resource_type) = field
+            {
+                rtn.insert(resource_type.clone());
+            }
+        }
+        rtn
     }
 
     pub fn add( &mut self, field: FieldSelection )
@@ -317,8 +331,11 @@ pub enum RegistryCommand
 {
     Close,
     Clear,
+    Accept(HashSet<ResourceType>),
     Register(ResourceRegistration),
     Select(Selector),
+    SetLocation(ResourceLocation),
+    Find(HashSet<ResourceKey>)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -326,12 +343,16 @@ pub enum RegistryResult
 {
     Ok,
     Error(String),
-    Resources(Vec<Resource>)
+    Resources(Vec<Resource>),
+    Locations(Vec<ResourceLocation>),
+    NotFound,
+    NotAccepted
 }
 
 pub struct Registry {
    pub conn: Connection,
-   pub rx: mpsc::Receiver<RegistryAction>
+   pub rx: mpsc::Receiver<RegistryAction>,
+   pub accepted: Option<HashSet<ResourceType>>
 }
 
 impl Registry {
@@ -346,7 +367,8 @@ impl Registry {
             {
                 let mut db = Registry {
                     conn: conn.unwrap(),
-                    rx: rx
+                    rx: rx,
+                    accepted: Option::None
                 };
                 db.run().await.unwrap();
             }
@@ -378,6 +400,17 @@ impl Registry {
         Ok(())
     }
 
+    fn accept( &self, resource_type: ResourceType )->bool
+    {
+        if self.accepted.is_none() {
+            return true;
+        }
+
+        let accepted = self.accepted.as_ref().unwrap();
+
+        return accepted.contains(&resource_type);
+    }
+
     fn process(&mut self, command: RegistryCommand) -> Result<RegistryResult, Error> {
         match command
         {
@@ -389,11 +422,19 @@ impl Registry {
                 trans.execute("DELETE FROM labels", [] )?;
                 trans.execute("DELETE FROM names", [] )?;
                 trans.execute("DELETE FROM resources", [])?;
+                trans.execute("DELETE FROM locations", [])?;
                 trans.commit();
 
                 Ok(RegistryResult::Ok)
             }
+            RegistryCommand::Accept(accept)=> {
+                self.accepted= Option::Some(accept);
+                Ok(RegistryResult::Ok)
+            }
             RegistryCommand::Register(register) => {
+                if !self.accept(register.resource.key.resource_type() ) {
+                    return Ok(RegistryResult::NotAccepted);
+                }
                 let resource = register.resource;
                 let labels = register.labels;
                 let key = resource.key.bin()?;
@@ -439,6 +480,13 @@ impl Registry {
                 Ok(RegistryResult::Ok)
             }
             RegistryCommand::Select(selector) => {
+
+                for resource_type in selector.resource_types() {
+                    if !self.accept(resource_type ) {
+                        return Ok(RegistryResult::NotAccepted);
+                    }
+                }
+
                 let mut params = vec![];
                 let mut where_clause = String::new();
 
@@ -554,6 +602,71 @@ impl Registry {
                 }
                 Ok(RegistryResult::Resources(resources) )
             }
+            RegistryCommand::SetLocation(location) => {
+
+                if !self.accept(location.key.resource_type()) {
+                   return Ok(RegistryResult::NotAccepted);
+                }
+
+                let key = location.key.bin()?;
+                let host = location.host.bin()?;
+                let gathering = match location.gathering{
+                    None => Option::None,
+                    Some(key) => Option::Some(key.bin()?)
+                };
+                let mut trans = self.conn.transaction()?;
+                trans.execute("INSERT INTO locations (key,host,gathering) VALUES (?1,?2,?3)", params![key,host,gathering])?;
+                trans.commit();
+                Ok(RegistryResult::Ok)
+            }
+            RegistryCommand::Find(keys) => {
+                let mut index = 0;
+                let mut params = vec![];
+                let mut values = String::new();
+                for key in &keys
+                {
+                    index = index+1;
+                    params.push(key.bin()?);
+                    if index > 1 {
+                        values.push_str(",");
+                    }
+                    values.push_str(format!("'?{}'",index).as_str() );
+                }
+                let statement = format!("SELECT (key,host,gathering) FROM locations WHERE key IN ({})", values);
+                let mut statement = self.conn.prepare(statement.as_str())?;
+                let mut rows= statement.query( params_from_iter(params.iter() ) )?;
+                let mut locations = vec![];
+                while let Option::Some(row) = rows.next()?
+                {
+                    let key:Vec<u8> = row.get(0)?;
+                    let key = ResourceKey::from_bin(key)?;
+
+                    let host:Vec<u8> = row.get(1)?;
+                    let host = StarKey::from_bin(host)?;
+
+                    let gathering = if let ValueRef::Null = row.get_ref(2)? {
+                        Option::None
+                    }
+                    else {
+                        let gathering: Vec<u8>= row.get(2)?;
+                        let gathering: GatheringKey = GatheringKey::from_bin(gathering )?;
+                        Option::Some(gathering)
+                    };
+                    let location = ResourceLocation{
+                        key: key,
+                        host: host,
+                        gathering: gathering
+                    };
+                    locations.push(location);
+                }
+
+                if locations.len() == keys.len() {
+                    Ok(RegistryResult::Locations(locations))
+                }
+                else {
+                    Ok(RegistryResult::NotFound)
+                }
+            }
         }
     }
 
@@ -597,6 +710,12 @@ impl Registry {
          owner BLOB
         )"#;
 
+        let location = r#"CREATE TABLE IF NOT EXISTS locations (
+         key BLOB PRIMARY KEY,
+         host BLOB NOT NULL,
+         gathering BLOB
+        )"#;
+
         /*
       let labels_to_resources = r#"CREATE TABLE IF NOT EXISTS labels_to_resources
         (
@@ -619,6 +738,317 @@ impl Registry {
         Ok(())
     }
 }
+
+
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub enum ResourceKind
+{
+    Space,
+    SubSpace,
+    App(AppKind),
+    Actor(ActorKind),
+    User,
+    File,
+    Artifact(ArtifactKind)
+}
+
+impl ResourceType
+{
+    pub fn magic(&self) -> u8
+    {
+        match self
+        {
+            ResourceType::Space => 0,
+            ResourceType::SubSpace => 1,
+            ResourceType::App => 2,
+            ResourceType::Actor => 3,
+            ResourceType::User => 4,
+            ResourceType::File => 5,
+            ResourceType::Artifact => 6
+        }
+    }
+
+    pub fn from_magic(magic: u8)->Result<Self,Error>
+    {
+        match magic
+        {
+            0 => Ok(ResourceType::Space),
+            1 => Ok(ResourceType::SubSpace),
+            2 => Ok(ResourceType::App),
+            3 => Ok(ResourceType::Actor),
+            4 => Ok(ResourceType::User),
+            5 => Ok(ResourceType::File),
+            6 => Ok(ResourceType::Artifact),
+            _ => Err(format!("no resource type for magic number {}",magic).into())
+        }
+    }
+}
+
+impl fmt::Display for ResourceKind{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"{}",
+                match self{
+                    ResourceKind::Space=> "Space".to_string(),
+                    ResourceKind::SubSpace=> "SubSpace".to_string(),
+                    ResourceKind::App(kind)=> format!("App:{}",kind).to_string(),
+                    ResourceKind::Actor(kind)=> format!("Actor:{}",kind).to_string(),
+                    ResourceKind::User=> "User".to_string(),
+                    ResourceKind::File=> "File".to_string(),
+                    ResourceKind::Artifact(kind)=>format!("Artifact:{}",kind).to_string()
+                })
+    }
+
+}
+
+impl ResourceKind {
+    pub fn test_key(&self, sub_space: SubSpaceKey, index: usize )->ResourceKey
+    {
+        match self
+        {
+            ResourceKind::Space => {
+                ResourceKey::Space(SpaceKey::from_index(index as u32 ))
+            }
+            ResourceKind::SubSpace => {
+                ResourceKey::SubSpace(SubSpaceKey::new( sub_space.space, SubSpaceId::Index(index as u32)))
+            }
+            ResourceKind::App(_) => {
+                ResourceKey::App(AppKey::new(sub_space))
+            }
+            ResourceKind::Actor(_) => {
+                let app = AppKey::new(sub_space);
+                ResourceKey::Actor(ActorKey::new(app, Id::new(0,index as _)))
+            }
+            ResourceKind::User => {
+                ResourceKey::User(UserKey::new(sub_space.space))
+            }
+            ResourceKind::File => {
+                ResourceKey::File(FileKey{
+                    sub_space: sub_space,
+                    filesystem: 0,
+                    path: index as _
+                } )
+            }
+            ResourceKind::Artifact(_) => {
+                ResourceKey::Artifact(ArtifactKey{
+                    sub_space: sub_space,
+                    id: index as _
+                })
+            }
+        }
+    }
+}
+
+impl FromStr for ResourceKind
+{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+
+        if s.starts_with("App:") {
+            let mut split = s.split(":");
+            split.next().ok_or("error")?;
+            return Ok( ResourceKind::App( AppKind::from_str(split.next().ok_or("error")?)? ));
+        } else if s.starts_with("Actor:") {
+            let mut split = s.split(":");
+            split.next().ok_or("error")?;
+            return Ok( ResourceKind::Actor( ActorKind::from_str(split.next().ok_or("error")?)? ) );
+        } else if s.starts_with("Artifact:") {
+            let mut split = s.split(":");
+            split.next().ok_or("error")?;
+            return Ok( ResourceKind::Artifact( ArtifactKind::from_str(split.next().ok_or("error")?)? ) );
+        }
+
+
+        match s
+        {
+            "Space" => Ok(ResourceKind::Space),
+            "SubSpace" => Ok(ResourceKind::SubSpace),
+            "User" => Ok(ResourceKind::User),
+            "File" => Ok(ResourceKind::File),
+            _ => {
+                Err(format!("cannot match ResourceKind: {}", s).into())
+            }
+        }
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub enum ResourceType
+{
+    Space,
+    SubSpace,
+    App,
+    Actor,
+    User,
+    File,
+    Artifact
+}
+
+impl ResourceType
+{
+    pub fn has_specific(&self)->bool
+    {
+        match self
+        {
+            ResourceType::Space => false,
+            ResourceType::SubSpace => false,
+            ResourceType::App => true,
+            ResourceType::Actor => true,
+            ResourceType::User => false,
+            ResourceType::File => false,
+            ResourceType::Artifact => true
+        }
+    }
+}
+
+
+impl fmt::Display for ResourceType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"{}",
+                match self{
+                    ResourceType::Space=> "Space".to_string(),
+                    ResourceType::SubSpace=> "SubSpace".to_string(),
+                    ResourceType::App=> "App".to_string(),
+                    ResourceType::Actor=> "Actor".to_string(),
+                    ResourceType::User=> "User".to_string(),
+                    ResourceType::File=> "File".to_string(),
+                    ResourceType::Artifact=> "Artifact".to_string(),
+                })
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct Resource
+{
+    pub key: ResourceKey,
+    pub kind: ResourceKind,
+    pub owner: Option<UserKey>,
+    pub specific: Option<Name>,
+}
+
+impl Resource
+{
+    pub fn app(&self)->Option<AppKey>
+    {
+        match &self.key
+        {
+            ResourceKey::Space(_) => Option::None,
+            ResourceKey::SubSpace(_) => Option::None,
+            ResourceKey::App(app) => Option::Some(app.clone()),
+            ResourceKey::Actor(actor) => {
+                Option::Some(actor.app.clone())
+            }
+            ResourceKey::User(_) => Option::None,
+            ResourceKey::File(_) => Option::None,
+            ResourceKey::Artifact(_) => Option::None
+        }
+    }
+}
+
+impl From<AppKind> for ResourceKind{
+    fn from(e: AppKind) -> Self {
+        ResourceKind::App(e)
+    }
+}
+
+impl From<App> for ResourceKind{
+    fn from(e: App) -> Self {
+        ResourceKind::App(e.archetype.kind)
+    }
+}
+
+impl From<ActorKind> for ResourceKind{
+    fn from(e: ActorKind) -> Self {
+        ResourceKind::Actor(e)
+    }
+}
+
+impl From<ArtifactKind> for ResourceKind{
+    fn from(e: ArtifactKind) -> Self {
+        ResourceKind::Artifact(e)
+    }
+}
+
+impl From<SpaceKey> for Resource{
+    fn from(e: SpaceKey) -> Self {
+        Resource{
+            key: ResourceKey::Space(e),
+            kind: ResourceKind::Space,
+            owner: Option::Some(UserKey::hyper_user()),
+            specific: None
+        }
+    }
+}
+
+impl From<SubSpaceKey> for Resource{
+    fn from(e: SubSpaceKey) -> Self {
+        Resource{
+            key: ResourceKey::SubSpace(e.clone()),
+            kind: ResourceKind::SubSpace,
+            owner: Option::Some(UserKey::super_user(e.space.clone())),
+            specific: None
+        }
+    }
+}
+
+
+
+impl From<User> for Resource{
+    fn from(e: User) -> Self {
+        Resource{
+            key: ResourceKey::User(e.key.clone()),
+            specific: Option::None,
+            owner: Option::Some(e.key),
+            kind: ResourceKind::User
+        }
+    }
+}
+
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceMeta
+{
+    name: Option<String>,
+    labels: Labels
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceRegistration
+{
+    pub resource: Resource,
+    pub name: Option<String>,
+    pub labels: Labels,
+}
+
+impl ResourceRegistration
+{
+    pub fn new( resource: Resource, name: Option<String>, labels: Labels )->Self
+    {
+        ResourceRegistration{
+            resource: resource,
+            name: name,
+            labels: labels
+        }
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceLocation
+{
+    pub key: ResourceKey,
+    pub host: StarKey,
+    pub gathering: Option<GatheringKey>
+}
+
+pub enum ResourceManagerKey
+{
+    Central,
+    Key(ResourceKey)
+}
+
+
+
+
 
 #[cfg(test)]
 mod test
@@ -702,8 +1132,8 @@ mod test
     {
         if index == 0
         {
-          eprintln!("don't use 0 index, it messes up the tests.  Start with 1");
-          assert!(false)
+            eprintln!("don't use 0 index, it messes up the tests.  Start with 1");
+            assert!(false)
         }
         let key = kind.test_key(sub_space,index);
 
@@ -973,312 +1403,17 @@ mod test
         if let RegistryResult::Resources(resources) = result
         {
             assert_eq!(resources.len(),count);
-println!("PASS");
+            println!("PASS");
         }
         else if let RegistryResult::Error(error) = result
         {
-eprintln!("FAIL: {}",error);
+            eprintln!("FAIL: {}",error);
             assert!(false);
         }
         else
         {
-eprintln!("FAIL");
+            eprintln!("FAIL");
             assert!(false);
         }
     }
 }
-
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
-pub enum ResourceKind
-{
-    Space,
-    SubSpace,
-    App(AppKind),
-    Actor(ActorKind),
-    User,
-    File,
-    Artifact(ArtifactKind)
-}
-
-impl ResourceType
-{
-    pub fn magic(&self) -> u8
-    {
-        match self
-        {
-            ResourceType::Space => 0,
-            ResourceType::SubSpace => 1,
-            ResourceType::App => 2,
-            ResourceType::Actor => 3,
-            ResourceType::User => 4,
-            ResourceType::File => 5,
-            ResourceType::Artifact => 6
-        }
-    }
-
-    pub fn from_magic(magic: u8)->Result<Self,Error>
-    {
-        match magic
-        {
-            0 => Ok(ResourceType::Space),
-            1 => Ok(ResourceType::SubSpace),
-            2 => Ok(ResourceType::App),
-            3 => Ok(ResourceType::Actor),
-            4 => Ok(ResourceType::User),
-            5 => Ok(ResourceType::File),
-            6 => Ok(ResourceType::Artifact),
-            _ => Err(format!("no resource type for magic number {}",magic).into())
-        }
-    }
-}
-
-impl fmt::Display for ResourceKind{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!( f,"{}",
-                match self{
-                    ResourceKind::Space=> "Space".to_string(),
-                    ResourceKind::SubSpace=> "SubSpace".to_string(),
-                    ResourceKind::App(kind)=> format!("App:{}",kind).to_string(),
-                    ResourceKind::Actor(kind)=> format!("Actor:{}",kind).to_string(),
-                    ResourceKind::User=> "User".to_string(),
-                    ResourceKind::File=> "File".to_string(),
-                    ResourceKind::Artifact(kind)=>format!("Artifact:{}",kind).to_string()
-                })
-    }
-
-}
-
-impl ResourceKind {
-    pub fn test_key(&self, sub_space: SubSpaceKey, index: usize )->ResourceKey
-    {
-        match self
-        {
-            ResourceKind::Space => {
-                ResourceKey::Space(SpaceKey::from_index(index as u32 ))
-            }
-            ResourceKind::SubSpace => {
-                ResourceKey::SubSpace(SubSpaceKey::new( sub_space.space, SubSpaceId::Index(index as u32)))
-            }
-            ResourceKind::App(_) => {
-                ResourceKey::App(AppKey::new(sub_space))
-            }
-            ResourceKind::Actor(_) => {
-                let app = AppKey::new(sub_space);
-                ResourceKey::Actor(ActorKey::new(app, Id::new(0,index as _)))
-            }
-            ResourceKind::User => {
-                ResourceKey::User(UserKey::new(sub_space.space))
-            }
-            ResourceKind::File => {
-                ResourceKey::File(FileKey{
-                    sub_space: sub_space,
-                    filesystem: 0,
-                    path: index as _
-                } )
-            }
-            ResourceKind::Artifact(_) => {
-                ResourceKey::Artifact(ArtifactKey{
-                    sub_space: sub_space,
-                    id: index as _
-                })
-            }
-        }
-    }
-}
-
-impl FromStr for ResourceKind
-{
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-
-        if s.starts_with("App:") {
-            let mut split = s.split(":");
-            split.next().ok_or("error")?;
-            return Ok( ResourceKind::App( AppKind::from_str(split.next().ok_or("error")?)? ));
-        } else if s.starts_with("Actor:") {
-            let mut split = s.split(":");
-            split.next().ok_or("error")?;
-            return Ok( ResourceKind::Actor( ActorKind::from_str(split.next().ok_or("error")?)? ) );
-        } else if s.starts_with("Artifact:") {
-            let mut split = s.split(":");
-            split.next().ok_or("error")?;
-            return Ok( ResourceKind::Artifact( ArtifactKind::from_str(split.next().ok_or("error")?)? ) );
-        }
-
-
-        match s
-        {
-            "Space" => Ok(ResourceKind::Space),
-            "SubSpace" => Ok(ResourceKind::SubSpace),
-            "User" => Ok(ResourceKind::User),
-            "File" => Ok(ResourceKind::File),
-            _ => {
-                Err(format!("cannot match ResourceKind: {}", s).into())
-            }
-        }
-    }
-}
-
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
-pub enum ResourceType
-{
-    Space,
-    SubSpace,
-    App,
-    Actor,
-    User,
-    File,
-    Artifact
-}
-
-impl ResourceType
-{
-    pub fn has_specific(&self)->bool
-    {
-        match self
-        {
-            ResourceType::Space => false,
-            ResourceType::SubSpace => false,
-            ResourceType::App => true,
-            ResourceType::Actor => true,
-            ResourceType::User => false,
-            ResourceType::File => false,
-            ResourceType::Artifact => true
-        }
-    }
-}
-
-
-impl fmt::Display for ResourceType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!( f,"{}",
-                match self{
-                    ResourceType::Space=> "Space".to_string(),
-                    ResourceType::SubSpace=> "SubSpace".to_string(),
-                    ResourceType::App=> "App".to_string(),
-                    ResourceType::Actor=> "Actor".to_string(),
-                    ResourceType::User=> "User".to_string(),
-                    ResourceType::File=> "File".to_string(),
-                    ResourceType::Artifact=> "Artifact".to_string(),
-                })
-    }
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct Resource
-{
-    pub key: ResourceKey,
-    pub kind: ResourceKind,
-    pub owner: Option<UserKey>,
-    pub specific: Option<Name>,
-}
-
-impl Resource
-{
-    pub fn app(&self)->Option<AppKey>
-    {
-        match &self.key
-        {
-            ResourceKey::Space(_) => Option::None,
-            ResourceKey::SubSpace(_) => Option::None,
-            ResourceKey::App(app) => Option::Some(app.clone()),
-            ResourceKey::Actor(actor) => {
-                Option::Some(actor.app.clone())
-            }
-            ResourceKey::User(_) => Option::None,
-            ResourceKey::File(_) => Option::None,
-            ResourceKey::Artifact(_) => Option::None
-        }
-    }
-}
-
-impl From<AppKind> for ResourceKind{
-    fn from(e: AppKind) -> Self {
-        ResourceKind::App(e)
-    }
-}
-
-impl From<App> for ResourceKind{
-    fn from(e: App) -> Self {
-        ResourceKind::App(e.archetype.kind)
-    }
-}
-
-impl From<ActorKind> for ResourceKind{
-    fn from(e: ActorKind) -> Self {
-        ResourceKind::Actor(e)
-    }
-}
-
-impl From<ArtifactKind> for ResourceKind{
-    fn from(e: ArtifactKind) -> Self {
-        ResourceKind::Artifact(e)
-    }
-}
-
-impl From<SpaceKey> for Resource{
-    fn from(e: SpaceKey) -> Self {
-        Resource{
-            key: ResourceKey::Space(e),
-            kind: ResourceKind::Space,
-            owner: Option::Some(UserKey::hyper_user()),
-            specific: None
-        }
-    }
-}
-
-impl From<SubSpaceKey> for Resource{
-    fn from(e: SubSpaceKey) -> Self {
-        Resource{
-            key: ResourceKey::SubSpace(e.clone()),
-            kind: ResourceKind::SubSpace,
-            owner: Option::Some(UserKey::super_user(e.space.clone())),
-            specific: None
-        }
-    }
-}
-
-
-
-impl From<User> for Resource{
-    fn from(e: User) -> Self {
-        Resource{
-            key: ResourceKey::User(e.key.clone()),
-            specific: Option::None,
-            owner: Option::Some(e.key),
-            kind: ResourceKind::User
-        }
-    }
-}
-
-
-pub struct ResourceMeta
-{
-    name: Option<String>,
-    labels: Labels
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceRegistration
-{
-    pub resource: Resource,
-    pub name: Option<String>,
-    pub labels: Labels,
-}
-
-impl ResourceRegistration
-{
-    pub fn new( resource: Resource, name: Option<String>, labels: Labels )->Self
-    {
-        ResourceRegistration{
-            resource: resource,
-            name: name,
-            labels: labels
-        }
-    }
-}
-
-
-
-

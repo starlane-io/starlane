@@ -1,6 +1,6 @@
 use crate::names::Name;
 use serde::{Deserialize, Serialize};
-use crate::keys::SubSpaceKey;
+use crate::keys::{SubSpaceKey, AppKey};
 use std::sync::Arc;
 use std::fmt;
 

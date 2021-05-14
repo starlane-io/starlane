@@ -15,7 +15,7 @@ use crate::id::Id;
 use crate::message::Fail;
 use crate::names::Name;
 use crate::permissions::{Priviledges, User, UserKind};
-use crate::resource::{Labels, Resource, ResourceType};
+use crate::resource::{Labels, Resource, ResourceType, ResourceManagerKey};
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum SpaceKey
@@ -323,7 +323,61 @@ pub enum ResourceKey
     Artifact(ArtifactKey)
 }
 
+impl ResourceKey
+{
+    pub fn manager(&self)->ResourceManagerKey
+    {
+        match self
+        {
+            ResourceKey::Space(_) => ResourceManagerKey::Central,
+            ResourceKey::SubSpace(sub_space) => {
+                //ResourceManagerKey::Key(ResourceKey::Space(sub_space.space.clone()))
+                ResourceManagerKey::Central
+            }
+            ResourceKey::App(app) => {
+                //ResourceManagerKey::Key(ResourceKey::Space(app.sub_space.space.clone()))
+                ResourceManagerKey::Central
+            }
+            ResourceKey::Actor(actor) => {
+                ResourceManagerKey::Key(ResourceKey::App(actor.app.clone()))
+            }
+            ResourceKey::User(user) => {
+                //ResourceManagerKey::Key(ResourceKey::Space(user.space.clone()))
+                ResourceManagerKey::Central
+            }
+            ResourceKey::File(file) => {
+                //ResourceManagerKey::Key(ResourceKey::App(file.app.clone()))
+                ResourceManagerKey::Central
+            }
+            ResourceKey::Artifact(artifact) => {
+                //ResourceManagerKey::Key(ResourceKey::Space(artifact.sub_space.space.clone()))
+                ResourceManagerKey::Central
+            }
+        }
 
+    }
+}
+
+
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub enum GatheringKey {
+  Actor(ActorKey)
+}
+
+impl GatheringKey
+{
+    pub fn bin(&self) -> Result<Vec<u8>, Error>
+    {
+        let mut bin = bincode::serialize(self)?;
+        Ok(bin)
+    }
+
+    pub fn from_bin(mut bin: Vec<u8>) -> Result<GatheringKey, Error>
+    {
+        let mut key = bincode::deserialize::<GatheringKey>(bin.as_slice())?;
+        Ok(key)
+    }
+}
 
 impl fmt::Display for ResourceKey{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
