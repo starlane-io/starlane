@@ -9,7 +9,7 @@ use tokio::sync::oneshot::Receiver;
 
 use crate::app::{AppCreateController, AppMeta, ApplicationStatus, AppLocation, AppArchetype, App};
 use crate::error::Error;
-use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, CentralPayload, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply};
+use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, CentralPayload, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply, ResourceQuery, ResourceMessage};
 use crate::id::Id;
 use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, ResourceKey};
 use crate::resource::{Labels, Registry, RegistryAction, Selector, RegistryResult, RegistryCommand, FieldSelection, Resource, ResourceType, ResourceRegistration};
@@ -110,6 +110,7 @@ impl StarVariant for CentralStarVariant
                 accept.insert(ResourceType::App);
                 accept.insert(ResourceType::User);
                 accept.insert(ResourceType::File);
+                accept.insert(ResourceType::Filesystem);
                 accept.insert(ResourceType::Artifact);
                 self.registry.accept(accept);
             }
@@ -140,6 +141,23 @@ impl StarVariant for CentralStarVariant
                                self.skel.comm().reply_result(star_message.clone(),Reply::from_result(reply)).await;
                            }
                        }
+                   }
+                   StarMessagePayload::Resource(resource_message ) => {
+                      match resource_message
+                      {
+                          ResourceMessage::Register(registration) => {
+                              let result = self.registry.register(registration.clone()).await;
+                              self.skel.comm().reply_result_empty(star_message.clone(), result );
+                          }
+                          ResourceMessage::Location(location) => {
+                              let result = self.registry.set_location(location.clone()).await;
+                              self.skel.comm().reply_result_empty(star_message.clone(), result );
+                          }
+                          ResourceMessage::Find(find) => {
+                              let result = self.registry.find(find.to_owned()).await;
+                              self.skel.comm().reply_result(star_message.clone(), result );
+                          }
+                      }
                    }
                    StarMessagePayload::Space(space_message) => {
                        match &space_message.payload {
@@ -187,7 +205,19 @@ impl StarVariant for CentralStarVariant
                                    }
                                }
                            }
-                           _ => {}
+                           SpacePayload::Resource(query) => {
+                               match query
+                               {
+                                   ResourceQuery::Select(selector) => {
+                                       let mut selector = selector.clone();
+                                       selector.add( FieldSelection::Space(space_message.sub_space.space.clone()) );
+                                       selector.add( FieldSelection::SubSpace(space_message.sub_space.clone()) );
+                                       let result = self.registry.select(selector).await;
+                                       self.skel.comm().reply_result(star_message.clone(),Reply::from_result(result)).await;
+                                   }
+                              }
+                           }
+                           _=>{}
                        }
                    }
                    _ => {}

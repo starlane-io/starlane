@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
 
@@ -18,7 +18,7 @@ use crate::logger::Flags;
 use crate::message::{Fail, MessageExpect, MessageResult, MessageUpdate, ProtoMessage};
 use crate::names::Name;
 use crate::permissions::{Authentication, AuthToken};
-use crate::resource::{Labels, Resource, ResourceRegistration, Selector};
+use crate::resource::{Labels, Resource, ResourceRegistration, Selector, ResourceLocation};
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey, StarWatchInfo};
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -350,8 +350,17 @@ pub enum StarMessagePayload
    None,
    Central(StarMessageCentral),
    Supervisor(StarMessageSupervisor),
+   Resource(ResourceMessage),
    Space(SpaceMessage),
    Reply(SimpleReply),
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ResourceMessage
+{
+    Register(ResourceRegistration),
+    Location(ResourceLocation),
+    Find(HashSet<ResourceKey>)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -399,6 +408,7 @@ pub enum Reply
     Empty,
     Key(ResourceKey),
     Keys(Vec<ResourceKey>),
+    Locations(Vec<ResourceLocation>),
     Seq(u64)
 }
 
@@ -452,7 +462,14 @@ pub enum SpacePayload
     Reply(SpaceReply),
     Central(CentralPayload),
     Server(ServerPayload),
-    Supervisor(SupervisorPayload)
+    Supervisor(SupervisorPayload),
+    Resource(ResourceQuery)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ResourceQuery
+{
+    Select(Selector),
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -683,7 +700,8 @@ impl fmt::Display for StarMessagePayload{
             StarMessagePayload::Space(_) => "Space".to_string(),
             StarMessagePayload::Central(_) => "Central".to_string(),
             StarMessagePayload::Reply(_) => "Reply".to_string(),
-            StarMessagePayload::Supervisor(_) => "Supervisor".to_string()
+            StarMessagePayload::Supervisor(_) => "Supervisor".to_string(),
+            StarMessagePayload::Resource(_) => "Resource".to_string()
         };
         write!(f, "{}",r)
     }

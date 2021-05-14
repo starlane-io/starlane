@@ -1,6 +1,6 @@
 use crate::names::Name;
 use serde::{Deserialize, Serialize};
-use crate::keys::{SubSpaceKey, AppKey};
+use crate::keys::{SubSpaceKey, AppKey, FileSystemKey};
 use std::sync::Arc;
 use std::fmt;
 
@@ -16,14 +16,13 @@ pub struct File
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct FileKey
 {
-   pub sub_space: SubSpaceKey,
-   pub filesystem: u64,
+   pub filesystem: FileSystemKey,
    pub path: u64
 }
 
 impl fmt::Display for FileKey{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!( f,"[{},{},{}]",self.sub_space,self.filesystem,self.path )
+        write!( f,"[{},{},{}]",self.filesystem,self.filesystem,self.path )
     }
 
 }

@@ -17,7 +17,7 @@ use crate::filesystem::FileKey;
 use crate::id::Id;
 use crate::names::{Name, Specific};
 use crate::permissions::User;
-use crate::keys::{SubSpaceKey, ResourceKey, AppKey, SubSpaceId, SpaceKey, UserKey, GatheringKey, FilesystemKey, AppFilesystemKey, SubSpaceFilesystemKey};
+use crate::keys::{SubSpaceKey, ResourceKey, AppKey, SubSpaceId, SpaceKey, UserKey, GatheringKey, FileSystemKey, AppFilesystemKey, SubSpaceFilesystemKey};
 use crate::star::StarKey;
 
 pub type Labels = HashMap<String,String>;
@@ -834,8 +834,7 @@ impl ResourceKind {
             }
             ResourceKind::File => {
                 ResourceKey::File(FileKey{
-                    sub_space: sub_space,
-                    filesystem: 0,
+                    filesystem: FileSystemKey::SubSpace(SubSpaceFilesystemKey{ sub_space, id: 0}),
                     path: index as _
                 } )
             }
@@ -849,13 +848,13 @@ impl ResourceKind {
                 match kind
                 {
                     FilesystemKind::App => {
-                        ResourceKey::Filesystem(FilesystemKey::App(AppFilesystemKey{
+                        ResourceKey::Filesystem(FileSystemKey::App(AppFilesystemKey{
                             app:AppKey::new(sub_space),
                             id: index as _
                         }))
                     }
                     FilesystemKind::SubSpace => {
-                        ResourceKey::Filesystem(FilesystemKey::SubSpace(SubSpaceFilesystemKey{
+                        ResourceKey::Filesystem(FileSystemKey::SubSpace(SubSpaceFilesystemKey{
                             sub_space: sub_space,
                             id: index as _
                         }))
@@ -986,10 +985,10 @@ impl Resource
             ResourceKey::Filesystem(filesystem) => {
                 match filesystem
                 {
-                    FilesystemKey::App(app) => {
+                    FileSystemKey::App(app) => {
                         Option::Some(app.app.clone())
                     }
-                    FilesystemKey::SubSpace(_) => {
+                    FileSystemKey::SubSpace(_) => {
                         Option::None
                     }
                 }

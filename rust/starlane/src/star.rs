@@ -33,7 +33,7 @@ use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequ
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId, SpaceKey, UserKey, ResourceKey};
-use crate::resource::{Labels, ResourceRegistration, Selector, Resource, RegistryAction, RegistryCommand, RegistryResult, Registry, ResourceType};
+use crate::resource::{Labels, ResourceRegistration, Selector, Resource, RegistryAction, RegistryCommand, RegistryResult, Registry, ResourceType, ResourceLocation};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob, Fail};
@@ -2598,6 +2598,20 @@ impl StarComm
       self.send(proto).await;
     }
 
+    pub async fn reply_result_empty(&self, message: StarMessage, result: Result<(),Fail>)
+    {
+        match result
+        {
+            Ok(reply) => {
+                let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
+                self.star_tx.send( StarCommand::SendProtoMessage(proto) ).await;
+            }
+            Err(fail) => {
+                let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(fail)));
+                self.star_tx.send( StarCommand::SendProtoMessage(proto) ).await;
+            }
+        }
+    }
 
     pub async fn reply_result(&self, message: StarMessage, result: Result<Reply,Fail>)
     {
@@ -2679,6 +2693,8 @@ pub trait RegistryBacking : Sync+Send {
     async fn accept(&self, accept: HashSet<ResourceType> )->Result<(),Fail>;
     async fn register(&self, registration: ResourceRegistration)->Result<(),Fail>;
     async fn select(&self, select: Selector)->Result<Vec<Resource>,Fail>;
+    async fn set_location(&self, location: ResourceLocation)->Result<(),Fail>;
+    async fn find(&self, keys: HashSet<ResourceKey>)->Result<Reply,Fail>;
 }
 
 pub struct RegistryBackingSqlLite
@@ -2703,14 +2719,14 @@ impl RegistryBacking for RegistryBackingSqlLite
     async fn accept(&self, accept: HashSet<ResourceType>) -> Result<(), Fail> {
         let (request,rx) = RegistryAction::new(RegistryCommand::Accept(accept));
         self.registry.send( request ).await;
-        tokio::time::timeout( Duration::from_secs(5),rx).await?;
+        tokio::time::timeout( Duration::from_secs(5),rx).await??;
         Ok(())
     }
 
     async fn register(&self,registration: ResourceRegistration) -> Result<(),Fail> {
         let (request,rx) = RegistryAction::new(RegistryCommand::Register(registration));
         self.registry.send( request ).await;
-        tokio::time::timeout( Duration::from_secs(5),rx).await?;
+        tokio::time::timeout( Duration::from_secs(5),rx).await??;
         Ok(())
     }
 
@@ -2725,6 +2741,26 @@ impl RegistryBacking for RegistryBackingSqlLite
             _ => {
                 Result::Err(Fail::Timeout)
             }
+        }
+    }
+
+    async fn set_location(&self, location: ResourceLocation) -> Result<(), Fail> {
+        let (request,rx) = RegistryAction::new(RegistryCommand::SetLocation(location));
+        self.registry.send( request ).await;
+        tokio::time::timeout( Duration::from_secs(5),rx).await??;
+        Ok(())
+    }
+
+    async fn find(&self, keys: HashSet<ResourceKey>) -> Result<Reply, Fail> {
+        let (request,rx) = RegistryAction::new(RegistryCommand::Find(keys));
+        self.registry.send( request ).await;
+        let result = tokio::time::timeout( Duration::from_secs(5),rx).await??;
+        if let RegistryResult::Locations(locations) = result {
+            Ok(Reply::Locations(locations))
+        }
+        else
+        {
+            Err(Fail::Unexpected)
         }
     }
 }

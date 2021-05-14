@@ -9,7 +9,7 @@ use tokio::sync::mpsc::error::SendError;
 use crate::actor::{ActorKey, ActorLocation};
 use crate::app::{AppMeta, AppLocation, AppStatus, AppReadyStatus, AppPanicReason, AppArchetype, InitData, AppCreateResult, App};
 use crate::error::Error;
-use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, ServerAppPayload, SpaceReply, StarMessageCentral, SimpleReply, SupervisorPayload, StarMessageSupervisor, ServerPayload, StarPattern, FromReply};
+use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, ServerAppPayload, SpaceReply, StarMessageCentral, SimpleReply, SupervisorPayload, StarMessageSupervisor, ServerPayload, StarPattern, FromReply, ResourceQuery, ResourceMessage};
 use crate::keys::{AppKey, UserKey};
 use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait, Fail};
@@ -23,7 +23,7 @@ use tokio::sync::{oneshot, mpsc};
 use rusqlite::{Connection,params};
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
-use crate::resource::{RegistryAction, Registry, FieldSelection};
+use crate::resource::{RegistryAction, Registry, FieldSelection, ResourceType};
 use std::future::Future;
 
 pub enum SupervisorCommand
@@ -128,6 +128,11 @@ impl StarVariant for SupervisorVariant
         match command
         {
             StarVariantCommand::Init => {
+                let mut accept = HashSet::new();
+                accept.insert(ResourceType::Actor);
+                accept.insert(ResourceType::File);
+                self.registry.accept(accept);
+
                 self.pledge().await;
             }
             StarVariantCommand::SupervisorCommand(supervisor_command) => {
@@ -245,6 +250,23 @@ impl StarVariant for SupervisorVariant
             {
                 match &star_message.payload
                 {
+                    StarMessagePayload::Resource(resource_message ) => {
+                        match resource_message
+                        {
+                            ResourceMessage::Register(registration) => {
+                                let result = self.registry.register(registration.clone()).await;
+                                self.skel.comm().reply_result_empty(star_message.clone(), result );
+                            }
+                            ResourceMessage::Location(location) => {
+                                let result = self.registry.set_location(location.clone()).await;
+                                self.skel.comm().reply_result_empty(star_message.clone(), result );
+                            }
+                            ResourceMessage::Find(find) => {
+                                let result = self.registry.find(find.to_owned()).await;
+                                self.skel.comm().reply_result(star_message.clone(), result );
+                            }
+                        }
+                    }
                     StarMessagePayload::Space(space_message) => {
                         match &space_message.payload
                         {
@@ -290,6 +312,18 @@ println!("AppSEquenceRequest!");
                                         selector.add(FieldSelection::SubSpace(space_message.sub_space.clone()));
                                         let result = self.registry.select(selector).await;
                                         self.skel.comm().reply_result(star_message,Reply::from_result(result)).await;
+                                    }
+                                }
+                            }
+                            SpacePayload::Resource(query) => {
+                                match query
+                                {
+                                    ResourceQuery::Select(selector) => {
+                                        let mut selector = selector.clone();
+                                        selector.add( FieldSelection::Space(space_message.sub_space.space.clone()) );
+                                        selector.add( FieldSelection::SubSpace(space_message.sub_space.clone()) );
+                                        let result = self.registry.select(selector).await;
+                                        self.skel.comm().reply_result(star_message.clone(),Reply::from_result(result)).await;
                                     }
                                 }
                             }

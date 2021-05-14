@@ -321,7 +321,7 @@ pub enum ResourceKey
     User(UserKey),
     Artifact(ArtifactKey),
     File(FileKey),
-    Filesystem(FilesystemKey),
+    Filesystem(FileSystemKey),
 }
 
 impl ResourceKey
@@ -357,11 +357,11 @@ impl ResourceKey
             ResourceKey::Filesystem(key) => {
                 match key
                 {
-                    FilesystemKey::App(app) => {
+                    FileSystemKey::App(app) => {
                         //ResourceManagerKey::Key(ResourceKey::Space(app.sub_space.space.clone()))
                         ResourceManagerKey::Central
                     }
-                    FilesystemKey::SubSpace(sub_space) => {
+                    FileSystemKey::SubSpace(sub_space) => {
                         //ResourceManagerKey::Key(ResourceKey::Space(app.sub_space.space.clone()))
                         ResourceManagerKey::Central
                     }
@@ -373,7 +373,7 @@ impl ResourceKey
 }
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
-pub enum FilesystemKey
+pub enum FileSystemKey
 {
     App(AppFilesystemKey),
     SubSpace(SubSpaceFilesystemKey)
@@ -456,14 +456,21 @@ impl ResourceKey
             ResourceKey::App(app) => app.sub_space.clone(),
             ResourceKey::Actor(actor) => actor.app.sub_space.clone(),
             ResourceKey::User(user) => SubSpaceKey::new( user.space.clone(), SubSpaceId::Default ),
-            ResourceKey::File(file) => file.sub_space.clone(),
+            ResourceKey::File(file) => match &file.filesystem{
+                FileSystemKey::App(app) => {
+                    app.app.sub_space.clone()
+                }
+                FileSystemKey::SubSpace(sub_space) => {
+                    sub_space.sub_space.clone()
+                }
+            },
             ResourceKey::Artifact(artifact) => artifact.sub_space.clone(),
             ResourceKey::Filesystem(filesystem) => {
                 match filesystem{
-                    FilesystemKey::App(app) => {
+                    FileSystemKey::App(app) => {
                         app.app.sub_space.clone()
                     }
-                    FilesystemKey::SubSpace(sub_space) => {
+                    FileSystemKey::SubSpace(sub_space) => {
                         sub_space.sub_space.clone()
                     }
                 }
@@ -504,12 +511,12 @@ impl From<Vec<Resource>> for Reply
 
 
 
-impl fmt::Display for FilesystemKey{
+impl fmt::Display for FileSystemKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!( f,"{}",
                 match self{
-                    FilesystemKey::App(_) => "App",
-                    FilesystemKey::SubSpace(_) => "SubSpace"
+                    FileSystemKey::App(_) => "App",
+                    FileSystemKey::SubSpace(_) => "SubSpace"
                 })
     }
 }
