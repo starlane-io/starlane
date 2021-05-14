@@ -9,7 +9,7 @@ use tokio::sync::mpsc::error::SendError;
 use crate::actor::{ActorKey, ActorLocation};
 use crate::app::{AppMeta, AppLocation, AppStatus, AppReadyStatus, AppPanicReason, AppArchetype, InitData, AppCreateResult, App};
 use crate::error::Error;
-use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, AppMessage, ServerAppPayload, SpaceReply, StarMessageCentral, SimpleReply, SupervisorPayload, StarMessageSupervisor, ServerPayload, StarPattern, FromReply};
+use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, ServerAppPayload, SpaceReply, StarMessageCentral, SimpleReply, SupervisorPayload, StarMessageSupervisor, ServerPayload, StarPattern, FromReply};
 use crate::keys::{AppKey, UserKey};
 use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait, Fail};
@@ -24,6 +24,7 @@ use rusqlite::{Connection,params};
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use crate::resource::{RegistryAction, Registry, FieldSelection};
+use std::future::Future;
 
 pub enum SupervisorCommand
 {
@@ -306,6 +307,10 @@ println!("AppSEquenceRequest!");
 
                                         self.skel.logger.log( Log::Star(StarLog::new(&self.skel.info, StarLogPayload::PledgeRecv )));
                                     }
+                                }
+                                StarMessageSupervisor::Register(registration) => {
+                                    let result = self.registry.register(registration.clone()).await ;
+                                    self.skel.comm().reply(star_message, result).await;
                                 }
                             }
                     }

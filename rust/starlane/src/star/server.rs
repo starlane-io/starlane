@@ -1,14 +1,13 @@
 use crate::error::Error;
-use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, ServerAppPayload, Reply, AppMessage, SpaceMessage, ServerPayload, StarMessageCentral, SimpleReply, StarMessageSupervisor};
-use crate::star::{ServerVariantBacking, StarCommand, StarSkel, StarKey, StarKind, StarVariant, StarVariantCommand, Wind, ServerCommand, CoreRequest};
+use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, ServerAppPayload, Reply, SpaceMessage, ServerPayload, StarMessageCentral, SimpleReply, StarMessageSupervisor};
+use crate::star::{ServerVariantBacking, StarCommand, StarSkel, StarKey, StarKind, StarVariant, StarVariantCommand, Wind, ServerCommand, CoreRequest, Request};
 use crate::message::{ProtoMessage, MessageExpect, Fail};
 use crate::logger::{Flag, StarFlag, StarLog, StarLogPayload, Log};
 use tokio::time::{sleep, Duration};
-use crate::core::{StarCoreCommand, StarCoreAppMessage, AppCommandResult, StarCoreAppMessagePayload, StarCoreAppLaunch, StarCoreAppAssign};
+use crate::core::{StarCoreCommand, StarCoreAppMessage, AppCommandResult, StarCoreAppMessagePayload };
 use crate::app::{AppCommandKind};
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
-use crate::core::server::AppExtError;
 use crate::keys::{AppKey, UserKey};
 
 
@@ -140,11 +139,8 @@ impl StarVariant for ServerStarVariant
                                match server_space_message
                                {
                                    ServerPayload::AppAssign(meta) => {
-                                       let (tx,rx) = oneshot::channel();
-                                       let payload = StarCoreAppMessagePayload::Assign(StarCoreAppAssign {
-                                           meta: meta.clone(),
-                                           tx: tx
-                                       });
+                                       let (request,rx) = Request::new( meta.clone() );
+                                       let payload = StarCoreAppMessagePayload::Assign(request);
                                        let message = StarCoreAppMessage{ app: meta.key.clone(), payload: payload };
                                        self.skel.core_tx.send( StarCoreCommand::AppMessage(message)).await;
                                        let star_tx = self.skel.star_tx.clone();
@@ -173,11 +169,8 @@ impl StarVariant for ServerStarVariant
                                    }
                                    ServerPayload::SequenceResponse(_) => {}
                                    ServerPayload::AppLaunch(launch) => {
-                                       let (tx,rx) = oneshot::channel();
-                                       let payload = StarCoreAppMessagePayload::Launch(StarCoreAppLaunch{
-                                           app: launch.clone(),
-                                           tx: tx
-                                       });
+                                       let (request,rx) = Request::new(launch.clone());
+                                       let payload = StarCoreAppMessagePayload::Launch(request);
                                        let message = StarCoreAppMessage{ app: launch.key.clone(), payload: payload };
                                        self.skel.core_tx.send( StarCoreCommand::AppMessage(message)).await;
                                        let star_tx = self.skel.star_tx.clone();
@@ -218,6 +211,19 @@ impl StarVariant for ServerStarVariant
                {
                    ServerCommand::PledgeToSupervisor => {
                        self.pledge().await;
+                   }
+                   ServerCommand::Register(request) => {
+                      if let Option::Some(supervisor) = self.backing.get_supervisor()
+                      {
+                          let mut proto = ProtoMessage::new();
+                          proto.to = Option::Some(supervisor.clone());
+                          proto.payload = StarMessagePayload::Supervisor(StarMessageSupervisor::Register(request.payload));
+                          let rx = proto.get_ok_result().await;
+                          self.skel.comm().send_and_get_ok_result(proto,request.tx).await;
+                      } else {
+                          request.tx.send(Result::Err(Fail::Unexpected));
+                      }
+
                    }
                }
            }

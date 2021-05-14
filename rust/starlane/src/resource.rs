@@ -9,7 +9,7 @@ use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
 
-use crate::actor::{ActorKey, ActorKind, ActorRef};
+use crate::actor::{ActorKey, ActorKind};
 use crate::app::{App, AppKind};
 use crate::artifact::{ArtifactKey, ArtifactKind};
 use crate::error::Error;
@@ -1240,16 +1240,6 @@ impl From<SubSpaceKey> for Resource{
 }
 
 
-impl From<ActorRef> for Resource{
-    fn from(e: ActorRef) -> Self {
-        Resource{
-            key: ResourceKey::Actor(e.key),
-            specific: Option::Some(e.archetype.specific),
-            owner: Option::Some(e.archetype.owner),
-            kind: e.archetype.kind.into()
-        }
-    }
-}
 
 impl From<User> for Resource{
     fn from(e: User) -> Self {

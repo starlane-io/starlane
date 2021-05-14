@@ -3,22 +3,23 @@ use std::fmt;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize, Serializer};
-use tokio::time::Instant;
-
-use crate::actor::{ActorKey, ActorLocation, ActorStatus};
-use crate::id::Id;
-use crate::star::{StarKey, StarKind, StarWatchInfo, StarNotify, Star, StarCommand, StarInfo, StarSubGraphKey};
-use crate::resource::{Labels, Selector, Resource, ResourceRegistration};
-use crate::message::{MessageResult, ProtoMessage, MessageExpect, MessageUpdate, Fail};
-use tokio::sync::{oneshot, broadcast, mpsc};
-use crate::keys::{AppKey, UserKey, SubSpaceKey, MessageId, ResourceKey};
-use crate::app::{AppLocation, AppSpecific, AppMeta, AppArchetype, ConfigSrc, App, AppCreateResult};
-use crate::logger::Flags;
-use crate::error::Error;
-use crate::permissions::{AuthToken, Authentication};
-use crate::crypt::{Encrypted, HashEncrypted, HashId};
+use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
+use tokio::time::Instant;
+
+use crate::actor::{ActorKey, ActorLocation, ActorStatus, ActorMessage,  RawState};
+use crate::app::{App, AppArchetype, AppCreateResult, AppLocation, AppMeta, AppSpecific, ConfigSrc, AppMessage};
+use crate::crypt::{Encrypted, HashEncrypted, HashId};
+use crate::error::Error;
+use crate::id::Id;
+use crate::keys::{AppKey, MessageId, ResourceKey, SubSpaceKey, UserKey};
+use crate::logger::Flags;
+use crate::message::{Fail, MessageExpect, MessageResult, MessageUpdate, ProtoMessage};
+use crate::names::Name;
+use crate::permissions::{Authentication, AuthToken};
+use crate::resource::{Labels, Resource, ResourceRegistration, Selector};
+use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey, StarWatchInfo};
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Frame
@@ -363,7 +364,8 @@ pub enum StarMessageCentral
 #[derive(Clone,Serialize,Deserialize)]
 pub enum StarMessageSupervisor
 {
-    Pledge(StarKind)
+    Pledge(StarKind),
+    Register(ResourceRegistration)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -446,6 +448,7 @@ impl SpaceMessage
 #[derive(Clone,Serialize,Deserialize)]
 pub enum SpacePayload
 {
+    App(AppPayload),
     Reply(SpaceReply),
     Central(CentralPayload),
     Server(ServerPayload),
@@ -500,11 +503,6 @@ pub struct AppLabelRequest
     pub labels: Labels
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct AppMessage
-{
-    pub app: AppKey
-}
 
 
 
@@ -534,7 +532,7 @@ pub enum Event
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ActorEvent
 {
-   StateChange(ActorState),
+   StateChange(RawState),
    Gathered(ActorGathered),
    Scattered(ActorScattered),
    Broadcast(ActorBroadcast),
@@ -569,11 +567,6 @@ pub enum LaneEventKind
     Disconnect
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct ActorState
-{
-    pub payloads: ActorPayloads
-}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ActorGathered
@@ -591,28 +584,7 @@ pub struct ActorScattered
 pub struct ActorBroadcast
 {
     pub topic: String,
-    pub payloads: ActorPayloads
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct ActorPayloads
-{
-    pub map: HashMap<String, ActorPayload>
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct ActorPayload
-{
-    pub kind: String,
-    pub data: Arc<Vec<u8>>
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct ActorBindReport
-{
-    pub star: StarKey,
-    pub key: ActorKey,
-    pub name: Option<String>
+    pub data: Vec<u8>
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -654,37 +626,6 @@ pub struct ActorNameLookup
 
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum ActorFromKind
-{
-    Actor(ActorFrom),
-    User(UserKey)
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct ActorFrom
-{
-    key: ActorKey,
-    source: Option<Vec<u8>>
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct ActorTo
-{
-    key: ActorKey,
-    target: Option<Vec<u8>>
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct ActorMessage
-{
-    pub id: Id,
-    pub from: ActorFromKind,
-    pub to: ActorTo,
-    pub payloads: ActorPayloads,
-    pub transaction: Option<Id>
-}
-
-#[derive(Clone,Serialize,Deserialize)]
 pub struct ActorBind
 {
    pub key: ActorKey,
@@ -700,8 +641,11 @@ pub struct Rejection
 
 
 
-
-
+#[derive(Clone,Serialize,Deserialize)]
+pub enum AppPayload {
+   AppMessage(AppMessage),
+   ActorMessage(ActorMessage)
+}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct AppNotifyCreated

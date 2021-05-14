@@ -1,24 +1,4 @@
-use crate::frame::{ActorMessage, Event};
+use crate::frame::{Event};
 use tokio::sync::watch::{Sender, Receiver};
+use crate::actor::ActorMessage;
 
-pub enum ServerMessageIn
-{
-   ResourceMessage(ActorMessage)
-}
-
-pub enum ServerMessageOut
-{
-    ResourceEvent(Event),
-   ResourceMessage(ActorMessage),
-}
-
-pub struct Server
-{
-    pub tx: Sender<ServerMessageOut>,
-    pub rx: Receiver<ServerMessageIn>
-}
-
-impl Server
-{
-
-}

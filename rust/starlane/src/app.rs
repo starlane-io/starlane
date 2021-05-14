@@ -7,20 +7,24 @@ use serde::{Deserialize, Serialize, Serializer};
 use tokio::sync::{mpsc, Mutex, oneshot};
 use tokio::time::Duration;
 
-use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorKey, ActorKind, ActorMeta, ActorRef, MakeMeAnActor, NewActor};
+use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorKey, ActorKind, ActorMeta, ActorRegistration, ActorMessage, MessageFrom, ActorKeySeqListener};
 use crate::actor;
 use crate::artifact::{Artifact, ArtifactKey};
-use crate::core::{AppLaunchError, StarCoreCommand};
-use crate::core::server::{ActorCreateError, AppExt};
+use crate::core::{StarCoreCommand };
+use crate::core::server::{AppExt};
 use crate::error::Error;
 use crate::filesystem::File;
-use crate::frame::{ActorMessage, AppMessage};
+use crate::frame::{Reply};
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, SubSpaceKey, UserKey, ResourceKey};
-use crate::resource::{Labels, Resource, ResourceKind};
+use crate::resource::{Labels, Resource, ResourceKind, ResourceRegistration};
 use crate::names::Name;
 use crate::space::CreateAppControllerFail;
-use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarSkel, StarVariantCommand};
+use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarSkel, StarVariantCommand, StarComm, ServerCommand, Request, Empty};
+use crate::message::Fail;
+use tokio::sync::mpsc::Sender;
+use tokio::time::error::Elapsed;
+use tokio::sync::oneshot::error::RecvError;
 
 pub type AppSpecific = Name;
 
@@ -28,8 +32,6 @@ pub type AppSpecific = Name;
 pub enum AppKind
 {
     Normal,
-    Worker,
-    Daemon
 }
 
 
@@ -37,9 +39,7 @@ impl fmt::Display for AppKind{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!( f,"{}",
                 match self{
-                    AppKind::Normal => "Normal".to_string(),
-                    AppKind::Worker=> "Worker".to_string(),
-                    AppKind::Daemon=> "Daemon".to_string(),
+                    AppKind::Normal => "Normal".to_string()
                 })
     }
 }
@@ -53,15 +53,13 @@ impl FromStr for AppKind
         match s
         {
             "Normal" => Ok(AppKind::Normal),
-            "Worker" => Ok(AppKind::Worker),
-            "Daemon" => Ok(AppKind::Daemon),
             _ => Err(format!("could not find AppKind: {}",s).into())
         }
     }
 }
 
 
-        #[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Serialize,Deserialize)]
 pub enum ConfigSrc
 {
     None,
@@ -101,163 +99,109 @@ impl Memory
 
 
 
-
-pub struct AppSlice
-{
-    inner: Arc<Mutex<AppSliceInner>>
-}
-
-impl AppSlice
-{
-    pub fn new(assign: AppMeta, skel: StarSkel, ext: Arc<dyn AppExt>) -> Self
-    {
-        AppSlice {
-            inner: Arc::new( Mutex::new(AppSliceInner {
-                meta: assign,
-                actors: HashMap::new(),
-                sequence: Option::None,
-                skel: skel,
-                ext: ext
-            }))
-        }
-    }
-
-    pub fn context(&self)->AppContext
-    {
-        AppContext::new(self.inner.clone() )
-    }
-
-    pub async fn ext(&self)->Arc<AppExt>
-    {
-        let lock = self.inner.lock().await;
-        lock.ext.clone()
-    }
-
-}
-
-impl AppSlice
-{
-    async fn unique_seq(&self,user: UserKey)-> oneshot::Receiver<Arc<IdSeq>>
-    {
-        let lock = self.inner.lock().await;
-        lock.unique_seq(user).await
-    }
-
-    async fn seq(&mut self)->Result<Arc<IdSeq>,Error>
-    {
-        let mut lock = self.inner.lock().await;
-        (*lock).seq().await
-    }
-
-
-    async fn next_id(&mut self)->Result<Id,Error>
-    {
-        let mut lock = self.inner.lock().await;
-        (*lock).next_id().await
-    }
-
-    async fn actor_create(&mut self, archetype: ActorArchetype) ->Result<ActorRef,ActorCreateError> {
-        let context = AppContext::new( self.inner.clone() );
-        let mut lock = self.inner.lock().await;
-        (*lock).actor_create(context, archetype).await
-    }
-
-    async fn meta(&self) -> AppMeta {
-        let lock = self.inner.lock().await;
-        lock.meta.clone()
-    }
+pub enum AppSliceCommand {
+    FetchSequence(Request<Empty,u64>),
+    ClaimActor(ActorKey),
+    Launch(Request<AppArchetype,()>)
 }
 
 /**
   * represents part of an app on one Server or Client star
   */
-pub struct AppSliceInner
+pub struct AppSlice
 {
     pub meta: AppMeta,
-    pub actors: HashMap<ActorKey,ActorRef>,
-    pub sequence: Option<Arc<IdSeq>>,
-    pub skel: StarSkel,
-    pub ext: Arc<dyn AppExt>
+    pub comm: StarComm,
+    pub ext: Box<dyn AppExt>,
+    pub rx: mpsc::Receiver<AppSliceCommand>,
+    pub context: AppContext
 }
 
-impl AppSliceInner
+impl AppSlice
 {
-    pub async fn unique_seq(&self,user: UserKey)-> oneshot::Receiver<Arc<IdSeq>>
+    pub async fn new( meta: AppMeta, comm: StarComm, ext: Box<dyn AppExt>) -> mpsc::Sender<AppSliceCommand>
     {
-        let (tx,rx) = oneshot::channel();
-        self.skel.variant_tx.send(StarVariantCommand::CoreRequest( CoreRequest::AppSequenceRequest(CoreAppSequenceRequest{
-            app: self.meta.key.clone(),
-            user: user.clone(),
-            tx: tx
-        }) )).await;
+        let (tx,rx) = mpsc::channel(1024);
 
-        let (seq_tx, seq_rx) = oneshot::channel();
+        let context = AppContext::new(meta.clone(), tx.clone(), comm.clone() );
+        let app = AppSlice{
+            meta: meta,
+            context: context,
+            comm: comm,
+            ext: ext,
+            rx: rx
+        };
 
-        tokio::spawn( async move {
-            if let Result::Ok(Result::Ok(seq)) = tokio::time::timeout(Duration::from_secs(15), rx).await
-            {
-                seq_tx.send( Arc::new( IdSeq::new(seq)));
+        tokio::spawn(async move { app.run().await; } );
+
+        tx
+    }
+
+    async fn run(mut self)
+    {
+        while let Option::Some(command) = self.rx.recv().await {
+            self.process(command).await;
+        }
+    }
+
+    async fn process( &mut self, command: AppSliceCommand )->Result<(),Error>
+    {
+        match command
+        {
+            AppSliceCommand::FetchSequence(request) => {
+                self.fetch_seq(request).await;
+                Ok(())
             }
-        });
-
-        seq_rx
-    }
-
-
-    pub async fn seq(&mut self)->Result<Arc<IdSeq>,Error>
-    {
-        if let Option::None = self.sequence
-        {
-            let rx = self.unique_seq(self.meta.owner.clone()).await;
-            let seq = rx.await?;
-            self.sequence = Option::Some(seq);
+            AppSliceCommand::ClaimActor(claim) => {
+                // not sure what to do with this yet...
+                Ok(())
+            }
+            AppSliceCommand::Launch(request) => {
+                let result = self.ext.launch(request.payload ).await;
+                request.tx.send(result);
+                Ok(())
+            }
         }
-
-        Ok(self.sequence.as_ref().unwrap().clone())
     }
 
-
-    pub async fn next_id(&mut self)->Result<Id,Error>
-    {
-        Ok(self.seq().await?.next())
-    }
-
-    pub async fn actor_create(&mut self, context: AppContext, archetype: ActorArchetype) ->Result<ActorRef,ActorCreateError>
-    {
-        let actor_id = self.next_id().await;
-        if actor_id.is_err()
-        {
-            return Err(ActorCreateError::Error(actor_id.err().unwrap().to_string()));
-        }
-
-        let actor_id = actor_id.unwrap();
-
-        let key = ActorKey{
+    async fn fetch_seq(&mut self, request: Request<Empty,u64>) {
+        let (tx,rx) = oneshot::channel();
+        self.comm.variant_tx.send( StarVariantCommand::CoreRequest(CoreRequest::AppSequenceRequest(CoreAppSequenceRequest{
             app: self.meta.key.clone(),
-            id: actor_id
-        };
-
-        let meta = ActorMeta::new(key.clone(), archetype.kind.clone(), archetype.config.clone() );
-
-        let mut context = ActorContext::new( meta, context );
-
-        let actor = self.ext.actor_create( &mut context, archetype.clone() ).await?;
-
-        let actor_ref = ActorRef{
-            key: key.clone(),
-            archetype: archetype.clone(),
-            actor: actor
-        };
-
-        self.actors.insert( key.clone(), actor_ref.clone() );
-
-        Ok( actor_ref )
-
+            user: self.meta.owner.clone(),
+            tx: tx
+        }))).await;
+        tokio::spawn( async move {
+            match tokio::time::timeout( Duration::from_secs(10),rx).await
+            {
+                Ok(result) => {
+                    match result
+                    {
+                        Ok(seq) => {
+                            request.tx.send(Result::Ok(seq));
+                        }
+                        Err(err) => {
+                            request.tx.send(Result::Err(Fail::Unexpected));
+                        }
+                    }
+                }
+                Err(err) => {
+                    request.tx.send(Result::Err(Fail::Timeout));
+                }
+            }
+        } );
     }
+
+
 
     pub fn meta(&self) -> AppMeta {
        self.meta.clone()
     }
+
+
+
+
+
 }
 
 
@@ -370,11 +314,17 @@ pub struct AppLocation
     pub supervisor: StarKey
 }
 
+#[derive(Clone,Serialize,Deserialize)]
+pub enum AppCommand
+{
+
+}
+
 #[derive(Clone)]
 pub struct AppController
 {
     pub app: AppKey,
-    pub tx: mpsc::Sender<AppMessage>
+    pub tx: mpsc::Sender<AppCommand>
 }
 
 impl AppController
@@ -533,46 +483,102 @@ impl fmt::Display for HaltReason{
     }
 }
 
+#[derive(Clone)]
+pub struct AppContext
+{
+    meta: AppMeta,
+    sequence: Option<Arc<IdSeq>>,
+    app_tx: mpsc::Sender<AppSliceCommand>,
+    comm: StarComm
+}
+
 impl AppContext
 {
-    pub fn new( app: Arc<Mutex<AppSliceInner>> )->AppContext
+    pub fn new( meta: AppMeta, app_tx: mpsc::Sender<AppSliceCommand>, comm: StarComm )->Self
     {
         AppContext{
-            app: app
+            app_tx: app_tx,
+            meta: meta,
+            sequence: Option::None,
+            comm: comm
         }
     }
 
     pub async fn meta(&mut self)->AppMeta {
-        let app = self.app.lock().await;
-        app.meta().clone()
+        self.meta.clone()
     }
 
-    pub async fn unique_seq(&self,user: UserKey)-> oneshot::Receiver<Arc<IdSeq>> {
-        let app = self.app.lock().await;
-        app.unique_seq(user).await
-    }
-
-    pub async fn seq(&mut self)->Result<Arc<IdSeq>,Error> {
-        let mut app = self.app.lock().await;
-        app.seq().await
-    }
-
-    pub async fn next_id(&mut self)->Result<Id,Error>
+    pub async fn unique_seq(&mut self)->Result<Arc<IdSeq>,Fail>
     {
-        let mut app = self.app.lock().await;
-        app.next_id().await
+        let (request,rx) = Request::new(Empty::new() );
+        self.app_tx.send( AppSliceCommand::FetchSequence(request)).await;
+        if let seq_id= rx.await??
+        {
+            Ok(Arc::new(IdSeq::new(seq_id)))
+        }
+        else
+        {
+            Err(Fail::Unexpected)
+        }
+
     }
 
-    pub async fn actor_create( &mut self , archetype: ActorArchetype) -> Result<ActorRef,ActorCreateError>
+    pub async fn seq(&mut self)->Result<Arc<IdSeq>,Fail>
     {
-        let context = AppContext::new(self.app.clone());
-        let mut app = self.app.lock().await;
-        app.actor_create(context, archetype).await
+        if let Option::None = self.sequence
+        {
+            self.sequence = Option::Some(self.unique_seq().await?)
+        }
+
+        Ok(self.sequence.as_ref().unwrap().clone())
+    }
+
+
+    pub async fn next_id(&mut self)->Result<Id,Fail>
+    {
+        Ok(self.seq().await?.next())
+    }
+
+    pub async fn create_actor_key(&mut self) ->Result<ActorKey,Fail>
+    {
+        let actor_id = self.next_id().await?;
+
+        let actor_key = ActorKey{
+            app: self.meta.key.clone(),
+            id: actor_id
+        };
+
+        Ok( actor_key )
+    }
+
+    pub async fn register(&mut self, registration: ActorRegistration ) -> Result<(),Fail>
+    {
+        let registration: ResourceRegistration = registration.into();
+        let (request,rx) = Request::new(registration);
+        self.comm.variant_tx.send( StarVariantCommand::ServerCommand(ServerCommand::Register(request))).await;
+        rx.await?;
+        Ok(())
     }
 }
 
+#[derive(Clone,Serialize,Deserialize)]
+pub struct AppTo{
+    pub app: AppKey,
+    pub ext: Option<Raw>
+}
 
-pub struct AppContext
+#[derive(Clone,Serialize,Deserialize)]
+pub struct AppMessage
 {
-    app: Arc<Mutex<AppSliceInner>>
+    pub to: AppTo,
+    pub from: MessageFrom,
+    pub payload: Arc<Raw>
 }
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct AppFrom{
+    pub app: AppKey,
+    pub ext: Option<Raw>
+}
+
+pub type Raw=Vec<u8>;

@@ -24,12 +24,12 @@ use url::Url;
 
 use server::ServerStarVariant;
 
-use crate::actor::{Actor, ActorKey, ActorKind, ActorLocation, ActorWatcher};
-use crate::app::{AppCommandKind, AppController, AppCreateController, AppMeta, AppSpecific, AppLocation};
+use crate::actor::{ActorKey, ActorKind, ActorLocation, ActorWatcher, ActorMessage};
+use crate::app::{AppCommandKind, AppController, AppCreateController, AppMeta, AppSpecific, AppLocation, AppMessage, AppCommand};
 use crate::core::StarCoreCommand;
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ActorMessage, ApplicationSupervisorReport, AppMessage, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, CentralPayload, SimpleReply, StarMessageCentral};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ApplicationSupervisorReport, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, CentralPayload, SimpleReply, StarMessageCentral, AppPayload};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId, SpaceKey, UserKey, ResourceKey};
@@ -387,9 +387,7 @@ impl Star
                     StarCommand::SpaceCommand(command)=>{
                         self.on_space_command(command).await;
                     }
-                    StarCommand::AppCommand(command)=>{
-                        self.on_app_command(command).await;
-                    }
+
                     StarCommand::AddLogger(tx) => {
 //                        self.logger.tx.push(tx);
                     }
@@ -604,7 +602,7 @@ println!("spaces_do_not_match");
         }
     }
 
-    async fn on_app_command( &mut self, command: AppMessage)
+    async fn on_app_command( &mut self, command: AppPayload )
     {
         println!("on_app_command!");
     }
@@ -1425,10 +1423,8 @@ pub enum StarCommand
     FrameTimeout(FrameTimeoutInner),
     FrameError(FrameErrorInner),
     SpaceCommand(SpaceCommand),
-    AppCommand(AppMessage),
-    ActorMessage(ActorMessage),
-    AppMessage(AppMessage),
-    GetSpaceController(GetSpaceController)
+    GetSpaceController(GetSpaceController),
+    AppCommand(AppCommand)
 }
 
 pub struct GetSpaceController
@@ -1571,7 +1567,38 @@ pub struct SupervisorSelect
 
 pub enum ServerCommand
 {
-    PledgeToSupervisor
+    PledgeToSupervisor,
+    Register(Request<ResourceRegistration,()>)
+}
+
+pub struct Request<P,R> {
+   pub payload: P,
+   pub tx: oneshot::Sender<Result<R,Fail>>
+}
+
+impl <P,R> Request<P,R>
+{
+
+}
+
+pub struct Empty {
+}
+
+impl Empty {
+    pub fn new()->Self {
+        Empty{}
+    }
+}
+
+impl <P,R> Request<P,R>
+{
+    pub fn new( payload: P )->(Self,oneshot::Receiver<Result<R,Fail>>) {
+       let (tx,rx) = oneshot::channel();
+        (Request{
+           payload: payload,
+           tx: tx
+       },rx)
+    }
 }
 
 pub struct FrameTimeoutInner
@@ -1634,8 +1661,6 @@ impl fmt::Display for StarCommand{
             StarCommand::ConstellationConstructionComplete => "ConstellationConstructionComplete".to_string(),
             StarCommand::Init => "Init".to_string(),
             StarCommand::GetSpaceController(_) => "GetSpaceController".to_string(),
-            StarCommand::ActorMessage(_) => "ActorMessage".to_string(),
-            StarCommand::AppMessage(_) => "AppMessage".to_string()
         };
         write!(f, "{}",r)
     }
@@ -2091,6 +2116,21 @@ impl StarKey
 
 }
 
+impl StarKey
+{
+    pub fn bin(&self)->Result<Vec<u8>,Error>
+    {
+        let mut bin= bincode::serialize(self)?;
+        Ok(bin)
+    }
+
+    pub fn from_bin(mut bin: Vec<u8> )->Result<StarKey,Error>
+    {
+        let mut key = bincode::deserialize::<StarKey>(bin.as_slice() )?;
+        Ok(key)
+    }
+}
+
 impl cmp::Ord for StarKey
 {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -2368,6 +2408,7 @@ impl StarNotify
     }
 }
 
+#[derive(Clone)]
 pub struct StarComm
 {
     pub star_tx: mpsc::Sender<StarCommand>,
@@ -2380,6 +2421,133 @@ impl StarComm
      pub async fn send( &self, proto: ProtoMessage ) {
         self.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
      }
+    pub async fn reply<R>( &self, message: StarMessage, result: Result<R,Fail> ) {
+        match result {
+            Ok(_) => {
+                let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
+                self.send(proto).await;
+            }
+            Err(fail) => {
+                let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(fail)));
+                self.send(proto).await;
+            }
+        }
+    }
+
+    pub async fn reply_ok( &self, message: StarMessage ) {
+        let proto = message.reply( StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
+        self.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
+    }
+
+
+    pub async fn handle_ok_response<R>( &self, rx: oneshot::Receiver<Result<R,Fail>>, message: StarMessage ) where R: Send+Sync+'static
+    {
+        let star_tx = self.star_tx.clone();
+        tokio::spawn( async move {
+            let reply = match rx.await
+            {
+                Ok(result) => {
+                    match result
+                    {
+                        Ok(ok) => {
+                            SimpleReply::Ok(Reply::Empty)
+                        }
+                        Err(fail) => {
+                            SimpleReply::Fail(fail)
+                        }
+                    }
+                }
+                Err(err) => {
+                    SimpleReply::Fail(Fail::RecvErr)
+                }
+            };
+            let proto = message.reply(StarMessagePayload::Reply(reply));
+            star_tx.send( StarCommand::SendProtoMessage(proto) ).await;
+        } );
+    }
+    pub async fn send_and_get_ok_result( &self, proto: ProtoMessage, tx: oneshot::Sender<Result<(),Fail>> ) {
+        let result = proto.get_ok_result().await;
+        tokio::spawn( async move {
+            match tokio::time::timeout( Duration::from_secs(30), result).await
+            {
+                Ok(result) => {
+                    match result{
+                        Ok(payload) => {
+                            match payload
+                            {
+                                StarMessagePayload::Reply(reply) => {
+                                    match reply
+                                    {
+                                        SimpleReply::Ok(reply) => {
+                                            tx.send(Result::Ok(()));
+                                        }
+                                        SimpleReply::Fail(fail) => {
+                                            tx.send(Result::Err(fail));
+                                        }
+                                        _ => {
+                                            tx.send(Result::Err(Fail::Unexpected));
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    tx.send(Result::Err(Fail::Unexpected));
+                                }
+                            }
+                        }
+                        Err(error) => {
+                            tx.send(Result::Err(Fail::Unexpected));
+                        }
+                    }
+                }
+                Err(elapsed) => {
+                    tx.send(Result::Err(Fail::Timeout));
+                }
+            };
+        } );
+        self.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
+    }
+
+    pub async fn send_and_get_result( &self, proto: ProtoMessage, tx: oneshot::Sender<Result<Reply,Fail>> ) {
+        let result = proto.get_ok_result().await;
+        tokio::spawn( async move {
+            match tokio::time::timeout( Duration::from_secs(30), result).await
+            {
+                Ok(result) => {
+                    match result{
+                        Ok(payload) => {
+                            match payload
+                            {
+                                StarMessagePayload::Reply(reply) => {
+                                    match reply
+                                    {
+                                        SimpleReply::Ok(reply) => {
+                                            tx.send(Result::Ok(reply));
+                                        }
+                                        SimpleReply::Fail(fail) => {
+                                            tx.send(Result::Err(fail));
+                                        }
+                                        _ => {
+                                            tx.send(Result::Err(Fail::Unexpected));
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    tx.send(Result::Err(Fail::Unexpected));
+                                }
+                            }
+                        }
+                        Err(error) => {
+                            tx.send(Result::Err(Fail::Unexpected));
+                        }
+                    }
+                }
+                Err(elapsed) => {
+                    tx.send(Result::Err(Fail::Timeout));
+                }
+            };
+        } );
+        self.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
+    }
 }
 
 impl StarComm

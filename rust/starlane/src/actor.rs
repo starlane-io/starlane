@@ -1,21 +1,29 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize, Serializer};
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::Sender;
 
-use crate::error::Error;
-use crate::frame::{Event, ActorMessage, ActorState};
-use crate::id::Id;
-use crate::star::StarKey;
-use crate::keys::{AppKey, UserKey, SubSpaceKey};
-use crate::names::Name;
-use crate::app::{InitData, ConfigSrc};
+use crate::app::{ConfigSrc, InitData, AppFrom};
 use crate::app::AppContext;
-use crate::resource::{Labels, Resource};
-use std::str::FromStr;
+use crate::error::Error;
+use crate::frame::{Event};
+use crate::id::Id;
+use crate::keys::{AppKey, ResourceKey, SubSpaceKey, UserKey};
+use crate::names::Name;
+use crate::resource::{Labels, Resource, ResourceKind, ResourceRegistration};
+use crate::star::StarKey;
+use std::marker::PhantomData;
+use serde::de::DeserializeOwned;
+
+pub struct Actor
+{
+    pub key: ActorKey,
+    pub archetype: ActorArchetype
+}
 
 pub struct ActorContext
 {
@@ -44,7 +52,6 @@ pub struct ActorArchetype
     pub init: InitData,
     pub labels: Labels,
     pub name: Option<String>,
-    pub register: bool
 }
 
 impl ActorArchetype
@@ -59,7 +66,6 @@ impl ActorArchetype
           init: InitData::None,
           labels: Labels::new(),
           name: Option::None,
-          register: false
       }
   }
 }
@@ -69,21 +75,60 @@ pub struct ActorMeta
 {
     pub key: ActorKey,
     pub kind: ActorKind,
+    pub specific: ActorSpecific,
     pub config: ConfigSrc,
 }
 
 impl ActorMeta
 {
-    pub fn new( key: ActorKey, kind: ActorKind, config: ConfigSrc ) -> Self
+    pub fn new( key: ActorKey, kind: ActorKind, specific: ActorSpecific, config: ConfigSrc ) -> Self
     {
         ActorMeta{
             key: key,
             kind: kind,
+            specific: specific,
             config: config
         }
     }
 }
 
+pub struct ActorResource
+{
+    pub key: ActorKey,
+    pub kind: ActorKind,
+    pub specific: ActorSpecific,
+    pub owner: UserKey
+}
+
+pub struct ActorRegistration
+{
+    pub resource: ActorResource,
+    pub name: Option<String>,
+    pub labels: Labels,
+}
+
+impl From<ActorResource> for Resource
+{
+    fn from(actor: ActorResource) -> Self {
+        Resource{
+            key: ResourceKey::Actor(actor.key),
+            kind: ResourceKind::Actor(actor.kind),
+            specific: Option::Some(actor.specific),
+            owner: Option::Some(actor.owner)
+        }
+    }
+}
+
+impl From<ActorRegistration> for ResourceRegistration
+{
+    fn from(actor : ActorRegistration) -> Self {
+        ResourceRegistration{
+            resource: actor.resource.into(),
+            name: actor.name,
+            labels: actor.labels
+        }
+    }
+}
 
 
 
@@ -109,20 +154,6 @@ impl ActorKey
             id: id
         }
     }
-}
-
-#[derive(Clone)]
-pub struct ActorRef
-{
-    pub key: ActorKey,
-    pub archetype: ActorArchetype,
-    pub actor: Arc<dyn Actor>
-}
-
-#[async_trait]
-pub trait Actor: Sync+Send
-{
-    async fn handle_message(&mut self, actor_context: &ActorContext, message: ActorMessage );
 }
 
 pub type ActorSpecific = Name;
@@ -176,6 +207,35 @@ impl fmt::Display for ActorKey {
 }
 
 #[derive(Clone,Serialize,Deserialize)]
+pub struct ActorTo
+{
+    pub key: ActorKey,
+    pub ext: ActorToExt
+
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ActorToExt
+{
+    None,
+    Ext(Raw)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ActorFrom
+{
+    pub key: ActorKey,
+    pub ext: ActorFromExt
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ActorFromExt
+{
+    None,
+    Ext(Raw)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
 pub struct ActorLocation
 {
     pub actor: ActorKey,
@@ -183,6 +243,8 @@ pub struct ActorLocation
     pub gathering: Option<ActorKey>,
     pub ext: Option<Vec<u8>>
 }
+
+
 
 impl ActorLocation
 {
@@ -240,21 +302,6 @@ impl ActorWatcher
     }
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct MakeMeAnActor
-{
-    pub app: AppKey,
-    pub kind: ActorKind,
-    pub data: Arc<Vec<u8>>,
-    pub labels: Labels
-}
-
-pub struct NewActor
-{
-    pub kind: ActorKind,
-    pub data: Arc<Vec<u8>>,
-    pub labels: Labels
-}
 
 pub struct ActorAssign
 {
@@ -270,3 +317,65 @@ pub enum ActorStatus
 {
     Unknown
 }
+
+pub trait ActorKeySeqListener
+{
+    fn on_new_actor( &self, actor: ActorKey );
+}
+
+#[derive(Clone)]
+pub struct ActorKeySeq
+{
+    app: AppKey,
+    seq: u64,
+    index: u64,
+    listener: Option<Arc<dyn ActorKeySeqListener>>
+}
+
+impl ActorKeySeq
+{
+    pub fn new( app:AppKey, seq: u64, index: u64, listener: Option<Arc<dyn ActorKeySeqListener>>)->Self {
+        ActorKeySeq{
+            app: app,
+            seq: seq,
+            index: index,
+            listener: listener
+        }
+    }
+
+    pub fn next(&mut self)->ActorKey
+    {
+        self.index=self.index+1;
+        let key = ActorKey::new(self.app.clone(), Id::new(self.seq, self.index ));
+
+        if let Option::Some(listener) = &self.listener
+        {
+            listener.on_new_actor(key.clone() )
+        }
+
+        key
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ActorMessage
+{
+    pub id: Id,
+    pub from: MessageFrom,
+    pub to: ActorTo,
+    pub payload: Arc<RawPayload>,
+    pub transaction: Option<Id>
+}
+
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum MessageFrom
+{
+    Actor(ActorFrom),
+    App(AppFrom),
+    User(UserKey)
+}
+
+pub type Raw=Vec<u8>;
+pub type RawPayload=Vec<u8>;
+pub type RawState=Vec<u8>;

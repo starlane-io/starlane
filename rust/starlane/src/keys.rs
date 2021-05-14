@@ -5,7 +5,7 @@ use bincode::deserialize;
 use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
 
-use crate::actor::{Actor, ActorKey, ActorKind, ActorRef};
+use crate::actor::{Actor, ActorKey, ActorKind};
 use crate::app::{App, AppKind};
 use crate::artifact::{Artifact, ArtifactKey, ArtifactKind};
 use crate::error::Error;
@@ -190,7 +190,7 @@ impl SubSpaceKey
 
 impl fmt::Display for SubSpaceKey{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!( f,"({},{})",self.space, self.id)
+        write!( f,"{}-{}",self.space, self.id)
     }
 
 }
@@ -338,7 +338,6 @@ impl fmt::Display for ResourceKey{
                     ResourceKey::Artifact(key) => format!("ArtifactKey:{}",key),
                 })
     }
-
 }
 
 impl ResourceKey

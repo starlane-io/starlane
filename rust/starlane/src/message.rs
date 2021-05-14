@@ -7,9 +7,10 @@ use crate::id::Id;
 use tokio::sync::{mpsc, oneshot, broadcast};
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::mpsc::Sender;
-use crate::keys::{MessageId, SubSpaceKey, UserKey};
+use crate::keys::{MessageId, SubSpaceKey, UserKey, ResourceKey};
 use tokio::sync::broadcast::error::RecvError;
 use serde::{Serialize, Deserialize};
+use crate::names::Specific;
 
 pub struct ProtoMessage
 {
@@ -332,7 +333,10 @@ pub enum Fail
     Timeout,
     Error(String),
     Reject(Reject),
-    Unexpected
+    Unexpected,
+    DoNotKnowSpecific(Specific),
+    ResourceNotFound(ResourceKey),
+    RecvErr
 }
 
 
@@ -360,3 +364,4 @@ impl From<tokio::sync::oneshot::error::RecvError> for Fail
         Fail::Timeout
     }
 }
+
