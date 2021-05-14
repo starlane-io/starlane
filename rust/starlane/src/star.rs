@@ -32,7 +32,7 @@ use crate::error::Error;
 use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ApplicationSupervisorReport, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, CentralPayload, SimpleReply, StarMessageCentral, AppPayload};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
-use crate::keys::{AppKey, MessageId, SpaceKey, UserKey, ResourceKey};
+use crate::keys::{AppKey, MessageId, SpaceKey, UserKey, ResourceKey, GatheringKey};
 use crate::resource::{Labels, ResourceRegistration, Selector, Resource, RegistryAction, RegistryCommand, RegistryResult, Registry, ResourceType, ResourceLocation};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
@@ -1521,6 +1521,7 @@ pub enum StarVariantCommand
     CentralCommand(CentralCommand),
     SupervisorCommand(SupervisorCommand),
     ServerCommand(ServerCommand),
+    ResourceCommand(ResourceCommand),
 }
 
 pub enum CoreRequest
@@ -1567,8 +1568,29 @@ pub struct SupervisorSelect
 
 pub enum ServerCommand
 {
-    PledgeToSupervisor,
-    Register(Request<ResourceRegistration,()>)
+    PledgeToSupervisor
+}
+
+pub enum ResourceCommand {
+    Register(Request<ResourceRegistration,()>),
+    SignalLocation(LocalResourceLocation),
+}
+
+pub struct LocalResourceLocation
+{
+    pub resource: ResourceKey,
+    pub gathering: Option<GatheringKey>
+}
+
+impl LocalResourceLocation
+{
+    pub fn new( resource: ResourceKey, gathering: Option<GatheringKey> )->Self
+    {
+        LocalResourceLocation {
+            resource: resource,
+            gathering: gathering
+        }
+    }
 }
 
 pub struct Request<P,R> {
@@ -1576,9 +1598,9 @@ pub struct Request<P,R> {
    pub tx: oneshot::Sender<Result<R,Fail>>
 }
 
-impl <P,R> Request<P,R>
-{
-
+pub struct Query<P,R> {
+    pub payload: P,
+    pub tx: oneshot::Sender<R>
 }
 
 pub struct Empty {
@@ -1629,7 +1651,8 @@ impl fmt::Display for StarVariantCommand {
             StarVariantCommand::ServerCommand(_) => "ServerCommand".to_string(),
             StarVariantCommand::Init => "Init".to_string(),
             StarVariantCommand::StarSkel(_) => "StarData".to_string(),
-            StarVariantCommand::CoreRequest(_) => "CoreRequest".to_string()
+            StarVariantCommand::CoreRequest(_) => "CoreRequest".to_string(),
+            StarVariantCommand::ResourceCommand(_) => "ResourceCommand".to_string()
         };
         write!(f, "{}",r)
     }
@@ -2762,5 +2785,24 @@ impl RegistryBacking for RegistryBackingSqlLite
         {
             Err(Fail::Unexpected)
         }
+    }
+}
+
+pub struct StarVariantCommon
+{
+    pub skel: StarSkel
+}
+
+impl StarVariantCommon
+{
+    pub async fn handle( command: StarVariantCommand) -> Result<(),Error>
+    {
+        match command {
+            StarVariantCommand::ResourceCommand(resource_command) => {
+
+            }
+            _ => {}
+        }
+        Ok(())
     }
 }

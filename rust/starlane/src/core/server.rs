@@ -15,7 +15,7 @@ use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, SubSpaceKey, UserKey, ResourceKey};
 use crate::resource::{Labels, ResourceRegistration};
 use crate::message::{ProtoMessage, Fail};
-use crate::star::{ActorCreate, StarCommand, StarKey, StarSkel, Request};
+use crate::star::{ActorCreate, StarCommand, StarKey, StarSkel, Request, LocalResourceLocation};
 use tokio::sync::oneshot::error::RecvError;
 
 pub struct ServerStarCore
@@ -101,9 +101,34 @@ impl StarCore for ServerStarCore
                         }
                     }
                 }
-                _ => {
-                eprintln!("unexpected star command");
-            }
+                StarCoreCommand::HasResource(request) => {
+                    let resource = request.payload.clone();
+                    match &request.payload
+                    {
+                        ResourceKey::Actor(actor) => {
+                            if let Option::Some(app) = self.apps.get_mut(&actor.app) {
+                               let (new_request,mut rx) = Request::new(resource.clone() );
+                               app.send(AppSliceCommand::HasActor(new_request)).await;
+                                tokio::spawn(async move{
+                                    match rx.await
+                                    {
+                                        Ok(result) => {
+                                            request.tx.send(result);
+                                        }
+                                        Err(_) => {
+                                            request.tx.send(Err(Fail::Unexpected));
+                                        }
+                                    }
+                                });
+                            } else {
+                                request.tx.send( Err(Fail::ResourceNotFound(resource)));
+                            }
+                        }
+                        _ => {
+                            request.tx.send( Err(Fail::ResourceNotFound(resource)));
+                        }
+                    }
+                }
             }
         }
     }

@@ -360,7 +360,8 @@ pub enum ResourceMessage
 {
     Register(ResourceRegistration),
     Location(ResourceLocation),
-    Find(HashSet<ResourceKey>)
+    Find(HashSet<ResourceKey>),
+    HasResource(ResourceKey)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -408,6 +409,7 @@ pub enum Reply
     Empty,
     Key(ResourceKey),
     Keys(Vec<ResourceKey>),
+    Location(ResourceLocation),
     Locations(Vec<ResourceLocation>),
     Seq(u64)
 }

@@ -10,7 +10,7 @@ use crate::actor::{ActorKey, ActorLocation};
 use crate::app::{AppMeta, AppLocation, AppStatus, AppReadyStatus, AppPanicReason, AppArchetype, InitData, AppCreateResult, App};
 use crate::error::Error;
 use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, ServerAppPayload, SpaceReply, StarMessageCentral, SimpleReply, SupervisorPayload, StarMessageSupervisor, ServerPayload, StarPattern, FromReply, ResourceQuery, ResourceMessage};
-use crate::keys::{AppKey, UserKey};
+use crate::keys::{AppKey, UserKey, ResourceKey};
 use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait, Fail};
 use crate::star::{StarCommand, StarSkel, StarInfo, StarKey, StarVariant, StarVariantCommand, StarKind, RegistryBacking, RegistryBackingSqlLite};
@@ -23,7 +23,7 @@ use tokio::sync::{oneshot, mpsc};
 use rusqlite::{Connection,params};
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
-use crate::resource::{RegistryAction, Registry, FieldSelection, ResourceType};
+use crate::resource::{RegistryAction, Registry, FieldSelection, ResourceType, ResourceLocation};
 use std::future::Future;
 
 pub enum SupervisorCommand
@@ -264,6 +264,19 @@ impl StarVariant for SupervisorVariant
                             ResourceMessage::Find(find) => {
                                 let result = self.registry.find(find.to_owned()).await;
                                 self.skel.comm().reply_result(star_message.clone(), result );
+                            }
+                            ResourceMessage::HasResource(resource) => {
+                                if let ResourceKey::App(app) = resource
+                                {
+                                    if self.backing.get_application(app).await.is_some() {
+                                        let location = ResourceLocation::new(resource.clone(), self.skel.info.star.clone() );
+                                        self.skel.comm().simple_reply(star_message.clone(), SimpleReply::Ok(Reply::Location(location))).await;
+                                    } else {
+                                        self.skel.comm().simple_reply(star_message.clone(), SimpleReply::Fail(Fail::ResourceNotFound(resource.clone()))).await;
+                                    }
+                                } else {
+                                    self.skel.comm().simple_reply(star_message.clone(), SimpleReply::Fail(Fail::ResourceNotFound(resource.clone()))).await;
+                                }
                             }
                         }
                     }

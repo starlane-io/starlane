@@ -20,10 +20,10 @@ use crate::app::{ApplicationStatus, AppArchetype, AppMeta, App};
 use crate::error::Error;
 use crate::frame::{StarMessage, StarMessagePayload, Watch, WatchInfo, ServerAppPayload, AppPayload};
 use crate::id::{Id, IdSeq};
-use crate::star::{ActorCreate, StarCommand, StarKey, StarKind, StarVariantCommand, StarSkel, Request};
+use crate::star::{ActorCreate, StarCommand, StarKey, StarKind, StarVariantCommand, StarSkel, Request, LocalResourceLocation};
 use crate::core::server::{ServerStarCore, ServerStarCoreExt, ExampleServerStarCoreExt};
 use std::marker::PhantomData;
-use crate::keys::AppKey;
+use crate::keys::{AppKey, ResourceKey};
 use crate::artifact::{Artifact, ArtifactKey};
 
 pub mod server;
@@ -33,6 +33,7 @@ pub enum StarCoreCommand
     SetSupervisor(StarKey),
     AppMessage(StarCoreAppMessage),
     Watch(Watch),
+    HasResource(Request<ResourceKey,LocalResourceLocation>)
 }
 
 pub struct StarCoreAppMessage

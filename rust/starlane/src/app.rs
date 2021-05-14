@@ -7,21 +7,21 @@ use serde::{Deserialize, Serialize, Serializer};
 use tokio::sync::{mpsc, Mutex, oneshot};
 use tokio::time::Duration;
 
-use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorKey, ActorKind, ActorMeta, ActorRegistration, ActorMessage, MessageFrom, ActorKeySeqListener};
+use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorKey, ActorKind, ActorMeta, ActorRegistration, ActorMessage, MessageFrom, ActorKeySeq, ActorStatus};
 use crate::actor;
 use crate::artifact::{Artifact, ArtifactKey};
 use crate::core::{StarCoreCommand };
 use crate::core::server::{AppExt};
 use crate::error::Error;
 use crate::filesystem::File;
-use crate::frame::{Reply};
+use crate::frame::{Reply, StarMessagePayload, ResourceMessage};
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, SubSpaceKey, UserKey, ResourceKey};
-use crate::resource::{Labels, Resource, ResourceKind, ResourceRegistration};
+use crate::resource::{Labels, Resource, ResourceKind, ResourceRegistration, ResourceLocation};
 use crate::names::Name;
 use crate::space::CreateAppControllerFail;
-use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarSkel, StarVariantCommand, StarComm, ServerCommand, Request, Empty};
-use crate::message::Fail;
+use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarSkel, StarVariantCommand, StarComm, ServerCommand, Request, Empty, Query, LocalResourceLocation, ResourceCommand};
+use crate::message::{Fail, ProtoMessage};
 use tokio::sync::mpsc::Sender;
 use tokio::time::error::Elapsed;
 use tokio::sync::oneshot::error::RecvError;
@@ -101,8 +101,9 @@ impl Memory
 
 pub enum AppSliceCommand {
     FetchSequence(Request<Empty,u64>),
-    ClaimActor(ActorKey),
-    Launch(Request<AppArchetype,()>)
+    Launch(Request<AppArchetype,()>),
+    AddActor(ActorKey),
+    HasActor(Request<ResourceKey, LocalResourceLocation>)
 }
 
 /**
@@ -114,7 +115,8 @@ pub struct AppSlice
     pub comm: StarComm,
     pub ext: Box<dyn AppExt>,
     pub rx: mpsc::Receiver<AppSliceCommand>,
-    pub context: AppContext
+    pub context: AppContext,
+    pub actors: HashMap<ActorKey,ActorStatus>
 }
 
 impl AppSlice
@@ -129,7 +131,8 @@ impl AppSlice
             context: context,
             comm: comm,
             ext: ext,
-            rx: rx
+            rx: rx,
+            actors: HashMap::new()
         };
 
         tokio::spawn(async move { app.run().await; } );
@@ -152,13 +155,29 @@ impl AppSlice
                 self.fetch_seq(request).await;
                 Ok(())
             }
-            AppSliceCommand::ClaimActor(claim) => {
-                // not sure what to do with this yet...
-                Ok(())
-            }
             AppSliceCommand::Launch(request) => {
                 let result = self.ext.launch(request.payload ).await;
                 request.tx.send(result);
+                Ok(())
+            }
+            AppSliceCommand::AddActor(actor) => {
+                self.actors.insert(actor.clone(),ActorStatus::Unknown );
+                let local = LocalResourceLocation::new(ResourceKey::Actor(actor), Option::None );
+                self.comm.variant_tx.send(StarVariantCommand::ResourceCommand(ResourceCommand::SignalLocation(local))).await;
+                Ok(())
+            }
+            AppSliceCommand::HasActor(request) => {
+                if let ResourceKey::Actor(actor)=request.payload
+                {
+                    if self.actors.contains_key(&actor) {
+                        let local = LocalResourceLocation::new(ResourceKey::Actor(actor), Option::None);
+                        request.tx.send(Result::Ok(local));
+                    } else {
+                        request.tx.send(Result::Err(Fail::ResourceNotFound(ResourceKey::Actor(actor))));
+                    }
+                } else {
+                    request.tx.send(Result::Err(Fail::ResourceNotFound(request.payload)));
+                }
                 Ok(())
             }
         }
@@ -489,7 +508,8 @@ pub struct AppContext
     meta: AppMeta,
     sequence: Option<Arc<IdSeq>>,
     app_tx: mpsc::Sender<AppSliceCommand>,
-    comm: StarComm
+    comm: StarComm,
+    actor_key_seq: Option<ActorKeySeq>
 }
 
 impl AppContext
@@ -497,6 +517,7 @@ impl AppContext
     pub fn new( meta: AppMeta, app_tx: mpsc::Sender<AppSliceCommand>, comm: StarComm )->Self
     {
         AppContext{
+            actor_key_seq: Option::None,
             app_tx: app_tx,
             meta: meta,
             sequence: Option::None,
@@ -520,8 +541,34 @@ impl AppContext
         {
             Err(Fail::Unexpected)
         }
-
     }
+
+    pub async fn unique_actor_key_seq(&mut self)->Result<ActorKeySeq,Fail>
+    {
+        let (request,rx) = Request::new(Empty::new() );
+        self.app_tx.send( AppSliceCommand::FetchSequence(request)).await;
+        if let seq_id= rx.await??
+        {
+            let (tx,mut rx) = mpsc::channel(16);
+            let actor_key_seq = ActorKeySeq::new(self.meta.key.clone(), seq_id, 0, tx );
+            let variant_tx= self.comm.variant_tx.clone();
+            tokio::spawn(async move {
+                while let Option::Some(actor) = rx.recv().await {
+                    let local_location = LocalResourceLocation{
+                        resource: ResourceKey::Actor(actor),
+                        gathering: Option::None
+                    };
+                    variant_tx.send( StarVariantCommand::ResourceCommand(ResourceCommand::SignalLocation(local_location))).await;
+                }
+            } );
+            Ok(actor_key_seq)
+        }
+        else
+        {
+            Err(Fail::Unexpected)
+        }
+    }
+
 
     pub async fn seq(&mut self)->Result<Arc<IdSeq>,Fail>
     {
@@ -533,10 +580,23 @@ impl AppContext
         Ok(self.sequence.as_ref().unwrap().clone())
     }
 
+    pub async fn actor_key_seq(&mut self)->Result<ActorKeySeq,Fail> {
+        if let Option::None = self.sequence
+        {
+            self.actor_key_seq= Option::Some(self.unique_actor_key_seq().await?)
+        }
+
+        Ok(self.actor_key_seq.as_ref().unwrap().clone())
+    }
 
     pub async fn next_id(&mut self)->Result<Id,Fail>
     {
         Ok(self.seq().await?.next())
+    }
+
+    pub async fn next_actor_key(&mut self)->Result<ActorKey,Fail>
+    {
+        Ok(self.actor_key_seq().await?.next().await)
     }
 
     pub async fn create_actor_key(&mut self) ->Result<ActorKey,Fail>
@@ -555,7 +615,7 @@ impl AppContext
     {
         let registration: ResourceRegistration = registration.into();
         let (request,rx) = Request::new(registration);
-        self.comm.variant_tx.send( StarVariantCommand::ServerCommand(ServerCommand::Register(request))).await;
+        self.comm.variant_tx.send( StarVariantCommand::ResourceCommand(ResourceCommand::Register(request))).await;
         rx.await?;
         Ok(())
     }

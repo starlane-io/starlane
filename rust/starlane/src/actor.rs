@@ -4,7 +4,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize, Serializer};
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
 use tokio::sync::broadcast::Sender;
 
 use crate::app::{ConfigSrc, InitData, AppFrom};
@@ -318,10 +318,7 @@ pub enum ActorStatus
     Unknown
 }
 
-pub trait ActorKeySeqListener
-{
-    fn on_new_actor( &self, actor: ActorKey );
-}
+
 
 #[derive(Clone)]
 pub struct ActorKeySeq
@@ -329,29 +326,26 @@ pub struct ActorKeySeq
     app: AppKey,
     seq: u64,
     index: u64,
-    listener: Option<Arc<dyn ActorKeySeqListener>>
+    tx: mpsc::Sender<ActorKey>
 }
 
 impl ActorKeySeq
 {
-    pub fn new( app:AppKey, seq: u64, index: u64, listener: Option<Arc<dyn ActorKeySeqListener>>)->Self {
+    pub fn new( app:AppKey, seq: u64, index: u64, tx: mpsc::Sender<ActorKey>)->Self {
         ActorKeySeq{
             app: app,
             seq: seq,
             index: index,
-            listener: listener
+            tx: tx
         }
     }
 
-    pub fn next(&mut self)->ActorKey
+    pub async fn next(&mut self)->ActorKey
     {
         self.index=self.index+1;
         let key = ActorKey::new(self.app.clone(), Id::new(self.seq, self.index ));
 
-        if let Option::Some(listener) = &self.listener
-        {
-            listener.on_new_actor(key.clone() )
-        }
+        self.tx.send(key.clone() ).await;
 
         key
     }

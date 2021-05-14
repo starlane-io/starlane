@@ -1092,6 +1092,18 @@ pub struct ResourceLocation
     pub gathering: Option<GatheringKey>
 }
 
+impl ResourceLocation
+{
+    pub fn new( key: ResourceKey, host: StarKey )->Self
+    {
+        ResourceLocation {
+            key: key,
+            host: host,
+            gathering: Option::None
+        }
+    }
+}
+
 pub enum ResourceManagerKey
 {
     Central,

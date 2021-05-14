@@ -147,15 +147,18 @@ impl StarVariant for CentralStarVariant
                       {
                           ResourceMessage::Register(registration) => {
                               let result = self.registry.register(registration.clone()).await;
-                              self.skel.comm().reply_result_empty(star_message.clone(), result );
+                              self.skel.comm().reply_result_empty(star_message.clone(), result ).await;
                           }
                           ResourceMessage::Location(location) => {
                               let result = self.registry.set_location(location.clone()).await;
-                              self.skel.comm().reply_result_empty(star_message.clone(), result );
+                              self.skel.comm().reply_result_empty(star_message.clone(), result ).await;
                           }
                           ResourceMessage::Find(find) => {
                               let result = self.registry.find(find.to_owned()).await;
-                              self.skel.comm().reply_result(star_message.clone(), result );
+                              self.skel.comm().reply_result(star_message.clone(), result ).await;
+                          }
+                          ResourceMessage::HasResource(resource) => {
+                              self.skel.comm().simple_reply(star_message.clone(), SimpleReply::Fail(Fail::ResourceNotFound(resource.clone()))).await;
                           }
                       }
                    }

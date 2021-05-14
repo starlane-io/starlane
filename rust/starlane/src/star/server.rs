@@ -1,6 +1,6 @@
 use crate::error::Error;
-use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, ServerAppPayload, Reply, SpaceMessage, ServerPayload, StarMessageCentral, SimpleReply, StarMessageSupervisor};
-use crate::star::{ServerVariantBacking, StarCommand, StarSkel, StarKey, StarKind, StarVariant, StarVariantCommand, Wind, ServerCommand, CoreRequest, Request};
+use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, ServerAppPayload, Reply, SpaceMessage, ServerPayload, StarMessageCentral, SimpleReply, StarMessageSupervisor, ResourceMessage};
+use crate::star::{ServerVariantBacking, StarCommand, StarSkel, StarKey, StarKind, StarVariant, StarVariantCommand, Wind, ServerCommand, CoreRequest, Request, ResourceCommand};
 use crate::message::{ProtoMessage, MessageExpect, Fail};
 use crate::logger::{Flag, StarFlag, StarLog, StarLogPayload, Log};
 use tokio::time::{sleep, Duration};
@@ -8,7 +8,9 @@ use crate::core::{StarCoreCommand, StarCoreAppMessage, AppCommandResult, StarCor
 use crate::app::{AppCommandKind};
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
-use crate::keys::{AppKey, UserKey};
+use crate::keys::{AppKey, UserKey, ResourceKey, GatheringKey};
+use crate::resource::ResourceLocation;
+use crate::actor::ActorKey;
 
 
 pub struct ServerVariantBackingDefault
@@ -203,7 +205,64 @@ impl StarVariant for ServerStarVariant
                            _ => {}
                        }
                    }
+                   StarMessagePayload::Resource(resource) => {
+                       match resource
+                       {
+                           ResourceMessage::HasResource(resource) => {
+                               let (request,rx) = Request::new(resource.clone() );
+                               self.skel.core_tx.send( StarCoreCommand::HasResource(request)).await;
+                               let skel = self.skel.clone();
+                               let star_message = star_message.clone();
+                               let resource = resource .clone();
+                               tokio::spawn( async move {
+                                   if let Result::Ok(Result::Ok(local)) = rx.await {
+                                       let location = ResourceLocation{
+                                           key: local.resource,
+                                           host: skel.info.star.clone(),
+                                           gathering: local.gathering
+                                       };
+                                       skel.comm().simple_reply( star_message, SimpleReply::Ok(Reply::Location(location))).await;
+                                   } else {
+                                       skel.comm().simple_reply( star_message, SimpleReply::Fail(Fail::ResourceNotFound(resource.clone()))).await;
+                                   }
+                               } );
+                           }
+                           _ => {}
+                       }
+
+                   }
                    _ => {}
+               }
+           }
+           StarVariantCommand::ResourceCommand(command) => {
+               match command
+               {
+                   ResourceCommand::Register(request) => {
+                       if let Option::Some(supervisor) = self.backing.get_supervisor()
+                       {
+                           let mut proto = ProtoMessage::new();
+                           proto.to = Option::Some(supervisor.clone());
+                           proto.payload = StarMessagePayload::Supervisor(StarMessageSupervisor::Register(request.payload));
+                           self.skel.comm().send_and_get_ok_result(proto,request.tx).await;
+                       } else {
+                           request.tx.send(Result::Err(Fail::Unexpected));
+                       }
+                   }
+                   ResourceCommand::SignalLocation(local) => {
+                       if let Option::Some(supervisor) = self.backing.get_supervisor()
+                       {
+                           let location = ResourceLocation{
+                               key: local.resource,
+                               host: self.skel.info.star.clone(),
+                               gathering: local.gathering
+                           };
+
+                           let mut proto = ProtoMessage::new();
+                           proto.to = Option::Some(supervisor.clone());
+                           proto.payload = StarMessagePayload::Resource(ResourceMessage::Location(location));
+                           self.skel.comm().send(proto).await;
+                       }
+                   }
                }
            }
            StarVariantCommand::ServerCommand(command) => {
@@ -211,19 +270,6 @@ impl StarVariant for ServerStarVariant
                {
                    ServerCommand::PledgeToSupervisor => {
                        self.pledge().await;
-                   }
-                   ServerCommand::Register(request) => {
-                      if let Option::Some(supervisor) = self.backing.get_supervisor()
-                      {
-                          let mut proto = ProtoMessage::new();
-                          proto.to = Option::Some(supervisor.clone());
-                          proto.payload = StarMessagePayload::Supervisor(StarMessageSupervisor::Register(request.payload));
-                          let rx = proto.get_ok_result().await;
-                          self.skel.comm().send_and_get_ok_result(proto,request.tx).await;
-                      } else {
-                          request.tx.send(Result::Err(Fail::Unexpected));
-                      }
-
                    }
                }
            }
