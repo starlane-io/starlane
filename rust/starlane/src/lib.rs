@@ -10,6 +10,10 @@ extern crate async_trait;
 #[macro_use]
 extern crate lazy_static;
 
+#[macro_use]
+extern crate error_chain;
+
+
 pub mod star;
 pub mod lane;
 pub mod frame;

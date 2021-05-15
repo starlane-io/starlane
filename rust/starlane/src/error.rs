@@ -6,6 +6,7 @@ use futures::channel::oneshot::Canceled;
 use tokio::sync::broadcast;
 use tokio::time::error::Elapsed;
 use semver::SemVerError;
+use base64::DecodeError;
 
 #[derive(Debug, Clone)]
 pub struct Error{
@@ -42,10 +43,10 @@ impl From<Box<bincode::ErrorKind>> for Error{
     }
 }
 
-impl <T> From<T> for Error where T: Display {
-    fn from(e: T) -> Self {
+impl From<DecodeError> for Error{
+    fn from(e: DecodeError) -> Self {
         Error{
-            error: format!("{}",e)
+            error: format!("{}",e.to_string())
         }
     }
 }

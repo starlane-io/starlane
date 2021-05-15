@@ -23,12 +23,12 @@ use crate::star::StarKey;
 lazy_static!
 {
     pub static ref SPACE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer] );
-    pub static ref SUB_SPACE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::with( SPACE_ADDRESS_STRUCT,vec![ResourceAddressPartKind::Skewer] );
-    pub static ref APP_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::with( SUB_SPACE_ADDRESS_STRUCT,vec![ResourceAddressPartKind::Skewer] );
-    pub static ref ACTOR_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::with( APP_ADDRESS_STRUCT,vec![ResourceAddressPartKind::Skewer] );
-    pub static ref USER_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::with( SPACE_ADDRESS_STRUCT,vec![ResourceAddressPartKind::Skewer] );
+    pub static ref SUB_SPACE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer] );
+    pub static ref APP_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer] );
+    pub static ref ACTOR_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer] );
+    pub static ref USER_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer] );
     pub static ref FILE_SYSTEM_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::WildcardOrSkewer,ResourceAddressPartKind::Skewer] );
-    pub static ref FILE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::with( ResourceType::FileSystem.address_structure(),vec![ResourceAddressPartKind::Path] );
+    pub static ref FILE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::WildcardOrSkewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Path] );
     pub static ref ARTIFACT_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Version,ResourceAddressPartKind::Path] );
 
     pub static ref HYPERSPACE_ADDRESS: ResourceAddress = SPACE_ADDRESS_STRUCT.from_str("hyperspace").unwrap();
