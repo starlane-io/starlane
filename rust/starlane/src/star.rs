@@ -33,7 +33,7 @@ use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequ
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId, SpaceKey, UserKey, ResourceKey, GatheringKey};
-use crate::resource::{Labels, ResourceRegistration, Selector, Resource, RegistryAction, RegistryCommand, RegistryResult, Registry, ResourceType, ResourceLocation, ResourceManagerKey};
+use crate::resource::{Labels, ResourceRegistration, Selector, Resource, RegistryAction, RegistryCommand, RegistryResult, Registry, ResourceType, ResourceLocation, ResourceManagerKey, ResourceBinding, ResourceAddress};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob, Fail};
@@ -2868,6 +2868,9 @@ pub trait RegistryBacking : Sync+Send {
     async fn select(&self, select: Selector)->Result<Vec<Resource>,Fail>;
     async fn set_location(&self, location: ResourceLocation)->Result<(),Fail>;
     async fn find(&self, keys: ResourceKey)->Result<Reply,Fail>;
+    async fn bind(&self, bind: ResourceBinding)->Result<(),Fail>;
+    async fn get_address(&self, key: ResourceKey)->Result<ResourceAddress,Fail>;
+    async fn get_key(&self, address: ResourceAddress)->Result<ResourceKey,Fail>;
 }
 
 pub struct RegistryBackingSqlLite
@@ -2930,6 +2933,39 @@ impl RegistryBacking for RegistryBackingSqlLite
         let result = tokio::time::timeout( Duration::from_secs(5),rx).await??;
         if let RegistryResult::Location(location) = result {
             Ok(Reply::Location(location))
+        }
+        else
+        {
+            Err(Fail::Unexpected)
+        }
+    }
+
+    async fn bind(&self, bind: ResourceBinding) -> Result<(), Fail> {
+        let (request,rx) = RegistryAction::new(RegistryCommand::Bind(bind));
+        self.registry.send( request ).await;
+        tokio::time::timeout( Duration::from_secs(5),rx).await??;
+        Ok(())
+    }
+
+    async fn get_address(&self, key: ResourceKey) -> Result<ResourceAddress, Fail> {
+        let (request,rx) = RegistryAction::new(RegistryCommand::GetAddress(key));
+        self.registry.send( request ).await;
+        let result = tokio::time::timeout( Duration::from_secs(5),rx).await??;
+        if let RegistryResult::Address(address) = result {
+            Ok(address)
+        }
+        else
+        {
+            Err(Fail::Unexpected)
+        }
+    }
+
+    async fn get_key(&self, address: ResourceAddress) -> Result<ResourceKey, Fail> {
+        let (request,rx) = RegistryAction::new(RegistryCommand::GetKey(address));
+        self.registry.send( request ).await;
+        let result = tokio::time::timeout( Duration::from_secs(5),rx).await??;
+        if let RegistryResult::Key(key) = result {
+            Ok(key)
         }
         else
         {

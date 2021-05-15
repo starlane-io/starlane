@@ -1,5 +1,5 @@
 use std::fmt;
-use std::fmt::Formatter;
+use std::fmt::{Formatter, Display};
 use crate::frame::ProtoFrame;
 use tokio::sync::mpsc::error::SendError;
 use futures::channel::oneshot::Canceled;
@@ -38,6 +38,14 @@ impl From<Box<bincode::ErrorKind>> for Error{
     fn from(e: Box<bincode::ErrorKind>) -> Self {
         Error{
             error: format!("{}",e.to_string())
+        }
+    }
+}
+
+impl <T> From<T> for Error where T: Display {
+    fn from(e: T) -> Self {
+        Error{
+            error: format!("{}",e)
         }
     }
 }

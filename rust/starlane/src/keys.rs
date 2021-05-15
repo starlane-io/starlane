@@ -350,6 +350,14 @@ impl ResourceKey
         }
     }
 
+    pub fn encode(&self)->Result<String,Error> {
+        Ok(base64::encode(self.bin()?))
+    }
+
+    pub fn decode( string: String )->Result<Self,Error>{
+        Ok(ResourceKey::from_bin(base64::decode(string)?)?)
+    }
+
 
 
     pub fn manager(&self)->ResourceManagerKey

@@ -20,6 +20,21 @@ use crate::permissions::User;
 use crate::keys::{SubSpaceKey, ResourceKey, AppKey, SubSpaceId, SpaceKey, UserKey, GatheringKey, FileSystemKey, AppFilesystemKey, SubSpaceFilesystemKey};
 use crate::star::StarKey;
 
+lazy_static!
+{
+    pub static ref SPACE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer] );
+    pub static ref SUB_SPACE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::with( SPACE_ADDRESS_STRUCT,vec![ResourceAddressPartKind::Skewer] );
+    pub static ref APP_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::with( SUB_SPACE_ADDRESS_STRUCT,vec![ResourceAddressPartKind::Skewer] );
+    pub static ref ACTOR_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::with( APP_ADDRESS_STRUCT,vec![ResourceAddressPartKind::Skewer] );
+    pub static ref USER_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::with( SPACE_ADDRESS_STRUCT,vec![ResourceAddressPartKind::Skewer] );
+    pub static ref FILE_SYSTEM_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::WildcardOrSkewer,ResourceAddressPartKind::Skewer] );
+    pub static ref FILE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::with( ResourceType::FileSystem.address_structure(),vec![ResourceAddressPartKind::Path] );
+    pub static ref ARTIFACT_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Version,ResourceAddressPartKind::Path] );
+
+    pub static ref HYPERSPACE_ADDRESS: ResourceAddress = SPACE_ADDRESS_STRUCT.from_str("hyperspace").unwrap();
+    pub static ref HYPERSPACE_DEFAULT_ADDRESS: ResourceAddress = SUB_SPACE_ADDRESS_STRUCT.from_str("hyperspace:default").unwrap();
+}
+
 pub type Labels = HashMap<String,String>;
 
 
@@ -335,7 +350,10 @@ pub enum RegistryCommand
     Register(ResourceRegistration),
     Select(Selector),
     SetLocation(ResourceLocation),
-    Find(ResourceKey)
+    Find(ResourceKey),
+    Bind(ResourceBinding),
+    GetAddress(ResourceKey),
+    GetKey(ResourceAddress)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -343,8 +361,11 @@ pub enum RegistryResult
 {
     Ok,
     Error(String),
+    Resource(Resource),
     Resources(Vec<Resource>),
+    Address(ResourceAddress),
     Location(ResourceLocation),
+    Key(ResourceKey),
     NotFound,
     NotAccepted
 }
@@ -603,7 +624,6 @@ impl Registry {
                 Ok(RegistryResult::Resources(resources) )
             }
             RegistryCommand::SetLocation(location) => {
-
                 if !self.accept(location.key.resource_type()) {
                    return Ok(RegistryResult::NotAccepted);
                 }
@@ -656,6 +676,58 @@ impl Registry {
                     }
                 }
             }
+            RegistryCommand::Bind(bind) => {
+                let key = bind.key.bin()?;
+                let address = bind.address.to_string();
+
+                let mut trans = self.conn.transaction()?;
+                trans.execute("DELETE addresses WHERE key=?1 OR address=?2)", params![key,address])?;
+                trans.execute("INSERT INTO addresses (key,address) VALUES (?1,?2)", params![key,address])?;
+                trans.commit();
+                Ok(RegistryResult::Ok)
+            }
+            RegistryCommand::GetAddress(key) => {
+                let key_blob = key.bin()?;
+                let statement = "SELECT address FROM addresses WHERE key=?1";
+                let mut statement = self.conn.prepare(statement)?;
+                let result = statement.query_row( params![key_blob], |row| {
+
+                    let address: String = row.get(0)?;
+                    let address=key.resource_type().address_structure().from_str(address.as_str())?;
+                    Ok(address)
+                });
+
+                match result
+                {
+                    Ok(address) => {
+                        Ok(RegistryResult::Address(address))
+                    }
+                    Err(err) => {
+                        Ok(RegistryResult::NotFound)
+                    }
+                }
+            }
+            RegistryCommand::GetKey(address) => {
+                let address = address.to_string();
+                let statement = "SELECT key FROM addresses WHERE address=?1";
+                let mut statement = self.conn.prepare(statement)?;
+                let result = statement.query_row( params![address], |row| {
+
+                    let key: Vec<u8>= row.get(0)?;
+                    let key=ResourceKey::from_bin(key)?;
+                    Ok(key)
+                });
+
+                match result
+                {
+                    Ok(key) => {
+                        Ok(RegistryResult::Key(key))
+                    }
+                    Err(err) => {
+                        Ok(RegistryResult::NotFound)
+                    }
+                }
+            }
         }
     }
 
@@ -699,10 +771,16 @@ impl Registry {
          owner BLOB
         )"#;
 
-        let location = r#"CREATE TABLE IF NOT EXISTS locations (
+        let locations = r#"CREATE TABLE IF NOT EXISTS locations (
          key BLOB PRIMARY KEY,
          host BLOB NOT NULL,
          gathering BLOB
+        )"#;
+
+        let addresses = r#"CREATE TABLE IF NOT EXISTS addresses(
+         key BLOB PRIMARY KEY,
+         address TEXT NOT NULL
+         UNIQUE(address)
         )"#;
 
         /*
@@ -722,6 +800,8 @@ impl Registry {
         transaction.execute(labels, [])?;
         transaction.execute(names, [])?;
         transaction.execute(resources, [])?;
+        transaction.execute(locations, [])?;
+        transaction.execute(addresses, [])?;
         transaction.commit();
 
         Ok(())
@@ -920,32 +1000,46 @@ impl ResourceType
         }
     }
 
-    pub fn name_structure(&self)->ResourceNameStructure{
+    pub fn address_required(&self)->bool
+    {
+        match self
+        {
+            ResourceType::Space => true,
+            ResourceType::SubSpace => true,
+            ResourceType::App => false,
+            ResourceType::Actor => false,
+            ResourceType::User => false,
+            ResourceType::File => true,
+            ResourceType::FileSystem => true,
+            ResourceType::Artifact => true
+        }
+    }
+
+    pub fn address_structure(&self) ->&ResourceAddressStructure{
         match self{
             ResourceType::Space => {
-                ResourceNameStructure::new( vec![ResourceNamePartKind::Skewer] )
+                &SPACE_ADDRESS_STRUCT
             }
             ResourceType::SubSpace => {
-                ResourceNameStructure::with( ResourceType::Space.name_structure(),vec![ResourceNamePartKind::Skewer] )
+                &SUB_SPACE_ADDRESS_STRUCT
             }
             ResourceType::App => {
-                ResourceNameStructure::with( ResourceType::SubSpace.name_structure(),vec![ResourceNamePartKind::Skewer] )
+                &APP_ADDRESS_STRUCT
             }
             ResourceType::Actor => {
-                ResourceNameStructure::with( ResourceType::App.name_structure(),vec![ResourceNamePartKind::Skewer] )
+                &ACTOR_ADDRESS_STRUCT
             }
             ResourceType::User => {
-                ResourceNameStructure::with( ResourceType::Space.name_structure(),vec![ResourceNamePartKind::Skewer] )
+                &USER_ADDRESS_STRUCT
             }
             ResourceType::FileSystem => {
-
-                ResourceNameStructure::new( vec![ResourceNamePartKind::Skewer,ResourceNamePartKind::Skewer,ResourceNamePartKind::WildcardOrSkewer,ResourceNamePartKind::Skewer] )
+                &FILE_SYSTEM_ADDRESS_STRUCT
             }
             ResourceType::File => {
-                ResourceNameStructure::with( ResourceType::FileSystem.name_structure(),vec![ResourceNamePartKind::Path] )
+                &FILE_ADDRESS_STRUCT
             }
             ResourceType::Artifact => {
-                ResourceNameStructure::new( vec![ResourceNamePartKind::Skewer,ResourceNamePartKind::Skewer,ResourceNamePartKind::Skewer,ResourceNamePartKind::Version,ResourceNamePartKind::Path] )
+                &ARTIFACT_ADDRESS_STRUCT
             }
         }
     }
@@ -1131,13 +1225,13 @@ pub enum ResourceManagerKey
 
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceName
+pub struct ResourceAddress
 {
-   parts: Vec<ResourceNamePart>
+   parts: Vec<ResourceAddressPart>
 }
 
 
-impl ToString for ResourceName {
+impl ToString for ResourceAddress {
     fn to_string(&self) -> String {
         let mut rtn = String::new();
         for (index,part) in self.parts.iter().enumerate() {
@@ -1150,20 +1244,26 @@ impl ToString for ResourceName {
     }
 }
 
-pub struct ResourceNameStructure
-{
-    kinds: Vec<ResourceNamePartKind>
+pub struct ResourceBinding{
+    pub key: ResourceKey,
+    pub address: ResourceAddress
 }
 
-impl ResourceNameStructure
+#[derive(Clone)]
+pub struct ResourceAddressStructure
 {
-    pub fn new( kinds: Vec<ResourceNamePartKind> ) -> Self {
-        ResourceNameStructure{
+    kinds: Vec<ResourceAddressPartKind>
+}
+
+impl ResourceAddressStructure
+{
+    pub fn new( kinds: Vec<ResourceAddressPartKind> ) -> Self {
+        ResourceAddressStructure{
             kinds: kinds
         }
     }
 
-    pub fn with( parent: Self, mut kinds: Vec<ResourceNamePartKind>) -> Self
+    pub fn with( parent: Self, mut kinds: Vec<ResourceAddressPartKind>) -> Self
     {
         let mut union = parent.kinds.clone();
         union.append( &mut kinds );
@@ -1174,9 +1274,9 @@ impl ResourceNameStructure
 
 
 
-impl ResourceNameStructure {
+impl ResourceAddressStructure {
 
-    fn from_str(&self, s: &str) -> Result<ResourceName, Error> {
+    fn from_str(&self, s: &str) -> Result<ResourceAddress, Error> {
         let mut split = s.split(":");
 
         if split.count()  != self.kinds.len() {
@@ -1191,12 +1291,12 @@ impl ResourceNameStructure {
             parts.push(kind.from_str(split.next().unwrap().clone() )?);
         }
 
-        Ok(ResourceName{
+        Ok(ResourceAddress{
             parts: parts
         })
     }
 
-    pub fn matches( &self, parts: Vec<ResourceNamePart> ) -> bool {
+    pub fn matches( &self, parts: Vec<ResourceAddressPart> ) -> bool {
         if parts.len() != self.kinds.len() {
             return false;
         }
@@ -1213,7 +1313,7 @@ impl ResourceNameStructure {
 }
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
-pub enum ResourceNamePartKind
+pub enum ResourceAddressPartKind
 {
     Wildcard,
     Skewer,
@@ -1222,55 +1322,55 @@ pub enum ResourceNamePartKind
     Path
 }
 
-impl ResourceNamePartKind
+impl ResourceAddressPartKind
 {
-    pub fn matches( &self, part: &ResourceNamePart )->bool
+    pub fn matches( &self, part: &ResourceAddressPart )->bool
     {
         match part
         {
-            ResourceNamePart::Wildcard => {
+            ResourceAddressPart::Wildcard => {
                 *self == Self::Wildcard || *self == Self::WildcardOrSkewer
             }
-            ResourceNamePart::Skewer(_) => {
+            ResourceAddressPart::Skewer(_) => {
                 *self == Self::Skewer || *self == Self::WildcardOrSkewer
             }
-            ResourceNamePart::Path(_) => {
+            ResourceAddressPart::Path(_) => {
                 *self == Self::Path
             }
-            ResourceNamePart::Version(_) => {
+            ResourceAddressPart::Version(_) => {
                 *self == Self::Version
             }
         }
     }
 
-    pub fn from_str(&self, s: &str ) -> Result<ResourceNamePart,Error> {
+    pub fn from_str(&self, s: &str ) -> Result<ResourceAddressPart,Error> {
         match self{
-            ResourceNamePartKind::Wildcard => {
+            ResourceAddressPartKind::Wildcard => {
                 if s == "*" {
-                    Ok(ResourceNamePart::Wildcard)
+                    Ok(ResourceAddressPart::Wildcard)
                 }
                 else
                 {
                     Err("expected wildcard".into())
                 }
             }
-            ResourceNamePartKind::Skewer => {
-                Ok(ResourceNamePart::Skewer(Skewer::from_str(s)?))
+            ResourceAddressPartKind::Skewer => {
+                Ok(ResourceAddressPart::Skewer(Skewer::from_str(s)?))
             }
-            ResourceNamePartKind::WildcardOrSkewer => {
+            ResourceAddressPartKind::WildcardOrSkewer => {
                 if s == "*" {
-                    Ok(ResourceNamePart::Wildcard)
+                    Ok(ResourceAddressPart::Wildcard)
                 }
                 else
                 {
-                    Ok(ResourceNamePart::Skewer(Skewer::from_str(s)?))
+                    Ok(ResourceAddressPart::Skewer(Skewer::from_str(s)?))
                 }
             }
-            ResourceNamePartKind::Path => {
-                Ok(ResourceNamePart::Path(Path::from_str(s)?))
+            ResourceAddressPartKind::Path => {
+                Ok(ResourceAddressPart::Path(Path::from_str(s)?))
             }
-            ResourceNamePartKind::Version => {
-                Ok(ResourceNamePart::Version(Version::from_str(s)?))
+            ResourceAddressPartKind::Version => {
+                Ok(ResourceAddressPart::Version(Version::from_str(s)?))
             }
         }
     }
@@ -1279,7 +1379,7 @@ impl ResourceNamePartKind
 
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum ResourceNamePart
+pub enum ResourceAddressPart
 {
     Wildcard,
     Skewer(Skewer),
@@ -1287,13 +1387,13 @@ pub enum ResourceNamePart
     Version(Version)
 }
 
-impl ToString for ResourceNamePart {
+impl ToString for ResourceAddressPart {
     fn to_string(&self) -> String {
         match self {
-            ResourceNamePart::Wildcard => "*".to_string(),
-            ResourceNamePart::Skewer(skewer) => skewer.to_string(),
-            ResourceNamePart::Path(path) => path.to_string(),
-            ResourceNamePart::Version(version) => version.to_string()
+            ResourceAddressPart::Wildcard => "*".to_string(),
+            ResourceAddressPart::Skewer(skewer) => skewer.to_string(),
+            ResourceAddressPart::Path(path) => path.to_string(),
+            ResourceAddressPart::Version(version) => version.to_string()
         }
     }
 }
@@ -1723,13 +1823,18 @@ pub struct Path
 impl Path
 {
     pub fn new( string: &str ) -> Result<Self,Error> {
-        if string.is_empty() {
+
+        if string.trim().is_empty() {
             return Err("path cannot be empty".into());
         }
 
+        if string.contains(".."){
+            return Err("path cannot contain directory traversal sequence [..]".into());
+        }
+
         for c in string.chars() {
-            if c == '*' || c == '?' {
-                return Err("path cannot contain wildcard characters [*,?]".into());
+            if c == '*' || c == '?' || c == ':' {
+                return Err("path cannot contain wildcard characters [*,?] or [:]".into());
             }
         }
         Ok(Path{
