@@ -31,18 +31,19 @@ pub mod server;
 pub enum StarCoreCommand
 {
     SetSupervisor(StarKey),
-    AppMessage(StarCoreAppMessage),
+    AppCommand(StarCoreAppCommand),
     Watch(Watch),
-    HasResource(Request<ResourceKey,LocalResourceLocation>)
+    HasResource(Request<ResourceKey,LocalResourceLocation>),
+    ResourceMessage(Request<ResourceMessage,()>)
 }
 
-pub struct StarCoreAppMessage
+pub struct StarCoreAppCommand
 {
     pub app: AppKey,
-    pub payload: StarCoreAppMessagePayload
+    pub payload: StarCoreAppCommandPayload
 }
 
-pub enum StarCoreAppMessagePayload
+pub enum StarCoreAppCommandPayload
 {
     None,
     Assign(Request<AppMeta,()>),

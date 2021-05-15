@@ -336,6 +336,7 @@ pub enum Fail
     Unexpected,
     DoNotKnowSpecific(Specific),
     ResourceNotFound(ResourceKey),
+    WrongResourceType,
     RecvErr
 }
 

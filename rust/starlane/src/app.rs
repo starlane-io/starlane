@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use tokio::sync::{mpsc, Mutex, oneshot};
 use tokio::time::Duration;
 
-use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorKey, ActorKind, ActorMeta, ActorRegistration, ResourceMessage, ActorKeySeq, ActorStatus};
+use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorKey, ActorKind, ActorMeta, ActorRegistration, ResourceMessage, ActorKeySeq, ActorStatus, RawPayload, ResourceTo, ResourceFrom};
 use crate::actor;
 use crate::artifact::{Artifact, ArtifactKey};
 use crate::core::{StarCoreCommand };
@@ -103,7 +103,9 @@ pub enum AppSliceCommand {
     FetchSequence(Request<Empty,u64>),
     Launch(Request<AppArchetype,()>),
     AddActor(ActorKey),
-    HasActor(Request<ResourceKey, LocalResourceLocation>)
+    HasActor(Request<ResourceKey, LocalResourceLocation>),
+    AppMessage(ResourceMessage),
+    ActorMessage(Request<ResourceMessage,()>),
 }
 
 /**
@@ -177,6 +179,24 @@ impl AppSlice
                     }
                 } else {
                     request.tx.send(Result::Err(Fail::ResourceNotFound(request.payload)));
+                }
+                Ok(())
+            }
+            AppSliceCommand::AppMessage(message) => {
+                let result = self.ext.app_message(message).await;
+                Ok(())
+            }
+            AppSliceCommand::ActorMessage(request) => {
+                if let ResourceKey::Actor(key) = &request.payload.to.key
+                {
+                    if self.actors.contains_key(key) {
+                        request.tx.send(Ok(()) );
+                        let result = self.ext.actor_message(request.payload).await;
+                    } else {
+                        request.tx.send(Err(Fail::ResourceNotFound(request.payload.to.key)));
+                    }
+                } else {
+                    request.tx.send(Err(Fail::WrongResourceType));
                 }
                 Ok(())
             }
@@ -524,6 +544,24 @@ impl AppContext
             comm: comm
         }
     }
+
+    pub async fn reply( &self, message: &ResourceMessage, payload: Arc<RawPayload> ) {
+        let mut reply = message.clone();
+
+        reply.payload = payload;
+        reply.to = message.from.reverse();
+        reply.from = message.to.reverse();
+
+        // send
+    }
+
+    pub async fn forward( &self, message: &ResourceMessage, from: ResourceFrom, to: ResourceTo ) {
+        let mut reply = message.clone();
+        reply.from = from;
+        reply.to = to;
+        // send
+    }
+
 
     pub async fn meta(&mut self)->AppMeta {
         self.meta.clone()

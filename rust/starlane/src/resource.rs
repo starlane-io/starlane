@@ -335,7 +335,7 @@ pub enum RegistryCommand
     Register(ResourceRegistration),
     Select(Selector),
     SetLocation(ResourceLocation),
-    Find(HashSet<ResourceKey>)
+    Find(ResourceKey)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -344,7 +344,7 @@ pub enum RegistryResult
     Ok,
     Error(String),
     Resources(Vec<Resource>),
-    Locations(Vec<ResourceLocation>),
+    Location(ResourceLocation),
     NotFound,
     NotAccepted
 }
@@ -619,52 +619,41 @@ impl Registry {
                 trans.commit();
                 Ok(RegistryResult::Ok)
             }
-            RegistryCommand::Find(keys) => {
-                let mut index = 0;
-                let mut params = vec![];
-                let mut values = String::new();
-                for key in &keys
-                {
-                    index = index+1;
-                    params.push(key.bin()?);
-                    if index > 1 {
-                        values.push_str(",");
-                    }
-                    values.push_str(format!("'?{}'",index).as_str() );
-                }
-                let statement = format!("SELECT (key,host,gathering) FROM locations WHERE key IN ({})", values);
-                let mut statement = self.conn.prepare(statement.as_str())?;
-                let mut rows= statement.query( params_from_iter(params.iter() ) )?;
-                let mut locations = vec![];
-                while let Option::Some(row) = rows.next()?
-                {
-                    let key:Vec<u8> = row.get(0)?;
+            RegistryCommand::Find(key) => {
+
+                let key = key.bin()?;
+                let statement = "SELECT (key,host,gathering) FROM locations WHERE key=?1";
+                let mut statement = self.conn.prepare(statement)?;
+                let result = statement.query_row( params![key], |row| {
+                    let key: Vec<u8> = row.get(0)?;
                     let key = ResourceKey::from_bin(key)?;
 
-                    let host:Vec<u8> = row.get(1)?;
+                    let host: Vec<u8> = row.get(1)?;
                     let host = StarKey::from_bin(host)?;
 
                     let gathering = if let ValueRef::Null = row.get_ref(2)? {
                         Option::None
-                    }
-                    else {
-                        let gathering: Vec<u8>= row.get(2)?;
-                        let gathering: GatheringKey = GatheringKey::from_bin(gathering )?;
+                    } else {
+                        let gathering: Vec<u8> = row.get(2)?;
+                        let gathering: GatheringKey = GatheringKey::from_bin(gathering)?;
                         Option::Some(gathering)
                     };
-                    let location = ResourceLocation{
+                    let location = ResourceLocation {
                         key: key,
                         host: host,
                         gathering: gathering
                     };
-                    locations.push(location);
-                }
+                    Ok(location)
+                });
 
-                if locations.len() == keys.len() {
-                    Ok(RegistryResult::Locations(locations))
-                }
-                else {
-                    Ok(RegistryResult::NotFound)
+                match result
+                {
+                    Ok(location) => {
+                        Ok(RegistryResult::Location(location))
+                    }
+                    Err(err) => {
+                        Ok(RegistryResult::NotFound)
+                    }
                 }
             }
         }

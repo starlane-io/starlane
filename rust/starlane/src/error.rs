@@ -41,6 +41,12 @@ impl From<Box<bincode::ErrorKind>> for Error{
     }
 }
 
+impl From<Error> for rusqlite::Error{
+    fn from(e: Error) -> Self {
+        rusqlite::Error::InvalidQuery
+    }
+}
+
 impl From<rusqlite::Error> for Error{
     fn from(e: rusqlite::Error) -> Self {
         Error{

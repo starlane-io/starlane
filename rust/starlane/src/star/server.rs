@@ -1,10 +1,10 @@
 use crate::error::Error;
-use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, ServerAppPayload, Reply, SpaceMessage, ServerPayload, StarMessageCentral, SimpleReply, StarMessageSupervisor, ResourceAction};
+use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, ServerAppPayload, Reply, SpaceMessage, ServerPayload, StarMessageCentral, SimpleReply, StarMessageSupervisor, ResourceAction, ResourcePayload};
 use crate::star::{ServerVariantBacking, StarCommand, StarSkel, StarKey, StarKind, StarVariant, StarVariantCommand, Wind, ServerCommand, CoreRequest, Request, ResourceCommand};
 use crate::message::{ProtoMessage, MessageExpect, Fail};
 use crate::logger::{Flag, StarFlag, StarLog, StarLogPayload, Log};
 use tokio::time::{sleep, Duration};
-use crate::core::{StarCoreCommand, StarCoreAppMessage, AppCommandResult, StarCoreAppMessagePayload };
+use crate::core::{StarCoreCommand, StarCoreAppCommand, AppCommandResult, StarCoreAppCommandPayload};
 use crate::app::{AppCommandKind};
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
@@ -142,9 +142,9 @@ impl StarVariant for ServerStarVariant
                                {
                                    ServerPayload::AppAssign(meta) => {
                                        let (request,rx) = Request::new( meta.clone() );
-                                       let payload = StarCoreAppMessagePayload::Assign(request);
-                                       let message = StarCoreAppMessage{ app: meta.key.clone(), payload: payload };
-                                       self.skel.core_tx.send( StarCoreCommand::AppMessage(message)).await;
+                                       let payload = StarCoreAppCommandPayload::Assign(request);
+                                       let message = StarCoreAppCommand { app: meta.key.clone(), payload: payload };
+                                       self.skel.core_tx.send( StarCoreCommand::AppCommand(message)).await;
                                        let star_tx = self.skel.star_tx.clone();
                                        tokio::spawn( async move {
                                            match rx.await
@@ -172,9 +172,9 @@ impl StarVariant for ServerStarVariant
                                    ServerPayload::SequenceResponse(_) => {}
                                    ServerPayload::AppLaunch(launch) => {
                                        let (request,rx) = Request::new(launch.clone());
-                                       let payload = StarCoreAppMessagePayload::Launch(request);
-                                       let message = StarCoreAppMessage{ app: launch.key.clone(), payload: payload };
-                                       self.skel.core_tx.send( StarCoreCommand::AppMessage(message)).await;
+                                       let payload = StarCoreAppCommandPayload::Launch(request);
+                                       let message = StarCoreAppCommand { app: launch.key.clone(), payload: payload };
+                                       self.skel.core_tx.send( StarCoreCommand::AppCommand(message)).await;
                                        let star_tx = self.skel.star_tx.clone();
                                        tokio::spawn( async move {
                                            match rx.await
@@ -200,6 +200,16 @@ impl StarVariant for ServerStarVariant
                                        } );
 
                                    }
+                               }
+                           }
+                           SpacePayload::Resource(resource_payload) => {
+                               match resource_payload{
+                                   ResourcePayload::Message(resource_message) => {
+                                       let (request,mut rx) = Request::new(resource_message.clone() );
+                                       self.skel.core_tx.send(StarCoreCommand::ResourceMessage(request)).await;
+                                       self.skel.comm().reply_result_empty_rx(star_message, rx).await;
+                                   }
+                                   _ => {}
                                }
                            }
                            _ => {}

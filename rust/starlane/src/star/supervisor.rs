@@ -9,7 +9,7 @@ use tokio::sync::mpsc::error::SendError;
 use crate::actor::{ActorKey};
 use crate::app::{AppMeta, AppLocation, AppStatus, AppReadyStatus, AppPanicReason, AppArchetype, InitData, AppCreateResult, App};
 use crate::error::Error;
-use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, ServerAppPayload, SpaceReply, StarMessageCentral, SimpleReply, SupervisorPayload, StarMessageSupervisor, ServerPayload, StarPattern, FromReply, ResourceQuery, ResourceAction};
+use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, ServerAppPayload, SpaceReply, StarMessageCentral, SimpleReply, SupervisorPayload, StarMessageSupervisor, ServerPayload, StarPattern, FromReply, ResourcePayload, ResourceAction};
 use crate::keys::{AppKey, UserKey, ResourceKey};
 use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait, Fail};
@@ -262,7 +262,7 @@ impl StarVariant for SupervisorVariant
                                 self.skel.comm().reply_result_empty(star_message.clone(), result );
                             }
                             ResourceAction::Find(find) => {
-                                let result = self.registry.find(find.to_owned()).await;
+                                let result = self.registry.find(find.to_owned() ).await;
                                 self.skel.comm().reply_result(star_message.clone(), result );
                             }
                             ResourceAction::HasResource(resource) => {
@@ -331,13 +331,14 @@ println!("AppSEquenceRequest!");
                             SpacePayload::Resource(query) => {
                                 match query
                                 {
-                                    ResourceQuery::Select(selector) => {
+                                    ResourcePayload::Select(selector) => {
                                         let mut selector = selector.clone();
                                         selector.add( FieldSelection::Space(space_message.sub_space.space.clone()) );
                                         selector.add( FieldSelection::SubSpace(space_message.sub_space.clone()) );
                                         let result = self.registry.select(selector).await;
                                         self.skel.comm().reply_result(star_message.clone(),Reply::from_result(result)).await;
                                     }
+                                    ResourcePayload::Message(_) => {}
                                 }
                             }
                             _ => {}

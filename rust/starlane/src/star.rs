@@ -24,16 +24,16 @@ use url::Url;
 
 use server::ServerStarVariant;
 
-use crate::actor::{ActorKey, ActorKind, ActorWatcher, ResourceMessage};
+use crate::actor::{ActorKey, ActorKind, ActorWatcher, ResourceMessage, ResourceMessageWrapper};
 use crate::app::{AppCommandKind, AppController, AppCreateController, AppMeta, AppSpecific, AppLocation, AppCommand};
 use crate::core::StarCoreCommand;
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ApplicationSupervisorReport, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, CentralPayload, SimpleReply, StarMessageCentral, AppPayload, ResourceAction};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ApplicationSupervisorReport, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, CentralPayload, SimpleReply, StarMessageCentral, AppPayload, ResourceAction, ResourcePayload};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId, SpaceKey, UserKey, ResourceKey, GatheringKey};
-use crate::resource::{Labels, ResourceRegistration, Selector, Resource, RegistryAction, RegistryCommand, RegistryResult, Registry, ResourceType, ResourceLocation};
+use crate::resource::{Labels, ResourceRegistration, Selector, Resource, RegistryAction, RegistryCommand, RegistryResult, Registry, ResourceType, ResourceLocation, ResourceManagerKey};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob, Fail};
@@ -244,7 +244,7 @@ pub static MAX_HOPS: usize = 32;
 
 pub struct Star
 {
-    data: StarSkel,
+    skel: StarSkel,
     star_rx: mpsc::Receiver<StarCommand>,
     core_tx: mpsc::Sender<StarCoreCommand>,
     lanes: HashMap<StarKey, LaneMeta>,
@@ -271,7 +271,7 @@ impl Star
 
     {
         Star{
-            data: data,
+            skel: data,
             star_rx: star_rx,
             core_tx: core_tx,
             lanes: lanes,
@@ -318,10 +318,10 @@ impl Star
                 match command{
 
                     StarCommand::Init => {
-                        self.data.variant_tx.send(StarVariantCommand::Init).await;
+                        self.skel.variant_tx.send(StarVariantCommand::Init).await;
                     }
                     StarCommand::SetFlags(set_flags ) => {
-                       self.data.flags= set_flags.flags;
+                       self.skel.flags= set_flags.flags;
                        set_flags.tx.send(());
                     }
                     StarCommand::AddLane(lane) => {
@@ -365,7 +365,7 @@ impl Star
                     }
                     StarCommand::GetSpaceController(get)=>{
                         let (tx,rx) = mpsc::channel(16);
-                        let star_tx = self.data.star_tx.clone();
+                        let star_tx = self.skel.star_tx.clone();
                         let user = get.auth.user.clone();
                         let ctrl = SpaceController::new( get.auth.user, tx );
                         tokio::spawn( async move {
@@ -432,7 +432,14 @@ impl Star
                         self.send_frame( forward.to.clone(), forward.frame ).await;
                     }
                     StarCommand::ResourceMessage(request) => {
-                        self.send_resource_message(request).await;
+                        self.message_to_resource(request).await;
+                    }
+                    StarCommand::ResourceLocate(request) => {
+                        self.locate_resource(request).await;
+                    }
+                    StarCommand::SetResourceLocation(set) => {
+                        self.resource_locations.put( set.payload.key.clone(), set.payload.clone() );
+                        set.commit();
                     }
                     _ => {
                         eprintln!("cannot process command: {}",command);
@@ -448,13 +455,85 @@ impl Star
         }
     }
 
-    async fn send_resource_message( &mut self, request: Request<ResourceMessage,Fail> ) {
-       if let Option::Some(location) = self.resource_locations.get(&request.payload.to.key )
+    async fn message_to_resource(&mut self, request: Request<ResourceMessageWrapper,Fail> ) {
+       if let Option::Some(location) = self.resource_locations.get(&request.payload.message.to.key )
        {
            let mut proto = ProtoMessage::new();
            proto.to = Option::Some(location.host.clone());
+           proto.payload = StarMessagePayload::Space(SpaceMessage{
+               user: request.payload.user,
+               sub_space: request.payload.sub_space,
+               payload: SpacePayload::Resource(ResourcePayload::Message(request.payload.message))
+           });
+           self.send_proto_message(proto).await;
        }
     }
+
+    async fn locate_resource(&mut self, request: Request<ResourceKey,ResourceLocation> )
+    {
+        if let Option::Some(location) = self.resource_locations.get(&request.payload )
+        {
+            request.tx.send(Result::Ok(location.clone()) );
+        }
+        else
+        {
+            match request.payload.manager()
+            {
+                ResourceManagerKey::Central => {
+                    self.request_resource_location_from_star(request, StarKey::central() ).await
+                }
+                ResourceManagerKey::Key(parent) => {
+                    if let Option::Some(parent_resource_star ) = self.resource_locations.get(&parent).cloned() {
+                        self.request_resource_location_from_star(request, parent_resource_star.host.clone() ).await
+                    } else {
+                        let (new_locate_request,rx) = Request::new(parent );
+                        self.skel.star_tx.send(StarCommand::ResourceLocate(new_locate_request)).await;
+                        tokio::spawn(async move{
+                            let reply = rx.await;
+                            if let Result::Ok(result) = reply
+                            {
+                                request.tx.send(result);
+                            } else {
+                                request.tx.send(Err(Fail::Unexpected));
+                            }
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    async fn request_resource_location_from_star(&mut self, locate: Request<ResourceKey,ResourceLocation>, star: StarKey )
+    {
+        let mut proto = ProtoMessage::new();
+        proto.to = Option::Some(star);
+        proto.payload = StarMessagePayload::Resource(ResourceAction::Find(locate.payload.clone()));
+        let reply = proto.get_ok_result().await;
+        self.send_proto_message(proto).await;
+        let star_tx = self.skel.star_tx.clone();
+        tokio::spawn( async move {
+            let result = reply.await;
+            if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Location(location)))) = result {
+                let (set,rx) = Set::new(location);
+                star_tx.send( StarCommand::SetResourceLocation(set)).await;
+                tokio::spawn( async move {
+                    if let Result::Ok(location) = rx.await {
+                        locate.tx.send( Ok(location) );
+                    } else {
+                        locate.tx.send( Err(Fail::Unexpected) );
+                    }
+                });
+            }
+            else if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Fail(fail))) = result {
+                locate.tx.send( Err(fail) );
+            }
+            else
+            {
+                locate.tx.send( Err(Fail::Unexpected) );
+            }
+    } );
+    }
+
 
 
     async fn send_proto_message( &mut self, proto: ProtoMessage )
@@ -469,16 +548,16 @@ impl Star
 
         let message = StarMessage{
             id: id,
-            from: self.data.info.star.clone(),
+            from: self.skel.info.star.clone(),
             to: proto.to.unwrap(),
             //transaction: proto.transaction,
             payload: proto.payload,
             reply_to: proto.reply_to
         };
 
-        if message.to == self.data.info.star
+        if message.to == self.skel.info.star
         {
-            eprintln!("star {} kind {} cannot send a proto message to itself, payload: {} ", self.data.info.star, self.data.info.kind, message.payload );
+            eprintln!("star {} kind {} cannot send a proto message to itself, payload: {} ", self.skel.info.star, self.skel.info.kind, message.payload );
         }
         else {
             let delivery = StarMessageDeliveryInsurance::with_txrx(message, proto.expect, proto.tx.clone(), proto.tx.subscribe() );
@@ -510,7 +589,7 @@ println!("spaces_do_not_match");
                     proto.expect = MessageExpect::ReplyErrOrTimeout(MessageExpectWait::Med);
 
                     let result= proto.get_ok_result().await;
-                    let star_tx = self.data.star_tx.clone();
+                    let star_tx = self.skel.star_tx.clone();
                     tokio::spawn( async move {
 
                         let result = tokio::time::timeout(Duration::from_secs(30), result).await;
@@ -625,19 +704,19 @@ println!("spaces_do_not_match");
             max_hops: 16,
             action: WindAction::SearchHits
         };
-        self.data.star_tx.send( StarCommand::WindInit(wind) ).await;
+        self.skel.star_tx.send( StarCommand::WindInit(wind) ).await;
     }
 
     async fn do_wind(&mut self, wind: Wind)
     {
         let tx = wind.tx;
-        let wind_up = WindUp::new(self.data.info.star.clone(), wind.pattern, wind.action );
+        let wind_up = WindUp::new(self.skel.info.star.clone(), wind.pattern, wind.action );
         self.do_wind_up(wind_up, tx, Option::None).await;
     }
 
     async fn do_wind_up(&mut self, mut wind: WindUp, tx: oneshot::Sender<WindHits>, exclude: Option<HashSet<StarKey>> )
     {
-        let tid = self.data.sequence.fetch_add( 1, std::sync::atomic::Ordering::Relaxed );
+        let tid = self.skel.sequence.fetch_add(1, std::sync::atomic::Ordering::Relaxed );
 
         let num_excludes:usize = match &exclude
         {
@@ -645,16 +724,16 @@ println!("spaces_do_not_match");
             Some(exclude) => exclude.len()
         };
 
-        let local_hit = match wind.pattern.is_match(&self.data.info){
-            true => Option::Some(self.data.info.star.clone()),
+        let local_hit = match wind.pattern.is_match(&self.skel.info){
+            true => Option::Some(self.skel.info.star.clone()),
             false => Option::None
         };
 
-        let transaction = Box::new(StarSearchTransaction::new(wind.pattern.clone(), self.data.star_tx.clone(), tx, self.lanes.len()-num_excludes, local_hit ));
+        let transaction = Box::new(StarSearchTransaction::new(wind.pattern.clone(), self.skel.star_tx.clone(), tx, self.lanes.len()-num_excludes, local_hit ));
         self.transactions.insert(tid.clone(), transaction );
 
         wind.transactions.push(tid.clone());
-        wind.hops.push( self.data.info.star.clone() );
+        wind.hops.push( self.skel.info.star.clone() );
 
         self.broadcast_excluding(Frame::StarWind(StarWind::Up(wind)), &exclude ).await;
     }
@@ -665,14 +744,14 @@ println!("spaces_do_not_match");
     async fn on_wind_up_hop(&mut self, mut wind_up: WindUp, lane_key: StarKey )
     {
 
-        if wind_up.pattern.is_match(&self.data.info)
+        if wind_up.pattern.is_match(&self.skel.info)
         {
 
             if wind_up.pattern.is_single_match()
             {
 
                 let hit = WindHit {
-                    star: self.data.info.star.clone(),
+                    star: self.skel.info.star.clone(),
                     hops: wind_up.hops.len() + 1
                 };
 
@@ -706,15 +785,15 @@ println!("spaces_do_not_match");
             }
         }
 
-        let hit = wind_up.pattern.is_match(&self.data.info);
+        let hit = wind_up.pattern.is_match(&self.skel.info);
 
-        if wind_up.hops.len()+1 > min(wind_up.max_hops,MAX_HOPS) || self.lanes.len() <= 1 || !self.data.info.kind.relay()
+        if wind_up.hops.len()+1 > min(wind_up.max_hops,MAX_HOPS) || self.lanes.len() <= 1 || !self.skel.info.kind.relay()
         {
 
             let hits = match hit
             {
                 true => {
-                    vec![WindHit {star: self.data.info.star.clone(), hops: wind_up.hops.len().clone()+1 }]
+                    vec![WindHit {star: self.skel.info.star.clone(), hops: wind_up.hops.len().clone()+1 }]
                 }
                 false => {
                     vec!()
@@ -753,7 +832,7 @@ println!("spaces_do_not_match");
 
         let relay_wind_up = wind_up.clone();
 
-        let command_tx = self.data.star_tx.clone();
+        let command_tx = self.skel.star_tx.clone();
         self.do_wind_up(relay_wind_up, tx, Option::Some(exclude) ).await;
 
         tokio::spawn( async move {
@@ -791,12 +870,12 @@ println!("spaces_do_not_match");
 
     pub fn star_key(&self)->&StarKey
     {
-        &self.data.info.star
+        &self.skel.info.star
     }
 
     pub fn star_tx(&self)->mpsc::Sender<StarCommand>
     {
-        self.data.star_tx.clone()
+        self.skel.star_tx.clone()
     }
 
     async fn broadcast(&mut self,  frame: Frame )
@@ -833,7 +912,7 @@ println!("spaces_do_not_match");
 
             self.message_reply_trackers.insert(delivery.message.id.clone(), tracker);
 
-            let star_tx = self.data.star_tx.clone();
+            let star_tx = self.skel.star_tx.clone();
             tokio::spawn( async move {
                 let mut delivery = delivery;
                 delivery.retries = delivery.expect.retries();
@@ -911,7 +990,7 @@ println!("spaces_do_not_match");
             let (tx,rx) = oneshot::channel();
 
             self.search_for_star(star.clone(), tx ).await;
-            let command_tx = self.data.star_tx.clone();
+            let command_tx = self.skel.star_tx.clone();
             tokio::spawn(async move {
 
                 match rx.await
@@ -1102,7 +1181,7 @@ println!("spaces_do_not_match");
                 };
 
 
-                match transaction.on_frame(frame,lane, &mut self.data.star_tx).await
+                match transaction.on_frame(frame,lane, &mut self.skel.star_tx).await
                 {
                     TransactionResult::Continue => {}
                     TransactionResult::Done => {
@@ -1136,7 +1215,7 @@ println!("spaces_do_not_match");
                   ProtoFrame::RequestSubgraphExpansion => {
                       if let Option::Some(lane_key) = lane_key
                       {
-                          let mut subgraph = self.data.info.star.subgraph.clone();
+                          let mut subgraph = self.skel.info.star.subgraph.clone();
                           subgraph.push(StarSubGraphKey::Big(self.star_subgraph_expansion_seq.fetch_add(1,std::sync::atomic::Ordering::Relaxed)));
                           self.send_frame(lane_key.clone(), Frame::Proto(ProtoFrame::GrantSubgraphExpansion(subgraph))).await;
                       }
@@ -1293,7 +1372,7 @@ println!("spaces_do_not_match");
             else
             {
                 let mut rx = self.find_actor_location(lookup).await;
-                let command_tx = self.data.star_tx.clone();
+                let command_tx = self.skel.star_tx.clone();
                 tokio::spawn( async move {
                     if let Option::Some(_) = rx.recv().await
                     {
@@ -1374,21 +1453,21 @@ println!("spaces_do_not_match");
 
     async fn on_message(&mut self, mut message: StarMessage) -> Result<(),Error>
     {
-        if message.to != self.data.info.star
+        if message.to != self.skel.info.star
         {
-            if self.data.info.kind.relay() || message.from == self.data.info.star
+            if self.skel.info.kind.relay() || message.from == self.skel.info.star
             {
                 //forward the message
                 self.send_frame(message.to.clone(), Frame::StarMessage(message) ).await;
                 return Ok(());
             }
             else {
-                return Err(format!("this star {} does not relay Messages", self.data.info.kind ).into())
+                return Err(format!("this star {} does not relay Messages", self.skel.info.kind ).into())
             }
         }
         else {
             self.process_message_reply(&message).await;
-            Ok(self.data.variant_tx.send( StarVariantCommand::StarMessage( message)).await?)
+            Ok(self.skel.variant_tx.send( StarVariantCommand::StarMessage( message)).await?)
         }
     }
 
@@ -1428,7 +1507,9 @@ pub enum StarCommand
     SpaceCommand(SpaceCommand),
     GetSpaceController(GetSpaceController),
     AppCommand(AppCommand),
-    ResourceMessage(Request<ResourceMessage,Fail>)
+    ResourceMessage(Request<ResourceMessageWrapper,Fail>),
+    ResourceLocate(Request<ResourceKey,ResourceLocation>),
+    SetResourceLocation(Set<ResourceLocation>)
 }
 
 pub struct GetSpaceController
@@ -1602,9 +1683,53 @@ pub struct Request<P,R> {
    pub tx: oneshot::Sender<Result<R,Fail>>
 }
 
+impl <P,R> Request<P,R>
+{
+    pub fn new( payload: P )->(Self,oneshot::Receiver<Result<R,Fail>>) {
+        let (tx,rx) = oneshot::channel();
+        (Request{
+            payload: payload,
+            tx: tx
+        },rx)
+    }
+}
+
 pub struct Query<P,R> {
     pub payload: P,
     pub tx: oneshot::Sender<R>
+}
+
+impl <P,R> Query<P,R>
+{
+    pub fn new( payload: P )->(Self,oneshot::Receiver<R>) {
+        let (tx,rx) = oneshot::channel();
+        (Query{
+            payload: payload,
+            tx: tx
+        },rx)
+    }
+}
+
+
+pub struct Set<P> {
+    pub payload: P,
+    pub tx: oneshot::Sender<P>
+}
+
+impl <P> Set<P>
+{
+    pub fn new( payload: P )->(Self,oneshot::Receiver<P>) {
+        let (tx,rx) = oneshot::channel();
+        (Set{
+            payload: payload,
+            tx: tx
+        },rx)
+    }
+
+    pub fn commit(self)
+    {
+        self.tx.send(self.payload);
+    }
 }
 
 pub struct Empty {
@@ -1616,16 +1741,7 @@ impl Empty {
     }
 }
 
-impl <P,R> Request<P,R>
-{
-    pub fn new( payload: P )->(Self,oneshot::Receiver<Result<R,Fail>>) {
-       let (tx,rx) = oneshot::channel();
-        (Request{
-           payload: payload,
-           tx: tx
-       },rx)
-    }
-}
+
 
 pub struct FrameTimeoutInner
 {
@@ -1688,7 +1804,9 @@ impl fmt::Display for StarCommand{
             StarCommand::ConstellationConstructionComplete => "ConstellationConstructionComplete".to_string(),
             StarCommand::Init => "Init".to_string(),
             StarCommand::GetSpaceController(_) => "GetSpaceController".to_string(),
-            StarCommand::ResourceMessage(_) => "ResourceMessage".to_string()
+            StarCommand::ResourceMessage(_) => "ResourceMessage".to_string(),
+            StarCommand::ResourceLocate(_) => "ResourceLocate".to_string(),
+            StarCommand::SetResourceLocation(_) => "SetResourceLocation".to_string()
         };
         write!(f, "{}",r)
     }
@@ -2626,6 +2744,32 @@ impl StarComm
       self.send(proto).await;
     }
 
+    pub async fn reply_result_empty_rx(&self, message: StarMessage, rx: oneshot::Receiver<Result<(),Fail>> )
+    {
+        let star_tx = self.star_tx.clone();
+        tokio::spawn( async move {
+            match rx.await
+            {
+                Ok(result) => {
+                    match result {
+                        Ok(_) => {
+                            let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
+                            star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                        }
+                        Err(fail) => {
+                            let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(fail)));
+                            star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                        }
+                    }
+                }
+                Err(fail) => {
+                    let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Unexpected)));
+                    star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                }
+            }
+        });
+    }
+
     pub async fn reply_result_empty(&self, message: StarMessage, result: Result<(),Fail>)
     {
         match result
@@ -2722,7 +2866,7 @@ pub trait RegistryBacking : Sync+Send {
     async fn register(&self, registration: ResourceRegistration)->Result<(),Fail>;
     async fn select(&self, select: Selector)->Result<Vec<Resource>,Fail>;
     async fn set_location(&self, location: ResourceLocation)->Result<(),Fail>;
-    async fn find(&self, keys: HashSet<ResourceKey>)->Result<Reply,Fail>;
+    async fn find(&self, keys: ResourceKey)->Result<Reply,Fail>;
 }
 
 pub struct RegistryBackingSqlLite
@@ -2779,12 +2923,12 @@ impl RegistryBacking for RegistryBackingSqlLite
         Ok(())
     }
 
-    async fn find(&self, keys: HashSet<ResourceKey>) -> Result<Reply, Fail> {
-        let (request,rx) = RegistryAction::new(RegistryCommand::Find(keys));
+    async fn find(&self, key: ResourceKey) -> Result<Reply, Fail> {
+        let (request,rx) = RegistryAction::new(RegistryCommand::Find(key));
         self.registry.send( request ).await;
         let result = tokio::time::timeout( Duration::from_secs(5),rx).await??;
-        if let RegistryResult::Locations(locations) = result {
-            Ok(Reply::Locations(locations))
+        if let RegistryResult::Location(location) = result {
+            Ok(Reply::Location(location))
         }
         else
         {

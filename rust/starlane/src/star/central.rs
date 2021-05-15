@@ -9,7 +9,7 @@ use tokio::sync::oneshot::Receiver;
 
 use crate::app::{AppCreateController, AppMeta, ApplicationStatus, AppLocation, AppArchetype, App};
 use crate::error::Error;
-use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, CentralPayload, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply, ResourceQuery, ResourceAction};
+use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, CentralPayload, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply, ResourcePayload, ResourceAction};
 use crate::id::Id;
 use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, ResourceKey};
 use crate::resource::{Labels, Registry, RegistryAction, Selector, RegistryResult, RegistryCommand, FieldSelection, Resource, ResourceType, ResourceRegistration};
@@ -211,14 +211,15 @@ impl StarVariant for CentralStarVariant
                            SpacePayload::Resource(query) => {
                                match query
                                {
-                                   ResourceQuery::Select(selector) => {
+                                   ResourcePayload::Select(selector) => {
                                        let mut selector = selector.clone();
                                        selector.add( FieldSelection::Space(space_message.sub_space.space.clone()) );
                                        selector.add( FieldSelection::SubSpace(space_message.sub_space.clone()) );
                                        let result = self.registry.select(selector).await;
                                        self.skel.comm().reply_result(star_message.clone(),Reply::from_result(result)).await;
                                    }
-                              }
+                                   ResourcePayload::Message(_) => {}
+                               }
                            }
                            _=>{}
                        }

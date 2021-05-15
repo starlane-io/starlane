@@ -14,10 +14,11 @@ use crate::frame::{Event};
 use crate::id::Id;
 use crate::keys::{AppKey, ResourceKey, SubSpaceKey, UserKey};
 use crate::names::Name;
-use crate::resource::{Labels, Resource, ResourceKind, ResourceRegistration};
+use crate::resource::{Labels, Resource, ResourceKind, ResourceRegistration, ResourceType};
 use crate::star::StarKey;
 use std::marker::PhantomData;
 use serde::de::DeserializeOwned;
+use crate::message::Fail;
 
 pub struct Actor
 {
@@ -213,6 +214,17 @@ pub struct ResourceTo
     pub ext: ResourceToExt
 }
 
+impl ResourceTo
+{
+    pub fn reverse(&self)->ResourceFrom
+    {
+        ResourceFrom {
+            key: self.key.clone(),
+            ext: self.ext.reverse()
+        }
+    }
+}
+
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ResourceToExt
 {
@@ -227,12 +239,52 @@ pub struct ResourceFrom
     pub ext: ResourceFromExt
 }
 
+impl ResourceFrom
+{
+    pub fn reverse(&self)->ResourceTo
+    {
+        ResourceTo {
+           key: self.key.clone(),
+           ext: self.ext.reverse()
+        }
+    }
+}
+
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ResourceFromExt
 {
     None,
     Ext(Raw)
 }
+
+impl ResourceFromExt
+{
+    pub fn reverse(&self)->ResourceToExt {
+        match self {
+            ResourceFromExt::None => {
+                ResourceToExt::None
+            }
+            ResourceFromExt::Ext(raw) => {
+                ResourceToExt::Ext(raw.clone())
+            }
+        }
+    }
+}
+
+impl ResourceToExt
+{
+    pub fn reverse(&self)->ResourceFromExt {
+        match self {
+            ResourceToExt::None => {
+                ResourceFromExt::None
+            }
+            ResourceToExt::Ext(raw) => {
+                ResourceFromExt::Ext(raw.clone())
+            }
+        }
+    }
+}
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ActorFromExt
@@ -328,6 +380,13 @@ impl ActorKeySeq
     }
 }
 
+pub struct ResourceMessageWrapper
+{
+    pub user: UserKey,
+    pub sub_space: SubSpaceKey,
+    pub message: ResourceMessage
+}
+
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceMessage
 {
@@ -338,6 +397,19 @@ pub struct ResourceMessage
     pub transaction: Option<Id>
 }
 
+impl ResourceMessage
+{
+    pub fn verify_type(&self, resource_type: ResourceType )->Result<(),Fail>
+    {
+        if self.to.key.resource_type() == resource_type {
+            Ok(())
+        } else {
+            Err(Fail::WrongResourceType)
+        }
+    }
+}
+
 pub type Raw=Vec<u8>;
 pub type RawPayload=Vec<u8>;
 pub type RawState=Vec<u8>;
+

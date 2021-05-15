@@ -326,6 +326,32 @@ pub enum ResourceKey
 
 impl ResourceKey
 {
+    pub fn actor(&self)->Result<ActorKey,Fail> {
+        if let ResourceKey::Actor(key) = self {
+            Ok(key.clone())
+        } else {
+            Err(Fail::WrongResourceType)
+        }
+    }
+
+    pub fn app(&self)->Result<AppKey,Fail> {
+        if let ResourceKey::App(key) = self {
+            Ok(key.clone())
+        } else {
+            Err(Fail::WrongResourceType)
+        }
+    }
+
+    pub fn file(&self)->Result<FileKey,Fail> {
+        if let ResourceKey::File(key) = self {
+            Ok(key.clone())
+        } else {
+            Err(Fail::WrongResourceType)
+        }
+    }
+
+
+
     pub fn manager(&self)->ResourceManagerKey
     {
         match self

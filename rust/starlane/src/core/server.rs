@@ -7,7 +7,7 @@ use crate::actor::{ActorArchetype, ActorAssign, ActorContext, ActorInfo, ActorKe
 use crate::actor;
 use crate::app::{ActorMessageResult, Alert, AppArchetype, AppCommandKind, AppContext, AppCreateResult, AppSpecific, AppMessageResult, AppMeta, AppSlice, ConfigSrc, InitData, AppSliceCommand};
 use crate::artifact::Artifact;
-use crate::core::{AppCommandResult, AppLaunchError, StarCore, StarCoreAppMessagePayload, StarCoreCommand, StarCoreExt, StarCoreExtKind};
+use crate::core::{AppCommandResult, AppLaunchError, StarCore, StarCoreAppCommandPayload, StarCoreCommand, StarCoreExt, StarCoreExtKind};
 use crate::error::Error;
 use crate::frame::{ServerAppPayload, SpaceMessage, SpacePayload, StarMessagePayload, Watch};
 use crate::frame::ServerPayload::AppLaunch;
@@ -65,14 +65,13 @@ impl StarCore for ServerStarCore
                 }
                 StarCoreCommand::Watch(_) => {}
 
-                StarCoreCommand::AppMessage(message) => {
+                StarCoreCommand::AppCommand(star_core_app_command) => {
                     if let Option::Some(supervisor) = &self.supervisor
                     {
-                        let app= message.app.clone();
-                        match message.payload
+                        let app= star_core_app_command.app.clone();
+                        match star_core_app_command.payload
                         {
-                            StarCoreAppMessagePayload::None => {}
-                            StarCoreAppMessagePayload::Assign(assign ) => {
+                            StarCoreAppCommandPayload::Assign(assign ) => {
                                 match self.ext.app_ext(&assign.payload.specific)
                                 {
                                     Ok(app_ext) => {
@@ -85,7 +84,7 @@ impl StarCore for ServerStarCore
                                     }
                                 }
                             }
-                            StarCoreAppMessagePayload::Launch(launch) => {
+                            StarCoreAppCommandPayload::Launch(launch) => {
                                 if let Option::Some(app) = self.apps.get_mut(&launch.payload.key )
                                 {
                                     let (request,rx) = Request::new(launch.payload.archetype);
@@ -97,7 +96,7 @@ impl StarCore for ServerStarCore
                                     launch.tx.send( Result::Err(Fail::ResourceNotFound(ResourceKey::App(app))));
                                 }
                             }
-
+                            StarCoreAppCommandPayload::None => {}
                         }
                     }
                 }
@@ -126,6 +125,29 @@ impl StarCore for ServerStarCore
                         }
                         _ => {
                             request.tx.send( Err(Fail::ResourceNotFound(resource)));
+                        }
+                    }
+                }
+                StarCoreCommand::ResourceMessage(request) => {
+                    match &request.payload.to.key
+                    {
+                        ResourceKey::App(key) => {
+                            if let Option::Some(app) = self.apps.get(&key) {
+                                request.tx.send(Ok(()) );
+                                app.send( AppSliceCommand::AppMessage(request.payload) ).await;
+                            } else {
+                                request.tx.send(Err(Fail::ResourceNotFound(request.payload.to.key)));
+                            }
+                        }
+                        ResourceKey::Actor(key) => {
+                            if let Option::Some(app) = self.apps.get(&key.app ) {
+                                app.send( AppSliceCommand::ActorMessage(request) ).await;
+                            } else {
+                                request.tx.send(Err(Fail::ResourceNotFound(request.payload.to.key)));
+                            }
+                        }
+                        _ => {
+                            request.tx.send(Err(Fail::ResourceNotFound(request.payload.to.key)));
                         }
                     }
                 }

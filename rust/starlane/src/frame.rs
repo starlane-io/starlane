@@ -360,7 +360,7 @@ pub enum ResourceAction
 {
     Register(ResourceRegistration),
     Location(ResourceLocation),
-    Find(HashSet<ResourceKey>),
+    Find(ResourceKey),
     HasResource(ResourceKey)
 }
 
@@ -410,7 +410,6 @@ pub enum Reply
     Key(ResourceKey),
     Keys(Vec<ResourceKey>),
     Location(ResourceLocation),
-    Locations(Vec<ResourceLocation>),
     Seq(u64)
 }
 
@@ -465,13 +464,14 @@ pub enum SpacePayload
     Central(CentralPayload),
     Server(ServerPayload),
     Supervisor(SupervisorPayload),
-    Resource(ResourceQuery)
+    Resource(ResourcePayload)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum ResourceQuery
+pub enum ResourcePayload
 {
     Select(Selector),
+    Message(ResourceMessage)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
