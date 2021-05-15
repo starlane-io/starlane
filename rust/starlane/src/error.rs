@@ -5,6 +5,7 @@ use tokio::sync::mpsc::error::SendError;
 use futures::channel::oneshot::Canceled;
 use tokio::sync::broadcast;
 use tokio::time::error::Elapsed;
+use semver::SemVerError;
 
 #[derive(Debug, Clone)]
 pub struct Error{
@@ -35,6 +36,14 @@ impl From<bincode::ErrorKind> for Error{
 
 impl From<Box<bincode::ErrorKind>> for Error{
     fn from(e: Box<bincode::ErrorKind>) -> Self {
+        Error{
+            error: format!("{}",e.to_string())
+        }
+    }
+}
+
+impl From<SemVerError> for Error{
+    fn from(e: SemVerError) -> Self {
         Error{
             error: format!("{}",e.to_string())
         }

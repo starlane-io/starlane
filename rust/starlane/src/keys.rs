@@ -469,7 +469,7 @@ impl ResourceKey
             ResourceKey::User(_) => ResourceType::User,
             ResourceKey::File(_) => ResourceType::File,
             ResourceKey::Artifact(_) => ResourceType::Artifact,
-            ResourceKey::Filesystem(_) => ResourceType::Filesystem
+            ResourceKey::Filesystem(_) => ResourceType::FileSystem
         }
     }
 

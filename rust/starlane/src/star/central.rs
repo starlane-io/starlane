@@ -110,7 +110,7 @@ impl StarVariant for CentralStarVariant
                 accept.insert(ResourceType::App);
                 accept.insert(ResourceType::User);
                 accept.insert(ResourceType::File);
-                accept.insert(ResourceType::Filesystem);
+                accept.insert(ResourceType::FileSystem);
                 accept.insert(ResourceType::Artifact);
                 self.registry.accept(accept);
             }

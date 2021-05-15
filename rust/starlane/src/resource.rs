@@ -762,7 +762,7 @@ impl ResourceType
             ResourceType::User => 4,
             ResourceType::File => 5,
             ResourceType::Artifact => 6,
-            ResourceType::Filesystem => 7
+            ResourceType::FileSystem => 7
         }
     }
 
@@ -777,7 +777,7 @@ impl ResourceType
             4 => Ok(ResourceType::User),
             5 => Ok(ResourceType::File),
             6 => Ok(ResourceType::Artifact),
-            7 => Ok(ResourceType::Filesystem),
+            7 => Ok(ResourceType::FileSystem),
             _ => Err(format!("no resource type for magic number {}",magic).into())
         }
     }
@@ -898,7 +898,7 @@ pub enum ResourceType
     App,
     Actor,
     User,
-    Filesystem,
+    FileSystem,
     File,
     Artifact
 }
@@ -915,8 +915,38 @@ impl ResourceType
             ResourceType::Actor => true,
             ResourceType::User => false,
             ResourceType::File => false,
-            ResourceType::Filesystem => false,
+            ResourceType::FileSystem => false,
             ResourceType::Artifact => true
+        }
+    }
+
+    pub fn name_structure(&self)->ResourceNameStructure{
+        match self{
+            ResourceType::Space => {
+                ResourceNameStructure::new( vec![ResourceNamePartKind::Skewer] )
+            }
+            ResourceType::SubSpace => {
+                ResourceNameStructure::with( ResourceType::Space.name_structure(),vec![ResourceNamePartKind::Skewer] )
+            }
+            ResourceType::App => {
+                ResourceNameStructure::with( ResourceType::SubSpace.name_structure(),vec![ResourceNamePartKind::Skewer] )
+            }
+            ResourceType::Actor => {
+                ResourceNameStructure::with( ResourceType::App.name_structure(),vec![ResourceNamePartKind::Skewer] )
+            }
+            ResourceType::User => {
+                ResourceNameStructure::with( ResourceType::Space.name_structure(),vec![ResourceNamePartKind::Skewer] )
+            }
+            ResourceType::FileSystem => {
+
+                ResourceNameStructure::new( vec![ResourceNamePartKind::Skewer,ResourceNamePartKind::Skewer,ResourceNamePartKind::WildcardOrSkewer,ResourceNamePartKind::Skewer] )
+            }
+            ResourceType::File => {
+                ResourceNameStructure::with( ResourceType::FileSystem.name_structure(),vec![ResourceNamePartKind::Path] )
+            }
+            ResourceType::Artifact => {
+                ResourceNameStructure::new( vec![ResourceNamePartKind::Skewer,ResourceNamePartKind::Skewer,ResourceNamePartKind::Skewer,ResourceNamePartKind::Version,ResourceNamePartKind::Path] )
+            }
         }
     }
 }
@@ -932,7 +962,7 @@ impl fmt::Display for ResourceType {
                     ResourceType::Actor=> "Actor".to_string(),
                     ResourceType::User=> "User".to_string(),
                     ResourceType::File=> "File".to_string(),
-                    ResourceType::Filesystem=> "Filesystem".to_string(),
+                    ResourceType::FileSystem => "Filesystem".to_string(),
                     ResourceType::Artifact=> "Artifact".to_string(),
                 })
     }
@@ -1122,8 +1152,25 @@ impl ToString for ResourceName {
 
 pub struct ResourceNameStructure
 {
-    pub parts: Vec<ResourceNamePartKind>
+    kinds: Vec<ResourceNamePartKind>
 }
+
+impl ResourceNameStructure
+{
+    pub fn new( kinds: Vec<ResourceNamePartKind> ) -> Self {
+        ResourceNameStructure{
+            kinds: kinds
+        }
+    }
+
+    pub fn with( parent: Self, mut kinds: Vec<ResourceNamePartKind>) -> Self
+    {
+        let mut union = parent.kinds.clone();
+        union.append( &mut kinds );
+        Self::new(union)
+    }
+}
+
 
 
 
@@ -1132,7 +1179,7 @@ impl ResourceNameStructure {
     fn from_str(&self, s: &str) -> Result<ResourceName, Error> {
         let mut split = s.split(":");
 
-        if split.count()  != self.parts.len() {
+        if split.count()  != self.kinds.len() {
             return Err("part count not equal".into());
         }
 
@@ -1140,7 +1187,7 @@ impl ResourceNameStructure {
 
         let mut parts = vec![];
 
-        for kind in &self.parts{
+        for kind in &self.kinds {
             parts.push(kind.from_str(split.next().unwrap().clone() )?);
         }
 
@@ -1150,12 +1197,12 @@ impl ResourceNameStructure {
     }
 
     pub fn matches( &self, parts: Vec<ResourceNamePart> ) -> bool {
-        if parts.len() != self.parts.len() {
+        if parts.len() != self.kinds.len() {
             return false;
         }
         for (index,part) in parts.iter().enumerate()
         {
-            let kind = self.parts.get(index).unwrap();
+            let kind = self.kinds.get(index).unwrap();
             if !kind.matches(part) {
                 return false;
             }
@@ -1170,6 +1217,7 @@ pub enum ResourceNamePartKind
 {
     Wildcard,
     Skewer,
+    Version,
     WildcardOrSkewer,
     Path
 }
@@ -1188,6 +1236,9 @@ impl ResourceNamePartKind
             }
             ResourceNamePart::Path(_) => {
                 *self == Self::Path
+            }
+            ResourceNamePart::Version(_) => {
+                *self == Self::Version
             }
         }
     }
@@ -1216,7 +1267,10 @@ impl ResourceNamePartKind
                 }
             }
             ResourceNamePartKind::Path => {
-                Ok(ResourceNamePart::Path(s.to_owned()))
+                Ok(ResourceNamePart::Path(Path::from_str(s)?))
+            }
+            ResourceNamePartKind::Version => {
+                Ok(ResourceNamePart::Version(Version::from_str(s)?))
             }
         }
     }
@@ -1229,7 +1283,8 @@ pub enum ResourceNamePart
 {
     Wildcard,
     Skewer(Skewer),
-    Path(String)
+    Path(Path),
+    Version(Version)
 }
 
 impl ToString for ResourceNamePart {
@@ -1237,7 +1292,8 @@ impl ToString for ResourceNamePart {
         match self {
             ResourceNamePart::Wildcard => "*".to_string(),
             ResourceNamePart::Skewer(skewer) => skewer.to_string(),
-            ResourceNamePart::Path(path) => path.clone()
+            ResourceNamePart::Path(path) => path.to_string(),
+            ResourceNamePart::Version(version) => version.to_string()
         }
     }
 }
@@ -1251,6 +1307,10 @@ pub struct Skewer
 impl Skewer
 {
     pub fn new( string: &str ) -> Result<Self,Error> {
+        if string.is_empty() {
+            return Err("cannot be empty".into());
+        }
+
         for c in string.chars() {
             if !(c.is_lowercase() && (c.is_alphanumeric() || c == '-')) {
                 return Err("must be lowercase, use only alphanumeric characters & dashes".into());
@@ -1276,12 +1336,6 @@ impl FromStr for Skewer {
     }
 }
 
-
-
-impl ResourceNamePart
-{
-
-}
 
 
 
@@ -1655,3 +1709,96 @@ mod test
         }
     }
 }
+
+
+
+
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct Path
+{
+    string: String
+}
+
+impl Path
+{
+    pub fn new( string: &str ) -> Result<Self,Error> {
+        if string.is_empty() {
+            return Err("path cannot be empty".into());
+        }
+
+        for c in string.chars() {
+            if c == '*' || c == '?' {
+                return Err("path cannot contain wildcard characters [*,?]".into());
+            }
+        }
+        Ok(Path{
+            string: string.to_string()
+        })
+    }
+}
+
+impl ToString for Path {
+    fn to_string(&self) -> String {
+        self.string.clone()
+    }
+}
+
+impl FromStr for Path {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Path::new(s )?)
+    }
+}
+
+
+
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct Version
+{
+    string: String
+}
+
+impl Version
+{
+    pub fn new( string: &str ) -> Result<Self,Error> {
+        if string.is_empty() {
+            return Err("path cannot be empty".into());
+        }
+
+        // here we are just verifying that it parses and normalizing the output
+        let version = semver::Version::parse(string)?;
+
+        Ok(Version{
+            string: version.to_string()
+        })
+    }
+}
+
+impl Version
+{
+    pub fn as_semver(&self)->Result<semver::Version,Error>
+    {
+        Ok(semver::Version::parse(self.string.as_str() )?)
+    }
+}
+
+impl ToString for Version {
+    fn to_string(&self) -> String {
+        self.string.clone()
+    }
+}
+
+impl FromStr for Version {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Version::new(s )?)
+    }
+}
+
+
+
+
