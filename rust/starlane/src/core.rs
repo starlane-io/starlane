@@ -27,6 +27,7 @@ use crate::keys::{AppKey, ResourceKey};
 use crate::artifact::{Artifact, ArtifactKey};
 
 pub mod server;
+pub mod filestore;
 
 pub enum StarCoreCommand
 {

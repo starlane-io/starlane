@@ -48,6 +48,7 @@ use std::str::FromStr;
 pub mod central;
 pub mod supervisor;
 pub mod server;
+mod filestore;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
 pub enum StarKind
@@ -56,7 +57,7 @@ pub enum StarKind
     Mesh,
     Supervisor,
     Server,
-    Store,
+    FileStore,
     Gateway,
     Link,
     Client
@@ -72,7 +73,7 @@ impl FromStr for StarKind{
             "Mesh"  => Ok(StarKind::Mesh),
             "Supervisor"  => Ok(StarKind::Supervisor),
             "Server"  => Ok(StarKind::Server),
-            "Store"  => Ok(StarKind::Store),
+            "Store"  => Ok(StarKind::FileStore),
             "Gateway"  => Ok(StarKind::Gateway),
             "Link"  => Ok(StarKind::Link),
             "Client"  => Ok(StarKind::Client),
@@ -208,7 +209,7 @@ impl StarKind
             StarKind::Gateway => true,
             StarKind::Client => true,
             StarKind::Link => true,
-            StarKind::Store => false
+            StarKind::FileStore => false
         }
     }
 }
@@ -221,7 +222,7 @@ impl fmt::Display for StarKind{
             StarKind::Mesh => "Mesh".to_string(),
             StarKind::Supervisor => "Supervisor".to_string(),
             StarKind::Server => "Server".to_string(),
-            StarKind::Store => "Store".to_string(),
+            StarKind::FileStore => "Store".to_string(),
             StarKind::Gateway => "Gateway".to_string(),
             StarKind::Link => "Link".to_string(),
             StarKind::Client => "Client".to_string(),

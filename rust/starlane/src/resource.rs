@@ -738,12 +738,12 @@ pub enum ResourceKind
     Actor(ActorKind),
     User,
     File,
-    Filesystem(FilesystemKind),
+    FileSystem(FileSystemKind),
     Artifact(ArtifactKind)
 }
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
-pub enum FilesystemKind
+pub enum FileSystemKind
 {
     App,
     SubSpace
@@ -793,7 +793,7 @@ impl fmt::Display for ResourceKind{
                     ResourceKind::Actor(kind)=> format!("Actor:{}",kind).to_string(),
                     ResourceKind::User=> "User".to_string(),
                     ResourceKind::File=> "File".to_string(),
-                    ResourceKind::Filesystem(kind)=> format!("Filesystem:{}",kind).to_string(),
+                    ResourceKind::FileSystem(kind)=> format!("Filesystem:{}", kind).to_string(),
                     ResourceKind::Artifact(kind)=>format!("Artifact:{}",kind).to_string()
                 })
     }
@@ -833,16 +833,16 @@ impl ResourceKind {
                     id: index as _
                 })
             }
-            ResourceKind::Filesystem(kind) => {
+            ResourceKind::FileSystem(kind) => {
                 match kind
                 {
-                    FilesystemKind::App => {
+                    FileSystemKind::App => {
                         ResourceKey::Filesystem(FileSystemKey::App(AppFilesystemKey{
                             app:AppKey::new(sub_space),
                             id: index as _
                         }))
                     }
-                    FilesystemKind::SubSpace => {
+                    FileSystemKind::SubSpace => {
                         ResourceKey::Filesystem(FileSystemKey::SubSpace(SubSpaceFilesystemKey{
                             sub_space: sub_space,
                             id: index as _
@@ -938,12 +938,12 @@ impl fmt::Display for ResourceType {
     }
 }
 
-impl fmt::Display for FilesystemKind {
+impl fmt::Display for FileSystemKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!( f,"{}",
                 match self{
-                    FilesystemKind::App => "App".to_string(),
-                    FilesystemKind::SubSpace => "SubSpace".to_string()
+                    FileSystemKind::App => "App".to_string(),
+                    FileSystemKind::SubSpace => "SubSpace".to_string()
                 })
     }
 }
@@ -1097,6 +1097,190 @@ pub enum ResourceManagerKey
 {
     Central,
     Key(ResourceKey)
+}
+
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceName
+{
+   parts: Vec<ResourceNamePart>
+}
+
+
+impl ToString for ResourceName {
+    fn to_string(&self) -> String {
+        let mut rtn = String::new();
+        for (index,part) in self.parts.iter().enumerate() {
+            if index != 0{
+                rtn.push_str(":")
+            }
+            rtn.push_str(part.to_string().as_str() );
+        }
+        rtn
+    }
+}
+
+pub struct ResourceNameStructure
+{
+    pub parts: Vec<ResourceNamePartKind>
+}
+
+
+
+impl ResourceNameStructure {
+
+    fn from_str(&self, s: &str) -> Result<ResourceName, Error> {
+        let mut split = s.split(":");
+
+        if split.count()  != self.parts.len() {
+            return Err("part count not equal".into());
+        }
+
+        let mut split = s.split(":");
+
+        let mut parts = vec![];
+
+        for kind in &self.parts{
+            parts.push(kind.from_str(split.next().unwrap().clone() )?);
+        }
+
+        Ok(ResourceName{
+            parts: parts
+        })
+    }
+
+    pub fn matches( &self, parts: Vec<ResourceNamePart> ) -> bool {
+        if parts.len() != self.parts.len() {
+            return false;
+        }
+        for (index,part) in parts.iter().enumerate()
+        {
+            let kind = self.parts.get(index).unwrap();
+            if !kind.matches(part) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
+pub enum ResourceNamePartKind
+{
+    Wildcard,
+    Skewer,
+    WildcardOrSkewer,
+    Path
+}
+
+impl ResourceNamePartKind
+{
+    pub fn matches( &self, part: &ResourceNamePart )->bool
+    {
+        match part
+        {
+            ResourceNamePart::Wildcard => {
+                *self == Self::Wildcard || *self == Self::WildcardOrSkewer
+            }
+            ResourceNamePart::Skewer(_) => {
+                *self == Self::Skewer || *self == Self::WildcardOrSkewer
+            }
+            ResourceNamePart::Path(_) => {
+                *self == Self::Path
+            }
+        }
+    }
+
+    pub fn from_str(&self, s: &str ) -> Result<ResourceNamePart,Error> {
+        match self{
+            ResourceNamePartKind::Wildcard => {
+                if s == "*" {
+                    Ok(ResourceNamePart::Wildcard)
+                }
+                else
+                {
+                    Err("expected wildcard".into())
+                }
+            }
+            ResourceNamePartKind::Skewer => {
+                Ok(ResourceNamePart::Skewer(Skewer::from_str(s)?))
+            }
+            ResourceNamePartKind::WildcardOrSkewer => {
+                if s == "*" {
+                    Ok(ResourceNamePart::Wildcard)
+                }
+                else
+                {
+                    Ok(ResourceNamePart::Skewer(Skewer::from_str(s)?))
+                }
+            }
+            ResourceNamePartKind::Path => {
+                Ok(ResourceNamePart::Path(s.to_owned()))
+            }
+        }
+    }
+}
+
+
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ResourceNamePart
+{
+    Wildcard,
+    Skewer(Skewer),
+    Path(String)
+}
+
+impl ToString for ResourceNamePart {
+    fn to_string(&self) -> String {
+        match self {
+            ResourceNamePart::Wildcard => "*".to_string(),
+            ResourceNamePart::Skewer(skewer) => skewer.to_string(),
+            ResourceNamePart::Path(path) => path.clone()
+        }
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct Skewer
+{
+    string: String
+}
+
+impl Skewer
+{
+    pub fn new( string: &str ) -> Result<Self,Error> {
+        for c in string.chars() {
+            if !(c.is_lowercase() && (c.is_alphanumeric() || c == '-')) {
+                return Err("must be lowercase, use only alphanumeric characters & dashes".into());
+            }
+        }
+        Ok(Skewer{
+            string: string.to_string()
+        })
+    }
+}
+
+impl ToString for Skewer {
+    fn to_string(&self) -> String {
+        self.string.clone()
+    }
+}
+
+impl FromStr for Skewer {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Skewer::new(s )?)
+    }
+}
+
+
+
+impl ResourceNamePart
+{
+
 }
 
 
