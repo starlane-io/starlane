@@ -1211,6 +1211,7 @@ pub struct ResourceRegistration
     pub resource: Resource,
     pub name: Option<String>,
     pub labels: Labels,
+    pub address: Option<ResourceAddress>
 }
 
 impl ResourceRegistration
@@ -1220,7 +1221,8 @@ impl ResourceRegistration
         ResourceRegistration{
             resource: resource,
             name: name,
-            labels: labels
+            labels: labels,
+            address: Option::None
         }
     }
 }
@@ -1252,7 +1254,7 @@ pub enum ResourceManagerKey
 }
 
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub struct ResourceAddress
 {
    parts: Vec<ResourceAddressPart>
@@ -1272,6 +1274,7 @@ impl ToString for ResourceAddress {
     }
 }
 
+#[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceBinding{
     pub key: ResourceKey,
     pub address: ResourceAddress
@@ -1434,7 +1437,7 @@ impl ResourceAddressPartKind
 
 
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub enum ResourceAddressPart
 {
     Wildcard,
@@ -1454,7 +1457,7 @@ impl ToString for ResourceAddressPart {
     }
 }
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub struct Skewer
 {
     string: String
@@ -1551,7 +1554,8 @@ mod test
         let save = ResourceRegistration{
             resource: resource,
             labels: labels,
-            name: name
+            name: name,
+            address: None
         };
         save
     }
@@ -1568,7 +1572,8 @@ mod test
         let save = ResourceRegistration{
             resource: resource,
             labels: Labels::new(),
-            name: Option::None
+            name: Option::None,
+            address: None
         };
 
         save
@@ -1870,7 +1875,7 @@ mod test
 
 
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub struct Path
 {
     string: String
@@ -1916,7 +1921,7 @@ impl FromStr for Path {
 
 
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub struct Version
 {
     string: String

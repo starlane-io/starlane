@@ -278,6 +278,14 @@ impl StarVariant for SupervisorVariant
                                     self.skel.comm().simple_reply(star_message.clone(), SimpleReply::Fail(Fail::ResourceNotFound(resource.clone()))).await;
                                 }
                             }
+                            ResourceAction::GetKey(address) => {
+                                let result = self.registry.get_key(address.clone() ).await;
+                                self.skel.comm().reply_result(star_message.clone(), result );
+                            }
+                            ResourceAction::Bind(bind) => {
+                                let result = self.registry.bind(bind.clone() ).await;
+                                self.skel.comm().reply_result_empty(star_message.clone(), result );
+                            }
                         }
                     }
                     StarMessagePayload::Space(space_message) => {

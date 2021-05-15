@@ -126,7 +126,8 @@ impl From<ActorRegistration> for ResourceRegistration
         ResourceRegistration{
             resource: actor.resource.into(),
             name: actor.name,
-            labels: actor.labels
+            labels: actor.labels,
+            address: Option::None
         }
     }
 }

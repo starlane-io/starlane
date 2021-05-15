@@ -253,11 +253,11 @@ pub struct Star
     transactions: HashMap<u64,Box<dyn Transaction>>,
     frame_hold: FrameHold,
     watches: HashMap<ActorKey,HashMap<Id,StarWatchInfo>>,
-    app_locations: LruCache<AppKey,StarKey>,
     messages_received: HashMap<MessageId,Instant>,
     message_reply_trackers: HashMap<MessageId, MessageReplyTracker>,
     star_subgraph_expansion_seq: AtomicU64,
-    resource_locations: LruCache<ResourceKey,ResourceLocation>
+    resource_locations: LruCache<ResourceKey,ResourceLocation>,
+    resource_address_to_key: LruCache<ResourceAddress,ResourceKey>
 }
 
 impl Star
@@ -280,11 +280,11 @@ impl Star
             transactions: HashMap::new(),
             frame_hold: frame_hold,
             watches: HashMap::new(),
-            app_locations: LruCache::new(4*1024 ),
             messages_received: HashMap::new(),
             message_reply_trackers: HashMap::new(),
             star_subgraph_expansion_seq: AtomicU64::new(0),
             resource_locations: LruCache::new(64*1024 ),
+            resource_address_to_key: LruCache::new(16*1024 ),
         }
     }
 
@@ -340,10 +340,6 @@ impl Star
                     StarCommand::AddResourceLocation(add_resource_location) => {
                         self.resource_locations.put(add_resource_location.resource_location.key.clone(), add_resource_location.resource_location.clone() );
                         add_resource_location.tx.send( ()).await;
-                    }
-                    StarCommand::AddAppLocation(add_app_location) => {
-                        self.app_locations.put(add_app_location.app_location.app.clone(), add_app_location.app_location.supervisor.clone() );
-                        add_app_location.tx.send( add_app_location.app_location ).await;
                     }
                     StarCommand::SendProtoMessage(message) => {
                         self.send_proto_message(message).await;
@@ -442,6 +438,10 @@ impl Star
                         self.resource_locations.put( set.payload.key.clone(), set.payload.clone() );
                         set.commit();
                     }
+                    StarCommand::SetResourceBind(set) => {
+                        self.resource_address_to_key.put( set.payload.address.clone(), set.payload.key.clone() );
+                        set.commit();
+                    }
                     _ => {
                         eprintln!("cannot process command: {}",command);
                     }
@@ -533,6 +533,41 @@ impl Star
                 locate.tx.send( Err(Fail::Unexpected) );
             }
     } );
+    }
+
+    async fn request_resource_key_from_star(&mut self, request: Request<ResourceAddress,ResourceKey>, star: StarKey )
+    {
+        let mut proto = ProtoMessage::new();
+        proto.to = Option::Some(star);
+        proto.payload = StarMessagePayload::Resource(ResourceAction::GetKey(request.payload.clone()));
+        let reply = proto.get_ok_result().await;
+        self.send_proto_message(proto).await;
+        let star_tx = self.skel.star_tx.clone();
+        tokio::spawn( async move {
+            let result = reply.await;
+            if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Key(key)))) = result {
+                let bind = ResourceBinding{
+                    address: request.payload.clone(),
+                    key: key
+                };
+                let (set,rx) = Set::new(bind);
+                star_tx.send( StarCommand::SetResourceBind(set)).await;
+                tokio::spawn( async move {
+                    if let Result::Ok(bind) = rx.await {
+                        request.tx.send( Ok(bind.key) );
+                    } else {
+                        request.tx.send( Err(Fail::Unexpected) );
+                    }
+                });
+            }
+            else if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Fail(fail))) = result {
+                request.tx.send( Err(fail) );
+            }
+            else
+            {
+                request.tx.send( Err(Fail::Unexpected) );
+            }
+        } );
     }
 
 
@@ -1336,6 +1371,8 @@ println!("spaces_do_not_match");
 
     async fn forward_watch( &mut self, watch: Watch )
     {
+        unimplemented!()
+        /*
         let has_entity = match &watch
         {
             Watch::Add(info) => {
@@ -1382,74 +1419,11 @@ println!("spaces_do_not_match");
                 });
             }
         }
-    }
-
-    fn get_app_location(&mut self, app_key: &AppKey) -> Option<&StarKey>
-    {
-        self.app_locations.get(app_key )
-    }
-
-    async fn find_app_location(&mut self, app: AppKey ) -> mpsc::Receiver<AppLocation>
-    {
-        unimplemented!()
-        /*
-        let payload = StarMessagePayload::ApplicationSupervisorRequest(AppSupervisorRequest { app: app.clone() } );
-        let mut message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), StarKey::central(), payload );
-        message.transaction = Option::Some(self.info.sequence.next());
-
-        let (transaction,rx) = ApplicationSupervisorSearchTransaction::new(app.clone());
-        let transaction = Box::new(transaction);
-        self.transactions.insert( message.transaction.unwrap().clone(), transaction );
-
-        let delivery = StarMessageDeliveryInsurance::new(message, MessageExpect::ReplyErrOrTimeout(MessageExpectWait::Short));
-
-        self.message( delivery ).await;
-
-        rx
 
          */
     }
 
-    fn get_entity_location(&mut self, kind: ActorLookup) -> Option<&ResourceLocation>
-    {
-        unimplemented!()
-    }
 
-    async fn find_actor_location(&mut self, lookup: ActorLookup) -> mpsc::Receiver<()>
-    {
-
-        let supervisor_star = self.get_app_location(&lookup.app() ).cloned();
-
-        match supervisor_star{
-            None => {
-                let mut rx = self.find_app_location(lookup.app()).await;
-                let (xt,xr) = mpsc::channel(1);
-
-                tokio::spawn( async move {
-                    if let Option::Some(_) = rx.recv().await
-                    {
-                        xt.send(()).await;
-                    }
-                });
-
-                xr
-            }
-            Some(supervisor_star) => {
-                unimplemented!()
-/*                let payload = StarMessagePayload::ActorLocationRequest(ActorLocationRequest { lookup } );
-                let mut message = StarMessage::new(self.info.sequence.next(), self.info.star_key.clone(), supervisor_star, payload );
-                message.transaction = Option::Some(self.info.sequence.next());
-                let (transaction,rx) =  ResourceLocationRequestTransaction::new();
-                self.transactions.insert( message.transaction.unwrap().clone(), Box::new(transaction) );
-                let delivery = StarMessageDeliveryInsurance::new(message, MessageExpect::ReplyErrOrTimeout(MessageExpectWait::Short));
-                self.message( delivery ).await;
-                rx
-
- */
-            }
-        }
-
-    }
 
 
     async fn on_message(&mut self, mut message: StarMessage) -> Result<(),Error>
@@ -1492,7 +1466,6 @@ pub enum StarCommand
     Init,
     AddConnectorController(ConnectorController),
     AddResourceLocation(AddResourceLocation),
-    AddAppLocation(AddAppLocation),
     AddLogger(broadcast::Sender<Logger>),
     SendProtoMessage(ProtoMessage),
     SetFlags(SetFlags),
@@ -1510,7 +1483,8 @@ pub enum StarCommand
     AppCommand(AppCommand),
     ResourceMessage(Request<ResourceMessageWrapper,Fail>),
     ResourceLocate(Request<ResourceKey,ResourceLocation>),
-    SetResourceLocation(Set<ResourceLocation>)
+    SetResourceLocation(Set<ResourceLocation>),
+    SetResourceBind(Set<ResourceBinding>)
 }
 
 pub struct GetSpaceController
@@ -1569,11 +1543,7 @@ pub struct AddResourceLocation
 }
 
 
-pub struct AddAppLocation
-{
-    pub tx: mpsc::Sender<AppLocation>,
-    pub app_location: AppLocation
-}
+
 
 
 pub struct Wind
@@ -1795,7 +1765,6 @@ impl fmt::Display for StarCommand{
             StarCommand::WindCommit(_) => format!("SearchResult").to_string(),
             StarCommand::ReleaseHold(_) => format!("ReleaseHold").to_string(),
             StarCommand::AddResourceLocation(_) => format!("AddResourceLocation").to_string(),
-            StarCommand::AddAppLocation(_) => format!("AddAppLocation").to_string(),
             StarCommand::ForwardFrame(_) => format!("ForwardFrame").to_string(),
             StarCommand::SpaceCommand(_) => format!("AppLifecycleCommand").to_string(),
             StarCommand::AppCommand(_) => format!("AppCommand").to_string(),
@@ -1807,7 +1776,8 @@ impl fmt::Display for StarCommand{
             StarCommand::GetSpaceController(_) => "GetSpaceController".to_string(),
             StarCommand::ResourceMessage(_) => "ResourceMessage".to_string(),
             StarCommand::ResourceLocate(_) => "ResourceLocate".to_string(),
-            StarCommand::SetResourceLocation(_) => "SetResourceLocation".to_string()
+            StarCommand::SetResourceLocation(_) => "SetResourceLocation".to_string(),
+            StarCommand::SetResourceBind(_) => "SetResourceBind".to_string()
         };
         write!(f, "{}",r)
     }
@@ -1884,32 +1854,6 @@ impl ApplicationSupervisorSearchTransaction
     }
 }
 
-#[async_trait]
-impl Transaction for ApplicationSupervisorSearchTransaction
-{
-    async fn on_frame(&mut self, frame: &Frame, lane: Option<&mut LaneMeta>, command_tx: &mut mpsc::Sender<StarCommand>) -> TransactionResult {
-        unimplemented!()
-
-        /*
-        if let Frame::StarMessage( message ) = frame
-        {
-            if let StarMessagePayload::ApplicationSupervisorReport(report) = &message.payload
-            {
-                command_tx.send( StarCommand::AddAppLocation(AddAppLocation{
-                    tx: self.tx.clone(),
-                    app_location: AppLocation{
-                        app: report.app.clone(),
-                        supervisor: report.supervisor.clone()
-                    }
-                })).await;
-            }
-        }
-
-        TransactionResult::Done
-
-         */
-    }
-}
 
 pub struct ResourceLocationRequestTransaction
 {
@@ -2869,8 +2813,8 @@ pub trait RegistryBacking : Sync+Send {
     async fn set_location(&self, location: ResourceLocation)->Result<(),Fail>;
     async fn find(&self, keys: ResourceKey)->Result<Reply,Fail>;
     async fn bind(&self, bind: ResourceBinding)->Result<(),Fail>;
-    async fn get_address(&self, key: ResourceKey)->Result<ResourceAddress,Fail>;
-    async fn get_key(&self, address: ResourceAddress)->Result<ResourceKey,Fail>;
+    async fn get_address(&self, key: ResourceKey)->Result<Reply,Fail>;
+    async fn get_key(&self, address: ResourceAddress)->Result<Reply,Fail>;
 }
 
 pub struct RegistryBackingSqlLite
@@ -2947,12 +2891,12 @@ impl RegistryBacking for RegistryBackingSqlLite
         Ok(())
     }
 
-    async fn get_address(&self, key: ResourceKey) -> Result<ResourceAddress, Fail> {
+    async fn get_address(&self, key: ResourceKey) -> Result<Reply, Fail> {
         let (request,rx) = RegistryAction::new(RegistryCommand::GetAddress(key));
         self.registry.send( request ).await;
         let result = tokio::time::timeout( Duration::from_secs(5),rx).await??;
         if let RegistryResult::Address(address) = result {
-            Ok(address)
+            Ok(Reply::Address(address))
         }
         else
         {
@@ -2960,12 +2904,12 @@ impl RegistryBacking for RegistryBackingSqlLite
         }
     }
 
-    async fn get_key(&self, address: ResourceAddress) -> Result<ResourceKey, Fail> {
+    async fn get_key(&self, address: ResourceAddress) -> Result<Reply, Fail> {
         let (request,rx) = RegistryAction::new(RegistryCommand::GetKey(address));
         self.registry.send( request ).await;
         let result = tokio::time::timeout( Duration::from_secs(5),rx).await??;
         if let RegistryResult::Key(key) = result {
-            Ok(key)
+            Ok(Reply::Key(key))
         }
         else
         {

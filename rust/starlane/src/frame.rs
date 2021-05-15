@@ -18,7 +18,7 @@ use crate::logger::Flags;
 use crate::message::{Fail, MessageExpect, MessageResult, MessageUpdate, ProtoMessage};
 use crate::names::Name;
 use crate::permissions::{Authentication, AuthToken};
-use crate::resource::{Labels, Resource, ResourceRegistration, Selector, ResourceLocation, ResourceAddress};
+use crate::resource::{Labels, Resource, ResourceRegistration, Selector, ResourceLocation, ResourceAddress, ResourceBinding};
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey, StarWatchInfo};
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -361,7 +361,9 @@ pub enum ResourceAction
     Register(ResourceRegistration),
     Location(ResourceLocation),
     Find(ResourceKey),
-    HasResource(ResourceKey)
+    HasResource(ResourceKey),
+    GetKey(ResourceAddress),
+    Bind(ResourceBinding)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
