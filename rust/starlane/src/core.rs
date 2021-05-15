@@ -15,7 +15,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::time::Duration;
 
 
-use crate::actor::{ActorKey, ActorMessage};
+use crate::actor::{ActorKey, ResourceMessage};
 use crate::app::{ApplicationStatus, AppArchetype, AppMeta, App};
 use crate::error::Error;
 use crate::frame::{StarMessage, StarMessagePayload, Watch, WatchInfo, ServerAppPayload, AppPayload};
@@ -57,7 +57,7 @@ pub enum AppLaunchError
 pub enum AppCommandResult
 {
     Ok,
-    Actor(ActorKey),
+    Actor(ResourceKey),
     Error(String)
 }
 

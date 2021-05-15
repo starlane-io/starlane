@@ -8,8 +8,8 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 use tokio::time::Instant;
 
-use crate::actor::{ActorKey, ActorLocation, ActorStatus, ActorMessage,  RawState};
-use crate::app::{App, AppArchetype, AppCreateResult, AppLocation, AppMeta, AppSpecific, ConfigSrc, AppMessage};
+use crate::actor::{ActorKey, ActorStatus, ResourceMessage, RawState};
+use crate::app::{App, AppArchetype, AppCreateResult, AppLocation, AppMeta, AppSpecific, ConfigSrc };
 use crate::crypt::{Encrypted, HashEncrypted, HashId};
 use crate::error::Error;
 use crate::id::Id;
@@ -350,13 +350,13 @@ pub enum StarMessagePayload
    None,
    Central(StarMessageCentral),
    Supervisor(StarMessageSupervisor),
-   Resource(ResourceMessage),
+   Resource(ResourceAction),
    Space(SpaceMessage),
    Reply(SimpleReply),
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum ResourceMessage
+pub enum ResourceAction
 {
     Register(ResourceRegistration),
     Location(ResourceLocation),
@@ -490,7 +490,7 @@ pub enum SupervisorPayload
     AppSequenceRequest(AppKey),
     Register(ResourceRegistration),
     Select(Selector),
-    ActorUnRegister(ActorKey),
+    ActorUnRegister(ResourceKey),
     ActorStatus(ActorStatus),
 }
 
@@ -590,13 +590,13 @@ pub enum LaneEventKind
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ActorGathered
 {
-    pub to: ActorKey
+    pub to: ResourceKey
 }
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ActorScattered
 {
-    pub from : ActorKey
+    pub from : ResourceKey
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -615,8 +615,8 @@ pub struct ActorLocationRequest
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ActorLocationReport
 {
-    pub resource: ActorKey,
-    pub location: ActorLocation
+    pub resource: ResourceKey,
+    pub location: ResourceLocation
 }
 
 
@@ -647,7 +647,7 @@ pub struct ActorNameLookup
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ActorBind
 {
-   pub key: ActorKey,
+   pub key: ResourceKey,
    pub star: StarKey
 }
 
@@ -662,8 +662,7 @@ pub struct Rejection
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum AppPayload {
-   AppMessage(AppMessage),
-   ActorMessage(ActorMessage)
+   ActorMessage(ResourceMessage)
 }
 
 #[derive(Clone,Serialize,Deserialize)]

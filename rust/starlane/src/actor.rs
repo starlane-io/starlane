@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use tokio::sync::{broadcast, mpsc};
 use tokio::sync::broadcast::Sender;
 
-use crate::app::{ConfigSrc, InitData, AppFrom};
+use crate::app::{ConfigSrc, InitData};
 use crate::app::AppContext;
 use crate::error::Error;
 use crate::frame::{Event};
@@ -21,7 +21,7 @@ use serde::de::DeserializeOwned;
 
 pub struct Actor
 {
-    pub key: ActorKey,
+    pub key: ResourceKey,
     pub archetype: ActorArchetype
 }
 
@@ -73,7 +73,7 @@ impl ActorArchetype
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ActorMeta
 {
-    pub key: ActorKey,
+    pub key: ResourceKey,
     pub kind: ActorKind,
     pub specific: ActorSpecific,
     pub config: ConfigSrc,
@@ -81,7 +81,7 @@ pub struct ActorMeta
 
 impl ActorMeta
 {
-    pub fn new( key: ActorKey, kind: ActorKind, specific: ActorSpecific, config: ConfigSrc ) -> Self
+    pub fn new(key: ResourceKey, kind: ActorKind, specific: ActorSpecific, config: ConfigSrc ) -> Self
     {
         ActorMeta{
             key: key,
@@ -149,7 +149,7 @@ pub struct ActorKey
 impl ActorKey
 {
     pub fn new( app: AppKey, id: Id ) -> Self {
-        ActorKey {
+        ActorKey{
             app: app,
             id: id
         }
@@ -200,32 +200,38 @@ impl FromStr for ActorKind
 }
 
 
-impl fmt::Display for ActorKey {
+impl fmt::Display for ActorKey{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({},{})", self.app, self.id)
     }
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ActorTo
+pub struct ResourceTo
 {
-    pub key: ActorKey,
-    pub ext: ActorToExt
-
+    pub key: ResourceKey,
+    pub ext: ResourceToExt
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum ActorToExt
+pub enum ResourceToExt
 {
     None,
     Ext(Raw)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ActorFrom
+pub struct ResourceFrom
 {
-    pub key: ActorKey,
-    pub ext: ActorFromExt
+    pub key: ResourceKey,
+    pub ext: ResourceFromExt
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ResourceFromExt
+{
+    None,
+    Ext(Raw)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -235,56 +241,27 @@ pub enum ActorFromExt
     Ext(Raw)
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct ActorLocation
-{
-    pub actor: ActorKey,
-    pub star: StarKey,
-    pub gathering: Option<ActorKey>,
-    pub ext: Option<Vec<u8>>
-}
 
 
 
-impl ActorLocation
-{
-    pub fn new(resource: ActorKey, star: StarKey ) ->Self
-    {
-        ActorLocation {
-            actor: resource,
-            star: star,
-            ext: Option::None,
-            gathering: Option::None
-        }
-    }
 
-    pub fn new_ext(resource: ActorKey, star: StarKey, ext: Vec<u8>) -> Self
-    {
-        ActorLocation {
-            actor: resource,
-            star: star,
-            ext: Option::Some(ext),
-            gathering: Option::None
-        }
-    }
-}
 
 pub struct ActorGathering
 {
-    pub key: ActorKey,
-    pub entity: Vec<ActorKey>
+    pub key: ResourceKey,
+    pub entity: Vec<ResourceKey>
 }
 
 
 pub struct ActorWatcher
 {
-    pub entity: ActorKey,
+    pub entity: ResourceKey,
     pub tx: Sender<Event>
 }
 
 impl ActorWatcher
 {
-    pub fn new(entity: ActorKey) ->(Self, broadcast::Receiver<Event>)
+    pub fn new(entity: ResourceKey) ->(Self, broadcast::Receiver<Event>)
     {
         let (tx,rx) = broadcast::channel(32);
         (ActorWatcher {
@@ -305,7 +282,7 @@ impl ActorWatcher
 
 pub struct ActorAssign
 {
-    pub key: ActorKey,
+    pub key: ResourceKey,
     pub kind: ActorKind,
     pub data: Arc<Vec<u8>>,
     pub labels: Labels
@@ -331,7 +308,7 @@ pub struct ActorKeySeq
 
 impl ActorKeySeq
 {
-    pub fn new( app:AppKey, seq: u64, index: u64, tx: mpsc::Sender<ActorKey>)->Self {
+    pub fn new(app:AppKey, seq: u64, index: u64, tx: mpsc::Sender<ActorKey>) ->Self {
         ActorKeySeq{
             app: app,
             seq: seq,
@@ -340,7 +317,7 @@ impl ActorKeySeq
         }
     }
 
-    pub async fn next(&mut self)->ActorKey
+    pub async fn next(&mut self)-> ActorKey
     {
         self.index=self.index+1;
         let key = ActorKey::new(self.app.clone(), Id::new(self.seq, self.index ));
@@ -352,22 +329,13 @@ impl ActorKeySeq
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ActorMessage
+pub struct ResourceMessage
 {
     pub id: Id,
-    pub from: MessageFrom,
-    pub to: ActorTo,
+    pub from: ResourceFrom,
+    pub to: ResourceTo,
     pub payload: Arc<RawPayload>,
     pub transaction: Option<Id>
-}
-
-
-#[derive(Clone,Serialize,Deserialize)]
-pub enum MessageFrom
-{
-    Actor(ActorFrom),
-    App(AppFrom),
-    User(UserKey)
 }
 
 pub type Raw=Vec<u8>;

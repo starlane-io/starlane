@@ -24,12 +24,12 @@ use url::Url;
 
 use server::ServerStarVariant;
 
-use crate::actor::{ActorKey, ActorKind, ActorLocation, ActorWatcher, ActorMessage};
-use crate::app::{AppCommandKind, AppController, AppCreateController, AppMeta, AppSpecific, AppLocation, AppMessage, AppCommand};
+use crate::actor::{ActorKey, ActorKind, ActorWatcher, ResourceMessage};
+use crate::app::{AppCommandKind, AppController, AppCreateController, AppMeta, AppSpecific, AppLocation, AppCommand};
 use crate::core::StarCoreCommand;
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ApplicationSupervisorReport, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, CentralPayload, SimpleReply, StarMessageCentral, AppPayload};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ApplicationSupervisorReport, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, CentralPayload, SimpleReply, StarMessageCentral, AppPayload, ResourceAction};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId, SpaceKey, UserKey, ResourceKey, GatheringKey};
@@ -252,12 +252,11 @@ pub struct Star
     transactions: HashMap<u64,Box<dyn Transaction>>,
     frame_hold: FrameHold,
     watches: HashMap<ActorKey,HashMap<Id,StarWatchInfo>>,
-    actor_locations: LruCache<ActorKey, ActorLocation>,
     app_locations: LruCache<AppKey,StarKey>,
     messages_received: HashMap<MessageId,Instant>,
     message_reply_trackers: HashMap<MessageId, MessageReplyTracker>,
-    actors: HashSet<ActorKey>,
-    star_subgraph_expansion_seq: AtomicU64
+    star_subgraph_expansion_seq: AtomicU64,
+    resource_locations: LruCache<ResourceKey,ResourceLocation>
 }
 
 impl Star
@@ -280,18 +279,17 @@ impl Star
             transactions: HashMap::new(),
             frame_hold: frame_hold,
             watches: HashMap::new(),
-            actor_locations: LruCache::new(64*1024 ),
             app_locations: LruCache::new(4*1024 ),
             messages_received: HashMap::new(),
             message_reply_trackers: HashMap::new(),
-            actors: HashSet::new(),
-            star_subgraph_expansion_seq: AtomicU64::new(0)
+            star_subgraph_expansion_seq: AtomicU64::new(0),
+            resource_locations: LruCache::new(64*1024 ),
         }
     }
 
-    pub fn has_actor(&self, key: &ActorKey) -> bool
+    pub fn has_resource(&self, key: &ResourceKey) -> bool
     {
-        self.actors.contains(&key)
+        unimplemented!()
     }
 
 
@@ -338,9 +336,9 @@ impl Star
                     StarCommand::AddConnectorController(connector_ctrl) => {
                         self.connector_ctrls.push(connector_ctrl);
                     }
-                    StarCommand::AddActorLocation(add_entity_location) => {
-                        self.actor_locations.put(add_entity_location.entity_location.actor.clone(), add_entity_location.entity_location.clone() );
-                        add_entity_location.tx.send( ()).await;
+                    StarCommand::AddResourceLocation(add_resource_location) => {
+                        self.resource_locations.put(add_resource_location.resource_location.key.clone(), add_resource_location.resource_location.clone() );
+                        add_resource_location.tx.send( ()).await;
                     }
                     StarCommand::AddAppLocation(add_app_location) => {
                         self.app_locations.put(add_app_location.app_location.app.clone(), add_app_location.app_location.supervisor.clone() );
@@ -433,6 +431,9 @@ impl Star
                     StarCommand::ForwardFrame(forward) => {
                         self.send_frame( forward.to.clone(), forward.frame ).await;
                     }
+                    StarCommand::ResourceMessage(request) => {
+                        self.send_resource_message(request).await;
+                    }
                     _ => {
                         eprintln!("cannot process command: {}",command);
                     }
@@ -445,6 +446,14 @@ impl Star
             }
 
         }
+    }
+
+    async fn send_resource_message( &mut self, request: Request<ResourceMessage,Fail> ) {
+       if let Option::Some(location) = self.resource_locations.get(&request.payload.to.key )
+       {
+           let mut proto = ProtoMessage::new();
+           proto.to = Option::Some(location.host.clone());
+       }
     }
 
 
@@ -1250,10 +1259,10 @@ println!("spaces_do_not_match");
         let has_entity = match &watch
         {
             Watch::Add(info) => {
-                self.has_actor(&info.actor)
+                self.has_resource(&ResourceKey::Actor(info.actor.clone()))
             }
             Watch::Remove(info) => {
-                self.has_actor(&info.actor)
+                self.has_resource(&ResourceKey::Actor(info.actor.clone()))
             }
         };
 
@@ -1279,7 +1288,7 @@ println!("spaces_do_not_match");
 
             if let Some(location) = location.cloned()
             {
-                self.send_frame(location.star.clone(), Frame::Watch(watch)).await;
+                self.send_frame(location.host.clone(), Frame::Watch(watch)).await;
             }
             else
             {
@@ -1321,15 +1330,9 @@ println!("spaces_do_not_match");
          */
     }
 
-    fn get_entity_location(&mut self, kind: ActorLookup) -> Option<&ActorLocation>
+    fn get_entity_location(&mut self, kind: ActorLookup) -> Option<&ResourceLocation>
     {
-        if let ActorLookup::Key(entity) = &kind
-        {
-            self.actor_locations.get(entity)
-        }
-        else {
-            Option::None
-        }
+        unimplemented!()
     }
 
     async fn find_actor_location(&mut self, lookup: ActorLookup) -> mpsc::Receiver<()>
@@ -1408,7 +1411,7 @@ pub enum StarCommand
     ConstellationConstructionComplete,
     Init,
     AddConnectorController(ConnectorController),
-    AddActorLocation(AddEntityLocation),
+    AddResourceLocation(AddResourceLocation),
     AddAppLocation(AddAppLocation),
     AddLogger(broadcast::Sender<Logger>),
     SendProtoMessage(ProtoMessage),
@@ -1424,7 +1427,8 @@ pub enum StarCommand
     FrameError(FrameErrorInner),
     SpaceCommand(SpaceCommand),
     GetSpaceController(GetSpaceController),
-    AppCommand(AppCommand)
+    AppCommand(AppCommand),
+    ResourceMessage(Request<ResourceMessage,Fail>)
 }
 
 pub struct GetSpaceController
@@ -1476,10 +1480,10 @@ pub struct ForwardFrame
     pub frame: Frame
 }
 
-pub struct AddEntityLocation
+pub struct AddResourceLocation
 {
     pub tx: mpsc::Sender<()>,
-    pub entity_location: ActorLocation
+    pub resource_location: ResourceLocation
 }
 
 
@@ -1673,7 +1677,7 @@ impl fmt::Display for StarCommand{
             StarCommand::WindInit(_) => format!("Search").to_string(),
             StarCommand::WindCommit(_) => format!("SearchResult").to_string(),
             StarCommand::ReleaseHold(_) => format!("ReleaseHold").to_string(),
-            StarCommand::AddActorLocation(_) => format!("AddResourceLocation").to_string(),
+            StarCommand::AddResourceLocation(_) => format!("AddResourceLocation").to_string(),
             StarCommand::AddAppLocation(_) => format!("AddAppLocation").to_string(),
             StarCommand::ForwardFrame(_) => format!("ForwardFrame").to_string(),
             StarCommand::SpaceCommand(_) => format!("AppLifecycleCommand").to_string(),
@@ -1684,6 +1688,7 @@ impl fmt::Display for StarCommand{
             StarCommand::ConstellationConstructionComplete => "ConstellationConstructionComplete".to_string(),
             StarCommand::Init => "Init".to_string(),
             StarCommand::GetSpaceController(_) => "GetSpaceController".to_string(),
+            StarCommand::ResourceMessage(_) => "ResourceMessage".to_string()
         };
         write!(f, "{}",r)
     }

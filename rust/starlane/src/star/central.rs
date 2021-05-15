@@ -9,7 +9,7 @@ use tokio::sync::oneshot::Receiver;
 
 use crate::app::{AppCreateController, AppMeta, ApplicationStatus, AppLocation, AppArchetype, App};
 use crate::error::Error;
-use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, CentralPayload, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply, ResourceQuery, ResourceMessage};
+use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, CentralPayload, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply, ResourceQuery, ResourceAction};
 use crate::id::Id;
 use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, ResourceKey};
 use crate::resource::{Labels, Registry, RegistryAction, Selector, RegistryResult, RegistryCommand, FieldSelection, Resource, ResourceType, ResourceRegistration};
@@ -145,19 +145,19 @@ impl StarVariant for CentralStarVariant
                    StarMessagePayload::Resource(resource_message ) => {
                       match resource_message
                       {
-                          ResourceMessage::Register(registration) => {
+                          ResourceAction::Register(registration) => {
                               let result = self.registry.register(registration.clone()).await;
                               self.skel.comm().reply_result_empty(star_message.clone(), result ).await;
                           }
-                          ResourceMessage::Location(location) => {
+                          ResourceAction::Location(location) => {
                               let result = self.registry.set_location(location.clone()).await;
                               self.skel.comm().reply_result_empty(star_message.clone(), result ).await;
                           }
-                          ResourceMessage::Find(find) => {
+                          ResourceAction::Find(find) => {
                               let result = self.registry.find(find.to_owned()).await;
                               self.skel.comm().reply_result(star_message.clone(), result ).await;
                           }
-                          ResourceMessage::HasResource(resource) => {
+                          ResourceAction::HasResource(resource) => {
                               self.skel.comm().simple_reply(star_message.clone(), SimpleReply::Fail(Fail::ResourceNotFound(resource.clone()))).await;
                           }
                       }

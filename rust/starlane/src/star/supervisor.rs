@@ -6,10 +6,10 @@ use std::collections::{HashMap, HashSet};
 use async_trait::async_trait;
 use tokio::sync::mpsc::error::SendError;
 
-use crate::actor::{ActorKey, ActorLocation};
+use crate::actor::{ActorKey};
 use crate::app::{AppMeta, AppLocation, AppStatus, AppReadyStatus, AppPanicReason, AppArchetype, InitData, AppCreateResult, App};
 use crate::error::Error;
-use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, ServerAppPayload, SpaceReply, StarMessageCentral, SimpleReply, SupervisorPayload, StarMessageSupervisor, ServerPayload, StarPattern, FromReply, ResourceQuery, ResourceMessage};
+use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, ServerAppPayload, SpaceReply, StarMessageCentral, SimpleReply, SupervisorPayload, StarMessageSupervisor, ServerPayload, StarPattern, FromReply, ResourceQuery, ResourceAction};
 use crate::keys::{AppKey, UserKey, ResourceKey};
 use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait, Fail};
@@ -253,19 +253,19 @@ impl StarVariant for SupervisorVariant
                     StarMessagePayload::Resource(resource_message ) => {
                         match resource_message
                         {
-                            ResourceMessage::Register(registration) => {
+                            ResourceAction::Register(registration) => {
                                 let result = self.registry.register(registration.clone()).await;
                                 self.skel.comm().reply_result_empty(star_message.clone(), result );
                             }
-                            ResourceMessage::Location(location) => {
+                            ResourceAction::Location(location) => {
                                 let result = self.registry.set_location(location.clone()).await;
                                 self.skel.comm().reply_result_empty(star_message.clone(), result );
                             }
-                            ResourceMessage::Find(find) => {
+                            ResourceAction::Find(find) => {
                                 let result = self.registry.find(find.to_owned()).await;
                                 self.skel.comm().reply_result(star_message.clone(), result );
                             }
-                            ResourceMessage::HasResource(resource) => {
+                            ResourceAction::HasResource(resource) => {
                                 if let ResourceKey::App(app) = resource
                                 {
                                     if self.backing.get_application(app).await.is_some() {
@@ -463,7 +463,7 @@ pub struct SupervisorManagerBackingDefault
     servers: Vec<StarKey>,
     server_select_index: usize,
     applications: HashMap<AppKey, AppArchetype>,
-    actor_location: HashMap<ActorKey, ActorLocation>,
+    actor_location: HashMap<ResourceKey, ResourceLocation>,
     app_status: HashMap<AppKey,AppStatus>,
     app_server_status: HashMap<(AppKey,StarKey),AppServerStatus>,
     app_to_servers: HashMap<AppKey,HashSet<StarKey>>,
@@ -508,8 +508,8 @@ pub trait SupervisorManagerBacking: Send+Sync
 
     async fn app_sequence_next(&mut self, app: &AppKey ) -> Result<u64,Error>;
 
-    async fn set_actor_location(&mut self, location: ActorLocation)-> Result<(),Error>;
-    async fn get_actor_location(&self, actor: &ActorKey) -> Option<ActorLocation>;
+    async fn set_actor_location(&mut self, location: ResourceLocation) -> Result<(),Error>;
+    async fn get_actor_location(&self, actor: &ResourceKey) -> Option<ResourceLocation>;
 }
 
 
@@ -783,13 +783,13 @@ println!("SELECT SERVERS!");
         }
     }
 
-    async fn set_actor_location(&mut self, location: ActorLocation) -> Result<(), Error> {
-        let (request,rx) = SupervisorDbRequest::new( SupervisorDbCommand::SetActorLocation(location));
+    async fn set_actor_location(&mut self, location: ResourceLocation) -> Result<(), Error> {
+        let (request,rx) = SupervisorDbRequest::new( SupervisorDbCommand::SetResourceLocation(location));
         self.supervisor_db.send( request ).await;
         self.handle(rx.await)
     }
 
-    async fn get_actor_location(&self, actor: &ActorKey) -> Option<ActorLocation> {
+    async fn get_actor_location(&self, actor: &ResourceKey) -> Option<ResourceLocation> {
         let (request,rx) = SupervisorDbRequest::new( SupervisorDbCommand::GetActorLocation(actor.clone()));
         self.supervisor_db.send( request ).await;
         match rx.await
@@ -852,8 +852,8 @@ pub enum SupervisorDbCommand
     GetAppStatus(AppKey),
     GetServersForApp(AppKey),
     AppSequenceNext(AppKey),
-    SetActorLocation(ActorLocation),
-    GetActorLocation(ActorKey)
+    SetResourceLocation(ResourceLocation),
+    GetActorLocation(ResourceKey)
 }
 
 pub enum SupervisorDbResult
@@ -867,7 +867,7 @@ pub enum SupervisorDbResult
     AppStatus(AppStatus),
     AppServerStatus(AppServerStatus),
     AppSequenceNext(u64),
-    ActorLocation(ActorLocation)
+    ActorLocation(ResourceLocation)
 }
 
 pub struct SupervisorDb {
@@ -1159,8 +1159,8 @@ println!("GET APP STATUS ERROR: {}",e);
                         }
                     }
                 }
-                SupervisorDbCommand::SetActorLocation(loc) => {
-                    let actor = bincode::serialize(&loc.actor ).unwrap();
+                SupervisorDbCommand::SetResourceLocation(loc) => {
+                    let actor = bincode::serialize(&loc.key).unwrap();
                     let location = bincode::serialize(&loc).unwrap();
 
                     let result = self.conn.execute("REPLACE INTO actors (key,location) VALUES (?1,?2)", params![actor,location]);
@@ -1179,7 +1179,7 @@ println!("GET APP STATUS ERROR: {}",e);
                     let result = self.conn.query_row("SELECT location FROM actors WHERE key=?1", params![actor], |row|
                         {
                             let location : Vec<u8>= row.get(0).unwrap();
-                            if let Result::Ok(location) = bincode::deserialize::<ActorLocation>(location.as_slice()) {
+                            if let Result::Ok(location) = bincode::deserialize::<ResourceLocation>(location.as_slice()) {
                                 Ok(location)
                             }
                             else

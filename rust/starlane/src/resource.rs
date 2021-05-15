@@ -827,7 +827,7 @@ impl ResourceKind {
             }
             ResourceKind::Actor(_) => {
                 let app = AppKey::new(sub_space);
-                ResourceKey::Actor(ActorKey::new(app, Id::new(0,index as _)))
+                ResourceKey::Actor(ActorKey::new(app, Id::new(0, index as _)))
             }
             ResourceKind::User => {
                 ResourceKey::User(UserKey::new(sub_space.space))
@@ -1244,7 +1244,8 @@ mod test
     {
         for index in 1..11
         {
-            let actor_key = ResourceKey::Actor(ActorKey::new(app.clone(), Id::new(0,index)));
+            let actor_key = ResourceKey::Actor(ActorKey::new(app.clone(), Id::new(0, index)));
+
             let save = create_with_key(actor_key,ResourceKind::Actor(ActorKind::Single),specific.clone(),sub_space.clone(),owner.clone());
             let (request,rx) = RegistryAction::new(RegistryCommand::Register(save));
             tx.send( request ).await;

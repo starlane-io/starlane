@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use tokio::sync::{mpsc, Mutex, oneshot};
 
-use crate::actor::{ActorArchetype, ActorAssign, ActorContext, ActorInfo, ActorKey, ActorKind, ActorSpecific, ActorMessage};
+use crate::actor::{ActorArchetype, ActorAssign, ActorContext, ActorInfo, ActorKey, ActorKind, ActorSpecific, ResourceMessage};
 use crate::actor;
-use crate::app::{ActorMessageResult, Alert, AppArchetype, AppCommandKind, AppContext, AppCreateResult, AppSpecific, AppMessageResult, AppMeta, AppSlice, ConfigSrc, InitData, AppMessage, AppSliceCommand};
+use crate::app::{ActorMessageResult, Alert, AppArchetype, AppCommandKind, AppContext, AppCreateResult, AppSpecific, AppMessageResult, AppMeta, AppSlice, ConfigSrc, InitData, AppSliceCommand};
 use crate::artifact::Artifact;
 use crate::core::{AppCommandResult, AppLaunchError, StarCore, StarCoreAppMessagePayload, StarCoreCommand, StarCoreExt, StarCoreExtKind};
 use crate::error::Error;
@@ -140,8 +140,8 @@ pub trait AppExt : Sync+Send
 {
     fn set_context( &mut self, context: AppContext );
     async fn launch(&mut self, archetype: AppArchetype) -> Result<(), Fail>;
-    async fn app_message( &mut self, message: AppMessage ) ->  Result<(),Fail>;
-    async fn actor_message( &mut self, message: ActorMessage ) -> Result<(),Fail>;
+    async fn app_message( &mut self, message: ResourceMessage ) ->  Result<(),Fail>;
+    async fn actor_message(&mut self, message: ResourceMessage) -> Result<(),Fail>;
 }
 
 pub trait ServerStarCoreExt: StarCoreExt
@@ -243,11 +243,11 @@ impl AppExt for TestAppCreateExt
         Ok(())
     }
 
-    async fn app_message(&mut self, message: AppMessage) -> Result<(), Fail> {
+    async fn app_message(&mut self, message: ResourceMessage ) -> Result<(), Fail> {
         todo!()
     }
 
-    async fn actor_message(&mut self, message: ActorMessage) -> Result<(), Fail> {
+    async fn actor_message(&mut self, message: ResourceMessage) -> Result<(), Fail> {
         todo!()
     }
 }

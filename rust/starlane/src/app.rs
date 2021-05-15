@@ -7,14 +7,14 @@ use serde::{Deserialize, Serialize, Serializer};
 use tokio::sync::{mpsc, Mutex, oneshot};
 use tokio::time::Duration;
 
-use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorKey, ActorKind, ActorMeta, ActorRegistration, ActorMessage, MessageFrom, ActorKeySeq, ActorStatus};
+use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorKey, ActorKind, ActorMeta, ActorRegistration, ResourceMessage, ActorKeySeq, ActorStatus};
 use crate::actor;
 use crate::artifact::{Artifact, ArtifactKey};
 use crate::core::{StarCoreCommand };
 use crate::core::server::{AppExt};
 use crate::error::Error;
 use crate::filesystem::File;
-use crate::frame::{Reply, StarMessagePayload, ResourceMessage};
+use crate::frame::{Reply, StarMessagePayload, ResourceAction};
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, SubSpaceKey, UserKey, ResourceKey};
 use crate::resource::{Labels, Resource, ResourceKind, ResourceRegistration, ResourceLocation};
@@ -227,7 +227,7 @@ impl AppSlice
 #[derive(Clone,Serialize,Deserialize)]
 pub enum AppCommandKind
 {
-    AppMessage(AppMessage),
+    AppMessage(ResourceMessage),
     Suspend,
     Resume,
     Exit
@@ -621,24 +621,6 @@ impl AppContext
     }
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct AppTo{
-    pub app: AppKey,
-    pub ext: Option<Raw>
-}
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct AppMessage
-{
-    pub to: AppTo,
-    pub from: MessageFrom,
-    pub payload: Arc<Raw>
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct AppFrom{
-    pub app: AppKey,
-    pub ext: Option<Raw>
-}
 
 pub type Raw=Vec<u8>;
