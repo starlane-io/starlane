@@ -478,9 +478,6 @@ pub enum ResourcePayload
 pub enum CentralPayload
 {
     AppCreate(AppArchetype),
-    AppSupervisorLocationRequest(AppSupervisorLocationRequest),
-    AppRegister(ResourceRegistration),
-    AppLookup(Selector)
 }
 
 #[derive(Clone,Serialize,Deserialize)]

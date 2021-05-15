@@ -12,7 +12,7 @@ use crate::error::Error;
 use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, CentralPayload, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply, ResourcePayload, ResourceAction};
 use crate::id::Id;
 use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, ResourceKey};
-use crate::resource::{Labels, Registry, RegistryAction, Selector, RegistryResult, RegistryCommand, FieldSelection, Resource, ResourceType, ResourceRegistration};
+use crate::resource::{Labels, Registry, RegistryAction, Selector, RegistryResult, RegistryCommand, FieldSelection, Resource, ResourceType, ResourceRegistration, ResourceLocation};
 use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage, Fail};
 use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource, SetSupervisorForApp, RegistryBacking, RegistryBackingSqlLite};
@@ -174,6 +174,9 @@ impl StarVariant for CentralStarVariant
                                            let app_key = AppKey::new(space_message.sub_space.clone());
                                            let app = App::new(app_key.clone(), archetype.clone());
                                            let register = ResourceRegistration::new(app.into(), archetype.name.clone(), archetype.labels.clone() );
+                                           let location = ResourceLocation::new( ResourceKey::App(app_key.clone()), supervisor.clone() );
+                                           self.registry.set_location(location).await;
+
                                            match self.registry.register(register).await
                                            {
                                                Result::Ok(_) => {
@@ -192,19 +195,6 @@ impl StarVariant for CentralStarVariant
                                            let proto = star_message.reply(StarMessagePayload::Reply( SimpleReply:: Fail(Fail::Error("central: no supervisors selected.".into()))));
                                            self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                                        }
-                                   }
-                                   CentralPayload::AppSupervisorLocationRequest(_) => {}
-                                   CentralPayload::AppRegister(registration) => {
-                                       let result = self.registry.register(registration.clone()).await;
-                                       self.skel.comm().reply_result(star_message.clone(), Reply::from_result(result) ).await;
-                                   }
-                                   CentralPayload::AppLookup(selector) => {
-                                       let mut selector = selector.clone();
-                                       selector.add( FieldSelection::Type(ResourceType::App));
-                                       selector.add( FieldSelection::Space(space_message.sub_space.space.clone()) );
-                                       selector.add( FieldSelection::SubSpace(space_message.sub_space.clone()) );
-                                       let result = self.registry.select(selector).await;
-                                       self.skel.comm().reply_result(star_message.clone(),Reply::from_result(result)).await;
                                    }
                                }
                            }
