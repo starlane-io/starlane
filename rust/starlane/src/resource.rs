@@ -22,14 +22,42 @@ use crate::star::StarKey;
 
 lazy_static!
 {
-    pub static ref SPACE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer] );
-    pub static ref SUB_SPACE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer] );
-    pub static ref APP_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer] );
-    pub static ref ACTOR_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer] );
-    pub static ref USER_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer] );
-    pub static ref FILE_SYSTEM_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::WildcardOrSkewer,ResourceAddressPartKind::Skewer] );
-    pub static ref FILE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::WildcardOrSkewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Path] );
-    pub static ref ARTIFACT_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Skewer,ResourceAddressPartKind::Version,ResourceAddressPartKind::Path] );
+    pub static ref SPACE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::Skewer)] );
+    pub static ref SUB_SPACE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::Skewer),
+                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::Skewer)] );
+
+     pub static ref APP_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new(      vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::Skewer),
+                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::Skewer),
+                                                                                                           ResourceAddressPartStruct::new("app",ResourceAddressPartKind::Skewer)] );
+
+     pub static ref ACTOR_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new(    vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::Skewer),
+                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::Skewer),
+                                                                                                           ResourceAddressPartStruct::new("app",ResourceAddressPartKind::Skewer),
+                                                                                                           ResourceAddressPartStruct::new("actor",ResourceAddressPartKind::Skewer)] );
+
+     pub static ref USER_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new(     vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::Skewer),
+                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::Skewer),
+                                                                                                           ResourceAddressPartStruct::new("user",ResourceAddressPartKind::Skewer)] );
+
+
+     pub static ref FILE_SYSTEM_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::Skewer),
+                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::Skewer),
+                                                                                                           ResourceAddressPartStruct::new("app",ResourceAddressPartKind::WildcardOrSkewer),
+                                                                                                           ResourceAddressPartStruct::new("file-system",ResourceAddressPartKind::Skewer)]);
+
+
+     pub static ref FILE_ADDRESS_STRUCT:ResourceAddressStructure =      ResourceAddressStructure::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::Skewer),
+                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::Skewer),
+                                                                                                           ResourceAddressPartStruct::new("app",ResourceAddressPartKind::WildcardOrSkewer),
+                                                                                                           ResourceAddressPartStruct::new("file-system",ResourceAddressPartKind::Skewer),
+                                                                                                           ResourceAddressPartStruct::new("path",ResourceAddressPartKind::Path)]);
+
+
+     pub static ref ARTIFACT_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure ::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::Skewer),
+                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::Skewer),
+                                                                                                           ResourceAddressPartStruct::new("bundle",ResourceAddressPartKind::Skewer),
+                                                                                                           ResourceAddressPartStruct::new("version",ResourceAddressPartKind::Version),
+                                                                                                           ResourceAddressPartStruct::new("path",ResourceAddressPartKind::Path)]);
 
     pub static ref HYPERSPACE_ADDRESS: ResourceAddress = SPACE_ADDRESS_STRUCT.from_str("hyperspace").unwrap();
     pub static ref HYPERSPACE_DEFAULT_ADDRESS: ResourceAddress = SUB_SPACE_ADDRESS_STRUCT.from_str("hyperspace:default").unwrap();
@@ -1252,21 +1280,32 @@ pub struct ResourceBinding{
 #[derive(Clone)]
 pub struct ResourceAddressStructure
 {
-    kinds: Vec<ResourceAddressPartKind>
+    parts: Vec<ResourceAddressPartStruct>
 }
 
 impl ResourceAddressStructure
 {
-    pub fn new( kinds: Vec<ResourceAddressPartKind> ) -> Self {
+    pub fn format(&self)->String {
+        let mut rtn = String::new();
+        for (index,part) in self.parts.iter().enumerate() {
+            if index != 0 {
+                rtn.push_str(":");
+            }
+            rtn.push_str(part.name.as_str() );
+        }
+        rtn
+    }
+
+    pub fn new( parts: Vec<ResourceAddressPartStruct> ) -> Self {
         ResourceAddressStructure{
-            kinds: kinds
+            parts: parts
         }
     }
 
-    pub fn with( parent: Self, mut kinds: Vec<ResourceAddressPartKind>) -> Self
+    pub fn with( parent: Self, mut parts: Vec<ResourceAddressPartStruct>) -> Self
     {
-        let mut union = parent.kinds.clone();
-        union.append( &mut kinds );
+        let mut union = parent.parts.clone();
+        union.append( &mut parts );
         Self::new(union)
     }
 }
@@ -1279,16 +1318,16 @@ impl ResourceAddressStructure {
     fn from_str(&self, s: &str) -> Result<ResourceAddress, Error> {
         let mut split = s.split(":");
 
-        if split.count()  != self.kinds.len() {
-            return Err("part count not equal".into());
+        if split.count()  != self.parts.len() {
+            return Err(format!("part count not equal. expected format '{}'",self.format()).into());
         }
 
         let mut split = s.split(":");
 
         let mut parts = vec![];
 
-        for kind in &self.kinds {
-            parts.push(kind.from_str(split.next().unwrap().clone() )?);
+        for part in &self.parts{
+            parts.push(part.kind.from_str(split.next().unwrap().clone() )?);
         }
 
         Ok(ResourceAddress{
@@ -1297,18 +1336,35 @@ impl ResourceAddressStructure {
     }
 
     pub fn matches( &self, parts: Vec<ResourceAddressPart> ) -> bool {
-        if parts.len() != self.kinds.len() {
+        if parts.len() != self.parts.len() {
             return false;
         }
         for (index,part) in parts.iter().enumerate()
         {
-            let kind = self.kinds.get(index).unwrap();
-            if !kind.matches(part) {
+            let part_struct = self.parts.get(index).unwrap();
+            if !part_struct.kind.matches(part) {
                 return false;
             }
         }
 
         return true;
+    }
+}
+
+#[derive(Clone,Eq,PartialEq)]
+pub struct ResourceAddressPartStruct
+{
+    pub name: String,
+    pub kind: ResourceAddressPartKind
+}
+
+impl ResourceAddressPartStruct
+{
+    pub fn new( name:&str, kind: ResourceAddressPartKind ) -> Self {
+        ResourceAddressPartStruct{
+            name: name.to_string(),
+            kind: kind
+        }
     }
 }
 
