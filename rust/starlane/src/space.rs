@@ -1,4 +1,4 @@
-use crate::app::{AppCreateController,  AppController, AppSpecific, AppArchetype, InitData, ConfigSrc, AppKind};
+use crate::app::{AppCreateController, AppController, AppSpecific, AppArchetype, InitData, ConfigSrc, AppKind, AppProfile};
 use crate::keys::{SpaceKey, UserKey, AppKey, SubSpaceKey};
 use serde::{Deserialize, Serialize, Serializer};
 use std::fmt;
@@ -11,14 +11,14 @@ use crate::artifact::Artifact;
 use crate::names::Name;
 use crate::message::Fail;
 
-pub struct SpaceCommand
+pub struct RemoteSpaceCommand
 {
     pub space: SpaceKey,
     pub user: UserKey,
-    pub kind: SpaceCommandKind
+    pub kind: RemoteSpaceCommandKind
 }
 
-pub enum SpaceCommandKind
+pub enum RemoteSpaceCommandKind
 {
     AppCreateController(AppCreateController),
     AppSelect(AppSelectCommand)
@@ -33,12 +33,12 @@ pub struct AppSelectCommand
 pub struct SpaceController
 {
     user: UserKey,
-    tx: mpsc::Sender<SpaceCommand>
+    tx: mpsc::Sender<RemoteSpaceCommand>
 }
 
 impl SpaceController
 {
-   pub fn new(user: UserKey, tx: mpsc::Sender<SpaceCommand> ) -> Self
+   pub fn new(user: UserKey, tx: mpsc::Sender<RemoteSpaceCommand> ) -> Self
    {
        SpaceController{
            user: user,
@@ -50,27 +50,26 @@ impl SpaceController
    {
        let (tx,rx) = oneshot::channel();
 
-       let create = AppArchetype {
-           owner: self.user.clone(),
-           sub_space: sub_space.clone(),
-           kind: kind.clone(),
-           specific: specific.clone(),
-           config: config.clone(),
-           init: init.clone(),
-           labels: labels.clone(),
-           name: name
+       let profile = AppProfile{
+           init: InitData::None,
+           archetype: AppArchetype {
+               kind: kind.clone(),
+               specific: specific.clone(),
+               config: config.clone()
+           },
        };
 
        let create_ctrl = AppCreateController
        {
-           archetype: create,
+           sub_space: sub_space.clone(),
+           profile,
            tx: tx
        };
 
-       let command = SpaceCommand{
+       let command = RemoteSpaceCommand {
            space: sub_space.space.clone(),
            user: self.user.clone(),
-           kind: SpaceCommandKind::AppCreateController(create_ctrl)
+           kind: RemoteSpaceCommandKind::AppCreateController(create_ctrl)
        };
 
        self.tx.send( command ).await;
@@ -82,10 +81,11 @@ impl SpaceController
    {
        let (tx,rx) = oneshot::channel();
 
-       let command = SpaceCommand{
+       let command = RemoteSpaceCommand {
            space: sub_space.space.clone(),
            user: self.user.clone(),
-           kind: SpaceCommandKind::AppSelect(AppSelectCommand{
+           kind: RemoteSpaceCommandKind::AppSelect(AppSelectCommand{
+
                selector,
                tx
            })
@@ -100,11 +100,11 @@ impl SpaceController
 }
 
 
-impl fmt::Display for SpaceCommandKind {
+impl fmt::Display for RemoteSpaceCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
-            SpaceCommandKind::AppCreateController(_) => "AppCreate".to_string(),
-            SpaceCommandKind::AppSelect(_) => "AppSelect".to_string()
+            RemoteSpaceCommand::AppCreateController(_) => "AppCreate".to_string(),
+            RemoteSpaceCommand::AppSelect(_) => "AppSelect".to_string()
         };
         write!(f, "{}",r)
     }

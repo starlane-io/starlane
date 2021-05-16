@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, ServerAppPayload, Reply, SpaceMessage, ServerPayload, StarMessageCentral, SimpleReply, StarMessageSupervisor, ResourceAction, ResourcePayload};
+use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, ServerAppPayload, Reply, SpaceMessage, ServerPayload, StarMessageCentral, SimpleReply, StarMessageSupervisor, ResourceManagerAction, ResourcePayload};
 use crate::star::{ServerVariantBacking, StarCommand, StarSkel, StarKey, StarKind, StarVariant, StarVariantCommand, Wind, ServerCommand, CoreRequest, Request, ResourceCommand};
 use crate::message::{ProtoMessage, MessageExpect, Fail};
 use crate::logger::{Flag, StarFlag, StarLog, StarLogPayload, Log};
@@ -215,10 +215,12 @@ impl StarVariant for ServerStarVariant
                            _ => {}
                        }
                    }
-                   StarMessagePayload::Resource(resource) => {
+                   StarMessagePayload::ResourceManager(resource) => {
+                       unimplemented!()
+                       /*
                        match resource
                        {
-                           ResourceAction::HasResource(resource) => {
+                           ResourceManagerAction::HasResource(resource) => {
                                let (request,rx) = Request::new(resource.clone() );
                                self.skel.core_tx.send( StarCoreCommand::HasResource(request)).await;
                                let skel = self.skel.clone();
@@ -239,6 +241,8 @@ impl StarVariant for ServerStarVariant
                            }
                            _ => {}
                        }
+
+                        */
 
                    }
                    _ => {}
@@ -269,7 +273,7 @@ impl StarVariant for ServerStarVariant
 
                            let mut proto = ProtoMessage::new();
                            proto.to = Option::Some(supervisor.clone());
-                           proto.payload = StarMessagePayload::Resource(ResourceAction::Location(location));
+                           proto.payload = StarMessagePayload::ResourceManager(ResourceManagerAction::Location(location));
                            self.skel.comm().send(proto).await;
                        }
                    }

@@ -7,17 +7,17 @@ use serde::{Deserialize, Serialize, Serializer};
 use tokio::sync::{mpsc, Mutex, oneshot};
 use tokio::time::Duration;
 
-use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorKey, ActorKind, ActorMeta, ActorRegistration, ResourceMessage, ActorKeySeq, ActorStatus, RawPayload, ResourceTo, ResourceFrom};
+use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorKey, ActorKind, ActorMeta, ActorRegistration, ResourceMessage, ActorKeySeq, ActorStatus, RawPayload, ResourceTo, ResourceFrom, ActorResource};
 use crate::actor;
 use crate::artifact::{Artifact, ArtifactKey};
 use crate::core::{StarCoreCommand };
 use crate::core::server::{AppExt};
 use crate::error::Error;
 use crate::filesystem::File;
-use crate::frame::{Reply, StarMessagePayload, ResourceAction};
+use crate::frame::{Reply, StarMessagePayload, ResourceManagerAction};
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, SubSpaceKey, UserKey, ResourceKey};
-use crate::resource::{Labels, Resource, ResourceKind, ResourceRegistration, ResourceLocation};
+use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceLocation, ResourceArchetype, ResourceProfile, ResourceAddress, Names, ResourceSrc, Skewer, ResourceAddressPart, ResourceType, Resource};
 use crate::names::Name;
 use crate::space::CreateAppControllerFail;
 use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarSkel, StarVariantCommand, StarComm, ServerCommand, Request, Empty, Query, LocalResourceLocation, ResourceCommand};
@@ -62,8 +62,32 @@ impl FromStr for AppKind
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ConfigSrc
 {
-    None,
-    Artifact(Artifact)
+    Artifact(Artifact),
+    ResourceAddressPart(ResourceAddressPart)
+}
+
+impl ToString for ConfigSrc {
+
+    fn to_string(&self) -> String {
+        match self
+        {
+            ConfigSrc::Artifact(artifact) => format!("Artifact::{}",artifact.to_string()),
+            ConfigSrc::ResourceAddressPart(address) => format!("ResourceAddressPart::{}", address.to_string()),
+        }
+    }
+}
+
+impl FromStr for ConfigSrc {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut split = s.split("::");
+        match split.next()?{
+            "Artifact" => Ok(ConfigSrc::Artifact(Artifact::from_str(split.next()?))),
+            "ResourceAddress" => Ok(ConfigSrc::ResourceAddressPart(ResourceAddress::from_str(split.next()?)?)),
+            what => Err(format!("cannot process ConfigSrc of type {}",what).to_owned().into())
+        }
+    }
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -101,6 +125,7 @@ impl Memory
 
 pub enum AppSliceCommand {
     FetchSequence(Request<Empty,u64>),
+    FetchAddress(Request<ResourceKey,ResourceAddress>),
     Launch(Request<AppArchetype,()>),
     AddActor(ActorKey),
     HasActor(Request<ResourceKey, LocalResourceLocation>),
@@ -113,23 +138,23 @@ pub enum AppSliceCommand {
   */
 pub struct AppSlice
 {
-    pub meta: AppMeta,
     pub comm: StarComm,
     pub ext: Box<dyn AppExt>,
     pub rx: mpsc::Receiver<AppSliceCommand>,
     pub context: AppContext,
+    pub resource: AppResource,
     pub actors: HashMap<ActorKey,ActorStatus>
 }
 
 impl AppSlice
 {
-    pub async fn new( meta: AppMeta, comm: StarComm, ext: Box<dyn AppExt>) -> mpsc::Sender<AppSliceCommand>
+    pub async fn new( resource: AppResource, comm: StarComm, ext: Box<dyn AppExt>) -> mpsc::Sender<AppSliceCommand>
     {
         let (tx,rx) = mpsc::channel(1024);
 
-        let context = AppContext::new(meta.clone(), tx.clone(), comm.clone() );
+        let context = AppContext::new(resource.clone(), tx.clone(), comm.clone() );
         let app = AppSlice{
-            meta: meta,
+            resource: resource,
             context: context,
             comm: comm,
             ext: ext,
@@ -206,8 +231,8 @@ impl AppSlice
     async fn fetch_seq(&mut self, request: Request<Empty,u64>) {
         let (tx,rx) = oneshot::channel();
         self.comm.variant_tx.send( StarVariantCommand::CoreRequest(CoreRequest::AppSequenceRequest(CoreAppSequenceRequest{
-            app: self.meta.key.clone(),
-            user: self.meta.owner.clone(),
+            app: self.resource.key.clone(),
+            user: self.resource.owner.clone(),
             tx: tx
         }))).await;
         tokio::spawn( async move {
@@ -260,7 +285,8 @@ pub type AppMessageKind = String;
 
 pub struct AppCreateController
 {
-    pub archetype: AppArchetype,
+    pub sub_space: SubSpaceKey,
+    pub profile: AppProfile,
     pub tx: oneshot::Sender<Result<AppController,CreateAppControllerFail>>
 }
 
@@ -334,17 +360,7 @@ impl App
     }
 }
 
-impl From<App> for Resource
-{
-    fn from(app: App) -> Self {
-        Resource{
-            key: ResourceKey::App(app.key.clone()),
-            kind: ResourceKind::App(app.archetype.kind),
-            owner: Option::Some(app.archetype.owner),
-            specific: Option::Some(app.archetype.specific)
-        }
-    }
-}
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct AppLocation
@@ -371,19 +387,56 @@ impl AppController
 
 }
 
+#[derive(Clone,Serialize,Deserialize)]
+pub struct AppProfile
+{
+    pub archetype: AppArchetype,
+    pub init: InitData,
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ActorProfile{
+    pub archetype: ActorArchetype,
+    pub init: InitData
+}
+
+impl From<AppProfile> for ResourceProfile
+{
+    fn from(profile: AppProfile) -> Self {
+        ResourceProfile {
+            init: profile.init,
+            archetype: profile.archetype.into(),
+        }
+    }
+}
 
 // this is everything describes what an App should be minus it's instance data (instance data like AppKey)
 #[derive(Clone,Serialize,Deserialize)]
 pub struct AppArchetype
 {
-    pub owner: UserKey,
-    pub sub_space: SubSpaceKey,
     pub kind: AppKind,
     pub specific: AppSpecific,
     pub config: ConfigSrc,
-    pub init: InitData,
-    pub name: Option<String>,
-    pub labels: Labels
+}
+
+impl From<AppArchetype> for ResourceArchetype
+{
+    fn from(archetype: AppArchetype) -> Self {
+        ResourceArchetype{
+            kind: ResourceKind::App(archetype.kind),
+            specific: Option::Some(archetype.specific),
+            config: Option::Some(archetype.config)
+        }
+    }
+}
+
+
+
+
+impl AppArchetype {
+    pub fn resource_archetype(self)->ResourceArchetype{
+        ResourceArchetype::App(self)
+    }
 }
 
 
@@ -523,25 +576,60 @@ impl fmt::Display for HaltReason{
 }
 
 #[derive(Clone)]
+pub struct AppResource{
+    pub key: AppKey,
+    pub archetype: AppArchetype,
+    pub address: ResourceAddress,
+    pub owner: UserKey
+}
+
+impl AppResource {
+    pub fn from_resource( resource: Resource ) -> Result<AppResource,Error> {
+        if !resource.validate(ResourceType::App) {
+            return Err("resource is not completely an AppResource".into());
+        }
+
+        if let ResourceKind::App(kind) = resource.archetype.kind{
+            let resource = AppResource{
+                key: resource.key.app()?,
+                archetype: AppArchetype{
+                    kind: kind,
+                    specific: resource.archetype.specific.ok_or("app resource must have a specific")?,
+                    config:  resource.archetype.config.ok_or("app resource must have a config")?,
+                },
+                address: resource.address,
+                owner: resource.owner.ok_or("app resource must have an owner")?
+            };
+            Ok(resource)
+        }
+        else {
+            Err("could not get a proper AppKind".into())
+        }
+
+    }
+}
+
+
+#[derive(Clone)]
 pub struct AppContext
 {
-    meta: AppMeta,
     sequence: Option<Arc<IdSeq>>,
     app_tx: mpsc::Sender<AppSliceCommand>,
     comm: StarComm,
-    actor_key_seq: Option<ActorKeySeq>
+    actor_key_seq: Option<ActorKeySeq>,
+    resource: AppResource
 }
 
 impl AppContext
 {
-    pub fn new( meta: AppMeta, app_tx: mpsc::Sender<AppSliceCommand>, comm: StarComm )->Self
+    pub fn new( resource: AppResource, app_tx: mpsc::Sender<AppSliceCommand>, comm: StarComm )->Self
     {
         AppContext{
             actor_key_seq: Option::None,
             app_tx: app_tx,
-            meta: meta,
             sequence: Option::None,
-            comm: comm
+            comm: comm,
+            resource: resource
         }
     }
 
@@ -563,8 +651,8 @@ impl AppContext
     }
 
 
-    pub async fn meta(&mut self)->AppMeta {
-        self.meta.clone()
+    pub async fn resource(&mut self)->AppResource {
+        self.resource.clone()
     }
 
     pub async fn unique_seq(&mut self)->Result<Arc<IdSeq>,Fail>
@@ -588,7 +676,7 @@ impl AppContext
         if let seq_id= rx.await??
         {
             let (tx,mut rx) = mpsc::channel(16);
-            let actor_key_seq = ActorKeySeq::new(self.meta.key.clone(), seq_id, 0, tx );
+            let actor_key_seq = ActorKeySeq::new(self.resource.key.clone(), seq_id, 0, tx );
             let variant_tx= self.comm.variant_tx.clone();
             tokio::spawn(async move {
                 while let Option::Some(actor) = rx.recv().await {
@@ -606,6 +694,7 @@ impl AppContext
             Err(Fail::Unexpected)
         }
     }
+
 
 
     pub async fn seq(&mut self)->Result<Arc<IdSeq>,Fail>
@@ -637,14 +726,31 @@ impl AppContext
         Ok(self.actor_key_seq().await?.next().await)
     }
 
-    pub async fn create_actor_key(&mut self) ->Result<ActorKey,Fail>
+    pub async fn create_actor_key(&mut self, archetype: ActorArchetype, names: Option<Names>, labels: Option<Labels>) ->Result<ActorKey,Fail>
     {
         let actor_id = self.next_id().await?;
 
         let actor_key = ActorKey{
-            app: self.meta.key.clone(),
+            app: self.resource.key.clone(),
             id: actor_id
         };
+
+        let address_part = ResourceAddressPart::Skewer(Skewer::new(ResourceKey::Actor(actor_key.clone()).encode()?.as_str())?);
+
+        let resource = ActorResource{
+            key: actor_key.clone(),
+            owner: self.resource.owner.clone(),
+            archetype: archetype,
+            address: ResourceAddress::from_parent(&ResourceType::Actor, &self.resource.address, address_part )?
+        };
+
+        let registration = ActorRegistration{
+            resource: resource,
+            names: names.unwrap_or(vec![]),
+            labels: labels.unwrap_or(Labels::new()),
+        };
+
+        self.register(registration).await?;
 
         Ok( actor_key )
     }

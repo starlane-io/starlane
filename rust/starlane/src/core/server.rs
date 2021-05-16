@@ -256,11 +256,8 @@ impl AppExt for TestAppCreateExt
 
     async fn launch(&mut self, archetype: AppArchetype) -> Result<(), Fail>
     {
-        let meta = self.context()?.meta().await;
-        let mut archetype = ActorArchetype::new( ActorKind::Single, crate::names::TEST_ACTOR_SPEC.clone(), meta.owner );
-        archetype.name = Option::Some("main".to_string());
-
-        let actor = self.context()?.create_actor_key().await?;
+        let mut archetype = ActorArchetype::new( ActorKind::Single, crate::names::TEST_ACTOR_SPEC.clone(), ConfigSrc::Artifact(crate::names::TEST_ACTOR_CONFIG_ARTIFACT.clone()) );
+        let actor = self.context()?.create_actor_key(archetype, Option::Some(vec!["main".to_string()]), Option::None).await?;
 
         Ok(())
     }

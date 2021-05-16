@@ -13,6 +13,8 @@ pub struct Error{
     pub error: String
 }
 
+
+
 impl fmt::Display for Error{
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}",self.error)
@@ -23,6 +25,14 @@ impl From<Elapsed> for Error{
     fn from(e: Elapsed) -> Self {
         Error{
             error: format!("{}",e.to_string())
+        }
+    }
+}
+
+impl From<()> for Error{
+    fn from(e: ()) -> Self {
+        Error{
+            error: "() Error".to_string()
         }
     }
 }

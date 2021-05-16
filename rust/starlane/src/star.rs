@@ -29,31 +29,37 @@ use crate::app::{AppCommandKind, AppController, AppCreateController, AppMeta, Ap
 use crate::core::StarCoreCommand;
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ApplicationSupervisorReport, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, CentralPayload, SimpleReply, StarMessageCentral, AppPayload, ResourceAction, ResourcePayload};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ApplicationSupervisorReport, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, CentralPayload, SimpleReply, StarMessageCentral, AppPayload, ResourcePayload, ResourceManagerAction, ResourceHostAction};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId, SpaceKey, UserKey, ResourceKey, GatheringKey};
-use crate::resource::{Labels, ResourceRegistration, Selector, Resource, RegistryAction, RegistryCommand, RegistryResult, Registry, ResourceType, ResourceLocation, ResourceManagerKey, ResourceBinding, ResourceAddress};
+use crate::resource::{Labels, ResourceRegistration, Selector, ResourceAssign, ResourceRegistryCommand, ResourceRegistryResult, Registry, ResourceType, ResourceLocation, ResourceManagerKey, ResourceBinding, ResourceAddress, ResourceRegistryAction, Resource};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob, Fail};
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
-use crate::space::{CreateAppControllerFail, SpaceCommand, SpaceCommandKind, SpaceController};
+use crate::space::{CreateAppControllerFail, RemoteSpaceCommand, RemoteSpaceCommandKind, SpaceController};
 use crate::star::central::CentralStarVariant;
 use crate::star::supervisor::{SupervisorCommand, SupervisorVariant};
 use crate::permissions::{Authentication, AuthToken, AuthTokenSource, Credentials};
 use tokio::sync::oneshot::Sender;
 use std::str::FromStr;
+use crate::star::space::SpaceVariant;
+use crate::frame::ResourceHostAction::ResourceSliceAssign;
 
 pub mod central;
 pub mod supervisor;
 pub mod server;
-mod filestore;
+pub mod filestore;
+pub mod pledge;
+pub mod space;
+pub mod common;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize,Hash)]
 pub enum StarKind
 {
     Central,
+    Space,
     Mesh,
     Supervisor,
     Server,
@@ -73,10 +79,11 @@ impl FromStr for StarKind{
             "Mesh"  => Ok(StarKind::Mesh),
             "Supervisor"  => Ok(StarKind::Supervisor),
             "Server"  => Ok(StarKind::Server),
-            "Store"  => Ok(StarKind::FileStore),
+            "FileStore"  => Ok(StarKind::FileStore),
             "Gateway"  => Ok(StarKind::Gateway),
             "Link"  => Ok(StarKind::Link),
             "Client"  => Ok(StarKind::Client),
+            "Space"  => Ok(StarKind::Space),
             _      => Err(()),
         }
     }
@@ -209,7 +216,8 @@ impl StarKind
             StarKind::Gateway => true,
             StarKind::Client => true,
             StarKind::Link => true,
-            StarKind::FileStore => false
+            StarKind::FileStore => false,
+            StarKind::Space => false
         }
     }
 }
@@ -222,10 +230,11 @@ impl fmt::Display for StarKind{
             StarKind::Mesh => "Mesh".to_string(),
             StarKind::Supervisor => "Supervisor".to_string(),
             StarKind::Server => "Server".to_string(),
-            StarKind::FileStore => "Store".to_string(),
+            StarKind::FileStore => "FileStore".to_string(),
             StarKind::Gateway => "Gateway".to_string(),
             StarKind::Link => "Link".to_string(),
             StarKind::Client => "Client".to_string(),
+            StarKind::Space => "Space".to_string()
         })
     }
 }
@@ -508,7 +517,7 @@ impl Star
     {
         let mut proto = ProtoMessage::new();
         proto.to = Option::Some(star);
-        proto.payload = StarMessagePayload::Resource(ResourceAction::Find(locate.payload.clone()));
+        proto.payload = StarMessagePayload::ResourceManager(ResourceManagerAction::Find(locate.payload.clone()));
         let reply = proto.get_ok_result().await;
         self.send_proto_message(proto).await;
         let star_tx = self.skel.star_tx.clone();
@@ -539,7 +548,7 @@ impl Star
     {
         let mut proto = ProtoMessage::new();
         proto.to = Option::Some(star);
-        proto.payload = StarMessagePayload::Resource(ResourceAction::GetKey(request.payload.clone()));
+        proto.payload = StarMessagePayload::ResourceManager(ResourceManagerAction::GetKey(request.payload.clone()));
         let reply = proto.get_ok_result().await;
         self.send_proto_message(proto).await;
         let star_tx = self.skel.star_tx.clone();
@@ -601,27 +610,24 @@ impl Star
         }
     }
 
-    async fn on_space_command(&mut self, command: SpaceCommand )
+    async fn on_space_command(&mut self, command: RemoteSpaceCommand)
     {
         match command.kind
         {
-            SpaceCommandKind::AppCreateController(create) => {
-                if command.space != create.archetype.sub_space.space
-                {
-println!("spaces_do_not_match");
-                    create.tx.send(Err(CreateAppControllerFail::SpacesDoNotMatch) );
-                }
-                else {
+            RemoteSpaceCommandKind::AppCreateController(create) => {
+
+                /*
                     // send app create request to central
                     let space_message = SpaceMessage {
-                        sub_space: create.archetype.sub_space.clone(),
+                        sub_space: create.sub_space.clone(),
                         user: command.user.clone(),
-                        payload: SpacePayload::Central(CentralPayload::AppCreate(create.archetype.clone()))
+                        payload: SpacePayload::Resource(ResourcePayload::)
                     };
+                 */
 
                     let mut proto = ProtoMessage::new();
                     proto.to( StarKey::central() );
-                    proto.payload = StarMessagePayload::Space(space_message);
+                    proto.payload = StarMessagePayload::ResourceManager(ResourceManagerAction::Create(create.profile.clone().into()));
                     proto.expect = MessageExpect::ReplyErrOrTimeout(MessageExpectWait::Med);
 
                     let result= proto.get_ok_result().await;
@@ -669,9 +675,9 @@ println!("spaces_do_not_match");
 
                     });
                     self.send_proto_message(proto).await;
+
             }
-            }
-            SpaceCommandKind::AppSelect(app_select_command) => {
+            RemoteSpaceCommandKind::AppSelect(app_select_command) => {
                 let mut proto = ProtoMessage::new();
                 proto.payload = StarMessagePayload::Central(StarMessageCentral::AppSelect(app_select_command.selector.clone()));
                 proto.to = Option::Some(StarKey::central());
@@ -1478,7 +1484,7 @@ pub enum StarCommand
     ForwardFrame(ForwardFrame),
     FrameTimeout(FrameTimeoutInner),
     FrameError(FrameErrorInner),
-    SpaceCommand(SpaceCommand),
+    SpaceCommand(RemoteSpaceCommand),
     GetSpaceController(GetSpaceController),
     AppCommand(AppCommand),
     ResourceMessage(Request<ResourceMessageWrapper,Fail>),
@@ -1741,7 +1747,7 @@ impl fmt::Display for StarVariantCommand {
             StarVariantCommand::SupervisorCommand(_) => "SupervisorCommand".to_string(),
             StarVariantCommand::ServerCommand(_) => "ServerCommand".to_string(),
             StarVariantCommand::Init => "Init".to_string(),
-            StarVariantCommand::StarSkel(_) => "StarData".to_string(),
+            StarVariantCommand::StarSkel(_) => "StarSkel".to_string(),
             StarVariantCommand::CoreRequest(_) => "CoreRequest".to_string(),
             StarVariantCommand::ResourceCommand(_) => "ResourceCommand".to_string()
         };
@@ -2372,6 +2378,10 @@ impl StarManagerFactory for StarManagerFactoryDefault
                     {
                         break Box::new(CentralStarVariant::new(data.clone() ).await );
                     }
+                    if let StarKind::Space = data.info.kind
+                    {
+                        break Box::new(SpaceVariant::new(data.clone() ).await );
+                    }
                     else if let StarKind::Supervisor= data.info.kind
                     {
                         break Box::new(SupervisorVariant::new(data.clone()).await );
@@ -2385,7 +2395,7 @@ impl StarManagerFactory for StarManagerFactoryDefault
                     }
                 }
                 else {
-                    eprintln!("must send StarData, before manager commands can be processed")
+                    eprintln!("must send StarSkel, before manager commands can be processed")
                 }
             };
 
@@ -2819,7 +2829,7 @@ pub trait RegistryBacking : Sync+Send {
 
 pub struct RegistryBackingSqlLite
 {
-    registry: mpsc::Sender<RegistryAction>
+    registry: mpsc::Sender<ResourceRegistryAction>
 }
 
 impl RegistryBackingSqlLite
@@ -2837,26 +2847,26 @@ impl RegistryBackingSqlLite
 impl RegistryBacking for RegistryBackingSqlLite
 {
     async fn accept(&self, accept: HashSet<ResourceType>) -> Result<(), Fail> {
-        let (request,rx) = RegistryAction::new(RegistryCommand::Accept(accept));
-        self.registry.send( request ).await;
+        let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Accept(accept));
+        self.registry.send( request ).await?;
         tokio::time::timeout( Duration::from_secs(5),rx).await??;
         Ok(())
     }
 
     async fn register(&self,registration: ResourceRegistration) -> Result<(),Fail> {
-        let (request,rx) = RegistryAction::new(RegistryCommand::Register(registration));
-        self.registry.send( request ).await;
+        let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Register(registration));
+        self.registry.send( request ).await?;
         tokio::time::timeout( Duration::from_secs(5),rx).await??;
         Ok(())
     }
 
     async fn select(&self, selector: Selector) ->Result<Vec<Resource>,Fail>{
-        let (request,rx) = RegistryAction::new(RegistryCommand::Select(selector));
-        self.registry.send( request ).await;
+        let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Select(selector));
+        self.registry.send( request ).await?;
         match tokio::time::timeout( Duration::from_secs(5),rx).await??
         {
-            RegistryResult::Resources(resources) => {
-                Result::Ok(resources.into())
+            ResourceRegistryResult::Resources(resources) => {
+                Result::Ok(resources)
             }
             _ => {
                 Result::Err(Fail::Timeout)
@@ -2865,17 +2875,17 @@ impl RegistryBacking for RegistryBackingSqlLite
     }
 
     async fn set_location(&self, location: ResourceLocation) -> Result<(), Fail> {
-        let (request,rx) = RegistryAction::new(RegistryCommand::SetLocation(location));
+        let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::SetLocation(location));
         self.registry.send( request ).await;
         tokio::time::timeout( Duration::from_secs(5),rx).await??;
         Ok(())
     }
 
     async fn find(&self, key: ResourceKey) -> Result<Reply, Fail> {
-        let (request,rx) = RegistryAction::new(RegistryCommand::Find(key));
+        let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Find(key));
         self.registry.send( request ).await;
         let result = tokio::time::timeout( Duration::from_secs(5),rx).await??;
-        if let RegistryResult::Location(location) = result {
+        if let ResourceRegistryResult::Location(location) = result {
             Ok(Reply::Location(location))
         }
         else
@@ -2885,17 +2895,17 @@ impl RegistryBacking for RegistryBackingSqlLite
     }
 
     async fn bind(&self, bind: ResourceBinding) -> Result<(), Fail> {
-        let (request,rx) = RegistryAction::new(RegistryCommand::Bind(bind));
+        let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Bind(bind));
         self.registry.send( request ).await;
         tokio::time::timeout( Duration::from_secs(5),rx).await??;
         Ok(())
     }
 
     async fn get_address(&self, key: ResourceKey) -> Result<Reply, Fail> {
-        let (request,rx) = RegistryAction::new(RegistryCommand::GetAddress(key));
+        let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::GetAddress(key));
         self.registry.send( request ).await;
         let result = tokio::time::timeout( Duration::from_secs(5),rx).await??;
-        if let RegistryResult::Address(address) = result {
+        if let ResourceRegistryResult::Address(address) = result {
             Ok(Reply::Address(address))
         }
         else
@@ -2905,10 +2915,10 @@ impl RegistryBacking for RegistryBackingSqlLite
     }
 
     async fn get_key(&self, address: ResourceAddress) -> Result<Reply, Fail> {
-        let (request,rx) = RegistryAction::new(RegistryCommand::GetKey(address));
+        let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::GetKey(address));
         self.registry.send( request ).await;
         let result = tokio::time::timeout( Duration::from_secs(5),rx).await??;
-        if let RegistryResult::Key(key) = result {
+        if let ResourceRegistryResult::Key(key) = result {
             Ok(Reply::Key(key))
         }
         else

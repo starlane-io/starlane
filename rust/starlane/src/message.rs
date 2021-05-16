@@ -366,3 +366,11 @@ impl From<tokio::sync::oneshot::error::RecvError> for Fail
     }
 }
 
+impl <T> From<tokio::sync::mpsc::error::SendError<T>> for Fail
+{
+    fn from(_: tokio::sync::mpsc::error::SendError<T>) -> Self {
+        Fail::Unexpected
+    }
+
+}
+

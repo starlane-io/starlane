@@ -15,7 +15,7 @@ use crate::id::Id;
 use crate::message::Fail;
 use crate::names::Name;
 use crate::permissions::{Priviledges, User, UserKind};
-use crate::resource::{Labels, Resource, ResourceType, ResourceManagerKey};
+use crate::resource::{Labels, ResourceAssign, ResourceType, ResourceManagerKey, Resource, ResourceArchetype, ResourceKind};
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum SpaceKey
@@ -61,12 +61,30 @@ impl fmt::Display for SpaceKey{
 }
 
 
+
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct UserKey
 {
   pub space: SpaceKey,
   pub id: UserId
 }
+
+impl UserKey
+{
+    pub fn bin(&self)->Result<Vec<u8>,Error>
+    {
+        let mut bin= bincode::serialize(self)?;
+        Ok(bin)
+    }
+
+    pub fn from_bin(mut bin: Vec<u8> )->Result<Self,Error>
+    {
+        let mut key = bincode::deserialize::<Self>(bin.as_slice() )?;
+        Ok(key)
+    }
+}
+
+
 
 impl UserKey
 {
@@ -326,6 +344,28 @@ pub enum ResourceKey
 
 impl ResourceKey
 {
+
+    pub fn space(&self)->SpaceKey {
+        match self{
+            ResourceKey::Space(space) => space.clone(),
+            ResourceKey::SubSpace(sub_space) => sub_space.clone(),
+            ResourceKey::App(app) => app.sub_space.space.clone(),
+            ResourceKey::Actor(actor) => actor.app.sub_space.space.clone(),
+            ResourceKey::User(user) => user.space.clone(),
+            ResourceKey::Artifact(artifact) => artifact.sub_space.space.clone(),
+            ResourceKey::File(file) => match &file.filesystem{
+                FileSystemKey::App(app) => app.app.sub_space.space.clone(),
+                FileSystemKey::SubSpace(sub_space) => sub_space.sub_space.space.clone(),
+            }
+            ResourceKey::Filesystem(filesystem) => {
+                match filesystem{
+                    FileSystemKey::App(app) => app.app.sub_space.space.clone(),
+                    FileSystemKey::SubSpace(sub_space) => sub_space.sub_space.space.clone(),
+                }
+            }
+        }
+    }
+
     pub fn actor(&self)->Result<ActorKey,Fail> {
         if let ResourceKey::Actor(key) = self {
             Ok(key.clone())
@@ -481,31 +521,31 @@ impl ResourceKey
         }
     }
 
-    pub fn sub_space(&self)->SubSpaceKey
+    pub fn sub_space(&self)->Result<SubSpaceKey,Error>
     {
         match self
         {
-            ResourceKey::Space(_) => SubSpaceKey::hyper_default(),
-            ResourceKey::SubSpace(_) => SubSpaceKey::hyper_default(),
-            ResourceKey::App(app) => app.sub_space.clone(),
-            ResourceKey::Actor(actor) => actor.app.sub_space.clone(),
-            ResourceKey::User(user) => SubSpaceKey::new( user.space.clone(), SubSpaceId::Default ),
+            ResourceKey::Space(_) => Err("space does not have a subspace".into()),
+            ResourceKey::SubSpace(sub_space) => Ok(sub_space.clone()),
+            ResourceKey::App(app) => Ok(app.sub_space.clone()),
+            ResourceKey::Actor(actor) => Ok(actor.app.sub_space.clone()),
+            ResourceKey::User(user) => Err("user does not have a sub_space".into()),
             ResourceKey::File(file) => match &file.filesystem{
                 FileSystemKey::App(app) => {
-                    app.app.sub_space.clone()
+                    Ok(app.app.sub_space.clone())
                 }
                 FileSystemKey::SubSpace(sub_space) => {
-                    sub_space.sub_space.clone()
+                    Ok(sub_space.sub_space.clone())
                 }
             },
-            ResourceKey::Artifact(artifact) => artifact.sub_space.clone(),
+            ResourceKey::Artifact(artifact) => Ok(artifact.sub_space.clone()),
             ResourceKey::Filesystem(filesystem) => {
                 match filesystem{
                     FileSystemKey::App(app) => {
-                        app.app.sub_space.clone()
+                        Ok(app.app.sub_space.clone())
                     }
                     FileSystemKey::SubSpace(sub_space) => {
-                        sub_space.sub_space.clone()
+                        Ok(sub_space.sub_space.clone())
                     }
                 }
             }
@@ -529,10 +569,6 @@ impl ResourceKey
 
 
 
-    pub fn space(&self)->SpaceKey
-    {
-        self.sub_space().space
-    }
 }
 
 impl From<Vec<Resource>> for Reply
@@ -541,9 +577,6 @@ impl From<Vec<Resource>> for Reply
         Reply::Keys(resources.iter().map(|r|r.key.clone()).collect())
     }
 }
-
-
-
 
 impl fmt::Display for FileSystemKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

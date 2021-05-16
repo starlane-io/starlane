@@ -18,7 +18,7 @@ use crate::logger::Flags;
 use crate::message::{Fail, MessageExpect, MessageResult, MessageUpdate, ProtoMessage};
 use crate::names::Name;
 use crate::permissions::{Authentication, AuthToken};
-use crate::resource::{Labels, Resource, ResourceRegistration, Selector, ResourceLocation, ResourceAddress, ResourceBinding};
+use crate::resource::{Labels, ResourceAssign, ResourceRegistration, Selector, ResourceLocation, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus, ResourceProfile, Resource};
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey, StarWatchInfo};
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -350,20 +350,31 @@ pub enum StarMessagePayload
    None,
    Central(StarMessageCentral),
    Supervisor(StarMessageSupervisor),
-   Resource(ResourceAction),
+   ResourceManager(ResourceManagerAction),
+   ResourceHost(ResourceHostAction),
    Space(SpaceMessage),
    Reply(SimpleReply),
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum ResourceAction
+pub enum ResourceHostAction
 {
+    HasResource(ResourceKey),
+    ResourceAssign(ResourceAssign),
+    ResourceSliceAssign(ResourceSliceAssign)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ResourceManagerAction
+{
+    Create(ResourceProfile),
     Register(ResourceRegistration),
     Location(ResourceLocation),
     Find(ResourceKey),
-    HasResource(ResourceKey),
     GetKey(ResourceAddress),
-    Bind(ResourceBinding)
+    Bind(ResourceBinding),
+    Status(ResourceStatus),
+    SliceStatus(ResourceSliceStatus)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -702,7 +713,7 @@ impl fmt::Display for StarMessagePayload{
             StarMessagePayload::Central(_) => "Central".to_string(),
             StarMessagePayload::Reply(_) => "Reply".to_string(),
             StarMessagePayload::Supervisor(_) => "Supervisor".to_string(),
-            StarMessagePayload::Resource(_) => "Resource".to_string()
+            StarMessagePayload::ResourceManager(_) => "Resource".to_string()
         };
         write!(f, "{}",r)
     }

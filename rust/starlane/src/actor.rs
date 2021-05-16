@@ -14,7 +14,7 @@ use crate::frame::{Event};
 use crate::id::Id;
 use crate::keys::{AppKey, ResourceKey, SubSpaceKey, UserKey};
 use crate::names::Name;
-use crate::resource::{Labels, Resource, ResourceKind, ResourceRegistration, ResourceType};
+use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceType, ResourceArchetype, ResourceProfile, Resource, Names, ResourceAddress};
 use crate::star::StarKey;
 use std::marker::PhantomData;
 use serde::de::DeserializeOwned;
@@ -42,31 +42,61 @@ impl ActorContext
         }
     }
 }
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ActorProfile{
+    pub archetype: ActorArchetype,
+    pub init: InitData
+}
+
+impl From<ActorProfile> for ResourceProfile
+{
+    fn from(profile: ActorProfile) -> Self {
+        ResourceProfile {
+            init: profile.init,
+            archetype: profile.archetype.into(),
+        }
+    }
+}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ActorArchetype
 {
-    pub owner: UserKey,
     pub kind: ActorKind,
     pub specific: ActorSpecific,
     pub config: ConfigSrc,
-    pub init: InitData,
-    pub labels: Labels,
-    pub name: Option<String>,
 }
+
+impl From<ActorArchetype> for ResourceArchetype
+{
+    fn from(archetype: ActorArchetype) -> Self {
+        ResourceArchetype{
+            kind: ResourceKind::Actor(archetype.kind),
+            specific: Option::Some(archetype.specific),
+            config: Option::Some(archetype.config)
+        }
+    }
+}
+
+
+impl ActorArchetype {
+    pub fn resource_archetype(self)->ResourceArchetype{
+        ResourceArchetype{
+            kind: ResourceKind::Actor(self.kind),
+            specific: Option::Some(self.specific),
+            config: Option::Some(self.config)
+        }
+    }
+}
+
 
 impl ActorArchetype
 {
-  pub fn new( kind: ActorKind, specific: ActorSpecific, owner: UserKey )->Self
+  pub fn new( kind: ActorKind, specific: ActorSpecific, config: ConfigSrc )->Self
   {
       ActorArchetype{
           kind: kind,
           specific: specific,
-          owner: owner,
-          config: ConfigSrc::None,
-          init: InitData::None,
-          labels: Labels::new(),
-          name: Option::None,
+          config: config
       }
   }
 }
@@ -96,16 +126,16 @@ impl ActorMeta
 pub struct ActorResource
 {
     pub key: ActorKey,
-    pub kind: ActorKind,
-    pub specific: ActorSpecific,
-    pub owner: UserKey
+    pub owner: UserKey,
+    pub archetype: ActorArchetype,
+    pub address: ResourceAddress
 }
 
 pub struct ActorRegistration
 {
     pub resource: ActorResource,
-    pub name: Option<String>,
-    pub labels: Labels,
+    pub names: Names,
+    pub labels: Labels
 }
 
 impl From<ActorResource> for Resource
@@ -113,9 +143,13 @@ impl From<ActorResource> for Resource
     fn from(actor: ActorResource) -> Self {
         Resource{
             key: ResourceKey::Actor(actor.key),
-            kind: ResourceKind::Actor(actor.kind),
-            specific: Option::Some(actor.specific),
-            owner: Option::Some(actor.owner)
+            archetype: ResourceArchetype{
+                kind: ResourceKind::Actor(actor.archetype.kind),
+                specific: Option::Some(actor.archetype.specific),
+                config: Option::Some(actor.archetype.config)
+            },
+            owner: Option::Some(actor.owner),
+            address: actor.address
         }
     }
 }
@@ -125,9 +159,8 @@ impl From<ActorRegistration> for ResourceRegistration
     fn from(actor : ActorRegistration) -> Self {
         ResourceRegistration{
             resource: actor.resource.into(),
-            name: actor.name,
+            names: actor.names,
             labels: actor.labels,
-            address: Option::None
         }
     }
 }
@@ -159,7 +192,7 @@ impl ActorKey
 }
 
 pub type ActorSpecific = Name;
-pub type GatheringSpecific = String;
+pub type GatheringSpecific = Name;
 
 #[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
 pub enum ActorKind

@@ -9,10 +9,10 @@ use tokio::sync::oneshot::Receiver;
 
 use crate::app::{AppCreateController, AppMeta, ApplicationStatus, AppLocation, AppArchetype, App};
 use crate::error::Error;
-use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, CentralPayload, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply, ResourcePayload, ResourceAction};
+use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, CentralPayload, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply, ResourcePayload, ResourceManagerAction};
 use crate::id::Id;
 use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, ResourceKey};
-use crate::resource::{Labels, Registry, RegistryAction, Selector, RegistryResult, RegistryCommand, FieldSelection, Resource, ResourceType, ResourceRegistration, ResourceLocation};
+use crate::resource::{Labels, Registry, Selector, ResourceRegistryResult, ResourceRegistryCommand, FieldSelection, ResourceAssign, ResourceType, ResourceRegistration, ResourceLocation};
 use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage, Fail};
 use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource, SetSupervisorForApp, RegistryBacking, RegistryBackingSqlLite};
@@ -142,29 +142,26 @@ impl StarVariant for CentralStarVariant
                            }
                        }
                    }
-                   StarMessagePayload::Resource(resource_message ) => {
+                   StarMessagePayload::ResourceManager(resource_message ) => {
                       match resource_message
                       {
-                          ResourceAction::Register(registration) => {
+                          ResourceManagerAction::Register(registration) => {
                               let result = self.registry.register(registration.clone()).await;
                               self.skel.comm().reply_result_empty(star_message.clone(), result ).await;
                           }
-                          ResourceAction::Location(location) => {
+                          ResourceManagerAction::Location(location) => {
                               let result = self.registry.set_location(location.clone()).await;
                               self.skel.comm().reply_result_empty(star_message.clone(), result ).await;
                           }
-                          ResourceAction::Find(find) => {
+                          ResourceManagerAction::Find(find) => {
                               let result = self.registry.find(find.to_owned()).await;
                               self.skel.comm().reply_result(star_message.clone(), result ).await;
                           }
-                          ResourceAction::HasResource(resource) => {
-                              self.skel.comm().simple_reply(star_message.clone(), SimpleReply::Fail(Fail::ResourceNotFound(resource.clone()))).await;
-                          }
-                          ResourceAction::GetKey(address) => {
+                          ResourceManagerAction::GetKey(address) => {
                               let result = self.registry.get_key(address.clone()).await;
                               self.skel.comm().reply_result(star_message.clone(), result ).await;
                           }
-                          ResourceAction::Bind(bind) => {
+                          ResourceManagerAction::Bind(bind) => {
                               let result = self.registry.bind(bind.clone()).await;
                               self.skel.comm().reply_result_empty(star_message.clone(), result ).await;
                           }
@@ -176,7 +173,8 @@ impl StarVariant for CentralStarVariant
                                match central_payload
                                {
                                    CentralPayload::AppCreate(archetype) => {
-                                       if let Option::Some(supervisor) = self.backing.select_supervisor().await
+                                       unimplemented!()
+/*                                       if let Option::Some(supervisor) = self.backing.select_supervisor().await
                                        {
                                            let mut proto = ProtoMessage::new();
                                            let app_key = AppKey::new(space_message.sub_space.clone());
@@ -203,6 +201,8 @@ impl StarVariant for CentralStarVariant
                                            let proto = star_message.reply(StarMessagePayload::Reply( SimpleReply:: Fail(Fail::Error("central: no supervisors selected.".into()))));
                                            self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                                        }
+
+ */
                                    }
                                }
                            }
