@@ -9,11 +9,11 @@ use tokio::sync::mpsc::error::SendError;
 use crate::actor::{ActorKey};
 use crate::app::{AppMeta, AppLocation, AppStatus, AppReadyStatus, AppPanicReason, AppArchetype, InitData, AppCreateResult};
 use crate::error::Error;
-use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, ServerAppPayload, SpaceReply, StarMessageCentral, SimpleReply, SupervisorPayload, StarMessageSupervisor, ServerPayload, StarPattern, FromReply, ResourcePayload, ResourceManagerAction, WindAction};
+use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, ServerAppPayload, SpaceReply,  SimpleReply, SupervisorPayload,  ServerPayload, StarPattern, FromReply, ResourceManagerAction, WindAction};
 use crate::keys::{AppKey, UserKey, ResourceKey};
 use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait, Fail};
-use crate::star::{StarCommand, StarSkel, StarInfo, StarKey, StarVariant, StarVariantCommand, StarKind, RegistryBacking, RegistryBackingSqlLite, Wind};
+use crate::star::{StarCommand, StarSkel, StarInfo, StarKey, StarVariant, StarVariantCommand, StarKind, ResourceRegistryBacking, ResourceRegistryBackingSqLite, Wind};
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::oneshot::error::RecvError;
 use std::fmt;
@@ -28,10 +28,6 @@ use crate::star::pledge::{StarHandleBacking, StarHandle};
 use tokio::time::Duration;
 use std::sync::Arc;
 
-pub enum SupervisorCommand
-{
-    Pledge
-}
 
 pub struct SetAppServerStatus
 {
@@ -52,7 +48,6 @@ pub struct SupervisorVariant
 {
     skel: StarSkel,
     backing: Box<dyn SupervisorManagerBacking>,
-    registry: Arc<dyn RegistryBacking>,
     star_handles: StarHandleBacking
 }
 
@@ -63,7 +58,6 @@ impl SupervisorVariant
         SupervisorVariant {
             skel: data.clone(),
             backing: Box::new(SupervisorStarVariantBackingSqLite::new().await ),
-            registry: Arc::new(RegistryBackingSqlLite::new().await ),
             star_handles: StarHandleBacking::new().await
         }
     }
@@ -71,28 +65,6 @@ impl SupervisorVariant
 
 impl SupervisorVariant
 {
-    async fn pledge( &mut self )
-    {
-        let mut proto = ProtoMessage::new();
-        proto.to = Option::Some(StarKey::central());
-        proto.payload = StarMessagePayload::Central(StarMessageCentral::Pledge(self.skel.info.kind.clone()));
-        proto.expect = MessageExpect::RetryUntilOk;
-        let rx = proto.get_ok_result().await;
-        self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-
-        if self.skel.flags.check(Flag::Star(StarFlag::DiagnosePledge))
-        {
-            self.skel.logger.log( Log::Star( StarLog::new(&self.skel.info, StarLogPayload::PledgeSent )));
-            let mut data = self.skel.clone();
-            tokio::spawn(async move {
-                let payload = rx.await;
-                if let Ok(StarMessagePayload::Reply(SimpleReply::Ok(_))) = payload
-                {
-                    data.logger.log( Log::Star( StarLog::new( &data.info, StarLogPayload::PledgeOkRecv )))
-                }
-            });
-        }
-    }
 
     pub fn unwrap(&self, result: Result<(), SendError<StarCommand>>)
     {
@@ -128,13 +100,6 @@ impl StarVariant for SupervisorVariant
         match command
         {
             StarVariantCommand::Init => {
-                let mut accept = HashSet::new();
-                accept.insert(ResourceType::Actor);
-                accept.insert(ResourceType::FileSystem);
-                accept.insert(ResourceType::File);
-                self.registry.accept(accept);
-
-                self.pledge().await;
 
                 let (search, rx) = Wind::new(StarPattern::StarKind(StarKind::FileStore), WindAction::SearchHits);
                 self.skel.star_tx.send(StarCommand::WindInit(search)).await;
@@ -151,15 +116,6 @@ impl StarVariant for SupervisorVariant
                     }
                 } else {
                   eprintln!("error encountered when attempting to get a handle on FileStore's")
-                }
-            }
-            StarVariantCommand::SupervisorCommand(supervisor_command) => {
-                match supervisor_command
-                {
-                    SupervisorCommand::Pledge => {
-                        self.pledge().await;
-                    }
-
                 }
             }
             StarVariantCommand::StarMessage(star_message) =>
@@ -194,39 +150,9 @@ println!("AppSEquenceRequest!");
                                     }
                                 }
                             }
-                            SpacePayload::Resource(query) => {
-                                match query
-                                {
-                                    ResourcePayload::Select(selector) => {
-                                        let mut selector = selector.clone();
-                                        selector.add( FieldSelection::Space(space_message.sub_space.space.clone()) );
-                                        selector.add( FieldSelection::SubSpace(space_message.sub_space.clone()) );
-                                        let result = self.registry.select(selector).await;
-                                        self.skel.comm().reply_result(star_message.clone(),Reply::from_result(result)).await;
-                                    }
-                                    ResourcePayload::Message(_) => {}
-                                }
-                            }
+
                             _ => {}
                         }
-                    }
-                    StarMessagePayload::Supervisor(star_message_supervisor)=> {
-                            match star_message_supervisor
-                            {
-                                StarMessageSupervisor::Pledge(kind) => {
-                                    let info = StarInfo::new(star_message.from.clone(),kind.clone() );
-                                    self.backing.add_server(info).await;
-                                    self.reply_ok(star_message.clone()).await;
-                                    if self.skel.flags.check( Flag::Star(StarFlag::DiagnosePledge )) {
-
-                                        self.skel.logger.log( Log::Star(StarLog::new(&self.skel.info, StarLogPayload::PledgeRecv )));
-                                    }
-                                }
-                                StarMessageSupervisor::Register(registration) => {
-                                    let result = self.registry.register(registration.clone()).await ;
-                                    self.skel.comm().reply(star_message, result).await;
-                                }
-                            }
                     }
                     _ => {}
                 }

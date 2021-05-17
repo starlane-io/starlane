@@ -9,13 +9,13 @@ use tokio::sync::oneshot::Receiver;
 
 use crate::app::{AppCreateController, AppMeta, ApplicationStatus, AppLocation, AppArchetype };
 use crate::error::Error;
-use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply, ResourcePayload, ResourceManagerAction};
+use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply, ResourceManagerAction};
 use crate::id::Id;
 use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, ResourceKey};
 use crate::resource::{Labels, Registry, Selector, ResourceRegistryResult, ResourceRegistryCommand, FieldSelection, ResourceAssign, ResourceType, ResourceRegistration, ResourceLocation};
 use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage, Fail};
-use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource, SetSupervisorForApp, RegistryBacking, RegistryBackingSqlLite};
+use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource, SetSupervisorForApp, ResourceRegistryBacking, ResourceRegistryBackingSqLite};
 use crate::star::StarCommand::SpaceCommand;
 use crate::permissions::{AppAccess, AuthToken, User, UserKind};
 use crate::crypt::{PublicKey, CryptKeyId};
@@ -29,7 +29,6 @@ pub struct CentralStarVariant
 {
     skel: StarSkel,
     backing: Box<dyn CentralStarVariantBacking>,
-    registry: Box<dyn RegistryBacking>,
     pub status: CentralStatus,
     public_key_source: PublicKeySource
 }
@@ -42,7 +41,6 @@ impl CentralStarVariant
         {
             skel: data.clone(),
             backing: Box::new(CentralStarVariantBackingSqlLite::new().await ),
-            registry: Box::new( RegistryBackingSqlLite::new().await ),
             status: CentralStatus::Launching,
             public_key_source: PublicKeySource::new()
         }
@@ -104,174 +102,15 @@ impl StarVariant for CentralStarVariant
         match &command
         {
             StarVariantCommand::Init => {
-                let mut accept = HashSet::new();
-                accept.insert(ResourceType::Space);
-                accept.insert(ResourceType::App);
-                accept.insert(ResourceType::User);
-                accept.insert(ResourceType::File);
-                accept.insert(ResourceType::FileSystem);
-                accept.insert(ResourceType::Artifact);
-                self.registry.accept(accept);
-            }
-            StarVariantCommand::StarMessage(star_message) => {
-               match &star_message.payload
-               {
-                   StarMessagePayload::Central(central_message) => {
-                       match central_message
-                       {
-                           StarMessageCentral::Pledge(kind) => {
-                               if kind.is_supervisor()
-                               {
-                                   self.backing.add_supervisor(star_message.from.clone()).await;
-                                   self.reply_ok(star_message.clone()).await;
-                                   if self.skel.flags.check(Flag::Star(StarFlag::DiagnosePledge)) {
-                                       self.skel.logger.log(Log::Star(StarLog::new(&self.skel.info, StarLogPayload::PledgeRecv)));
-                                   }
-                               }
-                               else
-                               {
-                                   self.reply_error(star_message.clone(),format!("expected Supervisor kind got {}",kind)).await;
-                               }
-                           }
-                           StarMessageCentral::AppSelect(selector) => {
-                               let mut selector = selector.clone();
-                               selector.add( FieldSelection::Type(ResourceType::App));
-                               let reply = self.registry.select(selector).await;
-                               self.skel.comm().reply_result(star_message.clone(),Reply::from_result(reply)).await;
-                           }
-                       }
-                   }
-                   StarMessagePayload::ResourceManager(resource_message ) => {
-                      match resource_message
-                      {
-                          ResourceManagerAction::Register(registration) => {
-                              let result = self.registry.register(registration.clone()).await;
-                              self.skel.comm().reply_result_empty(star_message.clone(), result ).await;
-                          }
-                          ResourceManagerAction::Location(location) => {
-                              let result = self.registry.set_location(location.clone()).await;
-                              self.skel.comm().reply_result_empty(star_message.clone(), result ).await;
-                          }
-                          ResourceManagerAction::Find(find) => {
-                              let result = self.registry.find(find.to_owned()).await;
-                              self.skel.comm().reply_result(star_message.clone(), result ).await;
-                          }
-                          ResourceManagerAction::GetKey(address) => {
-                              let result = self.registry.get_key(address.clone()).await;
-                              self.skel.comm().reply_result(star_message.clone(), result ).await;
-                          }
-                          ResourceManagerAction::Bind(bind) => {
-                              let result = self.registry.bind(bind.clone()).await;
-                              self.skel.comm().reply_result_empty(star_message.clone(), result ).await;
-                          }
-                          _ => {
-                              unimplemented!()
-                          }
-                      }
-                   }
-                   StarMessagePayload::Space(space_message) => {
-                       match &space_message.payload {
 
-                           SpacePayload::Resource(query) => {
-                               match query
-                               {
-                                   ResourcePayload::Select(selector) => {
-                                       let mut selector = selector.clone();
-                                       selector.add( FieldSelection::Space(space_message.sub_space.space.clone()) );
-                                       selector.add( FieldSelection::SubSpace(space_message.sub_space.clone()) );
-                                       let result = self.registry.select(selector).await;
-                                       self.skel.comm().reply_result(star_message.clone(),Reply::from_result(result)).await;
-                                   }
-                                   ResourcePayload::Message(_) => {}
-                               }
-                           }
-                           _=>{}
-                       }
-                   }
-                   _ => {}
-               }
             }
+
             StarVariantCommand::CentralCommand(_) => {}
             _ => {}
         }
     }
 
-    /*async fn handle(&mut self, command: StarManagerCommand) {
-        if let StarManagerCommand::Init = command
-        {
-
-        }
-        if let StarManagerCommand::StarMessage(message) = command
-        {
-            let mut message = message;
-            match &message.payload
-            {
-                StarMessagePayload::Space(space_message) => {
-                    match &space_message.payload
-                    {
-                        SpacePayload::Central(central_payload) => {
-                            match central_payload {
-                                CentralPayload::AppCreate(archetype) => {
-                                    if let Option::Some(supervisor) = self.backing.select_supervisor()
-                                    {
-                                        let mut proto = ProtoMessage::new();
-                                        let app = AppKey::new(create.sub_space.clone());
-                                        let assign = AppMeta::new(app, archetype.kind.clone(), archetype.config.clone(), archetype.owner.clone() );
-                                        proto.payload = StarMessagePayload::Space(space_message.with_payload(SpacePayload::Server(ServerPayload::AppAssign(assign))));
-                                        proto.to(supervisor);
-                                        let reply = proto.get_ok_result().await;
-                                        self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                        match reply.await
-                                        {
-                                            Ok(StarMessagePayload::Ok(Empty)) => {
-                                                let proto = message.reply(StarMessagePayload::Ok(App(app.clone())));
-                                                self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                            }
-                                            Err(error) => {
-                                                let proto = message.reply(StarMessagePayload::Error(format!("central: receiving error: {}.", error).into()));
-                                                self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                            }
-                                            _ => {
-                                                let proto = message.reply(StarMessagePayload::Error(format!("central: unexpected response").into()));
-                                                self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                            }
-                                        }
-                                    } else {
-                                        let proto = message.reply(StarMessagePayload::Error("central: no supervisors selected.".into()));
-                                        self.data.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                    }
-                                }
-                                CentralPayload::AppSupervisorLocationRequest(_) => {}
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                StarMessagePayload::Central(central) => {
-                    match central {
-                        StarMessageCentral::Pledge(supervisor) => {
-                            self.backing.add_supervisor(message.from.clone());
-                            self.reply_ok(message).await;
-                            if self.data.flags.check(Flag::Star(StarFlag::DiagnosePledge)) {
-                                self.data.logger.log(Log::Star(StarLog::new(&self.data.info, StarLogPayload::PledgeRecv)));
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-    }*/
-
 }
-/*
-StarMessagePayload::Pledge(StarKind::Supervisor) => {
-
-
-}
-}
-
- */
 
 #[derive(Clone)]
 pub enum CentralStatus
@@ -299,87 +138,6 @@ trait CentralStarVariantBacking: Send+Sync
     async fn has_supervisor(&self)->bool;
     async fn select_supervisor(&mut self )->Option<StarKey>;
 }
-
-/*
-pub struct CentralStarVariantBackingDefault
-{
-    data: StarSkel,
-    init_status: CentralInitStatus,
-    supervisors: Vec<StarKey>,
-    application_to_supervisor: HashMap<AppKey,StarKey>,
-    application_name_to_app_id : HashMap<String, AppMeta>,
-    application_state: HashMap<AppKey, ApplicationStatus>,
-    supervisor_index: usize
-}
-
-impl CentralStarVariantBackingDefault
-{
-    pub fn new(data: StarSkel) -> Self
-    {
-        CentralStarVariantBackingDefault {
-            data: data,
-            init_status: CentralInitStatus::None,
-            supervisors: vec![],
-            application_to_supervisor: HashMap::new(),
-            application_name_to_app_id: HashMap::new(),
-            application_state: HashMap::new(),
-            supervisor_index: 0
-        }
-    }
-}
-
-#[async_trait]
-impl CentralStarVariantBacking for CentralStarVariantBackingDefault
-{
-
-    async fn add_supervisor(&mut self, star: StarKey) {
-        if !self.supervisors.contains(&star)
-        {
-            self.supervisors.push(star);
-        }
-    }
-
-    fn remove_supervisor(&mut self, star: StarKey) {
-        self.supervisors.retain( |s| *s != star );
-    }
-
-    fn set_supervisor_for_application(&mut self, app: AppKey, supervisor_star: StarKey) {
-        self.application_to_supervisor.insert( app, supervisor_star );
-    }
-
-    fn get_supervisor_for_application(&self, app: &AppKey) -> Option<&StarKey> {
-        self.application_to_supervisor.get(app )
-    }
-
-    fn has_supervisor(&self) -> bool {
-        !self.supervisors.is_empty()
-    }
-
-    fn get_init_status(&self) -> CentralInitStatus {
-        todo!()
-    }
-
-    fn set_init_status(&self, status: CentralInitStatus) {
-        todo!()
-    }
-
-    fn select_supervisor(&mut self) -> Option<StarKey> {
-        if self.supervisors.len() == 0
-        {
-            return Option::None;
-        }
-        else {
-            self.supervisor_index = &self.supervisor_index + 1;
-            return self.supervisors.get(&self.supervisor_index%self.supervisors.len()).cloned();
-        }
-    }
-
-    fn get_public_key_for_star(&self, star: &StarKey) -> Option<PublicKey> {
-        Option::Some( PublicKey{ id: CryptKeyId::default(), data: vec![] })
-    }
-}
-
- */
 
 
 struct CentralStarVariantBackingSqlLite

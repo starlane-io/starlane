@@ -19,7 +19,7 @@ use crate::error::Error;
 use crate::frame::{Frame, ProtoFrame, WindHit, StarMessage, StarMessagePayload, WindUp, StarPattern, WindDown, SequenceMessage} ;
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelReceiver, TunnelSender, TunnelSenderState};
-use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarKernel, StarKey, StarKind, StarManagerFactory, StarSearchTransaction, Transaction, StarInfo, StarSkel, StarVariantCommand};
+use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarKernel, StarKey, StarKind, StarManagerFactory, StarSearchTransaction, Transaction, StarInfo, StarSkel, StarVariantCommand, ResourceRegistryBackingSqLite, ResourceRegistryBacking};
 use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
 use crate::logger::{Logger, Flags, Flag, StarFlag, Log, ProtoStarLog, ProtoStarLogPayload};
@@ -109,6 +109,12 @@ impl ProtoStar
 
                         let (core_tx,core_rx) = mpsc::channel(16);
 
+                        let resource_registry: Option<Arc<dyn ResourceRegistryBacking>>= if info.kind.is_resource_manager() {
+                            Option::Some( Arc::new( ResourceRegistryBackingSqLite::new(info.kind.manages() ).await? ) )
+                        } else {
+                            Option::None
+                        };
+
                         let skel = StarSkel {
                             info: info,
                             sequence: self.sequence.clone(),
@@ -117,7 +123,8 @@ impl ProtoStar
                             variant_tx: manager_tx.clone(),
                             logger: self.logger.clone(),
                             flags: self.flags.clone(),
-                            auth_token_source: AuthTokenSource {}
+                            auth_token_source: AuthTokenSource {},
+                            resource_manager: resource_registry
                         };
 
                         let core_ext = self.star_core_ext_factory.create(&skel );

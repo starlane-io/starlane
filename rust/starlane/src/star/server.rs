@@ -1,6 +1,6 @@
 use crate::error::Error;
-use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, ServerAppPayload, Reply, SpaceMessage, ServerPayload, StarMessageCentral, SimpleReply, StarMessageSupervisor, ResourceManagerAction, ResourcePayload};
-use crate::star::{ServerVariantBacking, StarCommand, StarSkel, StarKey, StarKind, StarVariant, StarVariantCommand, Wind, ServerCommand, CoreRequest, Request, ResourceCommand};
+use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, ServerAppPayload, Reply, SpaceMessage, ServerPayload, SimpleReply, ResourceManagerAction};
+use crate::star::{ServerVariantBacking, StarCommand, StarSkel, StarKey, StarKind, StarVariant, StarVariantCommand, Wind, ServerCommand, CoreRequest, Request };
 use crate::message::{ProtoMessage, MessageExpect, Fail};
 use crate::logger::{Flag, StarFlag, StarLog, StarLogPayload, Log};
 use tokio::time::{sleep, Duration};
@@ -67,50 +67,6 @@ impl ServerStarVariant
         self.backing.get_supervisor()
     }
 
-    async fn pledge(&mut self)->Result<(),Error>
-    {
-        let supervisor = match self.get_supervisor(){
-            None => {
-                loop
-                {
-                    let (search, rx) = Wind::new(StarPattern::StarKind(StarKind::Supervisor), WindAction::SearchHits);
-                    self.skel.star_tx.send(StarCommand::WindInit(search)).await;
-                    if let Ok(hits) = rx.await
-                    {
-                        break hits.nearest().unwrap().star
-                    }
-println!("Server: Could not find Supervisor... waiting 5 seconds to try again...");
-                    tokio::time::sleep( Duration::from_secs(5) ).await;
-                }
-            }
-            Some(supervisor) => supervisor.clone()
-        };
-
-        self.set_supervisor(supervisor.clone());
-        self.skel.core_tx.send( StarCoreCommand::SetSupervisor(supervisor.clone() )).await;
-
-        let mut proto = ProtoMessage::new();
-        proto.to = Option::Some(supervisor);
-        proto.payload = StarMessagePayload::Supervisor(StarMessageSupervisor::Pledge(self.skel.info.kind.clone()));
-        proto.expect = MessageExpect::RetryUntilOk;
-        let rx = proto.get_ok_result().await;
-        self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-
-        if self.skel.flags.check(Flag::Star(StarFlag::DiagnosePledge))
-        {
-            self.skel.logger.log( Log::Star( StarLog::new(&self.skel.info, StarLogPayload::PledgeSent )));
-            let mut data = self.skel.clone();
-            tokio::spawn(async move {
-                let payload = rx.await;
-                if let Ok(StarMessagePayload::Reply(SimpleReply::Ok(_))) = payload
-                {
-                    data.logger.log( Log::Star( StarLog::new( &data.info, StarLogPayload::PledgeOkRecv )))
-                }
-            });
-        }
-
-        Ok(())
-    }
 
 
 }
@@ -130,7 +86,6 @@ impl StarVariant for ServerStarVariant
        match command
        {
            StarVariantCommand::Init => {
-               self.pledge().await;
            }
            StarVariantCommand::StarMessage(star_message) => {
                match &star_message.payload{
@@ -141,16 +96,6 @@ impl StarVariant for ServerStarVariant
                                match server_space_message
                                {
                                    ServerPayload::SequenceResponse(_) => {}
-                               }
-                           }
-                           SpacePayload::Resource(resource_payload) => {
-                               match resource_payload{
-                                   ResourcePayload::Message(resource_message) => {
-                                       let (request,mut rx) = Request::new(resource_message.clone() );
-                                       self.skel.core_tx.send(StarCoreCommand::ResourceMessage(request)).await;
-                                       self.skel.comm().reply_result_empty_rx(star_message, rx).await;
-                                   }
-                                   _ => {}
                                }
                            }
                            _ => {}
@@ -189,45 +134,7 @@ impl StarVariant for ServerStarVariant
                    _ => {}
                }
            }
-           StarVariantCommand::ResourceCommand(command) => {
-               match command
-               {
-                   ResourceCommand::Register(request) => {
-                       if let Option::Some(supervisor) = self.backing.get_supervisor()
-                       {
-                           let mut proto = ProtoMessage::new();
-                           proto.to = Option::Some(supervisor.clone());
-                           proto.payload = StarMessagePayload::Supervisor(StarMessageSupervisor::Register(request.payload));
-                           self.skel.comm().send_and_get_ok_result(proto,request.tx).await;
-                       } else {
-                           request.tx.send(Result::Err(Fail::Unexpected));
-                       }
-                   }
-                   ResourceCommand::SignalLocation(local) => {
-                       if let Option::Some(supervisor) = self.backing.get_supervisor()
-                       {
-                           let location = ResourceLocation{
-                               key: local.resource,
-                               host: self.skel.info.star.clone(),
-                               gathering: local.gathering
-                           };
 
-                           let mut proto = ProtoMessage::new();
-                           proto.to = Option::Some(supervisor.clone());
-                           proto.payload = StarMessagePayload::ResourceManager(ResourceManagerAction::Location(location));
-                           self.skel.comm().send(proto).await;
-                       }
-                   }
-               }
-           }
-           StarVariantCommand::ServerCommand(command) => {
-               match command
-               {
-                   ServerCommand::PledgeToSupervisor => {
-                       self.pledge().await;
-                   }
-               }
-           }
            _ => {}
        }
     }

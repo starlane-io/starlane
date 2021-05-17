@@ -29,23 +29,24 @@ use crate::app::{AppCommandKind, AppController, AppCreateController, AppMeta, Ap
 use crate::core::StarCoreCommand;
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ApplicationSupervisorReport, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, SimpleReply, StarMessageCentral, AppPayload, ResourcePayload, ResourceManagerAction, ResourceHostAction};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ApplicationSupervisorReport, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, SimpleReply, AppPayload, ResourceManagerAction, ResourceHostAction, FromReply};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId, SpaceKey, UserKey, ResourceKey, GatheringKey};
-use crate::resource::{Labels, ResourceRegistration, Selector, ResourceAssign, ResourceRegistryCommand, ResourceRegistryResult, Registry, ResourceType, ResourceLocation, ResourceManagerKey, ResourceBinding, ResourceAddress, ResourceRegistryAction, Resource};
+use crate::resource::{Labels, ResourceRegistration, Selector, ResourceAssign, ResourceRegistryCommand, ResourceRegistryResult, Registry, ResourceType, ResourceLocation, ResourceManagerKey, ResourceBinding, ResourceAddress, ResourceRegistryAction, Resource, FieldSelection};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob, Fail};
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
 use crate::space::{CreateAppControllerFail, RemoteSpaceCommand, RemoteSpaceCommandKind, SpaceController};
 use crate::star::central::CentralStarVariant;
-use crate::star::supervisor::{SupervisorCommand, SupervisorVariant};
+use crate::star::supervisor::{SupervisorVariant};
 use crate::permissions::{Authentication, AuthToken, AuthTokenSource, Credentials};
 use tokio::sync::oneshot::Sender;
 use std::str::FromStr;
 use crate::star::space::SpaceVariant;
-use crate::frame::ResourceHostAction::ResourceSliceAssign;
+use crate::frame::ResourceHostAction::SliceAssign;
+use std::iter::FromIterator;
 
 pub mod central;
 pub mod supervisor;
@@ -67,6 +68,65 @@ pub enum StarKind
     Gateway,
     Link,
     Client
+}
+
+impl StarKind
+{
+    pub fn is_resource_manager(&self)->bool{
+        match self{
+            StarKind::Central => true,
+            StarKind::Space => true,
+            StarKind::Mesh => false,
+            StarKind::Supervisor => true,
+            StarKind::Server => false,
+            StarKind::FileStore => true,
+            StarKind::Gateway => false,
+            StarKind::Link => false,
+            StarKind::Client => false
+        }
+    }
+
+    pub fn is_resource_host(&self)->bool{
+        match self{
+            StarKind::Central => false,
+            StarKind::Space => true,
+            StarKind::Mesh => false,
+            StarKind::Supervisor => true,
+            StarKind::Server => true,
+            StarKind::FileStore => true,
+            StarKind::Gateway => false,
+            StarKind::Link => false,
+            StarKind::Client => true
+        }
+    }
+
+    pub fn manages(&self)->HashSet<ResourceType>{
+        HashSet::from_iter(match self {
+            StarKind::Central => vec![ResourceType::Space],
+            StarKind::Space => vec![ResourceType::SubSpace,ResourceType::App,ResourceType::FileSystem],
+            StarKind::Mesh => vec![],
+            StarKind::Supervisor => vec![ResourceType::Actor,ResourceType::FileSystem],
+            StarKind::Server => vec![],
+            StarKind::FileStore => vec![ResourceType::File],
+            StarKind::Gateway => vec![],
+            StarKind::Link => vec![],
+            StarKind::Client => vec![]
+        }.iter().cloned())
+    }
+
+    pub fn hosts(&self)->HashSet<ResourceType>{
+        HashSet::from_iter(match self {
+            StarKind::Central => vec![],
+            StarKind::Space => vec![ResourceType::Space,ResourceType::SubSpace],
+            StarKind::Mesh => vec![],
+            StarKind::Supervisor => vec![ResourceType::App],
+            StarKind::Server => vec![ResourceType::Actor],
+            StarKind::FileStore => vec![ResourceType::FileSystem,ResourceType::File],
+            StarKind::Gateway => vec![],
+            StarKind::Link => vec![],
+            StarKind::Client => vec![ResourceType::Actor]
+        }.iter().cloned())
+    }
 }
 
 impl FromStr for StarKind{
@@ -470,11 +530,7 @@ impl Star
        {
            let mut proto = ProtoMessage::new();
            proto.to = Option::Some(location.host.clone());
-           proto.payload = StarMessagePayload::Space(SpaceMessage{
-               user: request.payload.user,
-               sub_space: request.payload.sub_space,
-               payload: SpacePayload::Resource(ResourcePayload::Message(request.payload.message))
-           });
+           proto.payload = StarMessagePayload::ResourceHost(ResourceHostAction::Message(request.payload.message));
            self.send_proto_message(proto).await;
        }
     }
@@ -612,127 +668,11 @@ impl Star
 
     async fn on_remote_space_command(&mut self, command: RemoteSpaceCommand)
     {
+        unimplemented!();
         match command.kind
         {
-            RemoteSpaceCommandKind::AppCreateController(create) => {
-unimplemented!()
-
-                /*
-                    // send app create request to central
-                    let space_message = SpaceMessage {
-                        sub_space: create.sub_space.clone(),
-                        user: command.user.clone(),
-                        payload: SpacePayload::Resource(ResourcePayload::)
-                    };
-                 */
-/*
-
-                    let mut proto = ProtoMessage::new();
-                    proto.to( StarKey::central() );
-                    proto.payload = StarMessagePayload::ResourceManager(ResourceManagerAction::Create(create.profile.clone().into()));
-                    proto.expect = MessageExpect::ReplyErrOrTimeout(MessageExpectWait::Med);
-
-                    let result= proto.get_ok_result().await;
-                    let star_tx = self.skel.star_tx.clone();
-                    tokio::spawn( async move {
-
-                        let result = tokio::time::timeout(Duration::from_secs(30), result).await;
-                        if let Result::Ok(Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Key(ResourceKey::App(app)))))) = result
-                        {
-                            let (tx,mut rx) = mpsc::channel(1);
-                            tokio::spawn( async move {
-                                while let Option::Some(command) = rx.recv().await
-                                {
-                                    star_tx.send(StarCommand::AppCommand(command)).await;
-                                }
-                            } );
-
-                            create.tx.send(
-                                Ok(AppController{
-                                    app: app,
-                                    tx: tx
-                                }));
-                        }
-                        else {
-                            match result {
-                                Ok(result) => {
-                                    match result
-                                    {
-                                        Ok(StarMessagePayload::Reply( SimpleReply::Fail(Fail::Error(error)))) => {
-                                            eprintln!("{}",error);
-                                        }
-                                        Ok(_) => {
-                                            eprintln!("unexpected OK");
-                                        }
-                                        Err(error) => {
-                                            eprintln!("{}",error);
-                                        }
-                                    }
-                                }
-                                Err(error) => {
-                                    eprintln!("{}", error);
-                                }
-                            }
-                        }
-
-                    });
-                    self.send_proto_message(proto).await;
-
-
- */
-            }
-            RemoteSpaceCommandKind::AppSelect(app_select_command) => {
-                let mut proto = ProtoMessage::new();
-                proto.payload = StarMessagePayload::Central(StarMessageCentral::AppSelect(app_select_command.selector.clone()));
-                proto.to = Option::Some(StarKey::central());
-                let result = proto.get_ok_result().await;
-                tokio::spawn(async move {
-                    match result.await
-                    {
-                        Ok(result) => {
-                            match result
-                            {
-                                StarMessagePayload::Reply(reply) => {
-                                    match reply{
-                                        SimpleReply::Ok(reply) => {
-                                            match reply{
-                                                Reply::Keys(keys) => {
-                                                    let keys:Vec<AppKey> = keys.iter().filter(|k| match k{
-                                                        ResourceKey::App(_) => true,
-                                                        _ => false
-                                                    }).map( |k| if let ResourceKey::App(app_key)=k{
-                                                        app_key.clone()
-                                                    }else{
-                                                        panic!("already filtered all the non-app keys!")
-                                                    }).collect();
-                                                    app_select_command.tx.send(Ok(keys));
-                                                }
-                                                _ => {
-                                                    app_select_command.tx.send(Err(Fail::Unexpected));
-                                                }
-                                            }
-                                        }
-                                        SimpleReply::Fail(fail) => {
-                                            app_select_command.tx.send(Err(fail));
-                                        }
-                                        _ => {
-
-                                            app_select_command.tx.send(Err(Fail::Unexpected));
-                                        }
-                                    }
-                                }
-                                _ => {
-                                    app_select_command.tx.send(Err(Fail::Unexpected));
-                                }
-                            }
-                        }
-                        Err(err) => {
-                            app_select_command.tx.send(Err(Fail::Unexpected));
-                        }
-                    }
-                } );
-                self.send_proto_message(proto).await;
-            }
+            RemoteSpaceCommandKind::AppCreateController(_) => {}
+            RemoteSpaceCommandKind::AppSelect(_) => {}
         }
     }
 
@@ -1452,10 +1392,103 @@ unimplemented!()
         }
         else {
             self.process_message_reply(&message).await;
-            Ok(self.skel.variant_tx.send( StarVariantCommand::StarMessage( message)).await?)
+            self.skel.variant_tx.send( StarVariantCommand::StarMessage( message.clone())).await?;
+            self.process_message(message).await?;
+            Ok(())
         }
     }
 
+
+    async fn process_message(&mut self, mut message: StarMessage) -> Result<(),Error> {
+        match &message.payload{
+            StarMessagePayload::ResourceManager(action) => self.process_resource_manager_action(message.clone(),action.clone()).await?,
+            StarMessagePayload::ResourceHost(action) => self.process_resource_host_action(message.clone(),action.clone()).await?,
+            _ => {}
+        };
+        Ok(())
+    }
+
+
+    async fn process_resource_manager_action( &self, message: StarMessage, action: ResourceManagerAction ) -> Result<(),Error>
+    {
+        if let Option::Some(manager) = self.skel.resource_manager.clone()
+        {
+            match action {
+                ResourceManagerAction::Register(registration) => {
+                    let result = manager.register(registration.clone()).await;
+                    self.skel.comm().reply_result_empty(message.clone(), result);
+                }
+                ResourceManagerAction::Location(location) => {
+                    let result = manager.set_location(location.clone()).await;
+                    self.skel.comm().reply_result_empty(message.clone(), result);
+                }
+                ResourceManagerAction::Find(find) => {
+                    let result = manager.find(find.to_owned()).await;
+                    self.skel.comm().reply_result(message.clone(), result);
+                }
+                ResourceManagerAction::GetKey(address) => {
+                    let result = manager.get_key(address.clone()).await;
+                    self.skel.comm().reply_result(message.clone(), result);
+                }
+                ResourceManagerAction::Bind(bind) => {
+                    let result = manager.bind(bind.clone()).await;
+                    self.skel.comm().reply_result_empty(message.clone(), result);
+                }
+                ResourceManagerAction::Status(report) => {
+                    unimplemented!()
+                }
+                ResourceManagerAction::SliceStatus(report) => {
+                    unimplemented!()
+                }
+                ResourceManagerAction::Create(_) => {
+                    unimplemented!()
+                }
+                ResourceManagerAction::Select(selector) => {
+                    let mut selector = selector.clone();
+                    let result = manager.select(selector).await;
+                    self.skel.comm().reply_result(message, Reply::from_result(result)).await;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn process_resource_host_action( &self, message: StarMessage, action: ResourceHostAction) -> Result<(),Error>
+    {
+        match action {
+            ResourceHostAction::IsHosting(resource) => {
+                let (request,rx) = Request::new(resource.clone());
+                self.skel.core_tx.send(StarCoreCommand::HasResource(request)).await?;
+                let skel = self.skel.clone();
+                tokio::spawn( async move {
+                    if let Result::Ok(Result::Ok(local)) = rx.await{
+                        let location = ResourceLocation{
+                            key: local.resource,
+                            host: skel.info.star.clone(),
+                            gathering: local.gathering
+                        };
+                        skel.comm().simple_reply(message,SimpleReply::Ok(Reply::Location(location))).await;
+                    }
+                    else {
+                        skel.comm().simple_reply(message,SimpleReply::Fail(Fail::ResourceNotFound(resource))).await;
+                    }
+                });
+            }
+            ResourceHostAction::Assign(assign) => {
+                unimplemented!()
+            }
+            ResourceHostAction::SliceAssign(assign) => {
+
+                unimplemented!()
+            }
+            ResourceHostAction::Message(_) => {
+                unimplemented!()
+            }
+
+        }
+        Ok(())
+    }
 
 
 
@@ -1585,9 +1618,6 @@ pub enum StarVariantCommand
     CoreRequest(CoreRequest),
     StarMessage(StarMessage),
     CentralCommand(CentralCommand),
-    SupervisorCommand(SupervisorCommand),
-    ServerCommand(ServerCommand),
-    ResourceCommand(ResourceCommand),
 }
 
 pub enum CoreRequest
@@ -1604,9 +1634,7 @@ pub struct CoreAppSequenceRequest
 
 pub enum CentralCommand
 {
-  SequenceRequest,
-  SupervisorSelect(SupervisorSelect),
-  SerSupervisorForApp(SetSupervisorForApp)
+  SequenceRequest
 }
 
 pub struct SetSupervisorForApp
@@ -1626,20 +1654,11 @@ impl SetSupervisorForApp
     }
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct SupervisorSelect
-{
- //right now supervisors are selected at random
-}
+
 
 pub enum ServerCommand
 {
     PledgeToSupervisor
-}
-
-pub enum ResourceCommand {
-    Register(Request<ResourceRegistration,()>),
-    SignalLocation(LocalResourceLocation),
 }
 
 pub struct LocalResourceLocation
@@ -1748,12 +1767,9 @@ impl fmt::Display for StarVariantCommand {
         let r = match self {
             StarVariantCommand::StarMessage(message) => format!("StarMessage({})", message.payload ).to_string(),
             StarVariantCommand::CentralCommand(_) => "CentralCommand".to_string(),
-            StarVariantCommand::SupervisorCommand(_) => "SupervisorCommand".to_string(),
-            StarVariantCommand::ServerCommand(_) => "ServerCommand".to_string(),
             StarVariantCommand::Init => "Init".to_string(),
             StarVariantCommand::StarSkel(_) => "StarSkel".to_string(),
             StarVariantCommand::CoreRequest(_) => "CoreRequest".to_string(),
-            StarVariantCommand::ResourceCommand(_) => "ResourceCommand".to_string()
         };
         write!(f, "{}",r)
     }
@@ -2424,7 +2440,8 @@ pub struct StarSkel
     pub flags: Flags,
     pub logger: Logger,
     pub sequence: Arc<AtomicU64>,
-    pub auth_token_source: AuthTokenSource
+    pub auth_token_source: AuthTokenSource,
+    pub resource_manager: Option<Arc<dyn ResourceRegistryBacking>>
 }
 
 impl StarSkel
@@ -2820,8 +2837,8 @@ impl StarComm
 }
 
 #[async_trait]
-pub trait RegistryBacking : Sync+Send {
-    async fn accept(&self, accept: HashSet<ResourceType> )->Result<(),Fail>;
+pub trait ResourceRegistryBacking: Sync+Send {
+    async fn accepts(&self, accept: HashSet<ResourceType> ) ->Result<(),Fail>;
     async fn register(&self, registration: ResourceRegistration)->Result<(),Fail>;
     async fn select(&self, select: Selector)->Result<Vec<Resource>,Fail>;
     async fn set_location(&self, location: ResourceLocation)->Result<(),Fail>;
@@ -2831,27 +2848,31 @@ pub trait RegistryBacking : Sync+Send {
     async fn get_key(&self, address: ResourceAddress)->Result<Reply,Fail>;
 }
 
-pub struct RegistryBackingSqlLite
+pub struct ResourceRegistryBackingSqLite
 {
     registry: mpsc::Sender<ResourceRegistryAction>
 }
 
-impl RegistryBackingSqlLite
+impl ResourceRegistryBackingSqLite
 {
-    pub async fn new()->Self
+    pub async fn new(accepts: HashSet<ResourceType>) ->Result<Self,Error>
     {
-        RegistryBackingSqlLite
+        let rtn = ResourceRegistryBackingSqLite
         {
             registry: Registry::new().await
-        }
+        };
+
+        rtn.accepts(accepts).await?;
+
+        Ok(rtn)
     }
 }
 
 #[async_trait]
-impl RegistryBacking for RegistryBackingSqlLite
+impl ResourceRegistryBacking for ResourceRegistryBackingSqLite
 {
-    async fn accept(&self, accept: HashSet<ResourceType>) -> Result<(), Fail> {
-        let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Accept(accept));
+    async fn accepts(&self, accepts: HashSet<ResourceType>) -> Result<(), Fail> {
+        let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Accepts(accepts));
         self.registry.send( request ).await?;
         tokio::time::timeout( Duration::from_secs(5),rx).await??;
         Ok(())
@@ -2932,52 +2953,3 @@ impl RegistryBacking for RegistryBackingSqlLite
     }
 }
 
-pub struct ResourceManager
-{
-    pub skel: StarSkel,
-    pub registry: Arc<dyn RegistryBacking>
-}
-
-impl ResourceManager
-{
-    pub async fn handle( &self, message: StarMessage, action: ResourceManagerAction ) -> Result<(),Error>
-    {
-        match action {
-
-            ResourceManagerAction::Register(registration) => {
-                let result = self.registry.register(registration.clone()).await;
-                self.skel.comm().reply_result_empty(message.clone(), result );
-            }
-            ResourceManagerAction::Location(location) => {
-                let result = self.registry.set_location(location.clone()).await;
-                self.skel.comm().reply_result_empty(message.clone(), result );
-            }
-            ResourceManagerAction::Find(find) => {
-                let result = self.registry.find(find.to_owned() ).await;
-                self.skel.comm().reply_result(message.clone(), result );
-            }
-            ResourceManagerAction::GetKey(address) => {
-                let result = self.registry.get_key(address.clone() ).await;
-                self.skel.comm().reply_result(message.clone(), result );
-            }
-            ResourceManagerAction::Bind(bind) => {
-                let result = self.registry.bind(bind.clone() ).await;
-                self.skel.comm().reply_result_empty(message.clone(), result );
-            }
-            ResourceManagerAction::Status(report) => {
-                unimplemented!()
-            }
-            ResourceManagerAction::SliceStatus(report) => {
-
-                unimplemented!()
-            }
-            ResourceManagerAction::Create(_) => {
-                unimplemented!()
-            }
-        }
-
-
-
-        Ok(())
-    }
-}

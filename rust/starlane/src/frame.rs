@@ -348,8 +348,6 @@ impl StarMessage
 pub enum StarMessagePayload
 {
    None,
-   Central(StarMessageCentral),
-   Supervisor(StarMessageSupervisor),
    ResourceManager(ResourceManagerAction),
    ResourceHost(ResourceHostAction),
    Space(SpaceMessage),
@@ -359,9 +357,10 @@ pub enum StarMessagePayload
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ResourceHostAction
 {
-    HasResource(ResourceKey),
-    ResourceAssign(ResourceAssign),
-    ResourceSliceAssign(ResourceSliceAssign)
+    IsHosting(ResourceKey),
+    Assign(ResourceAssign),
+    SliceAssign(ResourceSliceAssign),
+    Message(ResourceMessage)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -374,7 +373,8 @@ pub enum ResourceManagerAction
     Bind(ResourceBinding),
     Status(ResourceStatusReport),
     SliceStatus(ResourceSliceStatusReport),
-    Create(ResourceCreate)
+    Create(ResourceCreate),
+    Select(Selector),
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -389,19 +389,8 @@ pub struct ResourceSliceStatusReport {
     pub status: ResourceSliceStatus
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub enum StarMessageCentral
-{
-    Pledge(StarKind),
-    AppSelect(Selector)
-}
 
-#[derive(Clone,Serialize,Deserialize)]
-pub enum StarMessageSupervisor
-{
-    Pledge(StarKind),
-    Register(ResourceRegistration)
-}
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum SimpleReply
@@ -488,17 +477,7 @@ pub enum SpacePayload
     Reply(SpaceReply),
     Server(ServerPayload),
     Supervisor(SupervisorPayload),
-    Resource(ResourcePayload)
 }
-
-#[derive(Clone,Serialize,Deserialize)]
-pub enum ResourcePayload
-{
-    Select(Selector),
-    Message(ResourceMessage)
-}
-
-
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum SupervisorPayload
@@ -708,9 +687,7 @@ impl fmt::Display for StarMessagePayload{
         let r = match self {
             StarMessagePayload::None => "None".to_string(),
             StarMessagePayload::Space(_) => "Space".to_string(),
-            StarMessagePayload::Central(_) => "Central".to_string(),
             StarMessagePayload::Reply(_) => "Reply".to_string(),
-            StarMessagePayload::Supervisor(_) => "Supervisor".to_string(),
             StarMessagePayload::ResourceManager(_) => "Resource".to_string(),
             StarMessagePayload::ResourceHost(_) => "ResourceHost".to_string()
         };

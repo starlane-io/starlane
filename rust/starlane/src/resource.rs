@@ -351,7 +351,7 @@ pub enum ResourceRegistryCommand
 {
     Close,
     Clear,
-    Accept(HashSet<ResourceType>),
+    Accepts(HashSet<ResourceType>),
     Register(ResourceRegistration),
     Select(Selector),
     SetLocation(ResourceLocation),
@@ -460,7 +460,7 @@ eprintln!("error setting up db: {}", err );
 
                 Ok(ResourceRegistryResult::Ok)
             }
-            ResourceRegistryCommand::Accept(accept)=> {
+            ResourceRegistryCommand::Accepts(accept)=> {
                 self.accepted= Option::Some(accept);
                 Ok(ResourceRegistryResult::Ok)
             }

@@ -1,4 +1,4 @@
-use crate::star::{StarSkel, RegistryBacking, StarVariant, StarVariantCommand, Request, StarCommand};
+use crate::star::{StarSkel, ResourceRegistryBacking, StarVariant, StarVariantCommand, Request, StarCommand};
 use std::sync::Arc;
 use crate::star::pledge::StarHandleBacking;
 use crate::frame::{ResourceManagerAction, StarMessage, StarMessagePayload, SimpleReply, Reply, ResourceHostAction};
@@ -8,7 +8,7 @@ use crate::resource::ResourceLocation;
 pub struct CommonVariant
 {
     pub skel: StarSkel,
-    registry: Arc<dyn RegistryBacking>,
+    registry: Arc<dyn ResourceRegistryBacking>,
     star_handles: Arc<StarHandleBacking>
 }
 

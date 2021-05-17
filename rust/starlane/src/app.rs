@@ -20,7 +20,7 @@ use crate::keys::{AppKey, SubSpaceKey, UserKey, ResourceKey};
 use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceLocation, ResourceArchetype, ResourceProfile, ResourceAddress, Names, ResourceSrc, Skewer, ResourceAddressPart, ResourceType, Resource, ResourceCreate};
 use crate::names::Name;
 use crate::space::CreateAppControllerFail;
-use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarSkel, StarVariantCommand, StarComm, ServerCommand, Request, Empty, Query, LocalResourceLocation, ResourceCommand};
+use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarSkel, StarVariantCommand, StarComm, ServerCommand, Request, Empty, Query, LocalResourceLocation };
 use crate::message::{Fail, ProtoMessage};
 use tokio::sync::mpsc::Sender;
 use tokio::time::error::Elapsed;
@@ -186,7 +186,8 @@ impl AppSlice
             AppSliceCommand::AddActor(actor) => {
                 self.actors.insert(actor.clone(),ActorStatus::Unknown );
                 let local = LocalResourceLocation::new(ResourceKey::Actor(actor), Option::None );
-                self.comm.variant_tx.send(StarVariantCommand::ResourceCommand(ResourceCommand::SignalLocation(local))).await;
+//                self.comm.variant_tx.send(StarVariantCommand::ResourceCommand(ResourceCommand::SignalLocation(local))).await;
+unimplemented!();
                 Ok(())
             }
             AppSliceCommand::HasActor(request) => {
@@ -657,7 +658,8 @@ impl AppContext
                         resource: ResourceKey::Actor(actor),
                         gathering: Option::None
                     };
-                    variant_tx.send( StarVariantCommand::ResourceCommand(ResourceCommand::SignalLocation(local_location))).await;
+unimplemented!();
+//                    variant_tx.send( StarVariantCommand::ResourceCommand(ResourceCommand::SignalLocation(local_location))).await;
                 }
             } );
             Ok(actor_key_seq)
@@ -730,11 +732,15 @@ impl AppContext
 
     pub async fn register(&mut self, registration: ActorRegistration ) -> Result<(),Fail>
     {
+        unimplemented!();
+        /*
         let registration: ResourceRegistration = registration.into();
         let (request,rx) = Request::new(registration);
         self.comm.variant_tx.send( StarVariantCommand::ResourceCommand(ResourceCommand::Register(request))).await;
         rx.await?;
         Ok(())
+
+         */
     }
 }
 
