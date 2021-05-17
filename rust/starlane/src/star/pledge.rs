@@ -141,6 +141,7 @@ pub enum StarHandleResult
    Satisfaction(Satisfaction)
 }
 
+#[derive(Eq,PartialEq,Debug)]
 pub enum Satisfaction {
     Ok,
     Lacking(HashSet<StarKind>)

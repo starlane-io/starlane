@@ -67,7 +67,7 @@ impl ProtoStar
             tracker: ProtoTracker::new(),
             flags: flags
         }, StarController{
-            command_tx: command_tx
+            star_tx: command_tx
         })
     }
 

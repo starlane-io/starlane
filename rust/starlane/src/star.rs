@@ -1899,7 +1899,7 @@ impl fmt::Display for StarCommand{
 #[derive(Clone)]
 pub struct StarController
 {
-    pub command_tx: mpsc::Sender<StarCommand>
+    pub star_tx: mpsc::Sender<StarCommand>
 }
 
 impl StarController
@@ -1913,7 +1913,7 @@ impl StarController
            tx: tx
        };
 
-       self.command_tx.send( StarCommand::SetFlags(set_flags) ).await;
+       self.star_tx.send( StarCommand::SetFlags(set_flags) ).await;
        rx
    }
 
@@ -1927,7 +1927,7 @@ impl StarController
            tx: tx
        };
 
-       self.command_tx.send( StarCommand::GetSpaceController(get) ).await;
+       self.star_tx.send( StarCommand::GetSpaceController(get) ).await;
 
        match rx.await
        {
@@ -1936,6 +1936,12 @@ impl StarController
                Err(GetSpaceControllerFail::Error(error.into()))
            }
        }
+   }
+
+   pub async fn diagnose_handlers_satisfaction(&self ) -> Result<Satisfaction,Error>{
+       let( yesno, rx ) = YesNo::new();
+       self.star_tx.send( StarCommand::Diagnose(Diagnose::HandlersSatisfied(yesno))).await;
+       Ok(tokio::time::timeout( Duration::from_secs(5), rx).await??)
    }
 }
 

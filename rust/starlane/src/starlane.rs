@@ -134,7 +134,7 @@ impl Starlane
                     }
                 ));
 
-                evolve_tx.send( ProtoStarEvolution{ star: star.star_key().clone(), controller: StarController { command_tx: star.star_tx() } });
+                evolve_tx.send( ProtoStarEvolution{ star: star.star_key().clone(), controller: StarController { star_tx: star.star_tx() } });
                 
                 star.run().await;
             }
@@ -228,7 +228,7 @@ impl Starlane
                     evolve_tx.send( ProtoStarEvolution{
                         star: key,
                         controller: StarController{
-                            command_tx: star_tx
+                            star_tx: star_tx
                         }
                     });
                     println!("created star: {:?} key: {}", &star_template.kind, star_key);
@@ -257,7 +257,7 @@ impl Starlane
         {
             if let Option::Some(star_ctrl) = self.star_controllers.get_mut(&star_template.key.create(&data)? )
             {
-                star_ctrl.command_tx.send(StarCommand::ConstellationConstructionComplete).await;
+                star_ctrl.star_tx.send(StarCommand::ConstellationConstructionComplete).await;
             }
         }
 
@@ -269,7 +269,7 @@ impl Starlane
         {
             if let Ok(evolve) = evolve
             {
-                evolve.controller.command_tx.send(StarCommand::Init).await;
+                evolve.controller.star_tx.send(StarCommand::Init).await;
                 self.star_controllers.insert(evolve.star, evolve.controller);
             }
             else if let Err(error) = evolve
@@ -317,9 +317,9 @@ impl Starlane
         let high_lane= Lane::new(low).await;
         let low_lane = Lane::new(high).await;
         let connector = LocalTunnelConnector::new(&high_lane,&low_lane).await?;
-        high_star_ctrl.command_tx.send(StarCommand::AddLane(high_lane)).await?;
-        low_star_ctrl.command_tx.send(StarCommand::AddLane(low_lane)).await?;
-        high_star_ctrl.command_tx.send( StarCommand::AddConnectorController(connector)).await?;
+        high_star_ctrl.star_tx.send(StarCommand::AddLane(high_lane)).await?;
+        low_star_ctrl.star_tx.send(StarCommand::AddLane(low_lane)).await?;
+        high_star_ctrl.star_tx.send( StarCommand::AddConnectorController(connector)).await?;
 
         Ok(())
     }
@@ -470,100 +470,14 @@ mod test
                 }
             }
 
-            let mesh_ctrl = {
-                let (request,rx) = StarControlRequestByName::new("standalone".to_owned(), "mesh".to_owned());
+            let central_ctrl = {
+                let (request,rx) = StarControlRequestByName::new("standalone".to_owned(), "central".to_owned());
                 tx.send(StarlaneCommand::StarControlRequestByName(request)).await;
                 timeout(Duration::from_millis(10), rx).await.unwrap().unwrap()
-           };
+            };
 
 
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            assert_eq!(agg.count( |log| match log{
-                Log::Star(star_log) => {
-                    if let StarKind::ActorHost = star_log.kind
-                    {
-                        match star_log.payload
-                        {
-                            StarLogPayload::PledgeOkRecv => true,
-                            _ => false
-                        }
-                    }
-                    else
-                    {
-                        false
-                    }
-                }
-                _ => false
-            } ),1);
-
-            assert_eq!(agg.count( |log| match log{
-                Log::Star(star_log) => {
-                    if let StarKind::AppHost = star_log.kind
-                    {
-                        match star_log.payload
-                        {
-                            StarLogPayload::PledgeOkRecv => true,
-                            _ => false
-                        }
-                    }
-                    else
-                    {
-                        false
-                    }
-                }
-                _ => false
-            } ),1);
-
-
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            if let Ok(space_ctrl) = mesh_ctrl.get_space_controller(&SpaceKey::HyperSpace, &Authentication::mock(UserKey::hyper_user() ) ).await
-            {
-
-                let app_ctrl_result = space_ctrl.create_app(&AppKind::Normal, &crate::names::TEST_APP_SPEC.clone(), &ConfigSrc::Artifact(crate::names::TEST_APP_CONFIG_ARTIFACT.clone()), &InitData::None, &SubSpaceKey::hyper_default(), Option::Some("MyApp".to_string()), &Labels::new() ).await;
-                let app_ctrl_result = app_ctrl_result.await;
-                let app_ctrl = app_ctrl_result.unwrap();
-                match app_ctrl
-                {
-                    Ok(app_ctrl) => {
-
-                        println!("got app_ctrl!")
-                    }
-                    Err(fail) => {
-                        match fail
-                        {
-                            CreateAppControllerFail::PermissionDenied => {
-                                panic!("AppController: PermissionDenied")
-                            }
-                            CreateAppControllerFail::SpacesDoNotMatch => {
-                                panic!("AppController: SpacesDoNotMatch")
-                            }
-                            CreateAppControllerFail::UnexpectedResponse => {
-                                panic!("AppController: UnexpectedResponse")
-                            }
-                            CreateAppControllerFail::Timeout => {
-                                panic!("AppController: Timeout")
-                            }
-                            CreateAppControllerFail::Error(error) => {
-                                panic!("{}",error)
-                            }
-                        }
-                    }
-                }
-
-                tokio::time::sleep(Duration::from_secs(15)).await;
-
-            }
-
-
-
-            /*
-            tokio::time::sleep(Duration::from_secs(10)).await;
-
-            println!("sending Destroy command.");
-            tx.send(StarlaneCommand::Destroy ).await;
-
-            handle.await;
-             */
+            assert_eq!(central_ctrl.diagnose_handlers_satisfaction().await.unwrap(),crate::star::pledge::Satisfaction::Ok)
 
         });
 
