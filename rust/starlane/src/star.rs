@@ -29,7 +29,7 @@ use crate::app::{AppCommandKind, AppController, AppCreateController, AppMeta, Ap
 use crate::core::StarCoreCommand;
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ApplicationSupervisorReport, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, CentralPayload, SimpleReply, StarMessageCentral, AppPayload, ResourcePayload, ResourceManagerAction, ResourceHostAction};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ApplicationSupervisorReport, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, SimpleReply, StarMessageCentral, AppPayload, ResourcePayload, ResourceManagerAction, ResourceHostAction};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId, SpaceKey, UserKey, ResourceKey, GatheringKey};
@@ -389,7 +389,7 @@ impl Star
                         get.tx.send(Ok(ctrl) );
                     }
                     StarCommand::SpaceCommand(command)=>{
-                        self.on_space_command(command).await;
+                        self.on_remote_space_command(command).await;
                     }
 
                     StarCommand::AddLogger(tx) => {
@@ -610,11 +610,12 @@ impl Star
         }
     }
 
-    async fn on_space_command(&mut self, command: RemoteSpaceCommand)
+    async fn on_remote_space_command(&mut self, command: RemoteSpaceCommand)
     {
         match command.kind
         {
             RemoteSpaceCommandKind::AppCreateController(create) => {
+unimplemented!()
 
                 /*
                     // send app create request to central
@@ -624,6 +625,7 @@ impl Star
                         payload: SpacePayload::Resource(ResourcePayload::)
                     };
                  */
+/*
 
                     let mut proto = ProtoMessage::new();
                     proto.to( StarKey::central() );
@@ -676,6 +678,8 @@ impl Star
                     });
                     self.send_proto_message(proto).await;
 
+
+ */
             }
             RemoteSpaceCommandKind::AppSelect(app_select_command) => {
                 let mut proto = ProtoMessage::new();
@@ -2928,21 +2932,49 @@ impl RegistryBacking for RegistryBackingSqlLite
     }
 }
 
-pub struct StarVariantCommon
+pub struct ResourceManager
 {
-    pub skel: StarSkel
+    pub skel: StarSkel,
+    pub registry: Arc<dyn RegistryBacking>
 }
 
-impl StarVariantCommon
+impl ResourceManager
 {
-    pub async fn handle( command: StarVariantCommand) -> Result<(),Error>
+    pub async fn handle( &self, message: StarMessage, action: ResourceManagerAction ) -> Result<(),Error>
     {
-        match command {
-            StarVariantCommand::ResourceCommand(resource_command) => {
+        match action {
+
+            ResourceManagerAction::Register(registration) => {
+                let result = self.registry.register(registration.clone()).await;
+                self.skel.comm().reply_result_empty(message.clone(), result );
+            }
+            ResourceManagerAction::Location(location) => {
+                let result = self.registry.set_location(location.clone()).await;
+                self.skel.comm().reply_result_empty(message.clone(), result );
+            }
+            ResourceManagerAction::Find(find) => {
+                let result = self.registry.find(find.to_owned() ).await;
+                self.skel.comm().reply_result(message.clone(), result );
+            }
+            ResourceManagerAction::GetKey(address) => {
+                let result = self.registry.get_key(address.clone() ).await;
+                self.skel.comm().reply_result(message.clone(), result );
+            }
+            ResourceManagerAction::Bind(bind) => {
+                let result = self.registry.bind(bind.clone() ).await;
+                self.skel.comm().reply_result_empty(message.clone(), result );
+            }
+            ResourceManagerAction::Status(report) => {
+//                let result = self.registry.set_status(report.clone() ).await;
+//                self.skel.comm().reply_result_empty(message.clone(), result );
+            }
+            ResourceManagerAction::SliceStatus(report) => {
 
             }
-            _ => {}
         }
+
+
+
         Ok(())
     }
 }

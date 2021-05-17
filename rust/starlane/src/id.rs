@@ -19,7 +19,7 @@ impl Id {
 
 impl fmt::Display for Id{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({},{})",&self.sequence.clone() ,&self.index )
+        write!(f, "{}-{}",&self.sequence.clone() ,&self.index )
     }
 }
 

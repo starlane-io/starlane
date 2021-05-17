@@ -25,6 +25,7 @@ use crate::core::server::{ServerStarCore, ServerStarCoreExt, ExampleServerStarCo
 use std::marker::PhantomData;
 use crate::keys::{AppKey, ResourceKey};
 use crate::artifact::{Artifact, ArtifactKey};
+use crate::resource::{Resource, ResourceProfile, ResourceSrc, ResourceAssign, ResourceSliceAssign};
 
 pub mod server;
 pub mod filestore;
@@ -47,8 +48,9 @@ pub struct StarCoreAppCommand
 pub enum StarCoreAppCommandPayload
 {
     None,
-    Assign(Request<AppMeta,()>),
-    Launch(Request<App,()>)
+    Assign(Request<ResourceAssign,()>),
+    AssignSlice(Request<ResourceSliceAssign,()>),
+    InitSlice(Request<ResourceProfile,()>)
 }
 
 pub enum AppLaunchError

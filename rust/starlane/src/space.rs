@@ -48,6 +48,8 @@ impl SpaceController
 
    pub async fn create_app(&self, kind: &AppKind, specific: &AppSpecific, config: &ConfigSrc, init: &InitData, sub_space: &SubSpaceKey, name: Option<String>, labels: &Labels ) -> oneshot::Receiver<Result<AppController,CreateAppControllerFail>>
    {
+       unimplemented!()
+       /*
        let (tx,rx) = oneshot::channel();
 
        let profile = AppProfile{
@@ -75,6 +77,7 @@ impl SpaceController
        self.tx.send( command ).await;
 
        rx
+        */
    }
 
    pub async fn select_apps(&self, selector: Selector, sub_space: SubSpaceKey ) -> oneshot::Receiver<Result<Vec<AppKey>,Fail>>

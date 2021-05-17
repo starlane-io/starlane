@@ -10,7 +10,6 @@ use crate::artifact::Artifact;
 use crate::core::{AppCommandResult, AppLaunchError, StarCore, StarCoreAppCommandPayload, StarCoreCommand, StarCoreExt, StarCoreExtKind};
 use crate::error::Error;
 use crate::frame::{ServerAppPayload, SpaceMessage, SpacePayload, StarMessagePayload, Watch};
-use crate::frame::ServerPayload::AppLaunch;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, SubSpaceKey, UserKey, ResourceKey};
 use crate::resource::{Labels, ResourceRegistration};
@@ -66,13 +65,15 @@ impl StarCore for ServerStarCore
                 StarCoreCommand::Watch(_) => {}
 
                 StarCoreCommand::AppCommand(star_core_app_command) => {
+                    unimplemented!()
+/*
                     if let Option::Some(supervisor) = &self.supervisor
                     {
                         let app= star_core_app_command.app.clone();
                         match star_core_app_command.payload
                         {
                             StarCoreAppCommandPayload::Assign(assign ) => {
-                                match self.ext.app_ext(&assign.payload.specific)
+                                match self.ext.app_ext(&assign.payload.archetype().specific)
                                 {
                                     Ok(app_ext) => {
                                         let app_slice = AppSlice::new(assign.payload, self.skel.comm(), app_ext ).await;
@@ -84,7 +85,7 @@ impl StarCore for ServerStarCore
                                     }
                                 }
                             }
-                            StarCoreAppCommandPayload::Launch(launch) => {
+                            StarCoreAppCommandPayload::InitSlice(launch) => {
                                 if let Option::Some(app) = self.apps.get_mut(&launch.payload.key )
                                 {
                                     let (request,rx) = Request::new(launch.payload.archetype);
@@ -97,8 +98,11 @@ impl StarCore for ServerStarCore
                                 }
                             }
                             StarCoreAppCommandPayload::None => {}
+                            StarCoreAppCommandPayload::AssignSlice(_) => {}
                         }
                     }
+
+ */
                 }
                 StarCoreCommand::HasResource(request) => {
                     let resource = request.payload.clone();

@@ -18,7 +18,7 @@ use crate::logger::Flags;
 use crate::message::{Fail, MessageExpect, MessageResult, MessageUpdate, ProtoMessage};
 use crate::names::Name;
 use crate::permissions::{Authentication, AuthToken};
-use crate::resource::{Labels, ResourceAssign, ResourceRegistration, Selector, ResourceLocation, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus, ResourceProfile, Resource};
+use crate::resource::{Labels, ResourceAssign, ResourceRegistration, Selector, ResourceLocation, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus, ResourceProfile, Resource, ResourceCreate};
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey, StarWatchInfo};
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -367,14 +367,26 @@ pub enum ResourceHostAction
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ResourceManagerAction
 {
-    Create(ResourceProfile),
     Register(ResourceRegistration),
     Location(ResourceLocation),
     Find(ResourceKey),
     GetKey(ResourceAddress),
     Bind(ResourceBinding),
-    Status(ResourceStatus),
-    SliceStatus(ResourceSliceStatus)
+    Status(ResourceStatusReport),
+    SliceStatus(ResourceSliceStatusReport),
+    Create(ResourceCreate)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceStatusReport {
+    pub key: ResourceKey,
+    pub status: ResourceStatus
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceSliceStatusReport {
+    pub key: ResourceKey,
+    pub status: ResourceSliceStatus
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -473,9 +485,7 @@ impl SpaceMessage
 #[derive(Clone,Serialize,Deserialize)]
 pub enum SpacePayload
 {
-    App(AppPayload),
     Reply(SpaceReply),
-    Central(CentralPayload),
     Server(ServerPayload),
     Supervisor(SupervisorPayload),
     Resource(ResourcePayload)
@@ -488,36 +498,24 @@ pub enum ResourcePayload
     Message(ResourceMessage)
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub enum CentralPayload
-{
-    AppCreate(AppArchetype),
-}
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum SupervisorPayload
 {
-    AppCreate(AppArchetype),
     AppSequenceRequest(AppKey),
-    Register(ResourceRegistration),
-    Select(Selector),
-    ActorUnRegister(ResourceKey),
-    ActorStatus(ActorStatus),
 }
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ServerPayload
 {
-    AppAssign(AppMeta),
-    AppLaunch(App),
     SequenceResponse(u64)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum SpaceReply
 {
-   AppLocation(AppLocation),
-   AppSequenceResponse(u64),
+   AppSequenceResponse(u64)
 }
 
 #[derive(Clone,Serialize,Deserialize)]

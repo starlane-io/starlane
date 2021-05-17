@@ -15,7 +15,7 @@ use crate::id::Id;
 use crate::message::Fail;
 use crate::names::Name;
 use crate::permissions::{Priviledges, User, UserKind};
-use crate::resource::{Labels, ResourceAssign, ResourceType, ResourceManagerKey, Resource, ResourceArchetype, ResourceKind};
+use crate::resource::{Labels, ResourceAssign, ResourceType, ResourceManagerKey, Resource, ResourceArchetype, ResourceKind, ResourceAddressPart, Skewer};
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum SpaceKey
@@ -174,9 +174,9 @@ impl UserId
 impl fmt::Display for UserId{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!( f,"{}",match self{
-            UserId::Super => "Super".to_string(),
-            UserId::Annonymous => "Annonymous".to_string(),
-            UserId::Uuid(uuid) => uuid.to_string()
+            UserId::Super => "super".to_string(),
+            UserId::Annonymous => "annonymous".to_string(),
+            UserId::Uuid(uuid) => uuid.to_string().to_lowercase()
         })
     }
 
@@ -253,6 +253,13 @@ pub struct AppKey
     pub id: AppId
 }
 
+impl AppKey {
+    pub fn address_part(&self) -> Result<ResourceAddressPart,Error>{
+        Ok(ResourceAddressPart::Skewer(Skewer::new(self.id.to_string().as_str() )?))
+    }
+}
+
+
 
 impl AppKey
 {
@@ -277,6 +284,18 @@ pub enum AppId
     Uuid(Uuid)
 }
 
+impl AppId {
+    pub fn encode(&self) -> Result<String, Error> {
+        Ok(base64::encode(self.to_string().as_bytes().to_vec())?)
+    }
+
+    pub fn decode(string: String) -> Result<Self, Error> {
+        Ok(AppId::from_str(String::from_utf8(base64::decode(string)?)?.as_str())?)
+    }
+}
+
+
+
 impl AppId
 {
     pub fn new()->Self
@@ -300,18 +319,34 @@ impl AppKey
 
 impl fmt::Display for AppKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({},{})", self.sub_space, self.id)
+        write!(f, "({},{})", self.sub_space, self.id.to_string())
     }
 }
 
-impl fmt::Display for AppId{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let fmt = match self
+
+
+impl FromStr for AppId{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s{
+            "hyper-app" => {
+                    Ok(AppId::HyperApp)
+                }
+            _ => Ok(AppId::Uuid(Uuid::from_str(s)?))
+        }
+    }
+}
+
+
+impl ToString for AppId{
+
+    fn to_string(&self) -> String {
+        match self
         {
-            AppId::HyperApp => "HyperApp".to_string(),
-            AppId::Uuid(uuid) => uuid.to_string()
-        };
-        write!(f, "{}", fmt )
+            AppId::HyperApp => "hyper-app".to_string(),
+            AppId::Uuid(uuid) => uuid.to_string().to_lowercase()
+        }
     }
 }
 
@@ -339,11 +374,33 @@ pub enum ResourceKey
     User(UserKey),
     Artifact(ArtifactKey),
     File(FileKey),
-    Filesystem(FileSystemKey),
+    FileSystem(FileSystemKey),
 }
 
 impl ResourceKey
 {
+
+    pub fn parent(&self)->Option<ResourceKey>{
+        match self {
+            ResourceKey::Space(_) => Option::None,
+            ResourceKey::SubSpace(sub_space) => Option::Some(ResourceKey::Space(sub_space.space.clone())),
+            ResourceKey::App(app) =>  Option::Some(ResourceKey::SubSpace(app.sub_space.clone())),
+            ResourceKey::Actor(actor) =>  Option::Some(ResourceKey::App(actor.app.clone())),
+            ResourceKey::User(user) => Option::Some(ResourceKey::Space(user.space.clone())),
+            ResourceKey::Artifact(artifact) => Option::Some(ResourceKey::SubSpace(artifact.sub_space.clone())),
+            ResourceKey::File(file) => Option::Some(ResourceKey::FileSystem(file.filesystem.clone())),
+            ResourceKey::FileSystem(filesystem) => {
+                match filesystem{
+                    FileSystemKey::App(app) => {
+                        Option::Some(ResourceKey::App(app.app.clone()))
+                    }
+                    FileSystemKey::SubSpace(sub_space) => {
+                        Option::Some(ResourceKey::SubSpace(sub_space.sub_space.clone()))
+                    }
+                }
+            }
+        }
+    }
 
     pub fn space(&self)->SpaceKey {
         match self{
@@ -357,7 +414,7 @@ impl ResourceKey
                 FileSystemKey::App(app) => app.app.sub_space.space.clone(),
                 FileSystemKey::SubSpace(sub_space) => sub_space.sub_space.space.clone(),
             }
-            ResourceKey::Filesystem(filesystem) => {
+            ResourceKey::FileSystem(filesystem) => {
                 match filesystem{
                     FileSystemKey::App(app) => app.app.sub_space.space.clone(),
                     FileSystemKey::SubSpace(sub_space) => sub_space.sub_space.space.clone(),
@@ -428,7 +485,7 @@ impl ResourceKey
                 //ResourceManagerKey::Key(ResourceKey::Space(artifact.sub_space.space.clone()))
                 ResourceManagerKey::Central
             }
-            ResourceKey::Filesystem(key) => {
+            ResourceKey::FileSystem(key) => {
                 match key
                 {
                     FileSystemKey::App(app) => {
@@ -499,7 +556,7 @@ impl fmt::Display for ResourceKey{
                     ResourceKey::User(key) => format!("UserKey:{}",key),
                     ResourceKey::File(key) => format!("FileKey:{}",key),
                     ResourceKey::Artifact(key) => format!("ArtifactKey:{}",key),
-                    ResourceKey::Filesystem(key) => format!("FilesystemKey:{}",key),
+                    ResourceKey::FileSystem(key) => format!("FilesystemKey:{}", key),
                 })
     }
 }
@@ -517,7 +574,7 @@ impl ResourceKey
             ResourceKey::User(_) => ResourceType::User,
             ResourceKey::File(_) => ResourceType::File,
             ResourceKey::Artifact(_) => ResourceType::Artifact,
-            ResourceKey::Filesystem(_) => ResourceType::FileSystem
+            ResourceKey::FileSystem(_) => ResourceType::FileSystem
         }
     }
 
@@ -539,7 +596,7 @@ impl ResourceKey
                 }
             },
             ResourceKey::Artifact(artifact) => Ok(artifact.sub_space.clone()),
-            ResourceKey::Filesystem(filesystem) => {
+            ResourceKey::FileSystem(filesystem) => {
                 match filesystem{
                     FileSystemKey::App(app) => {
                         Ok(app.app.sub_space.clone())

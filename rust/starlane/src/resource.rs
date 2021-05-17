@@ -20,6 +20,8 @@ use crate::permissions::User;
 use crate::keys::{SubSpaceKey, ResourceKey, AppKey, SubSpaceId, SpaceKey, UserKey, GatheringKey, FileSystemKey, AppFilesystemKey, SubSpaceFilesystemKey};
 use crate::star::StarKey;
 use serde_json::to_string;
+use base64::DecodeError;
+use std::string::FromUtf8Error;
 
 lazy_static!
 {
@@ -649,9 +651,12 @@ eprintln!("error setting up db: {}", err );
                         Option::Some(config)
                     };
 
+                    let address: String = row.get(5)?;
+                    let address = ResourceAddress::from_str(address.as_str())?;
 
                     let resource = Resource{
                         key: key,
+                        address: address,
                         archetype: ResourceArchetype {
                             kind:kind,
                             specific: specific,
@@ -824,6 +829,14 @@ eprintln!("error setting up db: {}", err );
          UNIQUE(address)
         )"#;
 
+        let slices = r#"CREATE TABLE IF NOT EXISTS slices (
+         key BLOB PRIMARY KEY,
+         host BLOB NOT NULL,
+         status TEXT NOT NULL,
+         UNIQUE(key,host)
+        )"#;
+
+
         /*
       let labels_to_resources = r#"CREATE TABLE IF NOT EXISTS labels_to_resources
         (
@@ -843,6 +856,7 @@ eprintln!("error setting up db: {}", err );
         transaction.execute(resources, [])?;
         transaction.execute(locations, [])?;
         transaction.execute(addresses, [])?;
+        transaction.execute(slices, [])?;
         transaction.commit()?;
 
         Ok(())
@@ -973,13 +987,13 @@ impl ResourceKind {
                 match kind
                 {
                     FileSystemKind::App => {
-                        ResourceKey::Filesystem(FileSystemKey::App(AppFilesystemKey{
+                        ResourceKey::FileSystem(FileSystemKey::App(AppFilesystemKey{
                             app:AppKey::new(sub_space),
                             id: index as _
                         }))
                     }
                     FileSystemKind::SubSpace => {
-                        ResourceKey::Filesystem(FileSystemKey::SubSpace(SubSpaceFilesystemKey{
+                        ResourceKey::FileSystem(FileSystemKey::SubSpace(SubSpaceFilesystemKey{
                             sub_space: sub_space,
                             id: index as _
                         }))
@@ -1344,6 +1358,56 @@ pub struct ResourceAddress
 }
 
 impl ResourceAddress {
+
+    pub fn test_address( key: &ResourceKey )->Result<Self,Error> {
+        let mut parts = vec![];
+
+        let mut mark = Option::Some(key.clone());
+        while let Option::Some(key) = mark
+        {
+            match key
+            {
+                ResourceKey::Space(space) => {
+                    parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("space-{}",space.index()).as_str())?));
+                }
+                ResourceKey::SubSpace(sub_space) => {
+                    parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("sub-{}",sub_space.id.index()).as_str())?));
+                }
+                ResourceKey::App(app) => {
+                    parts.push(app.address_part()?);
+                }
+                ResourceKey::Actor(actor) => {
+                    parts.push(actor.address_part()?);
+                }
+                ResourceKey::User(user) => {
+                    parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("user-{}",user.id).as_str())?));
+                }
+                ResourceKey::Artifact(artifact) => {
+                    parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("artifact-{}",artifact.id).as_str())?));
+                }
+                ResourceKey::File(file) => {
+                    parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("file-{}",file.path).as_str())?));
+                }
+                ResourceKey::FileSystem(filesystem) => {
+                    match filesystem {
+                        FileSystemKey::App(app) => {
+                            parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("filesystem-{}",app.id).as_str())?));
+                        }
+                        FileSystemKey::SubSpace(sub_space) => {
+                            parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("filesystem-{}",sub_space.id).as_str())?));
+                            parts.push( ResourceAddressPart::Wildcard );
+                        }
+                    }
+                }
+            }
+
+            mark = key.parent();
+        }
+        Ok(ResourceAddress::from_parts( &key.resource_type(), parts )?)
+    }
+
+
+
     pub fn resource_type(&self) -> &ResourceType {
         &self.resource_type
     }
@@ -1360,16 +1424,19 @@ impl ResourceAddress {
             Ok(SPACE_ADDRESS_STRUCT.from_str(format!("{}:{}", self.parts.get(0).ok_or("expected space")?.to_string(), self.parts.get(1).ok_or("expected sub_space")?.to_string()).as_str())?)
         }
     }
-
     pub fn from_parent(resource_type: &ResourceType, parent: &ResourceAddress, part: ResourceAddressPart) -> Result<ResourceAddress, Error> {
-
         if !resource_type.parent().matches(parent.resource_type())  {
             return Err(format!("resource type parent is wrong: expected: {}", resource_type.parent().to_string()).into() )
         }
 
         let mut parts = vec![];
-        parts.append( &mut parent.parts.cloned() );
-        parts.append(part);
+        parts.append(&mut parent.parts.clone());
+        parts.push(part);
+
+        Self::from_parts( resource_type, parts )
+    }
+
+    pub fn from_parts(resource_type: &ResourceType, mut parts: Vec<ResourceAddressPart>) -> Result<ResourceAddress, Error> {
 
         for (index,part_struct) in resource_type.address_structure().parts.iter().enumerate(){
             let part = parts.get(index).ok_or("missing part")?;
@@ -1470,7 +1537,7 @@ impl ResourceAddressStructure {
         let mut parts = vec![];
 
         for part in &self.parts{
-            parts.push(part.kind.from_str(split.next().ok_or(part.kind.to_string().into() )?.clone() )?);
+            parts.push(part.kind.from_str(split.next().ok_or(part.kind.to_string() )?.clone() )?);
         }
 
         Ok(ResourceAddress{
@@ -1522,7 +1589,21 @@ pub enum ResourceAddressPartKind
     Skewer,
     Version,
     WildcardOrSkewer,
-    Path
+    Path,
+    Base64Encoded
+}
+
+impl ToString for ResourceAddressPartKind {
+    fn to_string(&self) -> String {
+        match self {
+            ResourceAddressPartKind::Wildcard => "Wildcard".to_string(),
+            ResourceAddressPartKind::Skewer => "Skewer".to_string(),
+            ResourceAddressPartKind::Version => "Version".to_string(),
+            ResourceAddressPartKind::WildcardOrSkewer => "WildcardOrSkewer".to_string(),
+            ResourceAddressPartKind::Path => "Path".to_string(),
+            ResourceAddressPartKind::Base64Encoded => "Base64Encoded".to_string()
+        }
+    }
 }
 
 impl ResourceAddressPartKind
@@ -1575,6 +1656,9 @@ impl ResourceAddressPartKind
             ResourceAddressPartKind::Version => {
                 Ok(ResourceAddressPart::Version(Version::from_str(s)?))
             }
+            ResourceAddressPartKind::Base64Encoded => {
+                Ok(ResourceAddressPart::Base64Encoded(Base64Encoded::encoded(s.to_string())?))
+            }
         }
     }
 }
@@ -1586,6 +1670,7 @@ pub enum ResourceAddressPart
 {
     Wildcard,
     Skewer(Skewer),
+    Base64Encoded(Base64Encoded),
     Path(Path),
     Version(Version)
 }
@@ -1595,8 +1680,43 @@ impl ToString for ResourceAddressPart {
         match self {
             ResourceAddressPart::Wildcard => "*".to_string(),
             ResourceAddressPart::Skewer(skewer) => skewer.to_string(),
+            ResourceAddressPart::Base64Encoded(base64) => base64.encoded.clone(),
             ResourceAddressPart::Path(path) => path.to_string(),
             ResourceAddressPart::Version(version) => version.to_string()
+        }
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub struct Base64Encoded {
+    encoded: String
+}
+
+impl Base64Encoded {
+    pub fn decoded( decoded: String ) ->Result<Self,Error>{
+        Ok(Base64Encoded {
+            encoded: base64::encode(decoded.as_bytes() ) ?
+        })
+    }
+
+    pub fn encoded( encoded: String ) ->Result<Self,Error>{
+
+        match base64::decode(encoded.clone() ) {
+            Ok(decoded ) => {
+                match String::from_utf8(decoded){
+                    Ok(_) => {
+                        Ok(Base64Encoded{
+                            encoded: encoded
+                        })
+                    }
+                    Err(err) => {
+                        Err(err.to_string().into())
+                    }
+                }
+            }
+            Err(err) => {
+                Err(err.to_string().into())
+            }
         }
     }
 }
@@ -1700,15 +1820,15 @@ mod test
             resource: resource,
             labels: labels,
             names: names,
-            address: resource.address
         };
         save
     }
 
-    fn create_with_key(  key: ResourceKey, kind: ResourceKind, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey ) -> ResourceRegistration
+    fn create_with_key(  key: ResourceKey, address: ResourceAddress, kind: ResourceKind, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey ) -> ResourceRegistration
     {
         let resource = Resource{
             key: key,
+            address: address,
             owner: Option::Some(owner),
             archetype: ResourceArchetype{
                 kind: kind,
@@ -1721,7 +1841,6 @@ mod test
             resource: resource,
             labels: Labels::new(),
             names: vec![],
-            address: None
         };
 
         save
@@ -1789,13 +1908,14 @@ mod test
     }
 
 
-    async fn create_10_actors(tx: mpsc::Sender<ResourceRegistryAction>, app: AppKey, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey )
+    async fn create_10_actors(tx: mpsc::Sender<ResourceRegistryAction>, app: AppKey, specific: Option<Specific>, sub_space: SubSpaceKey, app_address: ResourceAddress, owner: UserKey )
     {
         for index in 1..11
         {
             let actor_key = ResourceKey::Actor(ActorKey::new(app.clone(), Id::new(0, index)));
+            let address = ResourceAddress::from_parent( &ResourceType::Actor, &app_address, ResourceAddressPart::Skewer(Skewer::new(actor_key.encode().unwrap().as_str() ).unwrap())).unwrap();
 
-            let save = create_with_key(actor_key,ResourceKind::Actor(ActorKind::Single),specific.clone(),sub_space.clone(),owner.clone());
+            let save = create_with_key(actor_key,address, ResourceKind::Actor(ActorKind::Single),specific.clone(),sub_space.clone(),owner.clone());
             let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Register(save));
             tx.send( request ).await;
             timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
@@ -2159,20 +2279,72 @@ impl ResourceCreate {
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ResourceStatus {
-    HostPreparing,
+    Unknown,
+    Preparing,
     Ready
 }
+impl ToString for ResourceStatus{
+    fn to_string(&self) -> String {
+        match self {
+            Self::Unknown => "Unknown".to_string(),
+            Self::Preparing => "Preparing".to_string(),
+            Self::Ready => "Ready".to_string()
+        }
+    }
+}
+
+impl FromStr for ResourceStatus{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Unknown" => Ok(Self::Unknown),
+            "Waiting" => Ok(Self::Waiting),
+            "Ready" => Ok(Self::Ready),
+            what => Err(format!("not recognized: {}",what).into())
+        }
+    }
+}
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ResourceSrc {
     Creation(ResourceProfile)
+    //Assign(ResourceState) -- this is the mechanism that a Resource would be transfered to a new Host
 }
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub enum ResourceSliceStatus {
-    HostPreparing,
+    Unknown,
+    Preparing,
     Waiting,
     Ready
+}
+
+impl ToString for ResourceSliceStatus{
+    fn to_string(&self) -> String {
+        match self {
+            ResourceSliceStatus::Unknown => "Unknown".to_string(),
+            ResourceSliceStatus::Preparing => "Preparing".to_string(),
+            ResourceSliceStatus::Waiting => "Waiting".to_string(),
+            ResourceSliceStatus::Ready => "Ready".to_string()
+        }
+    }
+}
+
+impl FromStr for ResourceSliceStatus {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Unknown" => Ok(Self::Unknown),
+            "Preparing" => Ok(Self::Preparing),
+            "Waiting" => Ok(Self::Waiting),
+            "Ready" => Ok(Self::Ready),
+            what => Err(format!("not recognized: {}",what).into())
+
+        }
+    }
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -2220,7 +2392,9 @@ impl ResourceAssign {
     }
 
     pub fn archetype(&self) -> ResourceArchetype {
-        self.archetype.clone()
+        match &self.source{
+            ResourceSrc::Creation(profile) => profile.archetype.clone()
+        }
     }
 }
 

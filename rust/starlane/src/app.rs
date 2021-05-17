@@ -17,7 +17,7 @@ use crate::filesystem::File;
 use crate::frame::{Reply, StarMessagePayload, ResourceManagerAction};
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, SubSpaceKey, UserKey, ResourceKey};
-use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceLocation, ResourceArchetype, ResourceProfile, ResourceAddress, Names, ResourceSrc, Skewer, ResourceAddressPart, ResourceType, Resource};
+use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceLocation, ResourceArchetype, ResourceProfile, ResourceAddress, Names, ResourceSrc, Skewer, ResourceAddressPart, ResourceType, Resource, ResourceCreate};
 use crate::names::Name;
 use crate::space::CreateAppControllerFail;
 use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarSkel, StarVariantCommand, StarComm, ServerCommand, Request, Empty, Query, LocalResourceLocation, ResourceCommand};
@@ -286,7 +286,7 @@ pub type AppMessageKind = String;
 pub struct AppCreateController
 {
     pub sub_space: SubSpaceKey,
-    pub profile: AppProfile,
+    pub create: ResourceCreate,
     pub tx: oneshot::Sender<Result<AppController,CreateAppControllerFail>>
 }
 

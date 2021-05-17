@@ -140,66 +140,7 @@ impl StarVariant for ServerStarVariant
                            SpacePayload::Server(server_space_message) => {
                                match server_space_message
                                {
-                                   ServerPayload::AppAssign(meta) => {
-                                       let (request,rx) = Request::new( meta.clone() );
-                                       let payload = StarCoreAppCommandPayload::Assign(request);
-                                       let message = StarCoreAppCommand { app: meta.key.clone(), payload: payload };
-                                       self.skel.core_tx.send( StarCoreCommand::AppCommand(message)).await;
-                                       let star_tx = self.skel.star_tx.clone();
-                                       tokio::spawn( async move {
-                                           match rx.await
-                                           {
-                                               Ok(result) => {
-                                                   match result
-                                                   {
-                                                       Ok(_) => {
-                                                           let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
-                                                           star_tx.send( StarCommand::SendProtoMessage(proto)).await;
-                                                       }
-                                                       Err(error) => {
-                                                           let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error("ApExtError".to_string()))));
-                                                           star_tx.send( StarCommand::SendProtoMessage(proto)).await;
-                                                       }
-                                                   }
-                                               }
-                                               Err(err) => {
-                                                   let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error(err.to_string()))));
-                                                   star_tx.send( StarCommand::SendProtoMessage(proto)).await;
-                                               }
-                                           }
-                                       } );
-                                   }
                                    ServerPayload::SequenceResponse(_) => {}
-                                   ServerPayload::AppLaunch(launch) => {
-                                       let (request,rx) = Request::new(launch.clone());
-                                       let payload = StarCoreAppCommandPayload::Launch(request);
-                                       let message = StarCoreAppCommand { app: launch.key.clone(), payload: payload };
-                                       self.skel.core_tx.send( StarCoreCommand::AppCommand(message)).await;
-                                       let star_tx = self.skel.star_tx.clone();
-                                       tokio::spawn( async move {
-                                           match rx.await
-                                           {
-                                               Ok(result) => {
-                                                   match result
-                                                   {
-                                                       Ok(_) => {
-                                                           let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
-                                                           star_tx.send( StarCommand::SendProtoMessage(proto)).await;
-                                                       }
-                                                       Err(error) => {
-                                                           let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error("AppExtError".to_string()))));
-                                                           star_tx.send( StarCommand::SendProtoMessage(proto)).await;
-                                                       }
-                                                   }
-                                               }
-                                               Err(err) => {
-                                                   let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error(err.to_string()))));
-                                                   star_tx.send( StarCommand::SendProtoMessage(proto)).await;
-                                               }
-                                           }
-                                       } );
-
-                                   }
                                }
                            }
                            SpacePayload::Resource(resource_payload) => {

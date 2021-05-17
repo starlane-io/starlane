@@ -16,7 +16,6 @@ use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait, Fail};
 use crate::star::{StarCommand, StarSkel, StarInfo, StarKey, StarVariant, StarVariantCommand, StarKind, RegistryBacking, RegistryBackingSqlLite, Wind};
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::oneshot::error::RecvError;
-use crate::star::supervisor::SupervisorCommand::AppAssign;
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::{oneshot, mpsc};
@@ -27,14 +26,11 @@ use crate::resource::{Registry, FieldSelection, ResourceType, ResourceLocation, 
 use std::future::Future;
 use crate::star::pledge::{StarHandleBacking, StarHandle};
 use tokio::time::Duration;
+use std::sync::Arc;
 
 pub enum SupervisorCommand
 {
-    Pledge,
-    SetAppStatus(SetAppStatus),
-    AppAssign(App),
-    AppLaunch(AppKey),
-    SetAppServerStatus(SetAppServerStatus)
+    Pledge
 }
 
 pub struct SetAppServerStatus
@@ -56,7 +52,7 @@ pub struct SupervisorVariant
 {
     skel: StarSkel,
     backing: Box<dyn SupervisorManagerBacking>,
-    registry: Box<dyn RegistryBacking>,
+    registry: Arc<dyn RegistryBacking>,
     star_handles: StarHandleBacking
 }
 
@@ -67,7 +63,7 @@ impl SupervisorVariant
         SupervisorVariant {
             skel: data.clone(),
             backing: Box::new(SupervisorStarVariantBackingSqLite::new().await ),
-            registry: Box::new(RegistryBackingSqlLite::new().await ),
+            registry: Arc::new(RegistryBackingSqlLite::new().await ),
             star_handles: StarHandleBacking::new().await
         }
     }
@@ -163,109 +159,7 @@ impl StarVariant for SupervisorVariant
                     SupervisorCommand::Pledge => {
                         self.pledge().await;
                     }
-                    SupervisorCommand::SetAppStatus(set_app_status) => {
-                        self.backing.set_app_status(set_app_status.app.clone(), set_app_status.status.clone());
-                    }
-                    SupervisorCommand::AppAssign(app) => {
-                        let servers = self.backing.select_servers(StarPattern::Any).await;
-                        if !servers.is_empty()
-                        {
-                            for server in servers
-                            {
-                                self.backing.set_app_server_status(app.key.clone(), server.clone(), AppServerStatus::Assigning );
-                                let mut proto = ProtoMessage::new();
-                                proto.to(server.clone());
-                                proto.payload = StarMessagePayload::Space(SpaceMessage{
-                                    sub_space: app.key.sub_space.clone(),
-                                    user: UserKey::hyper_user(),
-                                    payload: SpacePayload::Server(ServerPayload::AppAssign(app.meta()))
-                                });
-                                let result = proto.get_ok_result().await;
-                                self.skel.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
-                                let manager_tx = self.skel.variant_tx.clone();
-                                let app = app.clone();
-                                let server= server.clone();
-                                tokio::spawn( async move {
-                                    match result.await
-                                    {
-                                        Ok(_) => {
-                                            manager_tx.send(StarVariantCommand::SupervisorCommand(SupervisorCommand::SetAppServerStatus(SetAppServerStatus{
-                                                app: app.key.clone(),
-                                                server: server.clone(),
-                                                status: AppServerStatus::Ready
-                                            }))).await;
-                                        }
-                                        Err(error) => {
-                                            eprintln!("{}",error);
 
-                                        }
-                                    }
-                                } );
-
-                            }
-                        }
-                        else {
-                            // leave in Waiting state
-                        }
-                    }
-                    SupervisorCommand::SetAppServerStatus(set_status) => {
-                        self.backing.set_app_server_status(set_status.app.clone(),set_status.server.clone(), set_status.status.clone() ).await;
-                        if self.backing.get_app_status(&set_status.app).await == AppStatus::Pending
-                        {
-                            self.backing.set_app_status(set_status.app.clone(),  AppStatus::Launching ).await;
-                            self.skel.variant_tx.send(StarVariantCommand::SupervisorCommand(SupervisorCommand::AppLaunch(set_status.app.clone()))).await;
-                        }
-                    }
-                    SupervisorCommand::AppLaunch(app_key) => {
-                        let archetype = self.backing.get_application(&app_key).await;
-                        let servers = self.backing.get_servers_for_app(&app_key).await;
-
-                        if archetype.is_none()
-                        {
-                            eprintln!("cannot find archetype for app: {}",app_key);
-                        }
-
-                        if servers.is_empty()
-                        {
-                            eprintln!("cannot select a server for app: {}",app_key);
-                            return;
-                        }
-
-                        let server = servers.get(0).cloned().unwrap();
-
-                        if let Option::Some(archetype) = archetype
-                        {
-                                let app = App {
-                                    key: app_key.clone(),
-                                    archetype: archetype.clone()
-                                };
-                                let mut proto = ProtoMessage::new();
-                                proto.to(server.clone());
-                                proto.payload = StarMessagePayload::Space(SpaceMessage {
-                                    sub_space: app.key.sub_space.clone(),
-                                    user: UserKey::hyper_user(),
-                                    payload: SpacePayload::Server(ServerPayload::AppLaunch(app))
-                                });
-                                let result = proto.get_ok_result().await;
-                                self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-
-                                let manager_tx = self.skel.variant_tx.clone();
-                                tokio::spawn(async move {
-                                    match result.await
-                                    {
-                                        Ok(_) => {
-                                            manager_tx.send(StarVariantCommand::SupervisorCommand(SupervisorCommand::SetAppStatus(SetAppStatus {
-                                                app: app_key,
-                                                status: AppStatus::Ready
-                                            }))).await;
-                                        }
-                                        Err(error) => {
-                                            eprintln!("{}", error);
-                                        }
-                                    }
-                                });
-                        }
-                    }
                 }
             }
             StarVariantCommand::StarMessage(star_message) =>
@@ -273,29 +167,8 @@ impl StarVariant for SupervisorVariant
                 match &star_message.payload
                 {
                     StarMessagePayload::ResourceManager(resource_message ) => {
-                        match resource_message
-                        {
-                            ResourceManagerAction::Register(registration) => {
-                                let result = self.registry.register(registration.clone()).await;
-                                self.skel.comm().reply_result_empty(star_message.clone(), result );
-                            }
-                            ResourceManagerAction::Location(location) => {
-                                let result = self.registry.set_location(location.clone()).await;
-                                self.skel.comm().reply_result_empty(star_message.clone(), result );
-                            }
-                            ResourceManagerAction::Find(find) => {
-                                let result = self.registry.find(find.to_owned() ).await;
-                                self.skel.comm().reply_result(star_message.clone(), result );
-                            }
-                            ResourceManagerAction::GetKey(address) => {
-                                let result = self.registry.get_key(address.clone() ).await;
-                                self.skel.comm().reply_result(star_message.clone(), result );
-                            }
-                            ResourceManagerAction::Bind(bind) => {
-                                let result = self.registry.bind(bind.clone() ).await;
-                                self.skel.comm().reply_result_empty(star_message.clone(), result );
-                            }
-                        }
+                        unimplemented!()
+
                     }
                     StarMessagePayload::Space(space_message) => {
                         match &space_message.payload
@@ -303,18 +176,7 @@ impl StarVariant for SupervisorVariant
                             SpacePayload::Supervisor(supervisor_payload) => {
                                 match supervisor_payload
                                 {
-                                    SupervisorPayload::AppCreate(archetype) => {
-                                        let app_key = AppKey::new(space_message.sub_space.clone());
-                                        self.backing.set_application(app_key.clone(), archetype.clone() );
-                                        self.backing.set_app_status(app_key.clone(), AppStatus::Pending);
-                                        let proto = star_message.reply( StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
-                                        self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                        let app = App{
-                                            key: app_key,
-                                            archetype: archetype.clone()
-                                        };
-                                        self.skel.variant_tx.send( StarVariantCommand::SupervisorCommand(SupervisorCommand::AppAssign(app))).await;
-                                    }
+
                                     SupervisorPayload::AppSequenceRequest(app_key) => {
 println!("AppSEquenceRequest!");
                                         let index = self.backing.app_sequence_next(app_key).await;
@@ -329,19 +191,6 @@ println!("AppSEquenceRequest!");
                                                 self.skel.star_tx.send(StarCommand::SendProtoMessage(reply)).await;
                                             }
                                         }
-                                    }
-                                    SupervisorPayload::ActorUnRegister(_) => {}
-                                    SupervisorPayload::ActorStatus(_) => {}
-                                    SupervisorPayload::Register(register) => {
-                                        let result = self.registry.register(register.clone() ).await;
-                                        self.skel.comm().reply_result(star_message, Reply::from_result(result) );
-                                    }
-                                    SupervisorPayload::Select(selector) => {
-                                        let mut selector = selector.clone();
-                                        selector.add(FieldSelection::Space(space_message.sub_space.space.clone()));
-                                        selector.add(FieldSelection::SubSpace(space_message.sub_space.clone()));
-                                        let result = self.registry.select(selector).await;
-                                        self.skel.comm().reply_result(star_message,Reply::from_result(result)).await;
                                     }
                                 }
                             }

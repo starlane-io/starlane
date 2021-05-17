@@ -9,7 +9,7 @@ use tokio::sync::oneshot::Receiver;
 
 use crate::app::{AppCreateController, AppMeta, ApplicationStatus, AppLocation, AppArchetype, App};
 use crate::error::Error;
-use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, CentralPayload, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply, ResourcePayload, ResourceManagerAction};
+use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply, ResourcePayload, ResourceManagerAction};
 use crate::id::Id;
 use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, ResourceKey};
 use crate::resource::{Labels, Registry, Selector, ResourceRegistryResult, ResourceRegistryCommand, FieldSelection, ResourceAssign, ResourceType, ResourceRegistration, ResourceLocation};
@@ -19,7 +19,6 @@ use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo,
 use crate::star::StarCommand::SpaceCommand;
 use crate::permissions::{AppAccess, AuthToken, User, UserKind};
 use crate::crypt::{PublicKey, CryptKeyId};
-use crate::frame::CentralPayload::AppCreate;
 use rusqlite::Connection;
 use bincode::ErrorKind;
 use tokio::time::Duration;
@@ -169,43 +168,7 @@ impl StarVariant for CentralStarVariant
                    }
                    StarMessagePayload::Space(space_message) => {
                        match &space_message.payload {
-                           SpacePayload::Central(central_payload) => {
-                               match central_payload
-                               {
-                                   CentralPayload::AppCreate(archetype) => {
-                                       unimplemented!()
-/*                                       if let Option::Some(supervisor) = self.backing.select_supervisor().await
-                                       {
-                                           let mut proto = ProtoMessage::new();
-                                           let app_key = AppKey::new(space_message.sub_space.clone());
-                                           let app = App::new(app_key.clone(), archetype.clone());
-                                           let register = ResourceRegistration::new(app.into(), archetype.name.clone(), archetype.labels.clone() );
-                                           let location = ResourceLocation::new( ResourceKey::App(app_key.clone()), supervisor.clone() );
-                                           self.registry.set_location(location).await;
 
-                                           match self.registry.register(register).await
-                                           {
-                                               Result::Ok(_) => {
-                                                   proto.payload = StarMessagePayload::Space(space_message.with_payload(SpacePayload::Supervisor(SupervisorPayload::AppCreate(archetype.clone()))));
-                                                   proto.to(supervisor.clone());
-                                                   let rx = proto.get_ok_result().await;
-                                                   self.skel.comm().relay_trigger(star_message.clone(), rx, Option::Some(StarVariantCommand::CentralCommand(CentralCommand::SerSupervisorForApp(SetSupervisorForApp::new(supervisor.clone(), app_key.clone() )))), Option::Some(Reply::Key(ResourceKey::App(app_key.clone()))) );
-                                                   self.skel.comm().send(proto).await;
-                                               }
-                                               Result::Err(fail) => {
-                                                   self.skel.comm().simple_reply(star_message.clone(),SimpleReply::Fail(fail)).await;
-                                               }
-                                           }
-
-                                       } else {
-                                           let proto = star_message.reply(StarMessagePayload::Reply( SimpleReply:: Fail(Fail::Error("central: no supervisors selected.".into()))));
-                                           self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                       }
-
- */
-                                   }
-                               }
-                           }
                            SpacePayload::Resource(query) => {
                                match query
                                {

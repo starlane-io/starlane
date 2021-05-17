@@ -14,11 +14,12 @@ use crate::frame::{Event};
 use crate::id::Id;
 use crate::keys::{AppKey, ResourceKey, SubSpaceKey, UserKey};
 use crate::names::Name;
-use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceType, ResourceArchetype, ResourceProfile, Resource, Names, ResourceAddress};
+use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceType, ResourceArchetype, ResourceProfile, Resource, Names, ResourceAddress, ResourceAddressPart, Skewer};
 use crate::star::StarKey;
 use std::marker::PhantomData;
 use serde::de::DeserializeOwned;
 use crate::message::Fail;
+use crate::resource::ResourceAddressPartKind::Base64Encoded;
 
 pub struct Actor
 {
@@ -180,6 +181,13 @@ pub struct ActorKey
     pub app: AppKey,
     pub id: Id,
 }
+
+impl ActorKey{
+    pub fn address_part(&self) -> Result<ResourceAddressPart,Error>{
+        Ok(ResourceAddressPart::Skewer(Skewer::new(self.id.to_string().as_str() )?))
+    }
+}
+
 
 impl ActorKey
 {
