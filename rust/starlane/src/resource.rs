@@ -13,7 +13,7 @@ use crate::actor::{ActorKey, ActorKind, ActorArchetype, ActorProfile};
 use crate::app::{AppKind, AppArchetype, AppProfile, ConfigSrc, InitData};
 use crate::artifact::{ArtifactKey, ArtifactKind};
 use crate::error::{Error};
-use crate::filesystem::FileKey;
+use crate::keys::FileKey;
 use crate::id::Id;
 use crate::names::{Name, Specific};
 use crate::permissions::User;

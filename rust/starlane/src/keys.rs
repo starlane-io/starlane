@@ -6,16 +6,15 @@ use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
 
 use crate::actor::{Actor, ActorKey, ActorKind};
-use crate::app::{AppKind};
+use crate::app::AppKind;
 use crate::artifact::{Artifact, ArtifactKey, ArtifactKind};
 use crate::error::Error;
-use crate::filesystem::FileKey;
 use crate::frame::Reply;
 use crate::id::Id;
 use crate::message::Fail;
 use crate::names::Name;
 use crate::permissions::{Priviledges, User, UserKind};
-use crate::resource::{Labels, ResourceAssign, ResourceType, ResourceManagerKey, Resource, ResourceArchetype, ResourceKind, ResourceAddressPart, Skewer};
+use crate::resource::{Labels, Resource, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceKind, ResourceManagerKey, ResourceType, Skewer};
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum SpaceKey
@@ -643,4 +642,18 @@ impl fmt::Display for FileSystemKey {
                     FileSystemKey::SubSpace(_) => "SubSpace"
                 })
     }
+}
+
+#[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
+pub struct FileKey
+{
+   pub filesystem: FileSystemKey,
+   pub path: u64
+}
+
+impl fmt::Display for FileKey{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,"[{},{},{}]",self.filesystem,self.filesystem,self.path )
+    }
+
 }
