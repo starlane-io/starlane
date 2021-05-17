@@ -340,6 +340,21 @@ pub enum Fail
     RecvErr
 }
 
+impl ToString for Fail {
+    fn to_string(&self) -> String {
+        match self{
+            Fail::Timeout => "Timeout".to_string(),
+            Fail::Error(message) => format!("Error({})",message),
+            Fail::Reject(_) => "Reject".to_string(),
+            Fail::Unexpected => "Unexpected".to_string(),
+            Fail::DoNotKnowSpecific(_) => "DoNotKnowSpecific".to_string(),
+            Fail::ResourceNotFound(_) => "ResourceNotFound".to_string(),
+            Fail::WrongResourceType => "WrongResourceType".to_string(),
+            Fail::RecvErr => "RecvErr".to_string()
+        }
+    }
+}
+
 
 
 #[derive(Clone,Serialize,Deserialize)]

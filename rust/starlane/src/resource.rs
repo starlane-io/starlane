@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::actor::{ActorKey, ActorKind, ActorArchetype, ActorProfile};
-use crate::app::{App, AppKind, AppArchetype, AppProfile, ConfigSrc, InitData};
+use crate::app::{AppKind, AppArchetype, AppProfile, ConfigSrc, InitData};
 use crate::artifact::{ArtifactKey, ArtifactKind};
 use crate::error::{Error};
 use crate::filesystem::FileKey;
@@ -482,7 +482,7 @@ eprintln!("error setting up db: {}", err );
                     Option::None
                 };
 
-                let app =  if let ResourceKey::Actor(actor) = resource.key {
+                let app =  if let ResourceKey::Actor(actor) = &resource.key {
                     Option::Some(actor.app.bin()?)
                 } else {
                     Option::None
@@ -1087,7 +1087,7 @@ impl FromStr for ResourceType {
     }
 }
 
-enum ResourceParent
+pub enum ResourceParent
 {
     None,
     Some(ResourceType),
@@ -1277,11 +1277,6 @@ impl From<AppKind> for ResourceKind{
     }
 }
 
-impl From<App> for ResourceKind{
-    fn from(e: App) -> Self {
-        ResourceKind::App(e.archetype.kind)
-    }
-}
 
 impl From<ActorKind> for ResourceKind{
     fn from(e: ActorKind) -> Self {
@@ -1365,7 +1360,7 @@ impl ResourceAddress {
         let mut mark = Option::Some(key.clone());
         while let Option::Some(key) = mark
         {
-            match key
+            match &key
             {
                 ResourceKey::Space(space) => {
                     parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("space-{}",space.index()).as_str())?));
@@ -1505,6 +1500,7 @@ impl ResourceAddressStructure
         rtn
     }
 
+
     pub fn new( parts: Vec<ResourceAddressPartStruct>, resource_type: ResourceType ) -> Self {
         ResourceAddressStructure{
             parts: parts,
@@ -1525,7 +1521,7 @@ impl ResourceAddressStructure
 
 impl ResourceAddressStructure {
 
-    fn from_str(&self, s: &str) -> Result<ResourceAddress, Error> {
+    pub fn from_str(&self, s: &str) -> Result<ResourceAddress, Error> {
         let mut split = s.split(":");
 
         if split.count()  != self.parts.len() {
@@ -1624,6 +1620,9 @@ impl ResourceAddressPartKind
             ResourceAddressPart::Version(_) => {
                 *self == Self::Version
             }
+            ResourceAddressPart::Base64Encoded(_) => {
+                *self == Self::Base64Encoded
+            }
         }
     }
 
@@ -1695,7 +1694,7 @@ pub struct Base64Encoded {
 impl Base64Encoded {
     pub fn decoded( decoded: String ) ->Result<Self,Error>{
         Ok(Base64Encoded {
-            encoded: base64::encode(decoded.as_bytes() ) ?
+            encoded: base64::encode(decoded.as_bytes() )
         })
     }
 
@@ -1855,9 +1854,11 @@ mod test
             assert!(false)
         }
         let key = kind.test_key(sub_space,index);
+        let address = ResourceAddress::test_address(&key).unwrap();
 
         let resource = Resource{
             key: key,
+            address: address,
             owner: Option::Some(owner),
             archetype: ResourceArchetype{
                 kind: kind,
@@ -1893,7 +1894,7 @@ mod test
                 archetype: ResourceArchetype{
                     kind: ResourceKind::Space,
                     specific: None,
-                    config: Option::Some(ConfigSrc::ResourceAddressPart(ResourceAddressPart::Skewer(Skewer::new(address_part.as_str()).unwrap())))
+                    config: Option::None
                 },
                 owner: None
             };
@@ -1939,7 +1940,7 @@ mod test
                 archetype: ResourceArchetype{
                     kind: ResourceKind::SubSpace,
                     specific: None,
-                    config: Option::Some(ConfigSrc::ResourceAddressPart(address_part))
+                    config: None
                 },
                 owner: None
             };
@@ -2050,7 +2051,17 @@ mod test
             let spaces = create_10_spaces(tx.clone() ).await;
             let mut sub_spaces = vec![];
             for space in spaces.clone() {
-                sub_spaces.append( &mut create_10_sub_spaces(tx.clone(), space ).await );
+                let space_resource = Resource{
+                    key: ResourceKey::Space(space.clone()),
+                    address: ResourceAddress::test_address(&ResourceKey::Space(space.clone())).unwrap(),
+                    archetype: ResourceArchetype {
+                        kind: ResourceKind::Space,
+                        specific: None,
+                        config: None
+                    },
+                    owner: None
+                };
+                sub_spaces.append( &mut create_10_sub_spaces(tx.clone(), space_resource ).await );
             }
 
             for sub_space in sub_spaces.clone()
@@ -2112,10 +2123,12 @@ mod test
 
             let sub_space = SubSpaceKey::hyper_default();
             let app1 = AppKey::new(sub_space.clone());
-            create_10_actors(tx.clone(), app1.clone(), Option::None, sub_space.clone(), UserKey::hyper_user() ).await;
+            let app_address = ResourceAddress::test_address(&ResourceKey::App(app1.clone())).unwrap();
+            create_10_actors(tx.clone(), app1.clone(), Option::None, sub_space.clone(), app_address,UserKey::hyper_user() ).await;
 
             let app2 = AppKey::new(sub_space.clone());
-            create_10_actors(tx.clone(), app2.clone(), Option::None, sub_space.clone(), UserKey::hyper_user() ).await;
+            let app_address = ResourceAddress::test_address(&ResourceKey::App(app2.clone())).unwrap();
+            create_10_actors(tx.clone(), app2.clone(), Option::None, sub_space.clone(), app_address, UserKey::hyper_user() ).await;
 
             let mut selector = Selector::actor_selector();
             let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Select(selector) );
@@ -2299,7 +2312,7 @@ impl FromStr for ResourceStatus{
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "Unknown" => Ok(Self::Unknown),
-            "Waiting" => Ok(Self::Waiting),
+            "Preparing" => Ok(Self::Preparing),
             "Ready" => Ok(Self::Ready),
             what => Err(format!("not recognized: {}",what).into())
         }

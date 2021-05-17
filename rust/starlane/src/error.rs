@@ -7,6 +7,8 @@ use tokio::sync::broadcast;
 use tokio::time::error::Elapsed;
 use semver::SemVerError;
 use base64::DecodeError;
+use crate::message::Fail;
+use std::string::FromUtf8Error;
 
 #[derive(Debug, Clone)]
 pub struct Error{
@@ -25,6 +27,28 @@ impl From<Elapsed> for Error{
     fn from(e: Elapsed) -> Self {
         Error{
             error: format!("{}",e.to_string())
+        }
+    }
+}
+
+impl From<uuid::Error> for Error {
+    fn from(e: uuid::Error) -> Self {
+        e.to_string().into()
+    }
+}
+
+impl From<FromUtf8Error> for Error{
+    fn from(e: FromUtf8Error) -> Self {
+        Error{
+            error: e.to_string()
+        }
+    }
+}
+
+impl From<Fail> for Error{
+    fn from(fail: Fail) -> Self {
+        Error{
+            error: format!("{}",fail.to_string())
         }
     }
 }

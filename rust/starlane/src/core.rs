@@ -16,7 +16,7 @@ use tokio::time::Duration;
 
 
 use crate::actor::{ActorKey, ResourceMessage};
-use crate::app::{ApplicationStatus, AppArchetype, AppMeta, App};
+use crate::app::{ApplicationStatus, AppArchetype, AppMeta};
 use crate::error::Error;
 use crate::frame::{StarMessage, StarMessagePayload, Watch, WatchInfo, ServerAppPayload, AppPayload};
 use crate::id::{Id, IdSeq};

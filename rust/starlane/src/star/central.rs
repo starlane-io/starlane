@@ -7,7 +7,7 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::oneshot::Receiver;
 
-use crate::app::{AppCreateController, AppMeta, ApplicationStatus, AppLocation, AppArchetype, App};
+use crate::app::{AppCreateController, AppMeta, ApplicationStatus, AppLocation, AppArchetype };
 use crate::error::Error;
 use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, StarMessageCentral, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply, ResourcePayload, ResourceManagerAction};
 use crate::id::Id;
@@ -163,6 +163,9 @@ impl StarVariant for CentralStarVariant
                           ResourceManagerAction::Bind(bind) => {
                               let result = self.registry.bind(bind.clone()).await;
                               self.skel.comm().reply_result_empty(star_message.clone(), result ).await;
+                          }
+                          _ => {
+                              unimplemented!()
                           }
                       }
                    }

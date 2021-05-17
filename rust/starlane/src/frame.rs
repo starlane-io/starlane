@@ -9,7 +9,7 @@ use tokio::time::error::Elapsed;
 use tokio::time::Instant;
 
 use crate::actor::{ActorKey, ActorStatus, ResourceMessage, RawState};
-use crate::app::{App, AppArchetype, AppCreateResult, AppLocation, AppMeta, AppSpecific, ConfigSrc };
+use crate::app::{AppArchetype, AppCreateResult, AppLocation, AppMeta, AppSpecific, ConfigSrc };
 use crate::crypt::{Encrypted, HashEncrypted, HashId};
 use crate::error::Error;
 use crate::id::Id;
@@ -711,7 +711,8 @@ impl fmt::Display for StarMessagePayload{
             StarMessagePayload::Central(_) => "Central".to_string(),
             StarMessagePayload::Reply(_) => "Reply".to_string(),
             StarMessagePayload::Supervisor(_) => "Supervisor".to_string(),
-            StarMessagePayload::ResourceManager(_) => "Resource".to_string()
+            StarMessagePayload::ResourceManager(_) => "Resource".to_string(),
+            StarMessagePayload::ResourceHost(_) => "ResourceHost".to_string()
         };
         write!(f, "{}",r)
     }

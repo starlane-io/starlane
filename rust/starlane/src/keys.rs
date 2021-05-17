@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
 
 use crate::actor::{Actor, ActorKey, ActorKind};
-use crate::app::{App, AppKind};
+use crate::app::{AppKind};
 use crate::artifact::{Artifact, ArtifactKey, ArtifactKind};
 use crate::error::Error;
 use crate::filesystem::FileKey;
@@ -286,7 +286,7 @@ pub enum AppId
 
 impl AppId {
     pub fn encode(&self) -> Result<String, Error> {
-        Ok(base64::encode(self.to_string().as_bytes().to_vec())?)
+        Ok(base64::encode(self.to_string().as_bytes().to_vec()))
     }
 
     pub fn decode(string: String) -> Result<Self, Error> {
@@ -405,7 +405,7 @@ impl ResourceKey
     pub fn space(&self)->SpaceKey {
         match self{
             ResourceKey::Space(space) => space.clone(),
-            ResourceKey::SubSpace(sub_space) => sub_space.clone(),
+            ResourceKey::SubSpace(sub_space) => sub_space.space.clone(),
             ResourceKey::App(app) => app.sub_space.space.clone(),
             ResourceKey::Actor(actor) => actor.app.sub_space.space.clone(),
             ResourceKey::User(user) => user.space.clone(),

@@ -9,6 +9,7 @@ use crate::error::Error;
 use crate::keys::SubSpaceKey;
 use crate::names::{Name, Specific};
 use std::fmt;
+use crate::resource::{ResourceAddress, ResourceType};
 
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct Artifact
@@ -17,6 +18,49 @@ pub struct Artifact
     pub kind: ArtifactKind,
     pub specific: Option<Specific>
 }
+
+impl Artifact
+{
+    fn to_address(&self) -> Result<ResourceAddress,Error>{
+       ResourceType::Artifact.address_structure().from_str(self.to_string().as_str() )
+    }
+}
+
+impl FromStr for Artifact{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut split = s.split("::");
+        let location = ArtifactLocation::from_str(split.next().ok_or("missing location")? )?;
+        let kind = ArtifactKind::from_str(split.next().ok_or("missing kind")? )?;
+        let specific = if let Option::Some(specific) = split.next(){
+            Option::Some(Specific::from_str(specific)?)
+        } else {
+            Option::None
+        };
+        Ok(Artifact{
+            location: location,
+            kind: kind,
+            specific: specific
+        })
+    }
+}
+
+impl ToString for Artifact{
+    fn to_string(&self) -> String {
+       let mut rtn = String::new();
+       rtn.push_str(self.location.to_string().as_str() );
+       rtn.push_str("::");
+       rtn.push_str(self.kind.to_string().as_str() );
+       if let Option::Some(specific) = &self.specific{
+           rtn.push_str("::");
+           rtn.push_str(specific.to_string().as_str() );
+       }
+       rtn
+    }
+}
+
+
 
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub enum ArtifactKind
@@ -104,14 +148,22 @@ impl ArtifactBundle
             version: parts.next().ok_or("version")?.to_string()
         },parts))
     }
+}
 
-    pub fn from(string: &str) -> Result<Self,Error>
+impl FromStr for ArtifactBundle
+{
+    type Err = Error;
+
+    fn from_str(string: &str) -> Result<Self,Self::Err>
     {
         let (bundle,_) = ArtifactBundle::more(string)?;
         Ok(bundle)
     }
+}
 
-    pub fn to(&self) -> String {
+
+impl ToString for ArtifactBundle{
+    fn to_string(&self) -> String {
         let mut rtn = String::new();
         rtn.push_str(self.domain.as_str()); rtn.push_str(":");
         rtn.push_str(self.space.as_str()); rtn.push_str(":");
@@ -129,9 +181,13 @@ pub struct ArtifactLocation
     pub path: String
 }
 
-impl ArtifactLocation
+
+
+impl FromStr for ArtifactLocation
 {
-    pub fn from(string: &str) -> Result<Self,Error>
+    type Err = Error;
+
+    fn from_str(string: &str) -> Result<Self,Self::Err>
     {
         let (bundle,mut parts) = ArtifactBundle::more(string)?;
         let path = parts.next().ok_or("path")?.to_string();
@@ -140,10 +196,12 @@ impl ArtifactLocation
            path: path
         })
     }
+}
 
-    pub fn to(&self) -> String {
+impl ToString for ArtifactLocation{
+    fn to_string(&self) -> String {
         let mut rtn = String::new();
-        rtn.push_str(self.bundle.to().as_str() ); rtn.push_str(":");
+        rtn.push_str(self.bundle.to_string().as_str() ); rtn.push_str(":");
         rtn.push_str(self.path.to_string().as_str());
         return rtn;
     }

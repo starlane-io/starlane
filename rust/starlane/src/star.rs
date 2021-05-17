@@ -2965,11 +2965,14 @@ impl ResourceManager
                 self.skel.comm().reply_result_empty(message.clone(), result );
             }
             ResourceManagerAction::Status(report) => {
-//                let result = self.registry.set_status(report.clone() ).await;
-//                self.skel.comm().reply_result_empty(message.clone(), result );
+                unimplemented!()
             }
             ResourceManagerAction::SliceStatus(report) => {
 
+                unimplemented!()
+            }
+            ResourceManagerAction::Create(_) => {
+                unimplemented!()
             }
         }
 

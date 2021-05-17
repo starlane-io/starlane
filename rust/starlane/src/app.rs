@@ -62,8 +62,7 @@ impl FromStr for AppKind
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ConfigSrc
 {
-    Artifact(Artifact),
-    ResourceAddressPart(ResourceAddressPart)
+    Artifact(Artifact)
 }
 
 impl ToString for ConfigSrc {
@@ -72,19 +71,19 @@ impl ToString for ConfigSrc {
         match self
         {
             ConfigSrc::Artifact(artifact) => format!("Artifact::{}",artifact.to_string()),
-            ConfigSrc::ResourceAddressPart(address) => format!("ResourceAddressPart::{}", address.to_string()),
+//            ConfigSrc::ResourceAddressPart(address) => format!("ResourceAddressPart::{}", address.to_string()),
         }
     }
 }
 
 impl FromStr for ConfigSrc {
-    type Err = ();
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut split = s.split("::");
-        match split.next()?{
-            "Artifact" => Ok(ConfigSrc::Artifact(Artifact::from_str(split.next()?))),
-            "ResourceAddress" => Ok(ConfigSrc::ResourceAddressPart(ResourceAddress::from_str(split.next()?)?)),
+        match split.next().ok_or("nothing to split")?{
+            "Artifact" => Ok(ConfigSrc::Artifact(Artifact::from_str(split.next().ok_or("artifact")?)?)),
+//            "ResourceAddress" => Ok(ConfigSrc::ResourceAddressPart(split.next().ok_or("no more splits")?),
             what => Err(format!("cannot process ConfigSrc of type {}",what).to_owned().into())
         }
     }
@@ -124,8 +123,8 @@ impl Memory
 
 
 pub enum AppSliceCommand {
-    FetchSequence(Request<Empty,u64>),
     FetchAddress(Request<ResourceKey,ResourceAddress>),
+    FetchSequence(Request<Empty,u64>),
     Launch(Request<AppArchetype,()>),
     AddActor(ActorKey),
     HasActor(Request<ResourceKey, LocalResourceLocation>),
@@ -178,10 +177,7 @@ impl AppSlice
     {
         match command
         {
-            AppSliceCommand::FetchSequence(request) => {
-                self.fetch_seq(request).await;
-                Ok(())
-            }
+
             AppSliceCommand::Launch(request) => {
                 let result = self.ext.launch(request.payload ).await;
                 request.tx.send(result);
@@ -225,6 +221,12 @@ impl AppSlice
                 }
                 Ok(())
             }
+            AppSliceCommand::FetchAddress(address) => {
+                unimplemented!()
+            }
+            AppSliceCommand::FetchSequence(_) => {
+                unimplemented!()
+            }
         }
     }
 
@@ -258,9 +260,6 @@ impl AppSlice
 
 
 
-    pub fn meta(&self) -> AppMeta {
-       self.meta.clone()
-    }
 
 
 
@@ -330,36 +329,6 @@ impl AppMeta
         }
     }
 }
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct App
-{
-    pub key: AppKey,
-    pub archetype: AppArchetype
-}
-
-impl App
-{
-    pub fn new(key: AppKey, archetype: AppArchetype ) -> Self
-    {
-        App{
-            key: key,
-            archetype: archetype
-        }
-    }
-
-    pub fn meta(&self)->AppMeta
-    {
-        AppMeta{
-            key: self.key.clone(),
-            kind: self.archetype.kind.clone(),
-            specific: self.archetype.specific.clone(),
-            config: self.archetype.config.clone(),
-            owner: self.archetype.owner.clone()
-        }
-    }
-}
-
 
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -435,7 +404,11 @@ impl From<AppArchetype> for ResourceArchetype
 
 impl AppArchetype {
     pub fn resource_archetype(self)->ResourceArchetype{
-        ResourceArchetype::App(self)
+        ResourceArchetype{
+            kind: ResourceKind::App(self.kind),
+            specific: Option::Some(self.specific),
+            config: Option::Some(self.config)
+        }
     }
 }
 

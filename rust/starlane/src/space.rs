@@ -103,15 +103,6 @@ impl SpaceController
 }
 
 
-impl fmt::Display for RemoteSpaceCommand {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let r = match self {
-            RemoteSpaceCommand::AppCreateController(_) => "AppCreate".to_string(),
-            RemoteSpaceCommand::AppSelect(_) => "AppSelect".to_string()
-        };
-        write!(f, "{}",r)
-    }
-}
 
 
 pub enum CreateAppControllerFail
