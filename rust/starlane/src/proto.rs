@@ -24,6 +24,7 @@ use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
 use crate::logger::{Logger, Flags, Flag, StarFlag, Log, ProtoStarLog, ProtoStarLogPayload};
 use crate::permissions::AuthTokenSource;
+use crate::star::pledge::StarHandleBacking;
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -115,6 +116,13 @@ impl ProtoStar
                             Option::None
                         };
 
+                        let star_handler: Option<StarHandleBacking>= if !info.kind.handles().is_empty() {
+                            Option::Some(  StarHandleBacking::new().await )
+                        } else {
+                            Option::None
+                        };
+
+
                         let skel = StarSkel {
                             info: info,
                             sequence: self.sequence.clone(),
@@ -124,7 +132,8 @@ impl ProtoStar
                             logger: self.logger.clone(),
                             flags: self.flags.clone(),
                             auth_token_source: AuthTokenSource {},
-                            resource_manager: resource_registry
+                            resource_manager: resource_registry,
+                            star_handler: star_handler
                         };
 
                         let core_ext = self.star_core_ext_factory.create(&skel );

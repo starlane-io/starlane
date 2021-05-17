@@ -33,21 +33,27 @@ impl ConstellationTemplate
 
         let mut central = StarTemplate::new(StarKeyTemplate::central(), StarKind::Central, Option::Some("central".to_string()) );
         let mut mesh = StarTemplate::new(StarKeyTemplate::central_geodesic(1), StarKind::Mesh, Option::Some("mesh".to_string())  );
-        let mut supervisor = StarTemplate::new(StarKeyTemplate::central_geodesic(2), StarKind::Supervisor, Option::Some("supervisor".to_string())  );
-        let mut server = StarTemplate::new(StarKeyTemplate::central_geodesic(3), StarKind::Server, Option::Some("server".to_string())  );
-        let mut gateway = StarTemplate::new(StarKeyTemplate::central_geodesic(4), StarKind::Gateway, Option::Some("gateway".to_string())  );
+        let mut space_host= StarTemplate::new(StarKeyTemplate::central_geodesic(2), StarKind::SpaceHost, Option::Some("space_host".to_string())  );
+        let mut app_host = StarTemplate::new(StarKeyTemplate::central_geodesic(3), StarKind::AppHost, Option::Some("app_host".to_string())  );
+        let mut actor_host = StarTemplate::new(StarKeyTemplate::central_geodesic(4), StarKind::ActorHost, Option::Some("actor_host".to_string())  );
+        let mut file_store= StarTemplate::new(StarKeyTemplate::central_geodesic(5), StarKind::FileStore, Option::Some("file_store".to_string())  );
+        let mut gateway = StarTemplate::new(StarKeyTemplate::central_geodesic(6), StarKind::Gateway, Option::Some("gateway".to_string())  );
 
 
         ConstellationTemplate::connect(&mut central, &mut mesh );
-        ConstellationTemplate::connect(&mut supervisor, &mut mesh );
-        ConstellationTemplate::connect(&mut server , &mut mesh );
+        ConstellationTemplate::connect(&mut space_host, &mut mesh );
+        ConstellationTemplate::connect(&mut app_host, &mut mesh );
+        ConstellationTemplate::connect(&mut actor_host, &mut mesh );
+        ConstellationTemplate::connect(&mut file_store, &mut mesh );
         ConstellationTemplate::connect(&mut gateway, &mut mesh );
 
 
         template.add_star(central );
         template.add_star(mesh );
-        template.add_star(supervisor );
-        template.add_star(server );
+        template.add_star(space_host );
+        template.add_star(app_host );
+        template.add_star(actor_host );
+        template.add_star(file_store );
         template.add_star(gateway );
 
         template

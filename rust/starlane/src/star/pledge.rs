@@ -9,7 +9,7 @@ use std::str::FromStr;
 use rusqlite::types::{ValueRef, ToSqlOutput, Value};
 use tokio::time::Duration;
 
-
+#[derive(Clone)]
 pub struct StarHandleBacking{
     tx: mpsc::Sender<StarHandleAction>
 }
@@ -22,7 +22,7 @@ impl StarHandleBacking {
         }
     }
 
-    pub async fn set_star_handle( &self, handle: StarHandle ) -> Result<(),Fail>{
+    pub async fn add_star_handle(&self, handle: StarHandle ) -> Result<(),Fail>{
        let (action,rx) = StarHandleAction::new(StarHandleCommand::SetStar(handle));
        self.tx.send( action ).await?;
        tokio::time::timeout(Duration::from_secs(5), rx).await??;
@@ -35,6 +35,18 @@ impl StarHandleBacking {
         let result = tokio::time::timeout(Duration::from_secs(5), rx).await??;
         if let StarHandleResult::StarHandles(handles) = result {
             Ok(handles)
+        } else {
+            Err(Fail::Unexpected)
+        }
+    }
+
+    // must have at least one of each StarKind
+    pub async fn satisfied( &self, set: HashSet<StarKind> ) -> Result<Satisfaction,Fail> {
+        let (action,rx) = StarHandleAction::new(StarHandleCommand::Satisfied(set));
+        self.tx.send( action ).await?;
+        let result = tokio::time::timeout(Duration::from_secs(5), rx).await??;
+        if let StarHandleResult::Satisfaction(satisfaction) = result {
+            Ok(satisfaction)
         } else {
             Err(Fail::Unexpected)
         }
@@ -117,14 +129,21 @@ impl StarHandleAction
 pub enum StarHandleCommand {
     Close,
     SetStar(StarHandle),
-    Select(StarSelector)
+    Select(StarSelector),
+    Satisfied(HashSet<StarKind>)
 }
 
 pub enum StarHandleResult
 {
    Ok,
    StarHandles(Vec<StarHandle>),
-   Error(String)
+   Error(String),
+   Satisfaction(Satisfaction)
+}
+
+pub enum Satisfaction {
+    Ok,
+    Lacking(HashSet<StarKind>)
 }
 
 
@@ -267,6 +286,23 @@ impl StarHandleDb {
                     handles.push(handle);
                 }
                 Ok(StarHandleResult::StarHandles(handles))
+            }
+            StarHandleCommand::Satisfied(kinds) => {
+                let mut lacking = HashSet::new();
+                for kind in kinds {
+                    if !self.conn.query_row("SELECT count(*) AS count FROM stars WHERE kind=?1", params![kind.to_string()], |row| {
+                       let count:usize = row.get(0)?;
+                       return Ok(count > 0);
+                    })? {
+                        lacking.insert(kind);
+                    }
+                }
+                if lacking.is_empty() {
+                    Ok(StarHandleResult::Satisfaction(Satisfaction::Ok))
+                } else {
+                    Ok(StarHandleResult::Satisfaction(Satisfaction::Lacking(lacking)))
+                }
+
             }
         }
 

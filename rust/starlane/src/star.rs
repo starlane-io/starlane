@@ -22,7 +22,7 @@ use tokio::time::{Duration, Instant, timeout};
 use tokio::time::error::Elapsed;
 use url::Url;
 
-use server::ServerStarVariant;
+use actor_host::ServerStarVariant;
 
 use crate::actor::{ActorKey, ActorKind, ActorWatcher, ResourceMessage, ResourceMessageWrapper};
 use crate::app::{AppCommandKind, AppController, AppCreateController, AppMeta, AppSpecific, AppLocation, AppCommand};
@@ -40,17 +40,18 @@ use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, Mess
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
 use crate::space::{CreateAppControllerFail, RemoteSpaceCommand, RemoteSpaceCommandKind, SpaceController};
 use crate::star::central::CentralStarVariant;
-use crate::star::supervisor::{SupervisorVariant};
+use crate::star::app_host::{SupervisorVariant};
 use crate::permissions::{Authentication, AuthToken, AuthTokenSource, Credentials};
 use tokio::sync::oneshot::Sender;
 use std::str::FromStr;
 use crate::star::space::SpaceVariant;
 use crate::frame::ResourceHostAction::SliceAssign;
 use std::iter::FromIterator;
+use crate::star::pledge::{StarHandleBacking, StarHandle, Satisfaction};
 
 pub mod central;
-pub mod supervisor;
-pub mod server;
+pub mod app_host;
+pub mod actor_host;
 pub mod filestore;
 pub mod pledge;
 pub mod space;
@@ -60,10 +61,10 @@ pub mod common;
 pub enum StarKind
 {
     Central,
-    Space,
+    SpaceHost,
     Mesh,
-    Supervisor,
-    Server,
+    AppHost,
+    ActorHost,
     FileStore,
     Gateway,
     Link,
@@ -75,10 +76,10 @@ impl StarKind
     pub fn is_resource_manager(&self)->bool{
         match self{
             StarKind::Central => true,
-            StarKind::Space => true,
+            StarKind::SpaceHost => true,
             StarKind::Mesh => false,
-            StarKind::Supervisor => true,
-            StarKind::Server => false,
+            StarKind::AppHost => true,
+            StarKind::ActorHost => false,
             StarKind::FileStore => true,
             StarKind::Gateway => false,
             StarKind::Link => false,
@@ -89,10 +90,10 @@ impl StarKind
     pub fn is_resource_host(&self)->bool{
         match self{
             StarKind::Central => false,
-            StarKind::Space => true,
+            StarKind::SpaceHost => true,
             StarKind::Mesh => false,
-            StarKind::Supervisor => true,
-            StarKind::Server => true,
+            StarKind::AppHost => true,
+            StarKind::ActorHost => true,
             StarKind::FileStore => true,
             StarKind::Gateway => false,
             StarKind::Link => false,
@@ -100,13 +101,28 @@ impl StarKind
         }
     }
 
+    pub fn handles(&self)->HashSet<StarKind>{
+        HashSet::from_iter(match self {
+            StarKind::Central => vec![StarKind::AppHost, StarKind::SpaceHost],
+            StarKind::SpaceHost => vec![StarKind::FileStore],
+            StarKind::Mesh => vec![],
+            StarKind::AppHost => vec![StarKind::ActorHost, StarKind::FileStore],
+            StarKind::ActorHost => vec![],
+            StarKind::FileStore => vec![],
+            StarKind::Gateway => vec![],
+            StarKind::Link => vec![],
+            StarKind::Client => vec![]
+        }.iter().cloned())
+    }
+
+
     pub fn manages(&self)->HashSet<ResourceType>{
         HashSet::from_iter(match self {
             StarKind::Central => vec![ResourceType::Space],
-            StarKind::Space => vec![ResourceType::SubSpace,ResourceType::App,ResourceType::FileSystem],
+            StarKind::SpaceHost => vec![ResourceType::SubSpace, ResourceType::App, ResourceType::FileSystem],
             StarKind::Mesh => vec![],
-            StarKind::Supervisor => vec![ResourceType::Actor,ResourceType::FileSystem],
-            StarKind::Server => vec![],
+            StarKind::AppHost => vec![ResourceType::Actor, ResourceType::FileSystem],
+            StarKind::ActorHost => vec![],
             StarKind::FileStore => vec![ResourceType::File],
             StarKind::Gateway => vec![],
             StarKind::Link => vec![],
@@ -117,10 +133,10 @@ impl StarKind
     pub fn hosts(&self)->HashSet<ResourceType>{
         HashSet::from_iter(match self {
             StarKind::Central => vec![],
-            StarKind::Space => vec![ResourceType::Space,ResourceType::SubSpace],
+            StarKind::SpaceHost => vec![ResourceType::Space, ResourceType::SubSpace],
             StarKind::Mesh => vec![],
-            StarKind::Supervisor => vec![ResourceType::App],
-            StarKind::Server => vec![ResourceType::Actor],
+            StarKind::AppHost => vec![ResourceType::App],
+            StarKind::ActorHost => vec![ResourceType::Actor],
             StarKind::FileStore => vec![ResourceType::FileSystem,ResourceType::File],
             StarKind::Gateway => vec![],
             StarKind::Link => vec![],
@@ -137,13 +153,13 @@ impl FromStr for StarKind{
         match input {
             "Central"  => Ok(StarKind::Central),
             "Mesh"  => Ok(StarKind::Mesh),
-            "Supervisor"  => Ok(StarKind::Supervisor),
-            "Server"  => Ok(StarKind::Server),
+            "AppHost"  => Ok(StarKind::AppHost),
+            "ActorHost"  => Ok(StarKind::ActorHost),
             "FileStore"  => Ok(StarKind::FileStore),
             "Gateway"  => Ok(StarKind::Gateway),
             "Link"  => Ok(StarKind::Link),
             "Client"  => Ok(StarKind::Client),
-            "Space"  => Ok(StarKind::Space),
+            "SpaceHost"  => Ok(StarKind::SpaceHost),
             _      => Err(()),
         }
     }
@@ -198,7 +214,7 @@ impl StarKind
 
     pub fn is_supervisor(&self)->bool
     {
-        if let StarKind::Supervisor = self
+        if let StarKind::AppHost = self
         {
             return true;
         }
@@ -232,7 +248,7 @@ impl StarKind
 
     pub fn supervisor_result(&self)->Result<(),Error>
     {
-        if let StarKind::Supervisor = self
+        if let StarKind::AppHost = self
         {
             Ok(())
         }
@@ -243,7 +259,7 @@ impl StarKind
 
     pub fn server_result(&self)->Result<(),Error>
     {
-        if let StarKind::Server= self
+        if let StarKind::ActorHost = self
         {
             Ok(())
         }
@@ -271,13 +287,13 @@ impl StarKind
         {
             StarKind::Central => false,
             StarKind::Mesh => true,
-            StarKind::Supervisor => false,
-            StarKind::Server => true,
+            StarKind::AppHost => false,
+            StarKind::ActorHost => true,
             StarKind::Gateway => true,
             StarKind::Client => true,
             StarKind::Link => true,
             StarKind::FileStore => false,
-            StarKind::Space => false
+            StarKind::SpaceHost => false
         }
     }
 }
@@ -288,13 +304,13 @@ impl fmt::Display for StarKind{
         match self{
             StarKind::Central => "Central".to_string(),
             StarKind::Mesh => "Mesh".to_string(),
-            StarKind::Supervisor => "Supervisor".to_string(),
-            StarKind::Server => "Server".to_string(),
+            StarKind::AppHost => "AppHost".to_string(),
+            StarKind::ActorHost => "ActorHost".to_string(),
             StarKind::FileStore => "FileStore".to_string(),
             StarKind::Gateway => "Gateway".to_string(),
             StarKind::Link => "Link".to_string(),
             StarKind::Client => "Client".to_string(),
-            StarKind::Space => "Space".to_string()
+            StarKind::SpaceHost => "SpaceHost".to_string()
         })
     }
 }
@@ -389,6 +405,7 @@ impl Star
 
                     StarCommand::Init => {
                         self.skel.variant_tx.send(StarVariantCommand::Init).await;
+                        self.init().await;
                     }
                     StarCommand::SetFlags(set_flags ) => {
                        self.skel.flags= set_flags.flags;
@@ -511,6 +528,9 @@ impl Star
                         self.resource_address_to_key.put( set.payload.address.clone(), set.payload.key.clone() );
                         set.commit();
                     }
+                    StarCommand::Diagnose(diagnose) => {
+                        self.diagnose(diagnose).await;
+                    }
                     _ => {
                         eprintln!("cannot process command: {}",command);
                     }
@@ -522,6 +542,37 @@ impl Star
                 return;
             }
 
+        }
+    }
+
+    async fn init(&mut self){
+        self.init_handles().await;
+    }
+
+    async fn init_handles(&mut self) {
+        if let Option::Some(star_handler) = &self.skel.star_handler {
+            for kind in self.skel.info.kind.handles() {
+                let (search, rx) = Wind::new(StarPattern::StarKind(kind.clone()), WindAction::SearchHits);
+                self.skel.star_tx.send(StarCommand::WindInit(search)).await;
+                let star_handler = star_handler.clone();
+                let kind = kind.clone();
+                tokio::spawn( async move {
+                    let result = tokio::time::timeout(Duration::from_secs(5), rx).await;
+                    if let Ok(Ok(hits)) = result
+                    {
+                        for (star, hops) in hits.hits {
+                            let handle = StarHandle {
+                                key: star,
+                                kind: StarKind::FileStore,
+                                hops: Option::Some(hops)
+                            };
+                            star_handler.add_star_handle(handle).await;
+                        }
+                    } else {
+                        eprintln!("error encountered when attempting to get a handle for: {}", kind );
+                    }
+                });
+            }
         }
     }
 
@@ -1491,6 +1542,22 @@ impl Star
     }
 
 
+    async fn diagnose( &self, diagnose: Diagnose ) {
+        match diagnose {
+            Diagnose::HandlersSatisfied(satisfied) => {
+                if let Option::Some(star_handler) = &self.skel.star_handler {
+                    if let Result::Ok(satisfaction) = star_handler.satisfied(self.skel.info.kind.handles() ).await {
+                        satisfied.tx.send( satisfaction );
+                    } else {
+                        // let satisfied.tx drop since we can't give it an answer
+                    }
+                } else {
+                    satisfied.tx.send( Satisfaction::Ok );
+                }
+            }
+        }
+    }
+
 
 }
 
@@ -1527,7 +1594,12 @@ pub enum StarCommand
     ResourceMessage(Request<ResourceMessageWrapper,Fail>),
     ResourceLocate(Request<ResourceKey,ResourceLocation>),
     SetResourceLocation(Set<ResourceLocation>),
-    SetResourceBind(Set<ResourceBinding>)
+    SetResourceBind(Set<ResourceBinding>),
+    Diagnose(Diagnose)
+}
+
+pub enum Diagnose{
+    HandlersSatisfied(YesNo<Satisfaction>)
 }
 
 pub struct GetSpaceController
@@ -1710,6 +1782,20 @@ impl <P,R> Query<P,R>
     }
 }
 
+pub struct YesNo<R> {
+    pub tx: oneshot::Sender<R>
+}
+
+impl <R> YesNo<R>
+{
+    pub fn new( )->(Self,oneshot::Receiver<R>) {
+        let (tx,rx) = oneshot::channel();
+        (YesNo{
+            tx: tx
+        },rx)
+    }
+}
+
 
 pub struct Set<P> {
     pub payload: P,
@@ -1803,7 +1889,8 @@ impl fmt::Display for StarCommand{
             StarCommand::ResourceMessage(_) => "ResourceMessage".to_string(),
             StarCommand::ResourceLocate(_) => "ResourceLocate".to_string(),
             StarCommand::SetResourceLocation(_) => "SetResourceLocation".to_string(),
-            StarCommand::SetResourceBind(_) => "SetResourceBind".to_string()
+            StarCommand::SetResourceBind(_) => "SetResourceBind".to_string(),
+            StarCommand::Diagnose(_) => "Diagnose".to_string()
         };
         write!(f, "{}",r)
     }
@@ -2398,15 +2485,15 @@ impl StarManagerFactory for StarManagerFactoryDefault
                     {
                         break Box::new(CentralStarVariant::new(data.clone() ).await );
                     }
-                    if let StarKind::Space = data.info.kind
+                    if let StarKind::SpaceHost = data.info.kind
                     {
                         break Box::new(SpaceVariant::new(data.clone() ).await );
                     }
-                    else if let StarKind::Supervisor= data.info.kind
+                    else if let StarKind::AppHost = data.info.kind
                     {
                         break Box::new(SupervisorVariant::new(data.clone()).await );
                     }
-                    else if let StarKind::Server= data.info.kind
+                    else if let StarKind::ActorHost = data.info.kind
                     {
                         break Box::new(ServerStarVariant::new(data.clone()));
                     }
@@ -2441,7 +2528,8 @@ pub struct StarSkel
     pub logger: Logger,
     pub sequence: Arc<AtomicU64>,
     pub auth_token_source: AuthTokenSource,
-    pub resource_manager: Option<Arc<dyn ResourceRegistryBacking>>
+    pub resource_manager: Option<Arc<dyn ResourceRegistryBacking>>,
+    pub star_handler: Option<StarHandleBacking>
 }
 
 impl StarSkel

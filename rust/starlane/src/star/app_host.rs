@@ -112,7 +112,7 @@ impl StarVariant for SupervisorVariant
                             kind: StarKind::FileStore,
                             hops: Option::Some(hops)
                         };
-                        self.star_handles.set_star_handle(handle).await;
+                        self.star_handles.add_star_handle(handle).await;
                     }
                 } else {
                   eprintln!("error encountered when attempting to get a handle on FileStore's")

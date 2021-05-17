@@ -480,7 +480,7 @@ mod test
             tokio::time::sleep(Duration::from_secs(1)).await;
             assert_eq!(agg.count( |log| match log{
                 Log::Star(star_log) => {
-                    if let StarKind::Server = star_log.kind
+                    if let StarKind::ActorHost = star_log.kind
                     {
                         match star_log.payload
                         {
@@ -498,7 +498,7 @@ mod test
 
             assert_eq!(agg.count( |log| match log{
                 Log::Star(star_log) => {
-                    if let StarKind::Supervisor = star_log.kind
+                    if let StarKind::AppHost = star_log.kind
                     {
                         match star_log.payload
                         {
