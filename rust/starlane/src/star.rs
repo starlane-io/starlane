@@ -551,22 +551,32 @@ impl Star
 
     async fn init_handles(&mut self) {
         if let Option::Some(star_handler) = &self.skel.star_handler {
+println!("init handles for: {}",self.skel.info.kind);
             for kind in self.skel.info.kind.handles() {
+println!("   {} searching for: {}",self.skel.info.kind,kind);
                 let (search, rx) = Wind::new(StarPattern::StarKind(kind.clone()), WindAction::SearchHits);
                 self.skel.star_tx.send(StarCommand::WindInit(search)).await;
                 let star_handler = star_handler.clone();
                 let kind = kind.clone();
+                let skel = self.skel.clone();
                 tokio::spawn( async move {
                     let result = tokio::time::timeout(Duration::from_secs(5), rx).await;
                     if let Ok(Ok(hits)) = result
                     {
+println!("   {} got {} hits for search: {}",skel.info.kind,hits.hits.len(),kind);
                         for (star, hops) in hits.hits {
                             let handle = StarHandle {
                                 key: star,
                                 kind: StarKind::FileStore,
                                 hops: Option::Some(hops)
                             };
-                            star_handler.add_star_handle(handle).await;
+                            let result = star_handler.add_star_handle(handle).await;
+                            match result {
+                                Ok(_) => {}
+                                Err(error) => {
+                                    eprintln!("error when adding star handle: {}", error.to_string())
+                                }
+                            }
                         }
                     } else {
                         eprintln!("error encountered when attempting to get a handle for: {}", kind );

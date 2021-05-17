@@ -214,8 +214,9 @@ impl StarHandleDb {
                 } else {
                     trans.execute("REPLACE INTO stars (key,kind) VALUES (?1,?2)", params![key,kind])?;
                 }
-
                 trans.commit()?;
+
+println!("STAR IS SET!");
                 Ok(StarHandleResult::Ok)
             }
             StarHandleCommand::Select(selector) => {
@@ -293,6 +294,7 @@ impl StarHandleDb {
                 for kind in kinds {
                     if !self.conn.query_row("SELECT count(*) AS count FROM stars WHERE kind=?1", params![kind.to_string()], |row| {
                        let count:usize = row.get(0)?;
+println!("count == {}",count);
                        return Ok(count > 0);
                     })? {
                         lacking.insert(kind);

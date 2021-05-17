@@ -470,6 +470,8 @@ mod test
                 }
             }
 
+            tokio::time::sleep(Duration::from_secs(1)).await;
+
             let central_ctrl = {
                 let (request,rx) = StarControlRequestByName::new("standalone".to_owned(), "central".to_owned());
                 tx.send(StarlaneCommand::StarControlRequestByName(request)).await;
