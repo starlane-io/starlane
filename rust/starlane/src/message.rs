@@ -348,7 +348,8 @@ pub enum Fail
     },
     ResourceTypeRequiresOwner,
     RecvErr,
-    CannotSelectResourceHost
+    CannotSelectResourceHost,
+    ResourceCannotGenerateAddress
 }
 
 impl ToString for Fail {
@@ -364,7 +365,8 @@ impl ToString for Fail {
             Fail::RecvErr => "RecvErr".to_string(),
             Fail::ResourceTypeRequiresOwner => "ResourceTypeRequiresOwner".to_string(),
             Fail::CannotSelectResourceHost => "CannotSelectResourceHost".to_string(),
-            Fail::WrongParentResourceType { .. } => "WrongParentResourceType".to_string()
+            Fail::WrongParentResourceType { .. } => "WrongParentResourceType".to_string(),
+            Fail::ResourceCannotGenerateAddress => "ResourceCannotGenerateAddress".to_string()
         }
     }
 }

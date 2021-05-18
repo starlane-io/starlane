@@ -8,7 +8,7 @@ use std::iter::FromIterator;
 use std::str::FromStr;
 use rusqlite::types::{ValueRef, ToSqlOutput, Value};
 use tokio::time::Duration;
-use crate::resource::{ResourceHost, ResourceAssign, Resource};
+use crate::resource::{RemoteResourceHost, ResourceAssign, Resource};
 use crate::frame::{StarMessagePayload, ResourceHostAction, SimpleReply, Reply};
 use tokio::time::error::Elapsed;
 use tokio::sync::oneshot::error::RecvError;
@@ -65,14 +65,14 @@ pub struct StarHandle {
     pub hops: Option<usize>
 }
 
-pub struct RemoteResourceHost {
+pub struct ResourceHost {
     comm: StarComm,
     handle: StarHandle
 }
 
 #[async_trait]
-impl ResourceHost for RemoteResourceHost {
-    async fn assign( &self, assign: ResourceAssign) -> Result<Resource, Fail> {
+impl RemoteResourceHost for ResourceHost {
+    async fn assign( &self, assign: ResourceAssign) -> Result<(), Fail> {
         if !self.handle.kind.hosts().contains(&assign.key.resource_type() ) {
             return Err(Fail::WrongResourceType{
                 expected: self.handle.kind.hosts().clone(),
@@ -88,7 +88,7 @@ impl ResourceHost for RemoteResourceHost {
         match tokio::time::timeout( Duration::from_secs(5), reply).await{
             Ok(result) => {
                 if let Result::Ok( StarMessagePayload::Reply(SimpleReply::Ok(Reply::Resource(resource)))) = result{
-                    Ok(resource)
+                    Ok(())
                 } else {
                     Err(Fail::Unexpected)
                 }

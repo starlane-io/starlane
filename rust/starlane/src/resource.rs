@@ -16,7 +16,7 @@ use crate::app::{AppKind, AppArchetype, AppProfile, ConfigSrc, InitData};
 use crate::artifact::{ArtifactKey, ArtifactKind};
 use crate::error::{Error};
 use crate::keys::{FileKey, ResourceId};
-use crate::id::Id;
+use crate::id::{Id, IdSeq};
 use crate::names::{Name, Specific};
 use crate::permissions::User;
 use crate::keys::{SubSpaceKey, ResourceKey, AppKey, SubSpaceId, SpaceKey, UserKey, GatheringKey, FileSystemKey, AppFilesystemKey, SubSpaceFilesystemKey};
@@ -1482,10 +1482,14 @@ pub trait ResourceIdSeq: Send+Sync {
     async fn next(&self)->ResourceId;
 }
 
+#[async_trait]
+pub trait RemoteHostedResource: Send+Sync {
+}
+
 
 #[async_trait]
 pub trait ResourceHostSelector: Send+Sync {
-    async fn select( &self, resource_type: ResourceType ) -> Result<Arc<dyn ResourceHost>,Fail>;
+    async fn select( &self, resource_type: ResourceType ) -> Result<Arc<dyn RemoteResourceHost>,Fail>;
 }
 
 pub struct HostedResourceStore{
@@ -1515,7 +1519,12 @@ impl  HostedResourceStore{
 
 pub struct HostedResource {
     pub manager: Arc<dyn RemoteResourceManager>,
+    pub id_seq: Arc<IdSeq>,
     pub resource: Resource
+}
+
+impl RemoteHostedResource for HostedResource{
+
 }
 
 #[async_trait]
@@ -1525,12 +1534,14 @@ pub trait RemoteResourceManager: Send+Sync {
 
 #[derive(Clone)]
 pub struct ResourceManagerCore{
-    pub key: Option<ResourceKey>,
+    pub key: ResourceKey,
+    pub address: ResourceAddress,
     pub resource_type: ResourceType,
     pub selector: Arc<dyn ResourceHostSelector>,
     pub registry: Arc<dyn ResourceRegistryBacking>,
-    pub key_sequence: Arc<dyn ResourceIdSeq>
+    pub id_seq: Arc<IdSeq>
 }
+
 
 pub struct ResourceManager{
    pub core: ResourceManagerCore
@@ -1557,14 +1568,44 @@ impl ResourceManager{
             archetype: create.init.archetype.clone(),
             info: create.registry_info } ).await?;
 
-        let key = ResourceKey::new( core.key, core.key_sequence.next().await )?;
+        let key = match create.key {
+            KeyCreationSrc::None => {
+                ResourceKey::new( &Option::Some(core.key.clone()), ResourceId::new(&core.resource_type, core.id_seq.next() ) )?
+            }
+            KeyCreationSrc::Key(key) => {
+                if key.parent() != Option::Some(core.key){
+                    return Err("parent keys do not match".into());
+                }
+                key
+            }
+        };
+
+        let address = match create.address{
+            AddressCreationSrc::None => {
+                let address = format!( "{}:{}", core.address.to_string(), key.generate_address_tail()? );
+                create.init.archetype.kind.resource_type().address_structure().from_str(address.as_str())?
+            }
+            AddressCreationSrc::Append(tail) => {
+                let address = format!( "{}:{}", core.address.to_string(), tail );
+                create.init.archetype.kind.resource_type().address_structure().from_str(address.as_str())?
+            }
+        };
+
         let assign = ResourceAssign {
-            key: key,
+            key: key.clone(),
             source: ResourceSrc::Creation(create.init.clone())
         };
 
         let mut host = core.selector.select(create.init.archetype.kind.resource_type()).await?;
-        let resource = host.assign(assign).await?;
+
+        host.assign(assign).await?;
+
+        let resource = Resource{
+            key: key,
+            address: address,
+            archetype: create.init.archetype,
+            owner: None
+        };
 
         reservation.commit( resource.clone() );
 
@@ -1590,8 +1631,8 @@ impl  RemoteResourceManager for ResourceManager{
 
 
 #[async_trait]
-pub trait ResourceHost: Send+Sync {
-    async fn assign( &self, assign: ResourceAssign ) -> Result<Resource,Fail>;
+pub trait RemoteResourceHost: Send+Sync {
+    async fn assign( &self, assign: ResourceAssign ) -> Result<(),Fail>;
 }
 
 
@@ -2679,6 +2720,7 @@ impl FromStr for Version {
 pub struct ResourceCreate {
    pub parent: Option<ResourceKey>,
    pub key: KeyCreationSrc,
+   pub address: AddressCreationSrc,
    pub init: ResourceInit,
    pub registry_info: Option<ResourceRegistryInfo>,
    pub owner: Option<UserKey>,
@@ -2691,6 +2733,7 @@ impl ResourceCreate {
         ResourceCreate {
             parent: Option::None,
             key: KeyCreationSrc::None,
+            address: AddressCreationSrc::None,
             init: init,
             registry_info: Option::None,
             owner: Option::None,
@@ -2732,6 +2775,11 @@ impl FromStr for ResourceStatus{
     }
 }
 
+#[derive(Clone,Serialize,Deserialize)]
+pub enum AddressCreationSrc{
+    None,
+    Append(String)
+}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum KeyCreationSrc {

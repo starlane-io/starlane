@@ -255,7 +255,7 @@ pub enum ResourceId{
 }
 
 impl ResourceId{
-    fn resource_type(&self)->ResourceType{
+    pub fn resource_type(&self)->ResourceType{
         match self{
             ResourceId::Space(_) => ResourceType::Space,
             ResourceId::SubSpace(_) => ResourceType::SubSpace,
@@ -266,7 +266,19 @@ impl ResourceId{
             ResourceId::File(_) => ResourceType::File,
             ResourceId::FileSystem(_) => ResourceType::FileSystem,
         }
+    }
 
+    pub fn new( resource_type: &ResourceType, id: Id ) -> Self{
+        match resource_type{
+            ResourceType::Space => Self::Space(id.index as _),
+            ResourceType::SubSpace =>  Self::SubSpace(id.index as _),
+            ResourceType::App =>  Self::App(id.index as _),
+            ResourceType::Actor =>  Self::Actor(id),
+            ResourceType::User =>  Self::User(id.index as _),
+            ResourceType::FileSystem =>  Self::FileSystem(id.index as _),
+            ResourceType::File =>  Self::File(id.index as _),
+            ResourceType::Artifact =>  Self::Artifact(id.index as _),
+        }
     }
 }
 
@@ -291,13 +303,14 @@ pub enum ResourceKey
 
 impl ResourceKey
 {
-    pub fn new(parent: Option<ResourceKey>, id: ResourceId) -> Result<Self,Error> {
+    pub fn new(parent: &Option<ResourceKey>, id: ResourceId) -> Result<Self,Error> {
         match &id{
             ResourceId::Space(space) => {
                 Ok(Self::Space(SpaceKey::Space(space.to_owned())))
             }
             _ => {
                 if let Option::Some(parent) = parent {
+                    let parent = parent.clone();
                     match id{
                         ResourceId::Space(_) => {
                             Err("IMPOSSIBLE! space should have already been processed".into())
@@ -361,6 +374,25 @@ impl ResourceKey
                     Err("expected parent key".into())
                 }
             }
+        }
+
+
+    }
+
+    pub fn generate_address_tail(&self) -> Result<String,Fail>{
+        match self{
+            ResourceKey::Space(_) => Err(Fail::ResourceCannotGenerateAddress),
+            ResourceKey::SubSpace(_) => Err(Fail::ResourceCannotGenerateAddress),
+            ResourceKey::App(app) => {
+                Ok(app.id.to_string())
+            }
+            ResourceKey::Actor(actor) => {
+                Ok(actor.id.to_string())
+            }
+            ResourceKey::User(user) => Err(Fail::ResourceCannotGenerateAddress),
+            ResourceKey::Artifact(_) => Err(Fail::ResourceCannotGenerateAddress),
+            ResourceKey::File(_) => Err(Fail::ResourceCannotGenerateAddress),
+            ResourceKey::FileSystem(_) => Err(Fail::ResourceCannotGenerateAddress)
         }
     }
 
