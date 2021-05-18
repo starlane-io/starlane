@@ -478,6 +478,16 @@ mod test
                 timeout(Duration::from_millis(10), rx).await.unwrap().unwrap()
             };
 
+            let mesh_ctrl = {
+                let (request,rx) = StarControlRequestByName::new("standalone".to_owned(), "mesh".to_owned());
+                tx.send(StarlaneCommand::StarControlRequestByName(request)).await;
+                timeout(Duration::from_millis(10), rx).await.unwrap().unwrap()
+            };
+
+            let space_ctrl = mesh_ctrl.get_space_controller(&SpaceKey::HyperSpace, &Authentication::mock(UserKey::hyper_user())).await.unwrap();
+
+            println!("got space ctrl");
+
 
             assert_eq!(central_ctrl.diagnose_handlers_satisfaction().await.unwrap(),crate::star::pledge::Satisfaction::Ok)
 

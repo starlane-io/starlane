@@ -15,6 +15,8 @@ use crate::message::Fail;
 use crate::names::Name;
 use crate::permissions::{Priviledges, User, UserKind};
 use crate::resource::{Labels, Resource, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceKind, ResourceManagerKey, ResourceType, Skewer};
+use std::collections::HashSet;
+use std::iter::FromIterator;
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum SpaceKey
@@ -426,7 +428,7 @@ impl ResourceKey
         if let ResourceKey::Actor(key) = self {
             Ok(key.clone())
         } else {
-            Err(Fail::WrongResourceType)
+            Err(Fail::WrongResourceType{expected: HashSet::from_iter(vec![ResourceType::Actor]), received: self.resource_type().clone() })
         }
     }
 
@@ -434,7 +436,7 @@ impl ResourceKey
         if let ResourceKey::App(key) = self {
             Ok(key.clone())
         } else {
-            Err(Fail::WrongResourceType)
+            Err(Fail::WrongResourceType{expected: HashSet::from_iter(vec![ResourceType::App]), received: self.resource_type().clone() })
         }
     }
 
@@ -442,7 +444,7 @@ impl ResourceKey
         if let ResourceKey::File(key) = self {
             Ok(key.clone())
         } else {
-            Err(Fail::WrongResourceType)
+            Err(Fail::WrongResourceType{expected: HashSet::from_iter(vec![ResourceType::File]), received: self.resource_type().clone() })
         }
     }
 

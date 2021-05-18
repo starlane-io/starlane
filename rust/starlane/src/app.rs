@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -17,7 +17,7 @@ use crate::filesystem::File;
 use crate::frame::{Reply, StarMessagePayload, ResourceManagerAction};
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, SubSpaceKey, UserKey, ResourceKey};
-use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceLocation, ResourceArchetype, ResourceProfile, ResourceAddress, Names, ResourceSrc, Skewer, ResourceAddressPart, ResourceType, Resource, ResourceCreate};
+use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceLocation, ResourceArchetype, ResourceInit, ResourceAddress, Names, ResourceSrc, Skewer, ResourceAddressPart, ResourceType, Resource, ResourceCreate};
 use crate::names::Name;
 use crate::space::CreateAppControllerFail;
 use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarSkel, StarVariantCommand, StarComm, ServerCommand, Request, Empty, Query, LocalResourceLocation };
@@ -25,6 +25,7 @@ use crate::message::{Fail, ProtoMessage};
 use tokio::sync::mpsc::Sender;
 use tokio::time::error::Elapsed;
 use tokio::sync::oneshot::error::RecvError;
+use std::iter::FromIterator;
 
 pub type AppSpecific = Name;
 
@@ -218,7 +219,7 @@ unimplemented!();
                         request.tx.send(Err(Fail::ResourceNotFound(request.payload.to.key)));
                     }
                 } else {
-                    request.tx.send(Err(Fail::WrongResourceType));
+                    request.tx.send(Err(Fail::WrongResourceType{expected: HashSet::from_iter(vec![ResourceType::Actor]), received: request.payload.to.key.resource_type().clone() }));
                 }
                 Ok(())
             }
@@ -370,10 +371,10 @@ pub struct ActorProfile{
     pub init: InitData
 }
 
-impl From<AppProfile> for ResourceProfile
+impl From<AppProfile> for ResourceInit
 {
     fn from(profile: AppProfile) -> Self {
-        ResourceProfile {
+        ResourceInit {
             init: profile.init,
             archetype: profile.archetype.into(),
         }

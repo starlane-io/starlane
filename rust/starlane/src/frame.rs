@@ -18,7 +18,7 @@ use crate::logger::Flags;
 use crate::message::{Fail, MessageExpect, MessageResult, MessageUpdate, ProtoMessage};
 use crate::names::Name;
 use crate::permissions::{Authentication, AuthToken};
-use crate::resource::{Labels, ResourceAssign, ResourceRegistration, Selector, ResourceLocation, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus, ResourceProfile, Resource, ResourceCreate};
+use crate::resource::{Labels, ResourceAssign, ResourceRegistration, Selector, ResourceLocation, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus, ResourceInit, Resource, ResourceCreate};
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey, StarWatchInfo};
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -425,6 +425,7 @@ pub enum Reply
     Keys(Vec<ResourceKey>),
     Location(ResourceLocation),
     Address(ResourceAddress),
+    Resource(Resource),
     Seq(u64)
 }
 

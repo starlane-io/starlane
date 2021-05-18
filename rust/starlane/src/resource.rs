@@ -1,3 +1,5 @@
+pub mod space;
+
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::iter::FromIterator;
@@ -22,6 +24,7 @@ use crate::star::StarKey;
 use serde_json::to_string;
 use base64::DecodeError;
 use std::string::FromUtf8Error;
+use crate::message::Fail;
 
 lazy_static!
 {
@@ -1053,18 +1056,50 @@ pub enum ResourceType
     Artifact
 }
 
+impl ResourceType{
+    pub fn requires_owner(&self)->bool {
+        match self{
+            Self::Space => false,
+            Self::SubSpace => true,
+            Self::App => true,
+            Self::Actor => true,
+            Self::User => false,
+            Self::FileSystem => true,
+            Self::File => true,
+            Self::Artifact => true
+        }
+    }
+}
+
+impl ResourceType{
+    pub fn children(&self)->HashSet<ResourceType> {
+        let mut children = match self{
+            Self::Space => vec![Self::SubSpace,Self::User],
+            Self::SubSpace => vec![Self::App,Self::FileSystem,Self::Artifact],
+            Self::App => vec![Self::Actor,Self::FileSystem],
+            Self::Actor => vec![],
+            Self::User => vec![],
+            Self::FileSystem => vec![Self::File],
+            Self::File => vec![],
+            Self::Artifact => vec![]
+        };
+
+        HashSet::from_iter(children.drain(..) )
+    }
+}
+
 impl ToString for ResourceType{
     fn to_string(&self) -> String {
         match self
         {
-            ResourceType::Space => "Space".to_string(),
-            ResourceType::SubSpace => "SubSpace".to_string(),
-            ResourceType::App => "App".to_string(),
-            ResourceType::Actor => "Actor".to_string(),
-            ResourceType::User => "User".to_string(),
-            ResourceType::FileSystem => "FileSystem".to_string(),
-            ResourceType::File => "File".to_string(),
-            ResourceType::Artifact => "Artifact".to_string(),
+            Self::Space => "Space".to_string(),
+            Self::SubSpace => "SubSpace".to_string(),
+            Self::App => "App".to_string(),
+            Self::Actor => "Actor".to_string(),
+            Self::User => "User".to_string(),
+            Self::FileSystem => "FileSystem".to_string(),
+            Self::File => "File".to_string(),
+            Self::Artifact => "Artifact".to_string(),
         }
     }
 }
@@ -1242,11 +1277,12 @@ impl ResourceType
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceProfile
+pub struct ResourceInit
 {
     pub init: InitData,
     pub archetype: ResourceArchetype
 }
+
 
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -1255,6 +1291,42 @@ pub struct ResourceArchetype {
     pub specific: Option<Specific>,
     pub config: Option<ConfigSrc>
 }
+
+pub struct ResourceControl{
+    pub resource_type: ResourceType
+}
+
+impl ResourceControl{
+
+    pub async fn create_child(resource: ResourceInit, register: Option<ResourceRegistryInfo> ) -> Result<Resource,Fail>
+    {
+        unimplemented!()
+    }
+}
+
+
+pub struct ResourceManager{
+    pub resource_type: ResourceType
+}
+
+impl ResourceManager {
+    pub async fn create( &self, create: ResourceCreate ) -> Result<Resource,Fail> {
+        if self.resource_type.requires_owner() && create.owner.is_none() {
+            return Err(Fail::ResourceTypeRequiresOwner);
+        }
+
+        unimplemented!()
+    }
+}
+
+
+#[async_trait]
+pub trait ResourceHost {
+    async fn assign( &mut self, assign: ResourceAssign ) -> Result<Resource,Fail>;
+}
+
+
+
 
 
 impl fmt::Display for FileSystemKind {
@@ -2276,15 +2348,17 @@ impl FromStr for Version {
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceCreate {
-   pub archetype: ResourceArchetype,
-   pub registry_info: Option<ResourceRegistryInfo>
+   pub init: ResourceInit,
+   pub registry_info: Option<ResourceRegistryInfo>,
+   pub owner: Option<UserKey>
 }
 
 impl ResourceCreate {
-    pub fn new( archetype: ResourceArchetype )->Self {
+    pub fn new( init: ResourceInit ) ->Self {
         ResourceCreate {
-            archetype: archetype,
-            registry_info: Option::None
+            init: init,
+            registry_info: Option::None,
+            owner: Option::None
         }
     }
 
@@ -2322,7 +2396,7 @@ impl FromStr for ResourceStatus{
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ResourceSrc {
-    Creation(ResourceProfile)
+    Creation(ResourceInit),
     //Assign(ResourceState) -- this is the mechanism that a Resource would be transfered to a new Host
 }
 
@@ -2369,7 +2443,7 @@ pub struct ResourceSliceAssign{
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceSliceInit{
     key: ResourceKey,
-    profile: ResourceProfile
+    profile: ResourceInit
 }
 
 #[derive(Clone,Serialize,Deserialize)]

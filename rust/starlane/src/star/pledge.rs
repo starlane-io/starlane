@@ -1,13 +1,17 @@
 use rusqlite::{Connection, params_from_iter, params, ToSql};
 use tokio::sync::{mpsc, oneshot};
-use crate::star::{StarInfo, StarKey, StarKind};
+use crate::star::{StarInfo, StarKey, StarKind, StarCommand, StarComm};
 use crate::error::Error;
 use std::collections::HashSet;
-use crate::message::Fail;
+use crate::message::{Fail, ProtoMessage};
 use std::iter::FromIterator;
 use std::str::FromStr;
 use rusqlite::types::{ValueRef, ToSqlOutput, Value};
 use tokio::time::Duration;
+use crate::resource::{ResourceHost, ResourceAssign, Resource};
+use crate::frame::{StarMessagePayload, ResourceHostAction, SimpleReply, Reply};
+use tokio::time::error::Elapsed;
+use tokio::sync::oneshot::error::RecvError;
 
 #[derive(Clone)]
 pub struct StarHandleBacking{
@@ -59,6 +63,42 @@ pub struct StarHandle {
     pub key: StarKey,
     pub kind: StarKind,
     pub hops: Option<usize>
+}
+
+pub struct RemoteResourceHost {
+    comm: StarComm,
+    handle: StarHandle
+}
+
+#[async_trait]
+impl ResourceHost for RemoteResourceHost {
+    async fn assign( &mut self, assign: ResourceAssign) -> Result<Resource, Fail> {
+        if !self.handle.kind.hosts().contains(&assign.key.resource_type() ) {
+            return Err(Fail::WrongResourceType{
+                expected: self.handle.kind.hosts().clone(),
+                received: assign.key.resource_type().clone()
+            });
+        }
+        let mut proto = ProtoMessage::new();
+        proto.to = Option::Some(self.handle.key.clone());
+        proto.payload = StarMessagePayload::ResourceHost(ResourceHostAction::Assign(assign));
+        let reply = proto.get_ok_result().await;
+        self.comm.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
+
+        match tokio::time::timeout( Duration::from_secs(5), reply).await{
+            Ok(result) => {
+                if let Result::Ok( StarMessagePayload::Reply(SimpleReply::Ok(Reply::Resource(resource)))) = result{
+                    Ok(resource)
+                } else {
+                    Err(Fail::Unexpected)
+                }
+            }
+            Err(err) => {
+
+                Err(Fail::Timeout)
+            }
+        }
+    }
 }
 
 pub struct StarSelector {

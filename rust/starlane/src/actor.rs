@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -14,12 +14,13 @@ use crate::frame::{Event};
 use crate::id::Id;
 use crate::keys::{AppKey, ResourceKey, SubSpaceKey, UserKey};
 use crate::names::Name;
-use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceType, ResourceArchetype, ResourceProfile, Resource, Names, ResourceAddress, ResourceAddressPart, Skewer};
+use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceType, ResourceArchetype, ResourceInit, Resource, Names, ResourceAddress, ResourceAddressPart, Skewer};
 use crate::star::StarKey;
 use std::marker::PhantomData;
 use serde::de::DeserializeOwned;
 use crate::message::Fail;
 use crate::resource::ResourceAddressPartKind::Base64Encoded;
+use std::iter::FromIterator;
 
 pub struct Actor
 {
@@ -49,10 +50,10 @@ pub struct ActorProfile{
     pub init: InitData
 }
 
-impl From<ActorProfile> for ResourceProfile
+impl From<ActorProfile> for ResourceInit
 {
     fn from(profile: ActorProfile) -> Self {
-        ResourceProfile {
+        ResourceInit {
             init: profile.init,
             archetype: profile.archetype.into(),
         }
@@ -446,7 +447,10 @@ impl ResourceMessage
         if self.to.key.resource_type() == resource_type {
             Ok(())
         } else {
-            Err(Fail::WrongResourceType)
+            Err(Fail::WrongResourceType{
+                received: resource_type,
+                expected: HashSet::from_iter(vec![self.to.key.resource_type().clone()])
+            })
         }
     }
 }

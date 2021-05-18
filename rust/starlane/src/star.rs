@@ -143,6 +143,20 @@ impl StarKind
             StarKind::Client => vec![ResourceType::Actor]
         }.iter().cloned())
     }
+
+    pub fn hosts_slices(&self)->HashSet<ResourceType>{
+        HashSet::from_iter(match self {
+            StarKind::Central => vec![],
+            StarKind::SpaceHost => vec![],
+            StarKind::Mesh => vec![],
+            StarKind::AppHost => vec![],
+            StarKind::ActorHost => vec![ResourceType::App],
+            StarKind::FileStore => vec![],
+            StarKind::Gateway => vec![],
+            StarKind::Link => vec![],
+            StarKind::Client => vec![]
+        }.iter().cloned())
+    }
 }
 
 impl FromStr for StarKind{
@@ -1616,6 +1630,7 @@ pub struct GetSpaceController
     pub tx: oneshot::Sender<Result<SpaceController,GetSpaceControllerFail>>
 }
 
+#[derive(Debug)]
 pub enum GetSpaceControllerFail
 {
     PermissionDenied,
