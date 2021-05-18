@@ -14,7 +14,7 @@ use crate::frame::{Event};
 use crate::id::Id;
 use crate::keys::{AppKey, ResourceKey, SubSpaceKey, UserKey};
 use crate::names::Name;
-use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceType, ResourceArchetype, ResourceInit, Resource, Names, ResourceAddress, ResourceAddressPart, Skewer};
+use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceType, ResourceArchetype, ResourceInit, Resource, Names, ResourceAddress, ResourceAddressPart, Skewer, ResourceRegistryInfo};
 use crate::star::StarKey;
 use std::marker::PhantomData;
 use serde::de::DeserializeOwned;
@@ -161,8 +161,10 @@ impl From<ActorRegistration> for ResourceRegistration
     fn from(actor : ActorRegistration) -> Self {
         ResourceRegistration{
             resource: actor.resource.into(),
-            names: actor.names,
-            labels: actor.labels,
+            info: ResourceRegistryInfo {
+                names: actor.names,
+                labels: actor.labels
+            }
         }
     }
 }

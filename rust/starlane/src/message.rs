@@ -342,8 +342,13 @@ pub enum Fail
         expected: HashSet<ResourceType>,
         received: ResourceType
     },
+    WrongParentResourceType{
+        expected: HashSet<ResourceType>,
+        received: Option<ResourceType>
+    },
     ResourceTypeRequiresOwner,
-    RecvErr
+    RecvErr,
+    CannotSelectResourceHost
 }
 
 impl ToString for Fail {
@@ -357,7 +362,9 @@ impl ToString for Fail {
             Fail::ResourceNotFound(_) => "ResourceNotFound".to_string(),
             Fail::WrongResourceType{expected:_,received:_} => "WrongResourceType".to_string(),
             Fail::RecvErr => "RecvErr".to_string(),
-            Fail::ResourceTypeRequiresOwner => "ResourceTypeRequiresOwner".to_string()
+            Fail::ResourceTypeRequiresOwner => "ResourceTypeRequiresOwner".to_string(),
+            Fail::CannotSelectResourceHost => "CannotSelectResourceHost".to_string(),
+            Fail::WrongParentResourceType { .. } => "WrongParentResourceType".to_string()
         }
     }
 }

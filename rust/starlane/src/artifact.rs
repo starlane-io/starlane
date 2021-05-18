@@ -106,8 +106,10 @@ pub type ArtifactKindExt = Name;
 pub struct ArtifactKey
 {
     pub sub_space: SubSpaceKey,
-    pub id: u64
+    pub id: ArtifactId
 }
+
+pub type ArtifactId = u64;
 
 impl fmt::Display for ArtifactKey{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

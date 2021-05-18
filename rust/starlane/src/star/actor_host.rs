@@ -9,7 +9,7 @@ use crate::app::{AppCommandKind};
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 use crate::keys::{AppKey, UserKey, ResourceKey, GatheringKey};
-use crate::resource::ResourceLocation;
+use crate::resource::ResourceLocationRecord;
 use crate::actor::ActorKey;
 
 

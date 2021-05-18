@@ -18,7 +18,7 @@ use crate::logger::Flags;
 use crate::message::{Fail, MessageExpect, MessageResult, MessageUpdate, ProtoMessage};
 use crate::names::Name;
 use crate::permissions::{Authentication, AuthToken};
-use crate::resource::{Labels, ResourceAssign, ResourceRegistration, Selector, ResourceLocation, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus, ResourceInit, Resource, ResourceCreate};
+use crate::resource::{Labels, ResourceAssign, ResourceRegistration, Selector, ResourceLocationRecord, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus, ResourceInit, Resource, ResourceCreate};
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey, StarWatchInfo};
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -367,7 +367,7 @@ pub enum ResourceHostAction
 pub enum ResourceManagerAction
 {
     Register(ResourceRegistration),
-    Location(ResourceLocation),
+    Location(ResourceLocationRecord),
     Find(ResourceKey),
     GetKey(ResourceAddress),
     Bind(ResourceBinding),
@@ -423,7 +423,7 @@ pub enum Reply
     Empty,
     Key(ResourceKey),
     Keys(Vec<ResourceKey>),
-    Location(ResourceLocation),
+    Location(ResourceLocationRecord),
     Address(ResourceAddress),
     Resource(Resource),
     Seq(u64)
@@ -605,7 +605,7 @@ pub struct ActorLocationRequest
 pub struct ActorLocationReport
 {
     pub resource: ResourceKey,
-    pub location: ResourceLocation
+    pub location: ResourceLocationRecord
 }
 
 
@@ -758,6 +758,7 @@ impl From<Elapsed> for Fail{
         Fail::Timeout
     }
 }
+
 
 
 impl From<Vec<ResourceKey>> for Reply

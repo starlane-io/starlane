@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::actor::{Actor, ActorKey, ActorKind};
 use crate::app::AppKind;
-use crate::artifact::{Artifact, ArtifactKey, ArtifactKind};
+use crate::artifact::{Artifact, ArtifactKey, ArtifactKind, ArtifactId};
 use crate::error::Error;
 use crate::frame::Reply;
 use crate::id::Id;
@@ -18,11 +18,13 @@ use crate::resource::{Labels, Resource, ResourceAddressPart, ResourceArchetype, 
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
+pub type SpaceId = u32;
+
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum SpaceKey
 {
     HyperSpace,
-    Space(u32)
+    Space(SpaceId)
 }
 
 impl SpaceKey
@@ -40,7 +42,7 @@ impl SpaceKey
         }
     }
 
-    pub fn index(&self)->u32
+    pub fn id(&self) ->SpaceId
     {
         match self
         {
@@ -194,7 +196,7 @@ impl SubSpaceKey
 {
     pub fn hyper_default( ) -> Self
     {
-        SubSpaceKey::new(SpaceKey::HyperSpace, SubSpaceId::Default )
+        SubSpaceKey::new(SpaceKey::HyperSpace, 0 )
     }
 
     pub fn new( space: SpaceKey, id: SubSpaceId ) -> Self
@@ -209,42 +211,13 @@ impl SubSpaceKey
 
 impl fmt::Display for SubSpaceKey{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!( f,"{}-{}",self.space, self.id)
+        write!( f,"{}-{}",self.space, self.id.to_string())
     }
 
 }
 
 
-#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
-pub enum SubSpaceId
-{
-    Default,
-    Index(u32)
-}
-
-impl SubSpaceId
-{
-    pub fn from_index(index: u32) -> Self
-    {
-        if index == 0
-        {
-            Self::Default
-        }
-        else
-        {
-            Self::Index(index)
-        }
-    }
-
-    pub fn index(&self)->u32
-    {
-        match self
-        {
-            SubSpaceId::Default => 0,
-            SubSpaceId::Index(index) => index.clone()
-        }
-    }
-}
+pub type SubSpaceId = u32;
 
 
 #[derive(Clone,Hash,Eq,PartialEq,Serialize,Deserialize)]
@@ -278,42 +251,15 @@ impl AppKey
 
 }
 
-#[derive(Clone,Hash,Eq,PartialEq,Serialize,Deserialize)]
-pub enum AppId
-{
-    HyperApp,
-    Uuid(Uuid)
-}
-
-impl AppId {
-    pub fn encode(&self) -> Result<String, Error> {
-        Ok(base64::encode(self.to_string().as_bytes().to_vec()))
-    }
-
-    pub fn decode(string: String) -> Result<Self, Error> {
-        Ok(AppId::from_str(String::from_utf8(base64::decode(string)?)?.as_str())?)
-    }
-}
-
-
-
-impl AppId
-{
-    pub fn new()->Self
-    {
-        Self::Uuid(Uuid::new_v4())
-    }
-}
-
-
+pub type AppId=u64;
 
 impl AppKey
 {
-    pub fn new( sub_space: SubSpaceKey )->Self
+    pub fn new( sub_space: SubSpaceKey, id: AppId )->Self
     {
         AppKey{
             sub_space: sub_space,
-            id: AppId::new()
+            id: id
         }
     }
 }
@@ -326,44 +272,21 @@ impl fmt::Display for AppKey {
 
 
 
-impl FromStr for AppId{
-    type Err = Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s{
-            "hyper-app" => {
-                    Ok(AppId::HyperApp)
-                }
-            _ => Ok(AppId::Uuid(Uuid::from_str(s)?))
-        }
-    }
-}
-
-
-impl ToString for AppId{
-
-    fn to_string(&self) -> String {
-        match self
-        {
-            AppId::HyperApp => "hyper-app".to_string(),
-            AppId::Uuid(uuid) => uuid.to_string().to_lowercase()
-        }
-    }
-}
-
-
-impl fmt::Display for SubSpaceId{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let str = match self
-        {
-            SubSpaceId::Default => "Default".to_string(),
-            SubSpaceId::Index(index) => index.to_string()
-        };
-        write!(f, "{}", str )
-    }
-}
 
 pub type MessageId = Uuid;
+
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub enum ResourceId{
+    Space(u32),
+    SubSpace(SubSpaceId),
+    App(AppId),
+    Actor(Id),
+    User(UserId),
+    Artifact(ArtifactId),
+    File(FileKey),
+    FileSystem(FileSystemKey),
+}
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum ResourceKey
@@ -433,10 +356,27 @@ impl ResourceKey
     }
 
     pub fn app(&self)->Result<AppKey,Fail> {
-        if let ResourceKey::App(key) = self {
-            Ok(key.clone())
-        } else {
-            Err(Fail::WrongResourceType{expected: HashSet::from_iter(vec![ResourceType::App]), received: self.resource_type().clone() })
+        match self{
+            ResourceKey::App(app) => {
+                Result::Ok(app.clone())
+            }
+            ResourceKey::Actor(actor) => {
+                ResourceKey::Actor(actor.clone()).parent().unwrap().app()
+            }
+            ResourceKey::FileSystem(filesystem) => {
+                match filesystem{
+                    FileSystemKey::App(app) => {
+                        ResourceKey::FileSystem(FileSystemKey::App(app.clone())).parent().unwrap().app()
+                    }
+                    _ => {
+
+                        Err(Fail::WrongResourceType{expected: HashSet::from_iter(vec![ResourceType::App,ResourceType::Actor,ResourceType::FileSystem]), received: self.resource_type().clone() })
+                    }
+                }
+            }
+            _ => {
+                Err(Fail::WrongResourceType{expected: HashSet::from_iter(vec![ResourceType::App,ResourceType::Actor,ResourceType::FileSystem]), received: self.resource_type().clone() })
+            }
         }
     }
 
@@ -511,18 +451,20 @@ pub enum FileSystemKey
     SubSpace(SubSpaceFilesystemKey)
 }
 
+pub type FileSystemId = u32;
+
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct AppFilesystemKey
 {
     pub app: AppKey,
-    pub id: u32
+    pub id: FileSystemId
 }
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct SubSpaceFilesystemKey
 {
     pub sub_space: SubSpaceKey,
-    pub id: u32
+    pub id: FileSystemId
 }
 
 
@@ -650,12 +592,15 @@ impl fmt::Display for FileSystemKey {
 pub struct FileKey
 {
    pub filesystem: FileSystemKey,
-   pub path: u64
+   pub id: FileId
 }
+
+pub type FileId = u64;
+
 
 impl fmt::Display for FileKey{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!( f,"[{},{},{}]",self.filesystem,self.filesystem,self.path )
+        write!( f,"[{},{},{}]",self.filesystem,self.filesystem,self.id)
     }
 
 }

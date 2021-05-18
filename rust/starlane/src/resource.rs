@@ -6,7 +6,7 @@ use std::iter::FromIterator;
 use std::str::FromStr;
 
 use bincode::ErrorKind;
-use rusqlite::{Connection, params, params_from_iter, Rows, Statement, ToSql};
+use rusqlite::{Connection, params, params_from_iter, Rows, Statement, ToSql, Transaction};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
@@ -15,16 +15,18 @@ use crate::actor::{ActorKey, ActorKind, ActorArchetype, ActorProfile};
 use crate::app::{AppKind, AppArchetype, AppProfile, ConfigSrc, InitData};
 use crate::artifact::{ArtifactKey, ArtifactKind};
 use crate::error::{Error};
-use crate::keys::FileKey;
+use crate::keys::{FileKey, ResourceId};
 use crate::id::Id;
 use crate::names::{Name, Specific};
 use crate::permissions::User;
 use crate::keys::{SubSpaceKey, ResourceKey, AppKey, SubSpaceId, SpaceKey, UserKey, GatheringKey, FileSystemKey, AppFilesystemKey, SubSpaceFilesystemKey};
-use crate::star::StarKey;
+use crate::star::{StarKey, ResourceRegistryBacking};
 use serde_json::to_string;
 use base64::DecodeError;
 use std::string::FromUtf8Error;
 use crate::message::Fail;
+use std::sync::Arc;
+use crate::util::AsyncHashMap;
 
 lazy_static!
 {
@@ -309,7 +311,7 @@ impl ToSql for FieldSelection
                 Ok(ToSqlOutput::Owned(Value::Blob(owner.clone().bin()?)))
             }
             FieldSelection::Space(space) => {
-                Ok(ToSqlOutput::Owned(Value::Integer(space.index() as _)))
+                Ok(ToSqlOutput::Owned(Value::Integer(space.id() as _)))
             }
             FieldSelection::SubSpace(sub_space) => {
                 Ok(ToSqlOutput::Owned(Value::Blob(ResourceKey::SubSpace(sub_space.clone()).bin()?)))
@@ -355,16 +357,16 @@ pub enum ResourceRegistryCommand
     Close,
     Clear,
     Accepts(HashSet<ResourceType>),
-    Register(ResourceRegistration),
+    Reserve(ResourceNamesReservationRequest),
+    Commit(ResourceRegistration),
     Select(Selector),
-    SetLocation(ResourceLocation),
+    SetLocation(ResourceLocationRecord),
     Find(ResourceKey),
     Bind(ResourceBinding),
     GetAddress(ResourceKey),
     GetKey(ResourceAddress)
 }
 
-#[derive(Clone,Serialize,Deserialize)]
 pub enum ResourceRegistryResult
 {
     Ok,
@@ -372,14 +374,124 @@ pub enum ResourceRegistryResult
     Resource(Resource),
     Resources(Vec<Resource>),
     Address(ResourceAddress),
-    Location(ResourceLocation),
+    Location(ResourceLocationRecord),
+    Reservation(RegistryReservation),
     Key(ResourceKey),
     NotFound,
     NotAccepted
 }
 
+type Blob = Vec<u8>;
+
+struct RegistryParams {
+   key: Option<Blob>,
+   resource_type: String,
+   kind: String,
+   specific: Option<String>,
+   space: Option<u32>,
+   sub_space: Option<Blob>,
+   config: Option<String>,
+   app: Option<Blob>,
+   owner: Option<Blob>
+}
+
+impl RegistryParams {
+    pub fn from_registration(registration: ResourceRegistration) -> Result<Self, Error> {
+        Self::new( registration.resource.archetype, registration.resource.key.parent(), Option::Some(registration.resource.key), registration.resource.owner)
+    }
+
+    pub fn from_archetype(archetype: ResourceArchetype, parent: Option<ResourceKey> ) -> Result<Self, Error> {
+        Self::new( archetype, parent, Option::None, Option::None )
+    }
+
+    pub fn new(archetype: ResourceArchetype, parent: Option<ResourceKey>,  key: Option<ResourceKey>, owner: Option<UserKey>) -> Result<Self, Error> {
+        let key = if let Option::Some(key) = key
+        {
+            Option::Some(key.bin()?)
+        } else {
+            Option::None
+        };
+
+        let resource_type = archetype.kind.resource_type().to_string();
+            let kind = archetype.kind.to_string();
+
+            let owner = if let Option::Some(owner) = owner
+            {
+                Option::Some(owner.bin()?)
+            } else {
+                Option::None
+            };
+
+
+
+            let specific = match &archetype.specific {
+                None => Option::None,
+                Some(specific) => {
+                    Option::Some(specific.to_string())
+                }
+            };
+
+
+            let config = match &archetype.config {
+                None => Option::None,
+                Some(config) => {
+                    Option::Some(config.to_string())
+                }
+            };
+
+
+
+            let space = if let Option::Some(parent) = &parent {
+                Option::Some( parent.space().id() )
+            } else {
+                Option::None
+            };
+
+            let sub_space = if let Option::Some(parent) = &parent {
+                match parent.sub_space()
+                {
+                    Ok(sub_space) => {
+                        Option::Some(ResourceKey::SubSpace(sub_space).bin()?)
+                    }
+                    Err(_) => Option::None
+                }
+            } else {
+                Option::None
+            };
+
+            let app = if let Option::Some(parent) = &parent {
+                match parent.app()
+                {
+                    Ok(app) => {
+                        Option::Some(ResourceKey::App(app).bin()?)
+                    }
+                    Err(_) => Option::None
+                }
+            } else {
+                Option::None
+            };
+
+
+        Ok(RegistryParams {
+                key: key,
+                resource_type: resource_type,
+                kind: kind,
+                specific: specific,
+                space: space,
+                sub_space: sub_space,
+                config: config,
+                app: app,
+                owner: owner
+            })
+
+        }
+}
+
+
+
 pub struct Registry {
    pub conn: Connection,
+   pub tx: mpsc::Sender<ResourceRegistryAction>,
    pub rx: mpsc::Receiver<ResourceRegistryAction>,
    pub accepted: Option<HashSet<ResourceType>>
 }
@@ -389,6 +501,7 @@ impl Registry {
     {
         let (tx, rx) = mpsc::channel(8 * 1024);
 
+        let tx_clone = tx.clone();
         tokio::spawn(async move {
 
             let conn = Connection::open_in_memory();
@@ -396,6 +509,7 @@ impl Registry {
             {
                 let mut db = Registry {
                     conn: conn.unwrap(),
+                    tx: tx_clone,
                     rx: rx,
                     accepted: Option::None
                 };
@@ -447,6 +561,7 @@ eprintln!("error setting up db: {}", err );
         return accepted.contains(&resource_type);
     }
 
+
     fn process(&mut self, command: ResourceRegistryCommand) -> Result<ResourceRegistryResult, Error> {
         match command
         {
@@ -467,68 +582,30 @@ eprintln!("error setting up db: {}", err );
                 self.accepted= Option::Some(accept);
                 Ok(ResourceRegistryResult::Ok)
             }
-            ResourceRegistryCommand::Register(register) => {
-                if !self.accept(register.resource.key.resource_type() ) {
+            ResourceRegistryCommand::Commit(registration) => {
+                if !self.accept(registration.resource.key.resource_type() ) {
                     return Ok(ResourceRegistryResult::NotAccepted);
                 }
-                let resource = register.resource;
-                let labels = register.labels;
-                let key = resource.key.bin()?;
-
-                let resource_type = resource.key.resource_type().to_string();
-                let kind = resource.archetype.kind.to_string();
-
-                let owner =  if let Option::Some(owner) = resource.owner
-                {
-                    Option::Some(owner.bin()?)
-                } else {
-                    Option::None
-                };
-
-                let app =  if let ResourceKey::Actor(actor) = &resource.key {
-                    Option::Some(actor.app.bin()?)
-                } else {
-                    Option::None
-                };
-
-
-                let specific= match &resource.archetype.specific {
-                    None => Option::None,
-                    Some(specific) => {
-                        Option::Some(specific.to_string())
-                    }
-                };
-
-
-                let config= match &resource.archetype.config {
-                    None => Option::None,
-                    Some(config) => {
-                        Option::Some(config.to_string())
-                    }
-                };
-
-
-                let space = resource.key.space().index();
-                let sub_space = if let ResourceKey::Space(_) = resource.key {
-                  Option::None
-                } else {
-                  Option::Some(ResourceKey::SubSpace(resource.key.sub_space()?).bin()?)
-                };
+                let params= RegistryParams::from_registration(registration.clone())?;
 
                 let trans = self.conn.transaction()?;
-                trans.execute("DELETE FROM labels WHERE labels.resource_key=?1", [key.clone()]);
-                trans.execute("DELETE FROM names WHERE key=?1", [key.clone()])?;
-                trans.execute("DELETE FROM resources WHERE key=?1", [key.clone()])?;
 
-                trans.execute("INSERT INTO resources (key,resource_type,kind,specific,space,sub_space,owner,app,config) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)", params![key.clone(),resource_type,kind,specific.clone(),space,sub_space,owner,app,config])?;
-                for name in register.names
-                {
-                    trans.execute("INSERT INTO names (key,name,resource_type,kind,specific,space,sub_space,owner,app,config) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)", params![key.clone(),name,resource_type,kind,specific.clone(),space,sub_space,owner,app,config])?;
+                if params.key.is_some() {
+                    trans.execute("DELETE FROM labels WHERE labels.resource_key=?1", [params.key.clone()]);
+                    trans.execute("DELETE FROM resources WHERE key=?1", [params.key.clone()])?;
                 }
 
-                for (name, value) in labels
+                trans.execute("INSERT INTO resources (key,resource_type,kind,specific,space,sub_space,owner,app,config) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)", params![params.key,params.resource_type,params.kind,params.specific,params.space,params.sub_space,params.owner,params.app,params.config])?;
+                if !registration.info.names.is_empty() {
+                    for name in registration.info.names
+                    {
+                        trans.execute("UPDATE names SET key=?1 WHERE name=?1", [name] )?;
+                    }
+                }
+
+                for (name, value) in registration.info.labels
                 {
-                    trans.execute("INSERT INTO labels (resource_key,name,value) VALUES (?1,?2,?3)", params![key.clone(),name, value])?;
+                    trans.execute("INSERT INTO labels (resource_key,name,value) VALUES (?1,?2,?3)", params![params.key,name, value])?;
                 }
 
                 trans.commit()?;
@@ -579,7 +656,11 @@ eprintln!("error setting up db: {}", err );
                     params.push(field);
                 }
 
+                if !params.is_empty() {
+                    where_clause.push_str(" AND ");
+                }
 
+                where_clause.push_str( " key IS NOT NULL");
 
                 let mut statement = match &selector.meta
                 {
@@ -672,14 +753,14 @@ eprintln!("error setting up db: {}", err );
                 }
                 Ok(ResourceRegistryResult::Resources(resources) )
             }
-            ResourceRegistryCommand::SetLocation(location) => {
-                if !self.accept(location.key.resource_type()) {
+            ResourceRegistryCommand::SetLocation(location_record) => {
+                if !self.accept(location_record.key.resource_type()) {
                    return Ok(ResourceRegistryResult::NotAccepted);
                 }
 
-                let key = location.key.bin()?;
-                let host = location.host.bin()?;
-                let gathering = match location.gathering{
+                let key = location_record.key.bin()?;
+                let host = location_record.location.host.bin()?;
+                let gathering = match location_record.location.gathering{
                     None => Option::None,
                     Some(key) => Option::Some(key.bin()?)
                 };
@@ -707,10 +788,12 @@ eprintln!("error setting up db: {}", err );
                         let gathering: GatheringKey = GatheringKey::from_bin(gathering)?;
                         Option::Some(gathering)
                     };
-                    let location = ResourceLocation {
+                    let location = ResourceLocationRecord {
                         key: key,
-                        host: host,
-                        gathering: gathering
+                        location: ResourceLocation {
+                            host: host,
+                            gathering: gathering
+                        }
                     };
                     Ok(location)
                 });
@@ -777,7 +860,40 @@ eprintln!("error setting up db: {}", err );
                     }
                 }
             }
+            ResourceRegistryCommand::Reserve(request) => {
+                let trans = self.conn.transaction()?;
+                trans.execute("DELETE FROM names WHERE key IS NULL AND datetime(reservation_timestamp) < datetime('now')", [] )?;
+                let params = RegistryParams::from_archetype(request.archetype,request.parent)?;
+                Self::process_names(&trans,&request.names,&params)?;
+                trans.commit()?;
+                let (tx,rx) = oneshot::channel();
+                let reservation = RegistryReservation::new(tx);
+                tokio::spawn( async move {
+
+                    if let Result::Ok( resource ) = rx.await {
+                        let mut params = params;
+                        let key = match resource.key.bin(){
+                            Ok(key) => {
+                                Option::Some(key)
+                            }
+                            Err(_) => Option::None
+                        };
+                        params.key = key
+                    }
+                } );
+                Ok(ResourceRegistryResult::Reservation(reservation))
+            }
+
+
+
         }
+    }
+
+    fn process_names( trans: &Transaction, names: &Names, params: &RegistryParams) -> Result<(),Error> {
+        for name in names{
+            trans.execute("INSERT INTO names (key,name,resource_type,kind,specific,space,sub_space,owner,app,config,reservation_timestamp) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,timestamp('now','+5 minutes')", params![params.key,name,params.resource_type,params.kind,params.specific,params.space,params.sub_space,params.owner,params.app,params.config])?;
+        }
+        Ok(())
     }
 
 
@@ -796,7 +912,8 @@ eprintln!("error setting up db: {}", err );
 
         let names= r#"
        CREATE TABLE IF NOT EXISTS names(
-          key BLOB PRIMARY KEY,
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          key BLOB,
 	      name TEXT NOT NULL,
 	      resource_type TEXT NOT NULL,
           kind BLOB NOT NULL,
@@ -805,8 +922,10 @@ eprintln!("error setting up db: {}", err );
           sub_space BLOB NOT NULL,
           app TEXT,
           owner BLOB,
+          reservation_timestamp TEXT,
           UNIQUE(name,resource_type,kind,specific,space,sub_space,app)
         )"#;
+
 
 
         let resources = r#"CREATE TABLE IF NOT EXISTS resources (
@@ -962,13 +1081,13 @@ impl ResourceKind {
                 ResourceKey::Space(SpaceKey::from_index(index as u32 ))
             }
             ResourceKind::SubSpace => {
-                ResourceKey::SubSpace(SubSpaceKey::new( sub_space.space, SubSpaceId::Index(index as u32)))
+                ResourceKey::SubSpace(SubSpaceKey::new( sub_space.space, index as _))
             }
             ResourceKind::App(_) => {
-                ResourceKey::App(AppKey::new(sub_space))
+                ResourceKey::App(AppKey::new(sub_space, index as _))
             }
             ResourceKind::Actor(_) => {
-                let app = AppKey::new(sub_space);
+                let app = AppKey::new(sub_space,index as _);
                 ResourceKey::Actor(ActorKey::new(app, Id::new(0, index as _)))
             }
             ResourceKind::User => {
@@ -977,7 +1096,7 @@ impl ResourceKind {
             ResourceKind::File => {
                 ResourceKey::File(FileKey{
                     filesystem: FileSystemKey::SubSpace(SubSpaceFilesystemKey{ sub_space, id: 0}),
-                    path: index as _
+                    id: index as _
                 } )
             }
             ResourceKind::Artifact(_) => {
@@ -991,7 +1110,7 @@ impl ResourceKind {
                 {
                     FileSystemKind::App => {
                         ResourceKey::FileSystem(FileSystemKey::App(AppFilesystemKey{
-                            app:AppKey::new(sub_space),
+                            app:AppKey::new(sub_space, index as _),
                             id: index as _
                         }))
                     }
@@ -1069,6 +1188,13 @@ impl ResourceType{
             Self::Artifact => true
         }
     }
+
+    pub fn from( parent: &Option<ResourceKey> ) -> Option<Self> {
+        match parent {
+            None => Option::None,
+            Some(parent) => Option::Some(parent.resource_type())
+        }
+    }
 }
 
 impl ResourceType{
@@ -1085,6 +1211,20 @@ impl ResourceType{
         };
 
         HashSet::from_iter(children.drain(..) )
+    }
+
+    pub fn supports_automatic_key_generation(&self) -> bool {
+
+        match self{
+            ResourceType::Space => false,
+            ResourceType::SubSpace => false,
+            ResourceType::App => true,
+            ResourceType::Actor => false,
+            ResourceType::User => true,
+            ResourceType::FileSystem => false,
+            ResourceType::File => false,
+            ResourceType::Artifact => false
+        }
     }
 }
 
@@ -1122,6 +1262,9 @@ impl FromStr for ResourceType {
     }
 }
 
+
+
+#[derive(Eq,PartialEq)]
 pub enum ResourceParent
 {
     None,
@@ -1130,14 +1273,41 @@ pub enum ResourceParent
 }
 
 impl ResourceParent {
-    pub fn matches( &self, resource_type: &ResourceType ) -> bool
+    pub fn matches_address( &self, address: &Option<&ResourceAddress> ) -> bool
     {
-        match self{
-            ResourceParent::None => false,
-            ResourceParent::Some(parent_type) => parent_type == resource_type,
-            ResourceParent::Multi(multi) => multi.contains(resource_type)
+        match address{
+            None => {
+                self.matches(&Option::None)
+            }
+            Some(address) => {
+                self.matches(&Option::Some(address.resource_type()))
+            }
         }
     }
+
+    pub fn matches( &self, resource_type: &Option<&ResourceType> ) -> bool
+    {
+        match resource_type{
+            None => *self == Self::None,
+            Some(resource_type) => {
+                match self{
+                    ResourceParent::None => false,
+                    ResourceParent::Some(parent_type) => parent_type == *resource_type,
+                    ResourceParent::Multi(multi) => multi.contains(*resource_type)
+                }
+            }
+        }
+    }
+
+    pub fn types(&self)->Vec<ResourceType> {
+        match self{
+            ResourceParent::None => vec![],
+            ResourceParent::Some(some) => vec![some.to_owned()],
+            ResourceParent::Multi(multi) => multi.to_owned()
+        }
+    }
+
+
 }
 
 impl ToString for ResourceParent{
@@ -1145,7 +1315,7 @@ impl ToString for ResourceParent{
         match self {
             ResourceParent::None => "None".to_string(),
             ResourceParent::Some(parent) => parent.to_string(),
-            ResourceParent::Multi(multi) => "Multi".to_string()
+            ResourceParent::Multi(_) => "Multi".to_string()
         }
     }
 }
@@ -1304,18 +1474,105 @@ impl ResourceControl{
     }
 }
 
-
-pub struct ResourceManager{
-    pub resource_type: ResourceType
+#[async_trait]
+pub trait ResourceIdSeq: Send+Sync {
+    async fn next(&mut self)->ResourceId;
 }
 
-impl ResourceManager {
-    pub async fn create( &self, create: ResourceCreate ) -> Result<Resource,Fail> {
-        if self.resource_type.requires_owner() && create.owner.is_none() {
-            return Err(Fail::ResourceTypeRequiresOwner);
-        }
 
-        unimplemented!()
+#[async_trait]
+pub trait ResourceHostSelector: Send+Sync {
+    async fn select( &self, resource_type: ResourceType ) -> Result<Arc<dyn ResourceHost>,Fail>;
+}
+
+pub struct HostedResourceStore{
+   map: AsyncHashMap<ResourceKey,Arc<HostedResource>>
+}
+
+impl  HostedResourceStore{
+
+    pub async fn new( ) -> Self{
+        HostedResourceStore{
+            map: AsyncHashMap::new().await
+        }
+    }
+
+    pub async fn store( &mut self, resource: Arc<HostedResource> ) -> Result<(),Error> {
+        self.map.put(resource.resource.key.clone(), resource ).await
+    }
+
+    pub async fn get( &mut self, key: ResourceKey ) -> Result<Option<Arc<HostedResource>>,Error> {
+        self.map.get(key).await
+    }
+
+    pub async fn remove( &mut self, key: ResourceKey ) -> Result<Option<Arc<HostedResource>>,Error> {
+        self.map.remove(key).await
+    }
+}
+
+pub struct HostedResource {
+    pub manager: Arc<dyn RemoteResourceManager>,
+    pub resource: Resource
+}
+
+#[async_trait]
+pub trait RemoteResourceManager: Send+Sync {
+    async fn create( &self, parent: Option<Arc<HostedResource>>, create: ResourceCreate ) -> oneshot::Receiver<Result<Resource,Fail>>;
+}
+
+pub struct ResourceManager{
+    pub key: Option<ResourceKey>,
+    pub resource_type: ResourceType,
+    pub selector: Arc<dyn ResourceHostSelector>,
+    pub registry: Arc<dyn ResourceRegistryBacking>,
+    pub key_sequence: Arc<dyn ResourceIdSeq>,
+}
+
+#[async_trait]
+impl  RemoteResourceManager for ResourceManager{
+    async fn create( &self, parent: Option<Arc<HostedResource>>, create: ResourceCreate ) -> oneshot::Receiver<Result<Resource,Fail>> {
+        unimplemented!();
+        /*
+        let (tx,rx) = oneshot::channel();
+        let resource_type = self.resource_type.clone();
+        let selector = self.selector.clone();
+        let registry = self.registry.clone();
+        let key_sequence = self.key_sequence.clone();
+        tokio::spawn( async move {
+            if resource_type.requires_owner() && create.owner.is_none() {
+                tx.send(Err(Fail::ResourceTypeRequiresOwner)).unwrap_or_default();
+            };
+
+            if !resource_type.parent().matches(&ResourceType::from(&create.parent)) {
+                return Err(Fail::WrongParentResourceType {
+                    expected: HashSet::from_iter(self.resource_type.parent().types()),
+                    received: match create.parent {
+                        None => Option::None,
+                        Some(key) => Option::Some(key.resource_type())
+                    }
+                });
+            }
+
+            let reservation = registry.reserve(create.registry_info.clone()).await?;
+
+            let assign = ResourceAssign {
+                key: key,
+                source: ResourceSrc::Creation(create.init)
+            };
+
+            let mut host = selector.select(create.init.archetype.kind.resource_type()).await?;
+            let resource = host.assign(assign).await?;
+
+            if let Option::Some(info) = create.registry_info {
+                let registration = ResourceRegistration::new(resource.clone(), info);
+                registry.register(registration).await?;
+            }
+
+            tx.send(Ok(resource)).unwrap_or_default();
+
+        });
+        rx
+             */
     }
 }
 
@@ -1366,44 +1623,96 @@ impl From<ArtifactKind> for ResourceKind{
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceRegistryInfo
 {
-    names: Names,
-    labels: Labels
+    pub names: Names,
+    pub labels: Labels
+}
+
+pub struct ResourceNamesReservationRequest{
+  pub parent: Option<ResourceKey>,
+  pub archetype: ResourceArchetype,
+  pub names: Names
+}
+
+pub struct RegistryReservation{
+    tx: Option<oneshot::Sender<Resource>>
+}
+
+impl RegistryReservation{
+    pub fn commit( self, resource: Resource ) -> Result<(),Fail> {
+        if let Option::Some(tx) = self.tx{
+            tx.send(resource).or(Err(Fail::Unexpected));
+        }
+        Ok(())
+    }
+
+    pub fn new( tx: oneshot::Sender<Resource> )->Self
+    {
+        Self{
+            tx: Option::Some(tx)
+        }
+    }
+
+    pub fn empty()->Self {
+        RegistryReservation{
+            tx: Option::None
+        }
+    }
 }
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceRegistration
 {
     pub resource: Resource,
-    pub names: Names,
-    pub labels: Labels
+    pub info: ResourceRegistryInfo
 }
+
+
+
 
 impl ResourceRegistration
 {
-    pub fn new(resource: Resource, name: Names, labels: Labels) ->Self
+    pub fn new(resource: Resource, info: ResourceRegistryInfo ) ->Self
     {
         ResourceRegistration{
             resource: resource,
-            names: name,
-            labels: labels,
+            info: info
         }
     }
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceLocation
+pub struct ResourceLocationAffinity{
+    pub star: StarKey
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceLocationRecord
 {
     pub key: ResourceKey,
+    pub location: ResourceLocation
+}
+
+impl ResourceLocationRecord
+{
+    pub fn new( key: ResourceKey, host: StarKey )->Self
+    {
+        ResourceLocationRecord {
+            key: key,
+            location: ResourceLocation::new(host)
+        }
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceLocation{
     pub host: StarKey,
     pub gathering: Option<GatheringKey>
 }
 
-impl ResourceLocation
-{
-    pub fn new( key: ResourceKey, host: StarKey )->Self
+impl ResourceLocation{
+    pub fn new(  host: StarKey )->Self
     {
-        ResourceLocation {
-            key: key,
+        ResourceLocation{
             host: host,
             gathering: Option::None
         }
@@ -1435,10 +1744,10 @@ impl ResourceAddress {
             match &key
             {
                 ResourceKey::Space(space) => {
-                    parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("space-{}",space.index()).as_str())?));
+                    parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("space-{}",space.id()).as_str())?));
                 }
                 ResourceKey::SubSpace(sub_space) => {
-                    parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("sub-{}",sub_space.id.index()).as_str())?));
+                    parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("sub-{}",sub_space.id).as_str())?));
                 }
                 ResourceKey::App(app) => {
                     parts.push(app.address_part()?);
@@ -1453,7 +1762,7 @@ impl ResourceAddress {
                     parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("artifact-{}",artifact.id).as_str())?));
                 }
                 ResourceKey::File(file) => {
-                    parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("file-{}",file.path).as_str())?));
+                    parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("file-{}",file.id).as_str())?));
                 }
                 ResourceKey::FileSystem(filesystem) => {
                     match filesystem {
@@ -1491,13 +1800,17 @@ impl ResourceAddress {
             Ok(SPACE_ADDRESS_STRUCT.from_str(format!("{}:{}", self.parts.get(0).ok_or("expected space")?.to_string(), self.parts.get(1).ok_or("expected sub_space")?.to_string()).as_str())?)
         }
     }
-    pub fn from_parent(resource_type: &ResourceType, parent: &ResourceAddress, part: ResourceAddressPart) -> Result<ResourceAddress, Error> {
-        if !resource_type.parent().matches(parent.resource_type())  {
+    pub fn from_parent(resource_type: &ResourceType, parent: Option<&ResourceAddress>, part: ResourceAddressPart) -> Result<ResourceAddress, Error> {
+
+
+        if !resource_type.parent().matches_address(&parent)  {
             return Err(format!("resource type parent is wrong: expected: {}", resource_type.parent().to_string()).into() )
         }
 
         let mut parts = vec![];
-        parts.append(&mut parent.parts.clone());
+        if let Option::Some(parent) = parent {
+            parts.append(&mut parent.parts.clone());
+        }
         parts.push(part);
 
         Self::from_parts( resource_type, parts )
@@ -1855,7 +2168,7 @@ mod test
     use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
     use crate::names::{Name, Specific};
     use crate::permissions::Authentication;
-    use crate::resource::{FieldSelection, Labels, LabelSelection, Registry, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryResult, ResourceAssign, ResourceKind, ResourceType, Selector, ResourceRegistration, Resource, ResourceArchetype, ResourceAddress, ResourceAddressPart, Skewer};
+    use crate::resource::{FieldSelection, Labels, LabelSelection, Registry, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryResult, ResourceAssign, ResourceKind, ResourceType, Selector, ResourceRegistration, Resource, ResourceArchetype, ResourceAddress, ResourceAddressPart, Skewer, ResourceRegistryInfo, Names};
     use crate::resource::FieldSelection::SubSpace;
     use crate::resource::ResourceRegistryResult::Resources;
     use crate::space::CreateAppControllerFail;
@@ -1889,8 +2202,10 @@ mod test
 
         let save = ResourceRegistration{
             resource: resource,
-            labels: labels,
-            names: names,
+            info: ResourceRegistryInfo {
+                labels: labels,
+                names: names,
+            }
         };
         save
     }
@@ -1910,8 +2225,10 @@ mod test
 
         let save = ResourceRegistration{
             resource: resource,
-            labels: Labels::new(),
-            names: vec![],
+            info: ResourceRegistryInfo {
+                labels: Labels::new(),
+                names: Names::new(),
+            }
         };
 
         save
@@ -1947,7 +2264,7 @@ mod test
         for index in 1..11
         {
             let save = create(index,kind.clone(),specific.clone(),sub_space.clone(),owner.clone());
-            let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Register(save));
+            let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Commit(save));
             tx.send( request ).await;
             timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
         }
@@ -1972,7 +2289,7 @@ mod test
             };
 
             let save = create_save(index,resource);
-            let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Register(save));
+            let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Commit(save));
             tx.send( request ).await;
             timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             spaces.push(space)
@@ -1986,10 +2303,10 @@ mod test
         for index in 1..11
         {
             let actor_key = ResourceKey::Actor(ActorKey::new(app.clone(), Id::new(0, index)));
-            let address = ResourceAddress::from_parent( &ResourceType::Actor, &app_address, ResourceAddressPart::Skewer(Skewer::new(actor_key.encode().unwrap().as_str() ).unwrap())).unwrap();
+            let address = ResourceAddress::from_parent( &ResourceType::Actor, Option::Some(&app_address), ResourceAddressPart::Skewer(Skewer::new(actor_key.encode().unwrap().as_str() ).unwrap())).unwrap();
 
             let save = create_with_key(actor_key,address, ResourceKind::Actor(ActorKind::Single),specific.clone(),sub_space.clone(),owner.clone());
-            let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Register(save));
+            let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Commit(save));
             tx.send( request ).await;
             timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
         }
@@ -2002,9 +2319,9 @@ mod test
         for index in 1..11
         {
             let space= space_resource.key.space();
-            let sub_space = SubSpaceKey::new(space.clone(), SubSpaceId::from_index(index as _) );
+            let sub_space = SubSpaceKey::new(space.clone(), index as _ );
             let address_part = ResourceAddressPart::Skewer(Skewer::new(format!("sub-space-{}", index).as_str()).unwrap());
-            let address = ResourceAddress::from_parent(&ResourceType::SubSpace, &space_resource.address.clone(), address_part.clone()).unwrap();
+            let address = ResourceAddress::from_parent(&ResourceType::SubSpace, Option::Some(&space_resource.address.clone()), address_part.clone()).unwrap();
 
             let resource= Resource{
                 key: ResourceKey::SubSpace(sub_space.clone()),
@@ -2018,7 +2335,7 @@ mod test
             };
 
             let save = create_save(index,resource);
-            let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Register(save));
+            let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Commit(save));
             tx.send( request ).await;
             timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
             sub_spaces.push(sub_space)
@@ -2046,7 +2363,7 @@ mod test
             let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
-            assert_result_count(result.clone(),5);
+            assert_result_count(result,5);
 
             let mut selector = Selector::app_selector();
             selector.add_label( LabelSelection::exact("parity", "Odd") );
@@ -2093,7 +2410,7 @@ mod test
             let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Select(selector) );
             tx.send(request).await;
             let result = timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
-            assert_result_count(result.clone(),5);
+            assert_result_count(result,5);
 
             let mut selector = Selector::app_selector();
             selector.add_label( LabelSelection::exact("parity", "Odd") );
@@ -2194,11 +2511,11 @@ mod test
             let tx = Registry::new().await;
 
             let sub_space = SubSpaceKey::hyper_default();
-            let app1 = AppKey::new(sub_space.clone());
+            let app1 = AppKey::new(sub_space.clone(), 1);
             let app_address = ResourceAddress::test_address(&ResourceKey::App(app1.clone())).unwrap();
             create_10_actors(tx.clone(), app1.clone(), Option::None, sub_space.clone(), app_address,UserKey::hyper_user() ).await;
 
-            let app2 = AppKey::new(sub_space.clone());
+            let app2 = AppKey::new(sub_space.clone(), 2);
             let app_address = ResourceAddress::test_address(&ResourceKey::App(app2.clone())).unwrap();
             create_10_actors(tx.clone(), app2.clone(), Option::None, sub_space.clone(), app_address, UserKey::hyper_user() ).await;
 
@@ -2348,20 +2665,30 @@ impl FromStr for Version {
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceCreate {
+   pub parent: Option<ResourceKey>,
+   pub key: KeyCreationSrc,
    pub init: ResourceInit,
    pub registry_info: Option<ResourceRegistryInfo>,
-   pub owner: Option<UserKey>
+   pub owner: Option<UserKey>,
+   pub location_affinity: Option<ResourceLocationAffinity>
 }
 
 impl ResourceCreate {
+
     pub fn new( init: ResourceInit ) ->Self {
         ResourceCreate {
+            parent: Option::None,
+            key: KeyCreationSrc::None,
             init: init,
             registry_info: Option::None,
-            owner: Option::None
+            owner: Option::None,
+            location_affinity: Option::None
         }
     }
 
+    pub fn validate(&self)->Result<(),Fail> {
+        Ok(())
+    }
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -2393,6 +2720,19 @@ impl FromStr for ResourceStatus{
     }
 }
 
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum KeyCreationSrc {
+    None,
+    Key(ResourceKey)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum KeySrc{
+    None,
+    Key(ResourceKey),
+    Address(ResourceAddress)
+}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ResourceSrc {

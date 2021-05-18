@@ -17,7 +17,7 @@ use crate::filesystem::File;
 use crate::frame::{Reply, StarMessagePayload, ResourceManagerAction};
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, SubSpaceKey, UserKey, ResourceKey};
-use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceLocation, ResourceArchetype, ResourceInit, ResourceAddress, Names, ResourceSrc, Skewer, ResourceAddressPart, ResourceType, Resource, ResourceCreate};
+use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceLocationRecord, ResourceArchetype, ResourceInit, ResourceAddress, Names, ResourceSrc, Skewer, ResourceAddressPart, ResourceType, Resource, ResourceCreate};
 use crate::names::Name;
 use crate::space::CreateAppControllerFail;
 use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarSkel, StarVariantCommand, StarComm, ServerCommand, Request, Empty, Query, LocalResourceLocation };
@@ -717,7 +717,7 @@ unimplemented!();
             key: actor_key.clone(),
             owner: self.resource.owner.clone(),
             archetype: archetype,
-            address: ResourceAddress::from_parent(&ResourceType::Actor, &self.resource.address, address_part )?
+            address: ResourceAddress::from_parent(&ResourceType::Actor, Option::Some(&self.resource.address), address_part )?
         };
 
         let registration = ActorRegistration{
