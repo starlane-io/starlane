@@ -72,7 +72,7 @@ pub struct RemoteResourceHost {
 
 #[async_trait]
 impl ResourceHost for RemoteResourceHost {
-    async fn assign( &mut self, assign: ResourceAssign) -> Result<Resource, Fail> {
+    async fn assign( &self, assign: ResourceAssign) -> Result<Resource, Fail> {
         if !self.handle.kind.hosts().contains(&assign.key.resource_type() ) {
             return Err(Fail::WrongResourceType{
                 expected: self.handle.kind.hosts().clone(),

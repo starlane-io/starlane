@@ -109,6 +109,15 @@ pub struct ArtifactKey
     pub id: ArtifactId
 }
 
+impl ArtifactKey{
+    pub fn new( sub_space: SubSpaceKey, id: ArtifactId )->Self{
+        ArtifactKey{
+            sub_space: sub_space,
+            id: id
+        }
+    }
+}
+
 pub type ArtifactId = u64;
 
 impl fmt::Display for ArtifactKey{

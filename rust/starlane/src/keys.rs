@@ -64,6 +64,7 @@ impl fmt::Display for SpaceKey{
 }
 
 
+pub type UserId=i32;
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct UserKey
@@ -91,15 +92,7 @@ impl UserKey
 
 impl UserKey
 {
-    pub fn new(space: SpaceKey) -> Self
-    {
-        UserKey{
-            space,
-            id: UserId::new()
-        }
-    }
-
-    pub fn with_id(space: SpaceKey, id: UserId) -> Self
+    pub fn new(space: SpaceKey, id: UserId) -> Self
     {
         UserKey{
             space,
@@ -107,21 +100,18 @@ impl UserKey
         }
     }
 
+
     pub fn hyper_user() -> Self
     {
-        UserKey::with_id(SpaceKey::HyperSpace, UserId::Super)
+        UserKey::new(SpaceKey::HyperSpace, 0)
     }
 
 
     pub fn super_user(space: SpaceKey) -> Self
     {
-        UserKey::with_id(space,UserId::Super)
+        UserKey::new(space,0)
     }
 
-    pub fn annonymous(space: SpaceKey) -> Self
-    {
-        UserKey::with_id(space,UserId::Annonymous)
-    }
 
 
     pub fn is_hyperuser(&self)->bool
@@ -130,7 +120,7 @@ impl UserKey
             SpaceKey::HyperSpace => {
                 match self.id
                 {
-                    UserId::Super => true,
+                    0 => true,
                     _ => false
                 }
             }
@@ -152,38 +142,14 @@ impl UserKey
 
 impl fmt::Display for UserKey{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!( f,"({},{})",self.space, self.id)
+        write!( f,"({},{})",self.space, self.id.to_string())
     }
 
 }
 
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
-pub enum UserId
-{
-    Super,
-    Annonymous,
-    Uuid(Uuid)
-}
 
-impl UserId
-{
-    pub fn new()->Self
-    {
-        Self::Uuid(Uuid::new_v4())
-    }
-}
 
-impl fmt::Display for UserId{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!( f,"{}",match self{
-            UserId::Super => "super".to_string(),
-            UserId::Annonymous => "annonymous".to_string(),
-            UserId::Uuid(uuid) => uuid.to_string().to_lowercase()
-        })
-    }
-
-}
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub struct SubSpaceKey
@@ -284,8 +250,30 @@ pub enum ResourceId{
     Actor(Id),
     User(UserId),
     Artifact(ArtifactId),
-    File(FileKey),
-    FileSystem(FileSystemKey),
+    File(FileId),
+    FileSystem(FileSystemId),
+}
+
+impl ResourceId{
+    fn resource_type(&self)->ResourceType{
+        match self{
+            ResourceId::Space(_) => ResourceType::Space,
+            ResourceId::SubSpace(_) => ResourceType::SubSpace,
+            ResourceId::App(_) => ResourceType::App,
+            ResourceId::Actor(_) => ResourceType::Actor,
+            ResourceId::User(_) => ResourceType::User,
+            ResourceId::Artifact(_) => ResourceType::Artifact,
+            ResourceId::File(_) => ResourceType::File,
+            ResourceId::FileSystem(_) => ResourceType::FileSystem,
+        }
+
+    }
+}
+
+impl ToString for ResourceId{
+    fn to_string(&self) -> String {
+        self.resource_type().to_string()
+    }
 }
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
@@ -303,6 +291,78 @@ pub enum ResourceKey
 
 impl ResourceKey
 {
+    pub fn new(parent: Option<ResourceKey>, id: ResourceId) -> Result<Self,Error> {
+        match &id{
+            ResourceId::Space(space) => {
+                Ok(Self::Space(SpaceKey::Space(space.to_owned())))
+            }
+            _ => {
+                if let Option::Some(parent) = parent {
+                    match id{
+                        ResourceId::Space(_) => {
+                            Err("IMPOSSIBLE! space should have already been processed".into())
+                        }
+                        ResourceId::SubSpace(index) => {
+                            if let Self::Space(parent) = parent {
+                                Ok(Self::SubSpace( SubSpaceKey::new(parent,index)))
+                            } else {
+                                Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                            }
+                        }
+                        ResourceId::App(index) => {
+                            if let Self::SubSpace(parent) = parent {
+                                Ok(Self::App( AppKey::new(parent,index)))
+                            } else {
+                                Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                            }
+                        }
+                        ResourceId::Actor(index) => {
+                            if let Self::App(parent) = parent {
+                                Ok(Self::Actor( ActorKey::new(parent,index)))
+                            } else {
+                                Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                            }
+                        }
+                        ResourceId::User(index) => {
+                            if let Self::Space(parent) = parent {
+                                Ok(Self::User( UserKey::new(parent,index)))
+                            } else {
+                                Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                            }
+                        }
+                        ResourceId::Artifact(index) => {
+                            if let Self::SubSpace(parent) = parent {
+                                Ok(Self::Artifact( ArtifactKey::new(parent,index)))
+                            } else {
+                                Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                            }
+                        }
+                        ResourceId::File(index) => {
+                            if let Self::FileSystem(parent) = parent {
+                                Ok(Self::File( FileKey::new(parent,index)))
+                            } else {
+                                Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                            }
+                        }
+                        ResourceId::FileSystem(index) => {
+                            if let Self::SubSpace(parent) = parent {
+                                Ok(Self::FileSystem(FileSystemKey::SubSpace(SubSpaceFilesystemKey { sub_space: parent, id: index })))
+                            }
+                            else if let Self::App(parent) = parent {
+                                Ok(Self::FileSystem(FileSystemKey::App(AppFilesystemKey{ app: parent, id: index })))
+
+                            } else {
+                                Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                            }
+                        }
+                    }
+                }
+                else{
+                    Err("expected parent key".into())
+                }
+            }
+        }
+    }
 
     pub fn parent(&self)->Option<ResourceKey>{
         match self {
@@ -451,6 +511,8 @@ pub enum FileSystemKey
     SubSpace(SubSpaceFilesystemKey)
 }
 
+
+
 pub type FileSystemId = u32;
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
@@ -593,6 +655,15 @@ pub struct FileKey
 {
    pub filesystem: FileSystemKey,
    pub id: FileId
+}
+
+impl FileKey{
+    pub fn new(filesystem: FileSystemKey, id: FileId ) -> Self {
+        FileKey{
+            filesystem: filesystem,
+            id: id
+        }
+    }
 }
 
 pub type FileId = u64;

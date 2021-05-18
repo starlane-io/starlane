@@ -379,7 +379,8 @@ impl AuthTokenSource
 
     pub async fn auth(&self, creds: &Credentials ) -> Result<AuthToken,Error>
     {
-        Ok(AuthToken{
+        unimplemented!()
+/*        Ok(AuthToken{
             user: User{
                 name: "someuser".to_string(),
                 key: creds.user.clone(),
@@ -391,6 +392,8 @@ impl AuthTokenSource
                 }
             }
         })
+
+ */
     }
 }
 

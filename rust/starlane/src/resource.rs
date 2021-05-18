@@ -863,8 +863,11 @@ eprintln!("error setting up db: {}", err );
             ResourceRegistryCommand::Reserve(request) => {
                 let trans = self.conn.transaction()?;
                 trans.execute("DELETE FROM names WHERE key IS NULL AND datetime(reservation_timestamp) < datetime('now')", [] )?;
-                let params = RegistryParams::from_archetype(request.archetype,request.parent)?;
-                Self::process_names(&trans,&request.names,&params)?;
+                let params = RegistryParams::new(request.archetype.clone(),request.parent.clone(),Option::None, Option::None)?;
+                if request.info.is_some() {
+                    let params = RegistryParams::from_archetype(request.archetype, request.parent)?;
+                    Self::process_names(&trans, &request.info.unwrap().names, &params)?;
+                }
                 trans.commit()?;
                 let (tx,rx) = oneshot::channel();
                 let reservation = RegistryReservation::new(tx);
@@ -1091,7 +1094,7 @@ impl ResourceKind {
                 ResourceKey::Actor(ActorKey::new(app, Id::new(0, index as _)))
             }
             ResourceKind::User => {
-                ResourceKey::User(UserKey::new(sub_space.space))
+                ResourceKey::User(UserKey::new(sub_space.space, index as _))
             }
             ResourceKind::File => {
                 ResourceKey::File(FileKey{
@@ -1189,7 +1192,7 @@ impl ResourceType{
         }
     }
 
-    pub fn from( parent: &Option<ResourceKey> ) -> Option<Self> {
+    pub fn from( parent: Option<&ResourceKey> ) -> Option<Self> {
         match parent {
             None => Option::None,
             Some(parent) => Option::Some(parent.resource_type())
@@ -1273,27 +1276,27 @@ pub enum ResourceParent
 }
 
 impl ResourceParent {
-    pub fn matches_address( &self, address: &Option<&ResourceAddress> ) -> bool
+    pub fn matches_address( &self, address: Option<&ResourceAddress> ) -> bool
     {
         match address{
             None => {
-                self.matches(&Option::None)
+                self.matches(Option::None)
             }
             Some(address) => {
-                self.matches(&Option::Some(address.resource_type()))
+                self.matches(Option::Some(address.resource_type()))
             }
         }
     }
 
-    pub fn matches( &self, resource_type: &Option<&ResourceType> ) -> bool
+    pub fn matches( &self, resource_type: Option<&ResourceType> ) -> bool
     {
         match resource_type{
             None => *self == Self::None,
             Some(resource_type) => {
                 match self{
                     ResourceParent::None => false,
-                    ResourceParent::Some(parent_type) => parent_type == *resource_type,
-                    ResourceParent::Multi(multi) => multi.contains(*resource_type)
+                    ResourceParent::Some(parent_type) => *parent_type == *resource_type,
+                    ResourceParent::Multi(multi) => multi.contains(resource_type)
                 }
             }
         }
@@ -1476,7 +1479,7 @@ impl ResourceControl{
 
 #[async_trait]
 pub trait ResourceIdSeq: Send+Sync {
-    async fn next(&mut self)->ResourceId;
+    async fn next(&self)->ResourceId;
 }
 
 
@@ -1517,69 +1520,78 @@ pub struct HostedResource {
 
 #[async_trait]
 pub trait RemoteResourceManager: Send+Sync {
-    async fn create( &self, parent: Option<Arc<HostedResource>>, create: ResourceCreate ) -> oneshot::Receiver<Result<Resource,Fail>>;
+    async fn create( &self, create: ResourceCreate ) -> oneshot::Receiver<Result<Resource,Fail>>;
 }
 
-pub struct ResourceManager{
+#[derive(Clone)]
+pub struct ResourceManagerCore{
     pub key: Option<ResourceKey>,
     pub resource_type: ResourceType,
     pub selector: Arc<dyn ResourceHostSelector>,
     pub registry: Arc<dyn ResourceRegistryBacking>,
-    pub key_sequence: Arc<dyn ResourceIdSeq>,
+    pub key_sequence: Arc<dyn ResourceIdSeq>
+}
+
+pub struct ResourceManager{
+   pub core: ResourceManagerCore
+}
+
+impl ResourceManager{
+    async fn process( core: ResourceManagerCore, create: ResourceCreate ) -> Result<Resource,Fail>{
+        if core.resource_type.requires_owner() && create.owner.is_none() {
+            return Err(Fail::ResourceTypeRequiresOwner);
+        };
+
+        if !core.resource_type.parent().matches(ResourceType::from(create.parent.as_ref()).as_ref()) {
+            return Err(Fail::WrongParentResourceType {
+                expected: HashSet::from_iter(core.resource_type.parent().types()),
+                received: match create.parent {
+                    None => Option::None,
+                    Some(key) => Option::Some(key.resource_type())
+                }
+            });
+        };
+
+        let reservation = core.registry.reserve(ResourceNamesReservationRequest{
+            parent: create.parent.clone(),
+            archetype: create.init.archetype.clone(),
+            info: create.registry_info } ).await?;
+
+        let key = ResourceKey::new( core.key, core.key_sequence.next().await )?;
+        let assign = ResourceAssign {
+            key: key,
+            source: ResourceSrc::Creation(create.init.clone())
+        };
+
+        let mut host = core.selector.select(create.init.archetype.kind.resource_type()).await?;
+        let resource = host.assign(assign).await?;
+
+        reservation.commit( resource.clone() );
+
+        Ok(resource)
+    }
 }
 
 #[async_trait]
 impl  RemoteResourceManager for ResourceManager{
-    async fn create( &self, parent: Option<Arc<HostedResource>>, create: ResourceCreate ) -> oneshot::Receiver<Result<Resource,Fail>> {
-        unimplemented!();
-        /*
+    async fn create( &self, create: ResourceCreate ) -> oneshot::Receiver<Result<Resource,Fail>> {
         let (tx,rx) = oneshot::channel();
-        let resource_type = self.resource_type.clone();
-        let selector = self.selector.clone();
-        let registry = self.registry.clone();
-        let key_sequence = self.key_sequence.clone();
+
+        let core = self.core.clone();
         tokio::spawn( async move {
-            if resource_type.requires_owner() && create.owner.is_none() {
-                tx.send(Err(Fail::ResourceTypeRequiresOwner)).unwrap_or_default();
-            };
-
-            if !resource_type.parent().matches(&ResourceType::from(&create.parent)) {
-                return Err(Fail::WrongParentResourceType {
-                    expected: HashSet::from_iter(self.resource_type.parent().types()),
-                    received: match create.parent {
-                        None => Option::None,
-                        Some(key) => Option::Some(key.resource_type())
-                    }
-                });
-            }
-
-            let reservation = registry.reserve(create.registry_info.clone()).await?;
-
-            let assign = ResourceAssign {
-                key: key,
-                source: ResourceSrc::Creation(create.init)
-            };
-
-            let mut host = selector.select(create.init.archetype.kind.resource_type()).await?;
-            let resource = host.assign(assign).await?;
-
-            if let Option::Some(info) = create.registry_info {
-                let registration = ResourceRegistration::new(resource.clone(), info);
-                registry.register(registration).await?;
-            }
-
-            tx.send(Ok(resource)).unwrap_or_default();
-
+            tx.send(ResourceManager::process(core, create ).await).unwrap_or_default();
         });
         rx
-             */
     }
+
+
+
 }
 
 
 #[async_trait]
-pub trait ResourceHost {
-    async fn assign( &mut self, assign: ResourceAssign ) -> Result<Resource,Fail>;
+pub trait ResourceHost: Send+Sync {
+    async fn assign( &self, assign: ResourceAssign ) -> Result<Resource,Fail>;
 }
 
 
@@ -1630,7 +1642,7 @@ pub struct ResourceRegistryInfo
 pub struct ResourceNamesReservationRequest{
   pub parent: Option<ResourceKey>,
   pub archetype: ResourceArchetype,
-  pub names: Names
+  pub info: Option<ResourceRegistryInfo>
 }
 
 pub struct RegistryReservation{
@@ -1803,7 +1815,7 @@ impl ResourceAddress {
     pub fn from_parent(resource_type: &ResourceType, parent: Option<&ResourceAddress>, part: ResourceAddressPart) -> Result<ResourceAddress, Error> {
 
 
-        if !resource_type.parent().matches_address(&parent)  {
+        if !resource_type.parent().matches_address(parent)  {
             return Err(format!("resource type parent is wrong: expected: {}", resource_type.parent().to_string()).into() )
         }
 

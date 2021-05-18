@@ -5,7 +5,6 @@ use std::cmp::{min, Ordering};
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::RandomState;
 use std::future::Future;
-use std::sync::{Arc, Mutex, Weak};
 use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU64};
 
 use futures::future::{BoxFuture, join_all, Map};
@@ -17,7 +16,6 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, oneshot};
 use tokio::sync::broadcast::error::{RecvError, SendError};
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::Receiver;
 use tokio::time::{Duration, Instant, timeout};
 use tokio::time::error::Elapsed;
 use url::Url;
@@ -48,6 +46,7 @@ use crate::star::space::SpaceVariant;
 use crate::frame::ResourceHostAction::SliceAssign;
 use std::iter::FromIterator;
 use crate::star::pledge::{StarHandleBacking, StarHandle, Satisfaction};
+use std::sync::Arc;
 
 pub mod central;
 pub mod app_host;
@@ -2951,7 +2950,7 @@ impl StarComm
 #[async_trait]
 pub trait ResourceRegistryBacking: Sync+Send {
     async fn accepts(&self, accept: HashSet<ResourceType> ) ->Result<(),Fail>;
-    async fn reserve(&self, request: Option<ResourceNamesReservationRequest>) -> Result<RegistryReservation, Fail>;
+    async fn reserve(&self, request: ResourceNamesReservationRequest) -> Result<RegistryReservation, Fail>;
     async fn register(&self, registration: ResourceRegistration)->Result<(),Fail>;
     async fn select(&self, select: Selector)->Result<Vec<Resource>,Fail>;
     async fn set_location(&self, location: ResourceLocationRecord) ->Result<(),Fail>;
@@ -2963,7 +2962,7 @@ pub trait ResourceRegistryBacking: Sync+Send {
 
 pub struct ResourceRegistryBackingSqLite
 {
-    registry: mpsc::Sender<ResourceRegistryAction>
+    registry: tokio::sync::mpsc::Sender<ResourceRegistryAction>
 }
 
 impl ResourceRegistryBackingSqLite
@@ -2991,27 +2990,18 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite
         Ok(())
     }
 
-    async fn reserve(&self, request: Option<ResourceNamesReservationRequest>) -> Result<RegistryReservation, Fail> {
-        match request {
-            None => {
-                Ok(RegistryReservation::empty())
+    async fn reserve(&self, request: ResourceNamesReservationRequest) -> Result<RegistryReservation, Fail> {
+        let (action,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Reserve(request));
+        self.registry.send(action).await?;
+        match tokio::time::timeout( Duration::from_secs(5),rx).await??
+        {
+            ResourceRegistryResult::Reservation(reservation) => {
+                Result::Ok(reservation)
             }
-            Some(request) => {
-
-                let (action,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Reserve(request));
-                self.registry.send(action).await?;
-                match tokio::time::timeout( Duration::from_secs(5),rx).await??
-                {
-                    ResourceRegistryResult::Reservation(reservation) => {
-                        Result::Ok(reservation)
-                    }
-                    _ => {
-                        Result::Err(Fail::Timeout)
-                    }
-                }
+            _ => {
+                Result::Err(Fail::Timeout)
             }
         }
-
     }
 
     async fn register(&self,registration: ResourceRegistration) -> Result<(),Fail> {
