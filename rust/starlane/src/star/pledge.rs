@@ -451,7 +451,7 @@ impl StarHandleDb {
 	      key BLOB PRIMARY KEY,
 	      kind TEXT NOT NULL,
 	      hops INTEGER,
-	      selections INTEGER NOT NULL
+	      selections INTEGER NOT NULL DEFAULT 0
         )"#;
 
         let transaction = self.conn.transaction()?;
