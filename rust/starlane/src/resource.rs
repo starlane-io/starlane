@@ -25,8 +25,8 @@ use crate::keys::{AppFilesystemKey, AppKey, FileSystemKey, GatheringKey, Resourc
 use crate::message::{Fail, ProtoMessage};
 use crate::names::{Name, Specific};
 use crate::permissions::User;
-use crate::star::{ResourceRegistryBacking, StarComm, StarCommand, StarKey, StarSkel};
-use crate::star::pledge::StarHandle;
+use crate::star::{ResourceRegistryBacking, StarComm, StarCommand, StarKey, StarSkel, StarKind};
+use crate::star::pledge::{StarHandle, ResourceHostSelector};
 use crate::util::AsyncHashMap;
 
 pub mod space;
@@ -1204,6 +1204,37 @@ impl ResourceType{
 }
 
 impl ResourceType{
+
+    pub fn star_host(&self) -> StarKind {
+        match self {
+            ResourceType::Space => StarKind::SpaceHost,
+            ResourceType::SubSpace => StarKind::SpaceHost,
+            ResourceType::App => StarKind::AppHost,
+            ResourceType::Actor => StarKind::ActorHost,
+            ResourceType::User => StarKind::SpaceHost,
+            ResourceType::FileSystem => StarKind::FileStore,
+            ResourceType::File => StarKind::FileStore,
+            ResourceType::Artifact => StarKind::FileStore
+        }
+    }
+
+    pub fn star_manager(&self) -> HashSet<StarKind>{
+        match self {
+            ResourceType::Space => HashSet::from_iter(vec![StarKind::Central] ),
+            ResourceType::SubSpace => HashSet::from_iter(vec![StarKind::SpaceHost] ),
+            ResourceType::App => HashSet::from_iter(vec![StarKind::SpaceHost] ),
+            ResourceType::Actor => HashSet::from_iter(vec![StarKind::AppHost] ),
+            ResourceType::User => HashSet::from_iter(vec![StarKind::SpaceHost] ),
+            ResourceType::FileSystem => HashSet::from_iter(vec![StarKind::SpaceHost,StarKind::AppHost] ),
+            ResourceType::File => HashSet::from_iter(vec![StarKind::FileStore] ),
+            ResourceType::Artifact => HashSet::from_iter(vec![StarKind::SpaceHost] )
+        }
+    }
+
+
+}
+
+impl ResourceType{
     pub fn children(&self)->HashSet<ResourceType> {
         let mut children = match self{
             Self::Space => vec![Self::SubSpace,Self::User],
@@ -1490,10 +1521,6 @@ pub trait RemoteHostedResource: Send+Sync {
 }
 
 
-#[async_trait]
-pub trait ResourceHostSelector: Send+Sync {
-    async fn select( &self, resource_type: ResourceType ) -> Result<Arc<dyn ResourceHost>,Fail>;
-}
 
 pub struct HostedResourceStore{
    map: AsyncHashMap<ResourceKey,Arc<HostedResource>>
@@ -1536,7 +1563,7 @@ impl RemoteHostedResource for HostedResource{
 
 #[async_trait]
 pub trait RemoteResourceManager: Send+Sync {
-    async fn create( &self, create: ResourceCreate ) -> oneshot::Receiver<Result<Resource,Fail>>;
+    async fn create( &self, create: ResourceCreate ) -> oneshot::Receiver<Result<ResourceLocationRecord,Fail>>;
 }
 
 #[derive(Clone)]
@@ -1544,7 +1571,7 @@ pub struct ResourceManagerCore{
     pub key: ResourceKey,
     pub address: ResourceAddress,
     pub resource_type: ResourceType,
-    pub selector: Arc<dyn ResourceHostSelector>,
+    pub selector: ResourceHostSelector,
     pub registry: Arc<dyn ResourceRegistryBacking>,
     pub id_seq: Arc<IdSeq>
 }
@@ -1555,7 +1582,7 @@ pub struct ResourceManager{
 }
 
 impl ResourceManager{
-    async fn process( core: ResourceManagerCore, create: ResourceCreate ) -> Result<Resource,Fail>{
+    async fn process_create(core: ResourceManagerCore, create: ResourceCreate ) -> Result<ResourceLocationRecord,Fail>{
         if core.resource_type.requires_owner() && create.owner.is_none() {
             return Err(Fail::ResourceTypeRequiresOwner);
         };
@@ -1603,7 +1630,7 @@ impl ResourceManager{
             source: ResourceSrc::Creation(create.init.clone())
         };
 
-        let mut host = core.selector.select(create.init.archetype.kind.resource_type()).await?;
+        let mut host = core.selector.select(create.init.archetype.kind.resource_type(), create.location_affinity ).await?;
 
         host.assign(assign).await?;
 
@@ -1612,7 +1639,7 @@ impl ResourceManager{
             location: ResourceLocation { host: host.star_key(), gathering: Option::None }
         };
 
-        core.registry.set_location(location_record).await?;
+        core.registry.set_location(location_record.clone()).await?;
 
         let resource = Resource{
             key: key,
@@ -1623,24 +1650,21 @@ impl ResourceManager{
 
         reservation.commit( resource.clone() );
 
-        Ok(resource)
+        Ok(location_record)
     }
 }
 
 #[async_trait]
 impl  RemoteResourceManager for ResourceManager{
-    async fn create( &self, create: ResourceCreate ) -> oneshot::Receiver<Result<Resource,Fail>> {
+    async fn create( &self, create: ResourceCreate ) -> oneshot::Receiver<Result<ResourceLocationRecord,Fail>> {
         let (tx,rx) = oneshot::channel();
 
         let core = self.core.clone();
         tokio::spawn( async move {
-            tx.send(ResourceManager::process(core, create ).await).unwrap_or_default();
+            tx.send(ResourceManager::process_create(core, create ).await).unwrap_or_default();
         });
         rx
     }
-
-
-
 }
 
 
@@ -2916,8 +2940,8 @@ impl ResourceHost for LocalResourceHost{
 }
 
 pub struct RemoteResourceHost {
-    comm: StarComm,
-    handle: StarHandle
+    pub comm: StarComm,
+    pub handle: StarHandle
 }
 
 #[async_trait]

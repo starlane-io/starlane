@@ -31,7 +31,7 @@ use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequ
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId, SpaceKey, UserKey, ResourceKey, GatheringKey};
-use crate::resource::{Labels, ResourceRegistration, Selector, ResourceAssign, ResourceRegistryCommand, ResourceRegistryResult, Registry, ResourceType, ResourceLocationRecord, ResourceManagerKey, ResourceBinding, ResourceAddress, ResourceRegistryAction, Resource, FieldSelection, ResourceRegistryInfo, RegistryReservation, ResourceNamesReservationRequest, ResourceManager, ResourceManagerCore, HostedResourceStore, HostedResource, RemoteResourceManager};
+use crate::resource::{Labels, ResourceRegistration, Selector, ResourceAssign, ResourceRegistryCommand, ResourceRegistryResult, Registry, ResourceType, ResourceLocationRecord, ResourceManagerKey, ResourceBinding, ResourceAddress, ResourceRegistryAction, Resource, FieldSelection, ResourceRegistryInfo, RegistryReservation, ResourceNamesReservationRequest, ResourceManager, ResourceManagerCore, HostedResourceStore, HostedResource, RemoteResourceManager, ResourceCreate, ResourceLocation};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob, Fail};
@@ -45,7 +45,7 @@ use std::str::FromStr;
 use crate::star::space::SpaceVariant;
 use crate::frame::ResourceHostAction::SliceAssign;
 use std::iter::FromIterator;
-use crate::star::pledge::{StarHandleBacking, StarHandle, Satisfaction};
+use crate::star::pledge::{StarHandleBacking, StarHandle, Satisfaction, ResourceHostSelector};
 use std::sync::Arc;
 
 pub mod central;
@@ -604,6 +604,36 @@ impl Star
                     StarCommand::SetResourceBind(set) => {
                         self.resource_address_to_key.put( set.payload.address.clone(), set.payload.key.clone() );
                         set.commit();
+                    }
+                    StarCommand::SetResourceAddress{ key, address } => {
+                        self.resource_address_to_key.put( address.clone(), key.clone() );
+                        self.resource_key_to_address.put( key, address );
+                    }
+                    StarCommand::GetResourceAddress(request) => {
+                        if self.resource_key_to_address.contains(&request.payload) {
+                            request.tx.send( Ok(self.resource_key_to_address.get(&request.payload ).cloned().unwrap()) );
+                        } else {
+                            let rx = self.fetch_resource_address(request.payload.clone() ).await;
+                            tokio::spawn( async move {
+                                if let Result::Ok(result) = rx.await{
+                                    request.tx.send(result);
+                                } else {
+                                    request.tx.send(Err(Fail::RecvErr));
+                                }
+                            } );
+                        }
+                    }
+                    StarCommand::GetResourceManager(request) => {
+                            let rx = self.get_resource_manager(request.payload.clone() ).await;
+                            tokio::spawn( async move {
+                                if let Result::Ok(rx) = rx{
+                                    if let Result::Ok(result) = rx.await{
+                                        request.tx.send(result);
+                                    } else {
+                                        request.tx.send(Err(Fail::RecvErr));
+                                    }
+                                }
+                            } );
                     }
                     StarCommand::Diagnose(diagnose) => {
                         self.diagnose(diagnose).await;
@@ -1544,9 +1574,9 @@ impl Star
     }
 
 
-    async fn process_resource_manager_action( &self, message: StarMessage, action: ResourceManagerAction ) -> Result<(),Error>
+    async fn process_resource_manager_action( &mut self, message: StarMessage, action: ResourceManagerAction ) -> Result<(),Error>
     {
-        if let Option::Some(manager) = self.skel.resource_manager.clone()
+        if let Option::Some(manager) = self.skel.registry.clone()
         {
             match action {
                 ResourceManagerAction::Register(registration) => {
@@ -1581,11 +1611,34 @@ impl Star
                     unimplemented!()
                 }
                 ResourceManagerAction::Create(create) => {
-                    if let Option::Some( parent ) = &create.parent{
-                        let manager = self.get_resource_manager(parent.clone() ).await?;
-                        manager.create(create).await.await?;
-
-                    }
+                    let skel = self.skel.clone();
+                    tokio::spawn( async move {
+                        let mut star_api:StarApi = StarApi::new(skel.clone());
+                            if let Option::Some( parent ) = &create.parent{
+                                let parent = parent.clone();
+                                if let Result::Ok(manager) = star_api.get_resource_manager(parent ).await
+                                {
+                                    match manager.create(create).await.await {
+                                        Ok(result) => {
+                                            match result {
+                                                Ok(record) => {
+                                                    unimplemented!();
+                                                }
+                                                Err(fail) => {
+                                                    skel.comm().simple_reply(message, SimpleReply::Fail(fail)).await;
+                                                }
+                                            }
+                                        }
+                                        Err(err) => {
+                                            skel.comm().simple_reply(message, SimpleReply::Fail(Fail::Unexpected)).await;
+                                        }
+                                    }
+                                }
+                            }
+                            else{
+                                skel.comm().simple_reply(message, SimpleReply::Fail(Fail::Unexpected)).await;
+                            }
+                    });
 
                 }
                 ResourceManagerAction::Select(selector) => {
@@ -1629,21 +1682,37 @@ impl Star
 
 
 
-    async fn get_resource_manager( &self, key: ResourceKey ) -> Result<ResourceManager,Fail>{
+    async fn get_resource_manager( &mut self, key: ResourceKey ) -> Result<oneshot::Receiver<Result<ResourceManager,Fail>>,Fail>{
 
-        unimplemented!();
-        /*
-        ResourceManager{
-            core: ResourceManagerCore {
-                key: key,
-                address: self.fetch_resource_address(&key),
-                resource_type: ResourceType::Space,
-                selector: Arc::new(()),
-                registry: Arc::new(()),
-                id_seq: Arc::new(())
-            }
+        let (tx,rx) = oneshot::channel();
+
+        let mut star_api = StarApi::new(self.skel.clone());
+        let skel = self.skel.clone();
+
+        if self.skel.registry.is_none(){
+            tx.send( Err(Fail::Error(format!("this star: {} does not have a registry and therefor cannot manage resources",self.skel.info.kind))));
+            return Err(Fail::Unexpected);
         }
-         */
+
+        let hosted_resource = self.resources_store.get(key.clone()).await?.ok_or(Fail::ResourceNotFound(key.clone()))?;
+
+        tokio::spawn( async move {
+            if let Result::Ok(address) = star_api.fetch_resource_address(key.clone()).await{
+                let manager = ResourceManager{
+                    core: ResourceManagerCore {
+                        key: key.clone(),
+                        address: address,
+                        resource_type: key.resource_type(),
+                        selector: ResourceHostSelector::new(skel.clone()),
+                        registry: skel.registry.as_ref().cloned().unwrap(),
+                        id_seq: hosted_resource.id_seq.clone()
+                    }
+                };
+                tx.send( Ok(manager) );
+            }
+        } );
+
+       Ok(rx)
     }
 
     async fn diagnose( &self, diagnose: Diagnose ) {
@@ -1700,7 +1769,9 @@ pub enum StarCommand
     SetResourceLocation(Set<ResourceLocationRecord>),
     SetResourceBind(Set<ResourceBinding>),
     Diagnose(Diagnose),
-    SetResourceAddress{key:ResourceKey,address:ResourceAddress}
+    SetResourceAddress{key:ResourceKey,address:ResourceAddress},
+    GetResourceAddress(Request<ResourceKey,ResourceAddress>),
+    GetResourceManager(Request<ResourceKey,ResourceManager>)
 }
 
 pub enum Diagnose{
@@ -1997,7 +2068,9 @@ impl fmt::Display for StarCommand{
             StarCommand::SetResourceLocation(_) => "SetResourceLocation".to_string(),
             StarCommand::SetResourceBind(_) => "SetResourceBind".to_string(),
             StarCommand::Diagnose(_) => "Diagnose".to_string(),
-            StarCommand::SetResourceAddress { .. } => "SetResourceAddress".to_string()
+            StarCommand::SetResourceAddress { .. } => "SetResourceAddress".to_string(),
+            StarCommand::GetResourceAddress(_) => "GetResourceAddress".to_string(),
+            StarCommand::GetResourceManager(_) => "GetResourceManager".to_string()
         };
         write!(f, "{}",r)
     }
@@ -2641,7 +2714,7 @@ pub struct StarSkel
     pub logger: Logger,
     pub sequence: Arc<AtomicU64>,
     pub auth_token_source: AuthTokenSource,
-    pub resource_manager: Option<Arc<dyn ResourceRegistryBacking>>,
+    pub registry: Option<Arc<dyn ResourceRegistryBacking>>,
     pub star_handler: Option<StarHandleBacking>
 }
 
@@ -3170,3 +3243,30 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite
 }
 
 
+
+#[derive(Clone)]
+pub struct StarApi{
+    pub skel: StarSkel
+}
+
+
+impl StarApi{
+    pub fn new( skel: StarSkel ) -> Self {
+        StarApi{
+            skel: skel
+        }
+    }
+
+    pub async fn fetch_resource_address( &mut self, key: ResourceKey )-> Result<ResourceAddress,Fail> {
+        let (request,rx)  = Request::new(key);
+        self.skel.star_tx.send( StarCommand::GetResourceAddress(request)).await;
+        rx.await?
+    }
+
+    pub async fn get_resource_manager( &mut self, key: ResourceKey )-> Result<ResourceManager,Fail> {
+        let (request,rx)  = Request::new(key);
+        self.skel.star_tx.send( StarCommand::GetResourceManager(request)).await;
+        Ok(rx.await??)
+    }
+
+}

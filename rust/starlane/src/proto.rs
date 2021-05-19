@@ -132,7 +132,7 @@ impl ProtoStar
                             logger: self.logger.clone(),
                             flags: self.flags.clone(),
                             auth_token_source: AuthTokenSource {},
-                            resource_manager: resource_registry,
+                            registry: resource_registry,
                             star_handler: star_handler
                         };
 

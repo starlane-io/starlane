@@ -12,8 +12,10 @@ use tokio::time::error::Elapsed;
 use crate::error::Error;
 use crate::frame::{Reply, ResourceHostAction, SimpleReply, StarMessagePayload};
 use crate::message::{Fail, ProtoMessage};
-use crate::resource::{Resource, ResourceAssign, ResourceHost};
+use crate::resource::{Resource, ResourceAssign, ResourceHost, ResourceType, RemoteResourceHost, ResourceLocationAffinity};
 use crate::star::{LocalResourceLocation, StarComm, StarCommand, StarInfo, StarKey, StarKind, StarSkel};
+use std::sync::Arc;
+use futures::TryFutureExt;
 
 #[derive(Clone)]
 pub struct StarHandleBacking{
@@ -46,6 +48,18 @@ impl StarHandleBacking {
         }
     }
 
+    pub async fn next( &self, selector: StarSelector ) -> Result<StarHandle,Fail>{
+        let (action,rx) = StarHandleAction::new(StarHandleCommand::Next(selector));
+        self.tx.send( action ).await?;
+        let result = tokio::time::timeout(Duration::from_secs(5), rx).await??;
+        if let StarHandleResult::StarHandle(handles) = result {
+            Ok(handles)
+        } else {
+            Err(Fail::Unexpected)
+        }
+    }
+
+
     // must have at least one of each StarKind
     pub async fn satisfied( &self, set: HashSet<StarKind> ) -> Result<Satisfaction,Fail> {
         let (action,rx) = StarHandleAction::new(StarHandleCommand::Satisfied(set));
@@ -61,6 +75,33 @@ impl StarHandleBacking {
 
 
 
+#[derive(Clone)]
+pub struct ResourceHostSelector{
+   skel: StarSkel
+}
+
+impl ResourceHostSelector{
+    pub fn new(skel: StarSkel ) -> Self {
+        ResourceHostSelector{
+            skel: skel,
+        }
+    }
+
+    pub async fn select( &self, resource_type: ResourceType, affinity: Option<ResourceLocationAffinity> ) -> Result<Arc<dyn ResourceHost>,Fail>
+    {
+        let handler = self.skel.star_handler.as_ref().ok_or(format!("non-manager star {} does not have a host star selector", self.skel.info.kind ))?;
+        let mut selector = StarSelector::new();
+        selector.add(StarFieldSelection::Kind(resource_type.star_host()));
+        let handle = handler.next(selector).await?;
+
+        let host = RemoteResourceHost{
+            comm: self.skel.comm(),
+            handle: handle
+        };
+
+        Ok(Arc::new(host))
+    }
+}
 
 pub struct StarHandle {
     pub key: StarKey,
@@ -73,8 +114,17 @@ pub struct StarSelector {
 }
 
 impl StarSelector {
+    pub fn new()->Self{
+        StarSelector{
+            fields: HashSet::new()
+        }
+    }
     pub fn is_empty(&self)->bool {
         self.fields.is_empty()
+    }
+
+    pub fn add( &mut self, field: StarFieldSelection ) {
+        self.fields.insert( field );
     }
 }
 
@@ -137,6 +187,7 @@ pub enum StarHandleCommand {
     Close,
     SetStar(StarHandle),
     Select(StarSelector),
+    Next(StarSelector),
     Satisfied(HashSet<StarKind>)
 }
 
@@ -144,6 +195,7 @@ pub enum StarHandleResult
 {
    Ok,
    StarHandles(Vec<StarHandle>),
+   StarHandle(StarHandle),
    Error(String),
    Satisfaction(Satisfaction)
 }
@@ -295,6 +347,82 @@ impl StarHandleDb {
                 }
                 Ok(StarHandleResult::StarHandles(handles))
             }
+            StarHandleCommand::Next(selector) => {
+                let mut params = vec![];
+                let mut where_clause = String::new();
+                let mut param_index = 0;
+
+                for (index, field) in Vec::from_iter(selector.fields.clone()).iter().map(|x| x.clone() ).enumerate()
+                {
+                    if index != 0 {
+                        where_clause.push_str(" AND ");
+                    }
+
+                    let f = match &field {
+                        StarFieldSelection::Kind(kind) => {
+                            format!("kind=?{}", index + 1)
+                        }
+                        StarFieldSelection::MinHops => {
+                            format!("hops NOT NULL AND hops=MIN(hops)")
+                        }
+                    };
+
+                    where_clause.push_str(f.as_str());
+                    if field.is_param() {
+                        params.push(field);
+                        param_index = param_index+1;
+                    }
+                }
+
+
+                // in case this search was for EVERYTHING
+                let statement = if !selector.is_empty()
+                {
+                    format!("SELECT DISTINCT star.key,star.kind,star.hops  FROM stars WHERE {} ORDER BY star.selections", where_clause )
+                }
+                else{
+
+                    "SELECT DISTINCT star.key,star.kind,star.hops  FROM stars ORDER BY star.selections".to_string()
+                };
+
+
+
+                println!("STATEMENT {}",statement);
+                let trans = self.conn.transaction()?;
+
+                let handle= trans.query_row( statement.as_str(), params_from_iter(params.iter() ), |row|
+                    {
+                        let key:Vec<u8> = row.get(0)?;
+                        let key = StarKey::from_bin(key)?;
+
+                        let kind:String = row.get(1)?;
+                        let kind= StarKind::from_str(kind.as_str()).map_err(|_|rusqlite::Error::InvalidQuery)?;
+
+                        let hops = if let ValueRef::Null = row.get_ref(2)? {
+                            Option::None
+                        }
+                        else {
+                            let hops : usize = row.get(2)?;
+                            Option::Some(hops)
+                        };
+
+                        let handle = StarHandle{
+                            key: key,
+                            kind: kind,
+                            hops: hops
+                        };
+
+                        Ok(handle)
+                    }
+                )?;
+
+                trans.execute("UPDATE stars SET selections=selections+1 WHERE key=?1", params![handle.key.bin()?])?;
+
+                trans.commit()?;
+
+                Ok(StarHandleResult::StarHandle(handle))
+            }
+
             StarHandleCommand::Satisfied(kinds) => {
                 let mut lacking = HashSet::new();
                 for kind in kinds {
@@ -322,7 +450,8 @@ impl StarHandleDb {
        CREATE TABLE IF NOT EXISTS stars(
 	      key BLOB PRIMARY KEY,
 	      kind TEXT NOT NULL,
-	      hops INTEGER
+	      hops INTEGER,
+	      selections INTEGER NOT NULL
         )"#;
 
         let transaction = self.conn.transaction()?;
