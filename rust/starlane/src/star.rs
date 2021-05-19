@@ -1649,8 +1649,7 @@ impl Star
                     let skel = self.skel.clone();
                     tokio::spawn( async move {
                         let mut star_api:StarApi = StarApi::new(skel.clone());
-                            if let Option::Some( parent ) = &create.parent{
-                                let parent = parent.clone();
+                                let parent = create.parent.clone();
                                 if let Result::Ok(manager) = star_api.get_resource_manager(parent ).await
                                 {
                                     match manager.create(create).await.await {
@@ -1669,7 +1668,7 @@ impl Star
                                         }
                                     }
                                 }
-                            }
+
                             else{
                                 skel.comm().simple_reply(message, SimpleReply::Fail(Fail::Unexpected)).await;
                             }

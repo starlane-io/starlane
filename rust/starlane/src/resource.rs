@@ -405,14 +405,14 @@ struct RegistryParams {
 
 impl RegistryParams {
     pub fn from_registration(registration: ResourceRegistration) -> Result<Self, Error> {
-        Self::new( registration.resource.archetype, registration.resource.key.parent(), Option::Some(registration.resource.key), registration.resource.owner)
+        Self::new( registration.resource.archetype, registration.resource.key.parent().ok_or("cannot register the parent of a nothing ResourceType::Nothing")?, Option::Some(registration.resource.key), registration.resource.owner)
     }
 
-    pub fn from_archetype(archetype: ResourceArchetype, parent: Option<ResourceKey> ) -> Result<Self, Error> {
+    pub fn from_archetype(archetype: ResourceArchetype, parent: ResourceKey ) -> Result<Self, Error> {
         Self::new( archetype, parent, Option::None, Option::None )
     }
 
-    pub fn new(archetype: ResourceArchetype, parent: Option<ResourceKey>,  key: Option<ResourceKey>, owner: Option<UserKey>) -> Result<Self, Error> {
+    pub fn new(archetype: ResourceArchetype, parent: ResourceKey,  key: Option<ResourceKey>, owner: Option<UserKey>) -> Result<Self, Error> {
         let key = if let Option::Some(key) = key
         {
             Option::Some(key.bin()?)
@@ -449,35 +449,28 @@ impl RegistryParams {
 
 
 
-            let space = if let Option::Some(parent) = &parent {
-                Option::Some( parent.space()?.id() )
-            } else {
-                Option::None
+            let space = match parent.resource_type(){
+                ResourceType::Nothing => Option::None,
+                ResourceType::Space => Option::None,
+                _ => Option::Some(parent.space()?.id())
             };
 
-            let sub_space = if let Option::Some(parent) = &parent {
-                match parent.sub_space()
+            let sub_space = match parent.sub_space()
                 {
                     Ok(sub_space) => {
                         Option::Some(ResourceKey::SubSpace(sub_space).bin()?)
                     }
                     Err(_) => Option::None
-                }
-            } else {
-                Option::None
-            };
+                };
 
-            let app = if let Option::Some(parent) = &parent {
+            let app =
                 match parent.app()
                 {
                     Ok(app) => {
                         Option::Some(ResourceKey::App(app).bin()?)
                     }
                     Err(_) => Option::None
-                }
-            } else {
-                Option::None
-            };
+                };
 
 
         Ok(RegistryParams {
@@ -1236,10 +1229,10 @@ impl ResourceType{
         }
     }
 
-    pub fn from( parent: Option<&ResourceKey> ) -> Option<Self> {
+    pub fn from( parent: &ResourceKey ) -> Option<Self> {
         match parent {
-            None => Option::None,
-            Some(parent) => Option::Some(parent.resource_type())
+            ResourceKey::Nothing => Option::None,
+            parent => Option::Some(parent.resource_type())
         }
     }
 }
@@ -1548,6 +1541,7 @@ pub struct ResourceInit
 
 
 
+
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceArchetype {
     pub kind: ResourceKind,
@@ -1660,13 +1654,10 @@ impl LocalResourceManager {
             return Err(Fail::ResourceTypeRequiresOwner);
         };
 
-        if !core.key.resource_type().parent().matches(ResourceType::from(create.parent.as_ref()).as_ref()) {
+        if !core.key.resource_type().parent().matches(ResourceType::from(&create.parent).as_ref()) {
             return Err(Fail::WrongParentResourceType {
                 expected: HashSet::from_iter(core.key.resource_type().parent().types()),
-                received: match create.parent {
-                    None => Option::None,
-                    Some(key) => Option::Some(key.resource_type())
-                }
+                received: Option::Some(create.parent.resource_type())
             });
         };
 
@@ -1697,8 +1688,8 @@ impl LocalResourceManager {
                 create.init.archetype.kind.resource_type().address_structure().from_str(address.as_str())?
             }
             AddressCreationSrc::Space(space_name) => {
-                if core.key.resource_type() == ResourceType::Nothing{
-                    return Err("Space creation can only be used at top level (Space)".into());
+                if core.key.resource_type() != ResourceType::Nothing{
+                    return Err(format!("Space creation can only be used at top level (Nothing) not by {}",core.key.resource_type().to_string()).into());
                 }
                 ResourceAddress::for_space(space_name.as_str())?
             }
@@ -1799,7 +1790,7 @@ pub struct ResourceRegistryInfo
 }
 
 pub struct ResourceNamesReservationRequest{
-  pub parent: Option<ResourceKey>,
+  pub parent: ResourceKey,
   pub archetype: ResourceArchetype,
   pub info: Option<ResourceRegistryInfo>
 }
@@ -2911,7 +2902,7 @@ impl FromStr for Version {
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceCreate {
-   pub parent: Option<ResourceKey>,
+   pub parent: ResourceKey,
    pub key: KeyCreationSrc,
    pub address: AddressCreationSrc,
    pub init: ResourceInit,
@@ -2924,7 +2915,7 @@ impl ResourceCreate {
 
     pub fn new( init: ResourceInit ) ->Self {
         ResourceCreate {
-            parent: Option::None,
+            parent: ResourceKey::Nothing,
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::None,
             init: init,

@@ -7,12 +7,12 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::oneshot::Receiver;
 
-use crate::app::{AppCreateController, AppMeta, ApplicationStatus, AppLocation, AppArchetype };
+use crate::app::{AppCreateController, AppMeta, ApplicationStatus, AppLocation, AppArchetype, InitData};
 use crate::error::Error;
 use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply, ResourceManagerAction};
 use crate::id::Id;
 use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, ResourceKey};
-use crate::resource::{Labels, Registry, ResourceSelector, ResourceRegistryResult, ResourceRegistryCommand, FieldSelection, ResourceAssign, ResourceType, ResourceRegistration, ResourceLocationRecord, ResourceAddress, LocalResourceManager};
+use crate::resource::{Labels, Registry, ResourceSelector, ResourceRegistryResult, ResourceRegistryCommand, FieldSelection, ResourceAssign, ResourceType, ResourceRegistration, ResourceLocationRecord, ResourceAddress, LocalResourceManager, ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceInit, ResourceArchetype, ResourceKind, ResourceManager};
 use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage, Fail};
 use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource, SetSupervisorForApp, ResourceRegistryBacking, ResourceRegistryBackingSqLite, StarApi};
@@ -115,8 +115,45 @@ impl StarVariant for CentralStarVariant
                         let mut star_api = StarApi::new(self.skel.clone());
                         let manager = star_api.get_resource_manager(ResourceKey::Nothing).await;
                         match manager {
-                            Ok(_) => {
-                                println!("Got NOTHING manager!")
+                            Ok(manager) => {
+                                println!("Got NOTHING manager!");
+                                let create = ResourceCreate{
+                                    parent: ResourceKey::Nothing,
+                                    key: KeyCreationSrc::None,
+                                    address: AddressCreationSrc::Space("hyper-space".to_string()),
+                                    init: ResourceInit {
+                                        init: InitData::None,
+                                        archetype: ResourceArchetype {
+                                            kind: ResourceKind::Nothing,
+                                            specific: None,
+                                            config: None
+                                        }
+                                    },
+                                    registry_info: None,
+                                    owner: None,
+                                    location_affinity: None
+                                };
+                                let rx = manager.create(create).await;
+
+                                let result = rx.await;
+
+                                match &result {
+                                    Ok(result) => {
+                                        match result{
+                                            Ok(ok) => {
+                                                println!("Create Space WORKED!");
+                                            }
+                                            Err(fail) => {
+                                                eprintln!("Create Space FAILED:{}",fail.to_string());
+                                            }
+                                        }
+                                    }
+                                    Err(err) => {
+                                        eprintln!("CREATE SPACE RecvError: {}",err);
+                                    }
+                                }
+
+
                             }
                             Err(err) => {
                                 println!("Could not get NOTHING manager!")

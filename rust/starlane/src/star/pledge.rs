@@ -307,11 +307,11 @@ impl StarHandleDb {
                 // in case this search was for EVERYTHING
                 let statement = if !selector.is_empty()
                 {
-                    format!("SELECT DISTINCT star.key,star.kind,star.hops  FROM stars WHERE {}", where_clause )
+                    format!("SELECT DISTINCT key,kind,hops  FROM stars WHERE {}", where_clause )
                 }
                 else{
 
-                    "SELECT DISTINCT star.key,star.kind,star.hops  FROM stars".to_string()
+                    "SELECT DISTINCT key,kind,hops  FROM stars".to_string()
                 };
 
                 println!("STATEMENT {}",statement);
@@ -359,6 +359,7 @@ impl StarHandleDb {
 
                     let f = match &field {
                         StarFieldSelection::Kind(kind) => {
+println!("kind {}",kind);
                             format!("kind=?{}", index + 1)
                         }
                         StarFieldSelection::MinHops => {
@@ -377,11 +378,11 @@ impl StarHandleDb {
                 // in case this search was for EVERYTHING
                 let statement = if !selector.is_empty()
                 {
-                    format!("SELECT DISTINCT star.key,star.kind,star.hops  FROM stars WHERE {} ORDER BY star.selections", where_clause )
+                    format!("SELECT DISTINCT key,kind,hops  FROM stars WHERE {} ORDER BY selections", where_clause )
                 }
                 else{
 
-                    "SELECT DISTINCT star.key,star.kind,star.hops  FROM stars ORDER BY star.selections".to_string()
+                    "SELECT DISTINCT key,kind,hops  FROM stars ORDER BY selections".to_string()
                 };
 
 

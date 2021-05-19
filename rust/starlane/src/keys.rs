@@ -397,7 +397,7 @@ impl ResourceKey
     pub fn parent(&self)->Option<ResourceKey>{
         match self {
             ResourceKey::Nothing => Option::None,
-            ResourceKey::Space(_) => Option::None,
+            ResourceKey::Space(_) => Option::Some(ResourceKey::Nothing),
             ResourceKey::SubSpace(sub_space) => Option::Some(ResourceKey::Space(sub_space.space.clone())),
             ResourceKey::App(app) =>  Option::Some(ResourceKey::SubSpace(app.sub_space.clone())),
             ResourceKey::Actor(actor) =>  Option::Some(ResourceKey::App(actor.app.clone())),
