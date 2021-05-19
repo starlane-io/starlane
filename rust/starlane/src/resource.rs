@@ -1,32 +1,35 @@
-pub mod space;
-
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::iter::FromIterator;
 use std::str::FromStr;
+use std::string::FromUtf8Error;
+use std::sync::Arc;
+use std::time::Duration;
 
+use base64::DecodeError;
 use bincode::ErrorKind;
 use rusqlite::{Connection, params, params_from_iter, Rows, Statement, ToSql, Transaction};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 use serde::{Deserialize, Serialize};
+use serde_json::to_string;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::actor::{ActorKey, ActorKind, ActorArchetype, ActorProfile};
-use crate::app::{AppKind, AppArchetype, AppProfile, ConfigSrc, InitData};
+use crate::actor::{ActorArchetype, ActorKey, ActorKind, ActorProfile};
+use crate::app::{AppArchetype, AppKind, AppProfile, ConfigSrc, InitData};
 use crate::artifact::{ArtifactKey, ArtifactKind};
-use crate::error::{Error};
-use crate::keys::{FileKey, ResourceId};
+use crate::error::Error;
+use crate::frame::{Reply, ResourceHostAction, SimpleReply, StarMessagePayload};
 use crate::id::{Id, IdSeq};
+use crate::keys::{FileKey, ResourceId};
+use crate::keys::{AppFilesystemKey, AppKey, FileSystemKey, GatheringKey, ResourceKey, SpaceKey, SubSpaceFilesystemKey, SubSpaceId, SubSpaceKey, UserKey};
+use crate::message::{Fail, ProtoMessage};
 use crate::names::{Name, Specific};
 use crate::permissions::User;
-use crate::keys::{SubSpaceKey, ResourceKey, AppKey, SubSpaceId, SpaceKey, UserKey, GatheringKey, FileSystemKey, AppFilesystemKey, SubSpaceFilesystemKey};
-use crate::star::{StarKey, ResourceRegistryBacking};
-use serde_json::to_string;
-use base64::DecodeError;
-use std::string::FromUtf8Error;
-use crate::message::Fail;
-use std::sync::Arc;
+use crate::star::{ResourceRegistryBacking, StarComm, StarCommand, StarKey, StarSkel};
+use crate::star::pledge::StarHandle;
 use crate::util::AsyncHashMap;
+
+pub mod space;
 
 lazy_static!
 {
@@ -1489,7 +1492,7 @@ pub trait RemoteHostedResource: Send+Sync {
 
 #[async_trait]
 pub trait ResourceHostSelector: Send+Sync {
-    async fn select( &self, resource_type: ResourceType ) -> Result<Arc<dyn RemoteResourceHost>,Fail>;
+    async fn select( &self, resource_type: ResourceType ) -> Result<Arc<dyn ResourceHost>,Fail>;
 }
 
 pub struct HostedResourceStore{
@@ -1504,16 +1507,20 @@ impl  HostedResourceStore{
         }
     }
 
-    pub async fn store( &mut self, resource: Arc<HostedResource> ) -> Result<(),Error> {
+    pub async fn store( &self, resource: Arc<HostedResource> ) -> Result<(),Error> {
         self.map.put(resource.resource.key.clone(), resource ).await
     }
 
-    pub async fn get( &mut self, key: ResourceKey ) -> Result<Option<Arc<HostedResource>>,Error> {
+    pub async fn get( &self, key: ResourceKey ) -> Result<Option<Arc<HostedResource>>,Error> {
         self.map.get(key).await
     }
 
-    pub async fn remove( &mut self, key: ResourceKey ) -> Result<Option<Arc<HostedResource>>,Error> {
+    pub async fn remove( &self, key: ResourceKey ) -> Result<Option<Arc<HostedResource>>,Error> {
         self.map.remove(key).await
+    }
+
+    pub async fn contains( &self, key: &ResourceKey ) -> Result<bool,Error> {
+        self.map.contains(key.clone()).await
     }
 }
 
@@ -1600,6 +1607,13 @@ impl ResourceManager{
 
         host.assign(assign).await?;
 
+        let location_record = ResourceLocationRecord{
+            key: key.clone(),
+            location: ResourceLocation { host: host.star_key(), gathering: Option::None }
+        };
+
+        core.registry.set_location(location_record).await?;
+
         let resource = Resource{
             key: key,
             address: address,
@@ -1631,7 +1645,8 @@ impl  RemoteResourceManager for ResourceManager{
 
 
 #[async_trait]
-pub trait RemoteResourceHost: Send+Sync {
+pub trait ResourceHost: Send+Sync {
+    fn star_key( &self ) -> StarKey;
     async fn assign( &self, assign: ResourceAssign ) -> Result<(),Fail>;
 }
 
@@ -2206,6 +2221,7 @@ mod test
 {
     use std::sync::Arc;
 
+    use futures::SinkExt;
     use tokio::runtime::Runtime;
     use tokio::sync::mpsc;
     use tokio::sync::oneshot::error::RecvError;
@@ -2221,14 +2237,13 @@ mod test
     use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
     use crate::names::{Name, Specific};
     use crate::permissions::Authentication;
-    use crate::resource::{FieldSelection, Labels, LabelSelection, Registry, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryResult, ResourceAssign, ResourceKind, ResourceType, Selector, ResourceRegistration, Resource, ResourceArchetype, ResourceAddress, ResourceAddressPart, Skewer, ResourceRegistryInfo, Names};
+    use crate::resource::{FieldSelection, Labels, LabelSelection, Names, Registry, Resource, ResourceAddress, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceKind, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceType, Selector, Skewer};
     use crate::resource::FieldSelection::SubSpace;
     use crate::resource::ResourceRegistryResult::Resources;
     use crate::space::CreateAppControllerFail;
     use crate::star::{StarController, StarInfo, StarKey, StarKind};
     use crate::starlane::{ConstellationCreate, StarControlRequestByName, Starlane, StarlaneCommand};
     use crate::template::{ConstellationData, ConstellationTemplate};
-    use futures::SinkExt;
 
     fn create_save(index: usize, resource: Resource) -> ResourceRegistration
     {
@@ -2881,6 +2896,61 @@ impl ResourceAssign {
     pub fn archetype(&self) -> ResourceArchetype {
         match &self.source{
             ResourceSrc::Creation(profile) => profile.archetype.clone()
+        }
+    }
+}
+
+pub struct LocalResourceHost{
+    skel: StarSkel
+}
+
+#[async_trait]
+impl ResourceHost for LocalResourceHost{
+    fn star_key(&self) -> StarKey {
+        self.skel.info.star.clone()
+    }
+
+    async fn assign(&self, assign: ResourceAssign) -> Result<(), Fail> {
+        unimplemented!()
+    }
+}
+
+pub struct RemoteResourceHost {
+    comm: StarComm,
+    handle: StarHandle
+}
+
+#[async_trait]
+impl ResourceHost for RemoteResourceHost {
+    fn star_key(&self) -> StarKey {
+        self.handle.key.clone()
+    }
+
+    async fn assign( &self, assign: ResourceAssign) -> Result<(), Fail> {
+        if !self.handle.kind.hosts().contains(&assign.key.resource_type() ) {
+            return Err(Fail::WrongResourceType{
+                expected: self.handle.kind.hosts().clone(),
+                received: assign.key.resource_type().clone()
+            });
+        }
+        let mut proto = ProtoMessage::new();
+        proto.to = Option::Some(self.handle.key.clone());
+        proto.payload = StarMessagePayload::ResourceHost(ResourceHostAction::Assign(assign));
+        let reply = proto.get_ok_result().await;
+        self.comm.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
+
+        match tokio::time::timeout( Duration::from_secs(5), reply).await{
+            Ok(result) => {
+                if let Result::Ok( StarMessagePayload::Reply(SimpleReply::Ok(Reply::Resource(resource)))) = result{
+                    Ok(())
+                } else {
+                    Err(Fail::Unexpected)
+                }
+            }
+            Err(err) => {
+
+                Err(Fail::Timeout)
+            }
         }
     }
 }

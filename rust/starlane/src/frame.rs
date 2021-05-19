@@ -370,6 +370,7 @@ pub enum ResourceManagerAction
     Location(ResourceLocationRecord),
     Find(ResourceKey),
     GetKey(ResourceAddress),
+    GetAddress(ResourceKey),
     Bind(ResourceBinding),
     Status(ResourceStatusReport),
     SliceStatus(ResourceSliceStatusReport),

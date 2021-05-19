@@ -1,17 +1,19 @@
-use rusqlite::{Connection, params_from_iter, params, ToSql};
-use tokio::sync::{mpsc, oneshot};
-use crate::star::{StarInfo, StarKey, StarKind, StarCommand, StarComm};
-use crate::error::Error;
 use std::collections::HashSet;
-use crate::message::{Fail, ProtoMessage};
 use std::iter::FromIterator;
 use std::str::FromStr;
-use rusqlite::types::{ValueRef, ToSqlOutput, Value};
-use tokio::time::Duration;
-use crate::resource::{RemoteResourceHost, ResourceAssign, Resource};
-use crate::frame::{StarMessagePayload, ResourceHostAction, SimpleReply, Reply};
-use tokio::time::error::Elapsed;
+
+use rusqlite::{Connection, params, params_from_iter, ToSql};
+use rusqlite::types::{ToSqlOutput, Value, ValueRef};
+use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::error::RecvError;
+use tokio::time::Duration;
+use tokio::time::error::Elapsed;
+
+use crate::error::Error;
+use crate::frame::{Reply, ResourceHostAction, SimpleReply, StarMessagePayload};
+use crate::message::{Fail, ProtoMessage};
+use crate::resource::{Resource, ResourceAssign, ResourceHost};
+use crate::star::{LocalResourceLocation, StarComm, StarCommand, StarInfo, StarKey, StarKind, StarSkel};
 
 #[derive(Clone)]
 pub struct StarHandleBacking{
@@ -59,46 +61,11 @@ impl StarHandleBacking {
 
 
 
+
 pub struct StarHandle {
     pub key: StarKey,
     pub kind: StarKind,
     pub hops: Option<usize>
-}
-
-pub struct ResourceHost {
-    comm: StarComm,
-    handle: StarHandle
-}
-
-#[async_trait]
-impl RemoteResourceHost for ResourceHost {
-    async fn assign( &self, assign: ResourceAssign) -> Result<(), Fail> {
-        if !self.handle.kind.hosts().contains(&assign.key.resource_type() ) {
-            return Err(Fail::WrongResourceType{
-                expected: self.handle.kind.hosts().clone(),
-                received: assign.key.resource_type().clone()
-            });
-        }
-        let mut proto = ProtoMessage::new();
-        proto.to = Option::Some(self.handle.key.clone());
-        proto.payload = StarMessagePayload::ResourceHost(ResourceHostAction::Assign(assign));
-        let reply = proto.get_ok_result().await;
-        self.comm.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
-
-        match tokio::time::timeout( Duration::from_secs(5), reply).await{
-            Ok(result) => {
-                if let Result::Ok( StarMessagePayload::Reply(SimpleReply::Ok(Reply::Resource(resource)))) = result{
-                    Ok(())
-                } else {
-                    Err(Fail::Unexpected)
-                }
-            }
-            Err(err) => {
-
-                Err(Fail::Timeout)
-            }
-        }
-    }
 }
 
 pub struct StarSelector {

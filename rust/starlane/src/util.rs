@@ -25,6 +25,10 @@ enum AsyncHashMapCommand<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static
         key: K,
         tx: oneshot::Sender<Option<V>>
     },
+    Contains{
+        key: K,
+        tx: oneshot::Sender<bool>
+    }
 }
 
 pub struct AsyncHashMap<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static, V: Clone+Send+Sync+'static {
@@ -50,6 +54,9 @@ impl <K,V> AsyncHashMap<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static,
                         let opt = map.remove(&key).clone();
                         tx.send(opt).unwrap_or_default();
                     }
+                    AsyncHashMapCommand::Contains{key,tx} => {
+                        tx.send(map.contains_key(&key) ).unwrap_or_default();
+                    }
                 }
             }
         });
@@ -59,20 +66,26 @@ impl <K,V> AsyncHashMap<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static,
         }
     }
 
-    pub async fn put( &mut self, key:K, value:V )->Result<(),Error>{
+    pub async fn put( &self, key:K, value:V )->Result<(),Error>{
         self.tx.send( AsyncHashMapCommand::Put { key, value}).await?;
         Ok(())
     }
 
-    pub async fn get( &mut self, key:K )->Result<Option<V>,Error>{
+    pub async fn get( &self, key:K )->Result<Option<V>,Error>{
         let (tx,rx) = oneshot::channel();
         self.tx.send( AsyncHashMapCommand::Get{ key, tx }).await?;
         Ok(rx.await?)
     }
 
-    pub async fn remove( &mut self, key:K )->Result<Option<V>,Error>{
+    pub async fn remove( &self, key:K )->Result<Option<V>,Error>{
         let (tx,rx) = oneshot::channel();
         self.tx.send( AsyncHashMapCommand::Remove{ key, tx }).await?;
+        Ok(rx.await?)
+    }
+
+    pub async fn contains( &self, key:K )->Result<bool,Error>{
+        let (tx,rx) = oneshot::channel();
+        self.tx.send( AsyncHashMapCommand::Contains{ key, tx }).await?;
         Ok(rx.await?)
     }
 

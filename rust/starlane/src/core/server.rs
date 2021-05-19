@@ -155,6 +155,9 @@ impl StarCore for ServerStarCore
                         }
                     }
                 }
+                StarCoreCommand::GetResource(request) => {
+                    unimplemented!()
+                }
             }
         }
     }

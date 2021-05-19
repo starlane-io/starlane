@@ -149,7 +149,7 @@ impl ProtoStar
                                                    core_tx,
                                                    self.lanes,
                                                    self.connector_ctrls,
-                                                   self.frame_hold ));
+                                                   self.frame_hold ).await );
 
                     }
                     StarCommand::AddLane(lane) => {
