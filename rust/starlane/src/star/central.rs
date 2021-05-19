@@ -12,10 +12,10 @@ use crate::error::Error;
 use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply, ResourceManagerAction};
 use crate::id::Id;
 use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, ResourceKey};
-use crate::resource::{Labels, Registry, Selector, ResourceRegistryResult, ResourceRegistryCommand, FieldSelection, ResourceAssign, ResourceType, ResourceRegistration, ResourceLocationRecord};
+use crate::resource::{Labels, Registry, ResourceSelector, ResourceRegistryResult, ResourceRegistryCommand, FieldSelection, ResourceAssign, ResourceType, ResourceRegistration, ResourceLocationRecord, ResourceAddress, ResourceManager};
 use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage, Fail};
-use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource, SetSupervisorForApp, ResourceRegistryBacking, ResourceRegistryBackingSqLite};
+use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource, SetSupervisorForApp, ResourceRegistryBacking, ResourceRegistryBackingSqLite, StarApi};
 use crate::star::StarCommand::SpaceCommand;
 use crate::permissions::{AppAccess, AuthToken, User, UserKind};
 use crate::crypt::{PublicKey, CryptKeyId};
@@ -102,6 +102,28 @@ impl StarVariant for CentralStarVariant
         match &command
         {
             StarVariantCommand::Init => {
+                let registry = self.skel.registry.as_ref().unwrap();
+                // verify that hyper-space exists
+                let address = ResourceAddress::for_space("hyper-space" ).unwrap();
+
+                let result = registry.get_key(address ).await;
+                match result {
+                    Ok(key) => {
+                        println!("space exists!");
+                    }
+                    Err(err) => {
+                        let mut star_api = StarApi::new(self.skel.clone());
+                        let manager = star_api.get_resource_manager(ResourceKey::Nothing).await;
+                        match manager {
+                            Ok(_) => {
+                                println!("Got NOTHING manager!")
+                            }
+                            Err(err) => {
+                                println!("Could not get NOTHING manager!")
+                            }
+                        }
+                    }
+                }
 
             }
 

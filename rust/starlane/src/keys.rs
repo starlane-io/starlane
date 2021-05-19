@@ -30,6 +30,10 @@ pub enum SpaceKey
 impl SpaceKey
 {
 
+    pub fn hyper_space() -> Self {
+        Self::from_index(0)
+    }
+
     pub fn from_index(index: u32) -> Self
     {
         if index == 0
@@ -244,6 +248,7 @@ pub type MessageId = Uuid;
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum ResourceId{
+    Nothing,
     Space(u32),
     SubSpace(SubSpaceId),
     App(AppId),
@@ -257,6 +262,7 @@ pub enum ResourceId{
 impl ResourceId{
     pub fn resource_type(&self)->ResourceType{
         match self{
+            ResourceId::Nothing => ResourceType::Nothing,
             ResourceId::Space(_) => ResourceType::Space,
             ResourceId::SubSpace(_) => ResourceType::SubSpace,
             ResourceId::App(_) => ResourceType::App,
@@ -270,6 +276,7 @@ impl ResourceId{
 
     pub fn new( resource_type: &ResourceType, id: Id ) -> Self{
         match resource_type{
+            ResourceType::Nothing => Self::Nothing,
             ResourceType::Space => Self::Space(id.index as _),
             ResourceType::SubSpace =>  Self::SubSpace(id.index as _),
             ResourceType::App =>  Self::App(id.index as _),
@@ -291,6 +298,7 @@ impl ToString for ResourceId{
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum ResourceKey
 {
+    Nothing,
     Space(SpaceKey),
     SubSpace(SubSpaceKey),
     App(AppKey),
@@ -303,84 +311,74 @@ pub enum ResourceKey
 
 impl ResourceKey
 {
-    pub fn new(parent: &Option<ResourceKey>, id: ResourceId) -> Result<Self,Error> {
-        match &id{
-            ResourceId::Space(space) => {
-                Ok(Self::Space(SpaceKey::Space(space.to_owned())))
-            }
-            _ => {
-                if let Option::Some(parent) = parent {
-                    let parent = parent.clone();
-                    match id{
-                        ResourceId::Space(_) => {
-                            Err("IMPOSSIBLE! space should have already been processed".into())
-                        }
-                        ResourceId::SubSpace(index) => {
-                            if let Self::Space(parent) = parent {
-                                Ok(Self::SubSpace( SubSpaceKey::new(parent,index)))
-                            } else {
-                                Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
-                            }
-                        }
-                        ResourceId::App(index) => {
-                            if let Self::SubSpace(parent) = parent {
-                                Ok(Self::App( AppKey::new(parent,index)))
-                            } else {
-                                Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
-                            }
-                        }
-                        ResourceId::Actor(index) => {
-                            if let Self::App(parent) = parent {
-                                Ok(Self::Actor( ActorKey::new(parent,index)))
-                            } else {
-                                Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
-                            }
-                        }
-                        ResourceId::User(index) => {
-                            if let Self::Space(parent) = parent {
-                                Ok(Self::User( UserKey::new(parent,index)))
-                            } else {
-                                Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
-                            }
-                        }
-                        ResourceId::Artifact(index) => {
-                            if let Self::SubSpace(parent) = parent {
-                                Ok(Self::Artifact( ArtifactKey::new(parent,index)))
-                            } else {
-                                Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
-                            }
-                        }
-                        ResourceId::File(index) => {
-                            if let Self::FileSystem(parent) = parent {
-                                Ok(Self::File( FileKey::new(parent,index)))
-                            } else {
-                                Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
-                            }
-                        }
-                        ResourceId::FileSystem(index) => {
-                            if let Self::SubSpace(parent) = parent {
-                                Ok(Self::FileSystem(FileSystemKey::SubSpace(SubSpaceFilesystemKey { sub_space: parent, id: index })))
-                            }
-                            else if let Self::App(parent) = parent {
-                                Ok(Self::FileSystem(FileSystemKey::App(AppFilesystemKey{ app: parent, id: index })))
+    pub fn new(parent: ResourceKey, id: ResourceId) -> Result<Self,Error> {
 
-                            } else {
-                                Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
-                            }
-                        }
-                    }
+        match id{
+            ResourceId::Nothing => {
+                Ok(Self::Nothing)
+            }
+            ResourceId::Space(id) => {
+                Ok(Self::Space( SpaceKey::from_index(id) ))
+            }
+            ResourceId::SubSpace(index) => {
+                if let Self::Space(parent) = parent {
+                    Ok(Self::SubSpace( SubSpaceKey::new(parent,index)))
+                } else {
+                    Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
                 }
-                else{
-                    Err("expected parent key".into())
+            }
+            ResourceId::App(index) => {
+                if let Self::SubSpace(parent) = parent {
+                    Ok(Self::App( AppKey::new(parent,index)))
+                } else {
+                    Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                }
+            }
+            ResourceId::Actor(index) => {
+                if let Self::App(parent) = parent {
+                    Ok(Self::Actor( ActorKey::new(parent,index)))
+                } else {
+                    Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                }
+            }
+            ResourceId::User(index) => {
+                if let Self::Space(parent) = parent {
+                    Ok(Self::User( UserKey::new(parent,index)))
+                } else {
+                    Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                }
+            }
+            ResourceId::Artifact(index) => {
+                if let Self::SubSpace(parent) = parent {
+                    Ok(Self::Artifact( ArtifactKey::new(parent,index)))
+                } else {
+                    Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                }
+            }
+            ResourceId::File(index) => {
+                if let Self::FileSystem(parent) = parent {
+                    Ok(Self::File( FileKey::new(parent,index)))
+                } else {
+                    Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                }
+            }
+            ResourceId::FileSystem(index) => {
+                if let Self::SubSpace(parent) = parent {
+                    Ok(Self::FileSystem(FileSystemKey::SubSpace(SubSpaceFilesystemKey { sub_space: parent, id: index })))
+                }
+                else if let Self::App(parent) = parent {
+                    Ok(Self::FileSystem(FileSystemKey::App(AppFilesystemKey{ app: parent, id: index })))
+
+                } else {
+                    Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
                 }
             }
         }
-
-
     }
 
     pub fn generate_address_tail(&self) -> Result<String,Fail>{
         match self{
+            ResourceKey::Nothing => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::Space(_) => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::SubSpace(_) => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::App(app) => {
@@ -392,12 +390,13 @@ impl ResourceKey
             ResourceKey::User(user) => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::Artifact(_) => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::File(_) => Err(Fail::ResourceCannotGenerateAddress),
-            ResourceKey::FileSystem(_) => Err(Fail::ResourceCannotGenerateAddress)
+            ResourceKey::FileSystem(_) => Err(Fail::ResourceCannotGenerateAddress),
         }
     }
 
     pub fn parent(&self)->Option<ResourceKey>{
         match self {
+            ResourceKey::Nothing => Option::None,
             ResourceKey::Space(_) => Option::None,
             ResourceKey::SubSpace(sub_space) => Option::Some(ResourceKey::Space(sub_space.space.clone())),
             ResourceKey::App(app) =>  Option::Some(ResourceKey::SubSpace(app.sub_space.clone())),
@@ -418,23 +417,24 @@ impl ResourceKey
         }
     }
 
-    pub fn space(&self)->SpaceKey {
+    pub fn space(&self)->Result<SpaceKey,Fail> {
         match self{
-            ResourceKey::Space(space) => space.clone(),
-            ResourceKey::SubSpace(sub_space) => sub_space.space.clone(),
-            ResourceKey::App(app) => app.sub_space.space.clone(),
-            ResourceKey::Actor(actor) => actor.app.sub_space.space.clone(),
-            ResourceKey::User(user) => user.space.clone(),
-            ResourceKey::Artifact(artifact) => artifact.sub_space.space.clone(),
-            ResourceKey::File(file) => match &file.filesystem{
+            ResourceKey::Nothing => Err(Fail::WrongResourceType { expected: HashSet::from_iter(vec![ResourceType::Space,ResourceType::SubSpace,ResourceType::App,ResourceType::Actor,ResourceType::User,ResourceType::Artifact,ResourceType::FileSystem,ResourceType::File] ), received: ResourceType::Nothing }),
+            ResourceKey::Space(space) => Ok(space.clone()),
+            ResourceKey::SubSpace(sub_space) => Ok(sub_space.space.clone()),
+            ResourceKey::App(app) => Ok(app.sub_space.space.clone()),
+            ResourceKey::Actor(actor) => Ok(actor.app.sub_space.space.clone()),
+            ResourceKey::User(user) => Ok(user.space.clone()),
+            ResourceKey::Artifact(artifact) => Ok(artifact.sub_space.space.clone()),
+            ResourceKey::File(file) => Ok(match &file.filesystem{
                 FileSystemKey::App(app) => app.app.sub_space.space.clone(),
                 FileSystemKey::SubSpace(sub_space) => sub_space.sub_space.space.clone(),
-            }
+            }),
             ResourceKey::FileSystem(filesystem) => {
-                match filesystem{
+                Ok(match filesystem{
                     FileSystemKey::App(app) => app.app.sub_space.space.clone(),
                     FileSystemKey::SubSpace(sub_space) => sub_space.sub_space.space.clone(),
-                }
+                })
             }
         }
     }
@@ -494,6 +494,7 @@ impl ResourceKey
     {
         match self
         {
+            ResourceKey::Nothing => ResourceManagerKey::Central,
             ResourceKey::Space(_) => ResourceManagerKey::Central,
             ResourceKey::SubSpace(sub_space) => {
                 //ResourceManagerKey::Key(ResourceKey::Space(sub_space.space.clone()))
@@ -594,6 +595,7 @@ impl fmt::Display for ResourceKey{
                     ResourceKey::File(key) => format!("FileKey:{}",key),
                     ResourceKey::Artifact(key) => format!("ArtifactKey:{}",key),
                     ResourceKey::FileSystem(key) => format!("FilesystemKey:{}", key),
+                    ResourceKey::Nothing => "Nothing".to_string()
                 })
     }
 }
@@ -604,6 +606,7 @@ impl ResourceKey
     {
         match self
         {
+            ResourceKey::Nothing => ResourceType::Nothing,
             ResourceKey::Space(_) => ResourceType::Space,
             ResourceKey::SubSpace(_) => ResourceType::SubSpace,
             ResourceKey::App(_) => ResourceType::App,
@@ -611,7 +614,7 @@ impl ResourceKey
             ResourceKey::User(_) => ResourceType::User,
             ResourceKey::File(_) => ResourceType::File,
             ResourceKey::Artifact(_) => ResourceType::Artifact,
-            ResourceKey::FileSystem(_) => ResourceType::FileSystem
+            ResourceKey::FileSystem(_) => ResourceType::FileSystem,
         }
     }
 
@@ -619,6 +622,7 @@ impl ResourceKey
     {
         match self
         {
+            ResourceKey::Nothing => Err("nothign does not have a subspace".into()),
             ResourceKey::Space(_) => Err("space does not have a subspace".into()),
             ResourceKey::SubSpace(sub_space) => Ok(sub_space.clone()),
             ResourceKey::App(app) => Ok(app.sub_space.clone()),

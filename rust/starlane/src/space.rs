@@ -6,7 +6,7 @@ use tokio::sync::{mpsc, oneshot};
 use std::sync::Arc;
 use crate::permissions::Authentication;
 use crate::error::Error;
-use crate::resource::{Labels, Selector};
+use crate::resource::{Labels, ResourceSelector};
 use crate::artifact::Artifact;
 use crate::names::Name;
 use crate::message::Fail;
@@ -26,7 +26,7 @@ pub enum RemoteSpaceCommandKind
 
 pub struct AppSelectCommand
 {
-    pub selector: Selector,
+    pub selector: ResourceSelector,
     pub tx: oneshot::Sender<Result<Vec<AppKey>,Fail>>
 }
 
@@ -80,7 +80,7 @@ impl SpaceController
         */
    }
 
-   pub async fn select_apps(&self, selector: Selector, sub_space: SubSpaceKey ) -> oneshot::Receiver<Result<Vec<AppKey>,Fail>>
+   pub async fn select_apps(&self, selector: ResourceSelector, sub_space: SubSpaceKey ) -> oneshot::Receiver<Result<Vec<AppKey>,Fail>>
    {
        let (tx,rx) = oneshot::channel();
 

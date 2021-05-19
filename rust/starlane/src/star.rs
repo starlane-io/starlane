@@ -31,7 +31,7 @@ use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequ
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId, SpaceKey, UserKey, ResourceKey, GatheringKey};
-use crate::resource::{Labels, ResourceRegistration, Selector, ResourceAssign, ResourceRegistryCommand, ResourceRegistryResult, Registry, ResourceType, ResourceLocationRecord, ResourceManagerKey, ResourceBinding, ResourceAddress, ResourceRegistryAction, Resource, FieldSelection, ResourceRegistryInfo, RegistryReservation, ResourceNamesReservationRequest, ResourceManager, ResourceManagerCore, HostedResourceStore, HostedResource, RemoteResourceManager, ResourceCreate, ResourceLocation};
+use crate::resource::{Labels, ResourceRegistration, ResourceSelector, ResourceAssign, ResourceRegistryCommand, ResourceRegistryResult, Registry, ResourceType, ResourceLocationRecord, ResourceManagerKey, ResourceBinding, ResourceAddress, ResourceRegistryAction, Resource, FieldSelection, ResourceRegistryInfo, RegistryReservation, ResourceNamesReservationRequest, ResourceManager, ResourceManagerCore, HostedResourceStore, HostedResource, RemoteResourceManager, ResourceCreate, ResourceLocation};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob, Fail};
@@ -357,7 +357,8 @@ pub struct Star
     resource_locations: LruCache<ResourceKey, ResourceLocationRecord>,
     resource_address_to_key: LruCache<ResourceAddress,ResourceKey>,
     resource_key_to_address: LruCache<ResourceKey,ResourceAddress>,
-    resources_store: Arc<HostedResourceStore>
+    resources_store: Arc<HostedResourceStore>,
+    status: StarStatus
 }
 
 impl Star
@@ -386,7 +387,8 @@ impl Star
             resource_locations: LruCache::new(64*1024 ),
             resource_address_to_key: LruCache::new(16*1024 ),
             resource_key_to_address: LruCache::new(16*1024 ),
-            resources_store: Arc::new(HostedResourceStore::new().await )
+            resources_store: Arc::new(HostedResourceStore::new().await ),
+            status: StarStatus::Unknown
         }
     }
 
@@ -610,7 +612,12 @@ impl Star
                         self.resource_key_to_address.put( key, address );
                     }
                     StarCommand::GetResourceAddress(request) => {
-                        if self.resource_key_to_address.contains(&request.payload) {
+                        if request.payload == ResourceKey::Nothing {
+                            self.resource_address_to_key.put( ResourceAddress::nothing(), ResourceKey::Nothing );
+                            self.resource_key_to_address.put( ResourceKey::Nothing, ResourceAddress::nothing() );
+                            request.tx.send( Ok(ResourceAddress::nothing()) );
+                        }
+                        else if self.resource_key_to_address.contains(&request.payload) {
                             request.tx.send( Ok(self.resource_key_to_address.get(&request.payload ).cloned().unwrap()) );
                         } else {
                             let rx = self.fetch_resource_address(request.payload.clone() ).await;
@@ -635,6 +642,9 @@ impl Star
                                 }
                             } );
                     }
+                    StarCommand::CheckStatus => {
+                        self.check_status().await;
+                    }
                     StarCommand::Diagnose(diagnose) => {
                         self.diagnose(diagnose).await;
                     }
@@ -653,10 +663,16 @@ impl Star
     }
 
     async fn init(&mut self){
-        self.init_handles().await;
+        self.refresh_handles().await;
+        self.check_status().await;
     }
 
-    async fn init_handles(&mut self) {
+    async fn refresh_handles(&mut self) {
+
+        if self.status == StarStatus::Unknown {
+            self.status = StarStatus::Waiting
+        }
+
         if let Option::Some(star_handler) = &self.skel.star_handler {
             for kind in self.skel.info.kind.handles() {
                 let (search, rx) = Wind::new(StarPattern::StarKind(kind.clone()), WindAction::SearchHits);
@@ -676,7 +692,9 @@ impl Star
                             };
                             let result = star_handler.add_star_handle(handle).await;
                             match result {
-                                Ok(_) => {}
+                                Ok(_) => {
+                                    skel.star_tx.send( StarCommand::CheckStatus ).await;
+                                }
                                 Err(error) => {
                                     eprintln!("error when adding star handle: {}", error.to_string())
                                 }
@@ -689,6 +707,22 @@ impl Star
             }
         }
     }
+
+    async fn check_status(&mut self){
+        if let Option::Some(star_handler) = &self.skel.star_handler{
+            if let Result::Ok(Satisfaction::Ok) = star_handler.satisfied( self.skel.info.kind.handles() ).await {
+                self.status = StarStatus::Ready;
+                println!("{}: Ready",self.skel.info.kind);
+
+            } else  {
+                // nothing
+            }
+        } else{
+            self.status = StarStatus::Ready
+        }
+    }
+
+
 
     async fn message_to_resource(&mut self, request: Request<ResourceMessageWrapper,Fail> ) {
        if let Option::Some(location) = self.resource_locations.get(&request.payload.message.to.key )
@@ -1694,22 +1728,30 @@ impl Star
             return Err(Fail::Unexpected);
         }
 
-        let hosted_resource = self.resources_store.get(key.clone()).await?.ok_or(Fail::ResourceNotFound(key.clone()))?;
+        let id_seq = Arc::new(IdSeq::new(0));
+
 
         tokio::spawn( async move {
-            if let Result::Ok(address) = star_api.fetch_resource_address(key.clone()).await{
-                let manager = ResourceManager{
-                    core: ResourceManagerCore {
-                        key: key.clone(),
-                        address: address,
-                        resource_type: key.resource_type(),
-                        selector: ResourceHostSelector::new(skel.clone()),
-                        registry: skel.registry.as_ref().cloned().unwrap(),
-                        id_seq: hosted_resource.id_seq.clone()
+
+                match star_api.fetch_resource_address(key.clone()).await {
+                    Ok(address) => {
+                        let manager = ResourceManager {
+                            core: ResourceManagerCore {
+                                key: key.clone(),
+                                address: address,
+                                resource_type: key.resource_type(),
+                                selector: ResourceHostSelector::new(skel.clone()),
+                                registry: skel.registry.as_ref().cloned().unwrap(),
+                                id_seq: id_seq.clone()
+                            }
+                        };
+                        tx.send(Ok(manager));
                     }
-                };
-                tx.send( Ok(manager) );
-            }
+                    Err(fail) => {
+                        tx.send(Err(fail));
+                    }
+                }
+
         } );
 
        Ok(rx)
@@ -1771,7 +1813,8 @@ pub enum StarCommand
     Diagnose(Diagnose),
     SetResourceAddress{key:ResourceKey,address:ResourceAddress},
     GetResourceAddress(Request<ResourceKey,ResourceAddress>),
-    GetResourceManager(Request<ResourceKey,ResourceManager>)
+    GetResourceManager(Request<ResourceKey,ResourceManager>),
+    CheckStatus
 }
 
 pub enum Diagnose{
@@ -2070,7 +2113,8 @@ impl fmt::Display for StarCommand{
             StarCommand::Diagnose(_) => "Diagnose".to_string(),
             StarCommand::SetResourceAddress { .. } => "SetResourceAddress".to_string(),
             StarCommand::GetResourceAddress(_) => "GetResourceAddress".to_string(),
-            StarCommand::GetResourceManager(_) => "GetResourceManager".to_string()
+            StarCommand::GetResourceManager(_) => "GetResourceManager".to_string(),
+            StarCommand::CheckStatus => "CheckStatus".to_string()
         };
         write!(f, "{}",r)
     }
@@ -3115,7 +3159,7 @@ pub trait ResourceRegistryBacking: Sync+Send {
     async fn accepts(&self, accept: HashSet<ResourceType> ) ->Result<(),Fail>;
     async fn reserve(&self, request: ResourceNamesReservationRequest) -> Result<RegistryReservation, Fail>;
     async fn register(&self, registration: ResourceRegistration)->Result<(),Fail>;
-    async fn select(&self, select: Selector)->Result<Vec<Resource>,Fail>;
+    async fn select(&self, select: ResourceSelector) ->Result<Vec<Resource>,Fail>;
     async fn set_location(&self, location: ResourceLocationRecord) ->Result<(),Fail>;
     async fn find(&self, keys: ResourceKey)->Result<Reply,Fail>;
     async fn bind(&self, bind: ResourceBinding)->Result<(),Fail>;
@@ -3174,7 +3218,7 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite
         Ok(())
     }
 
-    async fn select(&self, selector: Selector) ->Result<Vec<Resource>,Fail>{
+    async fn select(&self, selector: ResourceSelector) ->Result<Vec<Resource>,Fail>{
         let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Select(selector));
         self.registry.send( request ).await?;
         match tokio::time::timeout( Duration::from_secs(5),rx).await??
@@ -3229,7 +3273,7 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite
     }
 
     async fn get_key(&self, address: ResourceAddress) -> Result<Reply, Fail> {
-        let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::GetKey(address));
+        let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::GetKey(address.clone()));
         self.registry.send( request ).await;
         let result = tokio::time::timeout( Duration::from_secs(5),rx).await??;
         if let ResourceRegistryResult::Key(key) = result {
@@ -3237,7 +3281,7 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite
         }
         else
         {
-            Err(Fail::Unexpected)
+            Err(Fail::AddressNotFound(address))
         }
     }
 }
@@ -3269,4 +3313,12 @@ impl StarApi{
         Ok(rx.await??)
     }
 
+}
+
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
+pub enum StarStatus{
+    Unknown,
+    Waiting,
+    Ready,
+    Panic
 }

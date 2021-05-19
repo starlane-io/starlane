@@ -11,7 +11,7 @@ use crate::keys::{MessageId, SubSpaceKey, UserKey, ResourceKey};
 use tokio::sync::broadcast::error::RecvError;
 use serde::{Serialize, Deserialize};
 use crate::names::Specific;
-use crate::resource::ResourceType;
+use crate::resource::{ResourceType, ResourceAddress};
 use std::collections::HashSet;
 
 pub struct ProtoMessage
@@ -338,6 +338,7 @@ pub enum Fail
     Unexpected,
     DoNotKnowSpecific(Specific),
     ResourceNotFound(ResourceKey),
+    AddressNotFound(ResourceAddress),
     WrongResourceType{
         expected: HashSet<ResourceType>,
         received: ResourceType
@@ -366,7 +367,8 @@ impl ToString for Fail {
             Fail::ResourceTypeRequiresOwner => "ResourceTypeRequiresOwner".to_string(),
             Fail::CannotSelectResourceHost => "CannotSelectResourceHost".to_string(),
             Fail::WrongParentResourceType { .. } => "WrongParentResourceType".to_string(),
-            Fail::ResourceCannotGenerateAddress => "ResourceCannotGenerateAddress".to_string()
+            Fail::ResourceCannotGenerateAddress => "ResourceCannotGenerateAddress".to_string(),
+            Fail::AddressNotFound(address) => format!("AddressNotFound({})",address.to_string())
         }
     }
 }

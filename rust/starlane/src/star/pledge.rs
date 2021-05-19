@@ -59,7 +59,6 @@ impl StarHandleBacking {
         }
     }
 
-
     // must have at least one of each StarKind
     pub async fn satisfied( &self, set: HashSet<StarKind> ) -> Result<Satisfaction,Fail> {
         let (action,rx) = StarHandleAction::new(StarHandleCommand::Satisfied(set));
