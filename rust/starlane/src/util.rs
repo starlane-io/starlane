@@ -31,6 +31,7 @@ enum AsyncHashMapCommand<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static
     }
 }
 
+#[derive(Clone)]
 pub struct AsyncHashMap<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static, V: Clone+Send+Sync+'static {
     tx: mpsc::Sender<AsyncHashMapCommand<K,V>>
 }

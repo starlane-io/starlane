@@ -20,7 +20,7 @@ use crate::artifact::{ArtifactKey, ArtifactKind};
 use crate::error::Error;
 use crate::frame::{Reply, ResourceHostAction, SimpleReply, StarMessagePayload};
 use crate::id::{Id, IdSeq};
-use crate::keys::{FileKey, ResourceId};
+use crate::keys::{FileKey, ResourceId, UniqueSrc, Unique};
 use crate::keys::{AppFilesystemKey, AppKey, FileSystemKey, GatheringKey, ResourceKey, SpaceKey, SubSpaceFilesystemKey, SubSpaceId, SubSpaceKey, UserKey};
 use crate::message::{Fail, ProtoMessage};
 use crate::names::{Name, Specific};
@@ -28,6 +28,7 @@ use crate::permissions::User;
 use crate::star::{ResourceRegistryBacking, StarComm, StarCommand, StarKey, StarSkel, StarKind};
 use crate::star::pledge::{StarHandle, ResourceHostSelector};
 use crate::util::AsyncHashMap;
+use tokio::sync::oneshot::Receiver;
 
 pub mod space;
 
@@ -369,7 +370,8 @@ pub enum ResourceRegistryCommand
     Find(ResourceKey),
     Bind(ResourceBinding),
     GetAddress(ResourceKey),
-    GetKey(ResourceAddress)
+    GetKey(ResourceAddress),
+    Next{key:ResourceKey,unique:Unique}
 }
 
 pub enum ResourceRegistryResult
@@ -382,6 +384,7 @@ pub enum ResourceRegistryResult
     Location(ResourceLocationRecord),
     Reservation(RegistryReservation),
     Key(ResourceKey),
+    Unique(u64),
     NotFound,
     NotAccepted
 }
@@ -579,6 +582,8 @@ eprintln!("error setting up db: {}", err );
                 trans.execute("DELETE FROM names", [] )?;
                 trans.execute("DELETE FROM resources", [])?;
                 trans.execute("DELETE FROM locations", [])?;
+                trans.execute("DELETE FROM slices", [])?;
+                trans.execute("DELETE FROM uniques", [])?;
                 trans.commit()?;
 
                 Ok(ResourceRegistryResult::Ok)
@@ -892,8 +897,24 @@ eprintln!("error setting up db: {}", err );
                 Ok(ResourceRegistryResult::Reservation(reservation))
             }
 
+            ResourceRegistryCommand::Next{key,unique} => {
+                let mut trans = self.conn.transaction()?;
+                let key = key.bin()?;
+                let column = match unique{
+                    Unique::Sequence => "sequence",
+                    Unique::Index => "id_index"
+                };
+                trans.execute("INSERT OR IGNORE INTO uniques (key) VALUES (?1)", params![key])?;
+                trans.execute(format!("UPDATE uniques SET {}={}+1 WHERE key=?1",column,column).as_str(), params![key])?;
+                let rtn = trans.query_row(format!("SELECT {} FROM uniques WHERE key=?1",column).as_str(), params![key], |r| {
+                    let rtn:u64 = r.get(0)?;
+                    Ok(rtn)
+                })?;
 
+                trans.commit()?;
 
+                Ok(ResourceRegistryResult::Unique(rtn))
+            }
         }
     }
 
@@ -966,6 +987,11 @@ eprintln!("error setting up db: {}", err );
          UNIQUE(key,host)
         )"#;
 
+        let uniques = r#"CREATE TABLE IF NOT EXISTS uniques(
+         key BLOB PRIMARY KEY,
+         sequence INTEGER NOT NULL DEFAULT 0,
+         id_index INTEGER NOT NULL DEFAULT 0
+        )"#;
 
         /*
       let labels_to_resources = r#"CREATE TABLE IF NOT EXISTS labels_to_resources
@@ -987,6 +1013,7 @@ eprintln!("error setting up db: {}", err );
         transaction.execute(locations, [])?;
         transaction.execute(addresses, [])?;
         transaction.execute(slices, [])?;
+        transaction.execute(uniques, [])?;
         transaction.commit()?;
 
         Ok(())
@@ -1549,14 +1576,12 @@ pub trait ResourceIdSeq: Send+Sync {
 pub trait RemoteHostedResource: Send+Sync {
 }
 
-
-
+#[derive(Clone)]
 pub struct HostedResourceStore{
    map: AsyncHashMap<ResourceKey,Arc<HostedResource>>
 }
 
-impl  HostedResourceStore{
-
+impl HostedResourceStore{
     pub async fn new( ) -> Self{
         HostedResourceStore{
             map: AsyncHashMap::new().await
@@ -1581,45 +1606,63 @@ impl  HostedResourceStore{
 }
 
 pub struct HostedResource {
-    pub manager: Arc<dyn RemoteResourceManager>,
-    pub id_seq: Arc<IdSeq>,
+    pub manager: Arc<dyn ResourceManager>,
+    pub unique_src: Box<dyn UniqueSrc>,
     pub resource: Resource
 }
+
 
 impl RemoteHostedResource for HostedResource{
 
 }
 
 #[async_trait]
-pub trait RemoteResourceManager: Send+Sync {
+pub trait ResourceManager: Send+Sync {
     async fn create( &self, create: ResourceCreate ) -> oneshot::Receiver<Result<ResourceLocationRecord,Fail>>;
 }
 
+pub struct RemoteResourceManager{
+    pub key: ResourceKey
+}
+
+impl RemoteResourceManager{
+    pub fn new(key: ResourceKey) -> Self {
+        RemoteResourceManager{
+            key: key
+        }
+    }
+}
+
+#[async_trait]
+impl ResourceManager for RemoteResourceManager {
+    async fn create(&self, create: ResourceCreate) -> Receiver<Result<ResourceLocationRecord, Fail>> {
+        unimplemented!();
+    }
+}
 
 #[derive(Clone)]
 pub struct ResourceManagerCore{
     pub key: ResourceKey,
     pub address: ResourceAddress,
-    pub resource_type: ResourceType,
     pub selector: ResourceHostSelector,
     pub registry: Arc<dyn ResourceRegistryBacking>,
     pub id_seq: Arc<IdSeq>
 }
 
 
-pub struct ResourceManager{
+pub struct LocalResourceManager {
    pub core: ResourceManagerCore
 }
 
-impl ResourceManager{
+impl LocalResourceManager {
     async fn process_create(core: ResourceManagerCore, create: ResourceCreate ) -> Result<ResourceLocationRecord,Fail>{
-        if core.resource_type.requires_owner() && create.owner.is_none() {
+        if core.key.resource_type().requires_owner() && create.owner.is_none() {
             return Err(Fail::ResourceTypeRequiresOwner);
         };
 
-        if !core.resource_type.parent().matches(ResourceType::from(create.parent.as_ref()).as_ref()) {
+        if !core.key.resource_type().parent().matches(ResourceType::from(create.parent.as_ref()).as_ref()) {
             return Err(Fail::WrongParentResourceType {
-                expected: HashSet::from_iter(core.resource_type.parent().types()),
+                expected: HashSet::from_iter(core.key.resource_type().parent().types()),
                 received: match create.parent {
                     None => Option::None,
                     Some(key) => Option::Some(key.resource_type())
@@ -1634,10 +1677,10 @@ impl ResourceManager{
 
         let key = match create.key {
             KeyCreationSrc::None => {
-                ResourceKey::new(core.key.clone(), ResourceId::new(&core.resource_type, core.id_seq.next() ) )?
+                ResourceKey::new(core.key.clone(), ResourceId::new(&core.key.resource_type(), core.id_seq.next() ) )?
             }
             KeyCreationSrc::Key(key) => {
-                if key.parent() != Option::Some(core.key){
+                if key.parent() != Option::Some(core.key.clone()){
                     return Err("parent keys do not match".into());
                 }
                 key
@@ -1654,7 +1697,7 @@ impl ResourceManager{
                 create.init.archetype.kind.resource_type().address_structure().from_str(address.as_str())?
             }
             AddressCreationSrc::Space(space_name) => {
-                if core.resource_type == ResourceType::Nothing{
+                if core.key.resource_type() == ResourceType::Nothing{
                     return Err("Space creation can only be used at top level (Space)".into());
                 }
                 ResourceAddress::for_space(space_name.as_str())?
@@ -1691,13 +1734,13 @@ impl ResourceManager{
 }
 
 #[async_trait]
-impl  RemoteResourceManager for ResourceManager{
+impl ResourceManager for LocalResourceManager {
     async fn create( &self, create: ResourceCreate ) -> oneshot::Receiver<Result<ResourceLocationRecord,Fail>> {
         let (tx,rx) = oneshot::channel();
 
         let core = self.core.clone();
         tokio::spawn( async move {
-            tx.send(ResourceManager::process_create(core, create ).await).unwrap_or_default();
+            tx.send(LocalResourceManager::process_create(core, create ).await).unwrap_or_default();
         });
         rx
     }
@@ -1785,6 +1828,38 @@ impl RegistryReservation{
             tx: Option::None
         }
     }
+}
+
+pub struct RegistryUniqueSrc {
+  key: ResourceKey,
+  tx: mpsc::Sender<ResourceRegistryAction>
+}
+
+impl RegistryUniqueSrc {
+    pub fn new(key: ResourceKey, tx: mpsc::Sender<ResourceRegistryAction>) -> Self {
+        RegistryUniqueSrc {
+            key: key,
+            tx: tx
+        }
+    }
+}
+
+#[async_trait]
+impl UniqueSrc for RegistryUniqueSrc{
+   async fn next(&self, unique: Unique) -> Result<u64,Fail>{
+       let (tx,rx) = oneshot::channel();
+
+       self.tx.send( ResourceRegistryAction{
+           tx: tx,
+           command: ResourceRegistryCommand::Next{key:self.key.clone(),unique:unique}
+       }).await?;
+
+       if let ResourceRegistryResult::Unique(index) = rx.await? {
+           Ok(index)
+       } else {
+           Err(Fail::Unexpected)
+       }
+   }
 }
 
 #[derive(Clone,Serialize,Deserialize)]

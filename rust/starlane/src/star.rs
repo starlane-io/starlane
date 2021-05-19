@@ -30,8 +30,8 @@ use crate::error::Error;
 use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ApplicationSupervisorReport, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, SimpleReply, AppPayload, ResourceManagerAction, ResourceHostAction, FromReply};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
-use crate::keys::{AppKey, MessageId, SpaceKey, UserKey, ResourceKey, GatheringKey};
-use crate::resource::{Labels, ResourceRegistration, ResourceSelector, ResourceAssign, ResourceRegistryCommand, ResourceRegistryResult, Registry, ResourceType, ResourceLocationRecord, ResourceManagerKey, ResourceBinding, ResourceAddress, ResourceRegistryAction, Resource, FieldSelection, ResourceRegistryInfo, RegistryReservation, ResourceNamesReservationRequest, ResourceManager, ResourceManagerCore, HostedResourceStore, HostedResource, RemoteResourceManager, ResourceCreate, ResourceLocation};
+use crate::keys::{AppKey, MessageId, SpaceKey, UserKey, ResourceKey, GatheringKey, Unique, UniqueSrc};
+use crate::resource::{Labels, ResourceRegistration, ResourceSelector, ResourceAssign, ResourceRegistryCommand, ResourceRegistryResult, Registry, ResourceType, ResourceLocationRecord, ResourceManagerKey, ResourceBinding, ResourceAddress, ResourceRegistryAction, Resource, FieldSelection, ResourceRegistryInfo, RegistryReservation, ResourceNamesReservationRequest, LocalResourceManager, ResourceManagerCore, HostedResourceStore, HostedResource, ResourceManager, ResourceCreate, ResourceLocation, ResourceArchetype, ResourceKind, RemoteResourceManager, RegistryUniqueSrc};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob, Fail};
@@ -47,6 +47,7 @@ use crate::frame::ResourceHostAction::SliceAssign;
 use std::iter::FromIterator;
 use crate::star::pledge::{StarHandleBacking, StarHandle, Satisfaction, ResourceHostSelector};
 use std::sync::Arc;
+use crate::util::AsyncHashMap;
 
 pub mod central;
 pub mod app_host;
@@ -1716,30 +1717,55 @@ impl Star
 
 
 
-    async fn get_resource_manager( &mut self, key: ResourceKey ) -> Result<oneshot::Receiver<Result<ResourceManager,Fail>>,Fail>{
+    async fn get_resource_manager( &mut self, key: ResourceKey ) -> Result<oneshot::Receiver<Result<LocalResourceManager,Fail>>,Fail>{
 
-        let (tx,rx) = oneshot::channel();
-
-        let mut star_api = StarApi::new(self.skel.clone());
-        let skel = self.skel.clone();
-
-        if self.skel.registry.is_none(){
-            tx.send( Err(Fail::Error(format!("this star: {} does not have a registry and therefor cannot manage resources",self.skel.info.kind))));
-            return Err(Fail::Unexpected);
-        }
-
-        let id_seq = Arc::new(IdSeq::new(0));
+        let resource = match key.resource_type(){
+            ResourceType::Nothing => {
+                if self.skel.info.kind != StarKind::Central {
+                    return Err(Fail::ResourceNotFound(ResourceKey::Nothing))
+                }
 
 
-        tokio::spawn( async move {
+                Option::Some(Arc::new(HostedResource{
+                    manager: Arc::new(RemoteResourceManager::new(ResourceKey::Nothing) ),
+                    unique_src: self.skel.registry.clone().ok_or(format!("this star {} does not host resources",self.skel.info.kind))?.unique_src(key.clone()).await,
+                    resource: Resource {
+                        key:key.clone(),
+                        address: ResourceAddress::nothing(),
+                        archetype: ResourceArchetype {
+                            kind: ResourceKind::Nothing,
+                            specific: None,
+                            config: None
+                        },
+                        owner: None
+                    }
+                }))
+            }
+            _ => {
+                self.skel.resources.get(key.clone()).await?
+            }
+        };
 
+        if let Option::Some(resource) = resource {
+            let (tx, rx) = oneshot::channel();
+
+            let mut star_api = StarApi::new(self.skel.clone());
+            let skel = self.skel.clone();
+
+            if self.skel.registry.is_none() {
+                tx.send(Err(Fail::Error(format!("this star: {} does not have a registry and therefore cannot manage resources", self.skel.info.kind))));
+                return Err(Fail::Unexpected);
+            }
+
+            let id_seq = Arc::new(IdSeq::new(0));
+
+            tokio::spawn(async move {
                 match star_api.fetch_resource_address(key.clone()).await {
                     Ok(address) => {
-                        let manager = ResourceManager {
+                        let manager = LocalResourceManager {
                             core: ResourceManagerCore {
                                 key: key.clone(),
                                 address: address,
-                                resource_type: key.resource_type(),
                                 selector: ResourceHostSelector::new(skel.clone()),
                                 registry: skel.registry.as_ref().cloned().unwrap(),
                                 id_seq: id_seq.clone()
@@ -1751,10 +1777,12 @@ impl Star
                         tx.send(Err(fail));
                     }
                 }
+            });
 
-        } );
-
-       Ok(rx)
+            Ok(rx)
+        } else {
+            Err(Fail::ResourceNotFound(key.clone()))
+        }
     }
 
     async fn diagnose( &self, diagnose: Diagnose ) {
@@ -1813,7 +1841,7 @@ pub enum StarCommand
     Diagnose(Diagnose),
     SetResourceAddress{key:ResourceKey,address:ResourceAddress},
     GetResourceAddress(Request<ResourceKey,ResourceAddress>),
-    GetResourceManager(Request<ResourceKey,ResourceManager>),
+    GetResourceManager(Request<ResourceKey, LocalResourceManager>),
     CheckStatus
 }
 
@@ -2709,7 +2737,8 @@ impl StarManagerFactory for StarManagerFactoryDefault
 
         tokio::spawn( async move {
             let mut manager:Box<dyn StarVariant> = loop {
-                if let Option::Some(StarVariantCommand::StarSkel(data)) = rx.recv().await
+                let command = rx.recv().await;
+                if let Option::Some(StarVariantCommand::StarSkel(data)) = command
                 {
                     if let StarKind::Central = data.info.kind
                     {
@@ -2731,8 +2760,8 @@ impl StarManagerFactory for StarManagerFactoryDefault
                         break Box::new(PlaceholderStarManager::new(data.clone()))
                     }
                 }
-                else {
-                    eprintln!("must send StarSkel, before manager commands can be processed")
+                else if let Option::Some(command) = command {
+                    eprintln!("Attempt to process {} before StarSkel has been set.",command)
                 }
             };
 
@@ -2759,7 +2788,8 @@ pub struct StarSkel
     pub sequence: Arc<AtomicU64>,
     pub auth_token_source: AuthTokenSource,
     pub registry: Option<Arc<dyn ResourceRegistryBacking>>,
-    pub star_handler: Option<StarHandleBacking>
+    pub star_handler: Option<StarHandleBacking>,
+    pub resources: HostedResourceStore
 }
 
 impl StarSkel
@@ -3165,6 +3195,7 @@ pub trait ResourceRegistryBacking: Sync+Send {
     async fn bind(&self, bind: ResourceBinding)->Result<(),Fail>;
     async fn get_address(&self, key: ResourceKey)->Result<Reply,Fail>;
     async fn get_key(&self, address: ResourceAddress)->Result<Reply,Fail>;
+    async fn unique_src(&self, key: ResourceKey) -> Box< dyn UniqueSrc>;
 }
 
 pub struct ResourceRegistryBackingSqLite
@@ -3284,6 +3315,10 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite
             Err(Fail::AddressNotFound(address))
         }
     }
+
+    async fn unique_src(&self, key: ResourceKey) -> Box<dyn UniqueSrc> {
+         Box::new( RegistryUniqueSrc::new( key, self.registry.clone() ))
+    }
 }
 
 
@@ -3307,7 +3342,7 @@ impl StarApi{
         rx.await?
     }
 
-    pub async fn get_resource_manager( &mut self, key: ResourceKey )-> Result<ResourceManager,Fail> {
+    pub async fn get_resource_manager( &mut self, key: ResourceKey )-> Result<LocalResourceManager,Fail> {
         let (request,rx)  = Request::new(key);
         self.skel.star_tx.send( StarCommand::GetResourceManager(request)).await;
         Ok(rx.await??)

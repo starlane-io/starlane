@@ -711,3 +711,16 @@ impl fmt::Display for FileKey{
     }
 
 }
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum Unique {
+    Sequence,
+    Index
+}
+
+#[async_trait]
+pub trait UniqueSrc: Send+Sync{
+    async fn next(&self, unique: Unique) -> Result<u64,Fail>;
+}
+
+
