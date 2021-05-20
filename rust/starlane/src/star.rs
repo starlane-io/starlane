@@ -484,7 +484,6 @@ impl Star
                 match command{
 
                     StarCommand::Init => {
-                        self.skel.variant_tx.send(StarVariantCommand::Init).await;
                         self.init().await;
                     }
                     StarCommand::SetFlags(set_flags ) => {
@@ -671,7 +670,7 @@ impl Star
     async fn refresh_handles(&mut self) {
 
         if self.status == StarStatus::Unknown {
-            self.status = StarStatus::Waiting
+            self.status = StarStatus::Pending
         }
 
         if let Option::Some(star_handler) = &self.skel.star_handler {
@@ -710,16 +709,16 @@ impl Star
     }
 
     async fn check_status(&mut self){
-        if let Option::Some(star_handler) = &self.skel.star_handler{
-            if let Result::Ok(Satisfaction::Ok) = star_handler.satisfied( self.skel.info.kind.handles() ).await {
-                self.status = StarStatus::Ready;
-                println!("{}: Ready",self.skel.info.kind);
-
-            } else  {
-                // nothing
+        if self.status == StarStatus::Pending {
+            if let Option::Some(star_handler) = &self.skel.star_handler {
+                if let Result::Ok(Satisfaction::Ok) = star_handler.satisfied(self.skel.info.kind.handles()).await {
+                    self.status = StarStatus::Ready;
+                    println!("{}: Ready", self.skel.info.kind);
+                    self.skel.variant_tx.send(StarVariantCommand::Init).await;
+                } else {
+                    // nothing
+                }
             }
-        } else{
-            self.status = StarStatus::Ready
         }
     }
 
@@ -3352,7 +3351,7 @@ impl StarApi{
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub enum StarStatus{
     Unknown,
-    Waiting,
+    Pending,
     Ready,
     Panic
 }

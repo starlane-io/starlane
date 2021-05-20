@@ -112,6 +112,23 @@ pub struct StarSelector {
     fields: HashSet<StarFieldSelection>
 }
 
+impl ToString for StarSelector{
+    fn to_string(&self) -> String {
+        let mut rtn = String::new();
+
+        for (index,field) in self.fields.iter().enumerate() {
+
+            if index > 0 {
+                rtn.push_str(", ");
+            }
+            rtn.push_str( field.to_string().as_str() );
+
+        }
+
+        rtn
+    }
+}
+
 impl StarSelector {
     pub fn new()->Self{
         StarSelector{
@@ -132,6 +149,16 @@ pub enum StarFieldSelection
 {
     Kind(StarKind),
     MinHops
+}
+
+impl ToString for StarFieldSelection{
+
+    fn to_string(&self) -> String {
+        match self {
+            StarFieldSelection::Kind(kind) => format!("Kind:{}",kind),
+            StarFieldSelection::MinHops => format!("MinHops")
+        }
+    }
 }
 
 impl ToSql for StarFieldSelection
@@ -195,7 +222,7 @@ pub enum StarHandleResult
    Ok,
    StarHandles(Vec<StarHandle>),
    StarHandle(StarHandle),
-   Error(String),
+   Fail(Fail),
    Satisfaction(Satisfaction)
 }
 
@@ -245,16 +272,16 @@ impl StarHandleDb {
                 Ok(ok) => {
                     request.tx.send(ok);
                 }
-                Err(err) => {
-                    eprintln!("{}", err);
-                    request.tx.send(StarHandleResult::Error(err.to_string()));
+                Err(fail) => {
+                    eprintln!("{}", fail.to_string());
+                    request.tx.send(StarHandleResult::Fail(fail));
                 }
             }
         }
         Ok(())
     }
 
-    async fn process(&mut self, command: StarHandleCommand) -> Result<StarHandleResult,Error>
+    async fn process(&mut self, command: StarHandleCommand) -> Result<StarHandleResult,Fail>
     {
         match command
         {
@@ -414,7 +441,21 @@ println!("kind {}",kind);
 
                         Ok(handle)
                     }
-                )?;
+                );
+
+                let handle = match handle {
+                    Ok(handle) => handle,
+                    Err(err) => {
+                        match err{
+                            rusqlite::Error::QueryReturnedNoRows => {
+                                return Err(Fail::SuitableHostNotAvailable(format!("could not select for: {}", selector.to_string() )));
+                            }
+                            _ => {
+                                return Err(err.to_string().into());
+                            }
+                       };
+                    }
+                };
 
                 trans.execute("UPDATE stars SET selections=selections+1 WHERE key=?1", params![handle.key.bin()?])?;
 

@@ -13,6 +13,8 @@ use serde::{Serialize, Deserialize};
 use crate::names::Specific;
 use crate::resource::{ResourceType, ResourceAddress};
 use std::collections::HashSet;
+use std::fmt::{Display, Formatter};
+use std::fmt;
 
 pub struct ProtoMessage
 {
@@ -350,28 +352,38 @@ pub enum Fail
     ResourceTypeRequiresOwner,
     RecvErr,
     CannotSelectResourceHost,
-    ResourceCannotGenerateAddress
+    ResourceCannotGenerateAddress,
+    SuitableHostNotAvailable(String),
+    SqlError(String),
+    CannotCreateNothingResourceTypeItIsThereAsAPlaceholderDummy,
+    ResourceTypeMismatch(String)
 }
 
 impl ToString for Fail {
     fn to_string(&self) -> String {
-        match self{
+        match self {
             Fail::Timeout => "Timeout".to_string(),
-            Fail::Error(message) => format!("Error({})",message),
+            Fail::Error(message) => format!("Error({})", message),
             Fail::Reject(_) => "Reject".to_string(),
             Fail::Unexpected => "Unexpected".to_string(),
             Fail::DoNotKnowSpecific(_) => "DoNotKnowSpecific".to_string(),
             Fail::ResourceNotFound(_) => "ResourceNotFound".to_string(),
-            Fail::WrongResourceType{expected:_,received:_} => "WrongResourceType".to_string(),
+            Fail::WrongResourceType { expected: expected, received: received} => format!("WrongResourceType(expected:[{}],received:{})",ResourceType::hash_to_string(expected),received.to_string()),
             Fail::RecvErr => "RecvErr".to_string(),
             Fail::ResourceTypeRequiresOwner => "ResourceTypeRequiresOwner".to_string(),
             Fail::CannotSelectResourceHost => "CannotSelectResourceHost".to_string(),
             Fail::WrongParentResourceType { .. } => "WrongParentResourceType".to_string(),
             Fail::ResourceCannotGenerateAddress => "ResourceCannotGenerateAddress".to_string(),
-            Fail::AddressNotFound(address) => format!("AddressNotFound({})",address.to_string())
+            Fail::AddressNotFound(address) => format!("AddressNotFound({})", address.to_string()),
+            Fail::SuitableHostNotAvailable(detail) => format!("SuitableHostNotAvailable({})", detail.to_string()),
+            Fail::SqlError(detail) => format!("SqlError({})", detail.to_string()),
+            Fail::CannotCreateNothingResourceTypeItIsThereAsAPlaceholderDummy => "CannotCreateNothingResourceTypeItIsThereAsAPlaceholderDummy".to_string(),
+            Fail::ResourceTypeMismatch(detail) => format!("ResourceTypeMismatch({})", detail.to_string()).to_string()
         }
     }
 }
+
+
 
 
 

@@ -842,4 +842,15 @@ impl From<String> for Fail
     }
 }
 
+impl From<rusqlite::Error> for Fail{
+    fn from(error: rusqlite::Error) -> Self {
+        Fail::SqlError(error.to_string())
+    }
+}
+
+impl From<()> for Fail{
+    fn from(error: ()) -> Self {
+        Fail::Unexpected
+    }
+}
 

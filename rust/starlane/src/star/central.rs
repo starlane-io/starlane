@@ -124,7 +124,7 @@ impl StarVariant for CentralStarVariant
                                     init: ResourceInit {
                                         init: InitData::None,
                                         archetype: ResourceArchetype {
-                                            kind: ResourceKind::Nothing,
+                                            kind: ResourceKind::Space,
                                             specific: None,
                                             config: None
                                         }

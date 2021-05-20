@@ -1235,6 +1235,17 @@ impl ResourceType{
             parent => Option::Some(parent.resource_type())
         }
     }
+
+    pub fn hash_to_string(set: &HashSet<ResourceType> ) -> String {
+        let mut string = String::new();
+        for (index,resource_type) in set.iter().enumerate(){
+            if index > 0 {
+                string.push_str(",");
+            }
+            string.push_str(resource_type.to_string().as_str() );
+        }
+        string
+    }
 }
 
 impl ResourceType{
@@ -1549,6 +1560,15 @@ pub struct ResourceArchetype {
     pub config: Option<ConfigSrc>
 }
 
+impl ResourceArchetype{
+    pub fn valid(&self)->Result<(),Fail>{
+        if self.kind.resource_type() == ResourceType::Nothing{
+            return Err(Fail::CannotCreateNothingResourceTypeItIsThereAsAPlaceholderDummy);
+        }
+        Ok(())
+    }
+}
+
 pub struct ResourceControl{
     pub resource_type: ResourceType
 }
@@ -1650,9 +1670,6 @@ pub struct LocalResourceManager {
 
 impl LocalResourceManager {
     async fn process_create(core: ResourceManagerCore, create: ResourceCreate ) -> Result<ResourceLocationRecord,Fail>{
-        if core.key.resource_type().requires_owner() && create.owner.is_none() {
-            return Err(Fail::ResourceTypeRequiresOwner);
-        };
 
         if !core.key.resource_type().parent().matches(ResourceType::from(&create.parent).as_ref()) {
             return Err(Fail::WrongParentResourceType {
@@ -1661,6 +1678,8 @@ impl LocalResourceManager {
             });
         };
 
+        create.validate()?;
+
         let reservation = core.registry.reserve(ResourceNamesReservationRequest{
             parent: create.parent.clone(),
             archetype: create.init.archetype.clone(),
@@ -1668,7 +1687,7 @@ impl LocalResourceManager {
 
         let key = match create.key {
             KeyCreationSrc::None => {
-                ResourceKey::new(core.key.clone(), ResourceId::new(&core.key.resource_type(), core.id_seq.next() ) )?
+                ResourceKey::new(core.key.clone(), ResourceId::new(&create.init.archetype.kind.resource_type(), core.id_seq.next() ) )?
             }
             KeyCreationSrc::Key(key) => {
                 if key.parent() != Option::Some(core.key.clone()){
@@ -1677,6 +1696,7 @@ impl LocalResourceManager {
                 key
             }
         };
+println!("CREATED KEY: {}",key);
 
         let address = match create.address{
             AddressCreationSrc::None => {
@@ -1700,6 +1720,7 @@ impl LocalResourceManager {
             source: ResourceSrc::Creation(create.init.clone())
         };
 
+println!("selecting for resource kind: {}", create.init.archetype.kind.resource_type().to_string());
         let mut host = core.selector.select(create.init.archetype.kind.resource_type(), create.location_affinity ).await?;
 
         host.assign(assign).await?;
@@ -2911,6 +2932,7 @@ pub struct ResourceCreate {
    pub location_affinity: Option<ResourceLocationAffinity>
 }
 
+
 impl ResourceCreate {
 
     pub fn new( init: ResourceInit ) ->Self {
@@ -2926,6 +2948,20 @@ impl ResourceCreate {
     }
 
     pub fn validate(&self)->Result<(),Fail> {
+        let resource_type = self.init.archetype.kind.resource_type();
+
+        self.init.archetype.valid()?;
+
+        if resource_type.requires_owner() && self.owner.is_none() {
+            return Err(Fail::ResourceTypeRequiresOwner);
+        };
+
+        if let KeyCreationSrc::Key(key) = &self.key {
+            if key.resource_type() != resource_type {
+                return Err(Fail::ResourceTypeMismatch("ResourceCreate: key: KeyCreationSrc::Key(key) resource type != init.archetype.kind.resource_type()".into()));
+            }
+        }
+
         Ok(())
     }
 }
@@ -3097,6 +3133,7 @@ impl ResourceHost for RemoteResourceHost {
     }
 
     async fn assign( &self, assign: ResourceAssign) -> Result<(), Fail> {
+
         if !self.handle.kind.hosts().contains(&assign.key.resource_type() ) {
             return Err(Fail::WrongResourceType{
                 expected: self.handle.kind.hosts().clone(),
