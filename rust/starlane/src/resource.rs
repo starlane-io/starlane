@@ -1587,12 +1587,13 @@ pub trait ResourceIdSeq: Send+Sync {
 }
 
 #[async_trait]
-pub trait RemoteHostedResource: Send+Sync {
+pub trait HostedResource: Send+Sync {
+    fn key(&self)->ResourceKey;
 }
 
 #[derive(Clone)]
 pub struct HostedResourceStore{
-   map: AsyncHashMap<ResourceKey,Arc<HostedResource>>
+   map: AsyncHashMap<ResourceKey,Arc<LocalHostedResource>>
 }
 
 impl HostedResourceStore{
@@ -1602,15 +1603,15 @@ impl HostedResourceStore{
         }
     }
 
-    pub async fn store( &self, resource: Arc<HostedResource> ) -> Result<(),Error> {
+    pub async fn store(&self, resource: Arc<LocalHostedResource> ) -> Result<(),Error> {
         self.map.put(resource.resource.key.clone(), resource ).await
     }
 
-    pub async fn get( &self, key: ResourceKey ) -> Result<Option<Arc<HostedResource>>,Error> {
+    pub async fn get( &self, key: ResourceKey ) -> Result<Option<Arc<LocalHostedResource>>,Error> {
         self.map.get(key).await
     }
 
-    pub async fn remove( &self, key: ResourceKey ) -> Result<Option<Arc<HostedResource>>,Error> {
+    pub async fn remove( &self, key: ResourceKey ) -> Result<Option<Arc<LocalHostedResource>>,Error> {
         self.map.remove(key).await
     }
 
@@ -1619,15 +1620,24 @@ impl HostedResourceStore{
     }
 }
 
-pub struct HostedResource {
-    pub manager: Arc<dyn ResourceManager>,
+
+
+#[derive(Clone)]
+pub struct RemoteHostedResource{
+    key: ResourceKey,
+    star_host: StarKey,
+    local_skel: StarSkel
+}
+
+pub struct LocalHostedResource {
+//    pub manager: Arc<dyn ResourceManager>,
     pub unique_src: Box<dyn UniqueSrc>,
     pub resource: Resource
 }
-
-
-impl RemoteHostedResource for HostedResource{
-
+impl HostedResource for LocalHostedResource {
+    fn key(&self)->ResourceKey{
+       self.resource.key.clone()
+    }
 }
 
 #[async_trait]
@@ -1717,6 +1727,7 @@ println!("CREATED KEY: {}",key);
 
         let assign = ResourceAssign {
             key: key.clone(),
+            address: address.clone(),
             source: ResourceSrc::Creation(create.init.clone())
         };
 
@@ -3091,6 +3102,7 @@ impl Resource {
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceAssign{
     pub key: ResourceKey,
+    pub address: ResourceAddress,
     pub source: ResourceSrc
 }
 
@@ -3107,8 +3119,34 @@ impl ResourceAssign {
 }
 
 pub struct LocalResourceHost{
-    skel: StarSkel
+    skel: StarSkel,
+    resource: Resource
 }
+
+impl LocalResourceHost{
+
+    async fn assign(&self, assign: ResourceAssign) -> Result<Self, Fail> {
+        unimplemented!()
+        /*
+        let archetype = match assign.source{
+            ResourceSrc::Creation(init) => {
+                init.archetype.clone()
+            }
+        };
+
+        Ok(LocalResourceHost{
+            resource: Resource{
+                key: assign.key,
+                address: assign.address,
+                archetype: archetype,
+                owner: Option::None
+            }
+        })
+         */
+    }
+}
+
+
 
 #[async_trait]
 impl ResourceHost for LocalResourceHost{

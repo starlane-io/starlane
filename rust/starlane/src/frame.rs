@@ -19,7 +19,7 @@ use crate::message::{Fail, MessageExpect, MessageResult, MessageUpdate, ProtoMes
 use crate::names::Name;
 use crate::permissions::{Authentication, AuthToken};
 use crate::resource::{Labels, ResourceAssign, ResourceRegistration, ResourceSelector, ResourceLocationRecord, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus, ResourceInit, Resource, ResourceCreate};
-use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey, StarWatchInfo};
+use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey, StarWatchInfo, LocalResourceLocation};
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Frame
@@ -361,6 +361,12 @@ pub enum ResourceHostAction
     Assign(ResourceAssign),
     SliceAssign(ResourceSliceAssign),
     Message(ResourceMessage)
+}
+
+pub enum ResourceHostResult{
+   Ok,
+   Location(LocalResourceLocation),
+   Response(ResourceMessage)
 }
 
 #[derive(Clone,Serialize,Deserialize)]

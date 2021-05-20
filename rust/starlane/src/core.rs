@@ -15,31 +15,42 @@ use tokio::sync::mpsc::Sender;
 use tokio::time::Duration;
 
 
-use crate::actor::{ActorKey, ResourceMessage};
+use crate::actor::{ActorKey, ResourceMessage, ResourceMessagePayload};
 use crate::app::{ApplicationStatus, AppArchetype, AppMeta};
 use crate::error::Error;
-use crate::frame::{StarMessage, StarMessagePayload, Watch, WatchInfo, ServerAppPayload, AppPayload};
+use crate::frame::{StarMessage, StarMessagePayload, Watch, WatchInfo, ServerAppPayload, AppPayload, ResourceHostAction, ResourceHostResult};
 use crate::id::{Id, IdSeq};
 use crate::star::{ActorCreate, StarCommand, StarKey, StarKind, StarVariantCommand, StarSkel, Request, LocalResourceLocation};
 use crate::core::server::{ServerStarCore, ServerStarCoreExt, ExampleServerStarCoreExt};
 use std::marker::PhantomData;
 use crate::keys::{AppKey, ResourceKey};
 use crate::artifact::{Artifact, ArtifactKey};
-use crate::resource::{Resource, ResourceInit, ResourceSrc, ResourceAssign, ResourceSliceAssign, HostedResourceStore};
+use crate::resource::{Resource, ResourceInit, ResourceSrc, ResourceAssign, ResourceSliceAssign, HostedResourceStore, HostedResource, LocalHostedResource};
 use crate::message::Fail;
 
 pub mod server;
 pub mod filestore;
 
+pub struct StarCoreAction{
+    pub command: StarCoreCommand,
+    pub tx: oneshot::Sender<Result<StarCoreResult,Fail>>
+}
+
 pub enum StarCoreCommand
 {
-    SetSupervisor(StarKey),
-    AppCommand(StarCoreAppCommand),
-    Watch(Watch),
-    HasResource(Request<ResourceKey,LocalResourceLocation>),
-    GetResource(Request<ResourceKey,Resource>),
-    ResourceMessage(Request<ResourceMessage,()>)
+    IsHosting(ResourceKey),
+    Assign(ResourceAssign),
+    SliceAssign(ResourceSliceAssign),
+    Message(ResourceMessage)
 }
+
+pub enum StarCoreResult{
+    Ok,
+    LocalLocation(LocalResourceLocation),
+    MessageReply(ResourceMessagePayload)
+}
+
+
 
 pub struct StarCoreAppCommand
 {
@@ -213,39 +224,30 @@ impl StarCoreExtFactory for ExampleStarCoreExtFactory
 
 
 pub struct StarCore2{
-    rx: mpsc::Receiver<StarCoreCommand>,
+    rx: mpsc::Receiver<StarCoreAction>,
     resources: Arc<HostedResourceStore>
 }
 
 impl StarCore2{
     pub async fn run(mut self){
-        while let Option::Some(t) = self.rx.recv().await{
-
+        while let Option::Some(action) = self.rx.recv().await{
+            action.tx.send( self.process(action.command).await);
         }
     }
 
-    async fn process( &mut self, command: StarCoreCommand )->Result<(),Error>{
+    async fn process(&mut self, command: StarCoreCommand ) ->Result<StarCoreResult,Fail>{
         match command{
-            StarCoreCommand::HasResource(request) => {
-                if self.resources.contains(&request.payload ).await? {
-                    let local = LocalResourceLocation::new(request.payload, Option::None );
-                    request.tx.send(Ok(local));
+            StarCoreCommand::IsHosting(key) => {
+                if self.resources.contains(&key).await? {
+                    let local = LocalResourceLocation::new(key, Option::None );
+                    Ok(StarCoreResult::LocalLocation(local))
                 } else{
-                    request.tx.send(Err(Fail::ResourceNotFound(request.payload)));
-                }
-            }
-            StarCoreCommand::GetResource(request) => {
-                if let Option::Some( hosted_resource ) = self.resources.get(request.payload.clone() ).await?{
-                    request.tx.send(Ok(hosted_resource.resource.clone()));
-                } else{
-                    request.tx.send(Err(Fail::ResourceNotFound(request.payload)));
+                    Err(Fail::ResourceNotFound(key))
                 }
             }
             _ => {
-               unimplemented!()
+                unimplemented!()
             }
-        };
-        Ok(())
-
+        }
     }
 }

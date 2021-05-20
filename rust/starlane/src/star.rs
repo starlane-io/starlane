@@ -31,7 +31,7 @@ use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequ
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId, SpaceKey, UserKey, ResourceKey, GatheringKey, Unique, UniqueSrc};
-use crate::resource::{Labels, ResourceRegistration, ResourceSelector, ResourceAssign, ResourceRegistryCommand, ResourceRegistryResult, Registry, ResourceType, ResourceLocationRecord, ResourceManagerKey, ResourceBinding, ResourceAddress, ResourceRegistryAction, Resource, FieldSelection, ResourceRegistryInfo, RegistryReservation, ResourceNamesReservationRequest, LocalResourceManager, ResourceManagerCore, HostedResourceStore, HostedResource, ResourceManager, ResourceCreate, ResourceLocation, ResourceArchetype, ResourceKind, RemoteResourceManager, RegistryUniqueSrc};
+use crate::resource::{Labels, ResourceRegistration, ResourceSelector, ResourceAssign, ResourceRegistryCommand, ResourceRegistryResult, Registry, ResourceType, ResourceLocationRecord, ResourceManagerKey, ResourceBinding, ResourceAddress, ResourceRegistryAction, Resource, FieldSelection, ResourceRegistryInfo, RegistryReservation, ResourceNamesReservationRequest, LocalResourceManager, ResourceManagerCore, HostedResourceStore, LocalHostedResource, ResourceManager, ResourceCreate, ResourceLocation, ResourceArchetype, ResourceKind, RemoteResourceManager, RegistryUniqueSrc, LocalResourceHost, ResourceHost};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob, Fail};
@@ -398,7 +398,7 @@ impl Star
         Ok(self.resources_store.contains(key).await?)
     }
 
-    pub async fn get_resource(&self, key: &ResourceKey) -> Result<Arc<HostedResource>,Fail>
+    pub async fn get_resource(&self, key: &ResourceKey) -> Result<Arc<LocalHostedResource>,Fail>
     {
         match self.resources_store.get(key.clone()).await?
         {
@@ -1699,7 +1699,8 @@ impl Star
                 }
             }
             ResourceHostAction::Assign(assign) => {
-                unimplemented!()
+println!("Reached Star: {}",self.skel.info.kind);
+
             }
             ResourceHostAction::SliceAssign(assign) => {
 
@@ -1724,8 +1725,7 @@ impl Star
                 }
 
 
-                Option::Some(Arc::new(HostedResource{
-                    manager: Arc::new(RemoteResourceManager::new(ResourceKey::Nothing) ),
+                Option::Some(Arc::new(LocalHostedResource {
                     unique_src: self.skel.registry.clone().ok_or(format!("this star {} does not host resources",self.skel.info.kind))?.unique_src(key.clone()).await,
                     resource: Resource {
                         key:key.clone(),

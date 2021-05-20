@@ -457,6 +457,7 @@ impl ResourceMessage
     }
 }
 
+pub type ResourceMessagePayload=Arc<RawPayload>;
 pub type Raw=Vec<u8>;
 pub type RawPayload=Vec<u8>;
 pub type RawState=Vec<u8>;
