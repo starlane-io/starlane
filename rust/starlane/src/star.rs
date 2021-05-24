@@ -24,7 +24,7 @@ use actor_host::ServerStarVariant;
 
 use crate::actor::{ActorKey, ActorKind, ActorWatcher, ResourceMessage, ResourceMessageWrapper};
 use crate::app::{AppCommandKind, AppController, AppCreateController, AppMeta, AppSpecific, AppLocation, AppCommand};
-use crate::core::StarCoreCommand;
+use crate::core::{StarCoreCommand, StarCoreAction};
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
 use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ApplicationSupervisorReport, ServerAppPayload, AppNotifyCreated, AppSupervisorLocationRequest, Event, Frame, ProtoFrame, Rejection, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp, Reply, SimpleReply, AppPayload, ResourceManagerAction, ResourceHostAction, FromReply};
@@ -43,7 +43,6 @@ use crate::permissions::{Authentication, AuthToken, AuthTokenSource, Credentials
 use tokio::sync::oneshot::Sender;
 use std::str::FromStr;
 use crate::star::space::SpaceVariant;
-use crate::frame::ResourceHostAction::SliceAssign;
 use std::iter::FromIterator;
 use crate::star::pledge::{StarHandleBacking, StarHandle, Satisfaction, ResourceHostSelector};
 use std::sync::Arc;
@@ -346,7 +345,7 @@ pub struct Star
 {
     skel: StarSkel,
     star_rx: mpsc::Receiver<StarCommand>,
-    core_tx: mpsc::Sender<StarCoreCommand>,
+    core_tx: mpsc::Sender<StarCoreAction>,
     lanes: HashMap<StarKey, LaneMeta>,
     connector_ctrls: Vec<ConnectorController>,
     transactions: HashMap<u64,Box<dyn Transaction>>,
@@ -367,7 +366,7 @@ impl Star
 
     pub async fn from_proto(data: StarSkel,
                       star_rx: mpsc::Receiver<StarCommand>,
-                      core_tx: mpsc::Sender<StarCoreCommand>,
+                      core_tx: mpsc::Sender<StarCoreAction>,
                       lanes: HashMap<StarKey,LaneMeta>,
                       connector_ctrls: Vec<ConnectorController>,
                       frame_hold: FrameHold ) ->Self
@@ -1699,8 +1698,11 @@ impl Star
                 }
             }
             ResourceHostAction::Assign(assign) => {
-println!("Reached Star: {}",self.skel.info.kind);
-
+println!("Assignment Reached Star: {}",self.skel.info.kind);
+                let (action,rx) = StarCoreAction::new(StarCoreCommand::Assign(assign));
+                self.skel.core_tx.send( action).await;
+                rx.await;
+println!("Assignment CONFIRMED : {}",self.skel.info.kind);
             }
             ResourceHostAction::SliceAssign(assign) => {
 
@@ -2779,7 +2781,7 @@ pub struct StarSkel
 {
     pub info: StarInfo,
     pub star_tx: mpsc::Sender<StarCommand>,
-    pub core_tx: mpsc::Sender<StarCoreCommand>,
+    pub core_tx: mpsc::Sender<StarCoreAction>,
     pub variant_tx: mpsc::Sender<StarVariantCommand>,
     pub flags: Flags,
     pub logger: Logger,
@@ -2881,7 +2883,7 @@ pub struct StarComm
 {
     pub star_tx: mpsc::Sender<StarCommand>,
     pub variant_tx: mpsc::Sender<StarVariantCommand>,
-    pub core_tx: mpsc::Sender<StarCoreCommand>
+    pub core_tx: mpsc::Sender<StarCoreAction>
 }
 
 impl StarComm

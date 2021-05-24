@@ -594,7 +594,7 @@ impl fmt::Display for ResourceKey{
                     ResourceKey::User(key) => format!("UserKey:{}",key),
                     ResourceKey::File(key) => format!("FileKey:{}",key),
                     ResourceKey::Artifact(key) => format!("ArtifactKey:{}",key),
-                    ResourceKey::FileSystem(key) => format!("FilesystemKey:{}", key),
+                    ResourceKey::FileSystem(key) => format!("FileSystemKey:{}", key),
                     ResourceKey::Nothing => "Nothing".to_string()
                 })
     }
@@ -709,7 +709,6 @@ impl fmt::Display for FileKey{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!( f,"[{},{},{}]",self.filesystem,self.filesystem,self.id)
     }
-
 }
 
 #[derive(Clone,Serialize,Deserialize)]

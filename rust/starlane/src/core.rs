@@ -36,6 +36,16 @@ pub struct StarCoreAction{
     pub tx: oneshot::Sender<Result<StarCoreResult,Fail>>
 }
 
+impl StarCoreAction{
+    pub fn new( command: StarCoreCommand )-> (Self,oneshot::Receiver<Result<StarCoreResult,Fail>>){
+        let (tx,rx) = oneshot::channel();
+        (StarCoreAction{
+            command: command,
+            tx: tx
+        },rx)
+    }
+}
+
 pub enum StarCoreCommand
 {
     IsHosting(ResourceKey),
@@ -92,7 +102,11 @@ pub enum StarCoreExtKind
 
 pub enum CoreRunnerCommand
 {
-    Core(Box<dyn StarCore>),
+    Core{
+        skel: StarSkel,
+        ext: StarCoreExtKind,
+        rx: mpsc::Receiver<StarCoreAction>
+    },
     Shutdown
 }
 
@@ -105,12 +119,14 @@ impl CoreRunner
 {
     pub fn new()->Self
     {
+      let factory = StarCoreFactory::new();
       let (tx,mut rx) = mpsc::channel(1);
       thread::spawn( move || {
          let runtime = Runtime::new().unwrap();
          runtime.block_on( async move {
-            while let Option::Some(CoreRunnerCommand::Core(mut core)) = rx.recv().await
+            while let Option::Some(CoreRunnerCommand::Core{ skel, ext, rx }) = rx.recv().await
             {
+               let core = factory.create(skel,ext,rx).await;
                tokio::spawn( async move {
                    core.run().await
                } );
@@ -124,8 +140,8 @@ impl CoreRunner
       }
     }
 
-    pub async fn run( &self, core: Box<dyn StarCore> ) {
-        self.tx.send( CoreRunnerCommand::Core(core) ).await;
+    pub async fn send( &self, command: CoreRunnerCommand ) {
+        self.tx.send( command ).await;
     }
 }
 
@@ -153,9 +169,10 @@ impl StarCoreFactory
         StarCoreFactory{}
     }
 
-    pub fn create(&self, skel: StarSkel, ext: StarCoreExtKind, core_rx: mpsc::Receiver<StarCoreCommand> ) -> Result<Box<dyn StarCore>,Error>
+    pub async fn create(&self, skel: StarSkel, ext: StarCoreExtKind, core_rx: mpsc::Receiver<StarCoreAction> ) -> StarCore2
     {
-        match skel.info.kind
+        StarCore2::new(skel, core_rx).await
+/*        match skel.info.kind
         {
             StarKind::ActorHost => {
                 if let StarCoreExtKind::Server(ext) = ext
@@ -169,6 +186,7 @@ impl StarCoreFactory
             }
             _ => Ok(Box::new(InertStarCore::new()))
         }
+ */
     }
 }
 
@@ -224,11 +242,21 @@ impl StarCoreExtFactory for ExampleStarCoreExtFactory
 
 
 pub struct StarCore2{
+    skel: StarSkel,
     rx: mpsc::Receiver<StarCoreAction>,
-    resources: Arc<HostedResourceStore>
+    resources: HostedResourceStore
 }
 
 impl StarCore2{
+
+    pub async fn new(skel: StarSkel, rx: mpsc::Receiver<StarCoreAction>) -> Self {
+        StarCore2{
+            skel: skel,
+            rx: rx,
+            resources: HostedResourceStore::new().await
+        }
+    }
+
     pub async fn run(mut self){
         while let Option::Some(action) = self.rx.recv().await{
             action.tx.send( self.process(action.command).await);

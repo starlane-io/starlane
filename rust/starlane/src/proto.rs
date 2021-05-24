@@ -14,7 +14,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{Duration, Instant};
 
 use crate::constellation::Constellation;
-use crate::core::{StarCoreFactory, CoreRunner, StarCore, StarCoreCommand, StarCoreExtFactory};
+use crate::core::{StarCoreFactory, CoreRunner, StarCore, StarCoreCommand, StarCoreExtFactory, CoreRunnerCommand, StarCoreExtKind};
 use crate::error::Error;
 use crate::frame::{Frame, ProtoFrame, WindHit, StarMessage, StarMessagePayload, WindUp, StarPattern, WindDown, SequenceMessage} ;
 use crate::id::{Id, IdSeq};
@@ -139,9 +139,11 @@ impl ProtoStar
                         };
 
                         let core_ext = self.star_core_ext_factory.create(&skel );
-                        let star_core_factory = StarCoreFactory::new();
-                        let core = star_core_factory.create(skel.clone(), core_ext, core_rx )?;
-                        self.core_runner.run(core).await;
+                        self.core_runner.send(CoreRunnerCommand::Core{
+                            skel: skel.clone(),
+                            ext: StarCoreExtKind::None,
+                            rx: core_rx
+                        } ).await;
 
                         // now send star data to manager and core... tricky!
                         manager_tx.send(StarVariantCommand::StarSkel(skel.clone()) ).await;
