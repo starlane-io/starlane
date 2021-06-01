@@ -1704,10 +1704,7 @@ println!("Assignment Reached Star: {}",self.skel.info.kind);
                 rx.await;
 println!("Assignment CONFIRMED : {}",self.skel.info.kind);
             }
-            ResourceHostAction::SliceAssign(assign) => {
 
-                unimplemented!()
-            }
             ResourceHostAction::Message(_) => {
                 unimplemented!()
             }

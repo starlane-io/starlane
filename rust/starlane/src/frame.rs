@@ -359,7 +359,6 @@ pub enum ResourceHostAction
 {
     IsHosting(ResourceKey),
     Assign(ResourceAssign),
-    SliceAssign(ResourceSliceAssign),
     Message(ResourceMessage)
 }
 

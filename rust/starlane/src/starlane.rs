@@ -482,6 +482,8 @@ mod test
 
             println!("got space ctrl");
 
+            tokio::time::sleep(Duration::from_secs(10)).await;
+
 
 //            assert_eq!(central_ctrl.diagnose_handlers_satisfaction().await.unwrap(),crate::star::pledge::Satisfaction::Ok)
 

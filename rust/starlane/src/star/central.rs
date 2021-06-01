@@ -103,78 +103,8 @@ impl StarVariant for CentralStarVariant
         match &command
         {
             StarVariantCommand::Init => {
-                let registry = self.skel.registry.as_ref().unwrap();
-                // verify that hyper-space exists
-                let address = ResourceAddress::for_space("hyperspace" ).unwrap();
-
-                let result = registry.get_key(address ).await;
-                match result {
-                    Ok(key) => {
-                        println!("space exists!");
-                    }
-                    Err(err) => {
-                        let mut star_api = StarApi::new(self.skel.clone());
-                        let manager = star_api.get_resource_manager(ResourceKey::Nothing).await;
-
-
-                        match manager {
-                            Ok(manager) => {
-                                let space_state = SpaceState::new("hyperspace", "HyperSpace");
-                                let resource_src = space_state.to_bytes();
-                                match resource_src{
-                                    Ok(src_bytes) => {
-                                        let resource_src = ResourceSrc::AssignState(src_bytes);
-                                        println!("Got NOTHING manager!");
-                                        let create = ResourceCreate{
-                                            parent: ResourceKey::Nothing,
-                                            key: KeyCreationSrc::None,
-                                            address: AddressCreationSrc::Space("hyperspace".to_string()),
-                                            archetype: ResourceArchetype {
-                                                kind: ResourceKind::Space,
-                                                specific: None,
-                                                config: None
-                                            },
-                                            src: resource_src,
-                                            registry_info: None,
-                                            owner: None,
-                                            location_affinity: None
-                                        };
-                                        let rx = manager.create(create).await;
-
-                                        let result = rx.await;
-
-                                        match &result {
-                                            Ok(result) => {
-                                                match result{
-                                                    Ok(ok) => {
-                                                        println!("Create Space WORKED!");
-                                                    }
-                                                    Err(fail) => {
-                                                        eprintln!("Create Space FAILED:{}",fail.to_string());
-                                                    }
-                                                }
-                                            }
-                                            Err(err) => {
-                                                eprintln!("CREATE SPACE RecvError: {}",err);
-                                            }
-                                        }
-
-                                    }
-                                    Err(err) => {
-
-                                        println!("could not create the resourceSRc!")
-                                    }
-                                };
-
-
-                            }
-                            Err(err) => {
-                                println!("Could not get NOTHING manager!")
-                            }
-                        }
-                    }
-                }
-
+println!("Central: CALLING ENSURE!");
+                self.ensure().await;
             }
 
             StarVariantCommand::CentralCommand(_) => {}
@@ -182,6 +112,82 @@ impl StarVariant for CentralStarVariant
         }
     }
 
+
+
+}
+
+impl CentralStarVariant{
+
+    async fn ensure(&self){
+        if self.ensure_hyperspace().await.is_err(){
+            panic!("could not ensure hyperspace exists!")
+        }
+    }
+
+    async fn ensure_hyperspace(&self)->Result<(),Error>{
+
+println!("ENSURING HYPERSPACE!");
+
+
+        let registry = self.skel.clone().registry.ok_or("registry not set!")?.clone();
+        // verify that hyper-space exists
+        let address = ResourceAddress::for_space("hyperspace" ).unwrap();
+
+        let result = registry.get_key(address).await;
+        if result.is_ok(){
+            // hyperspace exists, nothing else need be done
+            return Ok(());
+        }
+
+        let mut star_api = StarApi::new(self.skel.clone());
+        let manager = star_api.get_resource_manager(ResourceKey::Nothing).await?;
+
+        let space_state= SpaceState::new("hyperspace", "HyperSpace");
+        let space_state_bytes = space_state.to_bytes()?;
+        let resource_src = ResourceSrc::AssignState(space_state_bytes);
+        let create = ResourceCreate{
+            parent: ResourceKey::Nothing,
+            key: KeyCreationSrc::None,
+            address: AddressCreationSrc::Space("hyperspace".to_string()),
+            archetype: ResourceArchetype {
+                kind: ResourceKind::Space,
+                specific: None,
+                config: None
+            },
+            src: resource_src,
+            registry_info: None,
+            owner: None,
+            location_affinity: None
+        };
+        let rx = manager.create(create).await;
+
+        let result = tokio::time::timeout(Duration::from_secs(5), rx).await;
+
+        match &result {
+            Ok(result) => {
+                match result{
+                    Ok(result) => {
+                        match result{
+                            Ok(ok) => {
+                                println!("Create Space WORKED!");
+                            }
+                            Err(err) => {
+                                println!("Still got a fail: {}", err.to_string() )
+                            }
+                        }
+                    }
+                    Err(fail) => {
+                        eprintln!("Create Space FAILED:{}",fail.to_string());
+                    }
+                }
+            }
+            Err(err) => {
+                eprintln!("CREATE SPACE RecvError: {}",err);
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Clone)]

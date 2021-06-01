@@ -10,15 +10,33 @@ use crate::resource::space::SpaceState;
 use serde::{Deserialize, Serialize};
 use crate::frame::ResourceHostAction;
 use crate::core::Host;
+use crate::resource;
 
-pub struct StarHost{
-
+pub struct SpaceHost {
+  tx: mpsc::Sender<SpaceHostAction>
 }
 
+impl SpaceHost {
+    pub async fn new()->Self{
+        SpaceHost {
+            tx: SpaceHostSqLite::new().await
+        }
+    }
+}
 #[async_trait]
-impl Host for StarHost{
+impl Host for SpaceHost {
+
+
     async fn assign(&self, assign: ResourceAssign) -> Result<(), Fail> {
-        todo!()
+println!("assignging resource:{} ", assign.archetype.kind );
+        let (tx,rx) = oneshot::channel();
+        self.tx.send( SpaceHostAction{
+            command: ResourceHostCommand::Assign(assign.clone()),
+            tx: tx
+        }).await?;
+        rx.await?;
+println!("AsSiGnEd:{} ", assign.archetype.kind );
+        Ok(())
     }
 }
 
@@ -111,6 +129,7 @@ impl SpaceHostSqLite {
                         let state = state_src.to_state()?;
                         let name = state.name();
                         let display = state.display();
+println!("INSERT INTO spaces (id,name,display) VALUES ({},{},{})", id,name,display);
                         trans.execute("INSERT INTO spaces (id,name,display) VALUES (?1,?2,?3)", params![id,name,display])?;
 
                         trans.commit()?;
