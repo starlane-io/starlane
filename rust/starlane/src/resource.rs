@@ -31,6 +31,8 @@ use crate::util::AsyncHashMap;
 use tokio::sync::oneshot::Receiver;
 
 pub mod space;
+pub mod sub_space;
+pub mod user;
 
 lazy_static!
 {
@@ -378,8 +380,8 @@ pub enum ResourceRegistryResult
 {
     Ok,
     Error(String),
-    Resource(Resource),
-    Resources(Vec<Resource>),
+    Resource(ResourceStub),
+    Resources(Vec<ResourceStub>),
     Address(ResourceAddress),
     Location(ResourceLocationRecord),
     Reservation(RegistryReservation),
@@ -741,7 +743,7 @@ eprintln!("error setting up db: {}", err );
                     let address: String = row.get(5)?;
                     let address = ResourceAddress::from_str(address.as_str())?;
 
-                    let resource = Resource{
+                    let resource = ResourceStub {
                         key: key,
                         address: address,
                         archetype: ResourceArchetype {
@@ -1575,7 +1577,7 @@ pub struct ResourceControl{
 
 impl ResourceControl{
 
-    pub async fn create_child(resource: ResourceInit, register: Option<ResourceRegistryInfo> ) -> Result<Resource,Fail>
+    pub async fn create_child(resource: ResourceInit, register: Option<ResourceRegistryInfo> ) -> Result<ResourceStub,Fail>
     {
         unimplemented!()
     }
@@ -1632,7 +1634,7 @@ pub struct RemoteHostedResource{
 pub struct LocalHostedResource {
 //    pub manager: Arc<dyn ResourceManager>,
     pub unique_src: Box<dyn UniqueSrc>,
-    pub resource: Resource
+    pub resource: ResourceStub
 }
 impl HostedResource for LocalHostedResource {
     fn key(&self)->ResourceKey{
@@ -1743,7 +1745,7 @@ println!("selecting for resource kind: {}", create.init.archetype.kind.resource_
 
         core.registry.set_location(location_record.clone()).await?;
 
-        let resource = Resource{
+        let resource = ResourceStub {
             key: key,
             address: address,
             archetype: create.init.archetype,
@@ -1828,18 +1830,18 @@ pub struct ResourceNamesReservationRequest{
 }
 
 pub struct RegistryReservation{
-    tx: Option<oneshot::Sender<Resource>>
+    tx: Option<oneshot::Sender<ResourceStub>>
 }
 
 impl RegistryReservation{
-    pub fn commit( self, resource: Resource ) -> Result<(),Fail> {
+    pub fn commit(self, resource: ResourceStub) -> Result<(),Fail> {
         if let Option::Some(tx) = self.tx{
             tx.send(resource).or(Err(Fail::Unexpected));
         }
         Ok(())
     }
 
-    pub fn new( tx: oneshot::Sender<Resource> )->Self
+    pub fn new(tx: oneshot::Sender<ResourceStub> ) ->Self
     {
         Self{
             tx: Option::Some(tx)
@@ -1888,7 +1890,7 @@ impl UniqueSrc for RegistryUniqueSrc{
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceRegistration
 {
-    pub resource: Resource,
+    pub resource: ResourceStub,
     pub info: ResourceRegistryInfo
 }
 
@@ -1897,7 +1899,7 @@ pub struct ResourceRegistration
 
 impl ResourceRegistration
 {
-    pub fn new(resource: Resource, info: ResourceRegistryInfo ) ->Self
+    pub fn new(resource: ResourceStub, info: ResourceRegistryInfo ) ->Self
     {
         ResourceRegistration{
             resource: resource,
@@ -1960,6 +1962,11 @@ pub struct ResourceAddress
 }
 
 impl ResourceAddress {
+
+    pub fn last_to_string(&self) -> Result<String,Error> {
+        Ok(self.parts.last().ok_or("couldn't find last".into() )?.to_string())
+    }
+
 
     pub fn nothing() -> ResourceAddress{
        ResourceAddress{
@@ -2438,7 +2445,7 @@ mod test
     use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
     use crate::names::{Name, Specific};
     use crate::permissions::Authentication;
-    use crate::resource::{FieldSelection, Labels, LabelSelection, Names, Registry, Resource, ResourceAddress, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceKind, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceType, ResourceSelector, Skewer};
+    use crate::resource::{FieldSelection, Labels, LabelSelection, Names, Registry, ResourceStub, ResourceAddress, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceKind, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceType, ResourceSelector, Skewer};
     use crate::resource::FieldSelection::SubSpace;
     use crate::resource::ResourceRegistryResult::Resources;
     use crate::space::CreateAppControllerFail;
@@ -2446,7 +2453,7 @@ mod test
     use crate::starlane::{ConstellationCreate, StarControlRequestByName, Starlane, StarlaneCommand};
     use crate::template::{ConstellationData, ConstellationTemplate};
 
-    fn create_save(index: usize, resource: Resource) -> ResourceRegistration
+    fn create_save(index: usize, resource: ResourceStub) -> ResourceRegistration
     {
         if index == 0
         {
@@ -2481,7 +2488,7 @@ mod test
 
     fn create_with_key(  key: ResourceKey, address: ResourceAddress, kind: ResourceKind, specific: Option<Specific>, sub_space: SubSpaceKey, owner: UserKey ) -> ResourceRegistration
     {
-        let resource = Resource{
+        let resource = ResourceStub {
             key: key,
             address: address,
             owner: Option::Some(owner),
@@ -2514,7 +2521,7 @@ mod test
         let key = kind.test_key(sub_space,index);
         let address = ResourceAddress::test_address(&key).unwrap();
 
-        let resource = Resource{
+        let resource = ResourceStub {
             key: key,
             address: address,
             owner: Option::Some(owner),
@@ -2546,7 +2553,7 @@ mod test
         {
             let space = SpaceKey::from_index(index as _);
             let address_part = format!("some-space-{}", index);
-            let resource= Resource{
+            let resource= ResourceStub {
                 key: ResourceKey::Space(space.clone()),
                 address: crate::resource::SPACE_ADDRESS_STRUCT.from_str(address_part.as_str()).unwrap(),
                 archetype: ResourceArchetype{
@@ -2582,7 +2589,7 @@ mod test
     }
 
 
-    async fn create_10_sub_spaces(tx: mpsc::Sender<ResourceRegistryAction>, space_resource: Resource ) ->Vec<SubSpaceKey>
+    async fn create_10_sub_spaces(tx: mpsc::Sender<ResourceRegistryAction>, space_resource: ResourceStub) ->Vec<SubSpaceKey>
     {
         let mut sub_spaces = vec!();
         for index in 1..11
@@ -2592,7 +2599,7 @@ mod test
             let address_part = ResourceAddressPart::Skewer(Skewer::new(format!("sub-space-{}", index).as_str()).unwrap());
             let address = ResourceAddress::from_parent(&ResourceType::SubSpace, Option::Some(&space_resource.address.clone()), address_part.clone()).unwrap();
 
-            let resource= Resource{
+            let resource= ResourceStub {
                 key: ResourceKey::SubSpace(sub_space.clone()),
                 address: address,
                 archetype: ResourceArchetype{
@@ -2709,7 +2716,7 @@ mod test
             let spaces = create_10_spaces(tx.clone() ).await;
             let mut sub_spaces = vec![];
             for space in spaces.clone() {
-                let space_resource = Resource{
+                let space_resource = ResourceStub {
                     key: ResourceKey::Space(space.clone()),
                     address: ResourceAddress::test_address(&ResourceKey::Space(space.clone())).unwrap(),
                     archetype: ResourceArchetype {
@@ -2803,7 +2810,7 @@ mod test
         });
     }
 
-    fn results(result: ResourceRegistryResult) ->Vec<Resource>
+    fn results(result: ResourceRegistryResult) ->Vec<ResourceStub>
     {
         if let ResourceRegistryResult::Resources(resources) = result
         {
@@ -3085,14 +3092,14 @@ pub enum ResourceSliceCommand {
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct Resource{
+pub struct ResourceStub {
     pub key: ResourceKey,
     pub address: ResourceAddress,
     pub archetype: ResourceArchetype,
     pub owner: Option<UserKey>
 }
 
-impl Resource {
+impl ResourceStub {
     pub fn validate( &self, resource_type: ResourceType ) -> bool {
         self.key.resource_type() == resource_type && self.address.resource_type == resource_type && self.archetype.kind.resource_type() == resource_type
     }
@@ -3120,7 +3127,7 @@ impl ResourceAssign {
 
 pub struct LocalResourceHost{
     skel: StarSkel,
-    resource: Resource
+    resource: ResourceStub
 }
 
 impl LocalResourceHost{
@@ -3200,8 +3207,28 @@ impl ResourceHost for RemoteResourceHost {
     }
 }
 
+pub trait Resource<S:State> : Send+Sync {
+    fn key(&self)->ResourceKey;
+    fn address(&self)->ResourceAddress;
+    fn resource_type(&self)->ResourceType;
+    fn state(&self) -> StateSrc<S>;
+}
 
+pub trait State : Send+Sync+Clone {
 
+    fn to_bytes(self) ->Result<Vec<u8>,Error>;
+}
 
+pub enum StateSrc<S> where S: State {
+    Memory(S)
+}
+
+impl <S> StateSrc<S> where S: State {
+    pub fn to_data(self)->Result<Vec<u8>,Error>{
+        match self{
+            StateSrc::Memory(data) => Ok(data)
+        }
+    }
+}
 
 

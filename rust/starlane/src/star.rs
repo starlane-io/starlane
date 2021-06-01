@@ -31,7 +31,7 @@ use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequ
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId, SpaceKey, UserKey, ResourceKey, GatheringKey, Unique, UniqueSrc};
-use crate::resource::{Labels, ResourceRegistration, ResourceSelector, ResourceAssign, ResourceRegistryCommand, ResourceRegistryResult, Registry, ResourceType, ResourceLocationRecord, ResourceManagerKey, ResourceBinding, ResourceAddress, ResourceRegistryAction, Resource, FieldSelection, ResourceRegistryInfo, RegistryReservation, ResourceNamesReservationRequest, LocalResourceManager, ResourceManagerCore, HostedResourceStore, LocalHostedResource, ResourceManager, ResourceCreate, ResourceLocation, ResourceArchetype, ResourceKind, RemoteResourceManager, RegistryUniqueSrc, LocalResourceHost, ResourceHost};
+use crate::resource::{Labels, ResourceRegistration, ResourceSelector, ResourceAssign, ResourceRegistryCommand, ResourceRegistryResult, Registry, ResourceType, ResourceLocationRecord, ResourceManagerKey, ResourceBinding, ResourceAddress, ResourceRegistryAction, ResourceStub, FieldSelection, ResourceRegistryInfo, RegistryReservation, ResourceNamesReservationRequest, LocalResourceManager, ResourceManagerCore, HostedResourceStore, LocalHostedResource, ResourceManager, ResourceCreate, ResourceLocation, ResourceArchetype, ResourceKind, RemoteResourceManager, RegistryUniqueSrc, LocalResourceHost, ResourceHost};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob, Fail};
@@ -1729,7 +1729,7 @@ println!("Assignment CONFIRMED : {}",self.skel.info.kind);
 
                 Option::Some(Arc::new(LocalHostedResource {
                     unique_src: self.skel.registry.clone().ok_or(format!("this star {} does not host resources",self.skel.info.kind))?.unique_src(key.clone()).await,
-                    resource: Resource {
+                    resource: ResourceStub {
                         key:key.clone(),
                         address: ResourceAddress::nothing(),
                         archetype: ResourceArchetype {
@@ -2775,6 +2775,10 @@ impl StarManagerFactory for StarManagerFactoryDefault
     }
 }
 
+#[derive(Clone)]
+pub enum Persistence{
+    Memory
+}
 
 #[derive(Clone)]
 pub struct StarSkel
@@ -2789,7 +2793,8 @@ pub struct StarSkel
     pub auth_token_source: AuthTokenSource,
     pub registry: Option<Arc<dyn ResourceRegistryBacking>>,
     pub star_handler: Option<StarHandleBacking>,
-    pub resources: HostedResourceStore
+    pub resources: HostedResourceStore,
+    pub persistence: Persistence
 }
 
 impl StarSkel
@@ -3189,7 +3194,7 @@ pub trait ResourceRegistryBacking: Sync+Send {
     async fn accepts(&self, accept: HashSet<ResourceType> ) ->Result<(),Fail>;
     async fn reserve(&self, request: ResourceNamesReservationRequest) -> Result<RegistryReservation, Fail>;
     async fn register(&self, registration: ResourceRegistration)->Result<(),Fail>;
-    async fn select(&self, select: ResourceSelector) ->Result<Vec<Resource>,Fail>;
+    async fn select(&self, select: ResourceSelector) ->Result<Vec<ResourceStub>,Fail>;
     async fn set_location(&self, location: ResourceLocationRecord) ->Result<(),Fail>;
     async fn find(&self, keys: ResourceKey)->Result<Reply,Fail>;
     async fn bind(&self, bind: ResourceBinding)->Result<(),Fail>;
@@ -3249,7 +3254,7 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite
         Ok(())
     }
 
-    async fn select(&self, selector: ResourceSelector) ->Result<Vec<Resource>,Fail>{
+    async fn select(&self, selector: ResourceSelector) ->Result<Vec<ResourceStub>,Fail>{
         let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Select(selector));
         self.registry.send( request ).await?;
         match tokio::time::timeout( Duration::from_secs(5),rx).await??
@@ -3356,4 +3361,8 @@ pub enum StarStatus{
     Pending,
     Ready,
     Panic
+}
+
+pub trait Host {
+  async fn assign( &mut self, assign: ResourceAssign ) -> Result<(),Fail>;
 }

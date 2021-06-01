@@ -25,11 +25,12 @@ use crate::core::server::{ServerStarCore, ServerStarCoreExt, ExampleServerStarCo
 use std::marker::PhantomData;
 use crate::keys::{AppKey, ResourceKey};
 use crate::artifact::{Artifact, ArtifactKey};
-use crate::resource::{Resource, ResourceInit, ResourceSrc, ResourceAssign, ResourceSliceAssign, HostedResourceStore, HostedResource, LocalHostedResource};
+use crate::resource::{ResourceStub, ResourceInit, ResourceSrc, ResourceAssign, ResourceSliceAssign, HostedResourceStore, HostedResource, LocalHostedResource};
 use crate::message::Fail;
 
 pub mod server;
 pub mod filestore;
+pub mod space;
 
 pub struct StarCoreAction{
     pub command: StarCoreCommand,
@@ -50,7 +51,6 @@ pub enum StarCoreCommand
 {
     IsHosting(ResourceKey),
     Assign(ResourceAssign),
-    SliceAssign(ResourceSliceAssign),
     Message(ResourceMessage)
 }
 
@@ -237,23 +237,28 @@ impl StarCoreExtFactory for ExampleStarCoreExtFactory
 }
 
 
-
+#[async_trait]
+pub trait Host{
+    async fn assign(&self, assign: ResourceAssign) -> Result<(),Fail>;
+}
 
 
 
 pub struct StarCore2{
     skel: StarSkel,
     rx: mpsc::Receiver<StarCoreAction>,
-    resources: HostedResourceStore
+    resources: HostedResourceStore,
+    host: Box<dyn Host>
 }
 
 impl StarCore2{
 
-    pub async fn new(skel: StarSkel, rx: mpsc::Receiver<StarCoreAction>) -> Self {
+    pub async fn new(skel: StarSkel, rx: mpsc::Receiver<StarCoreAction>, host: Box<dyn Host>) -> Self {
         StarCore2{
             skel: skel,
             rx: rx,
-            resources: HostedResourceStore::new().await
+            resources: HostedResourceStore::new().await,
+            host: host
         }
     }
 
@@ -272,6 +277,10 @@ impl StarCore2{
                 } else{
                     Err(Fail::ResourceNotFound(key))
                 }
+            }
+            StarCoreCommand::Assign(assign) => {
+                self.host.assign(assign).await?;
+                Ok(StarCoreResult::Ok)
             }
             _ => {
                 unimplemented!()

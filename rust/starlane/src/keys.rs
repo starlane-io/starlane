@@ -14,7 +14,7 @@ use crate::id::Id;
 use crate::message::Fail;
 use crate::names::Name;
 use crate::permissions::{Priviledges, User, UserKind};
-use crate::resource::{Labels, Resource, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceKind, ResourceManagerKey, ResourceType, Skewer};
+use crate::resource::{Labels, ResourceStub, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceKind, ResourceManagerKey, ResourceType, Skewer};
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
@@ -669,9 +669,9 @@ impl ResourceKey
 
 }
 
-impl From<Vec<Resource>> for Reply
+impl From<Vec<ResourceStub>> for Reply
 {
-    fn from(resources: Vec<Resource>) -> Self {
+    fn from(resources: Vec<ResourceStub>) -> Self {
         Reply::Keys(resources.iter().map(|r|r.key.clone()).collect())
     }
 }

@@ -14,7 +14,7 @@ use crate::frame::{Event};
 use crate::id::Id;
 use crate::keys::{AppKey, ResourceKey, SubSpaceKey, UserKey};
 use crate::names::Name;
-use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceType, ResourceArchetype, ResourceInit, Resource, Names, ResourceAddress, ResourceAddressPart, Skewer, ResourceRegistryInfo};
+use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceType, ResourceArchetype, ResourceInit, ResourceStub, Names, ResourceAddress, ResourceAddressPart, Skewer, ResourceRegistryInfo};
 use crate::star::StarKey;
 use std::marker::PhantomData;
 use serde::de::DeserializeOwned;
@@ -140,10 +140,10 @@ pub struct ActorRegistration
     pub labels: Labels
 }
 
-impl From<ActorResource> for Resource
+impl From<ActorResource> for ResourceStub
 {
     fn from(actor: ActorResource) -> Self {
-        Resource{
+        ResourceStub {
             key: ResourceKey::Actor(actor.key),
             archetype: ResourceArchetype{
                 kind: ResourceKind::Actor(actor.archetype.kind),

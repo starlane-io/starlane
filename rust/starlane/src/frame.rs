@@ -18,7 +18,7 @@ use crate::logger::Flags;
 use crate::message::{Fail, MessageExpect, MessageResult, MessageUpdate, ProtoMessage};
 use crate::names::Name;
 use crate::permissions::{Authentication, AuthToken};
-use crate::resource::{Labels, ResourceAssign, ResourceRegistration, ResourceSelector, ResourceLocationRecord, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus, ResourceInit, Resource, ResourceCreate};
+use crate::resource::{Labels, ResourceAssign, ResourceRegistration, ResourceSelector, ResourceLocationRecord, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus, ResourceInit, ResourceStub, ResourceCreate};
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey, StarWatchInfo, LocalResourceLocation};
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -432,7 +432,7 @@ pub enum Reply
     Keys(Vec<ResourceKey>),
     Location(ResourceLocationRecord),
     Address(ResourceAddress),
-    Resource(Resource),
+    Resource(ResourceStub),
     Seq(u64)
 }
 
@@ -803,9 +803,9 @@ impl FromReply<(),Fail> for Reply
     }
 }
 
-impl FromReply<Vec<Resource>,Fail> for Reply
+impl FromReply<Vec<ResourceStub>,Fail> for Reply
 {
-    fn from_result(t: Result<Vec<Resource>,Fail>) -> Result<Self,Fail> {
+    fn from_result(t: Result<Vec<ResourceStub>,Fail>) -> Result<Self,Fail> {
         match t
         {
             Ok(ok) => {
@@ -818,9 +818,9 @@ impl FromReply<Vec<Resource>,Fail> for Reply
     }
 }
 
-impl FromReply<Vec<Resource>,Error> for Reply
+impl FromReply<Vec<ResourceStub>,Error> for Reply
 {
-    fn from_result(t: Result<Vec<Resource>,Error>) -> Result<Self,Fail> {
+    fn from_result(t: Result<Vec<ResourceStub>,Error>) -> Result<Self,Fail> {
         match t
         {
             Ok(ok) => {
