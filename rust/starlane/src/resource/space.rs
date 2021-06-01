@@ -1,6 +1,8 @@
 use crate::keys::{SpaceKey, ResourceKey};
-use crate::resource::{Resource, ResourceAddress, ResourceType, State, StateSrc};
+use crate::resource::{Resource, ResourceAddress, ResourceType, State, StateSrc, ResourceSrc};
 use crate::error::Error;
+use std::convert::TryFrom;
+use serde::{Serialize,Deserialize};
 
 pub struct Space{
   key: SpaceKey,
@@ -40,10 +42,10 @@ impl Resource<SpaceState> for Space{
   }
 
   fn state(&self) -> StateSrc<SpaceState> {
-        StateSrc::Memory(SpaceState{
+        StateSrc::Memory(Box::new(SpaceState{
             name: self.name.clone(),
             display: self.display.clone()
-        })
+        }))
   }
 }
 
@@ -53,7 +55,24 @@ pub struct SpaceState{
   display: String
 }
 
+
 impl SpaceState{
+
+    pub fn new( name: &str, display: &str )-> Self{
+        SpaceState{
+            name: name.to_string(),
+            display: display.to_string()
+        }
+    }
+
+    pub fn name(&self)->String{
+        self.name.clone()
+    }
+
+    pub fn display(&self)->String{
+        self.display.clone()
+    }
+
     pub fn from_bytes( bytes: &[u8] ) -> Result<Self,Error> {
         Ok(bincode::deserialize(bytes)?)
     }
@@ -64,3 +83,17 @@ impl State for SpaceState{
       Ok(bincode::serialize(&self)?)
   }
 }
+
+impl TryFrom<ResourceSrc> for StateSrc<SpaceState>{
+
+    type Error = Error;
+
+    fn try_from(src: ResourceSrc) -> Result<StateSrc<SpaceState>, Self::Error> {
+        match src{
+            ResourceSrc::AssignState(raw) => {
+                Ok(StateSrc::Memory(Box::new(SpaceState::from_bytes(raw.as_slice())?)))
+            }
+        }
+    }
+}
+

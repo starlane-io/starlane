@@ -12,7 +12,7 @@ use crate::error::Error;
 use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply, ResourceManagerAction};
 use crate::id::Id;
 use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, ResourceKey};
-use crate::resource::{Labels, Registry, ResourceSelector, ResourceRegistryResult, ResourceRegistryCommand, FieldSelection, ResourceAssign, ResourceType, ResourceRegistration, ResourceLocationRecord, ResourceAddress, LocalResourceManager, ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceInit, ResourceArchetype, ResourceKind, ResourceManager};
+use crate::resource::{Labels, Registry, ResourceSelector, ResourceRegistryResult, ResourceRegistryCommand, FieldSelection, ResourceAssign, ResourceType, ResourceRegistration, ResourceLocationRecord, ResourceAddress, LocalResourceManager, ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceInit, ResourceArchetype, ResourceKind, ResourceManager, ResourceSrc, State};
 use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage, Fail};
 use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource, SetSupervisorForApp, ResourceRegistryBacking, ResourceRegistryBackingSqLite, StarApi};
@@ -24,6 +24,7 @@ use bincode::ErrorKind;
 use tokio::time::Duration;
 use std::future::Future;
 use std::iter::FromIterator;
+use crate::resource::space::SpaceState;
 
 pub struct CentralStarVariant
 {
@@ -104,7 +105,7 @@ impl StarVariant for CentralStarVariant
             StarVariantCommand::Init => {
                 let registry = self.skel.registry.as_ref().unwrap();
                 // verify that hyper-space exists
-                let address = ResourceAddress::for_space("hyper-space" ).unwrap();
+                let address = ResourceAddress::for_space("hyperspace" ).unwrap();
 
                 let result = registry.get_key(address ).await;
                 match result {
@@ -114,44 +115,56 @@ impl StarVariant for CentralStarVariant
                     Err(err) => {
                         let mut star_api = StarApi::new(self.skel.clone());
                         let manager = star_api.get_resource_manager(ResourceKey::Nothing).await;
+
+
                         match manager {
                             Ok(manager) => {
-                                println!("Got NOTHING manager!");
-                                let create = ResourceCreate{
-                                    parent: ResourceKey::Nothing,
-                                    key: KeyCreationSrc::None,
-                                    address: AddressCreationSrc::Space("hyper-space".to_string()),
-                                    init: ResourceInit {
-                                        init: InitData::None,
-                                        archetype: ResourceArchetype {
-                                            kind: ResourceKind::Space,
-                                            specific: None,
-                                            config: None
-                                        }
-                                    },
-                                    registry_info: None,
-                                    owner: None,
-                                    location_affinity: None
-                                };
-                                let rx = manager.create(create).await;
+                                let space_state = SpaceState::new("hyperspace", "HyperSpace");
+                                let resource_src = space_state.to_bytes();
+                                match resource_src{
+                                    Ok(src_bytes) => {
+                                        let resource_src = ResourceSrc::AssignState(src_bytes);
+                                        println!("Got NOTHING manager!");
+                                        let create = ResourceCreate{
+                                            parent: ResourceKey::Nothing,
+                                            key: KeyCreationSrc::None,
+                                            address: AddressCreationSrc::Space("hyperspace".to_string()),
+                                            archetype: ResourceArchetype {
+                                                kind: ResourceKind::Space,
+                                                specific: None,
+                                                config: None
+                                            },
+                                            src: resource_src,
+                                            registry_info: None,
+                                            owner: None,
+                                            location_affinity: None
+                                        };
+                                        let rx = manager.create(create).await;
 
-                                let result = rx.await;
+                                        let result = rx.await;
 
-                                match &result {
-                                    Ok(result) => {
-                                        match result{
-                                            Ok(ok) => {
-                                                println!("Create Space WORKED!");
+                                        match &result {
+                                            Ok(result) => {
+                                                match result{
+                                                    Ok(ok) => {
+                                                        println!("Create Space WORKED!");
+                                                    }
+                                                    Err(fail) => {
+                                                        eprintln!("Create Space FAILED:{}",fail.to_string());
+                                                    }
+                                                }
                                             }
-                                            Err(fail) => {
-                                                eprintln!("Create Space FAILED:{}",fail.to_string());
+                                            Err(err) => {
+                                                eprintln!("CREATE SPACE RecvError: {}",err);
                                             }
                                         }
+
                                     }
                                     Err(err) => {
-                                        eprintln!("CREATE SPACE RecvError: {}",err);
+
+                                        println!("could not create the resourceSRc!")
                                     }
-                                }
+                                };
 
 
                             }

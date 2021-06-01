@@ -99,6 +99,20 @@ pub enum InitData
     File(File)
 }
 
+impl InitData {
+    pub fn to_bytes(self) -> Vec<u8> {
+        match self{
+            InitData::None => vec![],
+            InitData::Memory(memory) => {
+                memory.to_bytes()
+            }
+            other => {
+                unimplemented!("can't handle this InitData type yet.")
+            }
+        }
+    }
+}
+
 #[derive(Clone,Serialize,Deserialize)]
 pub struct Memory
 {
@@ -118,6 +132,10 @@ impl Memory
                data: Arc::new(data)
            })
        }
+    }
+
+    pub fn to_bytes(self) -> Vec<u8> {
+       self.data.to_vec()
     }
 }
 

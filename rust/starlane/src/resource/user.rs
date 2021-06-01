@@ -1,6 +1,7 @@
 use crate::keys::{UserKey, ResourceKey};
 use crate::resource::{State, Resource, ResourceAddress, ResourceType, StateSrc};
 use crate::error::Error;
+use serde::{Serialize,Deserialize};
 
 pub struct User{
     key: UserKey,
@@ -22,9 +23,9 @@ impl Resource<UserState> for User{
     }
 
     fn state(&self) -> StateSrc<UserState> {
-        StateSrc::Memory(UserState{
-            email: email
-        })
+        StateSrc::Memory(Box::new(UserState{
+            email: self.email.clone()
+        }))
     }
 }
 

@@ -29,6 +29,8 @@ use crate::star::{ResourceRegistryBacking, StarComm, StarCommand, StarKey, StarS
 use crate::star::pledge::{StarHandle, ResourceHostSelector};
 use crate::util::AsyncHashMap;
 use tokio::sync::oneshot::Receiver;
+use crate::resource::space::SpaceState;
+use std::convert::TryFrom;
 
 pub mod space;
 pub mod sub_space;
@@ -1694,12 +1696,12 @@ impl LocalResourceManager {
 
         let reservation = core.registry.reserve(ResourceNamesReservationRequest{
             parent: create.parent.clone(),
-            archetype: create.init.archetype.clone(),
+            archetype: create.archetype.clone(),
             info: create.registry_info } ).await?;
 
         let key = match create.key {
             KeyCreationSrc::None => {
-                ResourceKey::new(core.key.clone(), ResourceId::new(&create.init.archetype.kind.resource_type(), core.id_seq.next() ) )?
+                ResourceKey::new(core.key.clone(), ResourceId::new(&create.archetype.kind.resource_type(), core.id_seq.next() ) )?
             }
             KeyCreationSrc::Key(key) => {
                 if key.parent() != Option::Some(core.key.clone()){
@@ -1713,11 +1715,11 @@ println!("CREATED KEY: {}",key);
         let address = match create.address{
             AddressCreationSrc::None => {
                 let address = format!("{}:{}", core.address.to_string(), key.generate_address_tail()? );
-                create.init.archetype.kind.resource_type().address_structure().from_str(address.as_str())?
+                create.archetype.kind.resource_type().address_structure().from_str(address.as_str())?
             }
             AddressCreationSrc::Append(tail) => {
                 let address = format!("{}:{}", core.address.to_string(), tail );
-                create.init.archetype.kind.resource_type().address_structure().from_str(address.as_str())?
+                create.archetype.kind.resource_type().address_structure().from_str(address.as_str())?
             }
             AddressCreationSrc::Space(space_name) => {
                 if core.key.resource_type() != ResourceType::Nothing{
@@ -1730,11 +1732,12 @@ println!("CREATED KEY: {}",key);
         let assign = ResourceAssign {
             key: key.clone(),
             address: address.clone(),
-            source: ResourceSrc::Creation(create.init.clone())
+            source: create.src.clone(),
+            archetype: create.archetype.clone()
         };
 
-println!("selecting for resource kind: {}", create.init.archetype.kind.resource_type().to_string());
-        let mut host = core.selector.select(create.init.archetype.kind.resource_type(), create.location_affinity ).await?;
+println!("selecting for resource kind: {}", create.archetype.kind.resource_type().to_string());
+        let mut host = core.selector.select(create.archetype.kind.resource_type(), create.location_affinity ).await?;
 
         host.assign(assign).await?;
 
@@ -1748,7 +1751,7 @@ println!("selecting for resource kind: {}", create.init.archetype.kind.resource_
         let resource = ResourceStub {
             key: key,
             address: address,
-            archetype: create.init.archetype,
+            archetype: create.archetype,
             owner: None
         };
 
@@ -1964,7 +1967,7 @@ pub struct ResourceAddress
 impl ResourceAddress {
 
     pub fn last_to_string(&self) -> Result<String,Error> {
-        Ok(self.parts.last().ok_or("couldn't find last".into() )?.to_string())
+        Ok(self.parts.last().ok_or("couldn't find last" )?.to_string())
     }
 
 
@@ -2944,7 +2947,8 @@ pub struct ResourceCreate {
    pub parent: ResourceKey,
    pub key: KeyCreationSrc,
    pub address: AddressCreationSrc,
-   pub init: ResourceInit,
+   pub archetype: ResourceArchetype,
+   pub src: ResourceSrc,
    pub registry_info: Option<ResourceRegistryInfo>,
    pub owner: Option<UserKey>,
    pub location_affinity: Option<ResourceLocationAffinity>
@@ -2953,12 +2957,13 @@ pub struct ResourceCreate {
 
 impl ResourceCreate {
 
-    pub fn new( init: ResourceInit ) ->Self {
+    pub fn new(archetype: ResourceArchetype, src: ResourceSrc ) ->Self {
         ResourceCreate {
             parent: ResourceKey::Nothing,
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::None,
-            init: init,
+            archetype: archetype,
+            src: src,
             registry_info: Option::None,
             owner: Option::None,
             location_affinity: Option::None
@@ -2966,9 +2971,9 @@ impl ResourceCreate {
     }
 
     pub fn validate(&self)->Result<(),Fail> {
-        let resource_type = self.init.archetype.kind.resource_type();
+        let resource_type = self.archetype.kind.resource_type();
 
-        self.init.archetype.valid()?;
+        self.archetype.valid()?;
 
         if resource_type.requires_owner() && self.owner.is_none() {
             return Err(Fail::ResourceTypeRequiresOwner);
@@ -3035,9 +3040,10 @@ pub enum KeySrc{
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ResourceSrc {
-    Creation(ResourceInit),
-    //Assign(ResourceState) -- this is the mechanism that a Resource would be transfered to a new Host
+    AssignState(Vec<u8>)
 }
+
+
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub enum ResourceSliceStatus {
@@ -3110,7 +3116,8 @@ impl ResourceStub {
 pub struct ResourceAssign{
     pub key: ResourceKey,
     pub address: ResourceAddress,
-    pub source: ResourceSrc
+    pub source: ResourceSrc,
+    pub archetype: ResourceArchetype
 }
 
 impl ResourceAssign {
@@ -3119,9 +3126,7 @@ impl ResourceAssign {
     }
 
     pub fn archetype(&self) -> ResourceArchetype {
-        match &self.source{
-            ResourceSrc::Creation(profile) => profile.archetype.clone()
-        }
+        self.archetype.clone()
     }
 }
 
@@ -3215,20 +3220,30 @@ pub trait Resource<S:State> : Send+Sync {
 }
 
 pub trait State : Send+Sync+Clone {
-
     fn to_bytes(self) ->Result<Vec<u8>,Error>;
 }
 
 pub enum StateSrc<S> where S: State {
-    Memory(S)
+    Memory(Box<S>)
 }
 
 impl <S> StateSrc<S> where S: State {
     pub fn to_data(self)->Result<Vec<u8>,Error>{
         match self{
-            StateSrc::Memory(data) => Ok(data)
+            StateSrc::Memory(data) => Ok(data.to_bytes()?)
+        }
+    }
+
+    pub fn to_state(self)->Result<Box<S>,Error> {
+        match self{
+            StateSrc::Memory(state) => {
+                Ok(state)
+            }
         }
     }
 }
+
+
+
 
 

@@ -1,6 +1,7 @@
 use crate::keys::{SubSpaceKey, ResourceKey};
 use crate::resource::{ResourceAddress, Resource, ResourceType, StateSrc, State};
 use crate::error::Error;
+use serde::{Serialize,Deserialize};
 
 pub struct SubSpace{
     key: SubSpaceKey,
@@ -39,10 +40,10 @@ impl Resource<SubSpaceState> for SubSpace{
     }
 
     fn state(&self) -> StateSrc<SubSpaceState> {
-        StateSrc::Memory(SubSpaceState{
+        StateSrc::Memory(Box::new(SubSpaceState{
             name: self.name.clone(),
             display: self.display.clone()
-        })
+        }))
     }
 }
 

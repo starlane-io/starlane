@@ -1,10 +1,26 @@
-use crate::resource::{ResourceAssign, ResourceType, Names};
-use rusqlite::{Connection, Transaction};
+use crate::resource::{ResourceAssign, ResourceType, Names, StateSrc};
+use rusqlite::{Connection, Transaction,params};
 use tokio::sync::{mpsc, oneshot};
 use std::collections::HashSet;
 use crate::error::Error;
 use crate::message::Fail;
 use std::iter::FromIterator;
+use std::convert::TryInto;
+use crate::resource::space::SpaceState;
+use serde::{Deserialize, Serialize};
+use crate::frame::ResourceHostAction;
+use crate::core::Host;
+
+pub struct StarHost{
+
+}
+
+#[async_trait]
+impl Host for StarHost{
+    async fn assign(&self, assign: ResourceAssign) -> Result<(), Fail> {
+        todo!()
+    }
+}
 
 pub struct SpaceHostAction {
 
@@ -65,7 +81,7 @@ impl SpaceHostSqLite {
         };
 
         while let Option::Some(request) = self.rx.recv().await {
-            if let SpaceHostSqLiteCommand::Close = request.command
+            if let ResourceHostCommand::Close = request.command
             {
                 request.tx.send(Ok(ResourceHostResult::Ok) );
                 break;
@@ -88,10 +104,22 @@ impl SpaceHostSqLite {
 
                 match assign.key.resource_type(){
                     ResourceType::Space => {
+                        let trans = self.conn.transaction()?;
+                        let space_key = assign.key.space()?;
+                        let id = space_key.id();
+                        let state_src :StateSrc<SpaceState> = assign.source.try_into()?;
+                        let state = state_src.to_state()?;
+                        let name = state.name();
+                        let display = state.display();
+                        trans.execute("INSERT INTO spaces (id,name,display) VALUES (?1,?2,?3)", params![id,name,display])?;
 
+                        trans.commit()?;
+                        Ok(ResourceHostResult::Ok)
                     }
-                    ResourceType::SubSpace => {}
+/*                    ResourceType::SubSpace => {}
                     ResourceType::User => {}
+
+ */
                     resource_type => {
 
                         Err(Fail::WrongResourceType { expected: HashSet::from_iter(vec![ResourceType::Space,ResourceType::SubSpace,ResourceType::User]), received: resource_type })

@@ -3363,6 +3363,3 @@ pub enum StarStatus{
     Panic
 }
 
-pub trait Host {
-  async fn assign( &mut self, assign: ResourceAssign ) -> Result<(),Fail>;
-}

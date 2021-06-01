@@ -27,6 +27,7 @@ use crate::keys::{AppKey, ResourceKey};
 use crate::artifact::{Artifact, ArtifactKey};
 use crate::resource::{ResourceStub, ResourceInit, ResourceSrc, ResourceAssign, ResourceSliceAssign, HostedResourceStore, HostedResource, LocalHostedResource};
 use crate::message::Fail;
+use crate::core::space::StarHost;
 
 pub mod server;
 pub mod filestore;
@@ -171,7 +172,7 @@ impl StarCoreFactory
 
     pub async fn create(&self, skel: StarSkel, ext: StarCoreExtKind, core_rx: mpsc::Receiver<StarCoreAction> ) -> StarCore2
     {
-        StarCore2::new(skel, core_rx).await
+        StarCore2::new(skel, core_rx, Box::new(StarHost{})).await
 /*        match skel.info.kind
         {
             StarKind::ActorHost => {
@@ -238,7 +239,7 @@ impl StarCoreExtFactory for ExampleStarCoreExtFactory
 
 
 #[async_trait]
-pub trait Host{
+pub trait Host: Send+Sync{
     async fn assign(&self, assign: ResourceAssign) -> Result<(),Fail>;
 }
 
