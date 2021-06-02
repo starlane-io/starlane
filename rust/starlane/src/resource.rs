@@ -30,7 +30,7 @@ use crate::star::pledge::{StarHandle, ResourceHostSelector};
 use crate::util::AsyncHashMap;
 use tokio::sync::oneshot::Receiver;
 use crate::resource::space::SpaceState;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 pub mod space;
 pub mod sub_space;
@@ -40,40 +40,40 @@ lazy_static!
 {
     pub static ref NOTHING_STRUCT :ResourceAddressStructure = ResourceAddressStructure::new( vec![], ResourceType::Nothing );
 
-    pub static ref SPACE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::Skewer)], ResourceType::Space );
-    pub static ref SUB_SPACE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::Skewer),
-                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::Skewer)], ResourceType::SubSpace );
+    pub static ref SPACE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase)], ResourceType::Space );
+    pub static ref SUB_SPACE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
+                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::SkewerCase)], ResourceType::SubSpace );
 
-     pub static ref APP_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new(      vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::Skewer),
-                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::Skewer),
-                                                                                                           ResourceAddressPartStruct::new("app",ResourceAddressPartKind::Skewer)], ResourceType::App );
+     pub static ref APP_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new(      vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
+                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::SkewerCase),
+                                                                                                           ResourceAddressPartStruct::new("app",ResourceAddressPartKind::SkewerCase)], ResourceType::App );
 
-     pub static ref ACTOR_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new(    vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::Skewer),
-                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::Skewer),
-                                                                                                           ResourceAddressPartStruct::new("app",ResourceAddressPartKind::Skewer),
-                                                                                                           ResourceAddressPartStruct::new("actor",ResourceAddressPartKind::Skewer)], ResourceType::Actor );
+     pub static ref ACTOR_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new(    vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
+                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::SkewerCase),
+                                                                                                           ResourceAddressPartStruct::new("app",ResourceAddressPartKind::SkewerCase),
+                                                                                                           ResourceAddressPartStruct::new("actor",ResourceAddressPartKind::SkewerCase)], ResourceType::Actor );
 
-     pub static ref USER_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new(     vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::Skewer),
-                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::Skewer),
-                                                                                                           ResourceAddressPartStruct::new("user",ResourceAddressPartKind::Skewer)], ResourceType::User );
+     pub static ref USER_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new(     vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
+                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::SkewerCase),
+                                                                                                           ResourceAddressPartStruct::new("user",ResourceAddressPartKind::Email)], ResourceType::User );
 
 
-     pub static ref FILE_SYSTEM_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::Skewer),
-                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::Skewer),
+     pub static ref FILE_SYSTEM_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
+                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::SkewerCase),
                                                                                                            ResourceAddressPartStruct::new("app",ResourceAddressPartKind::WildcardOrSkewer),
-                                                                                                           ResourceAddressPartStruct::new("file-system",ResourceAddressPartKind::Skewer)], ResourceType::FileSystem );
+                                                                                                           ResourceAddressPartStruct::new("file-system",ResourceAddressPartKind::SkewerCase)], ResourceType::FileSystem );
 
 
-     pub static ref FILE_ADDRESS_STRUCT:ResourceAddressStructure =      ResourceAddressStructure::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::Skewer),
-                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::Skewer),
+     pub static ref FILE_ADDRESS_STRUCT:ResourceAddressStructure =      ResourceAddressStructure::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
+                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::SkewerCase),
                                                                                                            ResourceAddressPartStruct::new("app",ResourceAddressPartKind::WildcardOrSkewer),
-                                                                                                           ResourceAddressPartStruct::new("file-system",ResourceAddressPartKind::Skewer),
+                                                                                                           ResourceAddressPartStruct::new("file-system",ResourceAddressPartKind::SkewerCase),
                                                                                                            ResourceAddressPartStruct::new("path",ResourceAddressPartKind::Path)], ResourceType::File );
 
 
-     pub static ref ARTIFACT_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure ::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::Skewer),
-                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::Skewer),
-                                                                                                           ResourceAddressPartStruct::new("bundle",ResourceAddressPartKind::Skewer),
+     pub static ref ARTIFACT_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure ::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
+                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::SkewerCase),
+                                                                                                           ResourceAddressPartStruct::new("bundle",ResourceAddressPartKind::SkewerCase),
                                                                                                            ResourceAddressPartStruct::new("version",ResourceAddressPartKind::Version),
                                                                                                            ResourceAddressPartStruct::new("path",ResourceAddressPartKind::Path)], ResourceType::Artifact );
 
@@ -397,6 +397,7 @@ type Blob = Vec<u8>;
 
 struct RegistryParams {
    key: Option<Blob>,
+   address: Option<String>,
    resource_type: String,
    kind: String,
    specific: Option<String>,
@@ -409,14 +410,14 @@ struct RegistryParams {
 
 impl RegistryParams {
     pub fn from_registration(registration: ResourceRegistration) -> Result<Self, Error> {
-        Self::new( registration.resource.archetype, registration.resource.key.parent().ok_or("cannot register the parent of a nothing ResourceType::Nothing")?, Option::Some(registration.resource.key), registration.resource.owner)
+        Self::new( registration.resource.archetype, registration.resource.key.parent().ok_or("cannot register the parent of a nothing ResourceType::Nothing")?, Option::Some(registration.resource.key), registration.resource.owner, Option::Some(registration.resource.address.to_string()))
     }
 
     pub fn from_archetype(archetype: ResourceArchetype, parent: ResourceKey ) -> Result<Self, Error> {
-        Self::new( archetype, parent, Option::None, Option::None )
+        Self::new( archetype, parent, Option::None, Option::None, Option::None )
     }
 
-    pub fn new(archetype: ResourceArchetype, parent: ResourceKey,  key: Option<ResourceKey>, owner: Option<UserKey>) -> Result<Self, Error> {
+    pub fn new(archetype: ResourceArchetype, parent: ResourceKey,  key: Option<ResourceKey>, owner: Option<UserKey>, address: Option<String>) -> Result<Self, Error> {
         let key = if let Option::Some(key) = key
         {
             Option::Some(key.bin()?)
@@ -486,7 +487,8 @@ impl RegistryParams {
                 sub_space: sub_space,
                 config: config,
                 app: app,
-                owner: owner
+                owner: owner,
+                address: address
             })
 
         }
@@ -601,19 +603,26 @@ eprintln!("error setting up db: {}", err );
                     trans.execute("DELETE FROM labels WHERE labels.resource_key=?1", [params.key.clone()]);
                     trans.execute("DELETE FROM resources WHERE key=?1", [params.key.clone()])?;
                 }
+                trans.execute("DELETE addresses WHERE key=?1 OR address=?2)", params![params.key.clone(),params.address.clone()])?;
+
+
+                trans.execute("INSERT INTO addresses (key,address) VALUES (?1,?2)", params![params.key.clone(),params.address.clone()])?;
+
+
+println!("BIND: INSERT INTO addresses (key,address) VALUES ({},{})",ResourceKey::from_bin(params.key.clone().unwrap()).unwrap(),params.address.clone().unwrap());
 
                 trans.execute("INSERT INTO resources (key,resource_type,kind,specific,space,sub_space,owner,app,config) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)", params![params.key,params.resource_type,params.kind,params.specific,params.space,params.sub_space,params.owner,params.app,params.config])?;
-                if !registration.info.names.is_empty() {
-                    for name in registration.info.names
+                if let Option::Some(info) = registration.info {
+                    for name in info.names
                     {
                         trans.execute("UPDATE names SET key=?1 WHERE name=?1", [name] )?;
                     }
+                    for (name, value) in info.labels
+                    {
+                        trans.execute("INSERT INTO labels (resource_key,name,value) VALUES (?1,?2,?3)", params![params.key,name, value])?;
+                    }
                 }
 
-                for (name, value) in registration.info.labels
-                {
-                    trans.execute("INSERT INTO labels (resource_key,name,value) VALUES (?1,?2,?3)", params![params.key,name, value])?;
-                }
 
                 trans.commit()?;
                 Ok(ResourceRegistryResult::Ok)
@@ -822,6 +831,7 @@ eprintln!("error setting up db: {}", err );
                 let mut trans = self.conn.transaction()?;
                 trans.execute("DELETE addresses WHERE key=?1 OR address=?2)", params![key,address])?;
                 trans.execute("INSERT INTO addresses (key,address) VALUES (?1,?2)", params![key,address])?;
+println!("BIND: INSERT INTO addresses (key,address) VALUES ({},{})",bind.key.to_string(),address);
                 trans.commit()?;
                 Ok(ResourceRegistryResult::Ok)
             }
@@ -870,17 +880,20 @@ eprintln!("error setting up db: {}", err );
             ResourceRegistryCommand::Reserve(request) => {
                 let trans = self.conn.transaction()?;
                 trans.execute("DELETE FROM names WHERE key IS NULL AND datetime(reservation_timestamp) < datetime('now')", [] )?;
-                let params = RegistryParams::new(request.archetype.clone(),request.parent.clone(),Option::None, Option::None)?;
+                let params = RegistryParams::new(request.archetype.clone(),request.parent.clone(),Option::None, Option::None, Option::None)?;
                 if request.info.is_some() {
-                    let params = RegistryParams::from_archetype(request.archetype, request.parent)?;
-                    Self::process_names(&trans, &request.info.unwrap().names, &params)?;
+                    let params = RegistryParams::from_archetype(request.archetype.clone(), request.parent.clone())?;
+                    Self::process_names(&trans, &request.info.as_ref().cloned().unwrap().names, &params)?;
                 }
                 trans.commit()?;
                 let (tx,rx) = oneshot::channel();
                 let reservation = RegistryReservation::new(tx);
+                let action_tx = self.tx.clone();
+                let info = request.info.clone();
                 tokio::spawn( async move {
 
                     if let Result::Ok( resource ) = rx.await {
+println!("RESERVATION COMMIT Ok") ;
                         let mut params = params;
                         let key = match resource.key.bin(){
                             Ok(key) => {
@@ -888,7 +901,17 @@ eprintln!("error setting up db: {}", err );
                             }
                             Err(_) => Option::None
                         };
-                        params.key = key
+                        params.key = key;
+                        params.address = Option::Some(resource.address.to_string());
+                        let registration = ResourceRegistration::new(resource.clone(), info );
+                        let (action,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Commit(registration));
+                        action_tx.send( action );
+                        rx.await;
+                        //send(resource);
+//                        request.
+                    }
+                    else{
+println!("RESERVATION DID NOT COMMIT") ;
                     }
                 } );
                 Ok(ResourceRegistryResult::Reservation(reservation))
@@ -1739,7 +1762,9 @@ println!("CREATED KEY: {}",key);
 println!("selecting for resource kind: {}", create.archetype.kind.resource_type().to_string());
         let mut host = core.selector.select(create.archetype.kind.resource_type(), create.location_affinity ).await?;
 
+println!(".. about .. to .. assign .." );
         host.assign(assign).await?;
+println!("........assigned...." );
 
         let location_record = ResourceLocationRecord{
             key: key.clone(),
@@ -1755,8 +1780,10 @@ println!("selecting for resource kind: {}", create.archetype.kind.resource_type(
             owner: None
         };
 
-        reservation.commit( resource.clone() );
+//panic!("About to commit reservation.");
+        reservation.commit( resource.clone() )?;
 
+println!("returning resource record..." );
         Ok(location_record)
     }
 }
@@ -1894,7 +1921,7 @@ impl UniqueSrc for RegistryUniqueSrc{
 pub struct ResourceRegistration
 {
     pub resource: ResourceStub,
-    pub info: ResourceRegistryInfo
+    pub info: Option<ResourceRegistryInfo>
 }
 
 
@@ -1902,7 +1929,7 @@ pub struct ResourceRegistration
 
 impl ResourceRegistration
 {
-    pub fn new(resource: ResourceStub, info: ResourceRegistryInfo ) ->Self
+    pub fn new(resource: ResourceStub, info: Option<ResourceRegistryInfo> ) ->Self
     {
         ResourceRegistration{
             resource: resource,
@@ -1970,6 +1997,39 @@ impl ResourceAddress {
         Ok(self.parts.last().ok_or("couldn't find last" )?.to_string())
     }
 
+    pub fn parent(&self) -> Option<ResourceAddress>{
+        match &self.resource_type{
+            ResourceType::Nothing => Option::None,
+            ResourceType::Space => Option::None,
+            parent => {
+                let mut parts = self.parts.clone();
+                parts.remove( self.parts.len() -1 );
+                Option::Some(ResourceAddress{
+                    resource_type: parent.clone(),
+                    parts: parts
+                })
+            }
+        }
+    }
+
+    pub fn parent_resource_type(&self) -> ResourceType {
+        match self.resource_type{
+            ResourceType::Nothing => ResourceType::Nothing,
+            ResourceType::Space => ResourceType::Nothing,
+            ResourceType::SubSpace => ResourceType::Space,
+            ResourceType::App => ResourceType::SubSpace,
+            ResourceType::Actor => ResourceType::App,
+            ResourceType::User => ResourceType::Space,
+            ResourceType::FileSystem => {
+                match self.parts.last().unwrap().is_wildcard(){
+                    true => ResourceType::App,
+                    false => ResourceType::SubSpace
+                }
+            }
+            ResourceType::File => ResourceType::FileSystem,
+            ResourceType::Artifact => ResourceType::Artifact
+        }
+    }
 
     pub fn nothing() -> ResourceAddress{
        ResourceAddress{
@@ -2023,10 +2083,10 @@ impl ResourceAddress {
                     // do nothing
                 }
                 ResourceKey::Space(space) => {
-                    parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("space-{}",space.id()).as_str())?));
+                    parts.push(ResourceAddressPart::SkewerCase(SkewerCase::new(format!("space-{}", space.id()).as_str())?));
                 }
                 ResourceKey::SubSpace(sub_space) => {
-                    parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("sub-{}",sub_space.id).as_str())?));
+                    parts.push(ResourceAddressPart::SkewerCase(SkewerCase::new(format!("sub-{}", sub_space.id).as_str())?));
                 }
                 ResourceKey::App(app) => {
                     parts.push(app.address_part()?);
@@ -2035,21 +2095,21 @@ impl ResourceAddress {
                     parts.push(actor.address_part()?);
                 }
                 ResourceKey::User(user) => {
-                    parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("user-{}",user.id).as_str())?));
+                    parts.push(ResourceAddressPart::SkewerCase(SkewerCase::new(format!("user-{}", user.id).as_str())?));
                 }
                 ResourceKey::Artifact(artifact) => {
-                    parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("artifact-{}",artifact.id).as_str())?));
+                    parts.push(ResourceAddressPart::SkewerCase(SkewerCase::new(format!("artifact-{}", artifact.id).as_str())?));
                 }
                 ResourceKey::File(file) => {
-                    parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("file-{}",file.id).as_str())?));
+                    parts.push(ResourceAddressPart::SkewerCase(SkewerCase::new(format!("file-{}", file.id).as_str())?));
                 }
                 ResourceKey::FileSystem(filesystem) => {
                     match filesystem {
                         FileSystemKey::App(app) => {
-                            parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("filesystem-{}",app.id).as_str())?));
+                            parts.push(ResourceAddressPart::SkewerCase(SkewerCase::new(format!("filesystem-{}", app.id).as_str())?));
                         }
                         FileSystemKey::SubSpace(sub_space) => {
-                            parts.push(ResourceAddressPart::Skewer(Skewer::new(format!("filesystem-{}",sub_space.id).as_str())?));
+                            parts.push(ResourceAddressPart::SkewerCase(SkewerCase::new(format!("filesystem-{}", sub_space.id).as_str())?));
                             parts.push( ResourceAddressPart::Wildcard );
                         }
                     }
@@ -2165,7 +2225,7 @@ impl ResourceAddressStructure
     }
 
 
-    pub fn new( parts: Vec<ResourceAddressPartStruct>, resource_type: ResourceType ) -> Self {
+    pub fn new( parts: Vec<ResourceAddressPartStruct>, resource_type: ResourceType) -> Self {
         ResourceAddressStructure{
             parts: parts,
             resource_type: resource_type
@@ -2246,7 +2306,8 @@ impl ResourceAddressPartStruct
 pub enum ResourceAddressPartKind
 {
     Wildcard,
-    Skewer,
+    SkewerCase,
+    Email,
     Version,
     WildcardOrSkewer,
     Path,
@@ -2257,11 +2318,12 @@ impl ToString for ResourceAddressPartKind {
     fn to_string(&self) -> String {
         match self {
             ResourceAddressPartKind::Wildcard => "Wildcard".to_string(),
-            ResourceAddressPartKind::Skewer => "Skewer".to_string(),
+            ResourceAddressPartKind::SkewerCase => "Skewer".to_string(),
             ResourceAddressPartKind::Version => "Version".to_string(),
             ResourceAddressPartKind::WildcardOrSkewer => "WildcardOrSkewer".to_string(),
             ResourceAddressPartKind::Path => "Path".to_string(),
-            ResourceAddressPartKind::Base64Encoded => "Base64Encoded".to_string()
+            ResourceAddressPartKind::Base64Encoded => "Base64Encoded".to_string(),
+            ResourceAddressPartKind::Email=> "Email".to_string()
         }
     }
 }
@@ -2275,8 +2337,8 @@ impl ResourceAddressPartKind
             ResourceAddressPart::Wildcard => {
                 *self == Self::Wildcard || *self == Self::WildcardOrSkewer
             }
-            ResourceAddressPart::Skewer(_) => {
-                *self == Self::Skewer || *self == Self::WildcardOrSkewer
+            ResourceAddressPart::SkewerCase(_) => {
+                *self == Self::SkewerCase || *self == Self::WildcardOrSkewer
             }
             ResourceAddressPart::Path(_) => {
                 *self == Self::Path
@@ -2286,6 +2348,9 @@ impl ResourceAddressPartKind
             }
             ResourceAddressPart::Base64Encoded(_) => {
                 *self == Self::Base64Encoded
+            }
+            ResourceAddressPart::Email(_) => {
+                *self == Self::Email
             }
         }
     }
@@ -2301,8 +2366,9 @@ impl ResourceAddressPartKind
                     Err("expected wildcard".into())
                 }
             }
-            ResourceAddressPartKind::Skewer => {
-                Ok(ResourceAddressPart::Skewer(Skewer::from_str(s)?))
+            ResourceAddressPartKind::SkewerCase => {
+                Ok(ResourceAddressPart::SkewerCase(SkewerCase::from_str(s)?))
+
             }
             ResourceAddressPartKind::WildcardOrSkewer => {
                 if s == "*" {
@@ -2310,7 +2376,7 @@ impl ResourceAddressPartKind
                 }
                 else
                 {
-                    Ok(ResourceAddressPart::Skewer(Skewer::from_str(s)?))
+                    Ok(ResourceAddressPart::SkewerCase(SkewerCase::from_str(s)?))
                 }
             }
             ResourceAddressPartKind::Path => {
@@ -2322,6 +2388,10 @@ impl ResourceAddressPartKind
             ResourceAddressPartKind::Base64Encoded => {
                 Ok(ResourceAddressPart::Base64Encoded(Base64Encoded::encoded(s.to_string())?))
             }
+            ResourceAddressPartKind::Email => {
+                validate::rules::email().validate(s)?;
+                Ok(ResourceAddressPart::Email(s.to_string().trim().to_lowercase()))
+            }
         }
     }
 }
@@ -2332,22 +2402,33 @@ impl ResourceAddressPartKind
 pub enum ResourceAddressPart
 {
     Wildcard,
-    Skewer(Skewer),
+    SkewerCase(SkewerCase),
     Base64Encoded(Base64Encoded),
     Path(Path),
-    Version(Version)
+    Version(Version),
+    Email(String)
 }
 
 impl ToString for ResourceAddressPart {
     fn to_string(&self) -> String {
         match self {
             ResourceAddressPart::Wildcard => "*".to_string(),
-            ResourceAddressPart::Skewer(skewer) => skewer.to_string(),
+            ResourceAddressPart::SkewerCase(skewer) => skewer.to_string(),
             ResourceAddressPart::Base64Encoded(base64) => base64.encoded.clone(),
             ResourceAddressPart::Path(path) => path.to_string(),
-            ResourceAddressPart::Version(version) => version.to_string()
+            ResourceAddressPart::Version(version) => version.to_string(),
+            ResourceAddressPart::Email(email) => email.to_string()
         }
     }
+}
+
+impl ResourceAddressPart {
+   pub fn is_wildcard(&self)->bool {
+       match self {
+           ResourceAddressPart::Wildcard => true,
+           _ => false
+       }
+   }
 }
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
@@ -2385,12 +2466,12 @@ impl Base64Encoded {
 }
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
-pub struct Skewer
+pub struct SkewerCase
 {
     string: String
 }
 
-impl Skewer
+impl SkewerCase
 {
     pub fn new( string: &str ) -> Result<Self,Error> {
         if string.is_empty() {
@@ -2402,23 +2483,23 @@ impl Skewer
                 return Err("must be lowercase, use only alphanumeric characters & dashes".into());
             }
         }
-        Ok(Skewer{
+        Ok(SkewerCase {
             string: string.to_string()
         })
     }
 }
 
-impl ToString for Skewer {
+impl ToString for SkewerCase {
     fn to_string(&self) -> String {
         self.string.clone()
     }
 }
 
-impl FromStr for Skewer {
+impl FromStr for SkewerCase {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Skewer::new(s )?)
+        Ok(SkewerCase::new(s )?)
     }
 }
 
@@ -2448,7 +2529,7 @@ mod test
     use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
     use crate::names::{Name, Specific};
     use crate::permissions::Authentication;
-    use crate::resource::{FieldSelection, Labels, LabelSelection, Names, Registry, ResourceStub, ResourceAddress, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceKind, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceType, ResourceSelector, Skewer};
+    use crate::resource::{FieldSelection, Labels, LabelSelection, Names, Registry, ResourceStub, ResourceAddress, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceKind, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceType, ResourceSelector, SkewerCase};
     use crate::resource::FieldSelection::SubSpace;
     use crate::resource::ResourceRegistryResult::Resources;
     use crate::space::CreateAppControllerFail;
@@ -2481,10 +2562,10 @@ mod test
 
         let save = ResourceRegistration{
             resource: resource,
-            info: ResourceRegistryInfo {
+            info: Option::Some(ResourceRegistryInfo {
                 labels: labels,
                 names: names,
-            }
+            })
         };
         save
     }
@@ -2504,10 +2585,10 @@ mod test
 
         let save = ResourceRegistration{
             resource: resource,
-            info: ResourceRegistryInfo {
+            info: Option::Some(ResourceRegistryInfo {
                 labels: Labels::new(),
                 names: Names::new(),
-            }
+            })
         };
 
         save
@@ -2582,7 +2663,7 @@ mod test
         for index in 1..11
         {
             let actor_key = ResourceKey::Actor(ActorKey::new(app.clone(), Id::new(0, index)));
-            let address = ResourceAddress::from_parent( &ResourceType::Actor, Option::Some(&app_address), ResourceAddressPart::Skewer(Skewer::new(actor_key.encode().unwrap().as_str() ).unwrap())).unwrap();
+            let address = ResourceAddress::from_parent( &ResourceType::Actor, Option::Some(&app_address), ResourceAddressPart::SkewerCase(SkewerCase::new(actor_key.encode().unwrap().as_str() ).unwrap())).unwrap();
 
             let save = create_with_key(actor_key,address, ResourceKind::Actor(ActorKind::Single),specific.clone(),sub_space.clone(),owner.clone());
             let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Commit(save));
@@ -2599,7 +2680,7 @@ mod test
         {
             let space= space_resource.key.space().unwrap_or(SpaceKey::hyper_space());
             let sub_space = SubSpaceKey::new(space.clone(), index as _ );
-            let address_part = ResourceAddressPart::Skewer(Skewer::new(format!("sub-space-{}", index).as_str()).unwrap());
+            let address_part = ResourceAddressPart::SkewerCase(SkewerCase::new(format!("sub-space-{}", index).as_str()).unwrap());
             let address = ResourceAddress::from_parent(&ResourceType::SubSpace, Option::Some(&space_resource.address.clone()), address_part.clone()).unwrap();
 
             let resource= ResourceStub {
@@ -3198,7 +3279,7 @@ impl ResourceHost for RemoteResourceHost {
 
         match tokio::time::timeout( Duration::from_secs(5), reply).await{
             Ok(result) => {
-                if let Result::Ok( StarMessagePayload::Reply(SimpleReply::Ok(Reply::Resource(resource)))) = result{
+                if let Result::Ok( StarMessagePayload::Reply(SimpleReply::Ok(_))) = result{
                     Ok(())
                 } else {
                     Err(Fail::Unexpected)

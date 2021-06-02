@@ -14,7 +14,7 @@ use crate::id::Id;
 use crate::message::Fail;
 use crate::names::Name;
 use crate::permissions::{Priviledges, User, UserKind};
-use crate::resource::{Labels, ResourceStub, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceKind, ResourceManagerKey, ResourceType, Skewer};
+use crate::resource::{Labels, ResourceStub, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceKind, ResourceManagerKey, ResourceType, SkewerCase};
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
@@ -199,7 +199,7 @@ pub struct AppKey
 
 impl AppKey {
     pub fn address_part(&self) -> Result<ResourceAddressPart,Error>{
-        Ok(ResourceAddressPart::Skewer(Skewer::new(self.id.to_string().as_str() )?))
+        Ok(ResourceAddressPart::SkewerCase(SkewerCase::new(self.id.to_string().as_str() )?))
     }
 }
 
@@ -436,6 +436,36 @@ impl ResourceKey
                     FileSystemKey::SubSpace(sub_space) => sub_space.sub_space.space.clone(),
                 })
             }
+        }
+    }
+
+/*    pub fn sub_space(&self)->Result<SubSpaceKey,Fail> {
+        match self{
+            ResourceKey::SubSpace(sub_space) => Ok(sub_space.clone()),
+            ResourceKey::App(app) => Ok(app.sub_space.clone()),
+            ResourceKey::Actor(actor) => Ok(actor.app.sub_space.clone()),
+            ResourceKey::Artifact(artifact) => Ok(artifact.sub_space.clone()),
+            ResourceKey::File(file) => Ok(match &file.filesystem{
+                FileSystemKey::App(app) => app.app.sub_space.clone(),
+                FileSystemKey::SubSpace(sub_space) => sub_space.sub_space.clone(),
+            }),
+            ResourceKey::FileSystem(filesystem) => {
+                Ok(match filesystem{
+                    FileSystemKey::App(app) => app.app.sub_space.clone(),
+                    FileSystemKey::SubSpace(sub_space) => sub_space.sub_space.clone(),
+                })
+            }
+            received => Err(Fail::WrongResourceType { expected: HashSet::from_iter(vec![ResourceType::SubSpace,ResourceType::App,ResourceType::Artifact,ResourceType::File,ResourceType::FileSystem] ), received: received.resource_type().clone() }),
+        }
+    }
+
+ */
+
+
+    pub fn user(&self)->Result<UserKey,Fail> {
+        match self{
+            ResourceKey::User(user) => Ok(user.clone()),
+            received => Err(Fail::WrongResourceType { expected: HashSet::from_iter(vec![ResourceType::User] ), received: received.resource_type().clone() }),
         }
     }
 

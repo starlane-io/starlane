@@ -61,6 +61,16 @@ pub enum StarCoreResult{
     MessageReply(ResourceMessagePayload)
 }
 
+impl ToString for StarCoreResult{
+    fn to_string(&self) -> String {
+        match self{
+            StarCoreResult::Ok => "Ok".to_string(),
+            StarCoreResult::LocalLocation(_) => "LocalLocation".to_string(),
+            StarCoreResult::MessageReply(_) => "MessageReply".to_string()
+        }
+    }
+}
+
 
 
 pub struct StarCoreAppCommand
@@ -265,7 +275,9 @@ impl StarCore2{
 
     pub async fn run(mut self){
         while let Option::Some(action) = self.rx.recv().await{
-            action.tx.send( self.process(action.command).await);
+            if action.tx.send( self.process(action.command).await).is_err() {
+                println!("Warning: Core sent response but got error.");
+            }
         }
     }
 

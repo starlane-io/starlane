@@ -695,7 +695,7 @@ impl fmt::Display for StarMessagePayload{
             StarMessagePayload::None => "None".to_string(),
             StarMessagePayload::Space(_) => "Space".to_string(),
             StarMessagePayload::Reply(_) => "Reply".to_string(),
-            StarMessagePayload::ResourceManager(_) => "Resource".to_string(),
+            StarMessagePayload::ResourceManager(_) => "ResourceManager".to_string(),
             StarMessagePayload::ResourceHost(_) => "ResourceHost".to_string()
         };
         write!(f, "{}",r)

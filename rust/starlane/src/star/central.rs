@@ -25,6 +25,8 @@ use tokio::time::Duration;
 use std::future::Future;
 use std::iter::FromIterator;
 use crate::resource::space::SpaceState;
+use crate::resource::user::UserState;
+use crate::message::Fail::ResourceCannotGenerateAddress;
 
 pub struct CentralStarVariant
 {
@@ -119,15 +121,13 @@ println!("Central: CALLING ENSURE!");
 impl CentralStarVariant{
 
     async fn ensure(&self){
-        if self.ensure_hyperspace().await.is_err(){
-            panic!("could not ensure hyperspace exists!")
-        }
+        self.ensure_hyperspace().await.unwrap();
+        self.ensure_user(&ResourceAddress::for_space("hyperspace").unwrap(),"hyperuser@starlane.io").await.unwrap();
+
     }
 
     async fn ensure_hyperspace(&self)->Result<(),Error>{
-
 println!("ENSURING HYPERSPACE!");
-
 
         let registry = self.skel.clone().registry.ok_or("registry not set!")?.clone();
         // verify that hyper-space exists
@@ -183,6 +183,75 @@ println!("ENSURING HYPERSPACE!");
             }
             Err(err) => {
                 eprintln!("CREATE SPACE RecvError: {}",err);
+            }
+        }
+
+        Ok(())
+    }
+
+
+    async fn ensure_user(&self, space_address: &ResourceAddress, email: &str ) ->Result<(),Error>{
+        println!("ENSURING user {}",email);
+
+        let space_key = StarApi::new(self.skel.clone()).fetch_resource_key( space_address.clone() ).await?;
+
+        println!("Got space key: {}", space_key );
+
+
+        let registry = self.skel.clone().registry.ok_or("registry not set!")?.clone();
+        // verify that user exists
+        let address = ResourceAddress::for_user(email).unwrap();
+
+        let result = registry.get_key(address).await;
+        if result.is_ok(){
+            // user exists, nothing else need be done
+            return Ok(());
+        }
+
+        let mut star_api = StarApi::new(self.skel.clone());
+        let manager = star_api.get_resource_manager(ResourceKey::Nothing).await?;
+
+        let user_state = UserState::new(email.to_string() );
+        let user_state_bytes = user_state.to_bytes()?;
+        let resource_src = ResourceSrc::AssignState(user_state_bytes);
+        let create = ResourceCreate{
+            parent: space_key,
+            key: KeyCreationSrc::None,
+            address: AddressCreationSrc::Append(email.to_string()),
+            archetype: ResourceArchetype {
+                kind: ResourceKind::User,
+                specific: None,
+                config: None
+            },
+            src: resource_src,
+            registry_info: None,
+            owner: None,
+            location_affinity: None
+        };
+        let rx = manager.create(create).await;
+
+        let result = tokio::time::timeout(Duration::from_secs(5), rx).await;
+
+        match &result {
+            Ok(result) => {
+                match result{
+                    Ok(result) => {
+                        match result{
+                            Ok(ok) => {
+                                println!("Create USER WORKED! {} ", email);
+                            }
+                            Err(err) => {
+                                println!("Still got a fail: {}", err.to_string() )
+                            }
+                        }
+                    }
+                    Err(fail) => {
+                        eprintln!("Create User FAILED:{}",fail.to_string());
+                    }
+                }
+            }
+            Err(err) => {
+                eprintln!("CREATE USER RecvError: {}",err);
             }
         }
 

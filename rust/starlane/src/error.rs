@@ -31,6 +31,14 @@ impl From<Elapsed> for Error{
     }
 }
 
+impl From<validate::Error> for Error{
+    fn from(e: validate::Error) -> Self {
+        Error{
+            error: format!("{}",e.get_message())
+        }
+    }
+}
+
 impl From<uuid::Error> for Error {
     fn from(e: uuid::Error) -> Self {
         e.to_string().into()

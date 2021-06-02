@@ -17,7 +17,7 @@ use crate::filesystem::File;
 use crate::frame::{Reply, StarMessagePayload, ResourceManagerAction};
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, SubSpaceKey, UserKey, ResourceKey};
-use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceLocationRecord, ResourceArchetype, ResourceInit, ResourceAddress, Names, ResourceSrc, Skewer, ResourceAddressPart, ResourceType, ResourceStub, ResourceCreate};
+use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceLocationRecord, ResourceArchetype, ResourceInit, ResourceAddress, Names, ResourceSrc, SkewerCase, ResourceAddressPart, ResourceType, ResourceStub, ResourceCreate};
 use crate::names::Name;
 use crate::space::CreateAppControllerFail;
 use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarSkel, StarVariantCommand, StarComm, ServerCommand, Request, Empty, Query, LocalResourceLocation };
@@ -729,7 +729,7 @@ unimplemented!();
             id: actor_id
         };
 
-        let address_part = ResourceAddressPart::Skewer(Skewer::new(ResourceKey::Actor(actor_key.clone()).encode()?.as_str())?);
+        let address_part = ResourceAddressPart::SkewerCase(SkewerCase::new(ResourceKey::Actor(actor_key.clone()).encode()?.as_str())?);
 
         let resource = ActorResource{
             key: actor_key.clone(),

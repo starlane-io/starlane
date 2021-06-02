@@ -14,7 +14,7 @@ use crate::frame::{Event};
 use crate::id::Id;
 use crate::keys::{AppKey, ResourceKey, SubSpaceKey, UserKey};
 use crate::names::Name;
-use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceType, ResourceArchetype, ResourceInit, ResourceStub, Names, ResourceAddress, ResourceAddressPart, Skewer, ResourceRegistryInfo};
+use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceType, ResourceArchetype, ResourceInit, ResourceStub, Names, ResourceAddress, ResourceAddressPart, SkewerCase, ResourceRegistryInfo};
 use crate::star::StarKey;
 use std::marker::PhantomData;
 use serde::de::DeserializeOwned;
@@ -161,10 +161,10 @@ impl From<ActorRegistration> for ResourceRegistration
     fn from(actor : ActorRegistration) -> Self {
         ResourceRegistration{
             resource: actor.resource.into(),
-            info: ResourceRegistryInfo {
+            info: Option::Some(ResourceRegistryInfo {
                 names: actor.names,
                 labels: actor.labels
-            }
+            })
         }
     }
 }
@@ -187,7 +187,7 @@ pub struct ActorKey
 
 impl ActorKey{
     pub fn address_part(&self) -> Result<ResourceAddressPart,Error>{
-        Ok(ResourceAddressPart::Skewer(Skewer::new(self.id.to_string().as_str() )?))
+        Ok(ResourceAddressPart::SkewerCase(SkewerCase::new(self.id.to_string().as_str() )?))
     }
 }
 

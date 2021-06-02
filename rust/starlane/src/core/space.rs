@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::frame::ResourceHostAction;
 use crate::core::Host;
 use crate::resource;
+use crate::resource::user::UserState;
 
 pub struct SpaceHost {
   tx: mpsc::Sender<SpaceHostAction>
@@ -135,8 +136,25 @@ println!("INSERT INTO spaces (id,name,display) VALUES ({},{},{})", id,name,displ
                         trans.commit()?;
                         Ok(ResourceHostResult::Ok)
                     }
+                    ResourceType::User => {
+                        let trans = self.conn.transaction()?;
+                        let user_key= assign.key.user()?;
+                        let space_id = user_key.space.id();
+                        let user_id = user_key.id;
+                        let state_src :StateSrc<UserState> = assign.source.try_into()?;
+                        let state = state_src.to_state()?;
+                        let email= state.email();
+println!("INSERT INTO users (id,space_id,email) VALUES ({},{},{})", user_id,space_id,email);
+                        trans.execute("INSERT INTO spaces (id,space_id,email) VALUES (?1,?2,?3)", params![user_id,space_id,email])?;
+
+                        trans.commit()?;
+                        Ok(ResourceHostResult::Ok)
+
+
+
+
+                    }
 /*                    ResourceType::SubSpace => {}
-                    ResourceType::User => {}
 
  */
                     resource_type => {
