@@ -12,7 +12,7 @@ use crate::error::Error;
 use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply, ResourceManagerAction};
 use crate::id::Id;
 use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, ResourceKey};
-use crate::resource::{Labels, Registry, ResourceSelector, ResourceRegistryResult, ResourceRegistryCommand, FieldSelection, ResourceAssign, ResourceType, ResourceRegistration, ResourceLocationRecord, ResourceAddress, LocalResourceManager, ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceInit, ResourceArchetype, ResourceKind, ResourceManager, ResourceSrc, State};
+use crate::resource::{Labels, Registry, ResourceSelector, ResourceRegistryResult, ResourceRegistryCommand, FieldSelection, ResourceAssign, ResourceType, ResourceRegistration, ResourceLocationRecord, ResourceAddress, LocalResourceManager, ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceInit, ResourceArchetype, ResourceKind, ResourceManager, ResourceSrc, State, ResourceAddressPart};
 use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage, Fail};
 use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource, SetSupervisorForApp, ResourceRegistryBacking, ResourceRegistryBackingSqLite, StarApi};
@@ -195,17 +195,19 @@ println!("ENSURING HYPERSPACE!");
 
         let space_key = StarApi::new(self.skel.clone()).fetch_resource_key( space_address.clone() ).await?;
 
-        println!("Got space key: {}", space_key );
+        println!("~~~Got space key: {}", space_key );
 
 
         let registry = self.skel.clone().registry.ok_or("registry not set!")?.clone();
         // verify that user exists
-        let address = ResourceAddress::for_user(email).unwrap();
+        let address = ResourceAddress::from_parent(&ResourceType::User, Option::Some(&space_address), ResourceAddressPart::Email(email.to_string()) )?;
 
-        let result = registry.get_key(address).await;
+        let result = registry.get_key(address.clone()).await;
         if result.is_ok(){
             // user exists, nothing else need be done
             return Ok(());
+        } else {
+            println!("did not get Key for address: {}. This was expected.", address.to_string())
         }
 
         let mut star_api = StarApi::new(self.skel.clone());

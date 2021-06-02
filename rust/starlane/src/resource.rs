@@ -54,8 +54,7 @@ lazy_static!
                                                                                                            ResourceAddressPartStruct::new("actor",ResourceAddressPartKind::SkewerCase)], ResourceType::Actor );
 
      pub static ref USER_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new(     vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
-                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::SkewerCase),
-                                                                                                           ResourceAddressPartStruct::new("user",ResourceAddressPartKind::Email)], ResourceType::User );
+                                                                                                           ResourceAddressPartStruct::new("email",ResourceAddressPartKind::Email)], ResourceType::User );
 
 
      pub static ref FILE_SYSTEM_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
@@ -393,6 +392,24 @@ pub enum ResourceRegistryResult
     NotAccepted
 }
 
+impl ToString for ResourceRegistryResult{
+    fn to_string(&self) -> String {
+        match self{
+            ResourceRegistryResult::Ok => "Ok".to_string(),
+            ResourceRegistryResult::Error(err) => format!("Error({})",err),
+            ResourceRegistryResult::Resource(_) =>  "Resource".to_string(),
+            ResourceRegistryResult::Resources(_) => "Resources".to_string(),
+            ResourceRegistryResult::Address(_) => "Address".to_string(),
+            ResourceRegistryResult::Location(_) => "Location".to_string(),
+            ResourceRegistryResult::Reservation(_) => "Reservation".to_string(),
+            ResourceRegistryResult::Key(_) => "Key".to_string(),
+            ResourceRegistryResult::Unique(_) => "Unique".to_string(),
+            ResourceRegistryResult::NotFound => "NotFound".to_string(),
+            ResourceRegistryResult::NotAccepted => "NotAccepted".to_string(),
+        }
+    }
+}
+
 type Blob = Vec<u8>;
 
 struct RegistryParams {
@@ -592,19 +609,27 @@ eprintln!("error setting up db: {}", err );
                 Ok(ResourceRegistryResult::Ok)
             }
             ResourceRegistryCommand::Commit(registration) => {
+println!("COMMIT REGISTRATION!!!!!");
                 if !self.accept(registration.resource.key.resource_type() ) {
+println!("WE DON'T HANDLE: {}",registration.resource.key.resource_type().to_string());
                     return Ok(ResourceRegistryResult::NotAccepted);
                 }
+println!("......Paramz.......");
                 let params= RegistryParams::from_registration(registration.clone())?;
 
                 let trans = self.conn.transaction()?;
 
+println!("......Trans created.......");
                 if params.key.is_some() {
+println!("......key is_some() .......");
                     trans.execute("DELETE FROM labels WHERE labels.resource_key=?1", [params.key.clone()]);
+println!("......key next trans.execute() .......");
                     trans.execute("DELETE FROM resources WHERE key=?1", [params.key.clone()])?;
                 }
-                trans.execute("DELETE addresses WHERE key=?1 OR address=?2)", params![params.key.clone(),params.address.clone()])?;
+println!("...... AfTeR .......");
+                trans.execute("DELETE FROM addresses WHERE key=?1 OR address=?2", params![params.key.clone(),params.address.clone()])?;
 
+println!("......Trans exec delete.......");
 
                 trans.execute("INSERT INTO addresses (key,address) VALUES (?1,?2)", params![params.key.clone(),params.address.clone()])?;
 
@@ -625,6 +650,7 @@ println!("BIND: INSERT INTO addresses (key,address) VALUES ({},{})",ResourceKey:
 
 
                 trans.commit()?;
+println!("......Trans commit()!.......");
                 Ok(ResourceRegistryResult::Ok)
             }
             ResourceRegistryCommand::Select(selector) => {
@@ -857,6 +883,7 @@ println!("BIND: INSERT INTO addresses (key,address) VALUES ({},{})",bind.key.to_
                 }
             }
             ResourceRegistryCommand::GetKey(address) => {
+println!("ResourceRegistry::GetKey({})",address.to_string());
                 let address = address.to_string();
                 let statement = "SELECT key FROM addresses WHERE address=?1";
                 let mut statement = self.conn.prepare(statement)?;
@@ -905,8 +932,12 @@ println!("RESERVATION COMMIT Ok") ;
                         params.address = Option::Some(resource.address.to_string());
                         let registration = ResourceRegistration::new(resource.clone(), info );
                         let (action,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Commit(registration));
-                        action_tx.send( action );
-                        rx.await;
+                        action_tx.send( action ).await;
+println!("Sent registration commit....") ;
+                        if let Result::Ok(result) = rx.await{
+                            println!("RESULT: {}", result.to_string() );
+                        }
+println!("REceived registration commit....confirm") ;
                         //send(resource);
 //                        request.
                     }
@@ -982,8 +1013,9 @@ println!("RESERVATION DID NOT COMMIT") ;
          resource_type TEXT NOT NULL,
          kind BLOB NOT NULL,
          specific TEXT,
-         space INTEGER NOT NULL,
-         sub_space BLOB NOT NULL,
+         config TEXT,
+         space INTEGER,
+         sub_space BLOB,
          app TEXT,
          owner BLOB
         )"#;
@@ -2160,7 +2192,7 @@ impl ResourceAddress {
         for (index,part_struct) in resource_type.address_structure().parts.iter().enumerate(){
             let part = parts.get(index).ok_or("missing part")?;
             if !part_struct.kind.matches(part) {
-                return Err(format!("part does not match {}",part.to_string()).into());
+                return Err(format!("part does not match {}",part_struct.kind.to_string()).into());
             }
         }
 
@@ -2175,8 +2207,6 @@ impl ToString for ResourceAddress {
     fn to_string(&self) -> String {
         let mut rtn = String::new();
 
-        rtn.push_str(self.resource_type.to_string().as_str() );
-        rtn.push_str("::");
 
         for (index,part) in self.parts.iter().enumerate() {
             if index != 0{
@@ -2184,6 +2214,12 @@ impl ToString for ResourceAddress {
             }
             rtn.push_str(part.to_string().as_str() );
         }
+
+        rtn.push_str("::");
+        rtn.push_str("<");
+        rtn.push_str(self.resource_type.to_string().as_str() );
+        rtn.push_str(">");
+
         rtn
     }
 }
@@ -2193,8 +2229,16 @@ impl FromStr for ResourceAddress {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut split = s.split("::");
-        let resource_type = ResourceType::from_str(split.next().ok_or("resource type")?)?;
-        Ok(resource_type.address_structure().from_str(split.next().ok_or("address structure")? )?)
+        let address_structure = split.next().ok_or("address structure")?;
+        let mut resource_type_gen = split.next().ok_or("resource type")?.to_string();
+
+        // chop off the generics i.e. <Space> remove '<' and '>'
+        resource_type_gen.remove(0);
+        resource_type_gen.remove(resource_type_gen.len() );
+
+        let resource_type = ResourceType::from_str(resource_type_gen.as_str() )?;
+        let resource_address = resource_type.address_structure().from_str(address_structure)?;
+        Ok(resource_address)
     }
 }
 
@@ -2395,6 +2439,8 @@ impl ResourceAddressPartKind
         }
     }
 }
+
+
 
 
 
