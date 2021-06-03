@@ -15,7 +15,7 @@ use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, Resourc
 use crate::resource::{Labels, Registry, ResourceSelector, ResourceRegistryResult, ResourceRegistryCommand, FieldSelection, ResourceAssign, ResourceType, ResourceRegistration, ResourceLocationRecord, ResourceAddress, LocalResourceManager, ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceInit, ResourceArchetype, ResourceKind, ResourceManager, ResourceSrc, State, ResourceAddressPart};
 use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage, Fail};
-use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource, SetSupervisorForApp, ResourceRegistryBacking, ResourceRegistryBackingSqLite, StarApi};
+use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource, SetSupervisorForApp, ResourceRegistryBacking, ResourceRegistryBackingSqLite, StarlaneApi};
 use crate::star::StarCommand::SpaceCommand;
 use crate::permissions::{AppAccess, AuthToken, User, UserKind};
 use crate::crypt::{PublicKey, CryptKeyId};
@@ -128,135 +128,18 @@ impl CentralStarVariant{
 
     async fn ensure_hyperspace(&self)->Result<(),Error>{
 println!("ENSURING HYPERSPACE!");
-
-        let registry = self.skel.clone().registry.ok_or("registry not set!")?.clone();
-        // verify that hyper-space exists
-        let address = ResourceAddress::for_space("hyperspace" ).unwrap();
-
-        let result = registry.get_key(address).await;
-        if result.is_ok(){
-            // hyperspace exists, nothing else need be done
-            return Ok(());
-        }
-
-        let mut star_api = StarApi::new(self.skel.clone());
-        let manager = star_api.get_resource_manager(ResourceKey::Nothing).await?;
-
-        let space_state= SpaceState::new("hyperspace", "HyperSpace");
-        let space_state_bytes = space_state.to_bytes()?;
-        let resource_src = ResourceSrc::AssignState(space_state_bytes);
-        let create = ResourceCreate{
-            parent: ResourceKey::Nothing,
-            key: KeyCreationSrc::None,
-            address: AddressCreationSrc::Space("hyperspace".to_string()),
-            archetype: ResourceArchetype {
-                kind: ResourceKind::Space,
-                specific: None,
-                config: None
-            },
-            src: resource_src,
-            registry_info: None,
-            owner: None,
-            location_affinity: None
-        };
-        let rx = manager.create(create).await;
-
-        let result = tokio::time::timeout(Duration::from_secs(5), rx).await;
-
-        match &result {
-            Ok(result) => {
-                match result{
-                    Ok(result) => {
-                        match result{
-                            Ok(ok) => {
-                                println!("Create Space WORKED!");
-                            }
-                            Err(err) => {
-                                println!("Still got a fail: {}", err.to_string() )
-                            }
-                        }
-                    }
-                    Err(fail) => {
-                        eprintln!("Create Space FAILED:{}",fail.to_string());
-                    }
-                }
-            }
-            Err(err) => {
-                eprintln!("CREATE SPACE RecvError: {}",err);
-            }
-        }
+        let starlane_api = StarlaneApi::new(self.skel.star_tx.clone());
+        starlane_api.create_space("hyperspace", "HyperSpace").await?;
 
         Ok(())
     }
 
 
     async fn ensure_user(&self, space_address: &ResourceAddress, email: &str ) ->Result<(),Error>{
-        println!("ENSURING user {}",email);
-
-        let space_key = StarApi::new(self.skel.clone()).fetch_resource_key( space_address.clone() ).await?;
-
-        println!("~~~Got space key: {}", space_key );
-
-
-        let registry = self.skel.clone().registry.ok_or("registry not set!")?.clone();
-        // verify that user exists
-        let address = ResourceAddress::from_parent(&ResourceType::User, Option::Some(&space_address), ResourceAddressPart::Email(email.to_string()) )?;
-
-        let result = registry.get_key(address.clone()).await;
-        if result.is_ok(){
-            // user exists, nothing else need be done
-            return Ok(());
-        } else {
-            println!("did not get Key for address: {}. This was expected.", address.to_string())
-        }
-
-        let mut star_api = StarApi::new(self.skel.clone());
-        let manager = star_api.get_resource_manager(ResourceKey::Nothing).await?;
-
-        let user_state = UserState::new(email.to_string() );
-        let user_state_bytes = user_state.to_bytes()?;
-        let resource_src = ResourceSrc::AssignState(user_state_bytes);
-        let create = ResourceCreate{
-            parent: space_key,
-            key: KeyCreationSrc::None,
-            address: AddressCreationSrc::Append(email.to_string()),
-            archetype: ResourceArchetype {
-                kind: ResourceKind::User,
-                specific: None,
-                config: None
-            },
-            src: resource_src,
-            registry_info: None,
-            owner: None,
-            location_affinity: None
-        };
-        let rx = manager.create(create).await;
-
-        let result = tokio::time::timeout(Duration::from_secs(5), rx).await;
-
-        match &result {
-            Ok(result) => {
-                match result{
-                    Ok(result) => {
-                        match result{
-                            Ok(ok) => {
-                                println!("Create USER WORKED! {} ", email);
-                            }
-                            Err(err) => {
-                                println!("Still got a fail: {}", err.to_string() )
-                            }
-                        }
-                    }
-                    Err(fail) => {
-                        eprintln!("Create User FAILED:{}",fail.to_string());
-                    }
-                }
-            }
-            Err(err) => {
-                eprintln!("CREATE USER RecvError: {}",err);
-            }
-        }
-
+println!("ENSURING USER!");
+        let starlane_api = StarlaneApi::new(self.skel.star_tx.clone());
+        let space_api = starlane_api.get_space_api_from_address(space_address).await?;
+        space_api.create_user(email).await?;
         Ok(())
     }
 }

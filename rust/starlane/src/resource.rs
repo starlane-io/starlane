@@ -239,6 +239,7 @@ impl LabelSelection
 #[derive(Clone,Hash,Eq,PartialEq,Serialize,Deserialize)]
 pub enum FieldSelection
 {
+    Key(ResourceKey),
     Type(ResourceType),
     Kind(ResourceKind),
     Specific(Specific),
@@ -262,6 +263,11 @@ impl FieldSelection
     {
         match self
         {
+            FieldSelection::Key(_) => {
+                if let FieldSelection::Key(_) = field {
+                    return true;
+                }
+            }
             FieldSelection::Type(_) => {
                 if let FieldSelection::Type(_) = field {
                     return true;
@@ -307,6 +313,9 @@ impl ToSql for FieldSelection
     fn to_sql(&self) -> Result<ToSqlOutput<'_>, rusqlite::Error> {
         match self
         {
+            FieldSelection::Key(key) => {
+                Ok(ToSqlOutput::Owned(Value::Blob(key.bin()?)))
+            }
             FieldSelection::Type(resource_type) => {
                 Ok(ToSqlOutput::Owned(Value::Text(resource_type.to_string())))
             }
@@ -671,6 +680,9 @@ println!("......Trans commit()!.......");
                     }
 
                     let f = match field {
+                        FieldSelection::Key(_) => {
+                            format!("key=?{}", index + 1)
+                        }
                         FieldSelection::Type(_) => {
                             format!("resource_type=?{}", index + 1)
                         }
@@ -1741,6 +1753,7 @@ impl LocalResourceManager {
     async fn process_create(core: ResourceManagerCore, create: ResourceCreate ) -> Result<ResourceLocationRecord,Fail>{
 
         if !core.key.resource_type().parent().matches(ResourceType::from(&create.parent).as_ref()) {
+println!("!!! -> Throwing Fail::WrongParentResourceType <- !!!");
             return Err(Fail::WrongParentResourceType {
                 expected: HashSet::from_iter(core.key.resource_type().parent().types()),
                 received: Option::Some(create.parent.resource_type())
@@ -2200,6 +2213,18 @@ impl ResourceAddress {
             parts: parts,
             resource_type: resource_type.clone()
         })
+    }
+
+    pub fn part_to_string( &self, name: &str ) -> Result<String,Error> {
+        for (index,part_struct) in self.resource_type.address_structure().parts.iter().enumerate()
+        {
+            if part_struct.name == name.to_string() {
+                let part = self.parts.get(index).ok_or(format!("missing part index {} for part name {}",index,name))?;
+                return Ok(part.to_string());
+            }
+        }
+
+        Err(format!("could not find part with name {}",name).into())
     }
 }
 

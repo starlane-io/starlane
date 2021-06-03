@@ -383,6 +383,23 @@ pub enum ResourceManagerAction
     Select(ResourceSelector),
 }
 
+impl ToString for ResourceManagerAction{
+    fn to_string(&self) -> String {
+        match self {
+            ResourceManagerAction::Register(_) => "Register".to_string(),
+            ResourceManagerAction::Location(_) => "Location".to_string(),
+            ResourceManagerAction::Find(_) => "Find".to_string(),
+            ResourceManagerAction::GetKey(_) => "GetKey".to_string(),
+            ResourceManagerAction::GetAddress(_) => "GetAddress".to_string(),
+            ResourceManagerAction::Bind(_) => "Bind".to_string(),
+            ResourceManagerAction::Status(_) => "Status".to_string(),
+            ResourceManagerAction::SliceStatus(_) => "SliceStatus".to_string(),
+            ResourceManagerAction::Create(_) => "Create".to_string(),
+            ResourceManagerAction::Select(_) => "Select".to_string(),
+        }
+    }
+}
+
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceStatusReport {
     pub key: ResourceKey,
