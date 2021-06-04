@@ -1455,12 +1455,23 @@ impl ResourceParent {
 
     pub fn matches( &self, resource_type: Option<&ResourceType> ) -> bool
     {
+println!("matches: option {}",resource_type.is_some() );
+if resource_type.is_some(){
+    println!("type is : {}",resource_type.unwrap().to_string() );
+
+}
         match resource_type{
             None => *self == Self::None,
             Some(resource_type) => {
                 match self{
-                    ResourceParent::None => false,
-                    ResourceParent::Some(parent_type) => *parent_type == *resource_type,
+                    ResourceParent::None => {
+println!("parent is None");
+                        false
+                    },
+                    ResourceParent::Some(parent_type) => {
+println!("parent is {}", parent_type.to_string());
+                        *parent_type == *resource_type
+                    },
                     ResourceParent::Multi(multi) => multi.contains(resource_type)
                 }
             }
@@ -1761,7 +1772,14 @@ pub struct ChildResourceManager {
 impl ChildResourceManager {
     async fn process_create(core: ChildResourceManagerCore, create: ResourceCreate ) -> Result<ResourceLocationRecord,Fail>{
 
-        if !core.key.resource_type().parent().matches(ResourceType::from(&create.parent).as_ref()) {
+
+println!("CHILD: {}", core.key.resource_type().to_string() );
+println!("PARENT: {}", core.key.resource_type().parent().to_string() );
+println!("create.PARENT: {}", create.parent.to_string() );
+if         ResourceType::from(&create.parent).is_some() {
+    println!("create.PARENT2: {}", ResourceType::from(&create.parent).unwrap().to_string());
+}
+        if !create.archetype.kind.resource_type().parent().matches(Option::Some(&core.key.resource_type())) {
 println!("!!! -> Throwing Fail::WrongParentResourceType <- !!!");
             return Err(Fail::WrongParentResourceType {
                 expected: HashSet::from_iter(core.key.resource_type().parent().types()),
@@ -1791,11 +1809,11 @@ println!("CREATED KEY: {}",key);
 
         let address = match create.address{
             AddressCreationSrc::None => {
-                let address = format!("{}:{}", core.address.to_string(), key.generate_address_tail()? );
+                let address = format!("{}:{}", core.address.to_parts_string(), key.generate_address_tail()? );
                 create.archetype.kind.resource_type().address_structure().from_str(address.as_str())?
             }
             AddressCreationSrc::Append(tail) => {
-                let address = format!("{}:{}", core.address.to_string(), tail );
+                let address = format!("{}:{}", core.address.to_parts_string(), tail );
                 create.archetype.kind.resource_type().address_structure().from_str(address.as_str())?
             }
             AddressCreationSrc::Space(space_name) => {
@@ -1849,6 +1867,7 @@ impl ResourceManager for ChildResourceManager {
 
         let core = self.core.clone();
         tokio::spawn( async move {
+println!("Sending ChildResourceManager::process_create(core, create ).await");
             tx.send(ChildResourceManager::process_create(core, create ).await).unwrap_or_default();
         });
         rx
@@ -2235,12 +2254,9 @@ impl ResourceAddress {
 
         Err(format!("could not find part with name {}",name).into())
     }
-}
 
-impl ToString for ResourceAddress {
-    fn to_string(&self) -> String {
+    pub fn to_parts_string( &self ) -> String {
         let mut rtn = String::new();
-
 
         for (index,part) in self.parts.iter().enumerate() {
             if index != 0{
@@ -2248,6 +2264,13 @@ impl ToString for ResourceAddress {
             }
             rtn.push_str(part.to_string().as_str() );
         }
+        rtn
+    }
+}
+
+impl ToString for ResourceAddress {
+    fn to_string(&self) -> String {
+        let mut rtn = self.to_parts_string();
 
         rtn.push_str("::");
         rtn.push_str("<");
@@ -2332,7 +2355,7 @@ impl ResourceAddressStructure {
         let mut split = s.split(":");
 
         if split.count()  != self.parts.len() {
-            return Err(format!("part count not equal. expected format '{}'",self.format()).into());
+            return Err(format!("part count not equal. expected format '{}' received: {}",self.format(),s).into());
         }
 
         let mut split = s.split(":");

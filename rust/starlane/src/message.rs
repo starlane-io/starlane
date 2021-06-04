@@ -382,7 +382,10 @@ impl ToString for Fail {
             Fail::RecvErr => "RecvErr".to_string(),
             Fail::ResourceTypeRequiresOwner => "ResourceTypeRequiresOwner".to_string(),
             Fail::CannotSelectResourceHost => "CannotSelectResourceHost".to_string(),
-            Fail::WrongParentResourceType { .. } => "WrongParentResourceType".to_string(),
+            Fail::WrongParentResourceType { expected, received } => format!("WrongParentResourceType(expected:[{}],received:{})",ResourceType::hash_to_string(expected),match received{
+                None => "None".to_string(),
+                Some(expected) => expected.to_string()
+            }),
             Fail::ResourceCannotGenerateAddress => "ResourceCannotGenerateAddress".to_string(),
             Fail::AddressNotFound(address) => format!("AddressNotFound({})", address.to_string()),
             Fail::SuitableHostNotAvailable(detail) => format!("SuitableHostNotAvailable({})", detail.to_string()),

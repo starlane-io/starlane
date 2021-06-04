@@ -1765,9 +1765,12 @@ println!("RECEIVED GetKey {}",address.to_string());
                 ChildResourceAction::Create(create) => {
 println!("received: ResourceManagerAction::Create(...) on {}", self.skel.info.kind);
                     let child_manager = self.get_child_resource_manager(create.parent.clone()).await?;
+println!("now clone the skel...");
                     let skel = self.skel.clone();
+println!("spawn.........");
                     tokio::spawn( async move {
-                        let record = child_manager.create( create ).await.await;
+                        let record = child_manager.create( create.clone() ).await.await;
+println!("received RECORD..from child manager. of : {}",create.archetype.kind.resource_type().to_string());
                         match record{
                             Ok(record) => {
                                 match record {
@@ -1858,7 +1861,7 @@ eprintln!("Error: {}",err);
                 }
                 Ok(())
             }
-            async fn get_child_resource_manager(&mut self, key: ResourceKey ) -> Result<ChildResourceManager,Fail>{
+            async fn get_child_resource_manager(&mut self, key: ResourceKey ) -> Result<ChildResourceManager,Fail> {
                 println!(" ::::>  GET RESOURCE MANAGER for {} <:::: [star kind {}]",key,&self.skel.info.kind );
 
                 let resource = match key.resource_type(){
