@@ -86,7 +86,7 @@ impl ResourceHostSelector{
         }
     }
 
-    pub async fn select( &self, resource_type: ResourceType, affinity: Option<ResourceLocationAffinity> ) -> Result<Arc<dyn ResourceHost>,Fail>
+    pub async fn select( &self, resource_type: ResourceType ) -> Result<Arc<dyn ResourceHost>,Fail>
     {
         if resource_type.star_host() == self.skel.info.kind{
             let handle = StarHandle{

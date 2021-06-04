@@ -360,7 +360,7 @@ pub enum Fail
         received: Option<ResourceType>
     },
     ResourceTypeRequiresOwner,
-    RecvErr,
+    ChannelRecvErr,
     CannotSelectResourceHost,
     ResourceCannotGenerateAddress,
     SuitableHostNotAvailable(String),
@@ -379,7 +379,7 @@ impl ToString for Fail {
             Fail::DoNotKnowSpecific(_) => "DoNotKnowSpecific".to_string(),
             Fail::ResourceNotFound(_) => "ResourceNotFound".to_string(),
             Fail::WrongResourceType { expected: expected, received: received} => format!("WrongResourceType(expected:[{}],received:{})",ResourceType::hash_to_string(expected),received.to_string()),
-            Fail::RecvErr => "RecvErr".to_string(),
+            Fail::ChannelRecvErr => "ChannelRecvErr".to_string(),
             Fail::ResourceTypeRequiresOwner => "ResourceTypeRequiresOwner".to_string(),
             Fail::CannotSelectResourceHost => "CannotSelectResourceHost".to_string(),
             Fail::WrongParentResourceType { expected, received } => format!("WrongParentResourceType(expected:[{}],received:{})",ResourceType::hash_to_string(expected),match received{

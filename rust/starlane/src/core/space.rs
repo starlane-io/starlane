@@ -143,8 +143,7 @@ impl SpaceHostSqLite {
                 let trans = self.conn.transaction()?;
                 let key = assign.key.bin()?;
                 let address = assign.address.to_string();
-                let state_src = assign.state_src.to_resource_state_src(assign.key.resource_type() )?;
-println!("state_src...{}",state_src.resource_type().to_string());
+                let state_src: ResourceStateSrc = assign.state_src.try_into()?;
                 let state: Arc<Vec<u8>> = state_src.try_into()?;
 
                 trans.execute("INSERT INTO resources (key,address,state) VALUES (?1,?2,?3)", params![key,address,*state])?;

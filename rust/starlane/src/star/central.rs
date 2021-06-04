@@ -123,7 +123,7 @@ impl CentralStarVariant{
     async fn ensure(&self){
         self.ensure_hyperspace().await.unwrap();
         self.ensure_user(&ResourceAddress::for_space("hyperspace").unwrap(),"hyperuser@starlane.io").await.unwrap();
-
+        self.ensure_subspace(&ResourceAddress::for_space("hyperspace").unwrap(),"default").await.unwrap();
     }
 
     async fn ensure_hyperspace(&self)->Result<(),Error>{
@@ -134,12 +134,20 @@ println!("ENSURING HYPERSPACE!");
         Ok(())
     }
 
-
     async fn ensure_user(&self, space_address: &ResourceAddress, email: &str ) ->Result<(),Error>{
 println!("ENSURING USER!");
         let starlane_api = StarlaneApi::new(self.skel.star_tx.clone());
         let space_api = starlane_api.get_space_api_from_address(space_address).await?;
         space_api.create_user(email).await?;
+        Ok(())
+    }
+
+    async fn ensure_subspace(&self, space_address: &ResourceAddress, sub_space: &str ) ->Result<(),Error>{
+        println!("---------- sub space ---------------");
+        println!("ENSURING SUB SPACE" );
+        let starlane_api = StarlaneApi::new(self.skel.star_tx.clone());
+        let space_api = starlane_api.get_space_api_from_address(space_address).await?;
+        space_api.create_sub_space(sub_space).await?;
         Ok(())
     }
 }

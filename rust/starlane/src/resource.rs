@@ -32,6 +32,7 @@ use tokio::sync::oneshot::Receiver;
 use crate::resource::space::{SpaceState, Space};
 use std::convert::{TryFrom, TryInto};
 use crate::resource::user::UserState;
+use crate::resource::sub_space::SubSpaceState;
 
 pub mod space;
 pub mod sub_space;
@@ -1267,7 +1268,7 @@ pub enum ResourceType
 
 impl ResourceType{
     pub fn requires_owner(&self)->bool {
-        match self{
+/*        match self{
             Self::Nothing => false,
             Self::Space => false,
             Self::SubSpace => true,
@@ -1277,7 +1278,9 @@ impl ResourceType{
             Self::FileSystem => true,
             Self::File => true,
             Self::Artifact => true
-        }
+        }*/
+        // for now let's not worry about owners
+        false
     }
 
     pub fn from( parent: &ResourceKey ) -> Option<Self> {
@@ -1803,7 +1806,7 @@ println!("CREATED KEY: {}",key);
         };
 
 println!("selecting for resource kind: {}", create.archetype.kind.resource_type().to_string());
-        let mut host = core.selector.select(create.archetype.kind.resource_type(), create.location_affinity ).await?;
+        let mut host = core.selector.select(create.archetype.kind.resource_type() ).await?;
 
 println!(".. about .. to .. assign .." );
         host.assign(assign).await?;
@@ -3110,8 +3113,7 @@ pub struct ResourceCreate {
    pub archetype: ResourceArchetype,
    pub src: AssignResourceStateSrc,
    pub registry_info: Option<ResourceRegistryInfo>,
-   pub owner: Option<UserKey>,
-   pub location_affinity: Option<ResourceLocationAffinity>
+   pub owner: Option<UserKey>
 }
 
 
@@ -3126,7 +3128,6 @@ impl ResourceCreate {
             src: src,
             registry_info: Option::None,
             owner: Option::None,
-            location_affinity: Option::None
         }
     }
 
@@ -3201,35 +3202,31 @@ pub enum KeySrc{
 /// can have other options like to Initialize the state data
 #[derive(Clone,Serialize,Deserialize)]
 pub enum AssignResourceStateSrc {
-    Direct(Arc<Vec<u8>>)
+    Direct(ResourceStateSrc)
 }
 
 impl AssignResourceStateSrc {
-
-    pub fn to_resource_state_src(self, resource_type: ResourceType ) -> Result<ResourceStateSrc,Error> {
-
-        let Self::Direct(data) = self;
-
-        match resource_type{
-            ResourceType::Space => Ok(ResourceStateSrc::Space(Src::<SpaceState>::try_from(data)?)),
-            ResourceType::User => Ok(ResourceStateSrc::User(Src::<UserState>::try_from(data)?)),
-            _ => unimplemented!()
-        }
-    }
-    pub fn to_data(self) -> Arc<Vec<u8>> {
-        match self{
-            AssignResourceStateSrc::Direct(data) => data
-        }
+    pub fn direct( state_src: ResourceStateSrc ) -> Self {
+        Self::Direct( state_src )
     }
 }
 
+impl TryInto<ResourceStateSrc> for AssignResourceStateSrc{
+    type Error = Error;
+
+    fn try_into(self) -> Result<ResourceStateSrc, Self::Error> {
+        match self {
+            AssignResourceStateSrc::Direct(state) => Ok(state)
+        }
+    }
+}
 
 impl TryInto<Arc<Vec<u8>>> for AssignResourceStateSrc{
     type Error = Error;
 
     fn try_into(self) -> Result<Arc<Vec<u8>>, Self::Error> {
         match self {
-            AssignResourceStateSrc::Direct(state) => Ok(state)
+            AssignResourceStateSrc::Direct(state) => Ok(state.try_into()?)
         }
     }
 }
@@ -3439,10 +3436,11 @@ impl Resource{
 
 
 
-#[derive(Clone)]
+#[derive(Clone,Serialize,Deserialize)]
 pub enum ResourceStateSrc {
     None,
     Space(Src<SpaceState>),
+    SubSpace(Src<SubSpaceState>),
     User(Src<UserState>)
 }
 
@@ -3450,6 +3448,7 @@ impl ResourceStateSrc{
     pub fn resource_type(&self)->ResourceType{
         match self {
             ResourceStateSrc::Space(_) => ResourceType::Space,
+            ResourceStateSrc::SubSpace(_) => ResourceType::SubSpace,
             ResourceStateSrc::User(_) => ResourceType::User,
             ResourceStateSrc::None => ResourceType::Nothing,
         }
@@ -3462,6 +3461,15 @@ impl TryFrom<Arc<Vec<u8>>> for Src<SpaceState>{
     fn try_from(value: Arc<Vec<u8>>) -> Result<Self, Self::Error> {
            let space = SpaceState::try_from(value)?;
            Ok(Src::Memory(Arc::new(space)))
+    }
+}
+
+impl TryFrom<Arc<Vec<u8>>> for Src<SubSpaceState>{
+    type Error = Error;
+
+    fn try_from(value: Arc<Vec<u8>>) -> Result<Self, Self::Error> {
+        let sub_space = SubSpaceState::try_from(value)?;
+        Ok(Src::Memory(Arc::new(sub_space)))
     }
 }
 
@@ -3482,6 +3490,7 @@ impl TryInto<Arc<Vec<u8>>> for ResourceStateSrc{
         let magic = self.resource_type().magic();
         let mut bytes:Vec<u8> = match self {
             ResourceStateSrc::Space(space) => space.try_into()?,
+            ResourceStateSrc::SubSpace(sub_space) => sub_space.try_into()?,
             ResourceStateSrc::User(user) => user.try_into()?,
             ResourceStateSrc::None => vec![],
         };
@@ -3514,12 +3523,36 @@ println!("MAGIC is: {}",magic );
     }
 }
 
+impl TryFrom<Arc<Vec<u8>>> for ResourceStateSrc {
+    type Error = Error;
 
-#[derive(Clone)]
+    fn try_from(value: Arc<Vec<u8>>) -> Result<Self, Self::Error> {
+        if value.len() == 0{
+            return Err("zero length data for ResourceStateSrc, expecrted at least a magic number".into());
+        }
+        // this is not good, potentially cloning a very big structure just to chop the magic number off... --Scott
+        let mut value = (*value).clone();
+        let magic = value.remove(0);
+        println!("MAGIC is: {}",magic );
+        match ResourceType::from_magic(magic) {
+            Ok(resource_type) => {
+                match resource_type {
+                    ResourceType::Space => {
+                        Ok(ResourceStateSrc::Space(Src::Memory(Arc::new(SpaceState::try_from(value)?))))
+                    }
+                    _ => Err(format!("do not have a ResourceStateSrc.try_from for {} yet",resource_type.to_string()).into())
+                }
+            }
+            Err(_) => Err(format!("bad magic number {}",magic).into())
+        }
+    }
+}
+
+
+#[derive(Clone,Serialize,Deserialize)]
 pub enum Src<S: Sync+Send> {
     Memory(Arc<S>)
 }
-
 
 
 impl TryInto<Arc<Vec<u8>>> for Src<SpaceState> {
@@ -3543,6 +3576,19 @@ impl TryInto<Vec<u8>> for Src<SpaceState> {
         match self{
             Src::Memory(space_state) => {
                 Ok((*space_state).clone().try_into()?)
+            }
+        }
+    }
+}
+
+impl TryInto<Vec<u8>> for Src<SubSpaceState> {
+
+    type Error = Error;
+
+    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
+        match self{
+            Src::Memory(sub_space_state) => {
+                Ok((*sub_space_state).clone().try_into()?)
             }
         }
     }
