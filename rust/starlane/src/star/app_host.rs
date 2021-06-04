@@ -9,7 +9,7 @@ use tokio::sync::mpsc::error::SendError;
 use crate::actor::{ActorKey};
 use crate::app::{AppMeta, AppLocation, AppStatus, AppReadyStatus, AppPanicReason, AppArchetype, InitData, AppCreateResult};
 use crate::error::Error;
-use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, ServerAppPayload, SpaceReply,  SimpleReply, SupervisorPayload,  ServerPayload, StarPattern, FromReply, ResourceManagerAction, WindAction};
+use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, ServerAppPayload, SpaceReply, SimpleReply, SupervisorPayload, ServerPayload, StarPattern, FromReply, ChildResourceAction, WindAction};
 use crate::keys::{AppKey, UserKey, ResourceKey};
 use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
 use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait, Fail};

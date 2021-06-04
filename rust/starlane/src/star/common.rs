@@ -1,7 +1,7 @@
 use crate::star::{StarSkel, ResourceRegistryBacking, StarVariant, StarVariantCommand, Request, StarCommand};
 use std::sync::Arc;
 use crate::star::pledge::StarHandleBacking;
-use crate::frame::{ResourceManagerAction, StarMessage, StarMessagePayload, SimpleReply, Reply, ResourceHostAction};
+use crate::frame::{ChildResourceAction, StarMessage, StarMessagePayload, SimpleReply, Reply, ResourceHostAction};
 use crate::core::StarCoreCommand;
 use crate::resource::ResourceLocationRecord;
 

@@ -1,76 +1,62 @@
 use crate::keys::{UserKey, ResourceKey};
-use crate::resource::{State, Resource, ResourceAddress, ResourceType, StateSrc, ResourceSrc};
+use crate::resource::{Resource, ResourceAddress, ResourceType, AssignResourceStateSrc, Src};
 use crate::error::Error;
 use serde::{Serialize,Deserialize};
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
+use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct User{
     key: UserKey,
-    email: String,
-    address: ResourceAddress
+    address: ResourceAddress,
+    state_src: Src<UserState>
 }
 
-impl Resource<UserState> for User{
-    fn key(&self) -> ResourceKey {
-        ResourceKey::User(self.key.clone())
-    }
-
-    fn address(&self) -> ResourceAddress {
-        self.address.clone()
-    }
-
-    fn resource_type(&self) -> ResourceType {
-        ResourceType::User
-    }
-
-    fn state(&self) -> StateSrc<UserState> {
-        StateSrc::Memory(Box::new(UserState{
-            email: self.email.clone()
-        }))
-    }
-}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct UserState {
     email: String,
 }
 
-impl UserState{
-    pub fn from_bytes( bytes: &[u8] ) -> Result<Self,Error> {
-        Ok(bincode::deserialize(bytes)?)
-    }
-}
 
 impl UserState{
-
     pub fn new( email: String ) -> Self {
         UserState{
-            email: email.clone(),
+            email: email
         }
     }
-
-    pub fn email(&self)->String{
-        self.email.clone()
-    }
-
 }
 
+impl TryInto<Vec<u8>> for UserState {
 
-impl State for UserState{
-    fn to_bytes(self) -> Result<Vec<u8>, Error> {
+    type Error = Error;
+
+    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
         Ok(bincode::serialize(&self)?)
     }
 }
 
-impl TryFrom<ResourceSrc> for StateSrc<UserState>{
+impl TryInto<Arc<Vec<u8>>> for UserState {
 
     type Error = Error;
 
-    fn try_from(src: ResourceSrc) -> Result<StateSrc<UserState>, Self::Error> {
-        match src{
-            ResourceSrc::AssignState(raw) => {
-                Ok(StateSrc::Memory(Box::new(UserState::from_bytes(raw.as_slice())?)))
-            }
-        }
+    fn try_into(self) -> Result<Arc<Vec<u8>>, Self::Error> {
+        Ok(Arc::new(bincode::serialize(&self)?))
+    }
+}
+
+impl TryFrom<Arc<Vec<u8>>> for UserState{
+    type Error = Error;
+
+    fn try_from(value: Arc<Vec<u8>>) -> Result<Self, Self::Error> {
+        Ok(bincode::deserialize::<UserState>(value.as_slice() )?)
+    }
+}
+
+impl TryFrom<Vec<u8>> for UserState{
+    type Error = Error;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        Ok(bincode::deserialize::<UserState>(value.as_slice() )?)
     }
 }

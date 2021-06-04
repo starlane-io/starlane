@@ -134,7 +134,6 @@ impl ProtoStar
                             auth_token_source: AuthTokenSource {},
                             registry: resource_registry,
                             star_handler: star_handler,
-                            resources: HostedResourceStore::new().await,
                             persistence: Persistence::Memory
                         };
 

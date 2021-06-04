@@ -25,7 +25,7 @@ use crate::core::server::{ServerStarCore, ServerStarCoreExt, ExampleServerStarCo
 use std::marker::PhantomData;
 use crate::keys::{AppKey, ResourceKey};
 use crate::artifact::{Artifact, ArtifactKey};
-use crate::resource::{ResourceStub, ResourceInit, ResourceSrc, ResourceAssign, ResourceSliceAssign, HostedResourceStore, HostedResource, LocalHostedResource};
+use crate::resource::{ResourceStub, ResourceInit, AssignResourceStateSrc, ResourceAssign, ResourceSliceAssign, HostedResourceStore, HostedResource, LocalHostedResource, Resource};
 use crate::message::Fail;
 use crate::core::space::{SpaceHost, SpaceHostSqLite};
 
@@ -50,13 +50,14 @@ impl StarCoreAction{
 
 pub enum StarCoreCommand
 {
-    IsHosting(ResourceKey),
+    Get(ResourceKey),
     Assign(ResourceAssign),
     Message(ResourceMessage)
 }
 
 pub enum StarCoreResult{
     Ok,
+    Resource(Option<Resource>),
     LocalLocation(LocalResourceLocation),
     MessageReply(ResourceMessagePayload)
 }
@@ -66,7 +67,8 @@ impl ToString for StarCoreResult{
         match self{
             StarCoreResult::Ok => "Ok".to_string(),
             StarCoreResult::LocalLocation(_) => "LocalLocation".to_string(),
-            StarCoreResult::MessageReply(_) => "MessageReply".to_string()
+            StarCoreResult::MessageReply(_) => "MessageReply".to_string(),
+            StarCoreResult::Resource(_) => "Resource".to_string()
         }
     }
 }
@@ -251,6 +253,7 @@ impl StarCoreExtFactory for ExampleStarCoreExtFactory
 #[async_trait]
 pub trait Host: Send+Sync{
     async fn assign(&self, assign: ResourceAssign) -> Result<(),Fail>;
+    async fn get(&self, key: ResourceKey) -> Result<Option<Resource>,Fail>;
 }
 
 
@@ -258,7 +261,6 @@ pub trait Host: Send+Sync{
 pub struct StarCore2{
     skel: StarSkel,
     rx: mpsc::Receiver<StarCoreAction>,
-    resources: HostedResourceStore,
     host: Box<dyn Host>
 }
 
@@ -268,7 +270,6 @@ impl StarCore2{
         StarCore2{
             skel: skel,
             rx: rx,
-            resources: HostedResourceStore::new().await,
             host: host
         }
     }
@@ -283,21 +284,16 @@ impl StarCore2{
 
     async fn process(&mut self, command: StarCoreCommand ) ->Result<StarCoreResult,Fail>{
         match command{
-            StarCoreCommand::IsHosting(key) => {
-                if self.resources.contains(&key).await? {
-                    let local = LocalResourceLocation::new(key, Option::None );
-                    Ok(StarCoreResult::LocalLocation(local))
-                } else{
-                    Err(Fail::ResourceNotFound(key))
-                }
-            }
+
             StarCoreCommand::Assign(assign) => {
                 self.host.assign(assign).await?;
                 Ok(StarCoreResult::Ok)
             }
-            _ => {
-                unimplemented!()
+            StarCoreCommand::Get(key) => {
+                let resource = self.host.get(key).await?;
+                Ok(StarCoreResult::Resource(resource))
             }
+            _ => unimplemented!()
         }
     }
 }

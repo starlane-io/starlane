@@ -152,6 +152,16 @@ pub enum MessageResult<OK>
     Timeout
 }
 
+impl <OK> ToString for MessageResult<OK>{
+    fn to_string(&self) -> String {
+        match self {
+            MessageResult::Ok(_) => "Ok".to_string(),
+            MessageResult::Err(err) => format!("Err({})",err),
+            MessageResult::Timeout => "Timeout".to_string()
+        }
+    }
+}
+
 pub struct StarMessageDeliveryInsurance
 {
     pub message: StarMessage,
@@ -289,8 +299,8 @@ impl OkResultWaiter
                     MessageResult::Ok(payload) => {
                         self.tx.send(payload);
                     }
-                    _ => {
-                        eprintln!("not expecting this results for OkResultWaiter...");
+                    x => {
+                        eprintln!("not expecting this results for OkResultWaiter...{} ", x.to_string() );
                         self.tx.send(StarMessagePayload::None);
                     }
                 }

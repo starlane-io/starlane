@@ -1,52 +1,31 @@
 use crate::keys::{SpaceKey, ResourceKey};
-use crate::resource::{Resource, ResourceAddress, ResourceType, State, StateSrc, ResourceSrc};
+use crate::resource::{Resource, ResourceAddress, ResourceType, AssignResourceStateSrc, Src};
 use crate::error::Error;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use serde::{Serialize,Deserialize};
+use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct Space{
-  key: SpaceKey,
-  address: ResourceAddress,
-  name: String,
-  display: String
+    key: SpaceKey,
+    address: ResourceAddress,
+    state_src: Src<SpaceState>
 }
 
 impl Space {
 
-  pub fn new( key: SpaceKey, address: ResourceAddress, display: String )->Result<Self,Error>{
+    pub fn new(key: SpaceKey, address: ResourceAddress, state_src: Src<SpaceState>) ->Result<Self,Error>{
         if address.resource_type != ResourceType::Space{
             Err("expected space address".into())
         }
         else {
             Ok(Space {
                 key: key,
-                name: address.last_to_string()?,
-                display: display,
-                address: address
+                address: address,
+                state_src: state_src
             })
         }
     }
-}
-
-impl Resource<SpaceState> for Space{
-  fn key(&self) -> ResourceKey {
-    ResourceKey::Space(self.key.clone())
-  }
-
-  fn address(&self) -> ResourceAddress {
-      self.address.clone()
-  }
-
-  fn resource_type(&self) -> ResourceType {
-      ResourceType::Space
-  }
-
-  fn state(&self) -> StateSrc<SpaceState> {
-        StateSrc::Memory(Box::new(SpaceState{
-            name: self.name.clone(),
-            display: self.display.clone()
-        }))
-  }
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -54,7 +33,6 @@ pub struct SpaceState{
   name: String,
   display: String
 }
-
 
 impl SpaceState{
 
@@ -78,22 +56,37 @@ impl SpaceState{
     }
 }
 
-impl State for SpaceState{
-  fn to_bytes(self) -> Result<Vec<u8>, Error> {
-      Ok(bincode::serialize(&self)?)
-  }
-}
 
-impl TryFrom<ResourceSrc> for StateSrc<SpaceState>{
+impl TryInto<Vec<u8>> for SpaceState {
 
     type Error = Error;
 
-    fn try_from(src: ResourceSrc) -> Result<StateSrc<SpaceState>, Self::Error> {
-        match src{
-            ResourceSrc::AssignState(raw) => {
-                Ok(StateSrc::Memory(Box::new(SpaceState::from_bytes(raw.as_slice())?)))
-            }
-        }
+    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
+        Ok(bincode::serialize(&self)?)
     }
 }
 
+impl TryInto<Arc<Vec<u8>>> for SpaceState {
+
+    type Error = Error;
+
+    fn try_into(self) -> Result<Arc<Vec<u8>>, Self::Error> {
+        Ok(Arc::new(bincode::serialize(&self)?))
+    }
+}
+
+impl TryFrom<Arc<Vec<u8>>> for SpaceState{
+    type Error = Error;
+
+    fn try_from(value: Arc<Vec<u8>>) -> Result<Self, Self::Error> {
+        Ok(bincode::deserialize::<SpaceState>(value.as_slice() )?)
+    }
+}
+
+impl TryFrom<Vec<u8>> for SpaceState{
+    type Error = Error;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        Ok(bincode::deserialize::<SpaceState>(value.as_slice() )?)
+    }
+}

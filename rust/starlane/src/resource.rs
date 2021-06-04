@@ -29,8 +29,9 @@ use crate::star::{ResourceRegistryBacking, StarComm, StarCommand, StarKey, StarS
 use crate::star::pledge::{StarHandle, ResourceHostSelector};
 use crate::util::AsyncHashMap;
 use tokio::sync::oneshot::Receiver;
-use crate::resource::space::SpaceState;
+use crate::resource::space::{SpaceState, Space};
 use std::convert::{TryFrom, TryInto};
+use crate::resource::user::UserState;
 
 pub mod space;
 pub mod sub_space;
@@ -825,16 +826,25 @@ println!("......Trans commit()!.......");
             }
             ResourceRegistryCommand::Find(key) => {
 
+println!("==Doing a FIND()");
+
                 let key = key.bin()?;
-                let statement = "SELECT (key,host,gathering) FROM locations WHERE key=?1";
+                //let statement = "SELECT (key,host,gathering) FROM locations WHERE key=?1";
+                let statement = "SELECT key,host,gathering FROM locations WHERE key=?1";
+println!("==just before prepared statement()");
                 let mut statement = self.conn.prepare(statement)?;
+println!("==GOT HERE in FIND()");
                 let result = statement.query_row( params![key], |row| {
+
+println!("==Query Row");
                     let key: Vec<u8> = row.get(0)?;
                     let key = ResourceKey::from_bin(key)?;
 
+println!("==Host");
                     let host: Vec<u8> = row.get(1)?;
                     let host = StarKey::from_bin(host)?;
 
+println!("==Gathering");
                     let gathering = if let ValueRef::Null = row.get_ref(2)? {
                         Option::None
                     } else {
@@ -1128,7 +1138,7 @@ impl ResourceType
     {
         match self
         {
-            ResourceType::Nothing => u8::max_value(),
+            ResourceType::Nothing => 255,
             ResourceType::Space => 0,
             ResourceType::SubSpace => 1,
             ResourceType::App => 2,
@@ -1142,10 +1152,8 @@ impl ResourceType
 
     pub fn from_magic(magic: u8)->Result<Self,Error>
     {
-        let max = u8::max_value();
         match magic
         {
-            max => Ok(ResourceType::Nothing),
             0 => Ok(ResourceType::Space),
             1 => Ok(ResourceType::SubSpace),
             2 => Ok(ResourceType::App),
@@ -1154,6 +1162,7 @@ impl ResourceType
             5 => Ok(ResourceType::File),
             6 => Ok(ResourceType::Artifact),
             7 => Ok(ResourceType::FileSystem),
+            255 => Ok(ResourceType::Nothing),
             _ => Err(format!("no resource type for magic number {}",magic).into())
         }
     }
@@ -1736,7 +1745,7 @@ impl ResourceManager for RemoteResourceManager {
 }
 
 #[derive(Clone)]
-pub struct ResourceManagerCore{
+pub struct ChildResourceManagerCore {
     pub key: ResourceKey,
     pub address: ResourceAddress,
     pub selector: ResourceHostSelector,
@@ -1745,12 +1754,12 @@ pub struct ResourceManagerCore{
 }
 
 
-pub struct LocalResourceManager {
-   pub core: ResourceManagerCore
+pub struct ChildResourceManager {
+   pub core: ChildResourceManagerCore
 }
 
-impl LocalResourceManager {
-    async fn process_create(core: ResourceManagerCore, create: ResourceCreate ) -> Result<ResourceLocationRecord,Fail>{
+impl ChildResourceManager {
+    async fn process_create(core: ChildResourceManagerCore, create: ResourceCreate ) -> Result<ResourceLocationRecord,Fail>{
 
         if !core.key.resource_type().parent().matches(ResourceType::from(&create.parent).as_ref()) {
 println!("!!! -> Throwing Fail::WrongParentResourceType <- !!!");
@@ -1800,7 +1809,7 @@ println!("CREATED KEY: {}",key);
         let assign = ResourceAssign {
             key: key.clone(),
             address: address.clone(),
-            source: create.src.clone(),
+            state_src: create.src.clone(),
             archetype: create.archetype.clone()
         };
 
@@ -1834,13 +1843,13 @@ println!("returning resource record..." );
 }
 
 #[async_trait]
-impl ResourceManager for LocalResourceManager {
+impl ResourceManager for ChildResourceManager {
     async fn create( &self, create: ResourceCreate ) -> oneshot::Receiver<Result<ResourceLocationRecord,Fail>> {
         let (tx,rx) = oneshot::channel();
 
         let core = self.core.clone();
         tokio::spawn( async move {
-            tx.send(LocalResourceManager::process_create(core, create ).await).unwrap_or_default();
+            tx.send(ChildResourceManager::process_create(core, create ).await).unwrap_or_default();
         });
         rx
     }
@@ -2257,12 +2266,17 @@ impl FromStr for ResourceAddress {
         let address_structure = split.next().ok_or("address structure")?;
         let mut resource_type_gen = split.next().ok_or("resource type")?.to_string();
 
+
         // chop off the generics i.e. <Space> remove '<' and '>'
+        if resource_type_gen.len() < 2 {
+            return Err(format!("not a valid resource type generic '{}'",resource_type_gen).into());
+        }
         resource_type_gen.remove(0);
-        resource_type_gen.remove(resource_type_gen.len() );
+        resource_type_gen.remove(resource_type_gen.len()-1 );
 
         let resource_type = ResourceType::from_str(resource_type_gen.as_str() )?;
         let resource_address = resource_type.address_structure().from_str(address_structure)?;
+
         Ok(resource_address)
     }
 }
@@ -3100,7 +3114,7 @@ pub struct ResourceCreate {
    pub key: KeyCreationSrc,
    pub address: AddressCreationSrc,
    pub archetype: ResourceArchetype,
-   pub src: ResourceSrc,
+   pub src: AssignResourceStateSrc,
    pub registry_info: Option<ResourceRegistryInfo>,
    pub owner: Option<UserKey>,
    pub location_affinity: Option<ResourceLocationAffinity>
@@ -3109,7 +3123,7 @@ pub struct ResourceCreate {
 
 impl ResourceCreate {
 
-    pub fn new(archetype: ResourceArchetype, src: ResourceSrc ) ->Self {
+    pub fn new(archetype: ResourceArchetype, src: AssignResourceStateSrc) ->Self {
         ResourceCreate {
             parent: ResourceKey::Nothing,
             key: KeyCreationSrc::None,
@@ -3190,12 +3204,40 @@ pub enum KeySrc{
     Address(ResourceAddress)
 }
 
+/// can have other options like to Initialize the state data
 #[derive(Clone,Serialize,Deserialize)]
-pub enum ResourceSrc {
-    AssignState(Vec<u8>)
+pub enum AssignResourceStateSrc {
+    Direct(Arc<Vec<u8>>)
+}
+
+impl AssignResourceStateSrc {
+
+    pub fn to_resource_state_src(self, resource_type: ResourceType ) -> Result<ResourceStateSrc,Error> {
+
+        let Self::Direct(data) = self;
+
+        match resource_type{
+            ResourceType::Space => Ok(ResourceStateSrc::Space(Src::<SpaceState>::try_from(data)?)),
+            _ => unimplemented!()
+        }
+    }
+    pub fn to_data(self) -> Arc<Vec<u8>> {
+        match self{
+            AssignResourceStateSrc::Direct(data) => data
+        }
+    }
 }
 
 
+impl TryInto<Arc<Vec<u8>>> for AssignResourceStateSrc{
+    type Error = Error;
+
+    fn try_into(self) -> Result<Arc<Vec<u8>>, Self::Error> {
+        match self {
+            AssignResourceStateSrc::Direct(state) => Ok(state)
+        }
+    }
+}
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub enum ResourceSliceStatus {
@@ -3230,6 +3272,7 @@ impl FromStr for ResourceSliceStatus {
         }
     }
 }
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceSliceAssign{
@@ -3268,7 +3311,7 @@ impl ResourceStub {
 pub struct ResourceAssign{
     pub key: ResourceKey,
     pub address: ResourceAddress,
-    pub source: ResourceSrc,
+    pub state_src: AssignResourceStateSrc,
     pub archetype: ResourceArchetype
 }
 
@@ -3364,38 +3407,138 @@ impl ResourceHost for RemoteResourceHost {
     }
 }
 
-pub trait Resource<S:State> : Send+Sync {
-    fn key(&self)->ResourceKey;
-    fn address(&self)->ResourceAddress;
-    fn resource_type(&self)->ResourceType;
-    fn state(&self) -> StateSrc<S>;
+#[derive(Clone)]
+pub struct Resource{
+   key: ResourceKey,
+   address: ResourceAddress,
+   state_src: ResourceStateSrc
 }
 
-pub trait State : Send+Sync+Clone {
-    fn to_bytes(self) ->Result<Vec<u8>,Error>;
-}
-
-pub enum StateSrc<S> where S: State {
-    Memory(Box<S>)
-}
-
-impl <S> StateSrc<S> where S: State {
-    pub fn to_data(self)->Result<Vec<u8>,Error>{
-        match self{
-            StateSrc::Memory(data) => Ok(data.to_bytes()?)
+impl Resource{
+    pub fn new(key: ResourceKey, address: ResourceAddress, state_src: ResourceStateSrc ) -> Resource {
+        Resource{
+            key: key,
+            address: address,
+            state_src: state_src
         }
     }
 
-    pub fn to_state(self)->Result<Box<S>,Error> {
+    pub fn key(&self)->ResourceKey{
+        self.key.clone()
+    }
+
+    pub fn address(&self)->ResourceAddress
+    {
+        self.address.clone()
+    }
+
+    pub fn resource_type(&self)->ResourceType{
+        self.key.resource_type()
+    }
+
+    pub fn state_src(&self) -> ResourceStateSrc {
+        self.state_src.clone()
+    }
+
+}
+
+
+
+#[derive(Clone)]
+pub enum ResourceStateSrc {
+    None,
+    Space(Src<SpaceState>)
+}
+
+impl ResourceStateSrc{
+    pub fn resource_type(&self)->ResourceType{
+        match self {
+            ResourceStateSrc::Space(_) => ResourceType::Space,
+            ResourceStateSrc::None => ResourceType::Nothing
+        }
+    }
+}
+
+impl TryFrom<Arc<Vec<u8>>> for Src<SpaceState>{
+    type Error = Error;
+
+    fn try_from(value: Arc<Vec<u8>>) -> Result<Self, Self::Error> {
+           let space = SpaceState::try_from(value)?;
+           Ok(Src::Memory(Arc::new(space)))
+    }
+}
+
+impl TryInto<Arc<Vec<u8>>> for ResourceStateSrc{
+    type Error = Error;
+
+    fn try_into(self) -> Result<Arc<Vec<u8>>, Self::Error> {
+        let magic = self.resource_type().magic();
+        let mut bytes:Vec<u8> = match self {
+            ResourceStateSrc::Space(space) => space.try_into()?,
+            ResourceStateSrc::None => vec![]
+        };
+        bytes.insert(0, magic );
+        Ok(Arc::new(bytes))
+    }
+}
+
+impl TryFrom<Vec<u8>> for ResourceStateSrc {
+    type Error = Error;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        if value.len() == 0{
+            return Err("zero length data for ResourceStateSrc, expecrted at least a magic number".into());
+        }
+        let mut value = value;
+        let magic = value.remove(0);
+println!("MAGIC is: {}",magic );
+        match ResourceType::from_magic(magic) {
+            Ok(resource_type) => {
+                match resource_type {
+                    ResourceType::Space => {
+                        Ok(ResourceStateSrc::Space(Src::Memory(Arc::new(SpaceState::try_from(value)?))))
+                    }
+                    _ => Err(format!("do not have a ResourceStateSrc.try_from for {} yet",resource_type.to_string()).into())
+                }
+            }
+            Err(_) => Err(format!("bad magic number {}",magic).into())
+        }
+    }
+}
+
+
+#[derive(Clone)]
+pub enum Src<S: Sync+Send> {
+    Memory(Arc<S>)
+}
+
+
+
+impl TryInto<Arc<Vec<u8>>> for Src<SpaceState> {
+
+    type Error = Error;
+
+    fn try_into(self) -> Result<Arc<Vec<u8>>, Self::Error> {
         match self{
-            StateSrc::Memory(state) => {
-                Ok(state)
+            Src::Memory(space_state) => {
+                Ok((*space_state).clone().try_into()?)
             }
         }
     }
 }
 
+impl TryInto<Vec<u8>> for Src<SpaceState> {
 
+    type Error = Error;
+
+    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
+        match self{
+            Src::Memory(space_state) => {
+                Ok((*space_state).clone().try_into()?)
+            }
+        }
+    }
+}
 
 
 

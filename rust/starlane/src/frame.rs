@@ -348,7 +348,7 @@ impl StarMessage
 pub enum StarMessagePayload
 {
    None,
-   ResourceManager(ResourceManagerAction),
+   ResourceManager(ChildResourceAction),
    ResourceHost(ResourceHostAction),
    Space(SpaceMessage),
    Reply(SimpleReply),
@@ -369,7 +369,7 @@ pub enum ResourceHostResult{
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum ResourceManagerAction
+pub enum ChildResourceAction
 {
     Register(ResourceRegistration),
     Location(ResourceLocationRecord),
@@ -383,19 +383,19 @@ pub enum ResourceManagerAction
     Select(ResourceSelector),
 }
 
-impl ToString for ResourceManagerAction{
+impl ToString for ChildResourceAction {
     fn to_string(&self) -> String {
         match self {
-            ResourceManagerAction::Register(_) => "Register".to_string(),
-            ResourceManagerAction::Location(_) => "Location".to_string(),
-            ResourceManagerAction::Find(_) => "Find".to_string(),
-            ResourceManagerAction::GetKey(_) => "GetKey".to_string(),
-            ResourceManagerAction::GetAddress(_) => "GetAddress".to_string(),
-            ResourceManagerAction::Bind(_) => "Bind".to_string(),
-            ResourceManagerAction::Status(_) => "Status".to_string(),
-            ResourceManagerAction::SliceStatus(_) => "SliceStatus".to_string(),
-            ResourceManagerAction::Create(_) => "Create".to_string(),
-            ResourceManagerAction::Select(_) => "Select".to_string(),
+            ChildResourceAction::Register(_) => "Register".to_string(),
+            ChildResourceAction::Location(_) => "Location".to_string(),
+            ChildResourceAction::Find(_) => "Find".to_string(),
+            ChildResourceAction::GetKey(_) => "GetKey".to_string(),
+            ChildResourceAction::GetAddress(_) => "GetAddress".to_string(),
+            ChildResourceAction::Bind(_) => "Bind".to_string(),
+            ChildResourceAction::Status(_) => "Status".to_string(),
+            ChildResourceAction::SliceStatus(_) => "SliceStatus".to_string(),
+            ChildResourceAction::Create(_) => "Create".to_string(),
+            ChildResourceAction::Select(_) => "Select".to_string(),
         }
     }
 }
@@ -450,6 +450,20 @@ pub enum Reply
     Address(ResourceAddress),
     Resource(ResourceStub),
     Seq(u64)
+}
+
+impl ToString for Reply{
+    fn to_string(&self) -> String {
+        match self{
+            Reply::Empty => "Empty".to_string(),
+            Reply::Key(_) => "Key".to_string(),
+            Reply::Keys(_) =>  "Keys".to_string(),
+            Reply::Location(_) =>  "Location".to_string(),
+            Reply::Address(_) =>  "Address".to_string(),
+            Reply::Resource(_) =>  "Resource".to_string(),
+            Reply::Seq(_) =>  "Seq".to_string(),
+        }
+    }
 }
 
 #[derive(Clone,Serialize,Deserialize)]

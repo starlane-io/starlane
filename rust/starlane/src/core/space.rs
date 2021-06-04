@@ -1,17 +1,20 @@
-use crate::resource::{ResourceAssign, ResourceType, Names, StateSrc};
+use crate::resource::{ResourceAssign, ResourceType, Names, Resource, ResourceAddress, ResourceStateSrc, AssignResourceStateSrc};
 use rusqlite::{Connection, Transaction,params};
 use tokio::sync::{mpsc, oneshot};
 use std::collections::HashSet;
 use crate::error::Error;
 use crate::message::Fail;
 use std::iter::FromIterator;
-use std::convert::TryInto;
-use crate::resource::space::SpaceState;
+use std::convert::{TryInto, TryFrom};
+use crate::resource::space::{SpaceState, Space};
 use serde::{Deserialize, Serialize};
 use crate::frame::ResourceHostAction;
 use crate::core::Host;
 use crate::resource;
 use crate::resource::user::UserState;
+use crate::keys::{ResourceKey, SpaceId};
+use std::str::FromStr;
+use std::sync::Arc;
 
 pub struct SpaceHost {
   tx: mpsc::Sender<SpaceHostAction>
@@ -39,6 +42,21 @@ println!("assignging resource:{} ", assign.archetype.kind );
 println!("AsSiGnEd:{} ", assign.archetype.kind );
         Ok(())
     }
+
+    async fn get(&self, key: ResourceKey) -> Result<Option<Resource>, Fail> {
+        let (tx,rx) = oneshot::channel();
+        self.tx.send( SpaceHostAction{
+            command: ResourceHostCommand::Get(key.clone()),
+            tx: tx
+        }).await?;
+        let result = rx.await??;
+        match result {
+            ResourceHostResult::Resource(resource) => {
+                Ok(resource)
+            }
+            _ => Err(Fail::Unexpected)
+        }
+    }
 }
 
 pub struct SpaceHostAction {
@@ -49,12 +67,14 @@ pub struct SpaceHostAction {
 
 pub enum ResourceHostCommand {
     Close,
-    Assign(ResourceAssign)
+    Assign(ResourceAssign),
+    Get(ResourceKey)
 }
 
 
 pub enum ResourceHostResult {
-    Ok
+    Ok,
+    Resource(Option<Resource>)
 }
 
 
@@ -120,47 +140,49 @@ impl SpaceHostSqLite {
                 Ok(ResourceHostResult::Ok)
             }
             ResourceHostCommand::Assign(assign) => {
+                let trans = self.conn.transaction()?;
+                let key = assign.key.bin()?;
+                let address = assign.address.to_string();
+                let state_src = assign.state_src.to_resource_state_src(assign.key.resource_type() )?;
+println!("state_src...{}",state_src.resource_type().to_string());
+                let state: Arc<Vec<u8>> = state_src.try_into()?;
 
-                match assign.key.resource_type(){
-                    ResourceType::Space => {
-                        let trans = self.conn.transaction()?;
-                        let space_key = assign.key.space()?;
-                        let id = space_key.id();
-                        let state_src :StateSrc<SpaceState> = assign.source.try_into()?;
-                        let state = state_src.to_state()?;
-                        let name = state.name();
-                        let display = state.display();
-println!("INSERT INTO spaces (id,name,display) VALUES ({},{},{})", id,name,display);
-                        trans.execute("INSERT INTO spaces (id,name,display) VALUES (?1,?2,?3)", params![id,name,display])?;
-
-                        trans.commit()?;
-                        Ok(ResourceHostResult::Ok)
+                trans.execute("INSERT INTO resources (key,address,state) VALUES (?1,?2,?3)", params![key,address,*state])?;
+                trans.commit()?;
+                Ok(ResourceHostResult::Ok)
+            }
+            ResourceHostCommand::Get(key) => {
+println!("Get Resource...");
+                let key_bin = key.bin()?;
+                let resource = self.conn.query_row("SELECT address,state FROM resources WHERE key=?1", params![key_bin], |row| {
+println!("ROW: ....");
+                    let address: String = row.get(0)?;
+println!("x: ....");
+                    let address= ResourceAddress::from_str(address.as_str())?;
+println!("y: ....");
+                    let state: Vec<u8> = row.get(1)?;
+println!("z: ....");
+                    let state= ResourceStateSrc::try_from(state);
+                    match &state {
+                        Ok(x) => {}
+                        Err(err) => { println!("error: {}",err)}
                     }
-                    ResourceType::User => {
-                        let trans = self.conn.transaction()?;
-                        let user_key= assign.key.user()?;
-                        let space_id = user_key.space.id();
-                        let user_id = user_key.id;
-                        let state_src :StateSrc<UserState> = assign.source.try_into()?;
-                        let state = state_src.to_state()?;
-                        let email= state.email();
-println!("INSERT INTO users (id,space_id,email) VALUES ({},{},{})", user_id,space_id,email);
-                        trans.execute("INSERT INTO spaces (id,space_id,email) VALUES (?1,?2,?3)", params![user_id,space_id,email])?;
+                    let state = state?;
+println!("w: ....");
+                    Ok(Resource::new(key,address,state))
+                });
 
-                        trans.commit()?;
-                        Ok(ResourceHostResult::Ok)
-
-
-
-
+                match resource {
+                    Ok(resource) => {
+                        Ok(ResourceHostResult::Resource(Option::Some(resource)))
                     }
-/*                    ResourceType::SubSpace => {}
+                    Err(err) => {
 
- */
-                    resource_type => {
-
-                        Err(Fail::WrongResourceType { expected: HashSet::from_iter(vec![ResourceType::Space,ResourceType::SubSpace,ResourceType::User]), received: resource_type })
-                    }
+println!("SQL ERR.......");
+                        match err {
+                        rusqlite::Error::QueryReturnedNoRows => Ok(ResourceHostResult::Resource(Option::None)),
+                        _ => Err(err.into())
+                    }}
                 }
 
             }
@@ -169,36 +191,15 @@ println!("INSERT INTO users (id,space_id,email) VALUES ({},{},{})", user_id,spac
 
     pub fn setup(&mut self)->Result<(),Error>
     {
-       let spaces = r#"
-       CREATE TABLE IF NOT EXISTS spaces (
-	      id INTEGER PRIMARY KEY AUTOINCREMENT,
-	      name TEXT NOT NULL,
-	      display TEXT NOT NULL
-        )"#;
-
-       let users= r#"
-       CREATE TABLE IF NOT EXISTS users (
-	      id INTEGER PRIMARY KEY AUTOINCREMENT,
-	      space_id INTEGER NOT NULL,
-	      email TEXT NOT NULL,
-          UNIQUE(space_id,email),
-          FOREIGN KEY (space_id) REFERENCES spaces (id)
-        )"#;
-
-       let sub_spaces= r#"
-       CREATE TABLE IF NOT EXISTS sub_spaces (
-	      id INTEGER PRIMARY KEY AUTOINCREMENT,
-	      space_id INTEGER NOT NULL,
-	      name TEXT NOT NULL,
-	      display TEXT,
-          UNIQUE(space_id,name),
-          FOREIGN KEY (space_id) REFERENCES spaces (id)
+       let resources= r#"
+       CREATE TABLE IF NOT EXISTS resources(
+	      key BLOB PRIMARY KEY,
+	      address TEXT NOT NULL,
+	      state BLOB NOT NULL
         )"#;
 
         let transaction = self.conn.transaction()?;
-        transaction.execute(spaces, [])?;
-        transaction.execute(users, [])?;
-        transaction.execute(sub_spaces, [])?;
+        transaction.execute(resources, [])?;
         transaction.commit()?;
 
         Ok(())
