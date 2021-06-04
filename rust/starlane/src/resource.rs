@@ -375,7 +375,7 @@ pub enum ResourceRegistryCommand
 {
     Close,
     Clear,
-    Accepts(HashSet<ResourceType>),
+    //Accepts(HashSet<ResourceType>),
     Reserve(ResourceNamesReservationRequest),
     Commit(ResourceRegistration),
     Select(ResourceSelector),
@@ -527,7 +527,6 @@ pub struct Registry {
    pub conn: Connection,
    pub tx: mpsc::Sender<ResourceRegistryAction>,
    pub rx: mpsc::Receiver<ResourceRegistryAction>,
-   pub accepted: Option<HashSet<ResourceType>>
 }
 
 impl Registry {
@@ -545,7 +544,6 @@ impl Registry {
                     conn: conn.unwrap(),
                     tx: tx_clone,
                     rx: rx,
-                    accepted: Option::None
                 };
                 db.run().await.unwrap();
             }
@@ -584,18 +582,6 @@ eprintln!("error setting up db: {}", err );
         Ok(())
     }
 
-    fn accept( &self, resource_type: ResourceType )->bool
-    {
-        if self.accepted.is_none() {
-            return true;
-        }
-
-        let accepted = self.accepted.as_ref().unwrap();
-
-        return accepted.contains(&resource_type);
-    }
-
-
     fn process(&mut self, command: ResourceRegistryCommand) -> Result<ResourceRegistryResult, Error> {
         match command
         {
@@ -614,16 +600,10 @@ eprintln!("error setting up db: {}", err );
 
                 Ok(ResourceRegistryResult::Ok)
             }
-            ResourceRegistryCommand::Accepts(accept)=> {
-                self.accepted= Option::Some(accept);
-                Ok(ResourceRegistryResult::Ok)
-            }
+
             ResourceRegistryCommand::Commit(registration) => {
 println!("COMMIT REGISTRATION!!!!!");
-                if !self.accept(registration.resource.key.resource_type() ) {
-println!("WE DON'T HANDLE: {}",registration.resource.key.resource_type().to_string());
-                    return Ok(ResourceRegistryResult::NotAccepted);
-                }
+
 println!("......Paramz.......");
                 let params= RegistryParams::from_registration(registration.clone())?;
 
@@ -664,12 +644,6 @@ println!("......Trans commit()!.......");
                 Ok(ResourceRegistryResult::Ok)
             }
             ResourceRegistryCommand::Select(selector) => {
-
-                for resource_type in selector.resource_types() {
-                    if !self.accept(resource_type ) {
-                        return Ok(ResourceRegistryResult::NotAccepted);
-                    }
-                }
 
                 let mut params = vec![];
                 let mut where_clause = String::new();
@@ -809,9 +783,6 @@ println!("......Trans commit()!.......");
                 Ok(ResourceRegistryResult::Resources(resources) )
             }
             ResourceRegistryCommand::SetLocation(location_record) => {
-                if !self.accept(location_record.key.resource_type()) {
-                   return Ok(ResourceRegistryResult::NotAccepted);
-                }
 
                 let key = location_record.key.bin()?;
                 let host = location_record.location.host.bin()?;
@@ -3241,6 +3212,7 @@ impl AssignResourceStateSrc {
 
         match resource_type{
             ResourceType::Space => Ok(ResourceStateSrc::Space(Src::<SpaceState>::try_from(data)?)),
+            ResourceType::User => Ok(ResourceStateSrc::User(Src::<UserState>::try_from(data)?)),
             _ => unimplemented!()
         }
     }
@@ -3381,7 +3353,7 @@ impl LocalResourceHost{
 #[async_trait]
 impl ResourceHost for LocalResourceHost{
     fn star_key(&self) -> StarKey {
-        self.skel.info.star.clone()
+        self.skel.info.key.clone()
     }
 
     async fn assign(&self, assign: ResourceAssign) -> Result<(), Fail> {
@@ -3470,14 +3442,16 @@ impl Resource{
 #[derive(Clone)]
 pub enum ResourceStateSrc {
     None,
-    Space(Src<SpaceState>)
+    Space(Src<SpaceState>),
+    User(Src<UserState>)
 }
 
 impl ResourceStateSrc{
     pub fn resource_type(&self)->ResourceType{
         match self {
             ResourceStateSrc::Space(_) => ResourceType::Space,
-            ResourceStateSrc::None => ResourceType::Nothing
+            ResourceStateSrc::User(_) => ResourceType::User,
+            ResourceStateSrc::None => ResourceType::Nothing,
         }
     }
 }
@@ -3491,6 +3465,16 @@ impl TryFrom<Arc<Vec<u8>>> for Src<SpaceState>{
     }
 }
 
+impl TryFrom<Arc<Vec<u8>>> for Src<UserState>{
+    type Error = Error;
+
+    fn try_from(value: Arc<Vec<u8>>) -> Result<Self, Self::Error> {
+        let user = UserState::try_from(value)?;
+        Ok(Src::Memory(Arc::new(user)))
+    }
+}
+
+
 impl TryInto<Arc<Vec<u8>>> for ResourceStateSrc{
     type Error = Error;
 
@@ -3498,7 +3482,8 @@ impl TryInto<Arc<Vec<u8>>> for ResourceStateSrc{
         let magic = self.resource_type().magic();
         let mut bytes:Vec<u8> = match self {
             ResourceStateSrc::Space(space) => space.try_into()?,
-            ResourceStateSrc::None => vec![]
+            ResourceStateSrc::User(user) => user.try_into()?,
+            ResourceStateSrc::None => vec![],
         };
         bytes.insert(0, magic );
         Ok(Arc::new(bytes))
@@ -3563,5 +3548,17 @@ impl TryInto<Vec<u8>> for Src<SpaceState> {
     }
 }
 
+impl TryInto<Vec<u8>> for Src<UserState> {
+
+    type Error = Error;
+
+    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
+        match self{
+            Src::Memory(user_state) => {
+                Ok((*user_state).clone().try_into()?)
+            }
+        }
+    }
+}
 
 

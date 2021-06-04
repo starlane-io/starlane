@@ -135,7 +135,7 @@ impl StarKind
     pub fn hosts(&self)->HashSet<ResourceType>{
         HashSet::from_iter(match self {
             StarKind::Central => vec![],
-            StarKind::SpaceHost => vec![ResourceType::Space, ResourceType::SubSpace],
+            StarKind::SpaceHost => vec![ResourceType::Space, ResourceType::SubSpace,ResourceType::User],
             StarKind::Mesh => vec![],
             StarKind::AppHost => vec![ResourceType::App],
             StarKind::ActorHost => vec![ResourceType::Actor],
@@ -957,7 +957,7 @@ println!("~~RESULT IS UNEXPECTED:::::!");
 
         let message = StarMessage{
             id: id,
-            from: self.skel.info.star.clone(),
+            from: self.skel.info.key.clone(),
             to: proto.to.unwrap(),
             //transaction: proto.transaction,
             payload: proto.payload,
@@ -1000,7 +1000,7 @@ println!("~~RESULT IS UNEXPECTED:::::!");
     async fn do_wind(&mut self, wind: Wind)
     {
         let tx = wind.tx;
-        let wind_up = WindUp::new(self.skel.info.star.clone(), wind.pattern, wind.action );
+        let wind_up = WindUp::new(self.skel.info.key.clone(), wind.pattern, wind.action );
         self.do_wind_up(wind_up, tx, Option::None).await;
     }
 
@@ -1015,7 +1015,7 @@ println!("~~RESULT IS UNEXPECTED:::::!");
         };
 
         let local_hit = match wind.pattern.is_match(&self.skel.info){
-            true => Option::Some(self.skel.info.star.clone()),
+            true => Option::Some(self.skel.info.key.clone()),
             false => Option::None
         };
 
@@ -1023,7 +1023,7 @@ println!("~~RESULT IS UNEXPECTED:::::!");
         self.transactions.insert(tid.clone(), transaction );
 
         wind.transactions.push(tid.clone());
-        wind.hops.push( self.skel.info.star.clone() );
+        wind.hops.push( self.skel.info.key.clone() );
 
         self.broadcast_excluding(Frame::StarWind(StarWind::Up(wind)), &exclude ).await;
     }
@@ -1041,7 +1041,7 @@ println!("~~RESULT IS UNEXPECTED:::::!");
             {
 
                 let hit = WindHit {
-                    star: self.skel.info.star.clone(),
+                    star: self.skel.info.key.clone(),
                     hops: wind_up.hops.len() + 1
                 };
 
@@ -1083,7 +1083,7 @@ println!("~~RESULT IS UNEXPECTED:::::!");
             let hits = match hit
             {
                 true => {
-                    vec![WindHit {star: self.skel.info.star.clone(), hops: wind_up.hops.len().clone()+1 }]
+                    vec![WindHit {star: self.skel.info.key.clone(), hops: wind_up.hops.len().clone()+1 }]
                 }
                 false => {
                     vec!()
@@ -1160,7 +1160,7 @@ println!("~~RESULT IS UNEXPECTED:::::!");
 
     pub fn star_key(&self)->&StarKey
     {
-        &self.skel.info.star
+        &self.skel.info.key
     }
 
     pub fn star_tx(&self)->mpsc::Sender<StarCommand>
@@ -1263,7 +1263,7 @@ println!("~~RESULT IS UNEXPECTED:::::!");
                  }
             });
         }
-        if message.to != self.skel.info.star {
+        if message.to != self.skel.info.key {
             self.send_frame(message.to.clone(), Frame::StarMessage(message) ).await;
         } else {
 println!("special process frame....");
@@ -1510,7 +1510,7 @@ println!("special process frame....");
                   ProtoFrame::RequestSubgraphExpansion => {
                       if let Option::Some(lane_key) = lane_key
                       {
-                          let mut subgraph = self.skel.info.star.subgraph.clone();
+                          let mut subgraph = self.skel.info.key.subgraph.clone();
                           subgraph.push(StarSubGraphKey::Big(self.star_subgraph_expansion_seq.fetch_add(1,std::sync::atomic::Ordering::Relaxed)));
                           self.send_frame(lane_key.clone(), Frame::Proto(ProtoFrame::GrantSubgraphExpansion(subgraph))).await;
                       }
@@ -1687,9 +1687,9 @@ println!("special process frame....");
 
     async fn on_message(&mut self, mut message: StarMessage) -> Result<(),Error>
     {
-        if message.to != self.skel.info.star
+        if message.to != self.skel.info.key
         {
-            if self.skel.info.kind.relay() || message.from == self.skel.info.star
+            if self.skel.info.kind.relay() || message.from == self.skel.info.key
             {
                 //forward the message
                 self.send_frame(message.to.clone(), Frame::StarMessage(message) ).await;
@@ -1837,7 +1837,7 @@ eprintln!("Error: {}",err);
                     ResourceHostAction::IsHosting(resource) => {
                         if self.has_resource(&resource).await?
                         {
-                            let location = ResourceLocationRecord::new(resource, self.skel.info.star.clone() );
+                            let location = ResourceLocationRecord::new(resource, self.skel.info.key.clone() );
                             self.skel.comm().simple_reply(message,SimpleReply::Ok(Reply::Location(location))).await;
                         }
                         else {
@@ -1849,7 +1849,7 @@ eprintln!("Error: {}",err);
                         let (action,rx) = StarCoreAction::new(StarCoreCommand::Assign(assign.clone()));
                         self.skel.core_tx.send( action).await;
                         rx.await??;
-                        let location = ResourceLocationRecord::new(assign.key, self.skel.info.star.clone() );
+                        let location = ResourceLocationRecord::new(assign.key, self.skel.info.key.clone() );
                         self.skel.comm().simple_reply(message,SimpleReply::Ok(Reply::Location(location))).await;
         println!("Assignment CONFIRMED : {}",self.skel.info.kind);
                     }
@@ -2994,7 +2994,7 @@ eprintln!("Error: {}",err);
         #[derive(Clone)]
         pub struct StarInfo
         {
-           pub star: StarKey,
+           pub key: StarKey,
            pub kind: StarKind,
         }
 
@@ -3003,7 +3003,7 @@ eprintln!("Error: {}",err);
             pub fn new( star: StarKey, kind: StarKind ) -> Self
             {
                 StarInfo{
-                    star: star,
+                    key: star,
                     kind: kind
                 }
             }
@@ -3373,7 +3373,6 @@ eprintln!("Error: {}",err);
 
         #[async_trait]
         pub trait ResourceRegistryBacking: Sync+Send {
-            async fn accepts(&self, accept: HashSet<ResourceType> ) ->Result<(),Fail>;
             async fn reserve(&self, request: ResourceNamesReservationRequest) -> Result<RegistryReservation, Fail>;
             async fn register(&self, registration: ResourceRegistration)->Result<(),Fail>;
             async fn select(&self, select: ResourceSelector) ->Result<Vec<ResourceStub>,Fail>;
@@ -3392,14 +3391,12 @@ eprintln!("Error: {}",err);
 
         impl ResourceRegistryBackingSqLite
         {
-            pub async fn new(accepts: HashSet<ResourceType>) ->Result<Self,Error>
+            pub async fn new() ->Result<Self,Error>
             {
                 let rtn = ResourceRegistryBackingSqLite
                 {
                     registry: Registry::new().await
                 };
-
-                rtn.accepts(accepts).await?;
 
                 Ok(rtn)
             }
@@ -3408,12 +3405,6 @@ eprintln!("Error: {}",err);
         #[async_trait]
         impl ResourceRegistryBacking for ResourceRegistryBackingSqLite
         {
-            async fn accepts(&self, accepts: HashSet<ResourceType>) -> Result<(), Fail> {
-                let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Accepts(accepts));
-                self.registry.send( request ).await?;
-                tokio::time::timeout( Duration::from_secs(5),rx).await??;
-                Ok(())
-            }
 
             async fn reserve(&self, request: ResourceNamesReservationRequest) -> Result<RegistryReservation, Fail> {
                 let (action,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Reserve(request));

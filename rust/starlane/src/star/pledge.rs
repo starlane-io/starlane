@@ -88,17 +88,31 @@ impl ResourceHostSelector{
 
     pub async fn select( &self, resource_type: ResourceType, affinity: Option<ResourceLocationAffinity> ) -> Result<Arc<dyn ResourceHost>,Fail>
     {
-        let handler = self.skel.star_handler.as_ref().ok_or(format!("non-manager star {} does not have a host star selector", self.skel.info.kind ))?;
-        let mut selector = StarSelector::new();
-        selector.add(StarFieldSelection::Kind(resource_type.star_host()));
-        let handle = handler.next(selector).await?;
+        if resource_type.star_host() == self.skel.info.kind{
+            let handle = StarHandle{
+                key: self.skel.info.key.clone(),
+                kind: self.skel.info.kind.clone(),
+                hops: None
+            };
+            let host = RemoteResourceHost{
+                comm: self.skel.comm(),
+                handle: handle
+            };
+            Ok(Arc::new(host))
+        }
+        else{
+            let handler = self.skel.star_handler.as_ref().ok_or(format!("non-manager star {} does not have a host star selector", self.skel.info.kind ))?;
+            let mut selector = StarSelector::new();
+            selector.add(StarFieldSelection::Kind(resource_type.star_host()));
+            let handle = handler.next(selector).await?;
 
-        let host = RemoteResourceHost{
-            comm: self.skel.comm(),
-            handle: handle
-        };
+            let host = RemoteResourceHost{
+                comm: self.skel.comm(),
+                handle: handle
+            };
 
-        Ok(Arc::new(host))
+            Ok(Arc::new(host))
+        }
     }
 }
 

@@ -211,7 +211,7 @@ impl StarLog
 {
     pub fn new(info: &StarInfo, payload: StarLogPayload  ) -> Self {
         StarLog{
-            star: info.star.clone(),
+            star: info.key.clone(),
             kind: info.kind.clone(),
             payload: payload
         }

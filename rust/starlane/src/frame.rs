@@ -181,7 +181,7 @@ impl StarPattern
             StarPattern::Any => {true}
             StarPattern::None => {false}
             StarPattern::StarKey(star) => {
-                *star == info.star
+                *star == info.key
             }
             StarPattern::StarKind(kind) => {
                 *kind == info.kind

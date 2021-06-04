@@ -104,7 +104,7 @@ impl ProtoStar
                 match command {
                     StarCommand::ConstellationConstructionComplete => {
                         let info = StarInfo{
-                            star: self.star_key.as_ref().unwrap().clone(),
+                            key: self.star_key.as_ref().unwrap().clone(),
                             kind: self.kind.clone()};
                         let manager_tx= self.star_manager_factory.create().await;
 
@@ -112,7 +112,7 @@ impl ProtoStar
                         let (core_tx,core_rx) = mpsc::channel(16);
 
                         let resource_registry: Option<Arc<dyn ResourceRegistryBacking>>= if info.kind.is_resource_manager() {
-                            Option::Some( Arc::new( ResourceRegistryBackingSqLite::new(info.kind.manages() ).await? ) )
+                            Option::Some( Arc::new( ResourceRegistryBackingSqLite::new().await? ) )
                         } else {
                             Option::None
                         };

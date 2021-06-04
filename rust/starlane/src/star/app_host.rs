@@ -699,7 +699,7 @@ impl SupervisorDb {
                     break;
                 }
                 SupervisorDbCommand::AddServer(info) => {
-                    let server = bincode::serialize(&info.star ).unwrap();
+                    let server = bincode::serialize(&info.key).unwrap();
                     let result = self.conn.execute("INSERT INTO servers (key,kind) VALUES (?1,?2)", params![server,info.kind.to_string()]);
                     match result
                     {
@@ -739,7 +739,7 @@ println!("Star SELECT ");
                                 if pattern.is_match(&server)
                                 {
 println!("adding server...");
-                                    rtn.push(server.star );
+                                    rtn.push(server.key);
                                 }
                             }
                         }
