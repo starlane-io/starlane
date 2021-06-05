@@ -1,4 +1,4 @@
-use crate::resource::{ResourceAssign, ResourceType, Names, Resource, ResourceAddress, ResourceStateSrc, AssignResourceStateSrc, DataTransfer, MemoryDataTransfer, LocalDataSrc};
+use crate::resource::{ResourceAssign, ResourceType, Names, Resource, ResourceAddress, ResourceStateSrc, AssignResourceStateSrc, DataTransfer, MemoryDataTransfer, LocalDataSrc, ResourceStatePersistence, FileAccess, FileDataTransfer};
 use rusqlite::{Connection, Transaction,params};
 use tokio::sync::{mpsc, oneshot};
 use std::collections::HashSet;
@@ -21,12 +21,13 @@ pub struct SpaceHost {
 }
 
 impl SpaceHost {
-    pub async fn new()->Self{
+    pub async fn new(file_access: Box<dyn FileAccess>)->Self{
         SpaceHost {
-            tx: ResourceStoreSqlLite::new().await
+            tx: ResourceStoreSqlLite::new(file_access).await
         }
     }
 }
+
 #[async_trait]
 impl Host for SpaceHost {
 
@@ -94,10 +95,11 @@ pub struct ResourceStoreSqlLite {
     pub conn: Connection,
     pub tx: mpsc::Sender<ResourceStoreAction>,
     pub rx: mpsc::Receiver<ResourceStoreAction>,
+    pub file_access: Box<dyn FileAccess>
 }
 
 impl ResourceStoreSqlLite {
-    pub async fn new() -> mpsc::Sender<ResourceStoreAction>
+    pub async fn new(file_access: Box<dyn FileAccess>) -> mpsc::Sender<ResourceStoreAction>
     {
         let (tx, rx) = mpsc::channel(1024 );
 
@@ -111,6 +113,7 @@ impl ResourceStoreSqlLite {
                     conn: conn.unwrap(),
                     tx: tx_clone,
                     rx: rx,
+                    file_access: file_access
                 };
                 db.run().await.unwrap();
             }
@@ -153,20 +156,39 @@ impl ResourceStoreSqlLite {
                 let trans = self.conn.transaction()?;
                 let key = assign.key.bin()?;
                 let address = assign.address.to_string();
+                let state = match assign.archetype.kind.resource_type().state_persistence(){
+                    ResourceStatePersistence::Database => {assign.state_src.get()?}
+                    ResourceStatePersistence::File => {
+                        match assign.state_src.src(){
+                            LocalDataSrc::None => Arc::new(vec![]),
+                            LocalDataSrc::Memory(data) => {
+                               let path = assign.address.path()?;
+                               self.file_access.write( &path, data )?;
+                               path.try_into()?
+                            }
+                            LocalDataSrc::File(path) => {
+                               path.try_into()?
+                            }
+                        }
+                    }
+                };
 
-                let state = assign.state_src.get()?;
-
-                trans.execute("INSERT INTO resources (key,address,state) VALUES (?1,?2,?3)", params![key,address,*state])?;
+                trans.execute("INSERT INTO resources (key,address,state_src) VALUES (?1,?2,?3)", params![key,address,*state])?;
                 trans.commit()?;
                 Ok(ResourceStoreResult::Ok)
             }
             ResourceStoreCommand::Get(key) => {
                 let key_bin = key.bin()?;
-                let resource = self.conn.query_row("SELECT address,state FROM resources WHERE key=?1", params![key_bin], |row| {
+                let resource = self.conn.query_row("SELECT address,state_src FROM resources WHERE key=?1", params![key_bin], |row| {
                     let address: String = row.get(0)?;
                     let address= ResourceAddress::from_str(address.as_str())?;
                     let state: Vec<u8> = row.get(1)?;
-                    let state= Arc::new(MemoryDataTransfer::new(Arc::new(state)));
+
+                    let state: Arc<dyn DataTransfer> = match key.resource_type().state_persistence(){
+                        ResourceStatePersistence::Database => Arc::new(MemoryDataTransfer::new(Arc::new(state))),
+                        ResourceStatePersistence::File => Arc::new( FileDataTransfer::new(dyn_clone::clone_box(&*self.file_access ), address.path()? ))
+                    };
+
                     Ok(Resource::new(key,address,state))
                 });
 
@@ -181,7 +203,6 @@ impl ResourceStoreSqlLite {
                         _ => Err(err.into())
                     }}
                 }
-
             }
         }
     }
@@ -192,7 +213,7 @@ impl ResourceStoreSqlLite {
        CREATE TABLE IF NOT EXISTS resources(
 	      key BLOB PRIMARY KEY,
 	      address TEXT NOT NULL,
-	      state BLOB NOT NULL,
+	      state_src BLOB NOT NULL,
 	      UNIQUE(address)
         )"#;
 

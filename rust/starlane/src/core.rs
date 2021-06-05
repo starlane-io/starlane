@@ -184,7 +184,8 @@ impl StarCoreFactory
 
     pub async fn create(&self, skel: StarSkel, ext: StarCoreExtKind, core_rx: mpsc::Receiver<StarCoreAction> ) -> StarCore2
     {
-        StarCore2::new(skel, core_rx, Box::new(SpaceHost::new().await )).await
+        let file_access = dyn_clone::clone_box(&**skel.file_access);
+        StarCore2::new(skel, core_rx, Box::new(SpaceHost::new(file_access).await )).await
 /*        match skel.info.kind
         {
             StarKind::ActorHost => {

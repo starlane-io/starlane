@@ -135,7 +135,7 @@ impl ProtoStar
                             registry: resource_registry,
                             star_handler: star_handler,
                             persistence: Persistence::Memory,
-                            file_access: Arc::new(MemoryFileAccess::new() )
+                            file_access: Arc::new(Box::new(MemoryFileAccess::new() ))
                         };
 
                         let core_ext = self.star_core_ext_factory.create(&skel );

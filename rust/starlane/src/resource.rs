@@ -33,6 +33,7 @@ use crate::resource::space::{SpaceState, Space};
 use std::convert::{TryFrom, TryInto};
 use crate::resource::user::UserState;
 use crate::resource::sub_space::SubSpaceState;
+use dyn_clone::DynClone;
 
 pub mod space;
 pub mod sub_space;
@@ -1076,7 +1077,7 @@ pub enum ResourceKind
     App(AppKind),
     Actor(ActorKind),
     User,
-    File,
+    File(FileKind),
     FileSystem(FileSystemKind),
     Artifact(ArtifactKind)
 }
@@ -1090,7 +1091,7 @@ impl ResourceKind{
            ResourceKind::App(_) => ResourceType::App,
            ResourceKind::Actor(_) => ResourceType::Actor,
            ResourceKind::User => ResourceType::User,
-           ResourceKind::File => ResourceType::File,
+           ResourceKind::File(_) => ResourceType::File,
            ResourceKind::FileSystem(_) => ResourceType::FileSystem,
            ResourceKind::Artifact(_) => ResourceType::Artifact
        }
@@ -1102,6 +1103,13 @@ pub enum FileSystemKind
 {
     App,
     SubSpace
+}
+
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub enum FileKind
+{
+    File,
+    Directory
 }
 
 impl ResourceType
@@ -1150,7 +1158,7 @@ impl fmt::Display for ResourceKind{
                     ResourceKind::App(kind)=> format!("App:{}",kind).to_string(),
                     ResourceKind::Actor(kind)=> format!("Actor:{}",kind).to_string(),
                     ResourceKind::User=> "User".to_string(),
-                    ResourceKind::File=> "File".to_string(),
+                    ResourceKind::File(_)=> "File".to_string(),
                     ResourceKind::FileSystem(kind)=> format!("Filesystem:{}", kind).to_string(),
                     ResourceKind::Artifact(kind)=>format!("Artifact:{}",kind).to_string()
                 })
@@ -1182,7 +1190,7 @@ impl ResourceKind {
             ResourceKind::User => {
                 ResourceKey::User(UserKey::new(sub_space.space, index as _))
             }
-            ResourceKind::File => {
+            ResourceKind::File(_) => {
                 ResourceKey::File(FileKey{
                     filesystem: FileSystemKey::SubSpace(SubSpaceFilesystemKey{ sub_space, id: 0}),
                     id: index as _
@@ -1244,7 +1252,6 @@ impl FromStr for ResourceKind
             "Space" => Ok(ResourceKind::Space),
             "SubSpace" => Ok(ResourceKind::SubSpace),
             "User" => Ok(ResourceKind::User),
-            "File" => Ok(ResourceKind::File),
             _ => {
                 Err(format!("cannot match ResourceKind: {}", s).into())
             }
@@ -1281,6 +1288,13 @@ impl ResourceType{
         }*/
         // for now let's not worry about owners
         false
+    }
+
+    pub fn state_persistence(&self)->ResourceStatePersistence{
+        match self{
+            ResourceType::File => ResourceStatePersistence::File,
+            _ => ResourceStatePersistence::Database
+        }
     }
 
     pub fn from( parent: &ResourceKey ) -> Option<Self> {
@@ -2036,6 +2050,19 @@ pub struct ResourceAddress
 {
    resource_type: ResourceType,
    parts: Vec<ResourceAddressPart>
+}
+
+impl ResourceAddress {
+    pub fn path(&self) -> Result<Path,Error> {
+        if self.parts.len() == 0{
+            Path::new("/")
+        } else if let ResourceAddressPart::Path(path) = self.parts.last().unwrap(){
+            Ok(path.clone())
+        }
+        else{
+            Path::new(base64::encode(self.parts.last().unwrap().to_string().as_bytes() ).as_str() )
+        }
+    }
 }
 
 impl ResourceAddress {
@@ -3042,6 +3069,12 @@ impl Path
         })
     }
 
+    pub fn bin(&self)->Result<Vec<u8>,Error>
+    {
+        let mut bin= bincode::serialize(self)?;
+        Ok(bin)
+    }
+
     pub fn is_absolute(&self) -> bool {
         self.string.starts_with("/")
     }
@@ -3054,6 +3087,24 @@ impl Path
         }
     }
 
+}
+
+impl TryInto<Arc<Vec<u8>>> for Path {
+
+    type Error = Error;
+
+    fn try_into(self) -> Result<Arc<Vec<u8>>, Self::Error> {
+        Ok(Arc::new(bincode::serialize(&self)?))
+    }
+
+}
+
+impl TryFrom<Arc<Vec<u8>>> for Path{
+    type Error = Error;
+
+    fn try_from(value: Arc<Vec<u8>>) -> Result<Self, Self::Error> {
+        Ok(bincode::deserialize::<Self>(&value )?)
+    }
 }
 
 impl ToString for Path {
@@ -3470,7 +3521,7 @@ impl <S> SrcTransfer<S> where S:TryInto<Arc<Vec<u8>>>+TryFrom<Arc<Vec<u8>>>{
     }
 }
 
-pub trait FileAccess: Send+Sync {
+pub trait FileAccess: Send+Sync+DynClone {
     fn read( &self, path: &Path )->Result<Arc<Vec<u8>>,Error>;
     fn write( &mut self, path: &Path, data: Arc<Vec<u8>> )->Result<(),Error>;
     fn with_base_path( &self, base_path: Path ) -> Result<Box<dyn FileAccess>,Error>;
@@ -3507,6 +3558,7 @@ impl FileAccess for MemoryFileAccess {
 
 pub trait DataTransfer: Send+Sync {
     fn get(&self) -> Result<Arc<Vec<u8>>,Error>;
+    fn src(&self) -> LocalDataSrc;
 }
 
 #[derive(Clone)]
@@ -3532,17 +3584,20 @@ impl DataTransfer for MemoryDataTransfer {
     fn get(&self) -> Result<Arc<Vec<u8>>, Error> {
         Ok(self.data.clone())
     }
+
+    fn src(&self) -> LocalDataSrc {
+        LocalDataSrc::Memory(self.data.clone())
+    }
 }
 
-#[derive(Clone)]
 pub struct FileDataTransfer{
-    file_access: Arc<dyn FileAccess>,
+    file_access: Box<dyn FileAccess>,
     path: Path
 }
 
 
 impl FileDataTransfer{
-    pub fn new(file_access: Arc<dyn FileAccess>, path: Path ) ->Self {
+    pub fn new(file_access: Box<dyn FileAccess>, path: Path ) ->Self {
         FileDataTransfer{
             file_access: file_access,
             path: path
@@ -3555,8 +3610,16 @@ impl DataTransfer for FileDataTransfer{
     fn get(&self) -> Result<Arc<Vec<u8>>, Error> {
         self.file_access.read(&self.path)
     }
+
+    fn src(&self) -> LocalDataSrc {
+        LocalDataSrc::File(self.path.clone())
+    }
 }
 
 
 
+pub enum ResourceStatePersistence{
+    Database,
+    File
+}
 
