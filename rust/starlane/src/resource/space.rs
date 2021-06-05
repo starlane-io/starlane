@@ -1,5 +1,5 @@
 use crate::keys::{SpaceKey, ResourceKey};
-use crate::resource::{Resource, ResourceAddress, ResourceType, AssignResourceStateSrc, Src};
+use crate::resource::{Resource, ResourceAddress, ResourceType, AssignResourceStateSrc, LocalDataSrc, SrcTransfer};
 use crate::error::Error;
 use std::convert::{TryFrom, TryInto};
 use serde::{Serialize,Deserialize};
@@ -9,12 +9,12 @@ use std::sync::Arc;
 pub struct Space{
     key: SpaceKey,
     address: ResourceAddress,
-    state_src: Src<SpaceState>
+    state_src: SrcTransfer<SpaceState>
 }
 
 impl Space {
 
-    pub fn new(key: SpaceKey, address: ResourceAddress, state_src: Src<SpaceState>) ->Result<Self,Error>{
+    pub fn new(key: SpaceKey, address: ResourceAddress, state_src: SrcTransfer<SpaceState>) ->Result<Self,Error>{
         if address.resource_type != ResourceType::Space{
             Err("expected space address".into())
         }

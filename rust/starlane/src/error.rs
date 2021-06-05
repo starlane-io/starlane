@@ -9,6 +9,8 @@ use semver::SemVerError;
 use base64::DecodeError;
 use crate::message::Fail;
 use std::string::FromUtf8Error;
+use std::convert::TryFrom;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct Error{
@@ -22,6 +24,9 @@ impl fmt::Display for Error{
         write!(f, "{}",self.error)
     }
 }
+
+
+
 
 impl From<Elapsed> for Error{
     fn from(e: Elapsed) -> Self {

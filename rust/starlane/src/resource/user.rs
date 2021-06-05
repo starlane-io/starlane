@@ -1,5 +1,5 @@
 use crate::keys::{UserKey, ResourceKey};
-use crate::resource::{Resource, ResourceAddress, ResourceType, AssignResourceStateSrc, Src};
+use crate::resource::{Resource, ResourceAddress, ResourceType, AssignResourceStateSrc, LocalDataSrc, SrcTransfer};
 use crate::error::Error;
 use serde::{Serialize,Deserialize};
 use std::convert::{TryFrom, TryInto};
@@ -9,7 +9,7 @@ use std::sync::Arc;
 pub struct User{
     key: UserKey,
     address: ResourceAddress,
-    state_src: Src<UserState>
+    state_src: SrcTransfer<UserState>
 }
 
 

@@ -31,7 +31,7 @@ use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequ
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, MessageId, SpaceKey, UserKey, ResourceKey, GatheringKey, Unique, UniqueSrc};
-use crate::resource::{Labels, ResourceRegistration, ResourceSelector, ResourceAssign, ResourceRegistryCommand, ResourceRegistryResult, Registry, ResourceType, ResourceLocationRecord, ResourceManagerKey, ResourceBinding, ResourceAddress, ResourceRegistryAction, ResourceStub, FieldSelection, ResourceRegistryInfo, RegistryReservation, ResourceNamesReservationRequest, ChildResourceManager, ChildResourceManagerCore, HostedResourceStore, LocalHostedResource, ResourceManager, ResourceCreate, ResourceLocation, ResourceArchetype, ResourceKind, RemoteResourceManager, RegistryUniqueSrc, LocalResourceHost, ResourceHost, ResourceParent, AssignResourceStateSrc, KeyCreationSrc, AddressCreationSrc, Resource, ResourceStateSrc, Src};
+use crate::resource::{Labels, ResourceRegistration, ResourceSelector, ResourceAssign, ResourceRegistryCommand, ResourceRegistryResult, Registry, ResourceType, ResourceLocationRecord, ResourceManagerKey, ResourceBinding, ResourceAddress, ResourceRegistryAction, ResourceStub, FieldSelection, ResourceRegistryInfo, RegistryReservation, ResourceNamesReservationRequest, ChildResourceManager, ChildResourceManagerCore, HostedResourceStore, LocalHostedResource, ResourceManager, ResourceCreate, ResourceLocation, ResourceArchetype, ResourceKind, RemoteResourceManager, RegistryUniqueSrc, LocalResourceHost, ResourceHost, ResourceParent, AssignResourceStateSrc, KeyCreationSrc, AddressCreationSrc, Resource, ResourceStateSrc, LocalDataSrc, FileAccess, MemoryDataTransfer};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::message::{MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob, Fail};
@@ -1832,7 +1832,7 @@ eprintln!("Error: {}",err);
                 Ok(())
             }
 
-            async fn process_resource_host_action( &self, message: StarMessage, action: ResourceHostAction) -> Result<(),Error>
+            async fn process_resource_host_action(&self, message: StarMessage, action: ResourceHostAction) -> Result<(),Error>
             {
                 match action {
                     ResourceHostAction::IsHosting(resource) => {
@@ -1870,7 +1870,7 @@ eprintln!("Error: {}",err);
                         if self.skel.info.kind != StarKind::Central {
                             return Err(Fail::ResourceNotFound(ResourceKey::Nothing))
                         }
-                        Option::Some(Resource::new(key.clone(), ResourceAddress::nothing(), ResourceStateSrc::None ))
+                        Option::Some(Resource::new(key.clone(), ResourceAddress::nothing(), Arc::new(MemoryDataTransfer::none()) ))
                     }
                     _ => {
                         self.get_resource(&key).await?
@@ -2977,7 +2977,8 @@ eprintln!("Error: {}",err);
             pub auth_token_source: AuthTokenSource,
             pub registry: Option<Arc<dyn ResourceRegistryBacking>>,
             pub star_handler: Option<StarHandleBacking>,
-            pub persistence: Persistence
+            pub persistence: Persistence,
+            pub file_access: Arc<dyn FileAccess>
         }
 
         impl StarSkel
@@ -3586,8 +3587,8 @@ eprintln!("Error: {}",err);
 
             pub async fn create_space( &self, name: &str, display: &str )-> Result<SpaceApi,Fail> {
                 let state= SpaceState::new(name.clone(), display);
-                let state_src = ResourceStateSrc::Space( Src::Memory(Arc::new(state)) );
-                let resource_src = AssignResourceStateSrc::direct(state_src);
+                let state_data =  state.try_into()?;
+                let resource_src = AssignResourceStateSrc::Direct(state_data);
                 let create = ResourceCreate{
                     parent: ResourceKey::Nothing,
                     key: KeyCreationSrc::None,
@@ -3636,8 +3637,8 @@ eprintln!("Error: {}",err);
 
             pub async fn create_user( &self, email: &str )-> Result<ResourceKey,Fail> {
                 let state = UserState::new(email.to_string() );
-                let state_src = ResourceStateSrc::User( Src::Memory(Arc::new(state)) );
-                let resource_src = AssignResourceStateSrc::Direct(state_src);
+                let state_data =  state.try_into()?;
+                let resource_src = AssignResourceStateSrc::Direct(state_data);
                 let create = ResourceCreate{
                     parent: self.key.clone(),
                     key: KeyCreationSrc::None,
@@ -3656,8 +3657,8 @@ eprintln!("Error: {}",err);
 
             pub async fn create_sub_space( &self, sub_space: &str )-> Result<ResourceKey,Fail> {
                 let state = SubSpaceState::new(sub_space);
-                let state_src = ResourceStateSrc::SubSpace( Src::Memory(Arc::new(state)) );
-                let resource_src = AssignResourceStateSrc::Direct(state_src);
+                let state_data =  state.try_into()?;
+                let resource_src = AssignResourceStateSrc::Direct(state_data);
                 let create = ResourceCreate{
                     parent: self.key.clone(),
                     key: KeyCreationSrc::None,

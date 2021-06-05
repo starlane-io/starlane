@@ -1,4 +1,4 @@
-use crate::resource::{ResourceAssign, ResourceType, Names, Resource, ResourceAddress, ResourceStateSrc, AssignResourceStateSrc};
+use crate::resource::{ResourceAssign, ResourceType, Names, Resource, ResourceAddress, ResourceStateSrc, AssignResourceStateSrc, DataTransfer, MemoryDataTransfer, LocalDataSrc};
 use rusqlite::{Connection, Transaction,params};
 use tokio::sync::{mpsc, oneshot};
 use std::collections::HashSet;
@@ -17,13 +17,13 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 pub struct SpaceHost {
-  tx: mpsc::Sender<SpaceHostAction>
+  tx: mpsc::Sender<ResourceStoreAction>
 }
 
 impl SpaceHost {
     pub async fn new()->Self{
         SpaceHost {
-            tx: SpaceHostSqLite::new().await
+            tx: ResourceStoreSqlLite::new().await
         }
     }
 }
@@ -31,27 +31,39 @@ impl SpaceHost {
 impl Host for SpaceHost {
 
 
-    async fn assign(&self, assign: ResourceAssign) -> Result<(), Fail> {
-println!("assignging resource:{} ", assign.archetype.kind );
+    async fn assign(&self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<(), Fail> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send( SpaceHostAction{
-            command: ResourceHostCommand::Assign(assign.clone()),
+
+        // if there is Initialization to do for assignment THIS is where we do it
+        let data = match assign.state_src{
+            AssignResourceStateSrc::Direct(data) => data
+        };
+        let data_transfer:Arc<dyn DataTransfer> = Arc::new(MemoryDataTransfer::new(data));
+
+        let assign = ResourceAssign{
+            key: assign.key,
+            address: assign.address,
+            archetype: assign.archetype,
+            state_src: data_transfer
+        };
+
+        self.tx.send( ResourceStoreAction {
+            command: ResourceStoreCommand::Put(assign),
             tx: tx
         }).await?;
         rx.await?;
-println!("AsSiGnEd:{} ", assign.archetype.kind );
         Ok(())
     }
 
     async fn get(&self, key: ResourceKey) -> Result<Option<Resource>, Fail> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send( SpaceHostAction{
-            command: ResourceHostCommand::Get(key.clone()),
+        self.tx.send( ResourceStoreAction {
+            command: ResourceStoreCommand::Get(key.clone()),
             tx: tx
         }).await?;
         let result = rx.await??;
         match result {
-            ResourceHostResult::Resource(resource) => {
+            ResourceStoreResult::Resource(resource) => {
                 Ok(resource)
             }
             _ => Err(Fail::Unexpected)
@@ -59,34 +71,33 @@ println!("AsSiGnEd:{} ", assign.archetype.kind );
     }
 }
 
-pub struct SpaceHostAction {
+pub struct ResourceStoreAction {
 
-    pub command: ResourceHostCommand,
-    pub tx: oneshot::Sender<Result<ResourceHostResult,Fail>>
+    pub command: ResourceStoreCommand,
+    pub tx: oneshot::Sender<Result<ResourceStoreResult,Fail>>
 }
 
-pub enum ResourceHostCommand {
+pub enum ResourceStoreCommand {
     Close,
-    Assign(ResourceAssign),
+    Put(ResourceAssign<Arc<dyn DataTransfer>>),
     Get(ResourceKey)
 }
 
 
-pub enum ResourceHostResult {
+pub enum ResourceStoreResult {
     Ok,
     Resource(Option<Resource>)
 }
 
 
-pub struct SpaceHostSqLite {
+pub struct ResourceStoreSqlLite {
     pub conn: Connection,
-    pub tx: mpsc::Sender<SpaceHostAction>,
-    pub rx: mpsc::Receiver<SpaceHostAction>,
-    pub accepted: Option<HashSet<ResourceType>>
+    pub tx: mpsc::Sender<ResourceStoreAction>,
+    pub rx: mpsc::Receiver<ResourceStoreAction>,
 }
 
-impl SpaceHostSqLite {
-    pub async fn new() -> mpsc::Sender<SpaceHostAction>
+impl ResourceStoreSqlLite {
+    pub async fn new() -> mpsc::Sender<ResourceStoreAction>
     {
         let (tx, rx) = mpsc::channel(1024 );
 
@@ -96,11 +107,10 @@ impl SpaceHostSqLite {
             let conn = Connection::open_in_memory();
             if conn.is_ok()
             {
-                let mut db = SpaceHostSqLite {
+                let mut db = ResourceStoreSqlLite {
                     conn: conn.unwrap(),
                     tx: tx_clone,
                     rx: rx,
-                    accepted: Option::None
                 };
                 db.run().await.unwrap();
             }
@@ -120,9 +130,9 @@ impl SpaceHostSqLite {
         };
 
         while let Option::Some(request) = self.rx.recv().await {
-            if let ResourceHostCommand::Close = request.command
+            if let ResourceStoreCommand::Close = request.command
             {
-                request.tx.send(Ok(ResourceHostResult::Ok) );
+                request.tx.send(Ok(ResourceStoreResult::Ok) );
                 break;
             }
             else {
@@ -133,53 +143,41 @@ impl SpaceHostSqLite {
         Ok(())
     }
 
-    fn process(&mut self, command: ResourceHostCommand) -> Result<ResourceHostResult, Fail> {
+    fn process(&mut self, command: ResourceStoreCommand) -> Result<ResourceStoreResult, Fail> {
         match command
         {
-            ResourceHostCommand::Close => {
-                Ok(ResourceHostResult::Ok)
+            ResourceStoreCommand::Close => {
+                Ok(ResourceStoreResult::Ok)
             }
-            ResourceHostCommand::Assign(assign) => {
+            ResourceStoreCommand::Put(assign) => {
                 let trans = self.conn.transaction()?;
                 let key = assign.key.bin()?;
                 let address = assign.address.to_string();
-                let state_src: ResourceStateSrc = assign.state_src.try_into()?;
-                let state: Arc<Vec<u8>> = state_src.try_into()?;
+
+                let state = assign.state_src.get()?;
 
                 trans.execute("INSERT INTO resources (key,address,state) VALUES (?1,?2,?3)", params![key,address,*state])?;
                 trans.commit()?;
-                Ok(ResourceHostResult::Ok)
+                Ok(ResourceStoreResult::Ok)
             }
-            ResourceHostCommand::Get(key) => {
-println!("Get Resource...");
+            ResourceStoreCommand::Get(key) => {
                 let key_bin = key.bin()?;
                 let resource = self.conn.query_row("SELECT address,state FROM resources WHERE key=?1", params![key_bin], |row| {
-println!("ROW: ....");
                     let address: String = row.get(0)?;
-println!("x: ....");
                     let address= ResourceAddress::from_str(address.as_str())?;
-println!("y: ....");
                     let state: Vec<u8> = row.get(1)?;
-println!("z: ....");
-                    let state= ResourceStateSrc::try_from(state);
-                    match &state {
-                        Ok(x) => {}
-                        Err(err) => { println!("error: {}",err)}
-                    }
-                    let state = state?;
-println!("w: ....");
+                    let state= Arc::new(MemoryDataTransfer::new(Arc::new(state)));
                     Ok(Resource::new(key,address,state))
                 });
 
                 match resource {
                     Ok(resource) => {
-                        Ok(ResourceHostResult::Resource(Option::Some(resource)))
+                        Ok(ResourceStoreResult::Resource(Option::Some(resource)))
                     }
                     Err(err) => {
 
-println!("SQL ERR.......");
                         match err {
-                        rusqlite::Error::QueryReturnedNoRows => Ok(ResourceHostResult::Resource(Option::None)),
+                        rusqlite::Error::QueryReturnedNoRows => Ok(ResourceStoreResult::Resource(Option::None)),
                         _ => Err(err.into())
                     }}
                 }
@@ -194,7 +192,8 @@ println!("SQL ERR.......");
        CREATE TABLE IF NOT EXISTS resources(
 	      key BLOB PRIMARY KEY,
 	      address TEXT NOT NULL,
-	      state BLOB NOT NULL
+	      state BLOB NOT NULL,
+	      UNIQUE(address)
         )"#;
 
         let transaction = self.conn.transaction()?;

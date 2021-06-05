@@ -1852,7 +1852,7 @@ println!("Sending ChildResourceManager::process_create(core, create ).await");
 #[async_trait]
 pub trait ResourceHost: Send+Sync {
     fn star_key( &self ) -> StarKey;
-    async fn assign( &self, assign: ResourceAssign ) -> Result<(),Fail>;
+    async fn assign( &self, assign: ResourceAssign<AssignResourceStateSrc> ) -> Result<(),Fail>;
 }
 
 
@@ -3041,6 +3041,19 @@ impl Path
             string: string.to_string()
         })
     }
+
+    pub fn is_absolute(&self) -> bool {
+        self.string.starts_with("/")
+    }
+
+    pub fn cat(&self, path: &Path ) -> Result<Self,Error> {
+        if self.string.ends_with("/"){
+            Path::new( format!("{}{}",self.string.as_str(),path.string.as_str()).as_str() )
+        } else {
+            Path::new( format!("{}/{}",self.string.as_str(),path.string.as_str()).as_str() )
+        }
+    }
+
 }
 
 impl ToString for Path {
@@ -3202,34 +3215,22 @@ pub enum KeySrc{
 /// can have other options like to Initialize the state data
 #[derive(Clone,Serialize,Deserialize)]
 pub enum AssignResourceStateSrc {
-    Direct(ResourceStateSrc)
+    Direct(Arc<Vec<u8>>)
 }
 
-impl AssignResourceStateSrc {
-    pub fn direct( state_src: ResourceStateSrc ) -> Self {
-        Self::Direct( state_src )
-    }
-}
+
 
 impl TryInto<ResourceStateSrc> for AssignResourceStateSrc{
     type Error = Error;
 
     fn try_into(self) -> Result<ResourceStateSrc, Self::Error> {
         match self {
-            AssignResourceStateSrc::Direct(state) => Ok(state)
+            AssignResourceStateSrc::Direct(state) => Ok(ResourceStateSrc::Memory(state))
         }
     }
 }
 
-impl TryInto<Arc<Vec<u8>>> for AssignResourceStateSrc{
-    type Error = Error;
 
-    fn try_into(self) -> Result<Arc<Vec<u8>>, Self::Error> {
-        match self {
-            AssignResourceStateSrc::Direct(state) => Ok(state.try_into()?)
-        }
-    }
-}
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub enum ResourceSliceStatus {
@@ -3300,14 +3301,15 @@ impl ResourceStub {
 
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceAssign{
+pub struct ResourceAssign<S>{
     pub key: ResourceKey,
     pub address: ResourceAddress,
-    pub state_src: AssignResourceStateSrc,
+    pub state_src: S,
     pub archetype: ResourceArchetype
 }
 
-impl ResourceAssign {
+impl <S> ResourceAssign<S> {
+
     pub fn key(&self) -> ResourceKey {
         self.key.clone()
     }
@@ -3317,32 +3319,24 @@ impl ResourceAssign {
     }
 }
 
+impl TryInto<ResourceAssign<ResourceStateSrc>> for ResourceAssign<AssignResourceStateSrc>
+{
+    type Error = Error;
+
+    fn try_into(self) -> Result<ResourceAssign<ResourceStateSrc>, Self::Error> {
+        let state_src = self.state_src.try_into()?;
+        Ok(ResourceAssign{
+            key: self.key,
+            address: self.address,
+            state_src: state_src,
+            archetype: self.archetype
+        })
+    }
+}
+
 pub struct LocalResourceHost{
     skel: StarSkel,
     resource: ResourceStub
-}
-
-impl LocalResourceHost{
-
-    async fn assign(&self, assign: ResourceAssign) -> Result<Self, Fail> {
-        unimplemented!()
-        /*
-        let archetype = match assign.source{
-            ResourceSrc::Creation(init) => {
-                init.archetype.clone()
-            }
-        };
-
-        Ok(LocalResourceHost{
-            resource: Resource{
-                key: assign.key,
-                address: assign.address,
-                archetype: archetype,
-                owner: Option::None
-            }
-        })
-         */
-    }
 }
 
 
@@ -3353,7 +3347,7 @@ impl ResourceHost for LocalResourceHost{
         self.skel.info.key.clone()
     }
 
-    async fn assign(&self, assign: ResourceAssign) -> Result<(), Fail> {
+    async fn assign(&self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<(), Fail> {
         unimplemented!()
     }
 }
@@ -3369,7 +3363,7 @@ impl ResourceHost for RemoteResourceHost {
         self.handle.key.clone()
     }
 
-    async fn assign( &self, assign: ResourceAssign) -> Result<(), Fail> {
+    async fn assign( &self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<(), Fail> {
 
         if !self.handle.kind.hosts().contains(&assign.key.resource_type() ) {
             return Err(Fail::WrongResourceType{
@@ -3403,11 +3397,11 @@ impl ResourceHost for RemoteResourceHost {
 pub struct Resource{
    key: ResourceKey,
    address: ResourceAddress,
-   state_src: ResourceStateSrc
+   state_src: Arc<dyn DataTransfer>
 }
 
 impl Resource{
-    pub fn new(key: ResourceKey, address: ResourceAddress, state_src: ResourceStateSrc ) -> Resource {
+    pub fn new(key: ResourceKey, address: ResourceAddress, state_src: Arc< dyn DataTransfer >) -> Resource {
         Resource{
             key: key,
             address: address,
@@ -3428,183 +3422,141 @@ impl Resource{
         self.key.resource_type()
     }
 
-    pub fn state_src(&self) -> ResourceStateSrc {
+    pub fn state_src(&self) -> Arc<dyn DataTransfer>{
         self.state_src.clone()
     }
-
 }
 
+pub type ResourceStateSrc = LocalDataSrc;
 
-
-#[derive(Clone,Serialize,Deserialize)]
-pub enum ResourceStateSrc {
+#[derive(Clone)]
+pub enum LocalDataSrc {
     None,
-    Space(Src<SpaceState>),
-    SubSpace(Src<SubSpaceState>),
-    User(Src<UserState>)
+    Memory(Arc<Vec<u8>>),
+    File(Path)
 }
 
-impl ResourceStateSrc{
-    pub fn resource_type(&self)->ResourceType{
-        match self {
-            ResourceStateSrc::Space(_) => ResourceType::Space,
-            ResourceStateSrc::SubSpace(_) => ResourceType::SubSpace,
-            ResourceStateSrc::User(_) => ResourceType::User,
-            ResourceStateSrc::None => ResourceType::Nothing,
+#[derive(Clone)]
+pub struct SrcTransfer<S> where S:TryInto<Arc<Vec<u8>>>+TryFrom<Arc<Vec<u8>>>{
+    data_transfer: Option<Arc<dyn DataTransfer>>,
+    data: Option<Arc<S>>
+}
+
+impl <S> SrcTransfer<S> where S:TryInto<Arc<Vec<u8>>>+TryFrom<Arc<Vec<u8>>>{
+    pub fn new( data_transfer: Arc<dyn DataTransfer> ) -> Self {
+        SrcTransfer{
+            data_transfer: Option::Some(data_transfer),
+            data: Option::None
         }
     }
-}
 
-impl TryFrom<Arc<Vec<u8>>> for Src<SpaceState>{
-    type Error = Error;
-
-    fn try_from(value: Arc<Vec<u8>>) -> Result<Self, Self::Error> {
-           let space = SpaceState::try_from(value)?;
-           Ok(Src::Memory(Arc::new(space)))
-    }
-}
-
-impl TryFrom<Arc<Vec<u8>>> for Src<SubSpaceState>{
-    type Error = Error;
-
-    fn try_from(value: Arc<Vec<u8>>) -> Result<Self, Self::Error> {
-        let sub_space = SubSpaceState::try_from(value)?;
-        Ok(Src::Memory(Arc::new(sub_space)))
-    }
-}
-
-impl TryFrom<Arc<Vec<u8>>> for Src<UserState>{
-    type Error = Error;
-
-    fn try_from(value: Arc<Vec<u8>>) -> Result<Self, Self::Error> {
-        let user = UserState::try_from(value)?;
-        Ok(Src::Memory(Arc::new(user)))
-    }
-}
-
-
-impl TryInto<Arc<Vec<u8>>> for ResourceStateSrc{
-    type Error = Error;
-
-    fn try_into(self) -> Result<Arc<Vec<u8>>, Self::Error> {
-        let magic = self.resource_type().magic();
-        let mut bytes:Vec<u8> = match self {
-            ResourceStateSrc::Space(space) => space.try_into()?,
-            ResourceStateSrc::SubSpace(sub_space) => sub_space.try_into()?,
-            ResourceStateSrc::User(user) => user.try_into()?,
-            ResourceStateSrc::None => vec![],
-        };
-        bytes.insert(0, magic );
-        Ok(Arc::new(bytes))
-    }
-}
-
-impl TryFrom<Vec<u8>> for ResourceStateSrc {
-    type Error = Error;
-
-    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        if value.len() == 0{
-            return Err("zero length data for ResourceStateSrc, expecrted at least a magic number".into());
-        }
-        let mut value = value;
-        let magic = value.remove(0);
-println!("MAGIC is: {}",magic );
-        match ResourceType::from_magic(magic) {
-            Ok(resource_type) => {
-                match resource_type {
-                    ResourceType::Space => {
-                        Ok(ResourceStateSrc::Space(Src::Memory(Arc::new(SpaceState::try_from(value)?))))
+    pub fn get(&mut self)->Result<Arc<S>,Error>{
+        match &self.data{
+            None => {
+                let data = self.data_transfer.as_ref().unwrap().get()?;
+                let s = match S::try_from(data) {
+                    Ok(s) => s,
+                    Err(err) => {
+                        return Err("could not convert to data".into())
                     }
-                    _ => Err(format!("do not have a ResourceStateSrc.try_from for {} yet",resource_type.to_string()).into())
-                }
+                };
+                let s = Arc::new(s);
+                self.data = Option::Some(s.clone());
+                self.data_transfer = Option::None;
+                Ok(s)
             }
-            Err(_) => Err(format!("bad magic number {}",magic).into())
+            Some(s) => Ok(s.clone())
         }
     }
 }
 
-impl TryFrom<Arc<Vec<u8>>> for ResourceStateSrc {
-    type Error = Error;
+pub trait FileAccess: Send+Sync {
+    fn read( &self, path: &Path )->Result<Arc<Vec<u8>>,Error>;
+    fn write( &mut self, path: &Path, data: Arc<Vec<u8>> )->Result<(),Error>;
+    fn with_base_path( &self, base_path: Path ) -> Result<Box<dyn FileAccess>,Error>;
+}
 
-    fn try_from(value: Arc<Vec<u8>>) -> Result<Self, Self::Error> {
-        if value.len() == 0{
-            return Err("zero length data for ResourceStateSrc, expecrted at least a magic number".into());
-        }
-        // this is not good, potentially cloning a very big structure just to chop the magic number off... --Scott
-        let mut value = (*value).clone();
-        let magic = value.remove(0);
-        println!("MAGIC is: {}",magic );
-        match ResourceType::from_magic(magic) {
-            Ok(resource_type) => {
-                match resource_type {
-                    ResourceType::Space => {
-                        Ok(ResourceStateSrc::Space(Src::Memory(Arc::new(SpaceState::try_from(value)?))))
-                    }
-                    _ => Err(format!("do not have a ResourceStateSrc.try_from for {} yet",resource_type.to_string()).into())
-                }
-            }
-            Err(_) => Err(format!("bad magic number {}",magic).into())
+#[derive(Clone)]
+pub struct MemoryFileAccess {
+    map: HashMap<Path,Arc<Vec<u8>>>
+}
+
+impl MemoryFileAccess {
+    pub fn new( ) -> Self{
+        MemoryFileAccess{
+            map: HashMap::new()
         }
     }
 }
 
 
-#[derive(Clone,Serialize,Deserialize)]
-pub enum Src<S: Sync+Send> {
-    Memory(Arc<S>)
+impl FileAccess for MemoryFileAccess {
+    fn read(&self, path: &Path) -> Result<Arc<Vec<u8>>, Error> {
+        self.map.get(path).cloned().ok_or(format!("could not find file for path '{}'",path.to_string()).into())
+    }
+
+    fn write(&mut self, path: &Path, data: Arc<Vec<u8>>) -> Result<(), Error> {
+        self.map.insert( path.clone(), data );
+        Ok(())
+    }
+
+    fn with_base_path(&self, base: Path) -> Result<Box<dyn FileAccess>,Error> {
+        Ok(Box::new(Self::new()))
+    }
 }
 
+pub trait DataTransfer: Send+Sync {
+    fn get(&self) -> Result<Arc<Vec<u8>>,Error>;
+}
 
-impl TryInto<Arc<Vec<u8>>> for Src<SpaceState> {
+#[derive(Clone)]
+pub struct MemoryDataTransfer {
+    data: Arc<Vec<u8>>
+}
 
-    type Error = Error;
+impl MemoryDataTransfer{
+    pub fn none() ->Self {
+        MemoryDataTransfer{
+            data: Arc::new(vec![])
+        }
+    }
 
-    fn try_into(self) -> Result<Arc<Vec<u8>>, Self::Error> {
-        match self{
-            Src::Memory(space_state) => {
-                Ok((*space_state).clone().try_into()?)
-            }
+    pub fn new(data: Arc<Vec<u8>>) ->Self {
+        MemoryDataTransfer{
+            data: data
         }
     }
 }
 
-impl TryInto<Vec<u8>> for Src<SpaceState> {
+impl DataTransfer for MemoryDataTransfer {
+    fn get(&self) -> Result<Arc<Vec<u8>>, Error> {
+        Ok(self.data.clone())
+    }
+}
 
-    type Error = Error;
+#[derive(Clone)]
+pub struct FileDataTransfer{
+    file_access: Arc<dyn FileAccess>,
+    path: Path
+}
 
-    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
-        match self{
-            Src::Memory(space_state) => {
-                Ok((*space_state).clone().try_into()?)
-            }
+
+impl FileDataTransfer{
+    pub fn new(file_access: Arc<dyn FileAccess>, path: Path ) ->Self {
+        FileDataTransfer{
+            file_access: file_access,
+            path: path
         }
     }
 }
 
-impl TryInto<Vec<u8>> for Src<SubSpaceState> {
 
-    type Error = Error;
-
-    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
-        match self{
-            Src::Memory(sub_space_state) => {
-                Ok((*sub_space_state).clone().try_into()?)
-            }
-        }
+impl DataTransfer for FileDataTransfer{
+    fn get(&self) -> Result<Arc<Vec<u8>>, Error> {
+        self.file_access.read(&self.path)
     }
 }
 
-impl TryInto<Vec<u8>> for Src<UserState> {
 
-    type Error = Error;
-
-    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
-        match self{
-            Src::Memory(user_state) => {
-                Ok((*user_state).clone().try_into()?)
-            }
-        }
-    }
-}
 
 

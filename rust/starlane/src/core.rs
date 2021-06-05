@@ -27,11 +27,11 @@ use crate::keys::{AppKey, ResourceKey};
 use crate::artifact::{Artifact, ArtifactKey};
 use crate::resource::{ResourceStub, ResourceInit, AssignResourceStateSrc, ResourceAssign, ResourceSliceAssign, HostedResourceStore, HostedResource, LocalHostedResource, Resource};
 use crate::message::Fail;
-use crate::core::space::{SpaceHost, SpaceHostSqLite};
+use crate::core::space::{SpaceHost, ResourceStoreSqlLite};
 
 pub mod server;
-pub mod filestore;
 pub mod space;
+pub mod file_store;
 
 pub struct StarCoreAction{
     pub command: StarCoreCommand,
@@ -51,7 +51,7 @@ impl StarCoreAction{
 pub enum StarCoreCommand
 {
     Get(ResourceKey),
-    Assign(ResourceAssign),
+    Assign(ResourceAssign<AssignResourceStateSrc>),
     Message(ResourceMessage)
 }
 
@@ -84,7 +84,7 @@ pub struct StarCoreAppCommand
 pub enum StarCoreAppCommandPayload
 {
     None,
-    Assign(Request<ResourceAssign,()>),
+    Assign(Request<ResourceAssign<AssignResourceStateSrc>,()>),
     AssignSlice(Request<ResourceSliceAssign,()>),
     InitSlice(Request<ResourceInit,()>)
 }
@@ -252,7 +252,7 @@ impl StarCoreExtFactory for ExampleStarCoreExtFactory
 
 #[async_trait]
 pub trait Host: Send+Sync{
-    async fn assign(&self, assign: ResourceAssign) -> Result<(),Fail>;
+    async fn assign(&self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<(),Fail>;
     async fn get(&self, key: ResourceKey) -> Result<Option<Resource>,Fail>;
 }
 

@@ -25,7 +25,7 @@ use crate::template::ConstellationTemplate;
 use crate::logger::{Logger, Flags, Flag, StarFlag, Log, ProtoStarLog, ProtoStarLogPayload};
 use crate::permissions::AuthTokenSource;
 use crate::star::pledge::StarHandleBacking;
-use crate::resource::HostedResourceStore;
+use crate::resource::{HostedResourceStore, MemoryFileAccess};
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -134,7 +134,8 @@ impl ProtoStar
                             auth_token_source: AuthTokenSource {},
                             registry: resource_registry,
                             star_handler: star_handler,
-                            persistence: Persistence::Memory
+                            persistence: Persistence::Memory,
+                            file_access: Arc::new(MemoryFileAccess::new() )
                         };
 
                         let core_ext = self.star_core_ext_factory.create(&skel );

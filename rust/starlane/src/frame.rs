@@ -18,7 +18,7 @@ use crate::logger::Flags;
 use crate::message::{Fail, MessageExpect, MessageResult, MessageUpdate, ProtoMessage};
 use crate::names::Name;
 use crate::permissions::{Authentication, AuthToken};
-use crate::resource::{Labels, ResourceAssign, ResourceRegistration, ResourceSelector, ResourceLocationRecord, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus, ResourceInit, ResourceStub, ResourceCreate};
+use crate::resource::{Labels, ResourceAssign, ResourceRegistration, ResourceSelector, ResourceLocationRecord, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus, ResourceInit, ResourceStub, ResourceCreate, AssignResourceStateSrc};
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey, StarWatchInfo, LocalResourceLocation};
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -358,7 +358,7 @@ pub enum StarMessagePayload
 pub enum ResourceHostAction
 {
     IsHosting(ResourceKey),
-    Assign(ResourceAssign),
+    Assign(ResourceAssign<AssignResourceStateSrc>),
     Message(ResourceMessage)
 }
 
