@@ -1,32 +1,33 @@
 use std::collections::{HashMap, HashSet};
+use std::future::Future;
+use std::iter::FromIterator;
 use std::sync::Arc;
 
+use bincode::ErrorKind;
 use futures::{FutureExt, TryFutureExt};
+use rusqlite::Connection;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::oneshot::Receiver;
-
-use crate::app::{AppCreateController, AppMeta, ApplicationStatus, AppLocation, AppArchetype, InitData};
-use crate::error::Error;
-use crate::frame::{AssignMessage, Frame, SpaceReply, SequenceMessage, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, Reply, ServerPayload, SimpleReply, SupervisorPayload, AppLabelRequest, FromReply, ChildResourceAction};
-use crate::id::Id;
-use crate::keys::{AppId, AppKey, SubSpaceKey, UserKey, SpaceKey, UserId, ResourceKey};
-use crate::resource::{Labels, Registry, ResourceSelector, ResourceRegistryResult, ResourceRegistryCommand, FieldSelection, ResourceAssign, ResourceType, ResourceRegistration, ResourceLocationRecord, ResourceAddress, ChildResourceManager, ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceInit, ResourceArchetype, ResourceKind, ResourceManager, AssignResourceStateSrc, ResourceAddressPart};
-use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
-use crate::message::{MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage, Fail};
-use crate::star::{CentralCommand, ForwardFrame, StarCommand, StarSkel, StarInfo, StarKey, StarKind, StarVariant, StarVariantCommand, StarNotify, PublicKeySource, SetSupervisorForApp, ResourceRegistryBacking, ResourceRegistryBackingSqLite, StarlaneApi};
-use crate::star::StarCommand::SpaceCommand;
-use crate::permissions::{AppAccess, AuthToken, User, UserKind};
-use crate::crypt::{PublicKey, CryptKeyId};
-use rusqlite::Connection;
-use bincode::ErrorKind;
 use tokio::time::Duration;
-use std::future::Future;
-use std::iter::FromIterator;
+
+use crate::app::{AppArchetype, AppCreateController, ApplicationStatus, AppLocation, AppMeta, InitData};
+use crate::crypt::{CryptKeyId, PublicKey};
+use crate::error::Error;
+use crate::frame::{AppLabelRequest, AssignMessage, ChildResourceAction, Frame, FromReply, Reply, SequenceMessage, ServerPayload, SimpleReply, SpaceMessage, SpacePayload, SpaceReply, StarMessage, StarMessagePayload, SupervisorPayload};
+use crate::id::Id;
+use crate::keys::{AppId, AppKey, ResourceKey, SpaceKey, SubSpaceKey, UserId, UserKey};
+use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
+use crate::message::{Fail, MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage};
+use crate::message::Fail::ResourceCannotGenerateAddress;
+use crate::permissions::{AppAccess, AuthToken, User, UserKind};
+use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, ChildResourceManager, FieldSelection, KeyCreationSrc, Labels, Registry, ResourceAddress, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceInit, ResourceKind, ResourceRecord, ResourceManager, ResourceRegistration, ResourceRegistryCommand, ResourceRegistryResult, ResourceSelector, ResourceType};
 use crate::resource::space::SpaceState;
 use crate::resource::user::UserState;
-use crate::message::Fail::ResourceCannotGenerateAddress;
+use crate::star::{CentralCommand, ForwardFrame, PublicKeySource, ResourceRegistryBacking, ResourceRegistryBackingSqLite, SetSupervisorForApp, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSkel, StarVariant, StarVariantCommand};
+use crate::star::StarCommand::SpaceCommand;
+use crate::starlane::api::StarlaneApi;
 
 pub struct CentralStarVariant
 {
@@ -67,7 +68,6 @@ impl CentralStarVariant
 
          */
     }
-
 
     pub fn unwrap(&self, result: Result<(), SendError<StarCommand>>)
     {
@@ -113,9 +113,6 @@ println!("Central: CALLING ENSURE!");
             _ => {}
         }
     }
-
-
-
 }
 
 impl CentralStarVariant{
@@ -137,7 +134,7 @@ println!("ENSURING HYPERSPACE!");
     async fn ensure_user(&self, space_address: &ResourceAddress, email: &str ) ->Result<(),Error>{
 println!("ENSURING USER!");
         let starlane_api = StarlaneApi::new(self.skel.star_tx.clone());
-        let space_api = starlane_api.get_space_api_from_address(space_address).await?;
+        let space_api = starlane_api.get_space(space_address.clone().into() ).await?;
         space_api.create_user(email).await?;
         Ok(())
     }
@@ -146,7 +143,7 @@ println!("ENSURING USER!");
         println!("---------- sub space ---------------");
         println!("ENSURING SUB SPACE" );
         let starlane_api = StarlaneApi::new(self.skel.star_tx.clone());
-        let space_api = starlane_api.get_space_api_from_address(space_address).await?;
+        let space_api = starlane_api.get_space(space_address.clone().into()).await?;
         space_api.create_sub_space(sub_space).await?;
         Ok(())
     }

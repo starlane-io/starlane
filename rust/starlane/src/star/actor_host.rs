@@ -9,7 +9,7 @@ use crate::app::{AppCommandKind};
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 use crate::keys::{AppKey, UserKey, ResourceKey, GatheringKey};
-use crate::resource::ResourceLocationRecord;
+use crate::resource::ResourceRecord;
 use crate::actor::ActorKey;
 
 
@@ -66,9 +66,6 @@ impl ServerStarVariant
     {
         self.backing.get_supervisor()
     }
-
-
-
 }
 
 impl ServerStarVariant

@@ -17,7 +17,7 @@ use crate::filesystem::File;
 use crate::frame::{Reply, StarMessagePayload, ChildResourceAction};
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, SubSpaceKey, UserKey, ResourceKey};
-use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceLocationRecord, ResourceArchetype, ResourceInit, ResourceAddress, Names, AssignResourceStateSrc, SkewerCase, ResourceAddressPart, ResourceType, ResourceStub, ResourceCreate};
+use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceRecord, ResourceArchetype, ResourceInit, ResourceAddress, Names, AssignResourceStateSrc, SkewerCase, ResourceAddressPart, ResourceType, ResourceCreate, ResourceStub};
 use crate::names::Name;
 use crate::space::CreateAppControllerFail;
 use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarSkel, StarVariantCommand, StarComm, ServerCommand, Request, Empty, Query, LocalResourceLocation };
@@ -216,10 +216,10 @@ unimplemented!();
                         let local = LocalResourceLocation::new(ResourceKey::Actor(actor), Option::None);
                         request.tx.send(Result::Ok(local));
                     } else {
-                        request.tx.send(Result::Err(Fail::ResourceNotFound(ResourceKey::Actor(actor))));
+                        request.tx.send(Result::Err(Fail::ResourceNotFound(ResourceKey::Actor(actor).into())));
                     }
                 } else {
-                    request.tx.send(Result::Err(Fail::ResourceNotFound(request.payload)));
+                    request.tx.send(Result::Err(Fail::ResourceNotFound(request.payload.into())));
                 }
                 Ok(())
             }
@@ -234,7 +234,7 @@ unimplemented!();
                         request.tx.send(Ok(()) );
                         let result = self.ext.actor_message(request.payload).await;
                     } else {
-                        request.tx.send(Err(Fail::ResourceNotFound(request.payload.to.key)));
+                        request.tx.send(Err(Fail::ResourceNotFound(request.payload.to.key.into())));
                     }
                 } else {
                     request.tx.send(Err(Fail::WrongResourceType{expected: HashSet::from_iter(vec![ResourceType::Actor]), received: request.payload.to.key.resource_type().clone() }));
@@ -577,7 +577,7 @@ pub struct AppResource{
 }
 
 impl AppResource {
-    pub fn from_resource(resource: ResourceStub) -> Result<AppResource,Error> {
+    pub fn from_resource(resource: ResourceStub ) -> Result<AppResource,Error> {
         if !resource.validate(ResourceType::App) {
             return Err("resource is not completely an AppResource".into());
         }

@@ -22,7 +22,7 @@ use tokio::sync::{oneshot, mpsc};
 use rusqlite::{Connection,params};
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
-use crate::resource::{Registry, FieldSelection, ResourceType, ResourceLocationRecord, ResourceRegistryAction};
+use crate::resource::{Registry, FieldSelection, ResourceType, ResourceRecord, ResourceRegistryAction};
 use std::future::Future;
 use crate::star::pledge::{StarHandleBacking, StarHandle};
 use tokio::time::Duration;
@@ -256,7 +256,7 @@ pub struct SupervisorManagerBackingDefault
     servers: Vec<StarKey>,
     server_select_index: usize,
     applications: HashMap<AppKey, AppArchetype>,
-    actor_location: HashMap<ResourceKey, ResourceLocationRecord>,
+    actor_location: HashMap<ResourceKey, ResourceRecord>,
     app_status: HashMap<AppKey,AppStatus>,
     app_server_status: HashMap<(AppKey,StarKey),AppServerStatus>,
     app_to_servers: HashMap<AppKey,HashSet<StarKey>>,
@@ -301,8 +301,8 @@ pub trait SupervisorManagerBacking: Send+Sync
 
     async fn app_sequence_next(&mut self, app: &AppKey ) -> Result<u64,Error>;
 
-    async fn set_actor_location(&mut self, location: ResourceLocationRecord) -> Result<(),Error>;
-    async fn get_actor_location(&self, actor: &ResourceKey) -> Option<ResourceLocationRecord>;
+    async fn set_actor_location(&mut self, location: ResourceRecord) -> Result<(),Error>;
+    async fn get_actor_location(&self, actor: &ResourceKey) -> Option<ResourceRecord>;
 }
 
 
@@ -573,13 +573,13 @@ println!("SELECT SERVERS!");
         }
     }
 
-    async fn set_actor_location(&mut self, location: ResourceLocationRecord) -> Result<(), Error> {
+    async fn set_actor_location(&mut self, location: ResourceRecord) -> Result<(), Error> {
         let (request,rx) = SupervisorDbRequest::new( SupervisorDbCommand::SetResourceLocation(location));
         self.supervisor_db.send( request ).await;
         self.handle(rx.await)
     }
 
-    async fn get_actor_location(&self, actor: &ResourceKey) -> Option<ResourceLocationRecord> {
+    async fn get_actor_location(&self, actor: &ResourceKey) -> Option<ResourceRecord> {
         let (request,rx) = SupervisorDbRequest::new( SupervisorDbCommand::GetActorLocation(actor.clone()));
         self.supervisor_db.send( request ).await;
         match rx.await
@@ -642,7 +642,7 @@ pub enum SupervisorDbCommand
     GetAppStatus(AppKey),
     GetServersForApp(AppKey),
     AppSequenceNext(AppKey),
-    SetResourceLocation(ResourceLocationRecord),
+    SetResourceLocation(ResourceRecord),
     GetActorLocation(ResourceKey)
 }
 
@@ -657,7 +657,7 @@ pub enum SupervisorDbResult
     AppStatus(AppStatus),
     AppServerStatus(AppServerStatus),
     AppSequenceNext(u64),
-    ActorLocation(ResourceLocationRecord)
+    ActorLocation(ResourceRecord)
 }
 
 pub struct SupervisorDb {
@@ -950,7 +950,7 @@ println!("GET APP STATUS ERROR: {}",e);
                     }
                 }
                 SupervisorDbCommand::SetResourceLocation(loc) => {
-                    let actor = bincode::serialize(&loc.key).unwrap();
+                    let actor = bincode::serialize(&loc.stub).unwrap();
                     let location = bincode::serialize(&loc).unwrap();
 
                     let result = self.conn.execute("REPLACE INTO actors (key,location) VALUES (?1,?2)", params![actor,location]);
@@ -969,7 +969,7 @@ println!("GET APP STATUS ERROR: {}",e);
                     let result = self.conn.query_row("SELECT location FROM actors WHERE key=?1", params![actor], |row|
                         {
                             let location : Vec<u8>= row.get(0).unwrap();
-                            if let Result::Ok(location) = bincode::deserialize::<ResourceLocationRecord>(location.as_slice()) {
+                            if let Result::Ok(location) = bincode::deserialize::<ResourceRecord>(location.as_slice()) {
                                 Ok(location)
                             }
                             else

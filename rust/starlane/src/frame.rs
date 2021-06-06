@@ -13,12 +13,12 @@ use crate::app::{AppArchetype, AppCreateResult, AppLocation, AppMeta, AppSpecifi
 use crate::crypt::{Encrypted, HashEncrypted, HashId};
 use crate::error::Error;
 use crate::id::Id;
-use crate::keys::{AppKey, MessageId, ResourceKey, SubSpaceKey, UserKey};
+use crate::keys::{AppKey, MessageId, ResourceKey, SubSpaceKey, UserKey, ResourceId};
 use crate::logger::Flags;
 use crate::message::{Fail, MessageExpect, MessageResult, MessageUpdate, ProtoMessage};
 use crate::names::Name;
 use crate::permissions::{Authentication, AuthToken};
-use crate::resource::{Labels, ResourceAssign, ResourceRegistration, ResourceSelector, ResourceLocationRecord, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus, ResourceInit, ResourceStub, ResourceCreate, AssignResourceStateSrc};
+use crate::resource::{Labels, ResourceAssign, ResourceRegistration, ResourceSelector, ResourceRecord, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus, ResourceInit, ResourceCreate, AssignResourceStateSrc, ResourceIdentifier, ResourceStub};
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey, StarWatchInfo, LocalResourceLocation};
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -372,11 +372,8 @@ pub enum ResourceHostResult{
 pub enum ChildResourceAction
 {
     Register(ResourceRegistration),
-    Location(ResourceLocationRecord),
-    Find(ResourceKey),
-    GetKey(ResourceAddress),
-    GetAddress(ResourceKey),
-    Bind(ResourceBinding),
+    Location(ResourceRecord),
+    Find(ResourceIdentifier),
     Status(ResourceStatusReport),
     SliceStatus(ResourceSliceStatusReport),
     Create(ResourceCreate),
@@ -389,9 +386,6 @@ impl ToString for ChildResourceAction {
             ChildResourceAction::Register(_) => "Register".to_string(),
             ChildResourceAction::Location(_) => "Location".to_string(),
             ChildResourceAction::Find(_) => "Find".to_string(),
-            ChildResourceAction::GetKey(_) => "GetKey".to_string(),
-            ChildResourceAction::GetAddress(_) => "GetAddress".to_string(),
-            ChildResourceAction::Bind(_) => "Bind".to_string(),
             ChildResourceAction::Status(_) => "Status".to_string(),
             ChildResourceAction::SliceStatus(_) => "SliceStatus".to_string(),
             ChildResourceAction::Create(_) => "Create".to_string(),
@@ -445,10 +439,9 @@ pub enum Reply
 {
     Empty,
     Key(ResourceKey),
-    Keys(Vec<ResourceKey>),
-    Location(ResourceLocationRecord),
+    Resources(Vec<ResourceRecord>),
+    Resource(ResourceRecord),
     Address(ResourceAddress),
-    Resource(ResourceStub),
     Seq(u64)
 }
 
@@ -457,8 +450,8 @@ impl ToString for Reply{
         match self{
             Reply::Empty => "Empty".to_string(),
             Reply::Key(_) => "Key".to_string(),
-            Reply::Keys(_) =>  "Keys".to_string(),
-            Reply::Location(_) =>  "Location".to_string(),
+            Reply::Resources(_) =>  "Keys".to_string(),
+            Reply::Resource(_) =>  "ResourceRecord".to_string(),
             Reply::Address(_) =>  "Address".to_string(),
             Reply::Resource(_) =>  "Resource".to_string(),
             Reply::Seq(_) =>  "Seq".to_string(),
@@ -642,7 +635,7 @@ pub struct ActorLocationRequest
 pub struct ActorLocationReport
 {
     pub resource: ResourceKey,
-    pub location: ResourceLocationRecord
+    pub location: ResourceRecord
 }
 
 
@@ -798,20 +791,8 @@ impl From<Elapsed> for Fail{
 
 
 
-impl From<Vec<ResourceKey>> for Reply
-{
-    fn from(keys: Vec<ResourceKey>) -> Self {
-        Reply::Keys(keys)
-    }
-}
 
 
-impl From<Vec<AppKey>> for Reply
-{
-    fn from(keys: Vec<AppKey>) -> Self {
-        Reply::Keys(keys.iter().map(|k|ResourceKey::App(k.clone())).collect())
-    }
-}
 
 pub trait FromReply<T,E>: Sized
 {
@@ -833,13 +814,13 @@ impl FromReply<(),Fail> for Reply
     }
 }
 
-impl FromReply<Vec<ResourceStub>,Fail> for Reply
+impl FromReply<Vec<ResourceRecord>,Fail> for Reply
 {
-    fn from_result(t: Result<Vec<ResourceStub>,Fail>) -> Result<Self,Fail> {
+    fn from_result(t: Result<Vec<ResourceRecord>,Fail>) -> Result<Self,Fail> {
         match t
         {
             Ok(ok) => {
-                Ok(ok.into())
+                Ok(Reply::Resources(ok))
             }
             Err(e) => {
                 Err(e)
@@ -848,20 +829,6 @@ impl FromReply<Vec<ResourceStub>,Fail> for Reply
     }
 }
 
-impl FromReply<Vec<ResourceStub>,Error> for Reply
-{
-    fn from_result(t: Result<Vec<ResourceStub>,Error>) -> Result<Self,Fail> {
-        match t
-        {
-            Ok(ok) => {
-                Ok(ok.into())
-            }
-            Err(e) => {
-                Err(Fail::Error(format!("{}",e)))
-            }
-        }
-    }
-}
 
 
 

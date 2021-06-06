@@ -1,23 +1,33 @@
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+use std::convert::TryInto;
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender};
+use std::time::Duration;
 
 use futures::future::join_all;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 
+use api::SpaceApi;
+
 use crate::core::{CoreRunner, ExampleStarCoreExtFactory, StarCoreExtFactory, StarCoreFactory};
 use crate::error::Error;
-use crate::frame::Frame;
+use crate::frame::{ChildResourceAction, Frame, Reply, SimpleReply, StarMessagePayload};
+use crate::keys::ResourceKey;
 use crate::lane::{ConnectionInfo, ConnectionKind, Lane, LocalTunnelConnector};
 use crate::layout::ConstellationLayout;
 use crate::logger::{Flags, Logger};
+use crate::message::{Fail, ProtoMessage};
 use crate::proto::{local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoTunnel};
 use crate::provision::Provisioner;
-use crate::star::{Star, StarCommand, StarController, StarKey, StarManagerFactory, StarManagerFactoryDefault, StarName};
+use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord};
+use crate::resource::space::SpaceState;
+use crate::star::{Request, Star, StarCommand, StarController, StarKey, StarManagerFactory, StarManagerFactoryDefault, StarName};
 use crate::template::{ConstellationData, ConstellationTemplate, StarKeyIndexTemplate, StarKeySubgraphTemplate, StarKeyTemplate};
+
+pub mod api;
 
 pub struct Starlane
 {
@@ -413,6 +423,7 @@ pub enum StarAddress
 #[cfg(test)]
 mod test
 {
+    use std::str::FromStr;
     use std::sync::Arc;
 
     use tokio::runtime::Runtime;
@@ -421,18 +432,17 @@ mod test
     use tokio::time::timeout;
 
     use crate::app::{AppController, AppKind, AppSpecific, ConfigSrc, InitData};
-    use crate::artifact::{Artifact, ArtifactLocation, ArtifactKind};
+    use crate::artifact::{Artifact, ArtifactKind, ArtifactLocation};
     use crate::error::Error;
     use crate::keys::{SpaceKey, SubSpaceKey, UserKey};
-    use crate::resource::Labels;
     use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
     use crate::names::Name;
     use crate::permissions::Authentication;
+    use crate::resource::Labels;
     use crate::space::CreateAppControllerFail;
     use crate::star::{StarController, StarInfo, StarKey, StarKind};
     use crate::starlane::{ConstellationCreate, StarControlRequestByName, Starlane, StarlaneCommand};
     use crate::template::{ConstellationData, ConstellationTemplate};
-    use std::str::FromStr;
 
     #[test]
     pub fn starlane()

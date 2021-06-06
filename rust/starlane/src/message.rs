@@ -11,7 +11,7 @@ use crate::keys::{MessageId, SubSpaceKey, UserKey, ResourceKey};
 use tokio::sync::broadcast::error::RecvError;
 use serde::{Serialize, Deserialize};
 use crate::names::Specific;
-use crate::resource::{ResourceType, ResourceAddress};
+use crate::resource::{ResourceType, ResourceAddress, ResourceIdentifier};
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::fmt;
@@ -349,8 +349,7 @@ pub enum Fail
     Reject(Reject),
     Unexpected,
     DoNotKnowSpecific(Specific),
-    ResourceNotFound(ResourceKey),
-    AddressNotFound(ResourceAddress),
+    ResourceNotFound(ResourceIdentifier),
     WrongResourceType{
         expected: HashSet<ResourceType>,
         received: ResourceType
@@ -387,7 +386,6 @@ impl ToString for Fail {
                 Some(expected) => expected.to_string()
             }),
             Fail::ResourceCannotGenerateAddress => "ResourceCannotGenerateAddress".to_string(),
-            Fail::AddressNotFound(address) => format!("AddressNotFound({})", address.to_string()),
             Fail::SuitableHostNotAvailable(detail) => format!("SuitableHostNotAvailable({})", detail.to_string()),
             Fail::SqlError(detail) => format!("SqlError({})", detail.to_string()),
             Fail::CannotCreateNothingResourceTypeItIsThereAsAPlaceholderDummy => "CannotCreateNothingResourceTypeItIsThereAsAPlaceholderDummy".to_string(),

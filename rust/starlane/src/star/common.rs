@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::star::pledge::StarHandleBacking;
 use crate::frame::{ChildResourceAction, StarMessage, StarMessagePayload, SimpleReply, Reply, ResourceHostAction};
 use crate::core::StarCoreCommand;
-use crate::resource::ResourceLocationRecord;
+use crate::resource::ResourceRecord;
 
 pub struct CommonVariant
 {

@@ -1,4 +1,4 @@
-use crate::resource::{ResourceAssign, ResourceType, Names, Resource, ResourceAddress, ResourceStateSrc, AssignResourceStateSrc, DataTransfer, MemoryDataTransfer, LocalDataSrc, ResourceStatePersistence, FileAccess, FileDataTransfer};
+use crate::resource::{ResourceAssign, ResourceType, Names, Resource, ResourceAddress, ResourceStateSrc, AssignResourceStateSrc, DataTransfer, MemoryDataTransfer, LocalDataSrc, ResourceStatePersistence, FileAccess, FileDataTransfer, ResourceKind, ResourceArchetype};
 use rusqlite::{Connection, Transaction,params};
 use tokio::sync::{mpsc, oneshot};
 use std::collections::HashSet;
@@ -15,6 +15,9 @@ use crate::resource::user::UserState;
 use crate::keys::{ResourceKey, SpaceId};
 use std::str::FromStr;
 use std::sync::Arc;
+use crate::names::{Name, Specific};
+use crate::app::ConfigSrc;
+use rusqlite::types::ValueRef;
 
 pub struct SpaceHost {
   tx: mpsc::Sender<ResourceStoreAction>
@@ -156,6 +159,15 @@ impl ResourceStoreSqlLite {
                 let trans = self.conn.transaction()?;
                 let key = assign.key.bin()?;
                 let address = assign.address.to_string();
+                let specific = match assign.archetype.specific{
+                    None => Option::None,
+                    Some(specific) => Option::Some(specific.to())
+                };
+                let config_src = match assign.archetype.config {
+                    None => Option::None,
+                    Some(config_src) => Option::Some(config_src.to_string())
+                };
+
                 let state = match assign.archetype.kind.resource_type().state_persistence(){
                     ResourceStatePersistence::Database => {assign.state_src.get()?}
                     ResourceStatePersistence::File => {
@@ -173,23 +185,47 @@ impl ResourceStoreSqlLite {
                     }
                 };
 
-                trans.execute("INSERT INTO resources (key,address,state_src) VALUES (?1,?2,?3)", params![key,address,*state])?;
+                trans.execute("INSERT INTO resources (key,address,state_src,kind,specific,config_src) VALUES (?1,?2,?3,?4,?5,?6)", params![key,address,*state,assign.archetype.kind.to_string(),specific,config_src])?;
                 trans.commit()?;
                 Ok(ResourceStoreResult::Ok)
             }
             ResourceStoreCommand::Get(key) => {
                 let key_bin = key.bin()?;
-                let resource = self.conn.query_row("SELECT address,state_src FROM resources WHERE key=?1", params![key_bin], |row| {
+                let resource = self.conn.query_row("SELECT address,state_src,kind,specific,config_src FROM resources WHERE key=?1", params![key_bin], |row| {
                     let address: String = row.get(0)?;
                     let address= ResourceAddress::from_str(address.as_str())?;
                     let state: Vec<u8> = row.get(1)?;
+                    let kind: String = row.get(2)?;
+                    let kind = ResourceKind::from_str( kind.as_str() )?;
+                    let specific= if let ValueRef::Null = row.get_ref(3)? {
+                        Option::None
+                    } else {
+                        let specific: String = row.get(3)?;
+                        let specific= Specific::from_str(specific.as_str())?;
+                        Option::Some(specific)
+                    };
+
+                    let config_src= if let ValueRef::Null = row.get_ref(4)? {
+                        Option::None
+                    } else {
+                        let config_src: String = row.get(4)?;
+                        let config_src = ConfigSrc::from_str(config_src.as_str())?;
+                        Option::Some(config_src)
+                    };
+
 
                     let state: Arc<dyn DataTransfer> = match key.resource_type().state_persistence(){
                         ResourceStatePersistence::Database => Arc::new(MemoryDataTransfer::new(Arc::new(state))),
                         ResourceStatePersistence::File => Arc::new( FileDataTransfer::new(dyn_clone::clone_box(&*self.file_access ), address.path()? ))
                     };
 
-                    Ok(Resource::new(key,address,state))
+                    let archetype = ResourceArchetype{
+                        kind: kind,
+                        specific: specific,
+                        config: config_src
+                    };
+
+                    Ok(Resource::new(key,address, archetype, state))
                 });
 
                 match resource {
@@ -214,6 +250,9 @@ impl ResourceStoreSqlLite {
 	      key BLOB PRIMARY KEY,
 	      address TEXT NOT NULL,
 	      state_src BLOB NOT NULL,
+	      kind: TEXT NOT NULL,
+	      specific: TEXT,
+	      config_src: TEXT,
 	      UNIQUE(address)
         )"#;
 

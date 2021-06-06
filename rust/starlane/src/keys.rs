@@ -14,7 +14,7 @@ use crate::id::Id;
 use crate::message::Fail;
 use crate::names::Name;
 use crate::permissions::{Priviledges, User, UserKind};
-use crate::resource::{Labels, ResourceStub, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceKind, ResourceManagerKey, ResourceType, SkewerCase};
+use crate::resource::{Labels, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceKind, ResourceManagerKey, ResourceType, SkewerCase, ResourceIdentifier, ResourceStub, ResourceRecord};
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
@@ -419,7 +419,7 @@ impl ResourceKey
 
     pub fn space(&self)->Result<SpaceKey,Fail> {
         match self{
-            ResourceKey::Nothing => Err(Fail::WrongResourceType { expected: HashSet::from_iter(vec![ResourceType::Space,ResourceType::SubSpace,ResourceType::App,ResourceType::Actor,ResourceType::User,ResourceType::Artifact,ResourceType::FileSystem,ResourceType::File] ), received: ResourceType::Nothing }),
+            ResourceKey::Nothing => Err(Fail::WrongResourceType { expected: HashSet::from_iter(vec![ResourceType::Space, ResourceType::SubSpace, ResourceType::App, ResourceType::Actor, ResourceType::User, ResourceType::Artifact, ResourceType::FileSystem, ResourceType::File] ), received: ResourceType::Nothing }),
             ResourceKey::Space(space) => Ok(space.clone()),
             ResourceKey::SubSpace(sub_space) => Ok(sub_space.space.clone()),
             ResourceKey::App(app) => Ok(app.sub_space.space.clone()),
@@ -613,17 +613,17 @@ impl GatheringKey
     }
 }
 
-impl fmt::Display for ResourceKey{
+impl fmt::Display for ResourceKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!( f,"{}",
                 match self{
-                    ResourceKey::Space(key) => format!("SpaceKey:{}",key),
-                    ResourceKey::SubSpace(key) => format!("SubSpaceKey:{}",key),
-                    ResourceKey::App(key)  => format!("AppKey:{}",key),
-                    ResourceKey::Actor(key) => format!("ActorKey:{}",key),
-                    ResourceKey::User(key) => format!("UserKey:{}",key),
-                    ResourceKey::File(key) => format!("FileKey:{}",key),
-                    ResourceKey::Artifact(key) => format!("ArtifactKey:{}",key),
+                    ResourceKey::Space(key) => format!("SpaceKey:{}", key),
+                    ResourceKey::SubSpace(key) => format!("SubSpaceKey:{}", key),
+                    ResourceKey::App(key)  => format!("AppKey:{}", key),
+                    ResourceKey::Actor(key) => format!("ActorKey:{}", key),
+                    ResourceKey::User(key) => format!("UserKey:{}", key),
+                    ResourceKey::File(key) => format!("FileKey:{}", key),
+                    ResourceKey::Artifact(key) => format!("ArtifactKey:{}", key),
                     ResourceKey::FileSystem(key) => format!("FileSystemKey:{}", key),
                     ResourceKey::Nothing => "Nothing".to_string()
                 })
@@ -699,12 +699,6 @@ impl ResourceKey
 
 }
 
-impl From<Vec<ResourceStub>> for Reply
-{
-    fn from(resources: Vec<ResourceStub>) -> Self {
-        Reply::Keys(resources.iter().map(|r|r.key.clone()).collect())
-    }
-}
 
 impl fmt::Display for FileSystemKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

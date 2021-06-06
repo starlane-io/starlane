@@ -12,7 +12,7 @@ use tokio::time::error::Elapsed;
 use crate::error::Error;
 use crate::frame::{Reply, ResourceHostAction, SimpleReply, StarMessagePayload};
 use crate::message::{Fail, ProtoMessage};
-use crate::resource::{ResourceStub, ResourceAssign, ResourceHost, ResourceType, RemoteResourceHost, ResourceLocationAffinity};
+use crate::resource::{ResourceAssign, ResourceHost, ResourceType, RemoteResourceHost, ResourceLocationAffinity};
 use crate::star::{LocalResourceLocation, StarComm, StarCommand, StarInfo, StarKey, StarKind, StarSkel};
 use std::sync::Arc;
 use futures::TryFutureExt;

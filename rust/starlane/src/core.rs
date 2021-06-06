@@ -25,7 +25,7 @@ use crate::core::server::{ServerStarCore, ServerStarCoreExt, ExampleServerStarCo
 use std::marker::PhantomData;
 use crate::keys::{AppKey, ResourceKey};
 use crate::artifact::{Artifact, ArtifactKey};
-use crate::resource::{ResourceStub, ResourceInit, AssignResourceStateSrc, ResourceAssign, ResourceSliceAssign, HostedResourceStore, HostedResource, LocalHostedResource, Resource};
+use crate::resource::{ ResourceInit, AssignResourceStateSrc, ResourceAssign, ResourceSliceAssign, HostedResourceStore, HostedResource, LocalHostedResource, Resource};
 use crate::message::Fail;
 use crate::core::space::{SpaceHost, ResourceStoreSqlLite};
 

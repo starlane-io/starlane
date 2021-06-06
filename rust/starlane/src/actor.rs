@@ -14,7 +14,7 @@ use crate::frame::{Event};
 use crate::id::Id;
 use crate::keys::{AppKey, ResourceKey, SubSpaceKey, UserKey};
 use crate::names::Name;
-use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceType, ResourceArchetype, ResourceInit, ResourceStub, Names, ResourceAddress, ResourceAddressPart, SkewerCase, ResourceRegistryInfo};
+use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceType, ResourceArchetype, ResourceInit, Names, ResourceAddress, ResourceAddressPart, SkewerCase, ResourceRegistryInfo, ResourceStub};
 use crate::star::StarKey;
 use std::marker::PhantomData;
 use serde::de::DeserializeOwned;
@@ -143,7 +143,7 @@ pub struct ActorRegistration
 impl From<ActorResource> for ResourceStub
 {
     fn from(actor: ActorResource) -> Self {
-        ResourceStub {
+        ResourceStub{
             key: ResourceKey::Actor(actor.key),
             archetype: ResourceArchetype{
                 kind: ResourceKind::Actor(actor.archetype.kind),
@@ -156,11 +156,13 @@ impl From<ActorResource> for ResourceStub
     }
 }
 
+/*
 impl From<ActorRegistration> for ResourceRegistration
 {
     fn from(actor : ActorRegistration) -> Self {
         ResourceRegistration{
             resource: actor.resource.into(),
+            location: ResourceLocation {},
             info: Option::Some(ResourceRegistryInfo {
                 names: actor.names,
                 labels: actor.labels
@@ -168,6 +170,7 @@ impl From<ActorRegistration> for ResourceRegistration
         }
     }
 }
+ */
 
 
 
