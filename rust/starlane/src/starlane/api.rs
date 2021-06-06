@@ -226,10 +226,10 @@ impl SubSpaceApi {
 
 
     pub fn new(star_tx: mpsc::Sender<StarCommand>, stub: ResourceStub ) -> Result<Self,Error> {
-        if stub.key.resource_type() != ResourceType::Space{
+        if stub.key.resource_type() != ResourceType::SubSpace{
             return Err(format!("wrong key resource type for SubSpaceApi: {}", stub.key.resource_type().to_string()).into());
         }
-        if stub.address.resource_type() != ResourceType::Space{
+        if stub.address.resource_type() != ResourceType::SubSpace{
             return Err(format!("wrong address resource type for SubSpaceApi: {}", stub.address.resource_type().to_string()).into());
         }
 
