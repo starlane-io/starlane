@@ -1738,11 +1738,13 @@ println!("special process frame....");
 
 
     async fn process_message(&mut self, mut message: StarMessage) -> Result<(),Error> {
-println!("process_message---> {}", message.payload.to_string() );
+//println!("process_message---> {}", message.payload.to_string() );
         match &message.payload{
             StarMessagePayload::ResourceManager(action) => self.process_resource_manager_action(message.clone(),action.clone()).await?,
             StarMessagePayload::ResourceHost(action) => self.process_resource_host_action(message.clone(),action.clone()).await?,
-            _ => {}
+            _ => {
+//eprintln!("process_message: Unexpected Payload");
+            }
         };
         Ok(())
     }
@@ -1806,7 +1808,7 @@ println!("received RECORD..from child manager. of : {}",create.archetype.kind.re
                                 match record {
                                     Ok(record) => {
 println!("responding with Reply::Location(record)...  ");
-                                        skel.comm().reply_result(message, Ok(Reply::Key(record.stub.key))).await;
+                                        skel.comm().reply_result(message, Ok(Reply::Resource(record))).await;
                                     }
                                     Err(fail) => {
                                         eprintln!("Fail: {}",fail.to_string());
@@ -1863,6 +1865,7 @@ eprintln!("Error: {}",err);
 
             async fn process_resource_host_action(&self, message: StarMessage, action: ResourceHostAction) -> Result<(),Error>
             {
+println!("process_resource_host_action");
                 match action {
                     ResourceHostAction::IsHosting(resource) => {
                         if let Option::Some(resource) = self.get_resource(&resource).await?
@@ -1879,13 +1882,16 @@ eprintln!("Error: {}",err);
         println!("Assignment Reached Star: {}",self.skel.info.kind);
                         let (action,rx) = StarCoreAction::new(StarCoreCommand::Assign(assign.clone()));
                         self.skel.core_tx.send( action).await;
-                        if let StarCoreResult::Resource(Option::Some(resource))= rx.await?? {
+                        let result = rx.await??;
+println!(">> RESULT: {}",result.to_string());
+                        if let StarCoreResult::Resource(Option::Some(resource)) = result {
                             let record = ResourceRecord::new(resource.into(), self.skel.info.key.clone());
+println!("returning record: {}",record.stub.address.to_string());
                             self.skel.comm().simple_reply(message, SimpleReply::Ok(Reply::Resource(record))).await;
                         } else {
+println!("UNEXPECTED RESULT IN ASSIGN!!!");
                             self.skel.comm().simple_reply(message, SimpleReply::Fail(Fail::Unexpected)).await;
                         }
-        println!("Assignment CONFIRMED : {}",self.skel.info.kind);
                     }
 
                     ResourceHostAction::Message(_) => {

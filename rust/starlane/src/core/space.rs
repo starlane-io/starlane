@@ -35,7 +35,7 @@ impl SpaceHost {
 impl Host for SpaceHost {
 
 
-    async fn assign(&self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<(), Fail> {
+    async fn assign(&self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource, Fail> {
         let (tx,rx) = oneshot::channel();
 
         // if there is Initialization to do for assignment THIS is where we do it
@@ -55,8 +55,14 @@ impl Host for SpaceHost {
             command: ResourceStoreCommand::Put(assign),
             tx: tx
         }).await?;
-        rx.await?;
-        Ok(())
+        match rx.await??{
+            ResourceStoreResult::Resource(resource) => {
+println!("IS SOME? {}",resource.is_some());
+                resource.ok_or(Fail::Error("option returned None".into()))
+            }
+            _ => Err(Fail::Error("unexpected response from host registry sql".into()))
+        }
+
     }
 
     async fn get(&self, key: ResourceKey) -> Result<Option<Resource>, Fail> {
@@ -118,7 +124,13 @@ impl ResourceStoreSqlLite {
                     rx: rx,
                     file_access: file_access
                 };
-                db.run().await.unwrap();
+                match db.run().await
+                {
+                    Ok(_) => {}
+                    Err(err) => {
+                        eprintln!("experienced fatal error in sql db: {}", err);
+                    }
+                }
             }
         });
         tx
@@ -156,14 +168,15 @@ impl ResourceStoreSqlLite {
                 Ok(ResourceStoreResult::Ok)
             }
             ResourceStoreCommand::Put(assign) => {
+println!("PUT!");
                 let trans = self.conn.transaction()?;
                 let key = assign.key.bin()?;
                 let address = assign.address.to_string();
-                let specific = match assign.archetype.specific{
+                let specific = match &assign.archetype.specific{
                     None => Option::None,
                     Some(specific) => Option::Some(specific.to())
                 };
-                let config_src = match assign.archetype.config {
+                let config_src = match &assign.archetype.config {
                     None => Option::None,
                     Some(config_src) => Option::Some(config_src.to_string())
                 };
@@ -187,7 +200,11 @@ impl ResourceStoreSqlLite {
 
                 trans.execute("INSERT INTO resources (key,address,state_src,kind,specific,config_src) VALUES (?1,?2,?3,?4,?5,?6)", params![key,address,*state,assign.archetype.kind.to_string(),specific,config_src])?;
                 trans.commit()?;
-                Ok(ResourceStoreResult::Ok)
+
+                let resource = Resource::new(assign.key,assign.address, assign.archetype, assign.state_src );
+
+println!("returning Resource....");
+                Ok(ResourceStoreResult::Resource(Option::Some(resource)))
             }
             ResourceStoreCommand::Get(key) => {
                 let key_bin = key.bin()?;
@@ -250,9 +267,9 @@ impl ResourceStoreSqlLite {
 	      key BLOB PRIMARY KEY,
 	      address TEXT NOT NULL,
 	      state_src BLOB NOT NULL,
-	      kind: TEXT NOT NULL,
-	      specific: TEXT,
-	      config_src: TEXT,
+	      kind TEXT NOT NULL,
+	      specific TEXT,
+	      config_src TEXT,
 	      UNIQUE(address)
         )"#;
 

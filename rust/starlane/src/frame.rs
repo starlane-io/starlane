@@ -417,6 +417,16 @@ pub enum SimpleReply
     Ack(MessageAck)
 }
 
+impl ToString for SimpleReply{
+    fn to_string(&self) -> String {
+        match self{
+            SimpleReply::Ok(ok) => format!("Ok({})",ok.to_string()),
+            SimpleReply::Fail(fail) => format!("Fail({})",fail.to_string()),
+            SimpleReply::Ack(ack) => "Ack".to_string()
+        }
+    }
+}
+
 
 
 impl StarMessagePayload{
@@ -718,7 +728,7 @@ impl fmt::Display for StarMessagePayload{
         let r = match self {
             StarMessagePayload::None => "None".to_string(),
             StarMessagePayload::Space(_) => "Space".to_string(),
-            StarMessagePayload::Reply(_) => "Reply".to_string(),
+            StarMessagePayload::Reply(reply) => format!("Reply({})",reply.to_string() ),
             StarMessagePayload::ResourceManager(_) => "ResourceManager".to_string(),
             StarMessagePayload::ResourceHost(_) => "ResourceHost".to_string()
         };

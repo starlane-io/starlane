@@ -253,7 +253,7 @@ impl StarCoreExtFactory for ExampleStarCoreExtFactory
 
 #[async_trait]
 pub trait Host: Send+Sync{
-    async fn assign(&self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<(),Fail>;
+    async fn assign(&self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource,Fail>;
     async fn get(&self, key: ResourceKey) -> Result<Option<Resource>,Fail>;
 }
 
@@ -277,7 +277,9 @@ impl StarCore2{
 
     pub async fn run(mut self){
         while let Option::Some(action) = self.rx.recv().await{
-            if action.tx.send( self.process(action.command).await).is_err() {
+            let result = self.process(action.command).await;
+println!("StarCore2: RESULT IS: {}",result.as_ref().ok().unwrap().to_string());
+            if action.tx.send( result ).is_err() {
                 println!("Warning: Core sent response but got error.");
             }
         }
@@ -287,8 +289,8 @@ impl StarCore2{
         match command{
 
             StarCoreCommand::Assign(assign) => {
-                self.host.assign(assign).await?;
-                Ok(StarCoreResult::Ok)
+println!("CORE... RETURNING RESOURCE");
+                Ok(StarCoreResult::Resource(Option::Some(self.host.assign(assign).await?)))
             }
             StarCoreCommand::Get(key) => {
                 let resource = self.host.get(key).await?;

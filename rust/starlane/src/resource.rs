@@ -634,15 +634,6 @@ println!("......key is_some() .......");
 println!("......key next trans.execute() .......");
                     trans.execute("DELETE FROM resources WHERE key=?1", [params.key.clone()])?;
                 }
-println!("...... AfTeR .......");
-                trans.execute("DELETE FROM addresses WHERE key=?1 OR address=?2", params![params.key.clone(),params.address.clone()])?;
-
-println!("......Trans exec delete.......");
-
-                trans.execute("INSERT INTO addresses (key,address) VALUES (?1,?2)", params![params.key.clone(),params.address.clone()])?;
-
-
-println!("BIND: INSERT INTO addresses (key,address) VALUES ({},{})", ResourceKey::from_bin(params.key.clone().unwrap()).unwrap(), params.address.clone().unwrap());
 
                 trans.execute("INSERT INTO resources (key,address,resource_type,kind,specific,space,sub_space,owner,app,config) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)", params![params.key,params.address,params.resource_type,params.kind,params.specific,params.space,params.sub_space,params.owner,params.app,params.config])?;
                 if let Option::Some(info) = registration.info {
@@ -655,7 +646,6 @@ println!("BIND: INSERT INTO addresses (key,address) VALUES ({},{})", ResourceKey
                         trans.execute("INSERT INTO labels (resource_key,name,value) VALUES (?1,?2,?3)", params![params.key,name, value])?;
                     }
                 }
-
 
                 trans.commit()?;
 println!("......Trans commit()!.......");
@@ -697,7 +687,6 @@ println!("......Trans commit()!.......");
                         FieldSelection::App(_) => {
                             format!("app=?{}", index + 1)
                         }
-
                     };
                     where_clause.push_str(f.as_str());
                     params.push(field);
@@ -825,7 +814,7 @@ println!("==GOT HERE in FIND()");
                 let info = request.info.clone();
                 tokio::spawn( async move {
 
-                    if let Result::Ok(record) = rx.await {
+                    if let Result::Ok((record,result_tx)) = rx.await {
 println!("RESERVATION COMMIT Ok") ;
                         let mut params = params;
                         let key = match record.stub.key.bin(){
@@ -838,19 +827,19 @@ println!("RESERVATION COMMIT Ok") ;
                         params.address = Option::Some(record.stub.address.to_string());
                         let registration = ResourceRegistration::new(record.stub.clone(),  info );
                         let (action,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Commit(registration));
+println!("Sending registration commit....") ;
                         action_tx.send( action ).await;
-println!("Sent registration commit....") ;
                         if let Result::Ok(result) = rx.await{
-                            println!("RESULT: {}", result.to_string() );
+                            println!("xx> RESULT: {}", result.to_string() );
                         }
 println!("REceived registration commit....confirm") ;
-                        //send(resource);
-//                        request.
+                        result_tx.send(Ok(()));
                     }
                     else{
-println!("RESERVATION DID NOT COMMIT") ;
+println!("RESERVATION DID NOT COMMIT");
                     }
                 } );
+println!("&^^^^ Returning RESERVATION");
                 Ok(ResourceRegistryResult::Reservation(reservation))
             }
 
@@ -1779,8 +1768,9 @@ println!("........assigned...." );
 
         let record = ResourceRecord::new( stub, host.star_key() );
 
-//panic!("About to commit reservation.");
-        reservation.commit( record.clone() )?;
+println!("About to commit reservation.");
+        let (tx,rx) = oneshot::channel();
+        reservation.commit( record.clone(), tx )?;
 
 println!("returning resource record..." );
         Ok(record)
@@ -1849,18 +1839,18 @@ pub struct ResourceNamesReservationRequest{
 }
 
 pub struct RegistryReservation{
-    tx: Option<oneshot::Sender<ResourceRecord>>
+    tx: Option<oneshot::Sender<(ResourceRecord,oneshot::Sender<Result<(),Fail>>)>>
 }
 
 impl RegistryReservation{
-    pub fn commit(self, record: ResourceRecord) -> Result<(),Fail> {
+    pub fn commit(self, record: ResourceRecord, result_tx: oneshot::Sender<Result<(),Fail>>) -> Result<(),Fail> {
         if let Option::Some(tx) = self.tx{
-            tx.send(record).or(Err(Fail::Unexpected));
+            tx.send((record,result_tx) ).or(Err(Fail::Unexpected));
         }
         Ok(())
     }
 
-    pub fn new(tx: oneshot::Sender<ResourceRecord> ) ->Self
+    pub fn new(tx: oneshot::Sender<(ResourceRecord,oneshot::Sender<Result<(),Fail>>)> ) ->Self
     {
         Self{
             tx: Option::Some(tx)

@@ -23,7 +23,7 @@ impl FileStoreHost {
 }
 #[async_trait]
 impl Host for FileStoreHost {
-    async fn assign(&self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<(), Fail> {
+    async fn assign(&self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource, Fail> {
         todo!()
     }
 

@@ -98,8 +98,8 @@ impl StarlaneApi {
             StarMessagePayload::Reply(SimpleReply::Ok(Reply::Resource(record))) => Ok(record.stub),
             StarMessagePayload::Reply(SimpleReply::Fail(fail)) => Err(fail),
             payload => {
-                println!("unexpected payload: {}",payload );
-                Err(Fail::Unexpected)
+                println!("create_resource: unexpected payload: {}",payload );
+                Err(Fail::Error(format!("create_resource: unexpected payload: {}",payload ).into()))
             }
         }
     }
