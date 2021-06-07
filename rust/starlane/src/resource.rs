@@ -633,7 +633,7 @@ eprintln!("error setting up db: {}", err );
             }
 
             ResourceRegistryCommand::Commit(registration) => {
-println!("COMMIT REGISTRATION!!!!!");
+println!("COMMIT REGISTRATION :::> {}", registration.resource.stub.archetype.kind );
 
 println!("......Paramz.......");
                 let params= RegistryParams::from_registration(registration.clone())?;
@@ -773,11 +773,11 @@ println!("......Trans commit()!.......");
             }
             ResourceRegistryCommand::Get(identifier) => {
 
-println!("==Doing a FIND()");
+println!("==Doing a FIND() for: {}",identifier.to_string());
 
                 //let statement = "SELECT (key,host,gathering) FROM locations WHERE key=?1";
 println!("==just before prepared statement()");
-                let result = match identifier {
+                let result = match &identifier {
                        ResourceIdentifier::Key(key) => {
                            let key = key.bin()?;
                            let statement = format!("SELECT {} FROM resources as r WHERE key=?1", RESOURCE_QUERY_FIELDS);
@@ -809,8 +809,12 @@ println!("==GOT HERE in FIND()");
 println!("Record Record Record OK!");
                         Ok(ResourceRegistryResult::Resource(Option::Some(record)))
                     }
+                    Err(rusqlite::Error::QueryReturnedNoRows) => {
+
+                        Ok(ResourceRegistryResult::Resource(Option::None))
+                    }
                     Err(err) => {
-println!("ERROR: {}!",err);
+println!("ERROR: trying to find: {} ERR:{}!",identifier.to_string(), err);
                         match err{
                             rusqlite::Error::QueryReturnedNoRows => {
                                 Ok(ResourceRegistryResult::Resource(Option::None))
@@ -891,14 +895,12 @@ println!("&^^^^ Returning RESERVATION");
     fn process_resource_row( row: &Row) -> Result<ResourceRecord,Error> {
         let key:Vec<u8> = row.get(0)?;
         let key = ResourceKey::from_bin(key)?;
-println!("1");
+
         let address: String = row.get(1)?;
         let address = ResourceAddress::from_str(address.as_str())?;
-println!("2");
 
         let kind:String = row.get(2)?;
         let kind = ResourceKind::from_str(kind.as_str())?;
-println!("3");
 
         let specific= if let ValueRef::Null = row.get_ref(3)? {
             Option::None
@@ -907,7 +909,6 @@ println!("3");
             let specific= Specific::from_str(specific.as_str())?;
             Option::Some(specific)
         };
-println!("4");
 
         let owner= if let ValueRef::Null = row.get_ref(4)? {
             Option::None
@@ -917,8 +918,6 @@ println!("4");
             Option::Some(owner)
         };
 
-println!("5");
-
         let config= if let ValueRef::Null = row.get_ref(5)? {
             Option::None
         } else {
@@ -927,15 +926,10 @@ println!("5");
             Option::Some(config)
         };
 
-println!("6");
 
-if let ValueRef::Null = row.get_ref(6)? {
-println!("6 is NULL");
-}
         let host:Vec<u8> = row.get(6)?;
         let host= StarKey::from_bin(host)?;
 
-println!("7");
         let gathering = if let ValueRef::Null = row.get_ref(7)? {
             Option::None
         } else {
@@ -944,7 +938,6 @@ println!("7");
             Option::Some(gathering)
         };
 
-println!("colums processed...");
 
         let stub = ResourceStub{
             key: key,
@@ -957,7 +950,6 @@ println!("colums processed...");
             owner: owner
         };
 
-println!("ALMOST READY ");
         let record = ResourceRecord {
             stub: stub,
             location: ResourceLocation {
@@ -966,7 +958,6 @@ println!("ALMOST READY ");
             }
         };
 
-println!("ROW PROCESSED...");
         Ok(record)
     }
 
@@ -1073,6 +1064,7 @@ impl ResourceKind{
     }
 }
 
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum FileSystemKind{
     TopDown,
     BottomUp
@@ -1132,7 +1124,7 @@ impl fmt::Display for ResourceKind{
                     ResourceKind::Actor(kind)=> format!("Actor:{}",kind).to_string(),
                     ResourceKind::User=> "User".to_string(),
                     ResourceKind::File(_)=> "File".to_string(),
-                    ResourceKind::FileSystem => format!("Filesystem").to_string(),
+                    ResourceKind::FileSystem(_)=> format!("Filesystem").to_string(),
                     ResourceKind::Artifact(kind)=>format!("Artifact:{}",kind).to_string()
                 })
     }
@@ -1175,7 +1167,7 @@ impl ResourceKind {
                     id: index as _
                 })
             }
-            ResourceKind::FileSystem => {
+            ResourceKind::FileSystem(_) => {
                 ResourceKey::FileSystem(FileSystemKey::SubSpace(SubSpaceFilesystemKey{
                     sub_space: sub_space,
                     id: index as _
@@ -1797,14 +1789,14 @@ println!("........assigned...." );
 
         let stub = ResourceStub {
             key: key,
-            address: address,
+            address: address.clone(),
             archetype: create.archetype,
             owner: None
         };
 
         let record = ResourceRecord::new( stub, host.star_key() );
 
-println!("About to commit reservation.");
+println!("About to commit reservation for child_resource_manager: {}",address.to_string());
         let (tx,rx) = oneshot::channel();
         reservation.commit( record.clone(), tx )?;
 
@@ -2038,16 +2030,27 @@ impl ResourceAddress {
     }
 
     pub fn parent(&self) -> Option<ResourceAddress>{
-        match &self.resource_type{
+        match &self.parent_resource_type(){
             ResourceType::Nothing => Option::None,
-            ResourceType::Space => Option::None,
             parent => {
                 let mut parts = self.parts.clone();
-                parts.remove( self.parts.len() -1 );
-                Option::Some(ResourceAddress{
-                    resource_type: parent.clone(),
-                    parts: parts
-                })
+                if parts.len() == 0 {
+
+println!("~~~ parts.len == 0");
+                   Option::None
+                } else {
+println!("PARTS last: {}",parts.last().unwrap().to_string());
+                    parts.remove(self.parts.len() - 1);
+if parts.len() >= 1 {
+    println!("AFTER ~~~ PARTS last: {}", parts.last().unwrap().to_string());
+} else{
+    println!("AFTER ~~~ NO MORE PARTS!");
+}
+                    Option::Some(ResourceAddress {
+                        resource_type: parent.clone(),
+                        parts: parts
+                    })
+                }
             }
         }
     }
@@ -2253,8 +2256,8 @@ impl FromStr for ResourceAddress {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut split = s.split("::");
-        let address_structure = split.next().ok_or("address structure")?;
-        let mut resource_type_gen = split.next().ok_or("resource type")?.to_string();
+        let address_structure = split.next().ok_or("missing address structure at beginning i.e: 'space:sub_space::<SubSpace>")?;
+        let mut resource_type_gen = split.next().ok_or("missing resource type at end i.e.: 'space:sub_space::<SubSpace>")?.to_string();
 
 
         // chop off the generics i.e. <Space> remove '<' and '>'
@@ -3662,3 +3665,11 @@ impl From<ResourceKey> for ResourceIdentifier {
     }
 }
 
+impl ToString for ResourceIdentifier{
+    fn to_string(&self) -> String {
+        match self{
+            ResourceIdentifier::Key(key) => key.to_string(),
+            ResourceIdentifier::Address(address) => address.to_string()
+        }
+    }
+}

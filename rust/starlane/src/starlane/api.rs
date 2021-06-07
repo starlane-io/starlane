@@ -3,10 +3,10 @@ use std::time::Duration;
 
 use tokio::sync::{mpsc, oneshot};
 
-use crate::frame::{ChildResourceAction, Reply, SimpleReply, StarMessagePayload};
+use crate::frame::{ChildManagerResourceAction, Reply, SimpleReply, StarMessagePayload};
 use crate::keys::ResourceKey;
 use crate::message::{Fail, ProtoMessage};
-use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord, ResourceType, Path, LocalDataSrc, DataTransfer, ResourceIdentifier, ResourceStub};
+use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord, ResourceType, Path, LocalDataSrc, DataTransfer, ResourceIdentifier, ResourceStub, FileSystemKind};
 use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
@@ -90,7 +90,7 @@ impl StarlaneApi {
 
         let mut proto = ProtoMessage::new();
         proto.to(parent_location.location.host);
-        proto.payload = StarMessagePayload::ResourceManager(ChildResourceAction::Create(create));
+        proto.payload = StarMessagePayload::ResourceManager(ChildManagerResourceAction::Create(create));
         let result = proto.get_ok_result().await;
         self.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
         match result.await?
@@ -128,6 +128,11 @@ impl StarlaneApi {
     pub async fn get_space( &self, identifier: ResourceIdentifier ) -> Result<SpaceApi,Fail> {
         let record = self.fetch_resource_record(identifier).await?;
         Ok(SpaceApi::new( self.star_tx.clone(), record.stub)?)
+    }
+
+    pub async fn get_sub_space( &self, identifier: ResourceIdentifier ) -> Result<SubSpaceApi,Fail> {
+        let record = self.fetch_resource_record(identifier).await?;
+        Ok(SubSpaceApi::new( self.star_tx.clone(), record.stub)?)
     }
 }
 
@@ -243,7 +248,7 @@ impl SubSpaceApi {
         StarlaneApi::new(self.star_tx.clone())
     }
 
-    pub async fn create_file_system( &self, name: &str )-> Result<FileSystemApi,Fail> {
+    pub async fn create_file_system( &self, name: &str, kind: FileSystemKind )-> Result<FileSystemApi,Fail> {
         let state = FileSystemState::new();
         let state_data =  state.try_into()?;
         let resource_src = AssignResourceStateSrc::Direct(state_data);
@@ -252,7 +257,7 @@ impl SubSpaceApi {
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Append(name.to_string()),
             archetype: ResourceArchetype {
-                kind: ResourceKind::FileSystem,
+                kind: ResourceKind::FileSystem(kind),
                 specific: None,
                 config: None
             },

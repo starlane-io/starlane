@@ -14,7 +14,7 @@ use api::SpaceApi;
 
 use crate::core::{CoreRunner, ExampleStarCoreExtFactory, StarCoreExtFactory, StarCoreFactory};
 use crate::error::Error;
-use crate::frame::{ChildResourceAction, Frame, Reply, SimpleReply, StarMessagePayload};
+use crate::frame::{ChildManagerResourceAction, Frame, Reply, SimpleReply, StarMessagePayload};
 use crate::keys::ResourceKey;
 use crate::lane::{ConnectionInfo, ConnectionKind, Lane, LocalTunnelConnector};
 use crate::layout::ConstellationLayout;
@@ -26,6 +26,7 @@ use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc
 use crate::resource::space::SpaceState;
 use crate::star::{Request, Star, StarCommand, StarController, StarKey, StarManagerFactory, StarManagerFactoryDefault, StarName};
 use crate::template::{ConstellationData, ConstellationTemplate, StarKeyIndexTemplate, StarKeySubgraphTemplate, StarKeyTemplate};
+use crate::starlane::api::StarlaneApi;
 
 pub mod api;
 
@@ -92,7 +93,7 @@ impl Starlane
                    {
                        if let Option::Some(ctrl) = self.star_controllers.get(key)
                        {
-                           request.tx.send(ctrl.clone());
+                           request.tx.send(StarlaneApi::new(ctrl.star_tx.clone()));
                        }
                    }
                 }
@@ -353,18 +354,18 @@ pub enum StarlaneCommand
 pub struct StarControlRequestByKey
 {
     pub star: StarKey,
-    pub tx: oneshot::Sender<StarController>
+    pub tx: oneshot::Sender<StarlaneApi>
 }
 
 pub struct StarControlRequestByName
 {
     pub name: StarName,
-    pub tx: oneshot::Sender<StarController>
+    pub tx: oneshot::Sender<StarlaneApi>
 }
 
 impl StarControlRequestByName
 {
-    pub fn new( constellation: String, star: String )->(Self,oneshot::Receiver<StarController>)
+    pub fn new( constellation: String, star: String )->(Self,oneshot::Receiver<StarlaneApi>)
     {
         let (tx,rx) = oneshot::channel();
         (StarControlRequestByName{
@@ -442,11 +443,13 @@ mod test
     use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
     use crate::names::Name;
     use crate::permissions::Authentication;
-    use crate::resource::Labels;
+    use crate::resource::{Labels, ResourceAddress, FileSystemKind};
     use crate::space::CreateAppControllerFail;
     use crate::star::{StarController, StarInfo, StarKey, StarKind};
     use crate::starlane::{ConstellationCreate, StarControlRequestByName, Starlane, StarlaneCommand};
     use crate::template::{ConstellationData, ConstellationTemplate};
+    use crate::starlane::api::SubSpaceApi;
+    use crate::message::Fail;
 
     #[test]
     pub fn starlane()
@@ -486,13 +489,23 @@ mod test
 
             tokio::time::sleep(Duration::from_secs(1)).await;
 
-            let mesh_ctrl = {
+            let starlane_api = {
                 let (request,rx) = StarControlRequestByName::new("standalone".to_owned(), "mesh".to_owned());
                 tx.send(StarlaneCommand::StarControlRequestByName(request)).await;
                 timeout(Duration::from_millis(10), rx).await.unwrap().unwrap()
             };
 
-            let space_ctrl = mesh_ctrl.get_space_controller(&SpaceKey::HyperSpace, &Authentication::mock(UserKey::hyper_user())).await.unwrap();
+println!("----------> GETTING SUBSPACE API <------------");
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            let sub_space_api = match starlane_api.get_sub_space(ResourceAddress::from_str("hyperspace:default::<SubSpace>").unwrap().into() ).await
+            {
+                Ok(api) => api,
+                Err(err) => {
+eprintln!("{}",err.to_string());
+                    panic!(err)
+                }
+            };
+            sub_space_api.create_file_system("bottom-up", FileSystemKind::BottomUp );
 
             println!("got space ctrl");
 

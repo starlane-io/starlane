@@ -14,7 +14,7 @@ use crate::core::{StarCoreCommand };
 use crate::core::server::{AppExt};
 use crate::error::Error;
 use crate::filesystem::File;
-use crate::frame::{Reply, StarMessagePayload, ChildResourceAction};
+use crate::frame::{Reply, StarMessagePayload, ChildManagerResourceAction};
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, SubSpaceKey, UserKey, ResourceKey};
 use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceRecord, ResourceArchetype, ResourceInit, ResourceAddress, Names, AssignResourceStateSrc, SkewerCase, ResourceAddressPart, ResourceType, ResourceCreate, ResourceStub};

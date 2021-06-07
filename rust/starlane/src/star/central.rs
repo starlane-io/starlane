@@ -15,7 +15,7 @@ use tokio::time::Duration;
 use crate::app::{AppArchetype, AppCreateController, ApplicationStatus, AppLocation, AppMeta, InitData};
 use crate::crypt::{CryptKeyId, PublicKey};
 use crate::error::Error;
-use crate::frame::{AppLabelRequest, AssignMessage, ChildResourceAction, Frame, FromReply, Reply, SequenceMessage, ServerPayload, SimpleReply, SpaceMessage, SpacePayload, SpaceReply, StarMessage, StarMessagePayload, SupervisorPayload};
+use crate::frame::{AppLabelRequest, AssignMessage, ChildManagerResourceAction, Frame, FromReply, Reply, SequenceMessage, ServerPayload, SimpleReply, SpaceMessage, SpacePayload, SpaceReply, StarMessage, StarMessagePayload, SupervisorPayload};
 use crate::id::Id;
 use crate::keys::{AppId, AppKey, ResourceKey, SpaceKey, SubSpaceKey, UserId, UserKey};
 use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};

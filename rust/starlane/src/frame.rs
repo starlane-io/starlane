@@ -348,7 +348,7 @@ impl StarMessage
 pub enum StarMessagePayload
 {
    None,
-   ResourceManager(ChildResourceAction),
+   ResourceManager(ChildManagerResourceAction),
    ResourceHost(ResourceHostAction),
    Space(SpaceMessage),
    Reply(SimpleReply),
@@ -369,7 +369,7 @@ pub enum ResourceHostResult{
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum ChildResourceAction
+pub enum ChildManagerResourceAction
 {
     Register(ResourceRegistration),
     Location(ResourceRecord),
@@ -380,16 +380,16 @@ pub enum ChildResourceAction
     Select(ResourceSelector),
 }
 
-impl ToString for ChildResourceAction {
+impl ToString for ChildManagerResourceAction {
     fn to_string(&self) -> String {
         match self {
-            ChildResourceAction::Register(_) => "Register".to_string(),
-            ChildResourceAction::Location(_) => "Location".to_string(),
-            ChildResourceAction::Find(_) => "Find".to_string(),
-            ChildResourceAction::Status(_) => "Status".to_string(),
-            ChildResourceAction::SliceStatus(_) => "SliceStatus".to_string(),
-            ChildResourceAction::Create(_) => "Create".to_string(),
-            ChildResourceAction::Select(_) => "Select".to_string(),
+            ChildManagerResourceAction::Register(_) => "Register".to_string(),
+            ChildManagerResourceAction::Location(_) => "Location".to_string(),
+            ChildManagerResourceAction::Find(_) => "Find".to_string(),
+            ChildManagerResourceAction::Status(_) => "Status".to_string(),
+            ChildManagerResourceAction::SliceStatus(_) => "SliceStatus".to_string(),
+            ChildManagerResourceAction::Create(_) => "Create".to_string(),
+            ChildManagerResourceAction::Select(_) => "Select".to_string(),
         }
     }
 }

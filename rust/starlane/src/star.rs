@@ -34,7 +34,7 @@ use crate::core::{StarCoreAction, StarCoreCommand, StarCoreResult};
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
 use crate::file::FileAccess;
-use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ApplicationSupervisorReport, AppNotifyCreated, AppPayload, AppSupervisorLocationRequest, ChildResourceAction, Event, Frame, FromReply, ProtoFrame, Rejection, Reply, ResourceHostAction, SequenceMessage, ServerAppPayload, SimpleReply, SpaceMessage, SpacePayload, SpaceReply, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp};
+use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ApplicationSupervisorReport, AppNotifyCreated, AppPayload, AppSupervisorLocationRequest, ChildManagerResourceAction, Event, Frame, FromReply, ProtoFrame, Rejection, Reply, ResourceHostAction, SequenceMessage, ServerAppPayload, SimpleReply, SpaceMessage, SpacePayload, SpaceReply, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, GatheringKey, MessageId, ResourceId, ResourceKey, SpaceKey, Unique, UniqueSrc, UserKey};
@@ -897,16 +897,16 @@ println!("GOT REPLY from GetKey");
                 }
             } );
         } else if request.payload.parent().is_some() {
-            unimplemented!()
-/*            let (new_request, rx) = Request::new(request.payload.parent().unwrap().clone());
-            self.locate_resource_record(new_request).boxed().await;
-            let star_tx = self.skel.star_tx.clone();
+            let (new_request, rx) = Request::new(request.payload.parent().unwrap().clone());
+            self.skel.star_tx.send( StarCommand::ResourceRecordRequest(new_request)).await;
+            let skel = self.skel.clone();
             tokio::spawn( async move {
                 match Star::wait_for_it(rx).await
                 {
                     Ok(parent_record) => {
-                        let (final_request, rx) = Request::new((request.payload.parent().unwrap().clone(), parent_record.location.host ));
-                        star_tx.send( StarCommand::ResourceRecordRequestFromStar(final_request)).await;
+println!("---> GETTING FROM PARENT: {} FOR CHILD {} on StarKind: {}",request.payload.parent().unwrap().resource_type().to_string(), request.payload.resource_type().to_string(), parent_record.location.host.to_string() );
+                        let (final_request, rx) = Request::new((request.payload.clone(), parent_record.location.host ));
+                        skel.star_tx.send( StarCommand::ResourceRecordRequestFromStar(final_request)).await;
                         request.tx.send(Star::wait_for_it(rx).await );
                     }
                     Err(fail) => {
@@ -914,8 +914,6 @@ println!("GOT REPLY from GetKey");
                     }
                 }
             } );
-
- */
         } else {
             request.tx.send(Err(Fail::Error("seems like an attempt to get a resource for a ResourceType::Nothing".to_string())));
 
@@ -926,10 +924,10 @@ println!("GOT REPLY from GetKey");
     async fn request_resource_record_from_star(&mut self, locate: Request<(ResourceIdentifier,StarKey), ResourceRecord>)
     {
         let (identifier,star) = locate.payload.clone();
-println!("request_resource_location_from_star --> ");
+println!("request_resource_location_from_star --> {}",star.to_string());
         let mut proto = ProtoMessage::new();
         proto.to = Option::Some(star);
-        proto.payload = StarMessagePayload::ResourceManager(ChildResourceAction::Find(identifier));
+        proto.payload = StarMessagePayload::ResourceManager(ChildManagerResourceAction::Find(identifier));
         let reply = proto.get_ok_result().await;
         self.send_proto_message(proto).await;
         let star_tx = self.skel.star_tx.clone();
@@ -1741,7 +1739,7 @@ println!("special process frame....");
     async fn process_message(&mut self, mut message: StarMessage) -> Result<(),Error> {
 //println!("process_message---> {}", message.payload.to_string() );
         match &message.payload{
-            StarMessagePayload::ResourceManager(action) => self.process_resource_manager_action(message.clone(),action.clone()).await?,
+            StarMessagePayload::ResourceManager(action) => self.process_child_manager_resource_action(message.clone(), action.clone()).await?,
             StarMessagePayload::ResourceHost(action) => self.process_resource_host_action(message.clone(),action.clone()).await?,
             _ => {
 //eprintln!("process_message: Unexpected Payload");
@@ -1751,26 +1749,24 @@ println!("special process frame....");
     }
 
 
-    async fn process_resource_manager_action(&mut self, message: StarMessage, action: ChildResourceAction) -> Result<(),Error>
+    async fn process_child_manager_resource_action(&mut self, message: StarMessage, action: ChildManagerResourceAction) -> Result<(),Error>
     {
-println!("process_resource_manager_action ---> {}", action.to_string() );
+println!("process_child_manager_resource_action ---> {} === StarKind: {}", action.to_string(), self.skel.info.kind );
         if let Option::Some(manager) = self.skel.registry.clone()
         {
             match action {
-                ChildResourceAction::Register(registration) => {
+                ChildManagerResourceAction::Register(registration) => {
                     let result = manager.register(registration.clone()).await;
                     self.skel.comm().reply_result_empty(message.clone(), result).await;
                 }
-                ChildResourceAction::Location(location) => {
+                ChildManagerResourceAction::Location(location) => {
                     let result = manager.set_location(location.clone()).await;
                     self.skel.comm().reply_result_empty(message.clone(), result).await;
                 }
-                ChildResourceAction::Find(find) => {
+                ChildManagerResourceAction::Find(find) => {
+
+println!("process_child_manager_resource_action ... FINDING {} === StarKind: {}", find.resource_type().to_string(), self.skel.info.kind );
                     let result = manager.get(find.to_owned()).await;
-                    match result.clone() {
-                        Ok(ok) => {}
-                        Err(err) => {println!("err: {}",err.to_string())}
-                    }
 
                     match result{
                         Ok(result) => {
@@ -1787,15 +1783,14 @@ println!("process_resource_manager_action ---> {}", action.to_string() );
                             self.skel.comm().reply_result(message.clone(), Err(fail)).await;
                         }
                     }
-
                 }
-                ChildResourceAction::Status(report) => {
+                ChildManagerResourceAction::Status(report) => {
                     unimplemented!()
                 }
-                ChildResourceAction::SliceStatus(report) => {
+                ChildManagerResourceAction::SliceStatus(report) => {
                     unimplemented!()
                 }
-                ChildResourceAction::Create(create) => {
+                ChildManagerResourceAction::Create(create) => {
 println!("received: ResourceManagerAction::Create(...) on {}", self.skel.info.kind);
                     let child_manager = self.get_child_resource_manager(create.parent.clone()).await?;
 println!("now clone the skel...");
@@ -1853,7 +1848,7 @@ eprintln!("Error: {}",err);
                                 }
                             });*/
                         }
-                        ChildResourceAction::Select(selector) => {
+                        ChildManagerResourceAction::Select(selector) => {
                             let mut selector = selector.clone();
                             let result = manager.select(selector).await;
                             self.skel.comm().reply_result(message, Reply::from_result(result)).await;
