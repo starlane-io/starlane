@@ -37,6 +37,7 @@ impl FileStoreHost {
 impl Host for FileStoreHost {
 
     async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource, Fail> {
+println!("$$$$ FILE RESOURCE ASSIGN: {}", assign.archetype.kind );
         // if there is Initialization to do for assignment THIS is where we do it
         let data = match assign.state_src{
             AssignResourceStateSrc::Direct(data) => data
@@ -47,7 +48,7 @@ impl Host for FileStoreHost {
         match assign.key.resource_type(){
             ResourceType::FileSystem => {
                 // here we just ensure that a directory exists for the filesystem
-                let path = Path::new(assign.key.to_string().as_str() )?;
+                let path = Path::new(format!("/{}",assign.key.to_string().as_str()).as_str() )?;
                 self.file_access.mkdir(&path)?;
             }
             ResourceType::File => {}

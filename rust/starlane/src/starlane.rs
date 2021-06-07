@@ -495,8 +495,6 @@ mod test
                 timeout(Duration::from_millis(10), rx).await.unwrap().unwrap()
             };
 
-println!("----------> GETTING SUBSPACE API <------------");
-            tokio::time::sleep(Duration::from_secs(1)).await;
             let sub_space_api = match starlane_api.get_sub_space(ResourceAddress::from_str("hyperspace:default::<SubSpace>").unwrap().into() ).await
             {
                 Ok(api) => api,
@@ -505,7 +503,8 @@ eprintln!("{}",err.to_string());
                     panic!(err)
                 }
             };
-            sub_space_api.create_file_system("bottom-up", FileSystemKind::BottomUp );
+
+            sub_space_api.create_file_system("bottom-up", FileSystemKind::BottomUp ).await;
 
             println!("got space ctrl");
 

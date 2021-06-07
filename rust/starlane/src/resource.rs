@@ -1269,6 +1269,28 @@ impl ResourceType{
 }
 
 impl ResourceType{
+    pub fn append_address(&self, parent: ResourceAddress, tail: String ) -> Result<ResourceAddress,Error> {
+        match self {
+            ResourceType::FileSystem => {
+                match parent.resource_type(){
+                    ResourceType::SubSpace => {
+                        let address = format!("{}:*:{}", parent.to_parts_string(), tail );
+                        Ok(self.address_structure().from_str(address.as_str())?)
+                    }
+                    ResourceType::App => {
+                        let address = format!("{}:{}", parent.to_parts_string(), tail );
+                        Ok(self.address_structure().from_str(address.as_str())?)
+                    }
+                    resource_type => Err(format!("illegal resource type parent for FileSystem: {}", resource_type.to_string()).into())
+
+                }
+            }
+            _ => {
+                let address = format!("{}:{}", parent.to_parts_string(), tail );
+                Ok(self.address_structure().from_str(address.as_str())?)
+            }
+        }
+    }
 
     pub fn star_host(&self) -> StarKind {
         match self {
@@ -1761,8 +1783,7 @@ println!("CREATED KEY: {}",key);
                 create.archetype.kind.resource_type().address_structure().from_str(address.as_str())?
             }
             AddressCreationSrc::Append(tail) => {
-                let address = format!("{}:{}", core.address.to_parts_string(), tail );
-                create.archetype.kind.resource_type().address_structure().from_str(address.as_str())?
+                create.archetype.kind.resource_type().append_address(core.address.clone(), tail )?
             }
             AddressCreationSrc::Space(space_name) => {
                 if core.key.resource_type() != ResourceType::Nothing{
@@ -1771,6 +1792,8 @@ println!("CREATED KEY: {}",key);
                 ResourceAddress::for_space(space_name.as_str())?
             }
         };
+
+println!("CREATE ADDRESS: {}", address.to_string() );
 
         let assign = ResourceAssign {
             key: key.clone(),

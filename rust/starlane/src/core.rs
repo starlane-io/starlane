@@ -303,7 +303,6 @@ impl StarCore2{
     pub async fn run(mut self){
         while let Option::Some(action) = self.rx.recv().await{
             let result = self.process(action.command).await;
-println!("StarCore2: RESULT IS: {}",result.as_ref().ok().unwrap().to_string());
             if action.tx.send( result ).is_err() {
                 println!("Warning: Core sent response but got error.");
             }
