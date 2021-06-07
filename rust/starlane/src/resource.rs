@@ -40,6 +40,7 @@ pub mod sub_space;
 pub mod user;
 pub mod file_system;
 pub mod file;
+pub mod store;
 
 lazy_static!
 {
@@ -1249,10 +1250,10 @@ impl ResourceType{
         false
     }
 
-    pub fn state_persistence(&self)->ResourceStatePersistence{
+    pub fn state_persistence(&self)-> ResourceStatePersistenceManager {
         match self{
-            ResourceType::File => ResourceStatePersistence::File,
-            _ => ResourceStatePersistence::Database
+            ResourceType::File => ResourceStatePersistenceManager::Host,
+            _ => ResourceStatePersistenceManager::Store
         }
     }
 
@@ -3516,6 +3517,7 @@ pub trait FileAccess: Send+Sync+DynClone {
     fn read( &self, path: &Path )->Result<Arc<Vec<u8>>,Error>;
     fn write( &mut self, path: &Path, data: Arc<Vec<u8>> )->Result<(),Error>;
     fn with_base_path( &self, base_path: Path ) -> Result<Box<dyn FileAccess>,Error>;
+    fn mkdir( &mut self, path: &Path ) -> Result<Box<dyn FileAccess>,Error>;
 }
 
 #[derive(Clone)]
@@ -3545,6 +3547,10 @@ impl FileAccess for MemoryFileAccess {
     fn with_base_path(&self, base: Path) -> Result<Box<dyn FileAccess>,Error> {
         Ok(Box::new(Self::new()))
     }
+
+    fn mkdir(&mut self, path: &Path) -> Result<Box<dyn FileAccess>, Error> {
+        Ok(Box::new(Self::new()))
+    }
 }
 
 pub trait DataTransfer: Send+Sync {
@@ -3570,6 +3576,7 @@ impl MemoryDataTransfer{
         }
     }
 }
+
 
 impl DataTransfer for MemoryDataTransfer {
     fn get(&self) -> Result<Arc<Vec<u8>>, Error> {
@@ -3609,9 +3616,10 @@ impl DataTransfer for FileDataTransfer{
 
 
 
-pub enum ResourceStatePersistence{
-    Database,
-    File
+pub enum ResourceStatePersistenceManager {
+    None,
+    Store,
+    Host
 }
 
 #[derive(Clone,Serialize,Deserialize)]

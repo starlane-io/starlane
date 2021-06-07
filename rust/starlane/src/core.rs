@@ -1,6 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::future::Future;
+use std::marker::PhantomData;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -14,20 +15,19 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::sync::mpsc::Sender;
 use tokio::time::Duration;
 
-
 use crate::actor::{ActorKey, ResourceMessage, ResourceMessagePayload};
-use crate::app::{ApplicationStatus, AppArchetype, AppMeta};
-use crate::error::Error;
-use crate::frame::{StarMessage, StarMessagePayload, Watch, WatchInfo, ServerAppPayload, AppPayload, ResourceHostAction, ResourceHostResult};
-use crate::id::{Id, IdSeq};
-use crate::star::{ActorCreate, StarCommand, StarKey, StarKind, StarVariantCommand, StarSkel, Request, LocalResourceLocation};
-use crate::core::server::{ServerStarCore, ServerStarCoreExt, ExampleServerStarCoreExt};
-use std::marker::PhantomData;
-use crate::keys::{AppKey, ResourceKey};
+use crate::app::{AppArchetype, ApplicationStatus, AppMeta};
 use crate::artifact::{Artifact, ArtifactKey};
-use crate::resource::{ ResourceInit, AssignResourceStateSrc, ResourceAssign, ResourceSliceAssign, HostedResourceStore, HostedResource, LocalHostedResource, Resource};
+use crate::core::server::{ExampleServerStarCoreExt, ServerStarCore, ServerStarCoreExt};
+use crate::core::space::SpaceHost;
+use crate::error::Error;
+use crate::frame::{AppPayload, ResourceHostAction, ResourceHostResult, ServerAppPayload, StarMessage, StarMessagePayload, Watch, WatchInfo};
+use crate::id::{Id, IdSeq};
+use crate::keys::{AppKey, ResourceKey};
 use crate::message::Fail;
-use crate::core::space::{SpaceHost, ResourceStoreSqlLite};
+use crate::resource::{AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource, Resource, ResourceAssign, ResourceInit, ResourceSliceAssign};
+use crate::resource::store::ResourceStoreSqlLite;
+use crate::star::{ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel, StarVariantCommand};
 
 pub mod server;
 pub mod space;
@@ -185,7 +185,7 @@ impl StarCoreFactory
     pub async fn create(&self, skel: StarSkel, ext: StarCoreExtKind, core_rx: mpsc::Receiver<StarCoreAction> ) -> StarCore2
     {
         let file_access = dyn_clone::clone_box(&**skel.file_access);
-        StarCore2::new(skel, core_rx, Box::new(SpaceHost::new(file_access).await )).await
+        StarCore2::new(skel, core_rx, Box::new(SpaceHost::new().await )).await
 /*        match skel.info.kind
         {
             StarKind::ActorHost => {
@@ -253,7 +253,7 @@ impl StarCoreExtFactory for ExampleStarCoreExtFactory
 
 #[async_trait]
 pub trait Host: Send+Sync{
-    async fn assign(&self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource,Fail>;
+    async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource,Fail>;
     async fn get(&self, key: ResourceKey) -> Result<Option<Resource>,Fail>;
 }
 
