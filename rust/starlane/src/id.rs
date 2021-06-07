@@ -2,12 +2,17 @@ use std::fmt;
 use serde::{Serialize,Deserialize};
 use std::sync::atomic::{AtomicU64, Ordering};
 use crate::keys::ResourceKey;
+use std::str::FromStr;
+use crate::error::Error;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Id {
     pub sequence: u64,
     pub index: u64,
 }
+
+pub type SequenceId=u64;
+pub type IndexId=u64;
 
 impl Id {
     pub fn new(sequence: u64, index: u64) -> Self {
@@ -18,11 +23,27 @@ impl Id {
     }
 }
 
-impl fmt::Display for Id{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}-{}",&self.sequence.clone() ,&self.index )
+impl ToString for Id{
+    fn to_string(&self) -> String {
+        format!("{}_{}",self.sequence,self.index)
     }
 }
+
+impl FromStr for Id {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut split = s.split("_");
+        let sequence = SequenceId::from_str(split.next().ok_or("expected sequence before '-'")?)?;
+        let index = IndexId::from_str(split.next().ok_or("expected index after '-'")?)?;
+        Ok(Id{
+            sequence: sequence,
+            index: index
+        })
+    }
+}
+
+
 
 pub struct IdSeq {
     sequence: u64,

@@ -11,6 +11,7 @@ use crate::message::Fail;
 use std::string::FromUtf8Error;
 use std::convert::TryFrom;
 use std::sync::Arc;
+use std::num::ParseIntError;
 
 #[derive(Debug, Clone)]
 pub struct Error{
@@ -22,6 +23,15 @@ pub struct Error{
 impl fmt::Display for Error{
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}",self.error)
+    }
+}
+
+
+impl From<ParseIntError> for Error{
+    fn from(e: ParseIntError) -> Self {
+        Error{
+            error: format!("{}",e.to_string())
+        }
     }
 }
 

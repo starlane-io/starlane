@@ -1007,8 +1007,6 @@ println!("ROW PROCESSED...");
           UNIQUE(name,resource_type,kind,specific,space,sub_space,app)
         )"#;
 
-
-
         let resources = r#"CREATE TABLE IF NOT EXISTS resources (
          key BLOB PRIMARY KEY,
          address TEXT NOT NULL,
@@ -1026,14 +1024,11 @@ println!("ROW PROCESSED...");
 
         let address_index = "CREATE UNIQUE INDEX resource_address_index ON resources(address)";
 
-
-
         let uniques = r#"CREATE TABLE IF NOT EXISTS uniques(
          key BLOB PRIMARY KEY,
          sequence INTEGER NOT NULL DEFAULT 0,
          id_index INTEGER NOT NULL DEFAULT 0
         )"#;
-
 
         let transaction = self.conn.transaction()?;
         transaction.execute(labels, [])?;
@@ -1057,8 +1052,8 @@ pub enum ResourceKind
     App(AppKind),
     Actor(ActorKind),
     User,
+    FileSystem(FileSystemKind),
     File(FileKind),
-    FileSystem,
     Artifact(ArtifactKind)
 }
 
@@ -1072,13 +1067,16 @@ impl ResourceKind{
            ResourceKind::Actor(_) => ResourceType::Actor,
            ResourceKind::User => ResourceType::User,
            ResourceKind::File(_) => ResourceType::File,
-           ResourceKind::FileSystem => ResourceType::FileSystem,
+           ResourceKind::FileSystem(_) => ResourceType::FileSystem,
            ResourceKind::Artifact(_) => ResourceType::Artifact
        }
     }
 }
 
-
+pub enum FileSystemKind{
+    TopDown,
+    BottomUp
+}
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum FileKind

@@ -118,14 +118,30 @@ impl ArtifactKey{
     }
 }
 
+impl ToString for ArtifactKey{
+    fn to_string(&self) -> String {
+        format!("{}-{}",self.sub_space.to_string(), self.id.to_string())
+    }
+}
+
+impl FromStr for ArtifactKey{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let pos = s.rfind( '-').ok_or("expected '-' between parent and id")?;
+        let (parent,id)= s.split_at(pos);
+        let sub_space= SubSpaceKey::from_str(parent)?;
+        let id = ArtifactId::from_str(id)?;
+        Ok(ArtifactKey{
+            sub_space: sub_space,
+            id: id
+        })
+    }
+}
+
+
 pub type ArtifactId = u64;
 
-impl fmt::Display for ArtifactKey{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!( f,"[{},{}]",self.sub_space.to_string(),self.id )
-    }
-
-}
 
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct NameKey

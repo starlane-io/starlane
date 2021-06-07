@@ -56,13 +56,17 @@ impl SpaceKey
     }
 }
 
-impl fmt::Display for SpaceKey{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!( f,"{}",
-                match self{
-                    SpaceKey::HyperSpace => "HyperSpace".to_string(),
-                    SpaceKey::Space(index) => index.to_string()
-                })
+impl FromStr for SpaceKey{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(SpaceKey::from_index(SpaceId::from_str(s)?))
+    }
+}
+
+impl ToString for SpaceKey{
+    fn to_string(&self)->String  {
+        self.id().to_string()
     }
 
 }
@@ -144,16 +148,27 @@ impl UserKey
     }
 }
 
-impl fmt::Display for UserKey{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!( f,"({},{})",self.space, self.id.to_string())
-    }
 
+impl ToString for UserKey{
+    fn to_string(&self) -> String {
+        format!("{}-{}",self.space.to_string(), self.id.to_string())
+    }
 }
 
+impl FromStr for UserKey{
+    type Err = Error;
 
-
-
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let pos = s.rfind( '-').ok_or("expected '-' between parent and id")?;
+        let (parent,id)= s.split_at(pos);
+        let space = SpaceKey::from_str(parent)?;
+        let id = UserId::from_str(id)?;
+        Ok(UserKey{
+            space: space,
+            id: id
+        })
+    }
+}
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub struct SubSpaceKey
@@ -178,16 +193,29 @@ impl SubSpaceKey
     }
 }
 
+pub type SubSpaceId = u32;
 
-impl fmt::Display for SubSpaceKey{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!( f,"{}-{}",self.space, self.id.to_string())
+
+impl ToString for SubSpaceKey{
+    fn to_string(&self) -> String {
+        format!("{}-{}",self.space.to_string(), self.id.to_string())
     }
-
 }
 
+impl FromStr for SubSpaceKey{
+    type Err = Error;
 
-pub type SubSpaceId = u32;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let pos = s.rfind( '-').ok_or("expected '-' between parent and id")?;
+        let (parent,id)= s.split_at(pos);
+        let space = SpaceKey::from_str(parent)?;
+        let id = SubSpaceId::from_str(id)?;
+        Ok(SubSpaceKey{
+            space: space,
+            id: id
+        })
+    }
+}
 
 
 #[derive(Clone,Hash,Eq,PartialEq,Serialize,Deserialize)]
@@ -234,14 +262,26 @@ impl AppKey
     }
 }
 
-impl fmt::Display for AppKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({},{})", self.sub_space, self.id.to_string())
+impl ToString for AppKey{
+    fn to_string(&self) -> String {
+        format!("{}-{}",self.sub_space.to_string(), self.id.to_string())
     }
 }
 
+impl FromStr for AppKey{
+    type Err = Error;
 
-
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let pos = s.rfind( '-').ok_or("expected '-' between parent and id")?;
+        let (parent,id)= s.split_at(pos);
+        let sub_space = SubSpaceKey::from_str(parent)?;
+        let id = AppId::from_str(id)?;
+        Ok(AppKey{
+            sub_space: sub_space,
+            id: id
+        })
+    }
+}
 
 
 pub type MessageId = Uuid;
@@ -291,7 +331,17 @@ impl ResourceId{
 
 impl ToString for ResourceId{
     fn to_string(&self) -> String {
-        self.resource_type().to_string()
+        match self {
+            ResourceId::Nothing => "nothing".to_string(),
+            ResourceId::Space(id) => id.to_string(),
+            ResourceId::SubSpace(id) => id.to_string(),
+            ResourceId::App(id) => id.to_string(),
+            ResourceId::Actor(id) => id.to_string(),
+            ResourceId::User(id) =>id.to_string(),
+            ResourceId::Artifact(id) => id.to_string(),
+            ResourceId::File(id) => id.to_string(),
+            ResourceId::FileSystem(id) => id.to_string()
+        }
     }
 }
 
@@ -574,6 +624,50 @@ pub enum FileSystemKey
     SubSpace(SubSpaceFilesystemKey)
 }
 
+impl ToString for FileSystemKey {
+    fn to_string(&self) -> String {
+
+        match self {
+            FileSystemKey::App(app) => {
+                format!("app_{}",app.to_string())
+            }
+            FileSystemKey::SubSpace(sub_space) => {
+                format!("subspace_{}",sub_space.to_string())
+            }
+        }
+    }
+}
+
+impl FromStr for FileSystemKey {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut split = s.split("_");
+        let sub_type = split.next().ok_or(format!("could not split string thought to be FileSystemKey: {}", s).to_string() )?;
+        match sub_type{
+            "app" => Ok(FileSystemKey::App(AppFilesystemKey::from_str(split.next().ok_or("expected")?)?)),
+            "subspace" => Ok(FileSystemKey::SubSpace(SubSpaceFilesystemKey::from_str(split.next().ok_or("expected")?)?)),
+            what => Err(format!("could not determine type of filsystem key for type {}",what).into())
+        }
+
+    }
+}
+
+
+impl FromStr for AppFilesystemKey {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let pos = s.rfind( '-').ok_or("expected '-' between parent and id")?;
+        let (parent,id)= s.split_at(pos);
+        let app = AppKey::from_str(parent)?;
+        let id = FileSystemId::from_str(id)?;
+        Ok(AppFilesystemKey{
+            app: app,
+            id: id
+        })
+    }
+}
 
 
 pub type FileSystemId = u32;
@@ -585,11 +679,38 @@ pub struct AppFilesystemKey
     pub id: FileSystemId
 }
 
+impl ToString for AppFilesystemKey  {
+    fn to_string(&self) -> String {
+        format!("{}-{}",self.app.to_string(), self.id.to_string())
+    }
+}
+
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct SubSpaceFilesystemKey
 {
     pub sub_space: SubSpaceKey,
     pub id: FileSystemId
+}
+
+impl ToString for SubSpaceFilesystemKey  {
+    fn to_string(&self) -> String {
+        format!("{}-{}",self.sub_space.to_string(), self.id.to_string())
+    }
+}
+
+impl FromStr for SubSpaceFilesystemKey{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let pos = s.rfind( '-').ok_or("expected '-' between parent and id")?;
+        let (parent,id)= s.split_at(pos);
+        let sub_space =  SubSpaceKey::from_str(parent)?;
+        let id = FileSystemId::from_str(id)?;
+        Ok(SubSpaceFilesystemKey{
+            sub_space: sub_space,
+            id: id
+        })
+    }
 }
 
 
@@ -617,15 +738,15 @@ impl fmt::Display for ResourceKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!( f,"{}",
                 match self{
-                    ResourceKey::Space(key) => format!("SpaceKey:{}", key),
-                    ResourceKey::SubSpace(key) => format!("SubSpaceKey:{}", key),
-                    ResourceKey::App(key)  => format!("AppKey:{}", key),
-                    ResourceKey::Actor(key) => format!("ActorKey:{}", key),
-                    ResourceKey::User(key) => format!("UserKey:{}", key),
-                    ResourceKey::File(key) => format!("FileKey:{}", key),
-                    ResourceKey::Artifact(key) => format!("ArtifactKey:{}", key),
-                    ResourceKey::FileSystem(key) => format!("FileSystemKey:{}", key),
-                    ResourceKey::Nothing => "Nothing".to_string()
+                    ResourceKey::Space(key) => format!("space-{}", key.to_string()),
+                    ResourceKey::SubSpace(key) => format!("sub_space-{}", key.to_string()),
+                    ResourceKey::App(key)  => format!("app-{}", key.to_string()),
+                    ResourceKey::Actor(key) => format!("actor-{}", key.to_string()),
+                    ResourceKey::User(key) => format!("user-{}", key.to_string()),
+                    ResourceKey::File(key) => format!("file-{}", key.to_string()),
+                    ResourceKey::Artifact(key) => format!("artifact-{}", key.to_string()),
+                    ResourceKey::FileSystem(key) => format!("filesystem-{}", key.to_string()),
+                    ResourceKey::Nothing => "nothing".to_string()
                 })
     }
 }
@@ -700,15 +821,6 @@ impl ResourceKey
 }
 
 
-impl fmt::Display for FileSystemKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!( f,"{}",
-                match self{
-                    FileSystemKey::App(_) => "App",
-                    FileSystemKey::SubSpace(_) => "SubSpace"
-                })
-    }
-}
 
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct FileKey
@@ -716,6 +828,7 @@ pub struct FileKey
    pub filesystem: FileSystemKey,
    pub id: FileId
 }
+
 
 impl FileKey{
     pub fn new(filesystem: FileSystemKey, id: FileId ) -> Self {
@@ -726,14 +839,31 @@ impl FileKey{
     }
 }
 
+impl ToString for FileKey{
+    fn to_string(&self) -> String {
+        format!("{}-{}",self.filesystem.to_string(), self.id.to_string())
+    }
+}
+
+impl FromStr for FileKey{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let pos = s.rfind( '-').ok_or("expected '-' between parent and id")?;
+        let (parent,id)= s.split_at(pos);
+        let filesystem = FileSystemKey::from_str(parent)?;
+        let id = FileId::from_str(id)?;
+        Ok(FileKey{
+            filesystem: filesystem,
+            id: id
+        })
+    }
+}
+
 pub type FileId = u64;
 
 
-impl fmt::Display for FileKey{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!( f,"[{},{},{}]",self.filesystem,self.filesystem,self.id)
-    }
-}
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Unique {

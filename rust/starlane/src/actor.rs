@@ -205,6 +205,27 @@ impl ActorKey
     }
 }
 
+impl ToString for ActorKey{
+    fn to_string(&self) -> String {
+        format!("{}-{}",self.app.to_string(), self.id.to_string())
+    }
+}
+
+impl FromStr for ActorKey{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let pos = s.rfind( '-').ok_or("expected '-' between parent and id")?;
+        let (parent,id)= s.split_at(pos);
+        let app= AppKey::from_str(parent)?;
+        let id = Id::from_str(id)?;
+        Ok(ActorKey{
+            app: app,
+            id: id
+        })
+    }
+}
+
 pub type ActorSpecific = Name;
 pub type GatheringSpecific = Name;
 
@@ -248,12 +269,6 @@ impl FromStr for ActorKind
     }
 }
 
-
-impl fmt::Display for ActorKey{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({},{})", self.app, self.id)
-    }
-}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceTo

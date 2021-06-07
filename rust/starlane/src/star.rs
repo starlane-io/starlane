@@ -340,7 +340,7 @@ impl fmt::Display for StarKind{
 impl fmt::Display for ActorLookup {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self{
-            ActorLookup::Key(entity) => format!("Key({})", entity).to_string(),
+            ActorLookup::Key(entity) => format!("Key({})", entity.to_string()).to_string(),
         };
         write!(f, "{}",r)
     }

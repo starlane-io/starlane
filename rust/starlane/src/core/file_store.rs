@@ -47,7 +47,7 @@ impl Host for FileStoreHost {
         match assign.key.resource_type(){
             ResourceType::FileSystem => {
                 // here we just ensure that a directory exists for the filesystem
-                let path = Path::new(assign.address.last_to_string()?.as_str() )?;
+                let path = Path::new(assign.key.to_string().as_str() )?;
                 self.file_access.mkdir(&path)?;
             }
             ResourceType::File => {}
