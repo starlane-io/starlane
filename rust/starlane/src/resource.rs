@@ -3034,6 +3034,7 @@ impl Path
         }
 
         if !string.starts_with("/") {
+println!("PATH IS: {}",string);
             return Err("Paths must be absolute (must start with a '/')".into())
         }
 

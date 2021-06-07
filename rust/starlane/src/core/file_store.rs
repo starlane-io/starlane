@@ -24,7 +24,7 @@ pub struct FileStoreHost {
 
 impl FileStoreHost {
     pub async fn new(skel: StarSkel, file_access: Box<dyn FileAccess>)->Result<Self,Error>{
-        let file_access = file_access.with_path( "files".to_string() )?;
+        let mut file_access = file_access.with_path( "filesystems".to_string() )?;
         Ok(FileStoreHost {
             skel: skel,
             file_access: file_access,

@@ -57,24 +57,32 @@ pub struct LocalFileAccess{
 }
 
 impl LocalFileAccess {
-    pub fn new( base_dir: String) -> Self{
-        LocalFileAccess{
+    pub fn new( base_dir: String) -> Result<Self,Error>{
+
+        let mut builder = DirBuilder::new();
+        builder.recursive(true);
+        builder.create(base_dir.clone() )?;
+
+        Ok(LocalFileAccess{
             base_dir: base_dir
-        }
+        })
     }
 
-    pub fn cat_path(&self, path: &Path ) -> Result<String,Error> {
-        if path.to_string().len() < 1 {
+    pub fn cat_path(&self, path: &str) -> Result<String,Error> {
+        if path.len() < 1 {
             return Err("path cannot be empty".into());
         }
 
         let mut path_str = path.to_string();
-        path_str.remove(0);
+        if path_str.starts_with("/") {
+            path_str.remove(0);
+        }
         let mut path_buf = PathBuf::new();
         path_buf.push(self.base_dir.clone() );
         path_buf.push(path_str);
         let path = path_buf.as_path().clone();
         let path = path.to_str().ok_or("path error")?.to_string();
+
         Ok(path)
     }
 }
@@ -82,7 +90,7 @@ impl LocalFileAccess {
 impl FileAccess for LocalFileAccess {
 
     fn read(&self, path: &Path) -> Result<Arc<Vec<u8>>, Error> {
-        let path = self.cat_path(path)?;
+        let path = self.cat_path(path.to_relative().as_str())?;
 
         let mut buf = vec![];
         let mut file = File::open(&path)?;
@@ -95,23 +103,26 @@ impl FileAccess for LocalFileAccess {
             self.mkdir(&parent)?;
         }
 
-        let path = self.cat_path(path)?;
+        let path = self.cat_path(path.to_relative().as_str() )?;
         let mut file = File::open(&path)?;
         file.write_all(data.as_slice())?;
         Ok(())
     }
 
     fn with_path(&self, ext_path: String ) -> Result<Box<dyn FileAccess>, Error> {
-        let path = Path::new(ext_path.as_str() )?;
-        let path = self.cat_path(&path)?;
-        Ok(Box::new(Self::new( path)  ))
+        let path = self.cat_path(ext_path.as_str())?;
+        let rtn:Box<dyn FileAccess> = Box::new(Self::new( path )?);
+        Ok(rtn)
     }
 
     fn mkdir(&mut self, path: &Path) -> Result<Box<dyn FileAccess>, Error> {
-        let path = self.cat_path(path)?;
+
+        let path = self.cat_path(path.to_relative().as_str())?;
         let mut builder = DirBuilder::new();
         builder.recursive(true);
         builder.create(path.clone() )?;
-        Ok(Box::new(Self::new( path )  ))
+println!("MKDIR {}", path.to_string());
+        let rtn:Box<dyn FileAccess> = Box::new(Self::new( path )?);
+        Ok(rtn)
     }
 }

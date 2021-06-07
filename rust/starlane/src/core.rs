@@ -141,7 +141,13 @@ impl CoreRunner
          runtime.block_on( async move {
             while let Option::Some(CoreRunnerCommand::Core{ skel, ext, rx }) = rx.recv().await
             {
-               let core = factory.create(skel,ext,rx).await.unwrap();
+               let core = match factory.create(skel,ext,rx).await{
+                   Ok(core) => core,
+                   Err(err) => {
+                       eprintln!("FATAL: {}", err);
+                       std::process::exit(1);
+                   }
+               };
                tokio::spawn( async move {
                    core.run().await
                } );

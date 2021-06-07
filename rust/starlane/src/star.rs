@@ -2855,14 +2855,19 @@ println!("UNEXPECTED RESULT IN ASSIGN!!!");
 
         impl ToString for StarKey{
             fn to_string(&self) -> String {
-                let mut string = String::new();
-                for (index,node) in self.subgraph.iter().enumerate(){
-                    if index !=0 {
-                        string.push_str("-");
+                if self.subgraph.len() > 0 {
+                    let mut string = String::new();
+                    for (index, node) in self.subgraph.iter().enumerate() {
+                        if index != 0 {
+                            string.push_str("-");
+                        }
+                        string.push_str(node.to_string().as_str());
                     }
-                    string.push_str(node.to_string().as_str() );
+                    format!("{}-{}", string, self.index)
                 }
-                format!("{}-{}",string,self.index)
+                else {
+                    self.index.to_string()
+                }
             }
         }
 
