@@ -767,7 +767,7 @@ impl fmt::Display for StarPattern{
         let r = match self {
             StarPattern::Any => "Any".to_string(),
             StarPattern::None => "None".to_string(),
-            StarPattern::StarKey(key) => format!("{}",key).to_string(),
+            StarPattern::StarKey(key) => format!("{}",key.to_string()).to_string(),
             StarPattern::StarKind(kind) => format!("{}",kind).to_string()
         };
         write!(f, "{}",r)
@@ -779,7 +779,7 @@ impl fmt::Display for ProtoFrame {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
             ProtoFrame::StarLaneProtocolVersion(version) => format!("StarLaneProtocolVersion({})", version).to_string(),
-            ProtoFrame::ReportStarKey(id) => format!("ReportStarId({})", id).to_string(),
+            ProtoFrame::ReportStarKey(key) => format!("ReportStarKey({})", key.to_string()).to_string(),
             ProtoFrame::RequestSubgraphExpansion=> format!("RequestSubgraphExpansion").to_string(),
             ProtoFrame::GrantSubgraphExpansion(path) => format!("GrantSubgraphExpansion({:?})", path).to_string(),
         };

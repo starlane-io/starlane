@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
@@ -29,6 +29,10 @@ use crate::template::{ConstellationData, ConstellationTemplate, StarKeyIndexTemp
 
 pub mod api;
 
+lazy_static!{
+   pub static ref DATA_DIR: Mutex<String> = Mutex::new("data".to_string());
+}
+
 pub struct Starlane
 {
     pub tx: mpsc::Sender<StarlaneCommand>,
@@ -45,10 +49,10 @@ pub struct Starlane
 
 impl Starlane
 {
-    pub fn new()->Self
+    pub fn new()->Result<Self,Error>
     {
         let (tx, rx) = mpsc::channel(32);
-        Starlane{
+        Ok(Starlane{
             star_controllers: HashMap::new(),
             star_names: HashMap::new(),
             constellation_names: HashSet::new(),
@@ -56,10 +60,10 @@ impl Starlane
             rx: rx,
             star_manager_factory: Arc::new( StarManagerFactoryDefault{} ),
             star_core_ext_factory: Arc::new(ExampleStarCoreExtFactory::new() ),
-            core_runner: Arc::new(CoreRunner::new()),
+            core_runner: Arc::new(CoreRunner::new()?),
             logger: Logger::new(),
             flags: Flags::new()
-        }
+        })
     }
 
     pub async fn run(&mut self)
@@ -108,7 +112,7 @@ impl Starlane
             Ok(StarAddress::Local)
         }
         else {
-            Err(format!("could not find address for starkey: {}", key).into() )
+            Err(format!("could not find address for starkey: {}", key.to_string()).into() )
         }
     }
 
@@ -163,7 +167,7 @@ impl Starlane
                         match low_star_ctrl
                         {
                             None => {
-                                return Err(format!("lane cannot construct. missing second star key: {}", &connection_info.gateway).into())
+                                return Err(format!("lane cannot construct. missing second star key: {}", &connection_info.gateway.to_string()).into())
                             }
                             Some(low_star_ctrl) => {low_star_ctrl.clone()}
                         }
@@ -241,7 +245,7 @@ impl Starlane
                             star_tx: star_tx
                         }
                     });
-                    println!("created star: {:?} key: {}", &star_template.kind, star_key);
+                    println!("created star: {:?} key: {}", &star_template.kind, star_key.to_string());
                 }
                 else {
                     eprintln!("experienced serious error could not evolve the proto_star");
@@ -300,7 +304,7 @@ impl Starlane
             match high_star_ctrl
             {
                 None => {
-                    return Err(format!("lane cannot construct. missing local star key: {}", high).into())
+                    return Err(format!("lane cannot construct. missing local star key: {}", high.to_string()).into())
                 }
                 Some(high_star_ctrl) => {high_star_ctrl.clone()}
             }
@@ -312,7 +316,7 @@ impl Starlane
             match low_star_ctrl
             {
                 None => {
-                    return Err(format!("lane cannot construct. missing second star key: {}", low).into())
+                    return Err(format!("lane cannot construct. missing second star key: {}", low.to_string()).into())
                 }
                 Some(low_star_ctrl) => {low_star_ctrl.clone()}
             }
@@ -451,7 +455,7 @@ mod test
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
 
-            let mut starlane = Starlane::new();
+            let mut starlane = Starlane::new().unwrap();
             starlane.flags.on(Flag::Star(StarFlag::DiagnosePledge) );
             let mut agg = LogAggregate::new();
             agg.watch(starlane.logger.clone()).await;

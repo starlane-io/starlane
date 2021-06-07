@@ -1,18 +1,18 @@
 use std::convert::TryInto;
+use std::str::FromStr;
 use std::sync::Arc;
 
+use rusqlite::{Connection, params, Transaction};
 use rusqlite::types::ValueRef;
 use tokio::sync::{mpsc, oneshot};
 
-use rusqlite::{Connection, params, Transaction};
 use crate::app::ConfigSrc;
 use crate::error::Error;
+use crate::file::FileAccess;
 use crate::keys::ResourceKey;
 use crate::message::Fail;
 use crate::names::Specific;
-use crate::resource::{DataTransfer, FileAccess, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceStatePersistenceManager};
-use std::str::FromStr;
-
+use crate::resource::{DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceStatePersistenceManager};
 
 pub struct ResourceStore{
    tx: mpsc::Sender<ResourceStoreAction>

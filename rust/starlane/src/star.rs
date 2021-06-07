@@ -17,6 +17,7 @@ use futures::FutureExt;
 use futures::prelude::future::FusedFuture;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
+use serde::de::Unexpected;
 use tokio::sync::{broadcast, oneshot};
 use tokio::sync::broadcast::error::{RecvError, SendError};
 use tokio::sync::mpsc;
@@ -32,16 +33,17 @@ use crate::app::{AppCommand, AppCommandKind, AppController, AppCreateController,
 use crate::core::{StarCoreAction, StarCoreCommand, StarCoreResult};
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
+use crate::file::FileAccess;
 use crate::frame::{ActorBind, ActorEvent, ActorLocationReport, ActorLocationRequest, ActorLookup, ApplicationSupervisorReport, AppNotifyCreated, AppPayload, AppSupervisorLocationRequest, ChildResourceAction, Event, Frame, FromReply, ProtoFrame, Rejection, Reply, ResourceHostAction, SequenceMessage, ServerAppPayload, SimpleReply, SpaceMessage, SpacePayload, SpaceReply, StarMessage, StarMessageAck, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
-use crate::keys::{AppKey, GatheringKey, MessageId, ResourceKey, SpaceKey, Unique, UniqueSrc, UserKey, ResourceId};
+use crate::keys::{AppKey, GatheringKey, MessageId, ResourceId, ResourceKey, SpaceKey, Unique, UniqueSrc, UserKey};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::message::{Fail, MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoMessage, StarMessageDeliveryInsurance, TrackerJob};
 use crate::permissions::{Authentication, AuthToken, AuthTokenSource, Credentials};
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
-use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, ChildResourceManager, ChildResourceManagerCore, FieldSelection, FileAccess, HostedResourceStore, KeyCreationSrc, Labels, LocalDataSrc, LocalHostedResource, LocalResourceHost, MemoryDataTransfer, Registry, RegistryReservation, RegistryUniqueSrc, RemoteResourceManager, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceBinding, ResourceCreate, ResourceHost, ResourceKind, ResourceLocation, ResourceRecord, ResourceManager, ResourceManagerKey, ResourceNamesReservationRequest, ResourceParent, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector, ResourceStateSrc,  ResourceType, ResourceIdentifier, ResourceStub};
+use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, ChildResourceManager, ChildResourceManagerCore, FieldSelection, HostedResourceStore, KeyCreationSrc, Labels, LocalDataSrc, LocalHostedResource, LocalResourceHost, MemoryDataTransfer, Registry, RegistryReservation, RegistryUniqueSrc, RemoteResourceManager, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceBinding, ResourceCreate, ResourceHost, ResourceIdentifier, ResourceKind, ResourceLocation, ResourceManager, ResourceManagerKey, ResourceNamesReservationRequest, ResourceParent, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector, ResourceStateSrc, ResourceStub, ResourceType};
 use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
@@ -52,7 +54,6 @@ use crate::star::pledge::{ResourceHostSelector, Satisfaction, StarHandle, StarHa
 use crate::star::space::SpaceVariant;
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
-use serde::de::Unexpected;
 
 pub mod central;
 pub mod app_host;
@@ -2781,6 +2782,19 @@ println!("UNEXPECTED RESULT IN ASSIGN!!!");
             Small(u16)
         }
 
+        impl ToString for StarSubGraphKey {
+            fn to_string(&self) -> String {
+                match self {
+                    StarSubGraphKey::Big(n) => {
+                        n.to_string()
+                    }
+                    StarSubGraphKey::Small(n) => {
+                        n.to_string()
+                    }
+                }
+            }
+        }
+
 
         #[derive(PartialEq, Eq, PartialOrd, Hash, Debug, Clone, Serialize, Deserialize)]
         pub struct StarKey
@@ -2838,9 +2852,17 @@ println!("UNEXPECTED RESULT IN ASSIGN!!!");
             }
         }
 
-        impl fmt::Display for StarKey{
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "({:?},{})", self.subgraph, self.index)
+
+        impl ToString for StarKey{
+            fn to_string(&self) -> String {
+                let mut string = String::new();
+                for (index,node) in self.subgraph.iter().enumerate(){
+                    if index !=0 {
+                        string.push_str("-");
+                    }
+                    string.push_str(node.to_string().as_str() );
+                }
+                format!("{}-{}",string,self.index)
             }
         }
 
@@ -2882,7 +2904,7 @@ println!("UNEXPECTED RESULT IN ASSIGN!!!");
            {
                if a == b
                {
-                   Err(format!("both StarKeys are equal. {}=={}",a,b).into())
+                   Err(format!("both StarKeys are equal. {}=={}",a.to_string(),b.to_string()).into())
                }
                else if a.cmp(&b) == Ordering::Greater
                {

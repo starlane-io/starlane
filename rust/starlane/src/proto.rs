@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicI32, AtomicI64, Ordering, AtomicU64};
+use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU64, Ordering};
 use std::task::Poll;
 
 use futures::future::{err, join_all, ok, select_all};
@@ -14,18 +14,19 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{Duration, Instant};
 
 use crate::constellation::Constellation;
-use crate::core::{StarCoreFactory, CoreRunner, StarCore, StarCoreCommand, StarCoreExtFactory, CoreRunnerCommand, StarCoreExtKind};
+use crate::core::{CoreRunner, CoreRunnerCommand, StarCore, StarCoreCommand, StarCoreExtFactory, StarCoreExtKind, StarCoreFactory};
 use crate::error::Error;
-use crate::frame::{Frame, ProtoFrame, WindHit, StarMessage, StarMessagePayload, WindUp, StarPattern, WindDown, SequenceMessage} ;
+use crate::file::MemoryFileAccess;
+use crate::frame::{Frame, ProtoFrame, SequenceMessage, StarMessage, StarMessagePayload, StarPattern, WindDown, WindHit, WindUp} ;
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelReceiver, TunnelSender, TunnelSenderState};
-use crate::star::{FrameHold, FrameTimeoutInner, ShortestPathStarKey, Star, StarCommand, StarController, StarKernel, StarKey, StarKind, StarManagerFactory, StarSearchTransaction, Transaction, StarInfo, StarSkel, StarVariantCommand, ResourceRegistryBackingSqLite, ResourceRegistryBacking, Persistence};
+use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
+use crate::permissions::AuthTokenSource;
+use crate::resource::HostedResourceStore;
+use crate::star::{FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBacking, ResourceRegistryBackingSqLite, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarManagerFactory, StarSearchTransaction, StarSkel, StarVariantCommand, Transaction};
+use crate::star::pledge::StarHandleBacking;
 use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
-use crate::logger::{Logger, Flags, Flag, StarFlag, Log, ProtoStarLog, ProtoStarLogPayload};
-use crate::permissions::AuthTokenSource;
-use crate::star::pledge::StarHandleBacking;
-use crate::resource::{HostedResourceStore, MemoryFileAccess};
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -292,7 +293,7 @@ impl ProtoStar
             lane.lane.outgoing.tx.send(LaneCommand::Frame(frame)).await;
         }
         else {
-           eprintln!("could not find lane for {}", star);
+           eprintln!("could not find lane for {}", star.to_string());
         }
     }
 

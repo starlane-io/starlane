@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::iter::FromIterator;
 use std::str::FromStr;
@@ -8,32 +9,33 @@ use std::time::Duration;
 
 use base64::DecodeError;
 use bincode::ErrorKind;
-use rusqlite::{Connection, params, params_from_iter, Rows, Statement, ToSql, Transaction, Row};
+use dyn_clone::DynClone;
+use rusqlite::{Connection, params, params_from_iter, Row, Rows, Statement, ToSql, Transaction};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
 use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot::Receiver;
 
 use crate::actor::{ActorArchetype, ActorKey, ActorKind, ActorProfile};
 use crate::app::{AppArchetype, AppKind, AppProfile, ConfigSrc, InitData};
 use crate::artifact::{ArtifactKey, ArtifactKind};
 use crate::error::Error;
+use crate::file::FileAccess;
 use crate::frame::{Reply, ResourceHostAction, SimpleReply, StarMessagePayload};
 use crate::id::{Id, IdSeq};
-use crate::keys::{FileKey, ResourceId, UniqueSrc, Unique};
+use crate::keys::{FileKey, ResourceId, Unique, UniqueSrc};
 use crate::keys::{AppFilesystemKey, AppKey, FileSystemKey, GatheringKey, ResourceKey, SpaceKey, SubSpaceFilesystemKey, SubSpaceId, SubSpaceKey, UserKey};
 use crate::message::{Fail, ProtoMessage};
 use crate::names::{Name, Specific};
 use crate::permissions::User;
-use crate::star::{ResourceRegistryBacking, StarComm, StarCommand, StarKey, StarSkel, StarKind};
-use crate::star::pledge::{StarHandle, ResourceHostSelector};
-use crate::util::AsyncHashMap;
-use tokio::sync::oneshot::Receiver;
-use crate::resource::space::{SpaceState, Space};
-use std::convert::{TryFrom, TryInto};
-use crate::resource::user::UserState;
+use crate::resource::space::{Space, SpaceState};
 use crate::resource::sub_space::SubSpaceState;
-use dyn_clone::DynClone;
+use crate::resource::user::UserState;
+use crate::star::{ResourceRegistryBacking, StarComm, StarCommand, StarKey, StarKind, StarSkel};
+use crate::star::pledge::{ResourceHostSelector, StarHandle};
+use crate::util::AsyncHashMap;
+use std::path::PathBuf;
 
 pub mod space;
 pub mod sub_space;
@@ -2604,7 +2606,7 @@ mod test
     use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
     use crate::names::{Name, Specific};
     use crate::permissions::Authentication;
-    use crate::resource::{FieldSelection, Labels, LabelSelection, Names, Registry, ResourceAddress, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceKind, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceType, ResourceSelector, SkewerCase, ResourceStub, ResourceRecord};
+    use crate::resource::{FieldSelection, Labels, LabelSelection, Names, Registry, ResourceAddress, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceKind, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector, ResourceStub, ResourceType, SkewerCase};
     use crate::resource::FieldSelection::SubSpace;
     use crate::resource::ResourceRegistryResult::Resources;
     use crate::space::CreateAppControllerFail;
@@ -3030,6 +3032,11 @@ impl Path
                 return Err("path cannot contain wildcard characters [*,?] or [:]".into());
             }
         }
+
+        if !string.starts_with("/") {
+            return Err("Paths must be absolute (must start with a '/')".into())
+        }
+
         Ok(Path{
             string: string.to_string()
         })
@@ -3053,6 +3060,31 @@ impl Path
         }
     }
 
+    pub fn parent(&self) -> Option<Path> {
+        let split = self.string.split("/");
+        if split.count() <= 1{
+            Option::None
+        }
+        else{
+            let mut string = String::new();
+            let mut split = self.string.split("/");
+            while let Option::Some(segment) = split.next() {
+                string.push_str("/");
+                string.push_str(segment );
+            }
+            match Self::new(string.as_str())
+            {
+                Ok(path) => Option::Some(path),
+                Err(_) => Option::None
+            }
+        }
+    }
+
+    pub fn to_relative(&self)->String{
+        let mut rtn = self.string.clone();
+        rtn.remove(0);
+        rtn
+    }
 }
 
 impl TryInto<Arc<Vec<u8>>> for Path {
@@ -3513,45 +3545,6 @@ impl <S> SrcTransfer<S> where S:TryInto<Arc<Vec<u8>>>+TryFrom<Arc<Vec<u8>>>{
     }
 }
 
-pub trait FileAccess: Send+Sync+DynClone {
-    fn read( &self, path: &Path )->Result<Arc<Vec<u8>>,Error>;
-    fn write( &mut self, path: &Path, data: Arc<Vec<u8>> )->Result<(),Error>;
-    fn with_base_path( &self, base_path: Path ) -> Result<Box<dyn FileAccess>,Error>;
-    fn mkdir( &mut self, path: &Path ) -> Result<Box<dyn FileAccess>,Error>;
-}
-
-#[derive(Clone)]
-pub struct MemoryFileAccess {
-    map: HashMap<Path,Arc<Vec<u8>>>
-}
-
-impl MemoryFileAccess {
-    pub fn new( ) -> Self{
-        MemoryFileAccess{
-            map: HashMap::new()
-        }
-    }
-}
-
-
-impl FileAccess for MemoryFileAccess {
-    fn read(&self, path: &Path) -> Result<Arc<Vec<u8>>, Error> {
-        self.map.get(path).cloned().ok_or(format!("could not find file for path '{}'",path.to_string()).into())
-    }
-
-    fn write(&mut self, path: &Path, data: Arc<Vec<u8>>) -> Result<(), Error> {
-        self.map.insert( path.clone(), data );
-        Ok(())
-    }
-
-    fn with_base_path(&self, base: Path) -> Result<Box<dyn FileAccess>,Error> {
-        Ok(Box::new(Self::new()))
-    }
-
-    fn mkdir(&mut self, path: &Path) -> Result<Box<dyn FileAccess>, Error> {
-        Ok(Box::new(Self::new()))
-    }
-}
 
 pub trait DataTransfer: Send+Sync {
     fn get(&self) -> Result<Arc<Vec<u8>>,Error>;

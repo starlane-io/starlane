@@ -26,6 +26,13 @@ impl fmt::Display for Error{
 }
 
 
+impl From<std::io::Error> for Error{
+    fn from(e: std::io::Error) -> Self {
+        Error{
+            error: format!("{}",e.to_string())
+        }
+    }
+}
 
 
 impl From<Elapsed> for Error{

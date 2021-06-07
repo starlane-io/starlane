@@ -12,14 +12,15 @@ use tokio::sync::{mpsc, oneshot};
 use crate::app::ConfigSrc;
 use crate::core::Host;
 use crate::error::Error;
+use crate::file::FileAccess;
 use crate::frame::ResourceHostAction;
 use crate::keys::{ResourceKey, SpaceId};
 use crate::message::Fail;
 use crate::names::{Name, Specific};
-use crate::resource::{AssignResourceStateSrc, DataTransfer, FileAccess, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Names, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceStatePersistenceManager, ResourceStateSrc, ResourceType};
+use crate::resource::{AssignResourceStateSrc, DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Names, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceStatePersistenceManager, ResourceStateSrc, ResourceType};
 use crate::resource;
 use crate::resource::space::{Space, SpaceState};
-use crate::resource::store::{ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult, ResourceStoreSqlLite, ResourceStore};
+use crate::resource::store::{ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult, ResourceStoreSqlLite};
 use crate::resource::user::UserState;
 
 pub struct SpaceHost {

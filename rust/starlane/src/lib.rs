@@ -44,4 +44,5 @@ pub mod artifact;
 pub mod config;
 pub mod names;
 pub mod filesystem;
+pub mod file;
 

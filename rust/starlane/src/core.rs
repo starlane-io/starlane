@@ -1,5 +1,5 @@
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -28,6 +28,8 @@ use crate::message::Fail;
 use crate::resource::{AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource, Resource, ResourceAssign, ResourceInit, ResourceSliceAssign};
 use crate::resource::store::ResourceStoreSqlLite;
 use crate::star::{ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel, StarVariantCommand};
+use crate::file::FileAccess;
+use crate::core::file_store::FileStoreHost;
 
 pub mod server;
 pub mod space;
@@ -130,7 +132,7 @@ pub struct CoreRunner
 
 impl CoreRunner
 {
-    pub fn new()->Self
+    pub fn new()->Result<Self,Error>
     {
       let factory = StarCoreFactory::new();
       let (tx,mut rx) = mpsc::channel(1);
@@ -139,7 +141,7 @@ impl CoreRunner
          runtime.block_on( async move {
             while let Option::Some(CoreRunnerCommand::Core{ skel, ext, rx }) = rx.recv().await
             {
-               let core = factory.create(skel,ext,rx).await;
+               let core = factory.create(skel,ext,rx).await.unwrap();
                tokio::spawn( async move {
                    core.run().await
                } );
@@ -147,10 +149,10 @@ impl CoreRunner
          } );
       } );
 
-      CoreRunner
+      Ok(CoreRunner
       {
           tx: tx
-      }
+      })
     }
 
     pub async fn send( &self, command: CoreRunnerCommand ) {
@@ -182,25 +184,42 @@ impl StarCoreFactory
         StarCoreFactory{}
     }
 
-    pub async fn create(&self, skel: StarSkel, ext: StarCoreExtKind, core_rx: mpsc::Receiver<StarCoreAction> ) -> StarCore2
+    pub async fn create(&self, skel: StarSkel, ext: StarCoreExtKind, core_rx: mpsc::Receiver<StarCoreAction> ) -> Result<StarCore2,Error>
     {
-        let file_access = dyn_clone::clone_box(&**skel.file_access);
-        StarCore2::new(skel, core_rx, Box::new(SpaceHost::new().await )).await
-/*        match skel.info.kind
+        let file_access = skel.file_access.with_path(format!("stars/{}",skel.info.key.to_string()))?;
+        let host:Box<dyn Host> =  match skel.info.kind
         {
-            StarKind::ActorHost => {
-                if let StarCoreExtKind::Server(ext) = ext
-                {
-                    Ok(Box::new(ServerStarCore::new(skel, ext, core_rx)))
-                }
-                else
-                {
-                    Err("expected ServerCoreExt".into())
-                }
+            StarKind::SpaceHost => {
+                Box::new(SpaceHost::new().await)
             }
-            _ => Ok(Box::new(InertStarCore::new()))
-        }
- */
+            StarKind::FileStore => {
+                Box::new(FileStoreHost::new(skel.clone(),file_access).await? )
+            }
+            _ => {
+                Box::new(InertHost::new())
+            }
+        };
+        Ok(StarCore2::new(skel, core_rx, host ).await)
+    }
+}
+
+pub struct InertHost{
+}
+
+impl InertHost{
+    pub fn new() -> Self {
+        InertHost {}
+    }
+}
+
+#[async_trait]
+impl Host for InertHost{
+    async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource, Fail> {
+        Err(Fail::WrongResourceType {expected:HashSet::new(),received:assign.archetype.kind.resource_type()})
+    }
+
+    async fn get(&self, key: ResourceKey) -> Result<Option<Resource>, Fail> {
+        Err(Fail::WrongResourceType {expected:HashSet::new(),received:key.resource_type()})
     }
 }
 

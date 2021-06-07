@@ -1,4 +1,6 @@
+use std::collections::HashSet;
 use std::convert::{TryFrom, TryInto};
+use std::iter::FromIterator;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -7,25 +9,27 @@ use tokio::sync::mpsc;
 
 use crate::core::Host;
 use crate::error::Error;
+use crate::file::FileAccess;
 use crate::keys::ResourceKey;
 use crate::message::Fail;
-use crate::resource::{AssignResourceStateSrc, Resource, ResourceAddress, ResourceAssign, ResourceStateSrc, FileAccess, DataTransfer, MemoryDataTransfer, ResourceType, Path};
-use crate::resource::store::{ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult, ResourceStore};
-use std::collections::HashSet;
-use std::iter::FromIterator;
-
+use crate::resource::{AssignResourceStateSrc, DataTransfer, MemoryDataTransfer, Path, Resource, ResourceAddress, ResourceAssign, ResourceStateSrc, ResourceType};
+use crate::resource::store::{ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult};
+use crate::star::StarSkel;
 
 pub struct FileStoreHost {
+    skel: StarSkel,
     file_access: Box<dyn FileAccess>,
     store: ResourceStore
 }
 
 impl FileStoreHost {
-    pub async fn new(file_access: Box<dyn FileAccess>)->Self{
-        FileStoreHost {
+    pub async fn new(skel: StarSkel, file_access: Box<dyn FileAccess>)->Result<Self,Error>{
+        let file_access = file_access.with_path( "files".to_string() )?;
+        Ok(FileStoreHost {
+            skel: skel,
             file_access: file_access,
             store: ResourceStore::new().await
-        }
+        })
     }
 }
 
