@@ -4,7 +4,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize, Serializer};
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::sync::broadcast::Sender;
 
 use crate::app::{ConfigSrc, InitData};
@@ -12,9 +12,9 @@ use crate::app::AppContext;
 use crate::error::Error;
 use crate::frame::{Event};
 use crate::id::Id;
-use crate::keys::{AppKey, ResourceKey, SubSpaceKey, UserKey};
+use crate::keys::{AppKey, ResourceKey, SubSpaceKey, UserKey, ResourceId};
 use crate::names::Name;
-use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceType, ResourceArchetype, ResourceInit, Names, ResourceAddress, ResourceAddressPart, SkewerCase, ResourceRegistryInfo, ResourceStub};
+use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceType, ResourceArchetype, ResourceInit, Names, ResourceAddress, ResourceAddressPart, SkewerCase, ResourceRegistryInfo, ResourceStub, ResourceCreate, ResourceSelector, ResourceRecord};
 use crate::star::StarKey;
 use std::marker::PhantomData;
 use serde::de::DeserializeOwned;
@@ -270,23 +270,6 @@ impl FromStr for ActorKind
 }
 
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceTo
-{
-    pub key: ResourceKey,
-    pub ext: ResourceToExt
-}
-
-impl ResourceTo
-{
-    pub fn reverse(&self)->ResourceFrom
-    {
-        ResourceFrom {
-            key: self.key.clone(),
-            ext: self.ext.reverse()
-        }
-    }
-}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ResourceToExt
@@ -296,21 +279,9 @@ pub enum ResourceToExt
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceFrom
+pub enum ResourceFrom
 {
-    pub key: ResourceKey,
-    pub ext: ResourceFromExt
-}
-
-impl ResourceFrom
-{
-    pub fn reverse(&self)->ResourceTo
-    {
-        ResourceTo {
-           key: self.key.clone(),
-           ext: self.ext.reverse()
-        }
-    }
+    Injected
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -450,14 +421,77 @@ pub struct ResourceMessageWrapper
     pub message: ResourceMessage
 }
 
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct ResourceTo
+{
+    pub key: ResourceKey
+}
+
+impl ResourceTo{
+    pub fn new(key:ResourceKey) -> Self{
+        ResourceTo{
+            key: key
+        }
+    }
+}
+
+
+pub struct ResourceMessageBuilder{
+    pub from: Option<ResourceFrom>,
+    pub to: Option<ResourceTo>,
+    pub payload: ResourceMessagePayload,
+    pub reply: Option<oneshot::Sender<Result<ResourceMessage,Fail>>>
+}
+
+impl ResourceMessageBuilder{
+    pub fn new()->Self{
+
+        ResourceMessageBuilder{
+            from: Option::None,
+            to: Option::None,
+            payload: ResourceMessagePayload::None,
+            reply: Option::None
+        }
+    }
+
+    pub fn build(self)->Result<ResourceMessage,Error>{
+        if let &ResourceMessagePayload::None = &self.payload {
+            return Err("ResourceMessagePayload cannot be None".into());
+        }
+
+        Ok(ResourceMessage{
+            from: self.from.ok_or("need to set 'from' in ResourceMessageBuilder")?,
+            to: self.to.ok_or("need to set 'to' in ResourceMessageBuilder")?,
+            payload: self.payload,
+        })
+    }
+
+    pub fn injected(&mut self) {
+        self.from = Option::Some(ResourceFrom::Injected);
+    }
+
+    pub fn to(&mut self, to: ResourceTo) {
+        self.to = Option::Some(to);
+    }
+
+    pub fn from(&mut self, from: ResourceFrom ) {
+        self.from = Option::Some(from);
+    }
+
+    pub fn reply(&mut self) -> oneshot::Receiver<Result<ResourceMessage,Fail>> {
+        let (tx,rx) = oneshot::channel();
+        self.reply = Option::Some(tx);
+        rx
+    }
+}
+
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceMessage
 {
-    pub id: Id,
     pub from: ResourceFrom,
     pub to: ResourceTo,
-    pub payload: Arc<RawPayload>,
-    pub transaction: Option<Id>
+    pub payload: ResourceMessagePayload
 }
 
 impl ResourceMessage
@@ -475,7 +509,30 @@ impl ResourceMessage
     }
 }
 
-pub type ResourceMessagePayload=Arc<RawPayload>;
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ResourceMessagePayload {
+    None,
+    Raw(Arc<RawPayload>),
+    Request(ResourceRequest),
+    Response(ResourceResponse)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ResourceRequest
+{
+    Create(ResourceCreate),
+    Select(ResourceSelector),
+    Unique(ResourceType)
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ResourceResponse
+{
+    Resource(Option<ResourceRecord>),
+    Resources(Vec<ResourceRecord>),
+    Unique(ResourceId)
+}
+
 pub type Raw=Vec<u8>;
 pub type RawPayload=Vec<u8>;
 pub type RawState=Vec<u8>;

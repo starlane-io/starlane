@@ -40,10 +40,15 @@ impl Host for SpaceHost {
 
     async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource, Fail> {
         // if there is Initialization to do for assignment THIS is where we do it
-        let data = match assign.state_src{
-            AssignResourceStateSrc::Direct(data) => data
+        let data_transfer= match assign.state_src{
+            AssignResourceStateSrc::Direct(data) => {
+                let data_transfer:Arc<dyn DataTransfer> = Arc::new(MemoryDataTransfer::new(data));
+                data_transfer
+            },
+            AssignResourceStateSrc::Hosted => {
+                Arc::new(MemoryDataTransfer::none())
+            }
         };
-        let data_transfer:Arc<dyn DataTransfer> = Arc::new(MemoryDataTransfer::new(data));
 
         let assign = ResourceAssign{
             stub: assign.stub,

@@ -18,7 +18,7 @@ use crate::logger::Flags;
 use crate::message::{Fail, MessageExpect, MessageResult, MessageUpdate, ProtoMessage};
 use crate::names::Name;
 use crate::permissions::{Authentication, AuthToken};
-use crate::resource::{Labels, ResourceAssign, ResourceRegistration, ResourceSelector, ResourceRecord, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus, ResourceInit, ResourceCreate, AssignResourceStateSrc, ResourceIdentifier, ResourceStub};
+use crate::resource::{Labels, ResourceAssign, ResourceRegistration, ResourceSelector, ResourceRecord, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus, ResourceInit, ResourceCreate, AssignResourceStateSrc, ResourceIdentifier, ResourceStub, ResourceType};
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey, StarWatchInfo, LocalResourceLocation};
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -352,6 +352,7 @@ pub enum StarMessagePayload
    ResourceHost(ResourceHostAction),
    Space(SpaceMessage),
    Reply(SimpleReply),
+   UniqueId(ResourceId)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -378,6 +379,7 @@ pub enum ChildManagerResourceAction
     SliceStatus(ResourceSliceStatusReport),
     Create(ResourceCreate),
     Select(ResourceSelector),
+    UniqueResourceId{parent:ResourceKey,child_type:ResourceType}
 }
 
 impl ToString for ChildManagerResourceAction {
@@ -390,6 +392,7 @@ impl ToString for ChildManagerResourceAction {
             ChildManagerResourceAction::SliceStatus(_) => "SliceStatus".to_string(),
             ChildManagerResourceAction::Create(_) => "Create".to_string(),
             ChildManagerResourceAction::Select(_) => "Select".to_string(),
+            ChildManagerResourceAction::UniqueResourceId{..} => "UniqueResourceId".to_string()
         }
     }
 }
@@ -452,6 +455,7 @@ pub enum Reply
     Resources(Vec<ResourceRecord>),
     Resource(ResourceRecord),
     Address(ResourceAddress),
+    Id(ResourceId),
     Seq(u64)
 }
 
@@ -465,6 +469,7 @@ impl ToString for Reply{
             Reply::Address(_) =>  "Address".to_string(),
             Reply::Resource(_) =>  "Resource".to_string(),
             Reply::Seq(_) =>  "Seq".to_string(),
+            Reply::Id(_) => "Id".to_string()
         }
     }
 }
@@ -730,7 +735,8 @@ impl fmt::Display for StarMessagePayload{
             StarMessagePayload::Space(_) => "Space".to_string(),
             StarMessagePayload::Reply(reply) => format!("Reply({})",reply.to_string() ),
             StarMessagePayload::ResourceManager(_) => "ResourceManager".to_string(),
-            StarMessagePayload::ResourceHost(_) => "ResourceHost".to_string()
+            StarMessagePayload::ResourceHost(_) => "ResourceHost".to_string(),
+            StarMessagePayload::UniqueId(_) => "UniqueId".to_string()
         };
         write!(f, "{}",r)
     }

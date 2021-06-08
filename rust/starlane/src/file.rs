@@ -32,6 +32,10 @@ pub struct FileAccess{
 
 impl FileAccess{
 
+    pub fn path(&self)->String{
+        self.path.clone()
+    }
+
     pub async fn new( path: String ) -> Result<Self,Error>{
         let tx = LocalFileAccess::new(path.clone()).await?;
         Ok(FileAccess{

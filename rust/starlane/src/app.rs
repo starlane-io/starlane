@@ -627,12 +627,15 @@ impl AppContext
     }
 
     pub async fn reply( &self, message: &ResourceMessage, payload: Arc<RawPayload> ) {
-        let mut reply = message.clone();
+        unimplemented!();
+/*        let mut reply = message.clone();
 
         reply.payload = payload;
         reply.to = message.from.reverse();
         reply.from = message.to.reverse();
 
+
+ */
         // send
     }
 

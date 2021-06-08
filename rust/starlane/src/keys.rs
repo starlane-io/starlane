@@ -426,6 +426,20 @@ impl ResourceKey
         }
     }
 
+    pub fn id(&self)->ResourceId{
+       match self{
+           ResourceKey::Nothing => ResourceId::Nothing,
+           ResourceKey::Space(space) => ResourceId::Space(space.id()),
+           ResourceKey::SubSpace(sub_space) => {ResourceId::SubSpace(sub_space.id.clone())}
+           ResourceKey::App(app) => {ResourceId::App(app.id.clone())}
+           ResourceKey::Actor(actor) => {ResourceId::Actor(actor.id.clone())}
+           ResourceKey::User(user) => {ResourceId::User(user.id.clone())}
+           ResourceKey::Artifact(artifact) => {ResourceId::Artifact(artifact.id.clone())}
+           ResourceKey::File(file) => {ResourceId::File(file.id.clone())}
+           ResourceKey::FileSystem(filesystem) => {filesystem.id()}
+       }
+    }
+
     pub fn generate_address_tail(&self) -> Result<String,Fail>{
         match self{
             ResourceKey::Nothing => Err(Fail::ResourceCannotGenerateAddress),
@@ -440,7 +454,14 @@ impl ResourceKey
             ResourceKey::User(user) => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::Artifact(_) => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::File(_) => Err(Fail::ResourceCannotGenerateAddress),
-            ResourceKey::FileSystem(_) => Err(Fail::ResourceCannotGenerateAddress),
+            ResourceKey::FileSystem(filesystem) => match filesystem{
+                FileSystemKey::App(app) => {
+                    Ok(app.id.to_string())
+                }
+                FileSystemKey::SubSpace(sub) => {
+                    Ok(sub.id.to_string())
+                }
+            },
         }
     }
 
@@ -622,6 +643,19 @@ pub enum FileSystemKey
 {
     App(AppFilesystemKey),
     SubSpace(SubSpaceFilesystemKey)
+}
+
+impl FileSystemKey{
+    pub fn id(&self)->ResourceId{
+        match self {
+            FileSystemKey::App(app) => {
+                ResourceId::FileSystem(app.id.clone())
+            }
+            FileSystemKey::SubSpace(sub_space) => {
+                ResourceId::FileSystem(sub_space.id.clone())
+            }
+        }
+    }
 }
 
 impl ToString for FileSystemKey {
@@ -873,7 +907,5 @@ pub enum Unique {
 
 #[async_trait]
 pub trait UniqueSrc: Send+Sync{
-    async fn next(&self, unique: Unique) -> Result<u64,Fail>;
+    async fn next(&self, resource_type: &ResourceType) -> Result<ResourceId,Fail>;
 }
-
-

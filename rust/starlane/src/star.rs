@@ -28,7 +28,7 @@ use url::Url;
 
 use actor_host::ServerStarVariant;
 
-use crate::actor::{ActorKey, ActorKind, ActorWatcher, ResourceMessage, ResourceMessageWrapper};
+use crate::actor::{ActorKey, ActorKind, ActorWatcher, ResourceMessage, ResourceMessageWrapper, ResourceMessageBuilder};
 use crate::app::{AppCommand, AppCommandKind, AppController, AppCreateController, AppLocation, AppMeta, AppSpecific};
 use crate::core::{StarCoreAction, StarCoreCommand, StarCoreResult};
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
@@ -1741,6 +1741,7 @@ println!("special process frame....");
         match &message.payload{
             StarMessagePayload::ResourceManager(action) => self.process_child_manager_resource_action(message.clone(), action.clone()).await?,
             StarMessagePayload::ResourceHost(action) => self.process_resource_host_action(message.clone(),action.clone()).await?,
+
             _ => {
 //eprintln!("process_message: Unexpected Payload");
             }
@@ -1853,7 +1854,13 @@ eprintln!("Error: {}",err);
                             let result = manager.select(selector).await;
                             self.skel.comm().reply_result(message, Reply::from_result(result)).await;
                         }
-                    }
+                ChildManagerResourceAction::UniqueResourceId{ parent, child_type } => {
+                        let unique_src = self.skel.registry.as_ref().unwrap().unique_src(parent).await;
+                        let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Id(unique_src.next(&child_type).await?))));
+                        self.skel.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
+
+                }
+            }
                 }
 
                 Ok(())
@@ -1864,13 +1871,11 @@ eprintln!("Error: {}",err);
 println!("process_resource_host_action");
                 match action {
                     ResourceHostAction::IsHosting(resource) => {
-                        if let Option::Some(resource) = self.get_resource(&resource).await?
-                        {
+                        if let Option::Some(resource) = self.get_resource(&resource).await? {
                             let record= resource.into();
                             let record = ResourceRecord::new(record, self.skel.info.key.clone() );
                             self.skel.comm().simple_reply(message,SimpleReply::Ok(Reply::Resource(record))).await;
-                        }
-                        else {
+                        } else {
                             self.skel.comm().simple_reply(message,SimpleReply::Fail(Fail::ResourceNotFound(resource.into()))).await;
                         }
                     }
@@ -2040,6 +2045,7 @@ println!("UNEXPECTED RESULT IN ASSIGN!!!");
             AddConnectorController(ConnectorController),
             AddLogger(broadcast::Sender<Logger>),
             SendProtoMessage(ProtoMessage),
+            SendResourceMessage(ResourceMessageBuilder),
             SetFlags(SetFlags),
             ReleaseHold(StarKey),
 
@@ -2361,7 +2367,8 @@ println!("UNEXPECTED RESULT IN ASSIGN!!!");
                     StarCommand::ResourceRecordSet(_) => "SetResourceLocation".to_string(),
                     StarCommand::Diagnose(_) => "Diagnose".to_string(),
                     StarCommand::CheckStatus => "CheckStatus".to_string(),
-                    StarCommand::ResourceRecordRequestFromStar(_) => "ResourceRecordRequestFromStar".to_string()
+                    StarCommand::ResourceRecordRequestFromStar(_) => "ResourceRecordRequestFromStar".to_string(),
+                    StarCommand::SendResourceMessage(_) => "SendResourceMessage".to_string()
                 };
                 write!(f, "{}",r)
             }

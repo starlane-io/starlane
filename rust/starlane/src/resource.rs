@@ -17,12 +17,12 @@ use serde_json::to_string;
 use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::Receiver;
 
-use crate::actor::{ActorArchetype, ActorKey, ActorKind, ActorProfile};
+use crate::actor::{ActorArchetype, ActorKey, ActorKind, ActorProfile, ResourceMessageBuilder, ResourceFrom, ResourceMessagePayload, ResourceRequest, ResourceMessage, ResourceTo, ResourceResponse};
 use crate::app::{AppArchetype, AppKind, AppProfile, ConfigSrc, InitData};
 use crate::artifact::{ArtifactKey, ArtifactKind};
 use crate::error::Error;
 use crate::file::FileAccess;
-use crate::frame::{Reply, ResourceHostAction, SimpleReply, StarMessagePayload};
+use crate::frame::{Reply, ResourceHostAction, SimpleReply, StarMessagePayload, ChildManagerResourceAction};
 use crate::id::{Id, IdSeq};
 use crate::keys::{FileKey, ResourceId, Unique, UniqueSrc};
 use crate::keys::{AppFilesystemKey, AppKey, FileSystemKey, GatheringKey, ResourceKey, SpaceKey, SubSpaceFilesystemKey, SubSpaceId, SubSpaceKey, UserKey};
@@ -36,6 +36,8 @@ use crate::star::{ResourceRegistryBacking, StarComm, StarCommand, StarKey, StarK
 use crate::star::pledge::{ResourceHostSelector, StarHandle};
 use crate::util::AsyncHashMap;
 use std::path::PathBuf;
+use std::future::Future;
+use crate::util;
 
 pub mod space;
 pub mod sub_space;
@@ -87,6 +89,7 @@ lazy_static!
     pub static ref HYPERSPACE_ADDRESS: ResourceAddress = SPACE_ADDRESS_STRUCT.from_str("hyperspace").unwrap();
     pub static ref HYPERSPACE_DEFAULT_ADDRESS: ResourceAddress = SUB_SPACE_ADDRESS_STRUCT.from_str("hyperspace:default").unwrap();
 }
+
 
 //static RESOURCE_QUERY_FIELDS: &str = "r.key,r.address,r.kind,r.specific,r.owner,r.config,r.host,r.gathering";
 static RESOURCE_QUERY_FIELDS: &str = "r.key,r.address,r.kind,r.specific,r.owner,r.config,r.host,r.gathering";
@@ -1842,12 +1845,124 @@ println!("Sending ChildResourceManager::process_create(core, create ).await");
 }
 
 pub struct ResourceCreationChamber{
-
+    parent: ResourceStub,
+    create: ResourceCreate,
+    skel: StarSkel,
+    tx: oneshot::Sender<Result<ResourceAssign<AssignResourceStateSrc>,Fail>>
 }
 
 impl ResourceCreationChamber{
-    pub fn create( create: ResourceCreate ) -> Result<ResourceStub,Fail> {
-        unimplemented!()
+    pub async fn new( parent: ResourceStub, create: ResourceCreate, skel: StarSkel ) -> oneshot::Receiver<Result<ResourceAssign<AssignResourceStateSrc>,Fail>> {
+        let (tx,rx) = oneshot::channel();
+        let chamber = ResourceCreationChamber {
+            parent: parent,
+            create: create,
+            skel: skel,
+            tx: tx
+        };
+        chamber.run().await;
+        rx
+    }
+
+    async fn run(self){
+
+        tokio::spawn( async move {
+            if !self.create.archetype.kind.resource_type().parent().matches(Option::Some(&self.parent.key.resource_type())) {
+                println!("!!! -> Throwing Fail::WrongParentResourceType <- !!!");
+                self.tx.send(Err(Fail::WrongParentResourceType {
+                    expected: HashSet::from_iter(self.parent.key.resource_type().parent().types()),
+                    received: Option::Some(self.create.parent.resource_type())
+                }));
+                return;
+            };
+
+            match self.create.validate()
+            {
+                Ok(_) => {}
+                Err(error) => {
+                    self.tx.send(Err(error));
+                    return;
+                }
+            }
+
+
+            let key = match &self.create.key {
+                KeyCreationSrc::None => {
+
+                    let mut builder = ResourceMessageBuilder::new();
+                    builder.to(ResourceTo::new(self.parent.key.clone()));
+                    builder.from(ResourceFrom::Injected);
+                    builder.payload = ResourceMessagePayload::Request(ResourceRequest::Unique(self.create.archetype.kind.resource_type()));
+                    let mut rx = builder.reply();
+
+                    self.skel.star_tx.send(StarCommand::SendResourceMessage(builder)).await;
+
+                    tokio::spawn( async move {
+
+                        if let Ok(Ok(ResourceMessage{ payload: ResourceMessagePayload::Response(ResourceResponse::Unique(id)), to: _, from: _ })) = util::wait_for_it_whatever(rx).await {
+                            match ResourceKey::new(self.parent.key.clone(), id.clone()) {
+                                Ok(key) => {
+                                    let final_create = self.finalize_create(key.clone()).await;
+                                    self.tx.send(final_create);
+                                    return;
+                                }
+                                Err(error) => {
+                                    self.tx.send( Err(format!("error when trying to create resource key with id {}",id.to_string()).into()));
+                                    return;
+                                }
+                            }
+                        }
+                        else{
+                            self.tx.send( Err("unexpected response, expected ResourceResponse::Unique".into()));
+                            return;
+                        }
+                    } );
+
+                }
+                KeyCreationSrc::Key(key) => {
+                    if key.parent() != Option::Some(self.parent.key.clone()) {
+                        let final_create = self.finalize_create(key.clone()).await;
+                        self.tx.send(final_create);
+                        return;
+                    }
+                }
+            };
+        });
+    }
+
+
+    async fn finalize_create(&self, key: ResourceKey) -> Result<ResourceAssign<AssignResourceStateSrc>,Fail>  {
+
+        let address = match &self.create.address{
+            AddressCreationSrc::None => {
+                let address = format!("{}:{}", self.parent.address.to_parts_string(), key.generate_address_tail()? );
+                self.create.archetype.kind.resource_type().address_structure().from_str(address.as_str())?
+            }
+            AddressCreationSrc::Append(tail) => {
+                self.create.archetype.kind.resource_type().append_address(self.parent.address.clone(), tail.clone() )?
+            }
+            AddressCreationSrc::Space(space_name) => {
+                if self.parent.key.resource_type() != ResourceType::Nothing{
+                    return Err(format!("Space creation can only be used at top level (Nothing) not by {}",self.parent.key.resource_type().to_string()).into());
+                }
+                ResourceAddress::for_space(space_name.as_str())?
+            }
+        };
+
+        println!("CREATE ADDRESS: {}", address.to_string() );
+        let stub = ResourceStub {
+            key: key,
+            address: address.clone(),
+            archetype: self.create.archetype.clone(),
+            owner: None
+        };
+
+
+        let assign = ResourceAssign {
+            stub: stub,
+            state_src: self.create.src.clone(),
+        };
+        Ok(assign)
     }
 }
 
@@ -1924,14 +2039,14 @@ impl RegistryReservation{
 }
 
 pub struct RegistryUniqueSrc {
-  key: ResourceKey,
+  parent_key: ResourceKey,
   tx: mpsc::Sender<ResourceRegistryAction>
 }
 
 impl RegistryUniqueSrc {
-    pub fn new(key: ResourceKey, tx: mpsc::Sender<ResourceRegistryAction>) -> Self {
+    pub fn new(parent_key: ResourceKey, tx: mpsc::Sender<ResourceRegistryAction>) -> Self {
         RegistryUniqueSrc {
-            key: key,
+            parent_key: parent_key,
             tx: tx
         }
     }
@@ -1939,16 +2054,48 @@ impl RegistryUniqueSrc {
 
 #[async_trait]
 impl UniqueSrc for RegistryUniqueSrc{
-   async fn next(&self, unique: Unique) -> Result<u64,Fail>{
+   async fn next(&self, resource_type: &ResourceType ) -> Result<ResourceId,Fail>{
+
+       if !resource_type.parent().matches(Option::Some(&self.parent_key.resource_type()) ){
+           return Err(Fail::WrongResourceType {expected: HashSet::from_iter(self.parent_key.resource_type().children()), received: resource_type.clone() })
+       }
        let (tx,rx) = oneshot::channel();
 
        self.tx.send( ResourceRegistryAction{
            tx: tx,
-           command: ResourceRegistryCommand::Next{key:self.key.clone(),unique:unique}
+           command: ResourceRegistryCommand::Next{key:self.parent_key.clone(),unique:Unique::Index}
        }).await?;
 
        if let ResourceRegistryResult::Unique(index) = rx.await? {
-           Ok(index)
+           match resource_type{
+               ResourceType::Nothing => {
+                   Ok(ResourceId::Nothing)
+               }
+               ResourceType::Space => {
+                   Ok(ResourceId::Space(index as _))
+               }
+               ResourceType::SubSpace => {
+                   Ok(ResourceId::SubSpace(index as _))
+               }
+               ResourceType::App => {
+                   Ok(ResourceId::App(index as _))
+               }
+               ResourceType::Actor => {
+                  Ok(ResourceId::Actor(Id::new( 0, index as _)))
+               }
+               ResourceType::User => {
+                   Ok(ResourceId::User(index as _))
+               }
+               ResourceType::FileSystem => {
+                   Ok(ResourceId::FileSystem(index as _))
+               }
+               ResourceType::File => {
+                   Ok(ResourceId::File(index as _))
+               }
+               ResourceType::Artifact => {
+                   Ok(ResourceId::Artifact(index as _))
+               }
+           }
        } else {
            Err(Fail::Unexpected)
        }
@@ -3297,22 +3444,20 @@ pub enum KeySrc{
 /// can have other options like to Initialize the state data
 #[derive(Clone,Serialize,Deserialize)]
 pub enum AssignResourceStateSrc {
-    Direct(Arc<Vec<u8>>)
+    Direct(Arc<Vec<u8>>),
+    Hosted
 }
-
-
 
 impl TryInto<ResourceStateSrc> for AssignResourceStateSrc{
     type Error = Error;
 
     fn try_into(self) -> Result<ResourceStateSrc, Self::Error> {
         match self {
-            AssignResourceStateSrc::Direct(state) => Ok(ResourceStateSrc::Memory(state))
+            AssignResourceStateSrc::Direct(state) => Ok(ResourceStateSrc::Memory(state)),
+            AssignResourceStateSrc::Hosted => Ok(ResourceStateSrc::Hosted)
         }
     }
 }
-
-
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub enum ResourceSliceStatus {
@@ -3537,7 +3682,8 @@ pub type ResourceStateSrc = LocalDataSrc;
 pub enum LocalDataSrc {
     None,
     Memory(Arc<Vec<u8>>),
-    File(Path)
+    File(Path),
+    Hosted
 }
 
 #[derive(Clone)]
