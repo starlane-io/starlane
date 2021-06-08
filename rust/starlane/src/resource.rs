@@ -1794,12 +1794,17 @@ println!("CREATED KEY: {}",key);
         };
 
 println!("CREATE ADDRESS: {}", address.to_string() );
+        let stub = ResourceStub {
+            key: key,
+            address: address.clone(),
+            archetype: create.archetype.clone(),
+            owner: None
+        };
+
 
         let assign = ResourceAssign {
-            key: key.clone(),
-            address: address.clone(),
+            stub: stub.clone(),
             state_src: create.src.clone(),
-            archetype: create.archetype.clone()
         };
 
 println!("selecting for resource kind: {}", create.archetype.kind.resource_type().to_string());
@@ -1810,12 +1815,6 @@ println!(".. about .. to .. assign .." );
 println!("........assigned...." );
 
 
-        let stub = ResourceStub {
-            key: key,
-            address: address.clone(),
-            archetype: create.archetype,
-            owner: None
-        };
 
         let record = ResourceRecord::new( stub, host.star_key() );
 
@@ -1842,6 +1841,15 @@ println!("Sending ChildResourceManager::process_create(core, create ).await");
     }
 }
 
+pub struct ResourceCreationChamber{
+
+}
+
+impl ResourceCreationChamber{
+    pub fn create( create: ResourceCreate ) -> Result<ResourceStub,Fail> {
+        unimplemented!()
+    }
+}
 
 #[async_trait]
 pub trait ResourceHost: Send+Sync {
@@ -3398,20 +3406,18 @@ impl ResourceStub {
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceAssign<S>{
-    pub key: ResourceKey,
-    pub address: ResourceAddress,
+    pub stub: ResourceStub,
     pub state_src: S,
-    pub archetype: ResourceArchetype
 }
 
 impl <S> ResourceAssign<S> {
 
     pub fn key(&self) -> ResourceKey {
-        self.key.clone()
+        self.stub.key.clone()
     }
 
     pub fn archetype(&self) -> ResourceArchetype {
-        self.archetype.clone()
+        self.stub.archetype.clone()
     }
 }
 
@@ -3422,10 +3428,8 @@ impl TryInto<ResourceAssign<ResourceStateSrc>> for ResourceAssign<AssignResource
     fn try_into(self) -> Result<ResourceAssign<ResourceStateSrc>, Self::Error> {
         let state_src = self.state_src.try_into()?;
         Ok(ResourceAssign{
-            key: self.key,
-            address: self.address,
+            stub: self.stub,
             state_src: state_src,
-            archetype: self.archetype
         })
     }
 }
@@ -3461,10 +3465,10 @@ impl ResourceHost for RemoteResourceHost {
 
     async fn assign( &self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<(), Fail> {
 
-        if !self.handle.kind.hosts().contains(&assign.key.resource_type() ) {
+        if !self.handle.kind.hosts().contains(&assign.stub.key.resource_type() ) {
             return Err(Fail::WrongResourceType{
                 expected: self.handle.kind.hosts().clone(),
-                received: assign.key.resource_type().clone()
+                received: assign.stub.key.resource_type().clone()
             });
         }
         let mut proto = ProtoMessage::new();

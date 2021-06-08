@@ -12,7 +12,7 @@ use crate::file::FileAccess;
 use crate::keys::ResourceKey;
 use crate::message::Fail;
 use crate::names::Specific;
-use crate::resource::{DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceStatePersistenceManager};
+use crate::resource::{DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceStatePersistenceManager, ResourceCreate};
 
 #[derive(Clone)]
 pub struct ResourceStore{
@@ -64,7 +64,6 @@ impl ResourceStore{
 
 
 pub struct ResourceStoreAction {
-
     pub command: ResourceStoreCommand,
     pub tx: oneshot::Sender<Result<ResourceStoreResult,Fail>>
 }
@@ -75,12 +74,10 @@ pub enum ResourceStoreCommand {
     Get(ResourceKey)
 }
 
-
 pub enum ResourceStoreResult {
     Ok,
     Resource(Option<Resource>)
 }
-
 
 pub struct ResourceStoreSqlLite {
     pub conn: Connection,
@@ -149,25 +146,25 @@ impl ResourceStoreSqlLite {
             }
             ResourceStoreCommand::Put(assign) => {
 println!("PUT!");
-                let key = assign.key.bin()?;
-                let address = assign.address.to_string();
-                let specific = match &assign.archetype.specific{
+                let key = assign.stub.key.bin()?;
+                let address = assign.stub.address.to_string();
+                let specific = match &assign.stub.archetype.specific{
                     None => Option::None,
                     Some(specific) => Option::Some(specific.to())
                 };
-                let config_src = match &assign.archetype.config {
+                let config_src = match &assign.stub.archetype.config {
                     None => Option::None,
                     Some(config_src) => Option::Some(config_src.to_string())
                 };
 
-                let state = match assign.archetype.kind.resource_type().state_persistence(){
+                let state = match assign.stub.archetype.kind.resource_type().state_persistence(){
                     ResourceStatePersistenceManager::Store => {Option::Some(assign.state_src.get().await?)}
                     _ => Option::None
                 };
 
-                self.conn.execute("INSERT INTO resources (key,address,state_src,kind,specific,config_src) VALUES (?1,?2,?3,?4,?5,?6)", params![key,address,state,assign.archetype.kind.to_string(),specific,config_src])?;
+                self.conn.execute("INSERT INTO resources (key,address,state_src,kind,specific,config_src) VALUES (?1,?2,?3,?4,?5,?6)", params![key,address,state,assign.stub.archetype.kind.to_string(),specific,config_src])?;
 
-                let resource = Resource::new(assign.key,assign.address, assign.archetype, assign.state_src );
+                let resource = Resource::new(assign.stub.key,assign.stub.address, assign.stub.archetype, assign.state_src );
 
 println!("returning Resource....");
                 Ok(ResourceStoreResult::Resource(Option::Some(resource)))

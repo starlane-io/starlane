@@ -46,9 +46,7 @@ impl Host for SpaceHost {
         let data_transfer:Arc<dyn DataTransfer> = Arc::new(MemoryDataTransfer::new(data));
 
         let assign = ResourceAssign{
-            key: assign.key,
-            address: assign.address,
-            archetype: assign.archetype,
+            stub: assign.stub,
             state_src: data_transfer
         };
 

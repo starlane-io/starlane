@@ -221,7 +221,7 @@ impl InertHost{
 #[async_trait]
 impl Host for InertHost{
     async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource, Fail> {
-        Err(Fail::WrongResourceType {expected:HashSet::new(),received:assign.archetype.kind.resource_type()})
+        Err(Fail::WrongResourceType {expected:HashSet::new(),received:assign.stub.archetype.kind.resource_type()})
     }
 
     async fn get(&self, key: ResourceKey) -> Result<Option<Resource>, Fail> {

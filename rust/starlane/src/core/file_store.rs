@@ -54,7 +54,7 @@ impl FileStoreHost {
 impl Host for FileStoreHost {
 
     async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource, Fail> {
-println!("$$$$ FILE RESOURCE ASSIGN: {}", assign.archetype.kind );
+println!("$$$$ FILE RESOURCE ASSIGN: {}", assign.stub.archetype.kind );
         // if there is Initialization to do for assignment THIS is where we do it
         let data = match assign.state_src{
             AssignResourceStateSrc::Direct(data) => data
@@ -62,10 +62,10 @@ println!("$$$$ FILE RESOURCE ASSIGN: {}", assign.archetype.kind );
 
         let data_transfer:Arc<dyn DataTransfer> = Arc::new(MemoryDataTransfer::new(data));
 
-        match assign.key.resource_type(){
+        match assign.stub.key.resource_type(){
             ResourceType::FileSystem => {
                 // here we just ensure that a directory exists for the filesystem
-                let path = Path::new(format!("/{}",assign.key.to_string().as_str()).as_str() )?;
+                let path = Path::new(format!("/{}",assign.stub.key.to_string().as_str()).as_str() )?;
                 self.file_access.mkdir(&path).await?;
             }
             ResourceType::File => {}
@@ -75,9 +75,7 @@ println!("$$$$ FILE RESOURCE ASSIGN: {}", assign.archetype.kind );
         }
 
         let assign = ResourceAssign{
-            key: assign.key,
-            address: assign.address,
-            archetype: assign.archetype,
+            stub: assign.stub,
             state_src: data_transfer
         };
 
