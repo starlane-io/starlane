@@ -192,7 +192,7 @@ impl StarCoreFactory
 
     pub async fn create(&self, skel: StarSkel, ext: StarCoreExtKind, core_rx: mpsc::Receiver<StarCoreAction> ) -> Result<StarCore2,Error>
     {
-        let file_access = skel.file_access.with_path(format!("stars/{}",skel.info.key.to_string()))?;
+        let file_access = skel.file_access.with_path(format!("stars/{}",skel.info.key.to_string())).await?;
         let host:Box<dyn Host> =  match skel.info.kind
         {
             StarKind::SpaceHost => {

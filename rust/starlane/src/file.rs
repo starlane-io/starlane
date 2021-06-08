@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, mpsc, Mutex};
 
 use dyn_clone::DynClone;
 
@@ -9,12 +9,85 @@ use std::fs::{File, DirBuilder};
 use std::io::{Read, Write};
 use std::convert::TryFrom;
 use std::path::PathBuf;
+use std::sync::mpsc::{Receiver, RecvError};
+use notify::{raw_watcher, Watcher, RecursiveMode, RawEvent, Op};
+use std::thread;
+use crate::star::Star;
+use tokio::runtime::Runtime;
+use std::future::Future;
+use crate::util;
 
-pub trait FileAccess: Send+Sync+DynClone {
-    fn read( &self, path: &Path )->Result<Arc<Vec<u8>>,Error>;
-    fn write( &mut self, path: &Path, data: Arc<Vec<u8>> )->Result<(),Error>;
-    fn with_path(&self, ext_path: String ) -> Result<Box<dyn FileAccess>,Error>;
-    fn mkdir( &mut self, path: &Path ) -> Result<Box<dyn FileAccess>,Error>;
+pub enum FileCommand{
+    Read{path: Path, tx:tokio::sync::oneshot::Sender<Result<Arc<Vec<u8>>,Error>>},
+    Write{ path: Path, data: Arc<Vec<u8>>, tx: tokio::sync::oneshot::Sender<Result<(),Error>> },
+    MkDir{ path: Path,tx: tokio::sync::oneshot::Sender<Result<(),Error>> },
+    Watch{tx: tokio::sync::oneshot::Sender<Result<tokio::sync::mpsc::Receiver<FileEvent>,Error>>}
+}
+
+#[derive(Clone)]
+pub struct FileAccess{
+    path: String,
+    tx: tokio::sync::mpsc::Sender<FileCommand>
+}
+
+impl FileAccess{
+
+    pub async fn new( path: String ) -> Result<Self,Error>{
+        let tx = LocalFileAccess::new(path.clone()).await?;
+        Ok(FileAccess{
+            path: path,
+            tx: tx
+        })
+    }
+
+    pub async fn read( &self, path: &Path )->Result<Arc<Vec<u8>>,Error>{
+        let (tx,rx) = tokio::sync::oneshot::channel();
+        self.tx.send( FileCommand::Read{path: path.clone(),tx:tx}).await?;
+        Ok(util::wait_for_it(rx).await?)
+    }
+
+    pub async fn write( &mut self, path: &Path, data: Arc<Vec<u8>> )->Result<(),Error> {
+        let (tx,mut rx) = tokio::sync::oneshot::channel();
+        self.tx.send( FileCommand::Write{path:path.clone(),data,tx}).await?;
+        Ok(util::wait_for_it(rx).await?)
+    }
+
+    pub async fn with_path(&self, path: String ) -> Result<FileAccess,Error> {
+        Ok(FileAccess::new( format!("{}/{}",self.path,path) ).await?)
+    }
+
+    pub async fn mkdir( &mut self, path: &Path ) -> Result<FileAccess,Error> {
+        let (tx,rx) = tokio::sync::oneshot::channel();
+        self.tx.send( FileCommand::MkDir{path:path.clone(),tx}).await?;
+        util::wait_for_it(rx).await?;
+        self.with_path(path.to_relative() ).await
+    }
+
+    pub async fn watch(&self) -> Result<tokio::sync::mpsc::Receiver<FileEvent>,Error> {
+        let (tx,rx) = tokio::sync::oneshot::channel();
+        self.tx.send( FileCommand::Watch{tx}).await?;
+        Ok(util::wait_for_it(rx).await?)
+    }
+}
+
+#[derive(Debug)]
+pub enum FileEventKind{
+    Create,
+    Update,
+    Delete
+}
+
+#[derive(Debug)]
+pub struct FileEvent{
+    pub path: String,
+    pub event_kind: FileEventKind,
+    pub file_kind: FileKind
+}
+
+#[derive(Debug)]
+pub enum FileKind{
+    File,
+    Directory
 }
 
 #[derive(Clone)]
@@ -31,41 +104,56 @@ impl MemoryFileAccess {
 }
 
 
-impl FileAccess for MemoryFileAccess {
-    fn read(&self, path: &Path) -> Result<Arc<Vec<u8>>, Error> {
-        self.map.get(path).cloned().ok_or(format!("could not find file for path '{}'",path.to_string()).into())
-    }
 
-    fn write(&mut self, path: &Path, data: Arc<Vec<u8>>) -> Result<(), Error> {
-        self.map.insert( path.clone(), data );
-        Ok(())
-    }
-
-    fn with_path(&self, base: String ) -> Result<Box<dyn FileAccess>,Error> {
-        Ok(Box::new(Self::new()))
-    }
-
-    fn mkdir(&mut self, path: &Path) -> Result<Box<dyn FileAccess>, Error> {
-        Ok(Box::new(Self::new()))
-    }
-}
-
-
-#[derive(Clone)]
 pub struct LocalFileAccess{
-    base_dir: String
+    base_dir: String,
+    rx: tokio::sync::mpsc::Receiver<FileCommand>
 }
 
 impl LocalFileAccess {
-    pub fn new( base_dir: String) -> Result<Self,Error>{
+    pub async fn new( base_dir: String) -> Result<tokio::sync::mpsc::Sender<FileCommand>,Error>{
 
         let mut builder = DirBuilder::new();
         builder.recursive(true);
         builder.create(base_dir.clone() )?;
 
-        Ok(LocalFileAccess{
-            base_dir: base_dir
-        })
+        let (tx,rx) = tokio::sync::mpsc::channel(128 );
+
+        Self{
+            base_dir: base_dir,
+            rx: rx
+        }.run().await;
+
+        Ok(tx)
+    }
+
+    async fn run(mut self) {
+        tokio::spawn( async move {
+            while let Option::Some(command) = self.rx.recv().await {
+                match self.process(command).await {
+                    Ok(_) => {}
+                    Err(error) => { eprintln!("Error in LocalFileAccess: {}", error) }
+                }
+            }
+        });
+    }
+
+    async fn process( &mut self, command: FileCommand ) -> Result<(),Error>{
+        match command {
+            FileCommand::Read { path, tx } => {
+                tx.send(self.read(&path));
+            }
+            FileCommand::Write { path: path, data, tx } => {
+                tx.send(self.write(&path,data));
+            }
+            FileCommand::MkDir { path, tx } => {
+                tx.send( self.mkdir(&path));
+            }
+            FileCommand::Watch { tx } => {
+                tx.send(self.watch());
+            }
+        }
+        Ok(())
     }
 
     pub fn cat_path(&self, path: &str) -> Result<String,Error> {
@@ -87,9 +175,9 @@ impl LocalFileAccess {
     }
 }
 
-impl FileAccess for LocalFileAccess {
+impl LocalFileAccess {
 
-    fn read(&self, path: &Path) -> Result<Arc<Vec<u8>>, Error> {
+    pub fn read(&self, path: &Path) -> Result<Arc<Vec<u8>>, Error> {
         let path = self.cat_path(path.to_relative().as_str())?;
 
         let mut buf = vec![];
@@ -98,7 +186,7 @@ impl FileAccess for LocalFileAccess {
         Ok(Arc::new(buf))
     }
 
-    fn write(&mut self, path: &Path, data: Arc<Vec<u8>>) -> Result<(), Error> {
+    pub fn write(&mut self, path: &Path, data: Arc<Vec<u8>>) -> Result<(), Error> {
         if let Option::Some(parent) = path.parent(){
             self.mkdir(&parent)?;
         }
@@ -109,20 +197,71 @@ impl FileAccess for LocalFileAccess {
         Ok(())
     }
 
-    fn with_path(&self, ext_path: String ) -> Result<Box<dyn FileAccess>, Error> {
-        let path = self.cat_path(ext_path.as_str())?;
-        let rtn:Box<dyn FileAccess> = Box::new(Self::new( path )?);
-        Ok(rtn)
-    }
 
-    fn mkdir(&mut self, path: &Path) -> Result<Box<dyn FileAccess>, Error> {
-
+    fn mkdir(&mut self, path: &Path) -> Result<(), Error> {
         let path = self.cat_path(path.to_relative().as_str())?;
         let mut builder = DirBuilder::new();
         builder.recursive(true);
         builder.create(path.clone() )?;
-println!("MKDIR {}", path.to_string());
-        let rtn:Box<dyn FileAccess> = Box::new(Self::new( path )?);
-        Ok(rtn)
+        Ok(())
+    }
+
+    fn watch(&mut self) -> Result<tokio::sync::mpsc::Receiver<FileEvent>, Error> {
+println!("!#R@#$ STARTING FS WATCH LOOP FOR {}", self.base_dir );
+        let (tx,rx) = mpsc::channel();
+        let (event_tx,event_rx) = tokio::sync::mpsc::channel(128);
+
+
+        let tokio_runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+        let base_dir = self.base_dir.clone();
+
+        thread::spawn( move || {
+
+            let mut watcher = raw_watcher(tx).unwrap();
+            watcher.watch( base_dir.clone(), RecursiveMode::Recursive ).unwrap();
+
+            loop {
+                match rx.recv() {
+                    Ok(RawEvent { path: Some(path), op: Ok(op), cookie }) => {
+
+let CREATE_WRITE = Op::CREATE | Op::WRITE;
+println!("###########>>>>>>>>>> watch op: {:?}==CREATE_WRITE ? {}", op, op==CREATE_WRITE );
+                        let event_kind = match op {
+                            Op::CREATE => FileEventKind::Create,
+                            CREATE_WRITE => FileEventKind::Create,
+                            Op::REMOVE => FileEventKind::Delete,
+                            Op::WRITE => FileEventKind::Update,
+                            x => {
+                                println!("x {:?}", x);
+                                continue; }
+                        };
+
+
+                        let file_kind = match path.is_dir(){
+                            true => FileKind::Directory,
+                            false => FileKind::File
+                        };
+
+                        let event = FileEvent {
+                            path: path.to_str().unwrap().to_string(),
+                            event_kind: event_kind,
+                            file_kind: file_kind
+                        };
+println!("event: {:?}", event);
+
+                        let event_tx = event_tx.clone();
+                        tokio_runtime.block_on(async move {
+                            event_tx.send(event).await;
+                        })
+                    }
+                    Ok(event) => { eprintln!("file_access broken event: {:?}", event); }
+                    Err(error) => {
+eprintln!("WATCH ERROR: {}", error);
+                        break;
+                    }
+                }
+            }
+        });
+        Ok(event_rx)
     }
 }

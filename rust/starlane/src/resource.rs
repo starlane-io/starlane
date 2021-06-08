@@ -3550,10 +3550,10 @@ impl <S> SrcTransfer<S> where S:TryInto<Arc<Vec<u8>>>+TryFrom<Arc<Vec<u8>>>{
         }
     }
 
-    pub fn get(&mut self)->Result<Arc<S>,Error>{
+    pub async fn get(&mut self)->Result<Arc<S>,Error>{
         match &self.data{
             None => {
-                let data = self.data_transfer.as_ref().unwrap().get()?;
+                let data = self.data_transfer.as_ref().unwrap().get().await?;
                 let s = match S::try_from(data) {
                     Ok(s) => s,
                     Err(err) => {
@@ -3571,8 +3571,9 @@ impl <S> SrcTransfer<S> where S:TryInto<Arc<Vec<u8>>>+TryFrom<Arc<Vec<u8>>>{
 }
 
 
+#[async_trait]
 pub trait DataTransfer: Send+Sync {
-    fn get(&self) -> Result<Arc<Vec<u8>>,Error>;
+    async fn get(&self) -> Result<Arc<Vec<u8>>,Error>;
     fn src(&self) -> LocalDataSrc;
 }
 
@@ -3596,8 +3597,9 @@ impl MemoryDataTransfer{
 }
 
 
+#[async_trait]
 impl DataTransfer for MemoryDataTransfer {
-    fn get(&self) -> Result<Arc<Vec<u8>>, Error> {
+    async fn get(&self) -> Result<Arc<Vec<u8>>, Error> {
         Ok(self.data.clone())
     }
 
@@ -3607,13 +3609,13 @@ impl DataTransfer for MemoryDataTransfer {
 }
 
 pub struct FileDataTransfer{
-    file_access: Box<dyn FileAccess>,
+    file_access: FileAccess,
     path: Path
 }
 
 
 impl FileDataTransfer{
-    pub fn new(file_access: Box<dyn FileAccess>, path: Path ) ->Self {
+    pub fn new(file_access: FileAccess, path: Path ) ->Self {
         FileDataTransfer{
             file_access: file_access,
             path: path
@@ -3621,10 +3623,10 @@ impl FileDataTransfer{
     }
 }
 
-
+#[async_trait]
 impl DataTransfer for FileDataTransfer{
-    fn get(&self) -> Result<Arc<Vec<u8>>, Error> {
-        self.file_access.read(&self.path)
+    async fn get(&self) -> Result<Arc<Vec<u8>>, Error> {
+        self.file_access.read(&self.path).await
     }
 
     fn src(&self) -> LocalDataSrc {

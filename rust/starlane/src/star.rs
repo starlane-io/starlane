@@ -3039,7 +3039,7 @@ println!("UNEXPECTED RESULT IN ASSIGN!!!");
             pub registry: Option<Arc<dyn ResourceRegistryBacking>>,
             pub star_handler: Option<StarHandleBacking>,
             pub persistence: Persistence,
-            pub file_access: Arc<Box<dyn FileAccess>>
+            pub file_access: FileAccess
         }
 
         impl StarSkel

@@ -47,9 +47,8 @@ impl ServerStarCore
     {
         // not sure what to do with alerts yet
     }
-
-
 }
+
 #[async_trait]
 impl StarCore for ServerStarCore
 {

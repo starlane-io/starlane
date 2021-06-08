@@ -16,7 +16,7 @@ use tokio::time::{Duration, Instant};
 use crate::constellation::Constellation;
 use crate::core::{CoreRunner, CoreRunnerCommand, StarCore, StarCoreCommand, StarCoreExtFactory, StarCoreExtKind, StarCoreFactory};
 use crate::error::Error;
-use crate::file::{MemoryFileAccess, LocalFileAccess};
+use crate::file::FileAccess;
 use crate::frame::{Frame, ProtoFrame, SequenceMessage, StarMessage, StarMessagePayload, StarPattern, WindDown, WindHit, WindUp} ;
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelReceiver, TunnelSender, TunnelSenderState};
@@ -136,7 +136,7 @@ impl ProtoStar
                             registry: resource_registry,
                             star_handler: star_handler,
                             persistence: Persistence::Memory,
-                            file_access: Arc::new(Box::new(LocalFileAccess::new("data".to_string() )? ))
+                            file_access: FileAccess::new("data".to_string()).await?
                         };
 
                         let core_ext = self.star_core_ext_factory.create(&skel );

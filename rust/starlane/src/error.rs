@@ -35,6 +35,13 @@ impl From<ParseIntError> for Error{
     }
 }
 
+impl From<notify::Error> for Error{
+    fn from(e: notify::Error) -> Self {
+        Error{
+            error: format!("{}",e.to_string())
+        }
+    }
+}
 
 impl From<std::io::Error> for Error{
     fn from(e: std::io::Error) -> Self {

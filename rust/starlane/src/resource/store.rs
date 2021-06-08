@@ -14,6 +14,7 @@ use crate::message::Fail;
 use crate::names::Specific;
 use crate::resource::{DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceStatePersistenceManager};
 
+#[derive(Clone)]
 pub struct ResourceStore{
    tx: mpsc::Sender<ResourceStoreAction>
 }
@@ -133,14 +134,14 @@ impl ResourceStoreSqlLite {
                 break;
             }
             else {
-                request.tx.send(self.process(request.command));
+                request.tx.send(self.process(request.command).await );
             }
         }
 
         Ok(())
     }
 
-    fn process(&mut self, command: ResourceStoreCommand) -> Result<ResourceStoreResult, Fail> {
+    async fn process(&mut self, command: ResourceStoreCommand) -> Result<ResourceStoreResult, Fail> {
         match command
         {
             ResourceStoreCommand::Close => {
@@ -148,7 +149,6 @@ impl ResourceStoreSqlLite {
             }
             ResourceStoreCommand::Put(assign) => {
 println!("PUT!");
-                let trans = self.conn.transaction()?;
                 let key = assign.key.bin()?;
                 let address = assign.address.to_string();
                 let specific = match &assign.archetype.specific{
@@ -161,12 +161,11 @@ println!("PUT!");
                 };
 
                 let state = match assign.archetype.kind.resource_type().state_persistence(){
-                    ResourceStatePersistenceManager::Store => {Option::Some(assign.state_src.get()?)}
+                    ResourceStatePersistenceManager::Store => {Option::Some(assign.state_src.get().await?)}
                     _ => Option::None
                 };
 
-                trans.execute("INSERT INTO resources (key,address,state_src,kind,specific,config_src) VALUES (?1,?2,?3,?4,?5,?6)", params![key,address,state,assign.archetype.kind.to_string(),specific,config_src])?;
-                trans.commit()?;
+                self.conn.execute("INSERT INTO resources (key,address,state_src,kind,specific,config_src) VALUES (?1,?2,?3,?4,?5,?6)", params![key,address,state,assign.archetype.kind.to_string(),specific,config_src])?;
 
                 let resource = Resource::new(assign.key,assign.address, assign.archetype, assign.state_src );
 

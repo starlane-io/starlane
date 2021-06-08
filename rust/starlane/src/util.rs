@@ -91,3 +91,7 @@ impl <K,V> AsyncHashMap<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static,
     }
 
 }
+
+pub async fn wait_for_it<R>( rx: oneshot::Receiver<Result<R,Error>>) -> Result<R,Error> {
+    tokio::time::timeout( Duration::from_secs(15), rx).await??
+}
