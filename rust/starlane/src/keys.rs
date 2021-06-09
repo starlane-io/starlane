@@ -208,8 +208,10 @@ impl FromStr for SubSpaceKey{
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let pos = s.rfind( '-').ok_or("expected '-' between parent and id")?;
         let (parent,id)= s.split_at(pos);
+        let mut id = id.to_string();
+        id.remove(0);
         let space = SpaceKey::from_str(parent)?;
-        let id = SubSpaceId::from_str(id)?;
+        let id = SubSpaceId::from_str(id.as_str())?;
         Ok(SubSpaceKey{
             space: space,
             id: id
@@ -738,8 +740,13 @@ impl FromStr for SubSpaceFilesystemKey{
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let pos = s.rfind( '-').ok_or("expected '-' between parent and id")?;
         let (parent,id)= s.split_at(pos);
+        let mut id = id.to_string();
+        id.remove(0);
+println!("parent: {}",parent );
         let sub_space =  SubSpaceKey::from_str(parent)?;
-        let id = FileSystemId::from_str(id)?;
+
+println!("id : {}",id );
+        let id = FileSystemId::from_str(id.as_str())?;
         Ok(SubSpaceFilesystemKey{
             sub_space: sub_space,
             id: id

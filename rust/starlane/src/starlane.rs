@@ -19,7 +19,7 @@ use crate::keys::ResourceKey;
 use crate::lane::{ConnectionInfo, ConnectionKind, Lane, LocalTunnelConnector};
 use crate::layout::ConstellationLayout;
 use crate::logger::{Flags, Logger};
-use crate::message::{Fail, ProtoMessage};
+use crate::message::{Fail, ProtoStarMessage};
 use crate::proto::{local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoTunnel};
 use crate::provision::Provisioner;
 use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord};

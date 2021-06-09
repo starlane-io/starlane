@@ -17,16 +17,15 @@ use serde_json::to_string;
 use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::Receiver;
 
-use crate::actor::{ActorArchetype, ActorKey, ActorKind, ActorProfile, ResourceMessageBuilder, ResourceFrom, ResourceMessagePayload, ResourceRequest, ResourceMessage, ResourceTo, ResourceResponse};
 use crate::app::{AppArchetype, AppKind, AppProfile, ConfigSrc, InitData};
 use crate::artifact::{ArtifactKey, ArtifactKind};
 use crate::error::Error;
 use crate::file::FileAccess;
-use crate::frame::{Reply, ResourceHostAction, SimpleReply, StarMessagePayload, ChildManagerResourceAction};
+use crate::frame::{Reply, ResourceHostAction, SimpleReply, StarMessagePayload, ChildManagerResourceAction, MessagePayload};
 use crate::id::{Id, IdSeq};
 use crate::keys::{FileKey, ResourceId, Unique, UniqueSrc};
 use crate::keys::{AppFilesystemKey, AppKey, FileSystemKey, GatheringKey, ResourceKey, SpaceKey, SubSpaceFilesystemKey, SubSpaceId, SubSpaceKey, UserKey};
-use crate::message::{Fail, ProtoMessage};
+use crate::message::{Fail, ProtoStarMessage};
 use crate::names::{Name, Specific};
 use crate::permissions::User;
 use crate::resource::space::{Space, SpaceState};
@@ -38,6 +37,8 @@ use crate::util::AsyncHashMap;
 use std::path::PathBuf;
 use std::future::Future;
 use crate::util;
+use crate::message::resource::{Message, MessageTo, ProtoMessage, ResourceRequestMessage, MessageFrom};
+use crate::actor::{ActorKind, ActorKey};
 
 pub mod space;
 pub mod sub_space;
@@ -1073,7 +1074,7 @@ pub enum FileSystemKind{
     BottomUp
 }
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum FileKind
 {
     File,
@@ -1207,6 +1208,7 @@ impl FromStr for ResourceKind
             "Space" => Ok(ResourceKind::Space),
             "SubSpace" => Ok(ResourceKind::SubSpace),
             "User" => Ok(ResourceKind::User),
+            "Filesystem" => Ok(ResourceKind::FileSystem(FileSystemKind::BottomUp)),
             _ => {
                 Err(format!("cannot match ResourceKind: {}", s).into())
             }
@@ -1860,13 +1862,16 @@ impl ResourceCreationChamber{
             skel: skel,
             tx: tx
         };
+println!("Creation of ResourceCreationChamber")        ;
         chamber.run().await;
+println!("back from chamber.run");
         rx
     }
 
     async fn run(self){
 
         tokio::spawn( async move {
+println!("GOT HERE IN CHAMBER");
             if !self.create.archetype.kind.resource_type().parent().matches(Option::Some(&self.parent.key.resource_type())) {
                 println!("!!! -> Throwing Fail::WrongParentResourceType <- !!!");
                 self.tx.send(Err(Fail::WrongParentResourceType {
@@ -1876,6 +1881,7 @@ impl ResourceCreationChamber{
                 return;
             };
 
+println!("NEXT....");
             match self.create.validate()
             {
                 Ok(_) => {}
@@ -1885,21 +1891,24 @@ impl ResourceCreationChamber{
                 }
             }
 
+println!("MORE....");
 
             let key = match &self.create.key {
                 KeyCreationSrc::None => {
 
-                    let mut builder = ResourceMessageBuilder::new();
-                    builder.to(ResourceTo::new(self.parent.key.clone()));
-                    builder.from(ResourceFrom::Injected);
-                    builder.payload = ResourceMessagePayload::Request(ResourceRequest::Unique(self.create.archetype.kind.resource_type()));
-                    let mut rx = builder.reply();
+                    let mut proto = ProtoMessage::new();
+                    proto.to(self.parent.key.clone().into());
+                    proto.from(MessageFrom::Resource(self.parent.key.clone().into()));
+                    proto.payload = Option::Some(ResourceRequestMessage::Unique(self.create.archetype.kind.resource_type()));
+                    let mut rx = proto.reply();
 
-                    self.skel.star_tx.send(StarCommand::SendResourceMessage(builder)).await;
+println!("SENDING RESOURCE MESSAGE!!!!");
+                    self.skel.star_tx.send(StarCommand::SendProtoMessage(proto.create().unwrap().into())).await;
 
                     tokio::spawn( async move {
 
-                        if let Ok(Ok(ResourceMessage{ payload: ResourceMessagePayload::Response(ResourceResponse::Unique(id)), to: _, from: _ })) = util::wait_for_it_whatever(rx).await {
+/*
+                        if let Ok(Ok(Message { payload: MessagePayload::Response(MessageResponse::Unique(id)), to: _, from: _ })) = util::wait_for_it_whatever(rx).await {
                             match ResourceKey::new(self.parent.key.clone(), id.clone()) {
                                 Ok(key) => {
                                     let final_create = self.finalize_create(key.clone()).await;
@@ -1916,6 +1925,8 @@ impl ResourceCreationChamber{
                             self.tx.send( Err("unexpected response, expected ResourceResponse::Unique".into()));
                             return;
                         }
+
+ */
                     } );
 
                 }
@@ -2039,12 +2050,12 @@ impl RegistryReservation{
 }
 
 pub struct RegistryUniqueSrc {
-  parent_key: ResourceKey,
+  parent_key: ResourceIdentifier,
   tx: mpsc::Sender<ResourceRegistryAction>
 }
 
 impl RegistryUniqueSrc {
-    pub fn new(parent_key: ResourceKey, tx: mpsc::Sender<ResourceRegistryAction>) -> Self {
+    pub fn new(parent_key: ResourceIdentifier, tx: mpsc::Sender<ResourceRegistryAction>) -> Self {
         RegistryUniqueSrc {
             parent_key: parent_key,
             tx: tx
@@ -2061,9 +2072,28 @@ impl UniqueSrc for RegistryUniqueSrc{
        }
        let (tx,rx) = oneshot::channel();
 
+       let parent_key = match &self.parent_key{
+           ResourceIdentifier::Key(key) => {
+               key.clone()
+           }
+           ResourceIdentifier::Address(address) => {
+               let (tx,rx) = oneshot::channel();
+               self.tx.send( ResourceRegistryAction{
+                   tx: tx,
+                   command: ResourceRegistryCommand::Get(address.clone().into()),
+               }).await?;
+               if let ResourceRegistryResult::Resource(Option::Some(record)) = rx.await? {
+                   record.stub.key
+               }
+               else{
+                 return Err(format!("could not find key for address: {}",address.to_string()).into());
+               }
+           }
+       };
+
        self.tx.send( ResourceRegistryAction{
            tx: tx,
-           command: ResourceRegistryCommand::Next{key:self.parent_key.clone(),unique:Unique::Index}
+           command: ResourceRegistryCommand::Next{key:parent_key.clone(),unique:Unique::Index}
        }).await?;
 
        if let ResourceRegistryResult::Unique(index) = rx.await? {
@@ -3616,8 +3646,8 @@ impl ResourceHost for RemoteResourceHost {
                 received: assign.stub.key.resource_type().clone()
             });
         }
-        let mut proto = ProtoMessage::new();
-        proto.to = Option::Some(self.handle.key.clone());
+        let mut proto = ProtoStarMessage::new();
+        proto.to = self.handle.key.clone().into();
         proto.payload = StarMessagePayload::ResourceHost(ResourceHostAction::Assign(assign));
         let reply = proto.get_ok_result().await;
         self.comm.star_tx.send( StarCommand::SendProtoMessage(proto)).await;

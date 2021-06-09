@@ -170,20 +170,29 @@ println!("returning Resource....");
                 Ok(ResourceStoreResult::Resource(Option::Some(resource)))
             }
             ResourceStoreCommand::Get(key) => {
+println!("GETTING....");
                 let key_bin = key.bin()?;
                 let resource = self.conn.query_row("SELECT address,state_src,kind,specific,config_src FROM resources WHERE key=?1", params![key_bin], |row| {
+
+println!("....");
+
                     let address: String = row.get(0)?;
                     let address= ResourceAddress::from_str(address.as_str())?;
 
-                    let state= if let ValueRef::Null = row.get_ref(4)? {
+                    let state= if let ValueRef::Null = row.get_ref(1)? {
                         Option::None
                     } else {
                         let state: Vec<u8>= row.get(1)?;
                         Option::Some(state)
                     };
 
+println!("....");
                     let kind: String = row.get(2)?;
+println!("kind: {}",kind);
                     let kind = ResourceKind::from_str( kind.as_str() )?;
+
+println!("....");
+
                     let specific= if let ValueRef::Null = row.get_ref(3)? {
                         Option::None
                     } else {
@@ -192,6 +201,7 @@ println!("returning Resource....");
                         Option::Some(specific)
                     };
 
+println!("....");
                     let config_src= if let ValueRef::Null = row.get_ref(4)? {
                         Option::None
                     } else {
@@ -199,11 +209,14 @@ println!("returning Resource....");
                         let config_src = ConfigSrc::from_str(config_src.as_str())?;
                         Option::Some(config_src)
                     };
+println!("....");
 
                     let state: Arc<dyn DataTransfer> = match state {
                         None => {Arc::new(MemoryDataTransfer::none())}
                         Some(state) => {Arc::new(MemoryDataTransfer::new(Arc::new(state)))}
                     };
+
+println!("....");
 
                     let archetype = ResourceArchetype{
                         kind: kind,

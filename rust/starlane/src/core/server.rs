@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use tokio::sync::{mpsc, Mutex, oneshot};
 
-use crate::actor::{ActorArchetype, ActorAssign, ActorContext, ActorInfo, ActorKey, ActorKind, ActorSpecific, ResourceMessage};
+use crate::actor::{ActorArchetype, ActorAssign, ActorContext, ActorInfo, ActorKey, ActorKind, ActorSpecific};
 use crate::actor;
 use crate::app::{ActorMessageResult, Alert, AppArchetype, AppCommandKind, AppContext, AppCreateResult, AppSpecific, AppMessageResult, AppMeta, AppSlice, ConfigSrc, InitData, AppSliceCommand};
 use crate::artifact::Artifact;
@@ -13,9 +13,10 @@ use crate::frame::{ServerAppPayload, SpaceMessage, SpacePayload, StarMessagePayl
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, SubSpaceKey, UserKey, ResourceKey};
 use crate::resource::{Labels, ResourceRegistration};
-use crate::message::{ProtoMessage, Fail};
+use crate::message::{ProtoStarMessage, Fail};
 use crate::star::{ActorCreate, StarCommand, StarKey, StarSkel, Request, LocalResourceLocation};
 use tokio::sync::oneshot::error::RecvError;
+use crate::message::resource::Message;
 
 pub struct ServerStarCore
 {
@@ -67,8 +68,8 @@ pub trait AppExt : Sync+Send
 {
     fn set_context( &mut self, context: AppContext );
     async fn launch(&mut self, archetype: AppArchetype) -> Result<(), Fail>;
-    async fn app_message( &mut self, message: ResourceMessage ) ->  Result<(),Fail>;
-    async fn actor_message(&mut self, message: ResourceMessage) -> Result<(),Fail>;
+   // async fn app_message(&mut self, message: Message) ->  Result<(),Fail>;
+   // async fn actor_message(&mut self, message: Message) -> Result<(),Fail>;
 }
 
 pub trait ServerStarCoreExt: StarCoreExt
@@ -167,13 +168,16 @@ impl AppExt for TestAppCreateExt
         Ok(())
     }
 
-    async fn app_message(&mut self, message: ResourceMessage ) -> Result<(), Fail> {
+    /*
+    async fn app_message(&mut self, message: Message) -> Result<(), Fail> {
         todo!()
     }
 
-    async fn actor_message(&mut self, message: ResourceMessage) -> Result<(), Fail> {
+    async fn actor_message(&mut self, message: Message) -> Result<(), Fail> {
         todo!()
     }
+
+     */
 }
 
 

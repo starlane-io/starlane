@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::frame::{Frame, StarMessage, StarMessagePayload, StarPattern, WindAction, SpacePayload, ServerAppPayload, Reply, SpaceMessage, ServerPayload, SimpleReply, ChildManagerResourceAction};
 use crate::star::{ServerVariantBacking, StarCommand, StarSkel, StarKey, StarKind, StarVariant, StarVariantCommand, Wind, ServerCommand, CoreRequest, Request };
-use crate::message::{ProtoMessage, MessageExpect, Fail};
+use crate::message::{ProtoStarMessage, MessageExpect, Fail};
 use crate::logger::{Flag, StarFlag, StarLog, StarLogPayload, Log};
 use tokio::time::{sleep, Duration};
 use crate::core::{StarCoreCommand, StarCoreAppCommand, AppCommandResult, StarCoreAppCommandPayload};
@@ -70,7 +70,7 @@ impl ServerStarVariant
 
 impl ServerStarVariant
 {
-    async fn send_proto( &self, proto: ProtoMessage )
+    async fn send_proto( &self, proto: ProtoStarMessage)
     {
         self.skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
     }

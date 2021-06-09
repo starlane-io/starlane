@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use tokio::sync::{mpsc, Mutex, oneshot};
 use tokio::time::Duration;
 
-use crate::actor::{Actor, ActorArchetype, ActorAssign, ActorContext, ActorKey, ActorKind, ActorMeta, ActorRegistration, ResourceMessage, ActorKeySeq, ActorStatus, RawPayload, ResourceTo, ResourceFrom, ActorResource};
+use crate::actor::{Actor, ActorArchetype, ActorAssign,ActorContext, ActorKey, ActorKind, ActorMeta, ActorRegistration,  ActorKeySeq, ActorStatus,  ActorResource};
 use crate::actor;
 use crate::artifact::{Artifact, ArtifactKey};
 use crate::core::{StarCoreCommand };
@@ -21,11 +21,12 @@ use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration
 use crate::names::Name;
 use crate::space::CreateAppControllerFail;
 use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarSkel, StarVariantCommand, StarComm, ServerCommand, Request, Empty, Query, LocalResourceLocation };
-use crate::message::{Fail, ProtoMessage};
+use crate::message::{Fail, ProtoStarMessage};
 use tokio::sync::mpsc::Sender;
 use tokio::time::error::Elapsed;
 use tokio::sync::oneshot::error::RecvError;
 use std::iter::FromIterator;
+use crate::message::resource::{Message, RawPayload, MessageFrom, MessageTo, ActorMessage};
 
 pub type AppSpecific = Name;
 
@@ -147,8 +148,8 @@ pub enum AppSliceCommand {
     Launch(Request<AppArchetype,()>),
     AddActor(ActorKey),
     HasActor(Request<ResourceKey, LocalResourceLocation>),
-    AppMessage(ResourceMessage),
-    ActorMessage(Request<ResourceMessage,()>),
+//    AppMessage(Message),
+//    ActorMessage(Request<Message,()>),
 }
 
 /**
@@ -223,28 +224,7 @@ unimplemented!();
                 }
                 Ok(())
             }
-            AppSliceCommand::AppMessage(message) => {
-                let result = self.ext.app_message(message).await;
-                Ok(())
-            }
-            AppSliceCommand::ActorMessage(request) => {
-                if let ResourceKey::Actor(key) = &request.payload.to.key
-                {
-                    if self.actors.contains_key(key) {
-                        request.tx.send(Ok(()) );
-                        let result = self.ext.actor_message(request.payload).await;
-                    } else {
-                        request.tx.send(Err(Fail::ResourceNotFound(request.payload.to.key.into())));
-                    }
-                } else {
-                    request.tx.send(Err(Fail::WrongResourceType{expected: HashSet::from_iter(vec![ResourceType::Actor]), received: request.payload.to.key.resource_type().clone() }));
-                }
-                Ok(())
-            }
-            AppSliceCommand::FetchAddress(address) => {
-                unimplemented!()
-            }
-            AppSliceCommand::FetchSequence(_) => {
+            _ => {
                 unimplemented!()
             }
         }
@@ -291,7 +271,7 @@ unimplemented!();
 #[derive(Clone,Serialize,Deserialize)]
 pub enum AppCommandKind
 {
-    AppMessage(ResourceMessage),
+    //AppMessage(Message),
     Suspend,
     Resume,
     Exit
@@ -626,7 +606,7 @@ impl AppContext
         }
     }
 
-    pub async fn reply( &self, message: &ResourceMessage, payload: Arc<RawPayload> ) {
+    pub async fn reply(&self, message: &Message<ActorMessage>, payload: Arc<RawPayload> ) {
         unimplemented!();
 /*        let mut reply = message.clone();
 
@@ -639,10 +619,14 @@ impl AppContext
         // send
     }
 
-    pub async fn forward( &self, message: &ResourceMessage, from: ResourceFrom, to: ResourceTo ) {
+    pub async fn forward(&self, message: &Message<ActorMessage>, from: MessageFrom, to: MessageTo) {
+        unimplemented!()
+        /*
         let mut reply = message.clone();
         reply.from = from;
         reply.to = to;
+
+         */
         // send
     }
 

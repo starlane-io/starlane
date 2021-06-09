@@ -5,7 +5,7 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::frame::{ChildManagerResourceAction, Reply, SimpleReply, StarMessagePayload};
 use crate::keys::ResourceKey;
-use crate::message::{Fail, ProtoMessage};
+use crate::message::{Fail, ProtoStarMessage};
 use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord, ResourceType, Path, LocalDataSrc, DataTransfer, ResourceIdentifier, ResourceStub, FileSystemKind};
 use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
@@ -88,8 +88,8 @@ impl StarlaneApi {
             }
         };
 
-        let mut proto = ProtoMessage::new();
-        proto.to(parent_location.location.host);
+        let mut proto = ProtoStarMessage::new();
+        proto.to(parent_location.location.host.into());
         proto.payload = StarMessagePayload::ResourceManager(ChildManagerResourceAction::Create(create));
         let result = proto.get_ok_result().await;
         self.star_tx.send( StarCommand::SendProtoMessage(proto)).await;

@@ -19,7 +19,7 @@ use crate::frame::{AppLabelRequest, AssignMessage, ChildManagerResourceAction, F
 use crate::id::Id;
 use crate::keys::{AppId, AppKey, ResourceKey, SpaceKey, SubSpaceKey, UserId, UserKey};
 use crate::logger::{Flag, Log, Logger, StarFlag, StarLog, StarLogPayload};
-use crate::message::{Fail, MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoMessage};
+use crate::message::{Fail, MessageExpect, MessageExpectWait, MessageResult, MessageUpdate, ProtoStarMessage};
 use crate::message::Fail::ResourceCannotGenerateAddress;
 use crate::permissions::{AppAccess, AuthToken, User, UserKind};
 use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, ChildResourceManager, FieldSelection, KeyCreationSrc, Labels, Registry, ResourceAddress, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceInit, ResourceKind, ResourceRecord, ResourceManager, ResourceRegistration, ResourceRegistryCommand, ResourceRegistryResult, ResourceSelector, ResourceType};

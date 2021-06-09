@@ -8,18 +8,19 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 use tokio::time::Instant;
 
-use crate::actor::{ActorKey, ActorStatus, ResourceMessage, RawState};
+use crate::actor::{ActorKey, ActorStatus };
 use crate::app::{AppArchetype, AppCreateResult, AppLocation, AppMeta, AppSpecific, ConfigSrc };
 use crate::crypt::{Encrypted, HashEncrypted, HashId};
 use crate::error::Error;
 use crate::id::Id;
 use crate::keys::{AppKey, MessageId, ResourceKey, SubSpaceKey, UserKey, ResourceId};
 use crate::logger::Flags;
-use crate::message::{Fail, MessageExpect, MessageResult, MessageUpdate, ProtoMessage};
+use crate::message::{Fail, MessageExpect, MessageResult, MessageUpdate, ProtoStarMessage};
 use crate::names::Name;
 use crate::permissions::{Authentication, AuthToken};
 use crate::resource::{Labels, ResourceAssign, ResourceRegistration, ResourceSelector, ResourceRecord, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus, ResourceInit, ResourceCreate, AssignResourceStateSrc, ResourceIdentifier, ResourceStub, ResourceType};
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey, StarWatchInfo, LocalResourceLocation};
+use crate::message::resource::{Message, RawState, ResourceRequestMessage, ResourceResponseMessage, ActorMessage, MessageReply};
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Frame
@@ -264,10 +265,10 @@ impl StarMessage
         }
     }
 
-    pub fn forward(&self, to: &StarKey )->ProtoMessage
+    pub fn forward(&self, to: &StarKey )-> ProtoStarMessage
     {
-        let mut proto = ProtoMessage::new();
-        proto.to = Option::Some(self.to.clone());
+        let mut proto = ProtoStarMessage::new();
+        proto.to = self.to.clone().into();
         proto.payload = self.payload.clone();
         proto
     }
@@ -293,49 +294,49 @@ impl StarMessage
         tx
     }
 
-    pub fn fail(&self, fail: Fail )->ProtoMessage
+    pub fn fail(&self, fail: Fail )-> ProtoStarMessage
     {
         self.reply( StarMessagePayload::Reply(SimpleReply::Fail(fail)))
     }
 
-    pub fn ok(&self, reply: Reply )->ProtoMessage
+    pub fn ok(&self, reply: Reply )-> ProtoStarMessage
     {
         self.reply( StarMessagePayload::Reply(SimpleReply::Ok(reply)))
     }
 
 
-    pub fn reply(&self, payload: StarMessagePayload)->ProtoMessage
+    pub fn reply(&self, payload: StarMessagePayload)-> ProtoStarMessage
     {
-        let mut proto = ProtoMessage::new();
-        proto.to = Option::Some(self.from.clone());
+        let mut proto = ProtoStarMessage::new();
+        proto.to = self.from.clone().into();
         proto.reply_to = Option::Some(self.id.clone());
         proto.payload = payload;
         proto
     }
 
-    pub fn reply_err(&self, err: String )->ProtoMessage
+    pub fn reply_err(&self, err: String )-> ProtoStarMessage
     {
-        let mut proto = ProtoMessage::new();
-        proto.to = Option::Some(self.from.clone());
+        let mut proto = ProtoStarMessage::new();
+        proto.to = self.from.clone().into();
         proto.reply_to = Option::Some(self.id.clone());
         proto.payload = StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error(err)));
         proto
     }
 
-    pub fn reply_ok(&self, reply: Reply )->ProtoMessage
+    pub fn reply_ok(&self, reply: Reply )-> ProtoStarMessage
     {
-        let mut proto = ProtoMessage::new();
-        proto.to = Option::Some(self.from.clone());
+        let mut proto = ProtoStarMessage::new();
+        proto.to = self.from.clone().into();
         proto.reply_to = Option::Some(self.id.clone());
         proto.payload = StarMessagePayload::Reply(SimpleReply::Ok(reply));
         proto
     }
 
 
-    pub fn resubmit(self, expect: MessageExpect, tx: broadcast::Sender<MessageUpdate>, rx: broadcast::Receiver<MessageUpdate> ) -> ProtoMessage
+    pub fn resubmit(self, expect: MessageExpect, tx: broadcast::Sender<MessageUpdate>, rx: broadcast::Receiver<MessageUpdate> ) -> ProtoStarMessage
     {
-        let mut proto = ProtoMessage::with_txrx(tx,rx);
-        proto.to = Option::Some(self.from.clone());
+        let mut proto = ProtoStarMessage::with_txrx(tx, rx);
+        proto.to = self.from.clone().into();
         proto.expect = expect;
         proto.reply_to = Option::Some(self.id.clone());
         proto.payload = self.payload;
@@ -348,6 +349,7 @@ impl StarMessage
 pub enum StarMessagePayload
 {
    None,
+   MessagePayload(MessagePayload),
    ResourceManager(ChildManagerResourceAction),
    ResourceHost(ResourceHostAction),
    Space(SpaceMessage),
@@ -356,17 +358,23 @@ pub enum StarMessagePayload
 }
 
 #[derive(Clone,Serialize,Deserialize)]
+pub enum MessagePayload{
+    Request(Message<ResourceRequestMessage>),
+    Response(MessageReply<ResourceResponseMessage>),
+    Actor(Message<ActorMessage>)
+}
+
+
+#[derive(Clone,Serialize,Deserialize)]
 pub enum ResourceHostAction
 {
     IsHosting(ResourceKey),
     Assign(ResourceAssign<AssignResourceStateSrc>),
-    Message(ResourceMessage)
 }
 
 pub enum ResourceHostResult{
    Ok,
    Location(LocalResourceLocation),
-   Response(ResourceMessage)
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -379,7 +387,7 @@ pub enum ChildManagerResourceAction
     SliceStatus(ResourceSliceStatusReport),
     Create(ResourceCreate),
     Select(ResourceSelector),
-    UniqueResourceId{parent:ResourceKey,child_type:ResourceType}
+    UniqueResourceId{parent:ResourceIdentifier,child_type:ResourceType}
 }
 
 impl ToString for ChildManagerResourceAction {
@@ -694,10 +702,6 @@ pub struct Rejection
 
 
 
-#[derive(Clone,Serialize,Deserialize)]
-pub enum AppPayload {
-   ActorMessage(ResourceMessage)
-}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct AppNotifyCreated
@@ -736,7 +740,8 @@ impl fmt::Display for StarMessagePayload{
             StarMessagePayload::Reply(reply) => format!("Reply({})",reply.to_string() ),
             StarMessagePayload::ResourceManager(_) => "ResourceManager".to_string(),
             StarMessagePayload::ResourceHost(_) => "ResourceHost".to_string(),
-            StarMessagePayload::UniqueId(_) => "UniqueId".to_string()
+            StarMessagePayload::UniqueId(_) => "UniqueId".to_string(),
+            StarMessagePayload::MessagePayload(_) => "MessagePayload".to_string(),
         };
         write!(f, "{}",r)
     }

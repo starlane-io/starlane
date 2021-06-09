@@ -4,7 +4,7 @@ use std::sync::{Arc, mpsc, Mutex};
 use dyn_clone::DynClone;
 
 use crate::error::Error;
-use crate::resource::Path;
+use crate::resource::{Path, FileKind};
 use std::fs::{File, DirBuilder};
 use std::io::{Read, Write};
 use std::convert::TryFrom;
@@ -88,11 +88,6 @@ pub struct FileEvent{
     pub file_kind: FileKind
 }
 
-#[derive(Debug)]
-pub enum FileKind{
-    File,
-    Directory
-}
 
 #[derive(Clone)]
 pub struct MemoryFileAccess {

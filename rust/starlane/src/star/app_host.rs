@@ -12,7 +12,7 @@ use crate::error::Error;
 use crate::frame::{ActorLookup, AppNotifyCreated, AssignMessage, Frame, Reply, SpaceMessage, SpacePayload, StarMessage, StarMessagePayload, ServerAppPayload, SpaceReply, SimpleReply, SupervisorPayload, ServerPayload, StarPattern, FromReply, ChildManagerResourceAction, WindAction};
 use crate::keys::{AppKey, UserKey, ResourceKey};
 use crate::logger::{Flag, Log, StarFlag, StarLog, StarLogPayload};
-use crate::message::{MessageExpect, ProtoMessage, MessageExpectWait, Fail};
+use crate::message::{MessageExpect, ProtoStarMessage, MessageExpectWait, Fail};
 use crate::star::{StarCommand, StarSkel, StarInfo, StarKey, StarVariant, StarVariantCommand, StarKind, ResourceRegistryBacking, ResourceRegistryBackingSqLite, Wind};
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::oneshot::error::RecvError;

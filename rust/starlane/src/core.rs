@@ -15,13 +15,13 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::sync::mpsc::Sender;
 use tokio::time::Duration;
 
-use crate::actor::{ActorKey, ResourceMessage, ResourceMessagePayload};
+use crate::actor::{ActorKey };
 use crate::app::{AppArchetype, ApplicationStatus, AppMeta};
 use crate::artifact::{Artifact, ArtifactKey};
 use crate::core::server::{ExampleServerStarCoreExt, ServerStarCore, ServerStarCoreExt};
 use crate::core::space::SpaceHost;
 use crate::error::Error;
-use crate::frame::{AppPayload, ResourceHostAction, ResourceHostResult, ServerAppPayload, StarMessage, StarMessagePayload, Watch, WatchInfo};
+use crate::frame::{ResourceHostAction, ResourceHostResult, ServerAppPayload, StarMessage, StarMessagePayload, Watch, WatchInfo, MessagePayload};
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, ResourceKey};
 use crate::message::Fail;
@@ -54,14 +54,13 @@ pub enum StarCoreCommand
 {
     Get(ResourceKey),
     Assign(ResourceAssign<AssignResourceStateSrc>),
-    Message(ResourceMessage)
 }
 
 pub enum StarCoreResult{
     Ok,
     Resource(Option<Resource>),
     LocalLocation(LocalResourceLocation),
-    MessageReply(ResourceMessagePayload)
+    MessageReply(MessagePayload)
 }
 
 impl ToString for StarCoreResult{
@@ -106,7 +105,6 @@ pub enum AppCommandResult
 
 pub enum StarCoreMessagePayload
 {
-    AppCommand(AppPayload)
 }
 
 pub enum StarCoreExtKind

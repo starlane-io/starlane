@@ -1,5 +1,7 @@
+pub mod resource;
+
 use crate::star::{StarKey, StarSearchTransaction, Transaction, TransactionResult, StarCommand};
-use crate::frame::{StarMessagePayload, Frame, StarMessage, MessageAck, SimpleReply};
+use crate::frame::{StarMessagePayload, Frame, StarMessage, MessageAck, SimpleReply, MessagePayload};
 use crate::error::Error;
 use crate::lane::LaneMeta;
 use std::cell::Cell;
@@ -7,7 +9,7 @@ use crate::id::Id;
 use tokio::sync::{mpsc, oneshot, broadcast};
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::mpsc::Sender;
-use crate::keys::{MessageId, SubSpaceKey, UserKey, ResourceKey};
+use crate::keys::{MessageId, SubSpaceKey, UserKey, ResourceKey, ResourceId};
 use tokio::sync::broadcast::error::RecvError;
 use serde::{Serialize, Deserialize};
 use crate::names::Specific;
@@ -16,9 +18,46 @@ use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::fmt;
 
-pub struct ProtoMessage
+pub enum ProtoStarMessageTo{
+    None,
+    Star(StarKey),
+    Resource(ResourceIdentifier)
+}
+
+impl ProtoStarMessageTo {
+    pub fn is_none(&self) -> bool {
+        match self {
+            ProtoStarMessageTo::None => true,
+            ProtoStarMessageTo::Star(_) => false,
+            ProtoStarMessageTo::Resource(_) => false
+        }
+    }
+}
+
+impl From<StarKey> for ProtoStarMessageTo{
+    fn from(key: StarKey) -> Self {
+        ProtoStarMessageTo::Star(key)
+    }
+}
+
+impl From<ResourceIdentifier> for ProtoStarMessageTo{
+    fn from(id: ResourceIdentifier) -> Self {
+        ProtoStarMessageTo::Resource(id)
+    }
+}
+
+impl From<Option<ResourceIdentifier>> for ProtoStarMessageTo{
+    fn from(id: Option<ResourceIdentifier>) -> Self {
+        match id{
+            None => ProtoStarMessageTo::None,
+            Some(id) => ProtoStarMessageTo::Resource(id.into())
+        }
+    }
+}
+
+pub struct ProtoStarMessage
 {
-    pub to: Option<StarKey>,
+    pub to: ProtoStarMessageTo,
     pub payload: StarMessagePayload,
     pub tx: broadcast::Sender<MessageUpdate>,
     pub rx: broadcast::Receiver<MessageUpdate>,
@@ -26,19 +65,19 @@ pub struct ProtoMessage
     pub reply_to: Option<MessageId>
 }
 
-impl ProtoMessage
+impl ProtoStarMessage
 {
 
     pub fn new()->Self
     {
         let (tx,rx) = broadcast::channel(8);
-        ProtoMessage::with_txrx(tx,rx)
+        ProtoStarMessage::with_txrx(tx, rx)
     }
 
     pub fn with_txrx( tx: broadcast::Sender<MessageUpdate>, rx: broadcast::Receiver<MessageUpdate> )->Self
     {
-        ProtoMessage{
-            to: Option::None,
+        ProtoStarMessage {
+            to: ProtoStarMessageTo::None,
             payload: StarMessagePayload::None,
             tx: tx,
             rx: rx,
@@ -47,9 +86,9 @@ impl ProtoMessage
         }
     }
 
-    pub fn to( &mut self, to: StarKey)
+    pub fn to( &mut self, to: ProtoStarMessageTo )
     {
-        self.to = Option::Some(to);
+        self.to = to;
     }
 
     pub fn reply_to( &mut self, reply_to: MessageId )
@@ -115,7 +154,7 @@ impl MessageReplyTracker
                         TrackerJob::Done
                     }
                     SimpleReply::Fail(fail) => {
-                        self.tx.send(MessageUpdate::Result(MessageResult::Err("fail".to_string())));
+                        self.tx.send(MessageUpdate::Result(MessageResult::Err(fail.to_string())));
                         TrackerJob::Done
                     }
                     SimpleReply::Ack(ack) => {
