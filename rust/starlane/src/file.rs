@@ -206,7 +206,6 @@ impl LocalFileAccess {
     }
 
     fn watch(&mut self) -> Result<tokio::sync::mpsc::Receiver<FileEvent>, Error> {
-println!("!#R@#$ STARTING FS WATCH LOOP FOR {}", self.base_dir );
         let (tx,rx) = mpsc::channel();
         let (event_tx,event_rx) = tokio::sync::mpsc::channel(128);
 
@@ -223,15 +222,12 @@ println!("!#R@#$ STARTING FS WATCH LOOP FOR {}", self.base_dir );
                 match rx.recv() {
                     Ok(RawEvent { path: Some(path), op: Ok(op), cookie }) => {
 
-let CREATE_WRITE = Op::CREATE | Op::WRITE;
-println!("###########>>>>>>>>>> watch op: {:?}==CREATE_WRITE ? {}", op, op==CREATE_WRITE );
                         let event_kind = match op {
                             Op::CREATE => FileEventKind::Create,
                             CREATE_WRITE => FileEventKind::Create,
                             Op::REMOVE => FileEventKind::Delete,
                             Op::WRITE => FileEventKind::Update,
                             x => {
-                                println!("x {:?}", x);
                                 continue; }
                         };
 
@@ -246,7 +242,6 @@ println!("###########>>>>>>>>>> watch op: {:?}==CREATE_WRITE ? {}", op, op==CREA
                             event_kind: event_kind,
                             file_kind: file_kind
                         };
-println!("event: {:?}", event);
 
                         let event_tx = event_tx.clone();
                         tokio_runtime.block_on(async move {

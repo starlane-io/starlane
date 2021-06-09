@@ -885,7 +885,6 @@ println!("GOT REPLY from GetKey");
                 match Star::wait_for_it(rx).await
                 {
                     Ok(parent_record) => {
-                        println!("---> GETTING FROM PARENT: {} FOR CHILD {} on StarKind: {}", request.payload.parent().unwrap().resource_type().to_string(), request.payload.resource_type().to_string(), parent_record.location.host.to_string());
                         let (final_request, rx) = Request::new((request.payload.clone(), parent_record.location.host));
                         skel.star_tx.send(StarCommand::ResourceRecordRequestFromStar(final_request)).await;
                         request.tx.send(Star::wait_for_it(rx).await);
@@ -904,42 +903,28 @@ println!("GOT REPLY from GetKey");
     async fn request_resource_record_from_star(&mut self, locate: Request<(ResourceIdentifier, StarKey), ResourceRecord>)
     {
         let (identifier, star) = locate.payload.clone();
-        println!("request_resource_location_from_star --> {}", star.to_string());
         let mut proto = ProtoStarMessage::new();
         proto.to = star.into();
         proto.payload = StarMessagePayload::ResourceManager(ChildManagerResourceAction::Find(identifier));
         let reply = proto.get_ok_result().await;
         self.send_proto_message(proto).await;
         let star_tx = self.skel.star_tx.clone();
-        println!(":::SENT:::PROTO:::MESSAGE");
         tokio::spawn(async move {
-            println!(":::WAIT:::4:::RESULT");
             let result = reply.await;
-            println!(":::GOT :::RESULT!!!!");
-            if let Result::Ok(payload) = &result {
-                println!("++++ payload is {}", payload);
-            }
+
             if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Resource(record)))) = result {
-                println!("~~kracking result~~");
                 let (set, rx) = Set::new(record);
-                println!("~~new location~~");
                 star_tx.send(StarCommand::ResourceRecordSet(set)).await;
-                println!("........ Sent SetResourceLocation(set).....");
                 tokio::spawn(async move {
-                    println!("........ AWAITING set resource location result(set).....");
                     if let Result::Ok(record) = rx.await {
-                        println!("~~FOUND");
                         locate.tx.send(Ok(record));
                     } else {
-                        println!("~~unexpected!");
                         locate.tx.send(Err(Fail::Unexpected));
                     }
                 });
             } else if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Fail(fail))) = result {
-                println!("~~RESULT IS FAIL!");
                 locate.tx.send(Err(fail));
             } else {
-                println!("~~RESULT IS UNEXPECTED:::::!");
                 locate.tx.send(Err(Fail::Unexpected));
             }
         });
@@ -1009,7 +994,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
             }
             ProtoStarMessageTo::Star(star) => { star }
             ProtoStarMessageTo::Resource(resource) => {
-                println!("Looking up ADDRESS:::> {}", resource.to_string());
                 let (request, rx) = Request::new(resource.clone());
                 self.skel.star_tx.send(StarCommand::ResourceRecordRequest(request)).await;
                 let skel = self.skel.clone();
@@ -1017,7 +1001,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                 tokio::spawn(async move {
                     match Star::wait_for_it(rx).await {
                         Ok(result) => {
-                            println!("SERTTING HOST LOCATION ADDRESS:::> {}", &result.location.host.to_string());
                             proto.to = result.location.host.into();
                             skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                         }
@@ -1324,7 +1307,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
         if message.to != self.skel.info.key {
             self.send_frame(message.to.clone(), Frame::StarMessage(message)).await;
         } else {
-            println!("special process frame....");
             // a special exception for sending a message to ourselves
             self.process_frame(Frame::StarMessage(message), Option::None).await;
         }
@@ -1788,7 +1770,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
 
     async fn process_child_manager_resource_action(&mut self, message: StarMessage, action: ChildManagerResourceAction) -> Result<(),Error>
             {
-        println!("process_child_manager_resource_action ---> {} === StarKind: {}", action.to_string(), self.skel.info.kind );
                 if let Option::Some(manager) = self.skel.registry.clone()
                 {
                     match action {
@@ -1802,7 +1783,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                         }
                         ChildManagerResourceAction::Find(find) => {
 
-        println!("process_child_manager_resource_action ... FINDING {} === StarKind: {}", find.resource_type().to_string(), self.skel.info.kind );
                             let result = manager.get(find.to_owned()).await;
 
                             match result{
@@ -1828,19 +1808,14 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                             unimplemented!()
                         }
                         ChildManagerResourceAction::Create(create) => {
-        println!("received: ResourceManagerAction::Create(...) on {}", self.skel.info.kind);
                             let child_manager = self.get_child_resource_manager(create.parent.clone()).await?;
-        println!("now clone the skel...");
                             let skel = self.skel.clone();
-        println!("spawn.........");
                             tokio::spawn( async move {
                                 let record = child_manager.create( create.clone() ).await.await;
-        println!("received RECORD..from child manager. of : {}",create.archetype.kind.resource_type().to_string());
                                 match record{
                                     Ok(record) => {
                                         match record {
                                             Ok(record) => {
-        println!("responding with Reply::Location(record)...  ");
                                                 skel.comm().reply_result(message, Ok(Reply::Resource(record))).await;
                                             }
                                             Err(fail) => {
@@ -1849,7 +1824,7 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                                         }
                                     }
                                     Err(err) => {
-        eprintln!("Error: {}",err);
+                                         eprintln!("Error: {}",err);
                                     }
                                 }
 
@@ -1904,7 +1879,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
 
                     async fn process_resource_host_action(&self, message: StarMessage, action: ResourceHostAction) -> Result<(),Error>
                     {
-        println!("process_resource_host_action");
                         match action {
                             ResourceHostAction::IsHosting(resource) => {
                                 if let Option::Some(resource) = self.get_resource(&resource).await? {
@@ -1916,17 +1890,13 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                                 }
                             }
                             ResourceHostAction::Assign(assign) => {
-                println!("Assignment Reached Star: {}",self.skel.info.kind);
                                 let (action,rx) = StarCoreAction::new(StarCoreCommand::Assign(assign.clone()));
                                 self.skel.core_tx.send( action).await;
                                 let result = rx.await??;
-        println!(">> RESULT: {}",result.to_string());
                                 if let StarCoreResult::Resource(Option::Some(resource)) = result {
                                     let record = ResourceRecord::new(resource.into(), self.skel.info.key.clone());
-        println!("returning record: {}",record.stub.address.to_string());
                                     self.skel.comm().simple_reply(message, SimpleReply::Ok(Reply::Resource(record))).await;
                                 } else {
-        println!("UNEXPECTED RESULT IN ASSIGN!!!");
                                     self.skel.comm().simple_reply(message, SimpleReply::Fail(Fail::Unexpected)).await;
                                 }
                             }
@@ -1935,7 +1905,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                     }
 
                     async fn get_child_resource_manager(&mut self, key: ResourceKey) -> Result<ChildResourceManager,Fail> {
-                        println!(" ::::>  GET RESOURCE MANAGER for {} <:::: [star kind {}]",key,&self.skel.info.kind );
 
                         let resource = match key.resource_type(){
                             ResourceType::Nothing => {
@@ -1954,7 +1923,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                         };
 
                         if let Option::Some(resource) = resource {
-                            println!("::::> FOUND RESOURCE MANAGER :::::");
 
                             Ok(ChildResourceManager{
                                 core: ChildResourceManagerCore {
@@ -1966,7 +1934,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                                 }
                             })
                         } else {
-                            println!("::::> ??? RESOURCE MANAGER NOT FOUND :::::");
                             Err(Fail::ResourceNotFound(key.clone().into()))
                         }
                     }
@@ -2986,12 +2953,12 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                                 match &message.payload{
                                     StarMessagePayload::Reply(_) => {}
                                     _ => {
-                                        println!("command {} Placeholder unimplemented for kind: {} & payload {}",command,self.data.info.kind,message.payload);
+                                    //    println!("command {} Placeholder unimplemented for kind: {} & payload {}",command,self.data.info.kind,message.payload);
                                     }
                                 }
                             }
                             _ => {
-                                println!("command {} Placeholder unimplemented for kind: {}",command,self.data.info.kind);
+//                                println!("command {} Placeholder unimplemented for kind: {}",command,self.data.info.kind);
                             }
                         }
                     }

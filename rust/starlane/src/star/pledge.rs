@@ -355,8 +355,6 @@ impl StarHandleDb {
                     "SELECT DISTINCT key,kind,hops  FROM stars".to_string()
                 };
 
-                println!("STATEMENT {}",statement);
-
                 let mut statement = self.conn.prepare(statement.as_str())?;
                 let mut rows= statement.query( params_from_iter(params.iter() ) )?;
 
@@ -400,7 +398,6 @@ impl StarHandleDb {
 
                     let f = match &field {
                         StarFieldSelection::Kind(kind) => {
-println!("kind {}",kind);
                             format!("kind=?{}", index + 1)
                         }
                         StarFieldSelection::MinHops => {
@@ -426,9 +423,6 @@ println!("kind {}",kind);
                     "SELECT DISTINCT key,kind,hops  FROM stars ORDER BY selections".to_string()
                 };
 
-
-
-                println!("STATEMENT {}",statement);
                 let trans = self.conn.transaction()?;
 
                 let handle= trans.query_row( statement.as_str(), params_from_iter(params.iter() ), |row|

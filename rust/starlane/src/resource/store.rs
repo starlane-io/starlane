@@ -37,7 +37,6 @@ impl ResourceStore{
 
         match rx.await??{
             ResourceStoreResult::Resource(resource) => {
-                println!("IS SOME? {}",resource.is_some());
                 resource.ok_or(Fail::Error("option returned None".into()))
             }
             _ => Err(Fail::Error("unexpected response from host registry sql".into()))
@@ -145,7 +144,6 @@ impl ResourceStoreSqlLite {
                 Ok(ResourceStoreResult::Ok)
             }
             ResourceStoreCommand::Put(assign) => {
-println!("PUT!");
                 let key = assign.stub.key.bin()?;
                 let address = assign.stub.address.to_string();
                 let specific = match &assign.stub.archetype.specific{
@@ -166,15 +164,12 @@ println!("PUT!");
 
                 let resource = Resource::new(assign.stub.key,assign.stub.address, assign.stub.archetype, assign.state_src );
 
-println!("returning Resource....");
                 Ok(ResourceStoreResult::Resource(Option::Some(resource)))
             }
             ResourceStoreCommand::Get(key) => {
-println!("GETTING....");
                 let key_bin = key.bin()?;
                 let resource = self.conn.query_row("SELECT address,state_src,kind,specific,config_src FROM resources WHERE key=?1", params![key_bin], |row| {
 
-println!("....");
 
                     let address: String = row.get(0)?;
                     let address= ResourceAddress::from_str(address.as_str())?;
@@ -186,12 +181,9 @@ println!("....");
                         Option::Some(state)
                     };
 
-println!("....");
                     let kind: String = row.get(2)?;
-println!("kind: {}",kind);
                     let kind = ResourceKind::from_str( kind.as_str() )?;
 
-println!("....");
 
                     let specific= if let ValueRef::Null = row.get_ref(3)? {
                         Option::None
@@ -201,7 +193,6 @@ println!("....");
                         Option::Some(specific)
                     };
 
-println!("....");
                     let config_src= if let ValueRef::Null = row.get_ref(4)? {
                         Option::None
                     } else {
@@ -209,14 +200,12 @@ println!("....");
                         let config_src = ConfigSrc::from_str(config_src.as_str())?;
                         Option::Some(config_src)
                     };
-println!("....");
 
                     let state: Arc<dyn DataTransfer> = match state {
                         None => {Arc::new(MemoryDataTransfer::none())}
                         Some(state) => {Arc::new(MemoryDataTransfer::new(Arc::new(state)))}
                     };
 
-println!("....");
 
                     let archetype = ResourceArchetype{
                         kind: kind,

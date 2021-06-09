@@ -58,28 +58,21 @@ impl FileStoreHost {
 
     async fn handle_event(  root_path: String, event: FileEvent, store: ResourceStore, skel: StarSkel ) -> Result<(),Error>{
 
-        println!("event path {}", event.path );
-        println!("root  path {}", root_path );
         let mut path = event.path.clone();
         for _ in 0..root_path.len() {
             path.remove(0);
         }
 
-        println!("chomped path {}", path );
-
         // remove leading / for filesystem
         path.remove(0);
         let mut split = path.split("/");
         let filesystem = split.next().ok_or("expected at least one directory for the filesystem")?;
-        println!("filesystem: {}",filesystem);
         let mut file_path = String::new();
         for part in split {
             file_path.push_str("/");
             file_path.push_str(part);
         }
-        println!("file: {}", file_path );
 
-        println!("REceived Event: {:?}",event );
         let filesystem_key = ResourceKey::FileSystem(FileSystemKey::from_str(filesystem )?);
 
         FileStoreHost::ensure_file(filesystem_key, file_path,  event.file_kind, store, skel ).await?;
@@ -91,9 +84,7 @@ impl FileStoreHost {
     async fn ensure_file(filesystem_key: ResourceKey, file_path: String, kind: FileKind, store: ResourceStore, skel: StarSkel ) -> Result<(),Error> {
 
 
-println!("ENSURING FILE...");
         let filesystem= store.get(filesystem_key.clone()).await?.ok_or(format!("expected filesystem to be present in hosted environment: {}",filesystem_key.to_string()))?;
-println!("...did it work?");
         let filesystem: ResourceStub = filesystem.into();
 
         let archetype = ResourceArchetype{
@@ -125,7 +116,6 @@ println!("...did it work?");
 impl Host for FileStoreHost {
 
     async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource, Fail> {
-println!("$$$$ FILE RESOURCE ASSIGN: {}", assign.stub.archetype.kind );
         // if there is Initialization to do for assignment THIS is where we do it
        let data_transfer= match assign.state_src{
             AssignResourceStateSrc::Direct(data) => {

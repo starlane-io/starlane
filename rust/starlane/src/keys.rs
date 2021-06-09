@@ -742,10 +742,8 @@ impl FromStr for SubSpaceFilesystemKey{
         let (parent,id)= s.split_at(pos);
         let mut id = id.to_string();
         id.remove(0);
-println!("parent: {}",parent );
         let sub_space =  SubSpaceKey::from_str(parent)?;
 
-println!("id : {}",id );
         let id = FileSystemId::from_str(id.as_str())?;
         Ok(SubSpaceFilesystemKey{
             sub_space: sub_space,

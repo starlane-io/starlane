@@ -105,7 +105,6 @@ impl StarVariant for CentralStarVariant
         match &command
         {
             StarVariantCommand::Init => {
-println!("Central: CALLING ENSURE!");
                 self.ensure().await;
             }
 
@@ -124,7 +123,6 @@ impl CentralStarVariant{
     }
 
     async fn ensure_hyperspace(&self)->Result<(),Error>{
-println!("ENSURING HYPERSPACE!");
         let starlane_api = StarlaneApi::new(self.skel.star_tx.clone());
         starlane_api.create_space("hyperspace", "HyperSpace").await?;
 
@@ -132,7 +130,6 @@ println!("ENSURING HYPERSPACE!");
     }
 
     async fn ensure_user(&self, space_address: &ResourceAddress, email: &str ) ->Result<(),Error>{
-println!("ENSURING USER!");
         let starlane_api = StarlaneApi::new(self.skel.star_tx.clone());
         let space_api = starlane_api.get_space(space_address.clone().into() ).await?;
         space_api.create_user(email).await?;
@@ -140,8 +137,6 @@ println!("ENSURING USER!");
     }
 
     async fn ensure_subspace(&self, space_address: &ResourceAddress, sub_space: &str ) ->Result<(),Error>{
-        println!("---------- sub space ---------------");
-        println!("ENSURING SUB SPACE" );
         let starlane_api = StarlaneApi::new(self.skel.star_tx.clone());
         let space_api = starlane_api.get_space(space_address.clone().into()).await?;
         space_api.create_sub_space(sub_space).await?;
@@ -466,13 +461,13 @@ impl CentralDb {
                                     request.tx.send(Result::Ok(CentralDbResult::Supervisor(Option::Some(star))));
                                 }
                                 Err(error) => {
-                                    println!("(1)error: {}", error);
+                                    eprintln!("(1)error: {}", error);
                                     request.tx.send(Result::Ok(CentralDbResult::Supervisor(Option::None)));
                                 }
                             }
                         }
                         Err(err) => {
-                            println!("(2)error: {}", err);
+                            eprintln!("(2)error: {}", err);
                             request.tx.send(Result::Ok(CentralDbResult::Supervisor(Option::None)));
                         }
                     }
@@ -489,11 +484,10 @@ impl CentralDb {
                     match result
                     {
                         Ok(_) => {
-                            println!("Supervisor set for application!");
                             request.tx.send(Result::Ok(CentralDbResult::Ok));
                         }
                         Err(e) => {
-                            println!("ERROR setting supervisor app: {}", e);
+                            eprintln!("ERROR setting supervisor app: {}", e);
                             request.tx.send(Result::Err(e.into()));
                         }
                     }

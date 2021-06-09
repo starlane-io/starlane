@@ -637,23 +637,17 @@ eprintln!("error setting up db: {}", err );
             }
 
             ResourceRegistryCommand::Commit(registration) => {
-println!("COMMIT REGISTRATION :::> {}", registration.resource.stub.archetype.kind );
 
-println!("......Paramz.......");
                 let params= RegistryParams::from_registration(registration.clone())?;
 
                 let trans = self.conn.transaction()?;
 
-println!("......Trans created.......");
                 if params.key.is_some() {
-println!("......key is_some() .......");
                     trans.execute("DELETE FROM labels WHERE labels.resource_key=?1", [params.key.clone()]);
-println!("......key next trans.execute() .......");
                     trans.execute("DELETE FROM resources WHERE key=?1", [params.key.clone()])?;
                 }
 
                 trans.execute("INSERT INTO resources (key,address,resource_type,kind,specific,space,sub_space,owner,app,config,host,gathering) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)", params![params.key,params.address,params.resource_type,params.kind,params.specific,params.space,params.sub_space,params.owner,params.app,params.config,params.host,params.gathering])?;
-println!("INSERT HOST: {}",params.host.is_some());
                 if let Option::Some(info) = registration.info {
                     for name in info.names
                     {
@@ -666,7 +660,6 @@ println!("INSERT HOST: {}",params.host.is_some());
                 }
 
                 trans.commit()?;
-println!("......Trans commit()!.......");
                 Ok(ResourceRegistryResult::Ok)
             }
             ResourceRegistryCommand::Select(selector) => {
@@ -750,8 +743,6 @@ println!("......Trans commit()!.......");
                     statement = format!("SELECT DISTINCT {} FROM resources as r",RESOURCE_QUERY_FIELDS).to_string();
                 }
 
-                println!("STATEMENT {}",statement);
-
                 let mut statement = self.conn.prepare(statement.as_str())?;
                 let mut rows= statement.query( params_from_iter(params.iter() ) )?;
 
@@ -777,40 +768,30 @@ println!("......Trans commit()!.......");
             }
             ResourceRegistryCommand::Get(identifier) => {
 
-println!("==Doing a FIND() for: {}",identifier.to_string());
 
                 //let statement = "SELECT (key,host,gathering) FROM locations WHERE key=?1";
-println!("==just before prepared statement()");
                 let result = match &identifier {
                        ResourceIdentifier::Key(key) => {
                            let key = key.bin()?;
                            let statement = format!("SELECT {} FROM resources as r WHERE key=?1", RESOURCE_QUERY_FIELDS);
-println!("A PRE STATEMENT");
                            let mut statement = self.conn.prepare(statement.as_str())?;
-println!("A ABOUT TO RUN QUERY");
                            statement.query_row( params![key], |row| {
-println!("running QUERY");
                                Ok(Self::process_resource_row(row)?)
                            })
                        }
                        ResourceIdentifier::Address(address) => {
                            let address = address.to_string();
                            let statement = format!("SELECT {} FROM resources as r WHERE address=?1", RESOURCE_QUERY_FIELDS);
-println!("B PRE STATEMENT");
                            let mut statement = self.conn.prepare(statement.as_str())?;
-println!("B ABOUT TO RUN QUERY");
                            statement.query_row( params![address], |row| {
-println!("running QUERY");
                                Ok(Self::process_resource_row(row)?)
                            })
                        }
                    };
 
-println!("==GOT HERE in FIND()");
                 match result
                 {
                     Ok(record) => {
-println!("Record Record Record OK!");
                         Ok(ResourceRegistryResult::Resource(Option::Some(record)))
                     }
                     Err(rusqlite::Error::QueryReturnedNoRows) => {
@@ -818,7 +799,6 @@ println!("Record Record Record OK!");
                         Ok(ResourceRegistryResult::Resource(Option::None))
                     }
                     Err(err) => {
-println!("ERROR: trying to find: {} ERR:{}!",identifier.to_string(), err);
                         match err{
                             rusqlite::Error::QueryReturnedNoRows => {
                                 Ok(ResourceRegistryResult::Resource(Option::None))
@@ -845,7 +825,6 @@ println!("ERROR: trying to find: {} ERR:{}!",identifier.to_string(), err);
                 tokio::spawn( async move {
 
                     if let Result::Ok((record,result_tx)) = rx.await {
-println!("RESERVATION COMMIT Ok") ;
                         let mut params = params;
                         let key = match record.stub.key.bin(){
                             Ok(key) => {
@@ -858,19 +837,14 @@ println!("RESERVATION COMMIT Ok") ;
                         params.address = Option::Some(record.stub.address.to_string());
                         let registration = ResourceRegistration::new(record.clone(),  info );
                         let (action,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Commit(registration));
-println!("Sending registration commit....") ;
                         action_tx.send( action ).await;
-                        if let Result::Ok(result) = rx.await{
-                            println!("xx> RESULT: {}", result.to_string() );
-                        }
-println!("REceived registration commit....confirm") ;
+                        rx.await;
                         result_tx.send(Ok(()));
                     }
                     else{
-println!("RESERVATION DID NOT COMMIT");
+                        eprintln!("RESERVATION DID NOT COMMIT");
                     }
                 } );
-println!("&^^^^ Returning RESERVATION");
                 Ok(ResourceRegistryResult::Reservation(reservation))
             }
 
@@ -1422,21 +1396,15 @@ impl ResourceParent {
 
     pub fn matches( &self, resource_type: Option<&ResourceType> ) -> bool
     {
-println!("matches: option {}",resource_type.is_some() );
-if resource_type.is_some(){
-    println!("type is : {}",resource_type.unwrap().to_string() );
 
-}
         match resource_type{
             None => *self == Self::None,
             Some(resource_type) => {
                 match self{
                     ResourceParent::None => {
-println!("parent is None");
                         false
                     },
                     ResourceParent::Some(parent_type) => {
-println!("parent is {}", parent_type.to_string());
                         *parent_type == *resource_type
                     },
                     ResourceParent::Multi(multi) => multi.contains(resource_type)
@@ -1748,14 +1716,8 @@ impl ChildResourceManager {
     async fn process_create(core: ChildResourceManagerCore, create: ResourceCreate ) -> Result<ResourceRecord,Fail>{
 
 
-println!("CHILD: {}", core.key.resource_type().to_string() );
-println!("PARENT: {}", core.key.resource_type().parent().to_string() );
-println!("create.PARENT: {}", create.parent.to_string() );
-if         ResourceType::from(&create.parent).is_some() {
-    println!("create.PARENT2: {}", ResourceType::from(&create.parent).unwrap().to_string());
-}
+
         if !create.archetype.kind.resource_type().parent().matches(Option::Some(&core.key.resource_type())) {
-println!("!!! -> Throwing Fail::WrongParentResourceType <- !!!");
             return Err(Fail::WrongParentResourceType {
                 expected: HashSet::from_iter(core.key.resource_type().parent().types()),
                 received: Option::Some(create.parent.resource_type())
@@ -1780,7 +1742,6 @@ println!("!!! -> Throwing Fail::WrongParentResourceType <- !!!");
                 key
             }
         };
-println!("CREATED KEY: {}",key);
 
         let address = match create.address{
             AddressCreationSrc::None => {
@@ -1798,7 +1759,6 @@ println!("CREATED KEY: {}",key);
             }
         };
 
-println!("CREATE ADDRESS: {}", address.to_string() );
         let stub = ResourceStub {
             key: key,
             address: address.clone(),
@@ -1812,22 +1772,15 @@ println!("CREATE ADDRESS: {}", address.to_string() );
             state_src: create.src.clone(),
         };
 
-println!("selecting for resource kind: {}", create.archetype.kind.resource_type().to_string());
         let mut host = core.selector.select(create.archetype.kind.resource_type() ).await?;
 
-println!(".. about .. to .. assign .." );
         host.assign(assign).await?;
-println!("........assigned...." );
-
-
 
         let record = ResourceRecord::new( stub, host.star_key() );
 
-println!("About to commit reservation for child_resource_manager: {}",address.to_string());
         let (tx,rx) = oneshot::channel();
         reservation.commit( record.clone(), tx )?;
 
-println!("returning resource record..." );
         Ok(record)
     }
 }
@@ -1839,7 +1792,6 @@ impl ResourceManager for ChildResourceManager {
 
         let core = self.core.clone();
         tokio::spawn( async move {
-println!("Sending ChildResourceManager::process_create(core, create ).await");
             tx.send(ChildResourceManager::process_create(core, create ).await).unwrap_or_default();
         });
         rx
@@ -1862,16 +1814,13 @@ impl ResourceCreationChamber{
             skel: skel,
             tx: tx
         };
-println!("Creation of ResourceCreationChamber")        ;
         chamber.run().await;
-println!("back from chamber.run");
         rx
     }
 
     async fn run(self){
 
         tokio::spawn( async move {
-println!("GOT HERE IN CHAMBER");
             if !self.create.archetype.kind.resource_type().parent().matches(Option::Some(&self.parent.key.resource_type())) {
                 println!("!!! -> Throwing Fail::WrongParentResourceType <- !!!");
                 self.tx.send(Err(Fail::WrongParentResourceType {
@@ -1881,7 +1830,6 @@ println!("GOT HERE IN CHAMBER");
                 return;
             };
 
-println!("NEXT....");
             match self.create.validate()
             {
                 Ok(_) => {}
@@ -1890,8 +1838,6 @@ println!("NEXT....");
                     return;
                 }
             }
-
-println!("MORE....");
 
             let key = match &self.create.key {
                 KeyCreationSrc::None => {
@@ -1911,8 +1857,6 @@ println!("MORE....");
                         }
                     };
 
-
-println!("SENDING RESOURCE MESSAGE!!!!");
                     self.skel.star_tx.send(StarCommand::SendProtoMessage(proto_star_message)).await;
 
                     tokio::spawn( async move {
@@ -1967,7 +1911,6 @@ println!("SENDING RESOURCE MESSAGE!!!!");
             }
         };
 
-        println!("CREATE ADDRESS: {}", address.to_string() );
         let stub = ResourceStub {
             key: key,
             address: address.clone(),
@@ -2251,16 +2194,10 @@ impl ResourceAddress {
                 let mut parts = self.parts.clone();
                 if parts.len() == 0 {
 
-println!("~~~ parts.len == 0");
                    Option::None
                 } else {
-println!("PARTS last: {}",parts.last().unwrap().to_string());
                     parts.remove(self.parts.len() - 1);
-if parts.len() >= 1 {
-    println!("AFTER ~~~ PARTS last: {}", parts.last().unwrap().to_string());
-} else{
-    println!("AFTER ~~~ NO MORE PARTS!");
-}
+
                     Option::Some(ResourceAddress {
                         resource_type: parent.clone(),
                         parts: parts
@@ -3250,7 +3187,6 @@ impl Path
         }
 
         if !string.starts_with("/") {
-println!("PATH IS: {}",string);
             return Err("Paths must be absolute (must start with a '/')".into())
         }
 

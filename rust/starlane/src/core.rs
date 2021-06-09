@@ -311,7 +311,6 @@ impl StarCore2{
         match command{
 
             StarCoreCommand::Assign(assign) => {
-println!("CORE... RETURNING RESOURCE");
                 Ok(StarCoreResult::Resource(Option::Some(self.host.assign(assign).await?)))
             }
             StarCoreCommand::Get(key) => {
