@@ -12,9 +12,10 @@ use crate::resource::{ResourceType, ResourceCreate, ResourceSelector, ResourceRe
 use std::iter::FromIterator;
 use crate::id::Id;
 use crate::star::{StarKey, StarCommand, StarSkel};
-use crate::frame::{StarMessagePayload, MessagePayload};
+use crate::frame::{StarMessagePayload, MessagePayload, StarMessage, SimpleReply, Reply};
 use std::collections::HashSet;
 use crate::logger::Log::ProtoStar;
+use crate::util;
 
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -34,15 +35,15 @@ impl MessageTo{
 }
 
 
-pub struct ProtoMessage<P> {
+pub struct ProtoMessage<P,R> {
     pub id: MessageId,
     pub from: Option<MessageFrom>,
     pub to: Option<MessageTo>,
     pub payload: Option<P>,
-    pub reply_tx: Cell<Option<oneshot::Sender<Result<MessageReply<P>,Fail>>>>,
+    pub reply_tx: Cell<Option<oneshot::Sender<Result<MessageReply<R>,Fail>>>>,
 }
 
-impl <P> ProtoMessage <P>{
+impl <P,R> ProtoMessage <P,R>{
     pub fn new()->Self{
 
         ProtoMessage {
@@ -95,16 +96,45 @@ impl <P> ProtoMessage <P>{
     }
 
 
-    pub fn reply(&mut self) -> oneshot::Receiver<Result<MessageReply<P>,Fail>> {
+    pub fn reply(&mut self) -> oneshot::Receiver<Result<MessageReply<R>,Fail>> {
         let (tx,rx) = oneshot::channel();
         self.reply_tx.replace(Option::Some(tx));
         rx
     }
 
-    pub fn sender(&mut self) -> Option<tokio::sync::oneshot::Sender<Result<MessageReply<P>,Fail>>>{
+    pub fn sender(&mut self) -> Option<tokio::sync::oneshot::Sender<Result<MessageReply<R>,Fail>>>{
         self.reply_tx.replace(Option::None)
     }
 }
+
+impl ProtoMessage<ResourceRequestMessage,ResourceResponseMessage> {
+
+    pub async fn to_proto_star_message(mut self)->Result<ProtoStarMessage,Error> {
+        self.validate()?;
+        let tx = self.sender();
+        let message = self.create()?;
+        let mut proto = ProtoStarMessage::new();
+        proto.to = message.to.clone().into();
+        proto.payload = StarMessagePayload::MessagePayload(MessagePayload::Request(message));
+        let reply = proto.get_ok_result().await;
+
+        if let Option::Some(tx) = tx {
+            tokio::spawn( async move {
+                let result = util::wait_for_it_whatever(reply).await;
+                if let Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Message(message)))) = result {
+                    tx.send(Ok(message) );
+                } else if let Err(error) = result {
+                    tx.send(Err(Fail::Error(format!("message reply error: {}",error))));
+                }
+            });
+        }
+
+        Ok(proto)
+    }
+
+}
+
+
 pub struct ProtoMessageReply<P> {
     pub id: MessageId,
     pub from: Option<MessageFrom>,
@@ -193,24 +223,31 @@ impl <P> Message<P>
     }
 }
 
-pub struct Delivery<P>
+pub struct Delivery<M>
 {
     skel: StarSkel,
-    from_star: StarKey,
-    pub message: Message<P>
+    star_message: StarMessage,
+    pub message: M
 }
 
-impl <P> Delivery<P>{
+impl <M> Delivery<M> {
+    pub fn new( message: M, star_message: StarMessage, skel: StarSkel ) -> Self {
+        Delivery{
+            message: message,
+            star_message: star_message,
+            skel: skel,
+        }
+    }
+}
+
+impl <P> Delivery<Message<P>>{
    pub async fn reply(&self, response: ResourceResponseMessage) -> Result<(),Error> {
       let mut proto = ProtoMessageReply::new();
       proto.payload = Option::Some(response);
-      proto.from(MessageFrom::Resource(self.message.to.clone()));
       proto.reply_to = Option::Some(self.message.id.clone());
-      let mut proto:ProtoStarMessage = proto.create()?.into();
-      proto.to = self.from_star.clone().into();
-
+      proto.from = Option::Some(MessageFrom::Resource(self.message.to.clone()));
+      let proto = self.star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok( Reply::Message(proto.create()? ))));
       self.skel.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
-
       Ok(())
    }
 }
@@ -244,6 +281,7 @@ pub type RawState=Vec<u8>;
 impl Into<ProtoStarMessage> for Message<ResourceRequestMessage> {
     fn into(self) -> ProtoStarMessage {
         let mut proto = ProtoStarMessage::new();
+        proto.to = self.to.clone().into();
         proto.payload = StarMessagePayload::MessagePayload(MessagePayload::Request(self));
         proto
     }

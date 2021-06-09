@@ -463,6 +463,7 @@ pub enum Reply
     Resources(Vec<ResourceRecord>),
     Resource(ResourceRecord),
     Address(ResourceAddress),
+    Message(MessageReply<ResourceResponseMessage>),
     Id(ResourceId),
     Seq(u64)
 }
@@ -477,7 +478,8 @@ impl ToString for Reply{
             Reply::Address(_) =>  "Address".to_string(),
             Reply::Resource(_) =>  "Resource".to_string(),
             Reply::Seq(_) =>  "Seq".to_string(),
-            Reply::Id(_) => "Id".to_string()
+            Reply::Id(_) => "Id".to_string(),
+            Reply::Message(_) => "Message".to_string()
         }
     }
 }

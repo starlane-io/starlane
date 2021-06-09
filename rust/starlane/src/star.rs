@@ -53,7 +53,7 @@ use crate::star::space::SpaceVariant;
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
 use crate::util;
-use crate::message::resource::{ProtoMessage, ResourceRequestMessage, Message};
+use crate::message::resource::{ProtoMessage, ResourceRequestMessage, Message, Delivery, ResourceResponseMessage};
 use crate::actor::{ActorKind, ActorKey};
 use crate::frame::{WindHit, WindResults, WindDown, StarWind, Frame, StarMessage, StarMessagePayload, SimpleReply, ActorLookup, Watch, WatchInfo, ChildManagerResourceAction, StarPattern, WindAction, WindUp, ResourceHostAction, ProtoFrame, Reply, Event, FromReply, SpaceMessage, MessagePayload};
 
@@ -370,16 +370,15 @@ pub struct Star
 
 impl Star
 {
-
     pub async fn from_proto(data: StarSkel,
-                      star_rx: mpsc::Receiver<StarCommand>,
-                      core_tx: mpsc::Sender<StarCoreAction>,
-                      lanes: HashMap<StarKey,LaneMeta>,
-                      connector_ctrls: Vec<ConnectorController>,
-                      frame_hold: FrameHold ) ->Self
+                            star_rx: mpsc::Receiver<StarCommand>,
+                            core_tx: mpsc::Sender<StarCoreAction>,
+                            lanes: HashMap<StarKey, LaneMeta>,
+                            connector_ctrls: Vec<ConnectorController>,
+                            frame_hold: FrameHold) -> Self
 
     {
-        Star{
+        Star {
             skel: data,
             star_rx: star_rx,
             core_tx: core_tx,
@@ -391,19 +390,19 @@ impl Star
             messages_received: HashMap::new(),
             message_reply_trackers: HashMap::new(),
             star_subgraph_expansion_seq: AtomicU64::new(0),
-            resource_record_cache: LruCache::new(16*1024 ),
-            resource_address_to_key: LruCache::new(16*1024 ),
+            resource_record_cache: LruCache::new(16 * 1024),
+            resource_address_to_key: LruCache::new(16 * 1024),
             status: StarStatus::Unknown
         }
     }
 
-    pub fn has_resource_record(&mut self, identifier: &ResourceIdentifier ) -> bool {
-        match identifier{
+    pub fn has_resource_record(&mut self, identifier: &ResourceIdentifier) -> bool {
+        match identifier {
             ResourceIdentifier::Key(key) => {
                 self.resource_record_cache.contains(key)
             }
             ResourceIdentifier::Address(address) => {
-                let key= self.resource_address_to_key.get(address);
+                let key = self.resource_address_to_key.get(address);
                 match key {
                     None => false,
                     Some(key) => {
@@ -414,13 +413,13 @@ impl Star
         }
     }
 
-    pub fn get_resource_record(&mut self, identifier: &ResourceIdentifier ) -> Option<ResourceRecord>{
-        match identifier{
+    pub fn get_resource_record(&mut self, identifier: &ResourceIdentifier) -> Option<ResourceRecord> {
+        match identifier {
             ResourceIdentifier::Key(key) => {
                 self.resource_record_cache.get(key).cloned()
             }
             ResourceIdentifier::Address(address) => {
-                let key= self.resource_address_to_key.get(address);
+                let key = self.resource_address_to_key.get(address);
                 match key {
                     None => Option::None,
                     Some(key) => {
@@ -431,13 +430,13 @@ impl Star
         }
     }
 
-    pub async fn has_resource(&self, key: &ResourceKey) -> Result<bool,Fail> {
+    pub async fn has_resource(&self, key: &ResourceKey) -> Result<bool, Fail> {
         Ok(self.get_resource(key).await?.is_some())
     }
 
-    pub async fn get_resource(&self, key: &ResourceKey) -> Result<Option<Resource>,Fail>
+    pub async fn get_resource(&self, key: &ResourceKey) -> Result<Option<Resource>, Fail>
     {
-        let (action,rx) = StarCoreAction::new(StarCoreCommand::Get(key.clone()));
+        let (action, rx) = StarCoreAction::new(StarCoreCommand::Get(key.clone()));
         self.skel.core_tx.send(action).await?;
         match rx.await??
         {
@@ -617,7 +616,6 @@ println!("GOT REPLY from GetKey");
 
     pub async fn run(mut self)
     {
-
         loop {
             let mut futures = vec!();
             let mut lanes = vec!();
@@ -631,29 +629,27 @@ println!("GOT REPLY from GetKey");
             }
 
 
-            futures.push( self.star_rx.recv().boxed());
+            futures.push(self.star_rx.recv().boxed());
 
-            let (command,index,_) = select_all(futures).await;
+            let (command, index, _) = select_all(futures).await;
 
             if let Some(command) = command
             {
-                match command{
-
+                match command {
                     StarCommand::Init => {
                         self.init().await;
                     }
-                    StarCommand::SetFlags(set_flags ) => {
-                       self.skel.flags= set_flags.flags;
-                       set_flags.tx.send(());
+                    StarCommand::SetFlags(set_flags) => {
+                        self.skel.flags = set_flags.flags;
+                        set_flags.tx.send(());
                     }
                     StarCommand::AddLane(lane) => {
-                        if let Some(remote_star)=lane.remote_star.as_ref()
+                        if let Some(remote_star) = lane.remote_star.as_ref()
                         {
                             self.lanes.insert(remote_star.clone(), LaneMeta::new(lane));
-                        }
-                        else {
+                        } else {
                             eprintln!("for star remote star must be set");
-                         }
+                        }
                     }
                     StarCommand::AddConnectorController(connector_ctrl) => {
                         self.connector_ctrls.push(connector_ctrl);
@@ -665,38 +661,36 @@ println!("GOT REPLY from GetKey");
                         if let Option::Some(frames) = self.frame_hold.release(&star)
                         {
                             let lane = self.lane_with_shortest_path_to_star(&star);
-                            if let Option::Some(lane)=lane
+                            if let Option::Some(lane) = lane
                             {
                                 for frame in frames
                                 {
                                     lane.lane.outgoing.tx.send(LaneCommand::Frame(frame)).await;
                                 }
-                            }
-                            else {
+                            } else {
                                 eprintln!("release hold called on star that is not ready!")
                             }
-                       }
+                        }
                     }
-                    StarCommand::GetSpaceController(get)=>{
-                        let (tx,rx) = mpsc::channel(16);
+                    StarCommand::GetSpaceController(get) => {
+                        let (tx, rx) = mpsc::channel(16);
                         let star_tx = self.skel.star_tx.clone();
                         let user = get.auth.user.clone();
-                        let ctrl = SpaceController::new( get.auth.user, tx );
-                        tokio::spawn( async move {
+                        let ctrl = SpaceController::new(get.auth.user, tx);
+                        tokio::spawn(async move {
                             let mut rx = rx;
                             while let Option::Some(command) = rx.recv().await {
                                 if user == command.user
                                 {
-                                    star_tx.send( StarCommand::SpaceCommand(command)).await;
-                                }
-                                else {
+                                    star_tx.send(StarCommand::SpaceCommand(command)).await;
+                                } else {
                                     rx.close();
                                 }
                             }
-                        } );
-                        get.tx.send(Ok(ctrl) );
+                        });
+                        get.tx.send(Ok(ctrl));
                     }
-                    StarCommand::SpaceCommand(command)=>{
+                    StarCommand::SpaceCommand(command) => {
                         self.on_remote_space_command(command).await;
                     }
 
@@ -704,7 +698,7 @@ println!("GOT REPLY from GetKey");
 //                        self.logger.tx.push(tx);
                     }
                     StarCommand::Test(test) => {
-/*                        match test
+                        /*                        match test
                         {
                             StarTest::StarSearchForStarKey(star) => {
                                 let search = Search{
@@ -719,31 +713,31 @@ println!("GOT REPLY from GetKey");
  */
                     }
                     StarCommand::WindInit(search) =>
-                    {
-                        self.do_wind(search).await;
-                    }
-                    StarCommand::WindCommit(commit) =>
-                    {
-                        for lane in commit.result.lane_hits.keys()
                         {
-                            let hits = commit.result.lane_hits.get(lane).unwrap();
-                            for (star,size) in hits
-                            {
-                                self.lanes.get_mut(lane).unwrap().star_paths.put(star.clone(),size.clone() );
-                            }
+                            self.do_wind(search).await;
                         }
-                        commit.tx.send( commit.result );
-                    }
+                    StarCommand::WindCommit(commit) =>
+                        {
+                            for lane in commit.result.lane_hits.keys()
+                            {
+                                let hits = commit.result.lane_hits.get(lane).unwrap();
+                                for (star, size) in hits
+                                {
+                                    self.lanes.get_mut(lane).unwrap().star_paths.put(star.clone(), size.clone());
+                                }
+                            }
+                            commit.tx.send(commit.result);
+                        }
                     StarCommand::WindDown(result) => {
                         let lane = result.hops.last().unwrap();
-                        self.send_frame( lane.clone(), Frame::StarWind(StarWind::Down(result))).await;
+                        self.send_frame(lane.clone(), Frame::StarWind(StarWind::Down(result))).await;
                     }
                     StarCommand::Frame(frame) => {
                         let lane_key = lanes.get(index);
-                        self.process_frame(frame, lane_key ).await;
+                        self.process_frame(frame, lane_key).await;
                     }
                     StarCommand::ForwardFrame(forward) => {
-                        self.send_frame( forward.to.clone(), forward.frame ).await;
+                        self.send_frame(forward.to.clone(), forward.frame).await;
                     }
 
                     StarCommand::ResourceRecordRequest(request) => {
@@ -753,7 +747,7 @@ println!("GOT REPLY from GetKey");
                         self.request_resource_record_from_star(request).await;
                     }
                     StarCommand::ResourceRecordSet(set) => {
-                        self.resource_record_cache.put(set.payload.stub.key.clone(), set.payload.clone() );
+                        self.resource_record_cache.put(set.payload.stub.key.clone(), set.payload.clone());
                         set.commit();
                     }
                     StarCommand::CheckStatus => {
@@ -763,26 +757,22 @@ println!("GOT REPLY from GetKey");
                         self.diagnose(diagnose).await;
                     }
                     _ => {
-                        eprintln!("cannot process command: {}",command);
+                        eprintln!("cannot process command: {}", command);
                     }
                 }
-            }
-            else
-            {
+            } else {
                 println!("command_rx has been disconnected");
                 return;
             }
-
         }
     }
 
-    async fn init(&mut self){
+    async fn init(&mut self) {
         self.refresh_handles().await;
         self.check_status().await;
     }
 
     async fn refresh_handles(&mut self) {
-
         if self.status == StarStatus::Unknown {
             self.status = StarStatus::Pending
         }
@@ -794,7 +784,7 @@ println!("GOT REPLY from GetKey");
                 let star_handler = star_handler.clone();
                 let kind = kind.clone();
                 let skel = self.skel.clone();
-                tokio::spawn( async move {
+                tokio::spawn(async move {
                     let result = tokio::time::timeout(Duration::from_secs(5), rx).await;
                     if let Ok(Ok(hits)) = result
                     {
@@ -807,7 +797,7 @@ println!("GOT REPLY from GetKey");
                             let result = star_handler.add_star_handle(handle).await;
                             match result {
                                 Ok(_) => {
-                                    skel.star_tx.send( StarCommand::CheckStatus ).await;
+                                    skel.star_tx.send(StarCommand::CheckStatus).await;
                                 }
                                 Err(error) => {
                                     eprintln!("error when adding star handle: {}", error.to_string())
@@ -815,14 +805,14 @@ println!("GOT REPLY from GetKey");
                             }
                         }
                     } else {
-                        eprintln!("error encountered when attempting to get a handle for: {}", kind );
+                        eprintln!("error encountered when attempting to get a handle for: {}", kind);
                     }
                 });
             }
         }
     }
 
-    async fn check_status(&mut self){
+    async fn check_status(&mut self) {
         if self.status == StarStatus::Pending {
             if let Option::Some(star_handler) = &self.skel.star_handler {
                 if let Result::Ok(Satisfaction::Ok) = star_handler.satisfied(self.skel.info.kind.handles()).await {
@@ -837,8 +827,8 @@ println!("GOT REPLY from GetKey");
     }
 
 
-    pub async fn wait_for_it<R>( rx: oneshot::Receiver<Result<R,Fail>>) -> Result<R,Fail> {
-        match tokio::time::timeout( Duration::from_secs(15), rx).await{
+    pub async fn wait_for_it<R>(rx: oneshot::Receiver<Result<R, Fail>>) -> Result<R, Fail> {
+        match tokio::time::timeout(Duration::from_secs(15), rx).await {
             Ok(result) => {
                 match result {
                     Ok(result) => result,
@@ -851,32 +841,32 @@ println!("GOT REPLY from GetKey");
         }
     }
 
-    async fn locate_resource_record(&mut self, request: Request<ResourceIdentifier,ResourceRecord> )
+    async fn locate_resource_record(&mut self, request: Request<ResourceIdentifier, ResourceRecord>)
     {
         if self.has_resource_record(&request.payload)
         {
-            request.tx.send( Ok(self.get_resource_record(&request.payload).unwrap()) );
+            request.tx.send(Ok(self.get_resource_record(&request.payload).unwrap()));
             return;
         } else if request.payload.resource_type().star_manager().contains(&self.skel.info.kind) {
-            match self.skel.registry.as_ref().unwrap().get(request.payload.clone() ).await{
+            match self.skel.registry.as_ref().unwrap().get(request.payload.clone()).await {
                 Ok(record) => {
                     match record {
                         Some(record) => {
-                            request.tx.send( Ok(record) );
+                            request.tx.send(Ok(record));
                         }
                         None => {
-                            request.tx.send( Err(Fail::ResourceNotFound(request.payload)) );
+                            request.tx.send(Err(Fail::ResourceNotFound(request.payload)));
                         }
                     }
                 }
                 Err(fail) => {
-                    request.tx.send( Err(fail) );
+                    request.tx.send(Err(fail));
                 }
             }
         } else if request.payload.resource_type() == ResourceType::Space {
-            let (new_request, rx) = Request::new((request.payload.clone(),StarKey::central()));
-            self.request_resource_record_from_star(new_request ).await;
-            tokio::spawn( async move {
+            let (new_request, rx) = Request::new((request.payload.clone(), StarKey::central()));
+            self.request_resource_record_from_star(new_request).await;
+            tokio::spawn(async move {
                 match Star::wait_for_it(rx).await
                 {
                     Ok(record) => {
@@ -886,78 +876,73 @@ println!("GOT REPLY from GetKey");
                         request.tx.send(Err(fail));
                     }
                 }
-            } );
+            });
         } else if request.payload.parent().is_some() {
             let (new_request, rx) = Request::new(request.payload.parent().unwrap().clone());
-            self.skel.star_tx.send( StarCommand::ResourceRecordRequest(new_request)).await;
+            self.skel.star_tx.send(StarCommand::ResourceRecordRequest(new_request)).await;
             let skel = self.skel.clone();
-            tokio::spawn( async move {
+            tokio::spawn(async move {
                 match Star::wait_for_it(rx).await
                 {
                     Ok(parent_record) => {
-println!("---> GETTING FROM PARENT: {} FOR CHILD {} on StarKind: {}",request.payload.parent().unwrap().resource_type().to_string(), request.payload.resource_type().to_string(), parent_record.location.host.to_string() );
-                        let (final_request, rx) = Request::new((request.payload.clone(), parent_record.location.host ));
-                        skel.star_tx.send( StarCommand::ResourceRecordRequestFromStar(final_request)).await;
-                        request.tx.send(Star::wait_for_it(rx).await );
+                        println!("---> GETTING FROM PARENT: {} FOR CHILD {} on StarKind: {}", request.payload.parent().unwrap().resource_type().to_string(), request.payload.resource_type().to_string(), parent_record.location.host.to_string());
+                        let (final_request, rx) = Request::new((request.payload.clone(), parent_record.location.host));
+                        skel.star_tx.send(StarCommand::ResourceRecordRequestFromStar(final_request)).await;
+                        request.tx.send(Star::wait_for_it(rx).await);
                     }
                     Err(fail) => {
                         request.tx.send(Err(fail));
                     }
                 }
-            } );
+            });
         } else {
             request.tx.send(Err(Fail::Error("seems like an attempt to get a resource for a ResourceType::Nothing".to_string())));
-
         }
     }
 
 
-    async fn request_resource_record_from_star(&mut self, locate: Request<(ResourceIdentifier,StarKey), ResourceRecord>)
+    async fn request_resource_record_from_star(&mut self, locate: Request<(ResourceIdentifier, StarKey), ResourceRecord>)
     {
-        let (identifier,star) = locate.payload.clone();
-println!("request_resource_location_from_star --> {}",star.to_string());
+        let (identifier, star) = locate.payload.clone();
+        println!("request_resource_location_from_star --> {}", star.to_string());
         let mut proto = ProtoStarMessage::new();
         proto.to = star.into();
         proto.payload = StarMessagePayload::ResourceManager(ChildManagerResourceAction::Find(identifier));
         let reply = proto.get_ok_result().await;
         self.send_proto_message(proto).await;
         let star_tx = self.skel.star_tx.clone();
-println!(":::SENT:::PROTO:::MESSAGE");
-        tokio::spawn( async move {
-println!(":::WAIT:::4:::RESULT");
+        println!(":::SENT:::PROTO:::MESSAGE");
+        tokio::spawn(async move {
+            println!(":::WAIT:::4:::RESULT");
             let result = reply.await;
-println!(":::GOT :::RESULT!!!!");
+            println!(":::GOT :::RESULT!!!!");
             if let Result::Ok(payload) = &result {
-println!("++++ payload is {}",payload);
+                println!("++++ payload is {}", payload);
             }
             if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Resource(record)))) = result {
-println!("~~kracking result~~");
-                let (set,rx) = Set::new(record);
-println!("~~new location~~");
-                star_tx.send( StarCommand::ResourceRecordSet(set)).await;
-println!("........ Sent SetResourceLocation(set).....");
-                tokio::spawn( async move {
-println!("........ AWAITING set resource location result(set).....");
+                println!("~~kracking result~~");
+                let (set, rx) = Set::new(record);
+                println!("~~new location~~");
+                star_tx.send(StarCommand::ResourceRecordSet(set)).await;
+                println!("........ Sent SetResourceLocation(set).....");
+                tokio::spawn(async move {
+                    println!("........ AWAITING set resource location result(set).....");
                     if let Result::Ok(record) = rx.await {
-
-println!("~~FOUND");
-                        locate.tx.send( Ok(record) );
+                        println!("~~FOUND");
+                        locate.tx.send(Ok(record));
                     } else {
-println!("~~unexpected!");
-                        locate.tx.send( Err(Fail::Unexpected) );
+                        println!("~~unexpected!");
+                        locate.tx.send(Err(Fail::Unexpected));
                     }
                 });
+            } else if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Fail(fail))) = result {
+                println!("~~RESULT IS FAIL!");
+                locate.tx.send(Err(fail));
+            } else {
+                println!("~~RESULT IS UNEXPECTED:::::!");
+                locate.tx.send(Err(Fail::Unexpected));
             }
-            else if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Fail(fail))) = result {
-println!("~~RESULT IS FAIL!");
-                locate.tx.send( Err(fail) );
-            }
-            else
-            {
-println!("~~RESULT IS UNEXPECTED:::::!");
-                locate.tx.send( Err(Fail::Unexpected) );
-            }
-    } );
+        });
     }
 
     /*
@@ -1013,37 +998,31 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
      */
 
 
-
-
-    async fn send_proto_message( &mut self, mut proto: ProtoStarMessage)
+    async fn send_proto_message(&mut self, mut proto: ProtoStarMessage)
     {
-
-        if let Err(errors) = proto.validate() {
-            eprintln!("ProtoStarMessage is not valid cannot send: {}", errors );
-            return;
-        }
-
         let id = MessageId::new_v4();
 
         let star = match &proto.to {
             ProtoStarMessageTo::None => {
-                eprintln!("ProtoStarMessage to address cannot be None" );
+                eprintln!("ProtoStarMessage to address cannot be None");
                 return;
             }
-            ProtoStarMessageTo::Star(star) => {star}
+            ProtoStarMessageTo::Star(star) => { star }
             ProtoStarMessageTo::Resource(resource) => {
-                let (request,rx) = Request::new(resource.clone() );
-                self.skel.star_tx.send( StarCommand::ResourceRecordRequest(request)).await;
+                println!("Looking up ADDRESS:::> {}", resource.to_string());
+                let (request, rx) = Request::new(resource.clone());
+                self.skel.star_tx.send(StarCommand::ResourceRecordRequest(request)).await;
                 let skel = self.skel.clone();
 
-                tokio::spawn( async move {
-                    match Star::wait_for_it(rx).await{
+                tokio::spawn(async move {
+                    match Star::wait_for_it(rx).await {
                         Ok(result) => {
+                            println!("SERTTING HOST LOCATION ADDRESS:::> {}", &result.location.host.to_string());
                             proto.to = result.location.host.into();
-                            skel.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
+                            skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                         }
                         Err(fail) => {
-                            eprintln!("Star failed to find resource record: {}", fail.to_string() );
+                            eprintln!("Star failed to find resource record: {}", fail.to_string());
                         }
                     }
                 });
@@ -1051,8 +1030,12 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
             }
         };
 
+        if let Err(errors) = proto.validate() {
+            eprintln!("ProtoStarMessage is not valid cannot send: {}", errors);
+            return;
+        }
 
-        let message = StarMessage{
+        let message = StarMessage {
             id: id,
             from: self.skel.info.key.clone(),
             to: star.clone(),
@@ -1060,7 +1043,7 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
             reply_to: proto.reply_to
         };
 
-        let delivery = StarMessageDeliveryInsurance::with_txrx(message, proto.expect, proto.tx.clone(), proto.tx.subscribe() );
+        let delivery = StarMessageDeliveryInsurance::with_txrx(message, proto.expect, proto.tx.clone(), proto.tx.subscribe());
         self.message(delivery).await;
     }
 
@@ -1075,71 +1058,64 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
     }
 
 
-
-   async fn search_for_star( &mut self, star: StarKey, tx: oneshot::Sender<WindHits> )
-   {
+    async fn search_for_star(&mut self, star: StarKey, tx: oneshot::Sender<WindHits>)
+    {
         let wind = Wind {
             pattern: StarPattern::StarKey(star),
             tx: tx,
             max_hops: 16,
             action: WindAction::SearchHits
         };
-        self.skel.star_tx.send( StarCommand::WindInit(wind) ).await;
+        self.skel.star_tx.send(StarCommand::WindInit(wind)).await;
     }
 
     async fn do_wind(&mut self, wind: Wind)
     {
         let tx = wind.tx;
-        let wind_up = WindUp::new(self.skel.info.key.clone(), wind.pattern, wind.action );
+        let wind_up = WindUp::new(self.skel.info.key.clone(), wind.pattern, wind.action);
         self.do_wind_up(wind_up, tx, Option::None).await;
     }
 
-    async fn do_wind_up(&mut self, mut wind: WindUp, tx: oneshot::Sender<WindHits>, exclude: Option<HashSet<StarKey>> )
+    async fn do_wind_up(&mut self, mut wind: WindUp, tx: oneshot::Sender<WindHits>, exclude: Option<HashSet<StarKey>>)
     {
-        let tid = self.skel.sequence.fetch_add(1, std::sync::atomic::Ordering::Relaxed );
+        let tid = self.skel.sequence.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-        let num_excludes:usize = match &exclude
+        let num_excludes: usize = match &exclude
         {
             None => 0,
             Some(exclude) => exclude.len()
         };
 
-        let local_hit = match wind.pattern.is_match(&self.skel.info){
+        let local_hit = match wind.pattern.is_match(&self.skel.info) {
             true => Option::Some(self.skel.info.key.clone()),
             false => Option::None
         };
 
-        let transaction = Box::new(StarSearchTransaction::new(wind.pattern.clone(), self.skel.star_tx.clone(), tx, self.lanes.len()-num_excludes, local_hit ));
-        self.transactions.insert(tid.clone(), transaction );
+        let transaction = Box::new(StarSearchTransaction::new(wind.pattern.clone(), self.skel.star_tx.clone(), tx, self.lanes.len() - num_excludes, local_hit));
+        self.transactions.insert(tid.clone(), transaction);
 
         wind.transactions.push(tid.clone());
-        wind.hops.push( self.skel.info.key.clone() );
+        wind.hops.push(self.skel.info.key.clone());
 
-        self.broadcast_excluding(Frame::StarWind(StarWind::Up(wind)), &exclude ).await;
+        self.broadcast_excluding(Frame::StarWind(StarWind::Up(wind)), &exclude).await;
     }
 
 
-
-
-    async fn on_wind_up_hop(&mut self, mut wind_up: WindUp, lane_key: StarKey )
+    async fn on_wind_up_hop(&mut self, mut wind_up: WindUp, lane_key: StarKey)
     {
-
         if wind_up.pattern.is_match(&self.skel.info)
         {
-
             if wind_up.pattern.is_single_match()
             {
-
                 let hit = WindHit {
                     star: self.skel.info.key.clone(),
                     hops: wind_up.hops.len() + 1
                 };
 
-                match wind_up.action.update(vec![hit], WindResults::None )
+                match wind_up.action.update(vec![hit], WindResults::None)
                 {
                     Ok(result) => {
-
-                        let wind_down = WindDown{
+                        let wind_down = WindDown {
                             missed: None,
                             hops: wind_up.hops.clone(),
                             transactions: wind_up.transactions.clone(),
@@ -1147,44 +1123,40 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                             result: result
                         };
 
-                        let wind = Frame::StarWind( StarWind::Down(wind_down) );
+                        let wind = Frame::StarWind(StarWind::Down(wind_down));
 
                         let lane = self.lanes.get_mut(&lane_key).unwrap();
                         lane.lane.outgoing.tx.send(LaneCommand::Frame(wind)).await;
-
                     }
                     Err(error) => {
-                        eprintln!("error when attempting to update wind_down results {}",error);
+                        eprintln!("error when attempting to update wind_down results {}", error);
                     }
                 }
 
                 return;
-            }
-            else {
+            } else {
                 // need to create a new transaction here which gathers 'self' as a HIT
             }
         }
 
         let hit = wind_up.pattern.is_match(&self.skel.info);
 
-        if wind_up.hops.len()+1 > min(wind_up.max_hops,MAX_HOPS) || self.lanes.len() <= 1 || !self.skel.info.kind.relay()
+        if wind_up.hops.len() + 1 > min(wind_up.max_hops, MAX_HOPS) || self.lanes.len() <= 1 || !self.skel.info.kind.relay()
         {
-
             let hits = match hit
             {
                 true => {
-                    vec![WindHit {star: self.skel.info.key.clone(), hops: wind_up.hops.len().clone()+1 }]
+                    vec![WindHit { star: self.skel.info.key.clone(), hops: wind_up.hops.len().clone() + 1 }]
                 }
                 false => {
                     vec!()
                 }
             };
 
-            match wind_up.action.update(hits, WindResults::None )
+            match wind_up.action.update(hits, WindResults::None)
             {
                 Ok(result) => {
-
-                    let wind_down = WindDown{
+                    let wind_down = WindDown {
                         missed: None,
                         hops: wind_up.hops.clone(),
                         transactions: wind_up.transactions.clone(),
@@ -1192,13 +1164,13 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                         result: result
                     };
 
-                    let wind = Frame::StarWind( StarWind::Down(wind_down) );
+                    let wind = Frame::StarWind(StarWind::Down(wind_down));
 
                     let lane = self.lanes.get_mut(&lane_key).unwrap();
                     lane.lane.outgoing.tx.send(LaneCommand::Frame(wind)).await;
                 }
                 Err(error) => {
-                    eprintln!("error encountered when trying to update WindResult: {}",error );
+                    eprintln!("error encountered when trying to update WindResult: {}", error);
                 }
             }
 
@@ -1206,23 +1178,23 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
         }
 
         let mut exclude = HashSet::new();
-        exclude.insert( lane_key );
+        exclude.insert(lane_key);
 
-        let (tx,rx) = oneshot::channel();
+        let (tx, rx) = oneshot::channel();
 
         let relay_wind_up = wind_up.clone();
 
         let command_tx = self.skel.star_tx.clone();
-        self.do_wind_up(relay_wind_up, tx, Option::Some(exclude) ).await;
+        self.do_wind_up(relay_wind_up, tx, Option::Some(exclude)).await;
 
-        tokio::spawn( async move {
+        tokio::spawn(async move {
 //            result.hits.iter().map(|(star,hops)| SearchHit{ star: star.clone(), hops: hops.clone()+1} ).collect()
 
             let wind_result = rx.await;
 
-            match wind_result{
+            match wind_result {
                 Ok(wind_result) => {
-                let hits = wind_result.hits.iter().map(|(star,hops)| WindHit { star: star.clone(), hops: hops.clone()+1} ).collect();
+                    let hits = wind_result.hits.iter().map(|(star, hops)| WindHit { star: star.clone(), hops: hops.clone() + 1 }).collect();
                     match wind_up.action.update(hits, WindResults::None)
                     {
                         Ok(result) => {
@@ -1233,37 +1205,36 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                                 transactions: wind_up.transactions.clone(),
                                 result: result
                             };
-                            command_tx.send( StarCommand::WindDown(wind_down) ).await;
+                            command_tx.send(StarCommand::WindDown(wind_down)).await;
                         }
                         Err(error) => {
-                            eprintln!("{}",error);
+                            eprintln!("{}", error);
                         }
                     }
                 }
                 Err(error) => {
-                    eprintln!("{}",error);
+                    eprintln!("{}", error);
                 }
             }
-        } );
-
+        });
     }
 
-    pub fn star_key(&self)->&StarKey
+    pub fn star_key(&self) -> &StarKey
     {
         &self.skel.info.key
     }
 
-    pub fn star_tx(&self)->mpsc::Sender<StarCommand>
+    pub fn star_tx(&self) -> mpsc::Sender<StarCommand>
     {
         self.skel.star_tx.clone()
     }
 
-    async fn broadcast(&mut self,  frame: Frame )
+    async fn broadcast(&mut self, frame: Frame)
     {
-        self.broadcast_excluding(frame, &Option::None ).await;
+        self.broadcast_excluding(frame, &Option::None).await;
     }
 
-    async fn broadcast_excluding(&mut self,  frame: Frame, exclude: &Option<HashSet<StarKey>> )
+    async fn broadcast_excluding(&mut self, frame: Frame, exclude: &Option<HashSet<StarKey>>)
     {
         let mut stars = vec!();
         for star in self.lanes.keys()
@@ -1281,7 +1252,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
 
     async fn message(&mut self, delivery: StarMessageDeliveryInsurance)
     {
-
         let message = delivery.message.clone();
         if !delivery.message.payload.is_ack()
         {
@@ -1293,110 +1263,105 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
             self.message_reply_trackers.insert(delivery.message.id.clone(), tracker);
 
             let star_tx = self.skel.star_tx.clone();
-            tokio::spawn( async move {
+            tokio::spawn(async move {
                 let mut delivery = delivery;
                 delivery.retries = delivery.expect.retries();
 
                 loop
                 {
-                    let wait = if delivery.retries == 0 && delivery.expect.retry_forever(){
+                    let wait = if delivery.retries == 0 && delivery.expect.retry_forever() {
                         // take a 2 minute break if retry_forever to be sure that all messages have expired
                         120 as u64
-                    }
-                    else {
+                    } else {
                         delivery.expect.wait_seconds()
                     };
-                    let result = timeout(Duration::from_secs(wait ) ,delivery.rx.recv() ).await;
-                    match result{
-                         Ok(result) => {
-                             match result
-                             {
-                                 Ok(update) => {
-                                     match update
-                                     {
-                                         MessageUpdate::Result(_) => {
+                    let result = timeout(Duration::from_secs(wait), delivery.rx.recv()).await;
+                    match result {
+                        Ok(result) => {
+                            match result
+                            {
+                                Ok(update) => {
+                                    match update
+                                    {
+                                        MessageUpdate::Result(_) => {
 
-                                             // the result will have been captured on another
-                                             // rx as this is a broadcast.  no longer need to wait.
-                                             break;
-                                         }
-                                         _ => {}
-                                     }
-                                 }
-                                 Err(_) => {
-                                     // probably the TX got dropped. no point in sticking around.
-                                     break;
-                                 }
-                             }
-                         }
-                         Err(elapsed) => {
-                             delivery.retries = delivery.retries - 1;
-                             if delivery.retries == 0 {
-                                 if delivery.expect.retry_forever()
-                                 {
-                                     // we have to keep trying with a new message Id since the old one is now expired
-                                     let proto = delivery.message.resubmit( delivery.expect, delivery.tx.clone(), delivery.tx.subscribe() );
-                                     star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                     break;
-                                 }
-                                 else {
-                                     // out of retries, this
-                                     delivery.tx.send(MessageUpdate::Result(MessageResult::Timeout));
-                                     break;
-                                 }
-                             } else {
-                                 // we resend the message and hope it arrives this time
-                                 star_tx.send( StarCommand::ForwardFrame( ForwardFrame{ to: delivery.message.to.clone(), frame: Frame::StarMessage(delivery.message.clone()) }  )).await;
-                             }
-                         }
-                     }
-                 }
+                                            // the result will have been captured on another
+                                            // rx as this is a broadcast.  no longer need to wait.
+                                            break;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                Err(_) => {
+                                    // probably the TX got dropped. no point in sticking around.
+                                    break;
+                                }
+                            }
+                        }
+                        Err(elapsed) => {
+                            delivery.retries = delivery.retries - 1;
+                            if delivery.retries == 0 {
+                                if delivery.expect.retry_forever()
+                                {
+                                    // we have to keep trying with a new message Id since the old one is now expired
+                                    let proto = delivery.message.resubmit(delivery.expect, delivery.tx.clone(), delivery.tx.subscribe());
+                                    star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                                    break;
+                                } else {
+                                    // out of retries, this
+                                    delivery.tx.send(MessageUpdate::Result(MessageResult::Timeout));
+                                    break;
+                                }
+                            } else {
+                                // we resend the message and hope it arrives this time
+                                star_tx.send(StarCommand::ForwardFrame(ForwardFrame { to: delivery.message.to.clone(), frame: Frame::StarMessage(delivery.message.clone()) })).await;
+                            }
+                        }
+                    }
+                }
             });
         }
         if message.to != self.skel.info.key {
-            self.send_frame(message.to.clone(), Frame::StarMessage(message) ).await;
+            self.send_frame(message.to.clone(), Frame::StarMessage(message)).await;
         } else {
-println!("special process frame....");
+            println!("special process frame....");
             // a special exception for sending a message to ourselves
-            self.process_frame(Frame::StarMessage(message), Option::None ).await;
+            self.process_frame(Frame::StarMessage(message), Option::None).await;
         }
-
     }
 
-    async fn send_frame(&mut self, star: StarKey, frame: Frame )
+    async fn send_frame(&mut self, star: StarKey, frame: Frame)
     {
         let lane = self.lane_with_shortest_path_to_star(&star);
-        if let Option::Some(lane)=lane
+        if let Option::Some(lane) = lane
         {
-            lane.lane.outgoing.tx.send( LaneCommand::Frame(frame) ).await;
-        }
-        else {
-            self.frame_hold.add( &star, frame );
-            let (tx,rx) = oneshot::channel();
+            lane.lane.outgoing.tx.send(LaneCommand::Frame(frame)).await;
+        } else {
+            self.frame_hold.add(&star, frame);
+            let (tx, rx) = oneshot::channel();
 
-            self.search_for_star(star.clone(), tx ).await;
+            self.search_for_star(star.clone(), tx).await;
             let command_tx = self.skel.star_tx.clone();
             tokio::spawn(async move {
-
                 match rx.await
                 {
                     Ok(_) => {
-                        command_tx.send( StarCommand::ReleaseHold(star) ).await;
+                        command_tx.send(StarCommand::ReleaseHold(star)).await;
                     }
                     Err(error) => {
-                        eprintln!("RELEASE HOLD RX ERROR : {}",error);
+                        eprintln!("RELEASE HOLD RX ERROR : {}", error);
                     }
                 }
             });
         }
     }
 
-    fn lane_with_shortest_path_to_star( &mut self, star: &StarKey ) -> Option<&mut LaneMeta>
+    fn lane_with_shortest_path_to_star(&mut self, star: &StarKey) -> Option<&mut LaneMeta>
     {
-        let mut min_hops= usize::MAX;
+        let mut min_hops = usize::MAX;
         let mut rtn = Option::None;
 
-        for (_,lane) in &mut self.lanes
+        for (_, lane) in &mut self.lanes
         {
             if let Option::Some(hops) = lane.get_hops_to_star(star)
             {
@@ -1407,22 +1372,21 @@ println!("special process frame....");
             }
         }
 
-       rtn
+        rtn
     }
 
-    fn get_hops_to_star( &mut self, star: &StarKey ) -> Option<usize>
+    fn get_hops_to_star(&mut self, star: &StarKey) -> Option<usize>
     {
-        let mut rtn= Option::None;
+        let mut rtn = Option::None;
 
-        for (_,lane) in &mut self.lanes
+        for (_, lane) in &mut self.lanes
         {
             if let Option::Some(hops) = lane.get_hops_to_star(star)
             {
                 if rtn.is_none()
                 {
                     rtn = Option::Some(hops);
-                }
-                else if let Option::Some(min_hops) = rtn
+                } else if let Option::Some(min_hops) = rtn
                 {
                     if hops < min_hops
                     {
@@ -1481,7 +1445,7 @@ println!("special process frame....");
         }
     }*/
 
-    async fn on_wind_down(&mut self, mut search_result: WindDown, lane_key: StarKey )
+    async fn on_wind_down(&mut self, mut search_result: WindDown, lane_key: StarKey)
     {
 //        println!("ON STAR SEARCH RESULTS");
     }
@@ -1532,17 +1496,17 @@ println!("special process frame....");
     }
      */
 
-    async fn process_transactions( &mut self, frame: &Frame, lane_key: Option<&StarKey> )
+    async fn process_transactions(&mut self, frame: &Frame, lane_key: Option<&StarKey>)
     {
         let tid = match frame
         {
-/*            Frame::StarMessage(message) => {
+            /*            Frame::StarMessage(message) => {
                 message.transaction
             },
 
  */
             Frame::StarWind(wind) => {
-                match wind{
+                match wind {
                     StarWind::Down(wind_down) => {
                         wind_down.transactions.last().cloned()
                     }
@@ -1566,7 +1530,7 @@ println!("special process frame....");
                 };
 
 
-                match transaction.on_frame(frame,lane, &mut self.skel.star_tx).await
+                match transaction.on_frame(frame, lane, &mut self.skel.star_tx).await
                 {
                     TransactionResult::Continue => {}
                     TransactionResult::Done => {
@@ -1577,7 +1541,7 @@ println!("special process frame....");
         }
     }
 
-    async fn process_message_reply( &mut self, message: &StarMessage )
+    async fn process_message_reply(&mut self, message: &StarMessage)
     {
         if message.reply_to.is_some() && self.message_reply_trackers.contains_key(message.reply_to.as_ref().unwrap()) {
             if let Some(tracker) = self.message_reply_trackers.get(message.reply_to.as_ref().unwrap()) {
@@ -1589,41 +1553,34 @@ println!("special process frame....");
         }
     }
 
-    async fn process_frame( &mut self, frame: Frame, lane_key: Option<&StarKey> )
+    async fn process_frame(&mut self, frame: Frame, lane_key: Option<&StarKey>)
     {
-        self.process_transactions(&frame,lane_key).await;
+        self.process_transactions(&frame, lane_key).await;
         match frame
         {
             Frame::Proto(proto) => {
-              match &proto
-              {
-                  ProtoFrame::RequestSubgraphExpansion => {
-                      if let Option::Some(lane_key) = lane_key
-                      {
-                          let mut subgraph = self.skel.info.key.subgraph.clone();
-                          subgraph.push(StarSubGraphKey::Big(self.star_subgraph_expansion_seq.fetch_add(1,std::sync::atomic::Ordering::Relaxed)));
-                          self.send_frame(lane_key.clone(), Frame::Proto(ProtoFrame::GrantSubgraphExpansion(subgraph))).await;
-                      }
-                      else
-                      {
-                          eprintln!("missing lane key in RequestSubgraphExpansion")
-                      }
-
-                  }
-                  _ => {}
-
-              }
-
+                match &proto
+                {
+                    ProtoFrame::RequestSubgraphExpansion => {
+                        if let Option::Some(lane_key) = lane_key
+                        {
+                            let mut subgraph = self.skel.info.key.subgraph.clone();
+                            subgraph.push(StarSubGraphKey::Big(self.star_subgraph_expansion_seq.fetch_add(1, std::sync::atomic::Ordering::Relaxed)));
+                            self.send_frame(lane_key.clone(), Frame::Proto(ProtoFrame::GrantSubgraphExpansion(subgraph))).await;
+                        } else {
+                            eprintln!("missing lane key in RequestSubgraphExpansion")
+                        }
+                    }
+                    _ => {}
+                }
             }
             Frame::StarWind(wind) => {
-
-                match wind{
+                match wind {
                     StarWind::Up(wind_up) => {
                         if let Option::Some(lane_key) = lane_key
                         {
                             self.on_wind_up_hop(wind_up, lane_key.clone()).await;
-                        }
-                        else {
+                        } else {
                             eprintln!("missing lanekey on WindUp");
                         }
                     }
@@ -1631,14 +1588,11 @@ println!("special process frame....");
                         if let Option::Some(lane_key) = lane_key
                         {
                             self.on_wind_down(wind_down, lane_key.clone()).await;
-                        }
-                        else {
+                        } else {
                             eprintln!("missing lanekey on WindDown");
                         }
-
                     }
                 }
-
             }
             Frame::StarMessage(message) => {
                 match self.on_message(message).await
@@ -1655,7 +1609,7 @@ println!("special process frame....");
         }
     }
 
-    async fn on_event(&mut self, event: Event, lane_key: StarKey  )
+    async fn on_event(&mut self, event: Event, lane_key: StarKey)
     {
         unimplemented!()
         /*
@@ -1676,7 +1630,7 @@ println!("special process frame....");
          */
     }
 
-    async fn on_watch( &mut self, watch: Watch, lane_key: StarKey )
+    async fn on_watch(&mut self, watch: Watch, lane_key: StarKey)
     {
         match &watch
         {
@@ -1690,7 +1644,7 @@ println!("special process frame....");
                     watches.remove(&info.id);
                     if watches.is_empty()
                     {
-                        self.watches.remove( &info.actor);
+                        self.watches.remove(&info.actor);
                     }
                 }
                 self.forward_watch(watch).await;
@@ -1698,9 +1652,9 @@ println!("special process frame....");
         }
     }
 
-    fn watch_add_renew( &mut self, watch_info: &WatchInfo, lane_key: &StarKey )
+    fn watch_add_renew(&mut self, watch_info: &WatchInfo, lane_key: &StarKey)
     {
-        let star_watch = StarWatchInfo{
+        let star_watch = StarWatchInfo {
             id: watch_info.id.clone(),
             lane: lane_key.clone(),
             timestamp: Instant::now()
@@ -1718,7 +1672,7 @@ println!("special process frame....");
         }
     }
 
-    async fn forward_watch( &mut self, watch: Watch )
+    async fn forward_watch(&mut self, watch: Watch)
     {
         unimplemented!()
         /*
@@ -1773,50 +1727,40 @@ println!("special process frame....");
     }
 
 
-
-
-    async fn on_message(&mut self, mut message: StarMessage) -> Result<(),Error>
+    async fn on_message(&mut self, mut message: StarMessage) -> Result<(), Error>
     {
         if message.to != self.skel.info.key
         {
             if self.skel.info.kind.relay() || message.from == self.skel.info.key
             {
                 //forward the message
-                self.send_frame(message.to.clone(), Frame::StarMessage(message) ).await;
+                self.send_frame(message.to.clone(), Frame::StarMessage(message)).await;
                 return Ok(());
+            } else {
+                return Err(format!("this star {} does not relay Messages", self.skel.info.kind).into())
             }
-            else {
-                return Err(format!("this star {} does not relay Messages", self.skel.info.kind ).into())
-            }
-        }
-        else {
+        } else {
             self.process_message_reply(&message).await;
-            self.skel.variant_tx.send( StarVariantCommand::StarMessage( message.clone())).await?;
+            self.skel.variant_tx.send(StarVariantCommand::StarMessage(message.clone())).await?;
             self.process_resource_message(message).await?;
             Ok(())
         }
     }
 
 
-    async fn process_resource_message(&mut self, mut message: StarMessage) -> Result<(),Error> {
+    async fn process_resource_message(&mut self, mut star_message: StarMessage) -> Result<(), Error> {
 //println!("process_message---> {}", message.payload.to_string() );
-        match &message.payload{
-            StarMessagePayload::ResourceManager(action) => self.process_child_manager_resource_action(message.clone(), action.clone()).await?,
-            StarMessagePayload::ResourceHost(action) => self.process_resource_host_action(message.clone(),action.clone()).await?,
+        match &star_message.payload {
+            StarMessagePayload::ResourceManager(action) => self.process_child_manager_resource_action(star_message.clone(), action.clone()).await?,
+            StarMessagePayload::ResourceHost(action) => self.process_resource_host_action(star_message.clone(), action.clone()).await?,
 
             StarMessagePayload::None => {}
             StarMessagePayload::MessagePayload(message_payload) => {
                 match &message_payload {
                     MessagePayload::Request(request) => {
-                        match &request.payload{
-                            ResourceRequestMessage::Create(_) => {}
-                            ResourceRequestMessage::Select(_) => {}
-                            ResourceRequestMessage::Unique(resource_type) => {
-                                let unique_src = self.skel.registry.as_ref().unwrap().unique_src(request.to.clone().into() ).await;
-                                let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)) );
-                                self.skel.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
-                            }
-                        }
+                        let delivery = Delivery::new(request.clone(), star_message, self.skel.clone() );
+                        self.process_resource_message_request_delivery(delivery).await?;
+
                     }
                     MessagePayload::Response(_) => {}
                     MessagePayload::Actor(_) => {}
@@ -1826,11 +1770,23 @@ println!("special process frame....");
             StarMessagePayload::Reply(_) => {}
             StarMessagePayload::UniqueId(_) => {}
         };
-                Ok(())
+        Ok(())
+    }
+
+    async fn process_resource_message_request_delivery(&mut self, delivery: Delivery<Message<ResourceRequestMessage>> ) -> Result<(), Error> {
+        match &delivery.message.payload {
+            ResourceRequestMessage::Create(_) => {}
+            ResourceRequestMessage::Select(_) => {}
+            ResourceRequestMessage::Unique(resource_type) => {
+                let unique_src = self.skel.registry.as_ref().unwrap().unique_src(delivery.message.to.clone().into()).await;
+                delivery.reply(ResourceResponseMessage::Unique(unique_src.next(resource_type).await?)).await?;
             }
+        }
+        Ok(())
+    }
 
 
-            async fn process_child_manager_resource_action(&mut self, message: StarMessage, action: ChildManagerResourceAction) -> Result<(),Error>
+    async fn process_child_manager_resource_action(&mut self, message: StarMessage, action: ChildManagerResourceAction) -> Result<(),Error>
             {
         println!("process_child_manager_resource_action ---> {} === StarKind: {}", action.to_string(), self.skel.info.kind );
                 if let Option::Some(manager) = self.skel.registry.clone()
@@ -1977,6 +1933,7 @@ println!("special process frame....");
                         }
                         Ok(())
                     }
+
                     async fn get_child_resource_manager(&mut self, key: ResourceKey) -> Result<ChildResourceManager,Fail> {
                         println!(" ::::>  GET RESOURCE MANAGER for {} <:::: [star kind {}]",key,&self.skel.info.kind );
 

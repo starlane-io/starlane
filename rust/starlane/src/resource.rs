@@ -37,7 +37,7 @@ use crate::util::AsyncHashMap;
 use std::path::PathBuf;
 use std::future::Future;
 use crate::util;
-use crate::message::resource::{Message, MessageTo, ProtoMessage, ResourceRequestMessage, MessageFrom};
+use crate::message::resource::{Message, MessageTo, ProtoMessage, ResourceRequestMessage, MessageFrom, MessageReply, ResourceResponseMessage};
 use crate::actor::{ActorKind, ActorKey};
 
 pub mod space;
@@ -1900,15 +1900,24 @@ println!("MORE....");
                     proto.to(self.parent.key.clone().into());
                     proto.from(MessageFrom::Resource(self.parent.key.clone().into()));
                     proto.payload = Option::Some(ResourceRequestMessage::Unique(self.create.archetype.kind.resource_type()));
-                    let mut rx = proto.reply();
+
+                    let mut rx :Receiver<Result<MessageReply<ResourceResponseMessage>,Fail>> = proto.reply();
+
+                    let proto_star_message = match proto.to_proto_star_message().await {
+                        Ok(proto_star_message) => proto_star_message,
+                        Err(error) => {
+                            eprintln!("ERROR when process proto_star_message from ProtoMessage: {}", error);
+                            return;
+                        }
+                    };
+
 
 println!("SENDING RESOURCE MESSAGE!!!!");
-                    self.skel.star_tx.send(StarCommand::SendProtoMessage(proto.create().unwrap().into())).await;
+                    self.skel.star_tx.send(StarCommand::SendProtoMessage(proto_star_message)).await;
 
                     tokio::spawn( async move {
 
-/*
-                        if let Ok(Ok(Message { payload: MessagePayload::Response(MessageResponse::Unique(id)), to: _, from: _ })) = util::wait_for_it_whatever(rx).await {
+                        if let Ok(Ok(MessageReply{ id:_, from:_, reply_to:_, payload:ResourceResponseMessage::Unique(id) })) = util::wait_for_it_whatever(rx).await {
                             match ResourceKey::new(self.parent.key.clone(), id.clone()) {
                                 Ok(key) => {
                                     let final_create = self.finalize_create(key.clone()).await;
@@ -1925,8 +1934,6 @@ println!("SENDING RESOURCE MESSAGE!!!!");
                             self.tx.send( Err("unexpected response, expected ResourceResponse::Unique".into()));
                             return;
                         }
-
- */
                     } );
 
                 }
