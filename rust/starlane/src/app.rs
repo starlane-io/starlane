@@ -17,16 +17,14 @@ use crate::keys::{AppKey, SubSpaceKey, UserKey, ResourceKey};
 use crate::resource::{Labels, ResourceAssign, ResourceKind, ResourceRegistration, ResourceRecord, ResourceArchetype, ResourceAddress, Names, AssignResourceStateSrc, SkewerCase, ResourceAddressPart, ResourceType, ResourceCreate, ResourceStub};
 use crate::names::{Name, Specific};
 use crate::space::CreateAppControllerFail;
-use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarSkel, StarVariantCommand, StarComm, ServerCommand, Request, Empty, Query, LocalResourceLocation };
+use crate::star::{ActorCreate, CoreAppSequenceRequest, CoreRequest, StarCommand, StarKey, StarSkel, StarComm, ServerCommand, Request, Empty, Query, LocalResourceLocation };
 use crate::message::{Fail, ProtoStarMessage};
 use tokio::sync::mpsc::Sender;
 use tokio::time::error::Elapsed;
 use tokio::sync::oneshot::error::RecvError;
 use std::iter::FromIterator;
 use crate::message::resource::{Message, RawPayload, MessageFrom, MessageTo, ActorMessage};
-
-
-
+use crate::star::variant::StarVariantCommand;
 
 
 #[derive(Clone,Serialize,Deserialize)]

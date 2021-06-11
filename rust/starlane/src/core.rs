@@ -16,21 +16,22 @@ use tokio::sync::mpsc::Sender;
 use tokio::time::Duration;
 
 use crate::actor::{ActorKey };
-use crate::core::space::SpaceHost;
 use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, ResourceKey};
 use crate::message::Fail;
 use crate::resource::{AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource, Resource, ResourceAssign, ResourceSliceAssign};
 use crate::resource::store::ResourceStoreSqlLite;
-use crate::star::{ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel, StarVariantCommand};
+use crate::star::{ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel};
 use crate::file::FileAccess;
 use crate::core::file_store::FileStoreHost;
 use crate::frame::MessagePayload;
+use crate::core::default::DefaultHost;
+use crate::star::variant::StarVariantCommand;
 
 pub mod server;
-pub mod space;
 pub mod file_store;
+pub mod default;
 
 pub struct StarCoreAction{
     pub command: StarCoreCommand,
@@ -153,14 +154,12 @@ impl StarCoreFactory
         let file_access = skel.file_access.with_path(format!("stars/{}",skel.info.key.to_string())).await?;
         let host:Box<dyn Host> =  match skel.info.kind
         {
-            StarKind::SpaceHost => {
-                Box::new(SpaceHost::new().await)
-            }
+
             StarKind::FileStore => {
                 Box::new(FileStoreHost::new(skel.clone(),file_access).await? )
             }
             _ => {
-                Box::new(InertHost::new())
+                Box::new(DefaultHost::new().await )
             }
         };
         Ok(StarCore2::new(skel, core_rx, host ).await)
@@ -179,11 +178,11 @@ impl InertHost{
 #[async_trait]
 impl Host for InertHost{
     async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource, Fail> {
-        Err(Fail::WrongResourceType {expected:HashSet::new(),received:assign.stub.archetype.kind.resource_type()})
+        Err(Fail::Error("This is an InertHost which cannot actually host anything".into()))
     }
 
     async fn get(&self, key: ResourceKey) -> Result<Option<Resource>, Fail> {
-        Err(Fail::WrongResourceType {expected:HashSet::new(),received:key.resource_type()})
+        Err(Fail::Error("This is an InertHost which cannot actually host anything".into()))
     }
 }
 

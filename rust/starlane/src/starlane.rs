@@ -23,10 +23,11 @@ use crate::proto::{local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolu
 use crate::provision::Provisioner;
 use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord};
 use crate::resource::space::SpaceState;
-use crate::star::{Request, Star, StarCommand, StarController, StarKey, StarManagerFactory, StarManagerFactoryDefault, StarName};
+use crate::star::{Request, Star, StarCommand, StarController, StarKey, StarName};
 use crate::template::{ConstellationData, ConstellationTemplate, StarKeyIndexTemplate, StarKeySubgraphTemplate, StarKeyTemplate};
 use crate::starlane::api::StarlaneApi;
 use crate::core::CoreRunner;
+use crate::star::variant::{StarVariantFactory, StarVariantFactoryDefault};
 
 pub mod api;
 
@@ -40,7 +41,7 @@ pub struct Starlane
     rx: mpsc::Receiver<StarlaneCommand>,
     star_controllers: HashMap<StarKey,StarController>,
     star_names: HashMap<StarName,StarKey>,
-    star_manager_factory: Arc<dyn StarManagerFactory>,
+    star_manager_factory: Arc<dyn StarVariantFactory>,
 //    star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
     core_runner: Arc<CoreRunner>,
     constellation_names: HashSet<String>,
@@ -59,7 +60,7 @@ impl Starlane
             constellation_names: HashSet::new(),
             tx: tx,
             rx: rx,
-            star_manager_factory: Arc::new( StarManagerFactoryDefault{} ),
+            star_manager_factory: Arc::new( StarVariantFactoryDefault {} ),
 //            star_core_ext_factory: Arc::new(ExampleStarCoreExtFactory::new() ),
             core_runner: Arc::new(CoreRunner::new()?),
             logger: Logger::new(),

@@ -1302,7 +1302,7 @@ impl ResourceType{
             ResourceType::File => StarKind::FileStore,
             ResourceType::UrlPathPattern => StarKind::SpaceHost,
             ResourceType::Proxy => StarKind::SpaceHost,
-            ResourceType::Domain => StarKind::WebHost
+            ResourceType::Domain => StarKind::SpaceHost
         }
     }
 

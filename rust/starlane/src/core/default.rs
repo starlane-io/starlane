@@ -14,29 +14,28 @@ use crate::core::Host;
 use crate::error::Error;
 use crate::file::FileAccess;
 use crate::frame::ResourceHostAction;
-use crate::keys::{ResourceKey, SpaceId};
 use crate::message::Fail;
 use crate::names::{Name, Specific};
 use crate::resource::{AssignResourceStateSrc, DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Names, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceStatePersistenceManager, ResourceStateSrc, ResourceType};
 use crate::resource;
-use crate::resource::space::{Space, SpaceState};
 use crate::resource::store::{ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult, ResourceStoreSqlLite};
 use crate::resource::user::UserState;
+use crate::keys::ResourceKey;
 
-pub struct SpaceHost {
+pub struct DefaultHost {
   store: ResourceStore
 }
 
-impl SpaceHost {
+impl DefaultHost {
     pub async fn new()->Self{
-        SpaceHost {
+        DefaultHost {
             store: ResourceStore::new().await
         }
     }
 }
 
 #[async_trait]
-impl Host for SpaceHost {
+impl Host for DefaultHost {
 
     async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource, Fail> {
         // if there is Initialization to do for assignment THIS is where we do it

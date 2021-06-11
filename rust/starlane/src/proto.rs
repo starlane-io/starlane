@@ -22,11 +22,12 @@ use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PRO
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::permissions::AuthTokenSource;
 use crate::resource::HostedResourceStore;
-use crate::star::{FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBacking, ResourceRegistryBackingSqLite, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarManagerFactory, StarSearchTransaction, StarSkel, StarVariantCommand, Transaction};
+use crate::star::{FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBacking, ResourceRegistryBackingSqLite, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarSearchTransaction, StarSkel, Transaction};
 use crate::star::pledge::StarHandleBacking;
 use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
 use crate::core::{CoreRunner, CoreRunnerCommand};
+use crate::star::variant::{StarVariantFactory, StarVariantCommand};
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -39,7 +40,7 @@ pub struct ProtoStar
   command_rx: mpsc::Receiver<StarCommand>,
   lanes: HashMap<StarKey, LaneMeta>,
   connector_ctrls: Vec<ConnectorController>,
-  star_manager_factory: Arc<dyn StarManagerFactory>,
+  star_manager_factory: Arc<dyn StarVariantFactory>,
 //  star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
   core_runner: Arc<CoreRunner>,
   logger: Logger,
@@ -50,7 +51,7 @@ pub struct ProtoStar
 
 impl ProtoStar
 {
-    pub fn new(key: Option<StarKey>, kind: StarKind, star_manager_factory: Arc<dyn StarManagerFactory>, core_runner: Arc<CoreRunner>,  flags: Flags, logger: Logger ) ->(Self, StarController)
+    pub fn new(key: Option<StarKey>, kind: StarKind, star_manager_factory: Arc<dyn StarVariantFactory>, core_runner: Arc<CoreRunner>, flags: Flags, logger: Logger ) ->(Self, StarController)
     {
         let (command_tx, command_rx) = mpsc::channel(32);
         (ProtoStar{
@@ -107,7 +108,7 @@ impl ProtoStar
                         let info = StarInfo{
                             key: self.star_key.as_ref().unwrap().clone(),
                             kind: self.kind.clone()};
-                        let manager_tx= self.star_manager_factory.create().await;
+
 
 
                         let (core_tx,core_rx) = mpsc::channel(16);
@@ -129,7 +130,6 @@ impl ProtoStar
                             sequence: self.sequence.clone(),
                             star_tx: self.command_tx.clone(),
                             core_tx: core_tx.clone(),
-                            variant_tx: manager_tx.clone(),
                             logger: self.logger.clone(),
                             flags: self.flags.clone(),
                             auth_token_source: AuthTokenSource {},
@@ -139,20 +139,20 @@ impl ProtoStar
                             file_access: FileAccess::new("data".to_string()).await?
                         };
 
+                        let variant= self.star_manager_factory.create(skel.clone() ).await;
+
                         self.core_runner.send(CoreRunnerCommand::Core{
                             skel: skel.clone(),
                             rx: core_rx
                         } ).await;
-
-                        // now send star data to manager and core... tricky!
-                        manager_tx.send(StarVariantCommand::StarSkel(skel.clone()) ).await;
 
                         return Ok(Star::from_proto(skel.clone(),
                                                    self.command_rx,
                                                    core_tx,
                                                    self.lanes,
                                                    self.connector_ctrls,
-                                                   self.frame_hold ).await );
+                                                   self.frame_hold,
+                                                   variant ).await );
 
                     }
                     StarCommand::AddLane(lane) => {

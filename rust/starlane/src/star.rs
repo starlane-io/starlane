@@ -26,38 +26,37 @@ use tokio::time::{Duration, Instant, timeout};
 use tokio::time::error::Elapsed;
 use url::Url;
 
+use variant::central::CentralVariant;
+use variant::StarVariant;
 
+use crate::actor::{ActorKey, ActorKind};
 use crate::core::{StarCoreAction, StarCoreCommand, StarCoreResult};
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
 use crate::file::FileAccess;
+use crate::frame::{ActorLookup, ChildManagerResourceAction, Event, Frame, FromReply, MessagePayload, ProtoFrame, Reply, ResourceHostAction, SimpleReply, SpaceMessage, StarMessage, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, GatheringKey, MessageId, ResourceId, ResourceKey, SpaceKey, Unique, UniqueSrc, UserKey};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
-use crate::message::{Fail, MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage, StarMessageDeliveryInsurance, TrackerJob, ProtoStarMessageTo};
+use crate::message::{Fail, MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage, ProtoStarMessageTo, StarMessageDeliveryInsurance, TrackerJob};
+use crate::message::resource::{Delivery, Message, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage};
 use crate::permissions::{Authentication, AuthToken, AuthTokenSource, Credentials};
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
 use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, ChildResourceManager, ChildResourceManagerCore, FieldSelection, HostedResourceStore, KeyCreationSrc, Labels, LocalDataSrc, LocalHostedResource, LocalResourceHost, MemoryDataTransfer, Registry, RegistryReservation, RegistryUniqueSrc, RemoteResourceManager, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceBinding, ResourceCreate, ResourceHost, ResourceIdentifier, ResourceKind, ResourceLocation, ResourceManager, ResourceManagerKey, ResourceNamesReservationRequest, ResourceParent, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector, ResourceStateSrc, ResourceStub, ResourceType};
 use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
-use crate::star::central::CentralStarVariant;
 use crate::star::pledge::{ResourceHostSelector, Satisfaction, StarHandle, StarHandleBacking};
-use crate::star::space::SpaceVariant;
+use crate::star::variant::web::WebVariant;
 use crate::starlane::api::StarlaneApi;
-use crate::util::AsyncHashMap;
 use crate::util;
-use crate::message::resource::{ProtoMessage, ResourceRequestMessage, Message, Delivery, ResourceResponseMessage};
-use crate::actor::{ActorKind, ActorKey};
-use crate::frame::{WindHit, WindResults, WindDown, StarWind, Frame, StarMessage, StarMessagePayload, SimpleReply, ActorLookup, Watch, WatchInfo, ChildManagerResourceAction, StarPattern, WindAction, WindUp, ResourceHostAction, ProtoFrame, Reply, Event, FromReply, SpaceMessage, MessagePayload};
+use crate::util::AsyncHashMap;
 
-pub mod central;
 pub mod filestore;
 pub mod pledge;
-pub mod space;
-pub mod common;
+pub mod variant;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize,Hash)]
 pub enum StarKind
@@ -71,7 +70,7 @@ pub enum StarKind
     Gateway,
     Link,
     Client,
-    WebHost
+    Web
 }
 
 impl StarKind
@@ -87,7 +86,7 @@ impl StarKind
             StarKind::Gateway => false,
             StarKind::Link => false,
             StarKind::Client => false,
-            StarKind::WebHost => false
+            StarKind::Web => false
         }
     }
 
@@ -102,14 +101,14 @@ impl StarKind
             StarKind::Gateway => false,
             StarKind::Link => false,
             StarKind::Client => true,
-            StarKind::WebHost => true
+            StarKind::Web => true
         }
     }
 
     pub fn handles(&self)->HashSet<StarKind>{
         HashSet::from_iter(match self {
             StarKind::Central => vec![StarKind::AppHost, StarKind::SpaceHost],
-            StarKind::SpaceHost => vec![StarKind::FileStore,StarKind::WebHost],
+            StarKind::SpaceHost => vec![StarKind::FileStore,StarKind::Web],
             StarKind::Mesh => vec![],
             StarKind::AppHost => vec![StarKind::ActorHost, StarKind::FileStore],
             StarKind::ActorHost => vec![],
@@ -117,7 +116,7 @@ impl StarKind
             StarKind::Gateway => vec![],
             StarKind::Link => vec![],
             StarKind::Client => vec![],
-            StarKind::WebHost => vec![]
+            StarKind::Web => vec![]
         }.iter().cloned())
     }
 
@@ -133,14 +132,14 @@ impl StarKind
             StarKind::Gateway => vec![],
             StarKind::Link => vec![],
             StarKind::Client => vec![],
-            StarKind::WebHost => vec![ResourceType::Domain,ResourceType::UrlPathPattern]
+            StarKind::Web => vec![ResourceType::Domain, ResourceType::UrlPathPattern]
         }.iter().cloned())
     }
 
     pub fn hosts(&self)->HashSet<ResourceType>{
         HashSet::from_iter(match self {
             StarKind::Central => vec![],
-            StarKind::SpaceHost => vec![ResourceType::Space, ResourceType::SubSpace,ResourceType::User],
+            StarKind::SpaceHost => vec![ResourceType::Space, ResourceType::SubSpace,ResourceType::User,ResourceType::Domain, ResourceType::UrlPathPattern, ResourceType::Proxy],
             StarKind::Mesh => vec![],
             StarKind::AppHost => vec![ResourceType::App],
             StarKind::ActorHost => vec![ResourceType::Actor],
@@ -148,7 +147,7 @@ impl StarKind
             StarKind::Gateway => vec![],
             StarKind::Link => vec![],
             StarKind::Client => vec![ResourceType::Actor],
-            StarKind::WebHost => vec![ResourceType::Domain,ResourceType::UrlPathPattern]
+            StarKind::Web => vec![]
         }.iter().cloned())
     }
 }
@@ -168,7 +167,7 @@ impl FromStr for StarKind{
             "Link"  => Ok(StarKind::Link),
             "Client"  => Ok(StarKind::Client),
             "SpaceHost"  => Ok(StarKind::SpaceHost),
-            "WebHost"  => Ok(StarKind::WebHost),
+            "Web"  => Ok(StarKind::Web),
             _      => Err(()),
         }
     }
@@ -303,7 +302,7 @@ impl StarKind
             StarKind::Link => true,
             StarKind::FileStore => false,
             StarKind::SpaceHost => false,
-            StarKind::WebHost => false
+            StarKind::Web => false
         }
     }
 }
@@ -321,7 +320,7 @@ impl fmt::Display for StarKind{
             StarKind::Link => "Link".to_string(),
             StarKind::Client => "Client".to_string(),
             StarKind::SpaceHost => "SpaceHost".to_string(),
-            StarKind::WebHost => "WebHost".to_string()
+            StarKind::Web => "WebHost".to_string()
         })
     }
 }
@@ -344,6 +343,7 @@ pub struct Star
     skel: StarSkel,
     star_rx: mpsc::Receiver<StarCommand>,
     core_tx: mpsc::Sender<StarCoreAction>,
+    variant: Box<dyn StarVariant>,
     lanes: HashMap<StarKey, LaneMeta>,
     connector_ctrls: Vec<ConnectorController>,
     transactions: HashMap<u64,Box<dyn Transaction>>,
@@ -364,11 +364,13 @@ impl Star
                             core_tx: mpsc::Sender<StarCoreAction>,
                             lanes: HashMap<StarKey, LaneMeta>,
                             connector_ctrls: Vec<ConnectorController>,
-                            frame_hold: FrameHold) -> Self
+                            frame_hold: FrameHold,
+                            variant: Box<dyn StarVariant>) -> Self
 
     {
         Star {
             skel: data,
+            variant: variant,
             star_rx: star_rx,
             core_tx: core_tx,
             lanes: lanes,
@@ -786,7 +788,7 @@ println!("GOT REPLY from GetKey");
                 if let Result::Ok(Satisfaction::Ok) = star_handler.satisfied(self.skel.info.kind.handles()).await {
                     self.status = StarStatus::Ready;
                     println!("{}: Ready", self.skel.info.kind);
-                    self.skel.variant_tx.send(StarVariantCommand::Init).await;
+                    self.variant.init().await;
                 } else {
                     // nothing
                 }
@@ -1682,7 +1684,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
             }
         } else {
             self.process_message_reply(&message).await;
-            self.skel.variant_tx.send(StarVariantCommand::StarMessage(message.clone())).await?;
             self.process_resource_message(message).await?;
             Ok(())
         }
@@ -2100,16 +2101,7 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                     }
                 }
 
-                pub enum StarVariantCommand
-                {
-                    StarSkel(StarSkel),
-                    Init,
-                    CoreRequest(CoreRequest),
-                    StarMessage(StarMessage),
-                    CentralCommand(CentralCommand),
-                }
-
-                pub enum CoreRequest
+pub enum CoreRequest
                 {
                     AppSequenceRequest(CoreAppSequenceRequest)
                 }
@@ -2119,11 +2111,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                     pub app: AppKey,
                     pub user: UserKey,
                     pub tx: Sender<u64>
-                }
-
-                pub enum CentralCommand
-                {
-                  SequenceRequest
                 }
 
                 pub struct SetSupervisorForApp
@@ -2265,22 +2252,7 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                 }
 
 
-                impl fmt::Display for StarVariantCommand {
-                    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                        let r = match self {
-                            StarVariantCommand::StarMessage(message) => format!("StarMessage({})", message.payload ).to_string(),
-                            StarVariantCommand::CentralCommand(_) => "CentralCommand".to_string(),
-                            StarVariantCommand::Init => "Init".to_string(),
-                            StarVariantCommand::StarSkel(_) => "StarSkel".to_string(),
-                            StarVariantCommand::CoreRequest(_) => "CoreRequest".to_string(),
-                        };
-                        write!(f, "{}",r)
-                    }
-                }
-
-
-
-                impl fmt::Display for StarCommand{
+impl fmt::Display for StarCommand{
                     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                         let r = match self {
                             StarCommand::AddLane(_) => format!("AddLane").to_string(),
@@ -2617,14 +2589,7 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                 }
 
 
-                #[async_trait]
-                trait StarVariant: Send+Sync
-                {
-                    async fn handle(&mut self, command: StarVariantCommand);
-                }
-
-
-                #[derive(PartialEq, Eq, Ord, PartialOrd, Hash, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Ord, PartialOrd, Hash, Debug, Clone, Serialize, Deserialize)]
                 pub enum StarSubGraphKey
                 {
                     Big(u64),
@@ -2771,102 +2736,7 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                    }
                 }
 
-                trait ServerVariantBacking: Send+Sync
-                {
-                    fn set_supervisor( &mut self, supervisor_star: StarKey );
-                    fn get_supervisor( &self )->Option<&StarKey>;
-                }
-
-
-                pub struct PlaceholderStarManager
-                {
-                    pub data: StarSkel
-                }
-
-                impl PlaceholderStarManager
-                {
-
-                    pub fn new(info: StarSkel) ->Self
-                    {
-                        PlaceholderStarManager{
-                            data: info
-                        }
-                    }
-                }
-
-                #[async_trait]
-                impl StarVariant for PlaceholderStarManager
-                {
-                    async fn handle(&mut self, command: StarVariantCommand)  {
-                        match &command
-                        {
-                            StarVariantCommand::Init => {}
-                            StarVariantCommand::StarMessage(message)=>{
-                                match &message.payload{
-                                    StarMessagePayload::Reply(_) => {}
-                                    _ => {
-                                    //    println!("command {} Placeholder unimplemented for kind: {} & payload {}",command,self.data.info.kind,message.payload);
-                                    }
-                                }
-                            }
-                            _ => {
-//                                println!("command {} Placeholder unimplemented for kind: {}",command,self.data.info.kind);
-                            }
-                        }
-                    }
-                }
-
-                #[async_trait]
-                pub trait StarManagerFactory: Sync+Send
-                {
-                    async fn create(&self) -> mpsc::Sender<StarVariantCommand>;
-                }
-
-
-                pub struct StarManagerFactoryDefault
-                {
-                }
-
-                #[async_trait]
-                impl StarManagerFactory for StarManagerFactoryDefault
-                {
-                    async fn create(&self) -> mpsc::Sender<StarVariantCommand>
-                    {
-                        let (mut tx,mut rx) = mpsc::channel(32);
-
-                        tokio::spawn( async move {
-                            let mut manager:Box<dyn StarVariant> = loop {
-                                let command = rx.recv().await;
-                                if let Option::Some(StarVariantCommand::StarSkel(data)) = command
-                                {
-                                    if let StarKind::Central = data.info.kind
-                                    {
-                                        break Box::new(CentralStarVariant::new(data.clone() ).await );
-                                    }
-                                    if let StarKind::SpaceHost = data.info.kind
-                                    {
-                                        break Box::new(SpaceVariant::new(data.clone() ).await );
-                                    }
-                                    else {
-                                        break Box::new(PlaceholderStarManager::new(data.clone()))
-                                    }
-                                }
-                                else if let Option::Some(command) = command {
-                                    eprintln!("Attempt to process {} before StarSkel has been set.",command)
-                                }
-                            };
-
-                            while let Option::Some(command) = rx.recv().await
-                            {
-                                manager.handle(command).await;
-                            }
-                        }  );
-
-                        tx
-                    }
-                }
-
-                #[derive(Clone)]
+#[derive(Clone)]
                 pub enum Persistence{
                     Memory
                 }
@@ -2877,7 +2747,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                     pub info: StarInfo,
                     pub star_tx: mpsc::Sender<StarCommand>,
                     pub core_tx: mpsc::Sender<StarCoreAction>,
-                    pub variant_tx: mpsc::Sender<StarVariantCommand>,
                     pub flags: Flags,
                     pub logger: Logger,
                     pub sequence: Arc<AtomicU64>,
@@ -2894,7 +2763,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                     {
                         StarComm{
                             star_tx: self.star_tx.clone(),
-                            variant_tx: self.variant_tx.clone(),
                             core_tx: self.core_tx.clone(),
                         }
                     }
@@ -2978,7 +2846,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                 pub struct StarComm
                 {
                     pub star_tx: mpsc::Sender<StarCommand>,
-                    pub variant_tx: mpsc::Sender<StarVariantCommand>,
                     pub core_tx: mpsc::Sender<StarCoreAction>
                 }
 
@@ -3220,6 +3087,7 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                         }
                     }
 
+                    /*
                     pub async fn relay( &self, message: StarMessage, rx: oneshot::Receiver<StarMessagePayload> )
                     {
                         self.relay_trigger(message,rx, Option::None, Option::None).await;
@@ -3227,7 +3095,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
 
                     pub async fn relay_trigger(&self, message: StarMessage, rx: oneshot::Receiver<StarMessagePayload>, trigger: Option<StarVariantCommand>, trigger_reply: Option<Reply> )
                     {
-                        let variant_tx = self.variant_tx.clone();
                         let star_tx = self.star_tx.clone();
                         tokio::spawn(async move {
                             let proto = match rx.await
@@ -3245,6 +3112,8 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                             star_tx.send( StarCommand::SendProtoMessage(proto)).await;
                         });
                     }
+
+                     */
 
 
 
