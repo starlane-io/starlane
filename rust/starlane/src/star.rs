@@ -109,7 +109,7 @@ impl StarKind
     pub fn handles(&self)->HashSet<StarKind>{
         HashSet::from_iter(match self {
             StarKind::Central => vec![StarKind::AppHost, StarKind::SpaceHost],
-            StarKind::SpaceHost => vec![StarKind::FileStore],
+            StarKind::SpaceHost => vec![StarKind::FileStore,StarKind::WebHost],
             StarKind::Mesh => vec![],
             StarKind::AppHost => vec![StarKind::ActorHost, StarKind::FileStore],
             StarKind::ActorHost => vec![],
@@ -125,7 +125,7 @@ impl StarKind
     pub fn manages(&self)->HashSet<ResourceType>{
         HashSet::from_iter(match self {
             StarKind::Central => vec![ResourceType::Space],
-            StarKind::SpaceHost => vec![ResourceType::SubSpace, ResourceType::App, ResourceType::FileSystem,ResourceType::Proxy,ResourceType::UrlPathPattern],
+            StarKind::SpaceHost => vec![ResourceType::SubSpace, ResourceType::App, ResourceType::FileSystem,ResourceType::Proxy],
             StarKind::Mesh => vec![],
             StarKind::AppHost => vec![ResourceType::Actor, ResourceType::FileSystem],
             StarKind::ActorHost => vec![],
@@ -133,14 +133,14 @@ impl StarKind
             StarKind::Gateway => vec![],
             StarKind::Link => vec![],
             StarKind::Client => vec![],
-            StarKind::WebHost => vec![]
+            StarKind::WebHost => vec![ResourceType::Domain,ResourceType::UrlPathPattern]
         }.iter().cloned())
     }
 
     pub fn hosts(&self)->HashSet<ResourceType>{
         HashSet::from_iter(match self {
             StarKind::Central => vec![],
-            StarKind::SpaceHost => vec![ResourceType::Space, ResourceType::SubSpace,ResourceType::User,ResourceType::UrlPathPattern],
+            StarKind::SpaceHost => vec![ResourceType::Space, ResourceType::SubSpace,ResourceType::User],
             StarKind::Mesh => vec![],
             StarKind::AppHost => vec![ResourceType::App],
             StarKind::ActorHost => vec![ResourceType::Actor],
@@ -148,7 +148,7 @@ impl StarKind
             StarKind::Gateway => vec![],
             StarKind::Link => vec![],
             StarKind::Client => vec![ResourceType::Actor],
-            StarKind::WebHost => vec![]
+            StarKind::WebHost => vec![ResourceType::Domain,ResourceType::UrlPathPattern]
         }.iter().cloned())
     }
 }

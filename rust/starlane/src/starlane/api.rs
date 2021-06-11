@@ -14,6 +14,7 @@ use crate::star::{Request, StarCommand, StarKey};
 use crate::error::Error;
 use crate::resource::file_system::FileSystemState;
 use std::sync::Arc;
+use crate::resource::domain::DomainState;
 
 
 #[derive(Clone)]
@@ -211,6 +212,24 @@ impl SpaceApi {
         Ok(SubSpaceApi::new( self.star_tx.clone(), stub)?)
     }
 
+    pub async fn create_domain( &self, domain: &str )-> Result<DomainApi,Fail> {
+        let resource_src = AssignResourceStateSrc::None;
+        let create = ResourceCreate{
+            parent: self.stub.key.clone(),
+            key: KeyCreationSrc::None,
+            address: AddressCreationSrc::Append(domain.to_string()),
+            archetype: ResourceArchetype {
+                kind: ResourceKind::Domain,
+                specific: None,
+                config: None
+            },
+            src: resource_src,
+            registry_info: None,
+            owner: None
+        };
+        let stub = self.starlane_api().create_resource(create).await?;
+        Ok(DomainApi::new( self.star_tx.clone(), stub)?)
+    }
 }
 
 
@@ -370,6 +389,28 @@ impl UserApi {
         }
 
         Ok(UserApi{
+            star_tx: star_tx,
+            stub: stub
+        })
+    }
+}
+
+
+pub struct DomainApi{
+    stub: ResourceStub,
+    star_tx: mpsc::Sender<StarCommand>
+}
+
+impl DomainApi {
+    pub fn new(star_tx: mpsc::Sender<StarCommand>, stub: ResourceStub ) -> Result<Self,Error> {
+        if stub.key.resource_type() != ResourceType::Domain{
+            return Err(format!("wrong key resource type for DomainApi: {}", stub.key.resource_type().to_string()).into());
+        }
+        if stub.address.resource_type() != ResourceType::Domain{
+            return Err(format!("wrong address resource type for DomainApi: {}", stub.address.resource_type().to_string()).into());
+        }
+
+        Ok(DomainApi{
             star_tx: star_tx,
             stub: stub
         })

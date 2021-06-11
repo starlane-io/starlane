@@ -118,6 +118,7 @@ impl CentralStarVariant{
         self.ensure_hyperspace().await.unwrap();
         self.ensure_user(&ResourceAddress::for_space("hyperspace").unwrap(),"hyperuser@starlane.io").await.unwrap();
         self.ensure_subspace(&ResourceAddress::for_space("hyperspace").unwrap(),"default").await.unwrap();
+        self.ensure_localhost_domain().await.unwrap();
     }
 
     async fn ensure_hyperspace(&self)->Result<(),Error>{
@@ -138,6 +139,14 @@ impl CentralStarVariant{
         let starlane_api = StarlaneApi::new(self.skel.star_tx.clone());
         let space_api = starlane_api.get_space(space_address.clone().into()).await?;
         space_api.create_sub_space(sub_space).await?;
+        Ok(())
+    }
+
+    async fn ensure_localhost_domain(&self) ->Result<(),Error>{
+        let space_address = ResourceAddress::for_space("hyperspace")?;
+        let starlane_api = StarlaneApi::new(self.skel.star_tx.clone());
+        let space_api = starlane_api.get_space(space_address.clone().into()).await?;
+        space_api.create_domain("localhost").await?;
         Ok(())
     }
 }

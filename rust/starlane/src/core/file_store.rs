@@ -125,7 +125,10 @@ impl Host for FileStoreHost {
             AssignResourceStateSrc::Hosted => {
                 Arc::new(MemoryDataTransfer::none())
             }
-        };
+           AssignResourceStateSrc::None => {
+               Arc::new(MemoryDataTransfer::none())
+           }
+       };
 
         match assign.stub.key.resource_type(){
             ResourceType::FileSystem => {

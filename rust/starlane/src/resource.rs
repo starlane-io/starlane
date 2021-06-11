@@ -48,6 +48,7 @@ pub mod user;
 pub mod file_system;
 pub mod file;
 pub mod store;
+pub mod domain;
 
 lazy_static!
 {
@@ -1301,7 +1302,7 @@ impl ResourceType{
             ResourceType::File => StarKind::FileStore,
             ResourceType::UrlPathPattern => StarKind::SpaceHost,
             ResourceType::Proxy => StarKind::SpaceHost,
-            ResourceType::Domain => StarKind::SpaceHost
+            ResourceType::Domain => StarKind::WebHost
         }
     }
 
@@ -3495,6 +3496,7 @@ pub enum KeySrc{
 /// can have other options like to Initialize the state data
 #[derive(Clone,Serialize,Deserialize)]
 pub enum AssignResourceStateSrc {
+    None,
     Direct(Arc<Vec<u8>>),
     Hosted
 }
@@ -3505,7 +3507,8 @@ impl TryInto<ResourceStateSrc> for AssignResourceStateSrc{
     fn try_into(self) -> Result<ResourceStateSrc, Self::Error> {
         match self {
             AssignResourceStateSrc::Direct(state) => Ok(ResourceStateSrc::Memory(state)),
-            AssignResourceStateSrc::Hosted => Ok(ResourceStateSrc::Hosted)
+            AssignResourceStateSrc::Hosted => Ok(ResourceStateSrc::Hosted),
+            AssignResourceStateSrc::None => Ok(ResourceStateSrc::None)
         }
     }
 }
