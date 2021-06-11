@@ -12,7 +12,6 @@ use tokio::sync::oneshot::error::RecvError;
 
 use api::SpaceApi;
 
-use crate::core::{CoreRunner, ExampleStarCoreExtFactory, StarCoreExtFactory, StarCoreFactory};
 use crate::error::Error;
 use crate::frame::{ChildManagerResourceAction, Frame, Reply, SimpleReply, StarMessagePayload};
 use crate::keys::ResourceKey;
@@ -27,6 +26,7 @@ use crate::resource::space::SpaceState;
 use crate::star::{Request, Star, StarCommand, StarController, StarKey, StarManagerFactory, StarManagerFactoryDefault, StarName};
 use crate::template::{ConstellationData, ConstellationTemplate, StarKeyIndexTemplate, StarKeySubgraphTemplate, StarKeyTemplate};
 use crate::starlane::api::StarlaneApi;
+use crate::core::CoreRunner;
 
 pub mod api;
 
@@ -41,7 +41,7 @@ pub struct Starlane
     star_controllers: HashMap<StarKey,StarController>,
     star_names: HashMap<StarName,StarKey>,
     star_manager_factory: Arc<dyn StarManagerFactory>,
-    star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
+//    star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
     core_runner: Arc<CoreRunner>,
     constellation_names: HashSet<String>,
     pub logger: Logger,
@@ -60,7 +60,7 @@ impl Starlane
             tx: tx,
             rx: rx,
             star_manager_factory: Arc::new( StarManagerFactoryDefault{} ),
-            star_core_ext_factory: Arc::new(ExampleStarCoreExtFactory::new() ),
+//            star_core_ext_factory: Arc::new(ExampleStarCoreExtFactory::new() ),
             core_runner: Arc::new(CoreRunner::new()?),
             logger: Logger::new(),
             flags: Flags::new()
@@ -127,7 +127,7 @@ impl Starlane
 
         let link = link.unwrap().clone();
         let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
-        let (proto_star, star_ctrl) = ProtoStar::new(Option::None, link.kind.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.star_core_ext_factory.clone(), self.flags.clone(), self.logger.clone() );
+        let (proto_star, star_ctrl) = ProtoStar::new(Option::None, link.kind.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.flags.clone(), self.logger.clone() );
 
         println!("created proto star: {:?}", &link.kind);
 
@@ -219,7 +219,7 @@ impl Starlane
             let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
             evolve_rxs.push(evolve_rx );
 
-            let (proto_star, star_ctrl) = ProtoStar::new(Option::Some(star_key.clone()), star_template.kind.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.star_core_ext_factory.clone(), self.flags.clone(), self.logger.clone() );
+            let (proto_star, star_ctrl) = ProtoStar::new(Option::Some(star_key.clone()), star_template.kind.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.flags.clone(), self.logger.clone() );
             self.star_controllers.insert(star_key.clone(), star_ctrl.clone() );
             if name.is_some() && star_template.handle.is_some()
             {
@@ -436,14 +436,13 @@ mod test
     use tokio::time::Duration;
     use tokio::time::timeout;
 
-    use crate::app::{AppController, AppKind, AppSpecific, ConfigSrc, InitData};
-    use crate::artifact::{Artifact, ArtifactKind, ArtifactLocation};
+    use crate::artifact::{ArtifactKind, ArtifactLocation};
     use crate::error::Error;
     use crate::keys::{SpaceKey, SubSpaceKey, UserKey};
     use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
     use crate::names::Name;
     use crate::permissions::Authentication;
-    use crate::resource::{Labels, ResourceAddress, FileSystemKind};
+    use crate::resource::{Labels, ResourceAddress};
     use crate::space::CreateAppControllerFail;
     use crate::star::{StarController, StarInfo, StarKey, StarKind};
     use crate::starlane::{ConstellationCreate, StarControlRequestByName, Starlane, StarlaneCommand};
@@ -504,7 +503,7 @@ eprintln!("{}",err.to_string());
                 }
             };
 
-            sub_space_api.create_file_system("bottom-up", FileSystemKind::BottomUp ).await;
+            sub_space_api.create_file_system("bottom-up").await;
 
             println!("got space ctrl");
 

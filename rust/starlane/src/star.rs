@@ -26,9 +26,7 @@ use tokio::time::{Duration, Instant, timeout};
 use tokio::time::error::Elapsed;
 use url::Url;
 
-use actor_host::ServerStarVariant;
 
-use crate::app::{AppCommand, AppCommandKind, AppController, AppCreateController, AppLocation, AppMeta, AppSpecific};
 use crate::core::{StarCoreAction, StarCoreCommand, StarCoreResult};
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
@@ -45,8 +43,6 @@ use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, ChildResourceM
 use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
-use crate::space::{CreateAppControllerFail, RemoteSpaceCommand, RemoteSpaceCommandKind, SpaceController};
-use crate::star::app_host::SupervisorVariant;
 use crate::star::central::CentralStarVariant;
 use crate::star::pledge::{ResourceHostSelector, Satisfaction, StarHandle, StarHandleBacking};
 use crate::star::space::SpaceVariant;
@@ -58,8 +54,6 @@ use crate::actor::{ActorKind, ActorKey};
 use crate::frame::{WindHit, WindResults, WindDown, StarWind, Frame, StarMessage, StarMessagePayload, SimpleReply, ActorLookup, Watch, WatchInfo, ChildManagerResourceAction, StarPattern, WindAction, WindUp, ResourceHostAction, ProtoFrame, Reply, Event, FromReply, SpaceMessage, MessagePayload};
 
 pub mod central;
-pub mod app_host;
-pub mod actor_host;
 pub mod filestore;
 pub mod pledge;
 pub mod space;
@@ -76,7 +70,8 @@ pub enum StarKind
     FileStore,
     Gateway,
     Link,
-    Client
+    Client,
+    WebHost
 }
 
 impl StarKind
@@ -91,7 +86,8 @@ impl StarKind
             StarKind::FileStore => true,
             StarKind::Gateway => false,
             StarKind::Link => false,
-            StarKind::Client => false
+            StarKind::Client => false,
+            StarKind::WebHost => false
         }
     }
 
@@ -105,7 +101,8 @@ impl StarKind
             StarKind::FileStore => true,
             StarKind::Gateway => false,
             StarKind::Link => false,
-            StarKind::Client => true
+            StarKind::Client => true,
+            StarKind::WebHost => true
         }
     }
 
@@ -119,7 +116,8 @@ impl StarKind
             StarKind::FileStore => vec![],
             StarKind::Gateway => vec![],
             StarKind::Link => vec![],
-            StarKind::Client => vec![]
+            StarKind::Client => vec![],
+            StarKind::WebHost => vec![]
         }.iter().cloned())
     }
 
@@ -127,42 +125,30 @@ impl StarKind
     pub fn manages(&self)->HashSet<ResourceType>{
         HashSet::from_iter(match self {
             StarKind::Central => vec![ResourceType::Space],
-            StarKind::SpaceHost => vec![ResourceType::SubSpace, ResourceType::App, ResourceType::FileSystem],
+            StarKind::SpaceHost => vec![ResourceType::SubSpace, ResourceType::App, ResourceType::FileSystem,ResourceType::Proxy,ResourceType::UrlPathPattern],
             StarKind::Mesh => vec![],
             StarKind::AppHost => vec![ResourceType::Actor, ResourceType::FileSystem],
             StarKind::ActorHost => vec![],
             StarKind::FileStore => vec![ResourceType::File],
             StarKind::Gateway => vec![],
             StarKind::Link => vec![],
-            StarKind::Client => vec![]
+            StarKind::Client => vec![],
+            StarKind::WebHost => vec![]
         }.iter().cloned())
     }
 
     pub fn hosts(&self)->HashSet<ResourceType>{
         HashSet::from_iter(match self {
             StarKind::Central => vec![],
-            StarKind::SpaceHost => vec![ResourceType::Space, ResourceType::SubSpace,ResourceType::User],
+            StarKind::SpaceHost => vec![ResourceType::Space, ResourceType::SubSpace,ResourceType::User,ResourceType::UrlPathPattern],
             StarKind::Mesh => vec![],
             StarKind::AppHost => vec![ResourceType::App],
             StarKind::ActorHost => vec![ResourceType::Actor],
             StarKind::FileStore => vec![ResourceType::FileSystem,ResourceType::File],
             StarKind::Gateway => vec![],
             StarKind::Link => vec![],
-            StarKind::Client => vec![ResourceType::Actor]
-        }.iter().cloned())
-    }
-
-    pub fn hosts_slices(&self)->HashSet<ResourceType>{
-        HashSet::from_iter(match self {
-            StarKind::Central => vec![],
-            StarKind::SpaceHost => vec![],
-            StarKind::Mesh => vec![],
-            StarKind::AppHost => vec![],
-            StarKind::ActorHost => vec![ResourceType::App],
-            StarKind::FileStore => vec![],
-            StarKind::Gateway => vec![],
-            StarKind::Link => vec![],
-            StarKind::Client => vec![]
+            StarKind::Client => vec![ResourceType::Actor],
+            StarKind::WebHost => vec![]
         }.iter().cloned())
     }
 }
@@ -182,6 +168,7 @@ impl FromStr for StarKind{
             "Link"  => Ok(StarKind::Link),
             "Client"  => Ok(StarKind::Client),
             "SpaceHost"  => Ok(StarKind::SpaceHost),
+            "WebHost"  => Ok(StarKind::WebHost),
             _      => Err(()),
         }
     }
@@ -315,7 +302,8 @@ impl StarKind
             StarKind::Client => true,
             StarKind::Link => true,
             StarKind::FileStore => false,
-            StarKind::SpaceHost => false
+            StarKind::SpaceHost => false,
+            StarKind::WebHost => false
         }
     }
 }
@@ -332,7 +320,8 @@ impl fmt::Display for StarKind{
             StarKind::Gateway => "Gateway".to_string(),
             StarKind::Link => "Link".to_string(),
             StarKind::Client => "Client".to_string(),
-            StarKind::SpaceHost => "SpaceHost".to_string()
+            StarKind::SpaceHost => "SpaceHost".to_string(),
+            StarKind::WebHost => "WebHost".to_string()
         })
     }
 }
@@ -672,27 +661,6 @@ println!("GOT REPLY from GetKey");
                             }
                         }
                     }
-                    StarCommand::GetSpaceController(get) => {
-                        let (tx, rx) = mpsc::channel(16);
-                        let star_tx = self.skel.star_tx.clone();
-                        let user = get.auth.user.clone();
-                        let ctrl = SpaceController::new(get.auth.user, tx);
-                        tokio::spawn(async move {
-                            let mut rx = rx;
-                            while let Option::Some(command) = rx.recv().await {
-                                if user == command.user
-                                {
-                                    star_tx.send(StarCommand::SpaceCommand(command)).await;
-                                } else {
-                                    rx.close();
-                                }
-                            }
-                        });
-                        get.tx.send(Ok(ctrl));
-                    }
-                    StarCommand::SpaceCommand(command) => {
-                        self.on_remote_space_command(command).await;
-                    }
 
                     StarCommand::AddLogger(tx) => {
 //                        self.logger.tx.push(tx);
@@ -1030,15 +998,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
         self.message(delivery).await;
     }
 
-    async fn on_remote_space_command(&mut self, command: RemoteSpaceCommand)
-    {
-        unimplemented!();
-        match command.kind
-        {
-            RemoteSpaceCommandKind::AppCreateController(_) => {}
-            RemoteSpaceCommandKind::AppSelect(_) => {}
-        }
-    }
 
 
     async fn search_for_star(&mut self, star: StarKey, tx: oneshot::Sender<WindHits>)
@@ -2058,9 +2017,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                     FrameTimeout(FrameTimeoutInner),
                     FrameError(FrameErrorInner),
 
-                    SpaceCommand(RemoteSpaceCommand),
-                    GetSpaceController(GetSpaceController),
-                    AppCommand(AppCommand),
 
                     Diagnose(Diagnose),
                     CheckStatus,
@@ -2075,19 +2031,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                     HandlersSatisfied(YesNo<Satisfaction>)
                 }
 
-                pub struct GetSpaceController
-                {
-                    pub space: SpaceKey,
-                    pub auth: Authentication,
-                    pub tx: oneshot::Sender<Result<SpaceController,GetSpaceControllerFail>>
-                }
-
-                #[derive(Debug)]
-                pub enum GetSpaceControllerFail
-                {
-                    PermissionDenied,
-                    Error(Error)
-                }
 
 
                 pub struct SetFlags
@@ -2351,14 +2294,11 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                             StarCommand::WindCommit(_) => format!("SearchResult").to_string(),
                             StarCommand::ReleaseHold(_) => format!("ReleaseHold").to_string(),
                             StarCommand::ForwardFrame(_) => format!("ForwardFrame").to_string(),
-                            StarCommand::SpaceCommand(_) => format!("AppLifecycleCommand").to_string(),
-                            StarCommand::AppCommand(_) => format!("AppCommand").to_string(),
                             StarCommand::WindDown(_) => format!("SearchReturnResult").to_string(),
                             StarCommand::SendProtoMessage(_) => format!("SendProtoMessage(_)").to_string(),
                             StarCommand::SetFlags(_) => format!("SetFlags(_)").to_string(),
                             StarCommand::ConstellationConstructionComplete => "ConstellationConstructionComplete".to_string(),
                             StarCommand::Init => "Init".to_string(),
-                            StarCommand::GetSpaceController(_) => "GetSpaceController".to_string(),
                             StarCommand::ResourceRecordRequest(_) => "ResourceRecordRequest".to_string(),
                             StarCommand::ResourceRecordSet(_) => "SetResourceLocation".to_string(),
                             StarCommand::Diagnose(_) => "Diagnose".to_string(),
@@ -2390,26 +2330,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                        rx
                    }
 
-                   pub async fn get_space_controller( &self, space: &SpaceKey, authentication: &Authentication ) -> Result<SpaceController,GetSpaceControllerFail>
-                   {
-                       let (tx,rx) = oneshot::channel();
-
-                       let get = GetSpaceController{
-                           space: space.clone(),
-                           auth: authentication.clone(),
-                           tx: tx
-                       };
-
-                       self.star_tx.send( StarCommand::GetSpaceController(get) ).await;
-
-                       match rx.await
-                       {
-                           Ok(result) => result,
-                           Err(error) => {
-                               Err(GetSpaceControllerFail::Error(error.into()))
-                           }
-                       }
-                   }
 
                    pub async fn diagnose_handlers_satisfaction(&self ) -> Result<Satisfaction,Error>{
                        let( yesno, rx ) = YesNo::new();
@@ -2425,25 +2345,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                     pub id: Id,
                     pub timestamp: Instant,
                     pub lane: StarKey
-                }
-
-
-                pub struct ApplicationSupervisorSearchTransaction
-                {
-                    pub app_id: AppKey,
-                    pub tx: mpsc::Sender<AppLocation>
-                }
-
-                impl ApplicationSupervisorSearchTransaction
-                {
-                    pub fn new(app_id: AppKey) ->(Self,mpsc::Receiver<AppLocation>)
-                    {
-                        let (tx,rx) = mpsc::channel(1);
-                        (ApplicationSupervisorSearchTransaction{
-                            app_id: app_id,
-                            tx: tx
-                        },rx)
-                    }
                 }
 
 
@@ -2615,55 +2516,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                             TransactionResult::Continue
                         }
 
-                    }
-                }
-
-                pub struct AppCreateTransaction
-                {
-                    pub command_tx: mpsc::Sender<StarCommand>,
-                    pub tx: mpsc::Sender<AppController>
-                }
-
-                #[async_trait]
-                impl Transaction for AppCreateTransaction
-                {
-                    async fn on_frame(&mut self, frame: &Frame, lane: Option<&mut LaneMeta>, command_tx: &mut mpsc::Sender<StarCommand>) -> TransactionResult
-                    {
-                        /*
-                        if let Frame::StarMessage(message) = &frame
-                        {
-                            if let StarMessagePayload::ApplicationNotifyReady(notify) = &message.payload
-                            {
-                                let (tx,mut rx) = mpsc::channel(1);
-                                let add = AddAppLocation{ tx: tx.clone(), app_location: notify.location.clone() };
-                                self.command_tx.send( StarCommand::AddAppLocation(add)).await;
-
-                                let ( app_tx, mut app_rx ) = mpsc::channel(1);
-                                let command_tx = self.command_tx.clone();
-                                tokio::spawn( async move {
-                                    while let Option::Some(command) = app_rx.recv().await {
-                                        command_tx.send( StarCommand::AppCommand(command)).await;
-                                    }
-                                });
-
-                                let app_ctrl_tx = self.tx.clone();
-                                tokio::spawn( async move {
-                                    if let Option::Some(location) = rx.recv().await
-                                    {
-                                        let ctrl = AppController{
-                                            app: location.app.clone(),
-                                            tx: app_tx
-                                        };
-                                        app_ctrl_tx.send(ctrl).await;
-                                    }
-                                });
-                                return TransactionResult::Done;
-                            }
-                        }
-
-                         */
-                        unimplemented!();
-                        TransactionResult::Continue
                     }
                 }
 
@@ -2994,14 +2846,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                                     if let StarKind::SpaceHost = data.info.kind
                                     {
                                         break Box::new(SpaceVariant::new(data.clone() ).await );
-                                    }
-                                    else if let StarKind::AppHost = data.info.kind
-                                    {
-                                        break Box::new(SupervisorVariant::new(data.clone()).await );
-                                    }
-                                    else if let StarKind::ActorHost = data.info.kind
-                                    {
-                                        break Box::new(ServerStarVariant::new(data.clone()));
                                     }
                                     else {
                                         break Box::new(PlaceholderStarManager::new(data.clone()))

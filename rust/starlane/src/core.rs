@@ -16,20 +16,17 @@ use tokio::sync::mpsc::Sender;
 use tokio::time::Duration;
 
 use crate::actor::{ActorKey };
-use crate::app::{AppArchetype, ApplicationStatus, AppMeta};
-use crate::artifact::{Artifact, ArtifactKey};
-use crate::core::server::{ExampleServerStarCoreExt, ServerStarCore, ServerStarCoreExt};
 use crate::core::space::SpaceHost;
 use crate::error::Error;
-use crate::frame::{ResourceHostAction, ResourceHostResult, ServerAppPayload, StarMessage, StarMessagePayload, Watch, WatchInfo, MessagePayload};
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, ResourceKey};
 use crate::message::Fail;
-use crate::resource::{AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource, Resource, ResourceAssign, ResourceInit, ResourceSliceAssign};
+use crate::resource::{AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource, Resource, ResourceAssign, ResourceSliceAssign};
 use crate::resource::store::ResourceStoreSqlLite;
 use crate::star::{ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel, StarVariantCommand};
 use crate::file::FileAccess;
 use crate::core::file_store::FileStoreHost;
+use crate::frame::MessagePayload;
 
 pub mod server;
 pub mod space;
@@ -76,48 +73,11 @@ impl ToString for StarCoreResult{
 
 
 
-pub struct StarCoreAppCommand
-{
-    pub app: AppKey,
-    pub payload: StarCoreAppCommandPayload
-}
-
-pub enum StarCoreAppCommandPayload
-{
-    None,
-    Assign(Request<ResourceAssign<AssignResourceStateSrc>,()>),
-    AssignSlice(Request<ResourceSliceAssign,()>),
-    InitSlice(Request<ResourceInit,()>)
-}
-
-pub enum AppLaunchError
-{
-   Error(String)
-}
-
-pub enum AppCommandResult
-{
-    Ok,
-    Actor(ResourceKey),
-    Error(String)
-}
-
-
-pub enum StarCoreMessagePayload
-{
-}
-
-pub enum StarCoreExtKind
-{
-    None,
-    Server(Box<dyn ServerStarCoreExt>)
-}
 
 pub enum CoreRunnerCommand
 {
     Core{
         skel: StarSkel,
-        ext: StarCoreExtKind,
         rx: mpsc::Receiver<StarCoreAction>
     },
     Shutdown
@@ -137,9 +97,9 @@ impl CoreRunner
       thread::spawn( move || {
          let runtime = Runtime::new().unwrap();
          runtime.block_on( async move {
-            while let Option::Some(CoreRunnerCommand::Core{ skel, ext, rx }) = rx.recv().await
+            while let Option::Some(CoreRunnerCommand::Core{ skel, rx }) = rx.recv().await
             {
-               let core = match factory.create(skel,ext,rx).await{
+               let core = match factory.create(skel,rx).await{
                    Ok(core) => core,
                    Err(err) => {
                        eprintln!("FATAL: {}", err);
@@ -188,7 +148,7 @@ impl StarCoreFactory
         StarCoreFactory{}
     }
 
-    pub async fn create(&self, skel: StarSkel, ext: StarCoreExtKind, core_rx: mpsc::Receiver<StarCoreAction> ) -> Result<StarCore2,Error>
+    pub async fn create(&self, skel: StarSkel, core_rx: mpsc::Receiver<StarCoreAction> ) -> Result<StarCore2,Error>
     {
         let file_access = skel.file_access.with_path(format!("stars/{}",skel.info.key.to_string())).await?;
         let host:Box<dyn Host> =  match skel.info.kind
@@ -227,6 +187,7 @@ impl Host for InertHost{
     }
 }
 
+/*
 pub struct InertStarCore {
 }
 
@@ -243,35 +204,16 @@ impl InertStarCore {
     }
 }
 
+ */
+
+/*
 pub trait StarCoreExtFactory: Send+Sync
 {
     fn create( &self, skell: &StarSkel ) -> StarCoreExtKind;
 }
 
-pub struct ExampleStarCoreExtFactory
-{
-}
+ */
 
-impl ExampleStarCoreExtFactory
-{
-    pub fn new()->Self
-    {
-        ExampleStarCoreExtFactory{}
-    }
-}
-
-impl StarCoreExtFactory for ExampleStarCoreExtFactory
-{
-    fn create(&self, skel: &StarSkel ) -> StarCoreExtKind {
-        match skel.info.kind
-        {
-            StarKind::ActorHost => {
-                StarCoreExtKind::Server( Box::new(ExampleServerStarCoreExt::new(skel.clone()) ) )
-            }
-            _ => StarCoreExtKind::None
-        }
-    }
-}
 
 
 #[async_trait]

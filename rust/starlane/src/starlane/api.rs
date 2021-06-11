@@ -6,7 +6,7 @@ use tokio::sync::{mpsc, oneshot};
 use crate::frame::{ChildManagerResourceAction, Reply, SimpleReply, StarMessagePayload};
 use crate::keys::ResourceKey;
 use crate::message::{Fail, ProtoStarMessage};
-use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord, ResourceType, Path, LocalDataSrc, DataTransfer, ResourceIdentifier, ResourceStub, FileSystemKind};
+use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord, ResourceType, Path, LocalDataSrc, DataTransfer, ResourceIdentifier, ResourceStub };
 use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
@@ -248,7 +248,7 @@ impl SubSpaceApi {
         StarlaneApi::new(self.star_tx.clone())
     }
 
-    pub async fn create_file_system( &self, name: &str, kind: FileSystemKind )-> Result<FileSystemApi,Fail> {
+    pub async fn create_file_system( &self, name: &str)-> Result<FileSystemApi,Fail> {
         let state = FileSystemState::new();
         let state_data =  state.try_into()?;
         let resource_src = AssignResourceStateSrc::Direct(state_data);
@@ -257,7 +257,7 @@ impl SubSpaceApi {
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Append(name.to_string()),
             archetype: ResourceArchetype {
-                kind: ResourceKind::FileSystem(kind),
+                kind: ResourceKind::FileSystem,
                 specific: None,
                 config: None
             },

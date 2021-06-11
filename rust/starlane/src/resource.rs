@@ -17,7 +17,6 @@ use serde_json::to_string;
 use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::Receiver;
 
-use crate::app::{AppArchetype, AppKind, AppProfile, ConfigSrc, InitData};
 use crate::artifact::{ArtifactKey, ArtifactKind};
 use crate::error::Error;
 use crate::file::FileAccess;
@@ -39,6 +38,9 @@ use std::future::Future;
 use crate::util;
 use crate::message::resource::{Message, MessageTo, ProtoMessage, ResourceRequestMessage, MessageFrom, MessageReply, ResourceResponseMessage};
 use crate::actor::{ActorKind, ActorKey};
+use url::Url;
+use crate::resource::ResourceKind::UrlPathPattern;
+use crate::app::ConfigSrc;
 
 pub mod space;
 pub mod sub_space;
@@ -81,15 +83,31 @@ lazy_static!
                                                                                                            ResourceAddressPartStruct::new("path",ResourceAddressPartKind::Path)], ResourceType::File );
 
 
+    /*
      pub static ref ARTIFACT_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure ::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
                                                                                                            ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::SkewerCase),
                                                                                                            ResourceAddressPartStruct::new("bundle",ResourceAddressPartKind::SkewerCase),
                                                                                                            ResourceAddressPartStruct::new("version",ResourceAddressPartKind::Version),
                                                                                                            ResourceAddressPartStruct::new("path",ResourceAddressPartKind::Path)], ResourceType::Artifact );
 
+     */
+
+     pub static ref URL_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure ::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
+                                                                                                      ResourceAddressPartStruct::new("domain",ResourceAddressPartKind::Domain),
+                                                                                                      ResourceAddressPartStruct::new("url",ResourceAddressPartKind::Url)], ResourceType::UrlPathPattern );
+
+     pub static ref PROXY_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure ::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
+                                                                                                      ResourceAddressPartStruct::new("url",ResourceAddressPartKind::Url)], ResourceType::Proxy );
+
+     pub static ref DOMAIN_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure ::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
+                                                                                                         ResourceAddressPartStruct::new("domain",ResourceAddressPartKind::Domain)], ResourceType::Domain);
+
+
     pub static ref HYPERSPACE_ADDRESS: ResourceAddress = SPACE_ADDRESS_STRUCT.from_str("hyperspace").unwrap();
-    pub static ref HYPERSPACE_DEFAULT_ADDRESS: ResourceAddress = SUB_SPACE_ADDRESS_STRUCT.from_str("hyperspace:default").unwrap();
+    pub static ref HYPERSPACE_DEFAULT_ADDRESS: ResourceAddress = SUB_SPACE_ADDRESS_STRUCT.from_str("hyperspace::default").unwrap();
 }
+
+static RESOURCE_ADDRESS_DELIM: &str = "::";
 
 
 //static RESOURCE_QUERY_FIELDS: &str = "r.key,r.address,r.kind,r.specific,r.owner,r.config,r.host,r.gathering";
@@ -1018,12 +1036,14 @@ pub enum ResourceKind
     Nothing,
     Space,
     SubSpace,
-    App(AppKind),
+    App,
     Actor(ActorKind),
     User,
-    FileSystem(FileSystemKind),
+    FileSystem,
     File(FileKind),
-    Artifact(ArtifactKind)
+    Domain,
+    UrlPathPattern,
+    Proxy(ProxyKind)
 }
 
 impl ResourceKind{
@@ -1032,27 +1052,29 @@ impl ResourceKind{
            ResourceKind::Nothing=> ResourceType::Nothing,
            ResourceKind::Space => ResourceType::Space,
            ResourceKind::SubSpace => ResourceType::SubSpace,
-           ResourceKind::App(_) => ResourceType::App,
+           ResourceKind::App => ResourceType::App,
            ResourceKind::Actor(_) => ResourceType::Actor,
            ResourceKind::User => ResourceType::User,
            ResourceKind::File(_) => ResourceType::File,
-           ResourceKind::FileSystem(_) => ResourceType::FileSystem,
-           ResourceKind::Artifact(_) => ResourceType::Artifact
+           ResourceKind::FileSystem => ResourceType::FileSystem,
+           ResourceKind::Domain => ResourceType::Domain,
+           ResourceKind::UrlPathPattern => ResourceType::UrlPathPattern,
+           ResourceKind::Proxy(_) => ResourceType::Proxy
        }
     }
 }
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
-pub enum FileSystemKind{
-    TopDown,
-    BottomUp
-}
 
 #[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum FileKind
 {
     File,
     Directory
+}
+
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub enum ProxyKind{
+    Http
 }
 
 impl ResourceType
@@ -1068,8 +1090,10 @@ impl ResourceType
             ResourceType::Actor => 3,
             ResourceType::User => 4,
             ResourceType::File => 5,
-            ResourceType::Artifact => 6,
-            ResourceType::FileSystem => 7
+            ResourceType::FileSystem => 6,
+            ResourceType::Domain => 7,
+            ResourceType::UrlPathPattern => 8,
+            ResourceType::Proxy => 9
         }
     }
 
@@ -1083,8 +1107,10 @@ impl ResourceType
             3 => Ok(ResourceType::Actor),
             4 => Ok(ResourceType::User),
             5 => Ok(ResourceType::File),
-            6 => Ok(ResourceType::Artifact),
-            7 => Ok(ResourceType::FileSystem),
+            6 => Ok(ResourceType::FileSystem),
+            7 => Ok(ResourceType::Domain),
+            8 => Ok(ResourceType::UrlPathPattern),
+            9 => Ok(ResourceType::Proxy),
             255 => Ok(ResourceType::Nothing),
             _ => Err(format!("no resource type for magic number {}",magic).into())
         }
@@ -1098,12 +1124,14 @@ impl fmt::Display for ResourceKind{
                     ResourceKind::Nothing=> "Nothing".to_string(),
                     ResourceKind::Space=> "Space".to_string(),
                     ResourceKind::SubSpace=> "SubSpace".to_string(),
-                    ResourceKind::App(kind)=> format!("App:{}",kind).to_string(),
+                    ResourceKind::App=>  "App".to_string(),
                     ResourceKind::Actor(kind)=> format!("Actor:{}",kind).to_string(),
                     ResourceKind::User=> "User".to_string(),
                     ResourceKind::File(_)=> "File".to_string(),
-                    ResourceKind::FileSystem(_)=> format!("Filesystem").to_string(),
-                    ResourceKind::Artifact(kind)=>format!("Artifact:{}",kind).to_string()
+                    ResourceKind::FileSystem=> format!("Filesystem").to_string(),
+                    ResourceKind::Domain => "Domain".to_string(),
+                    ResourceKind::UrlPathPattern => "UrlPathPattern".to_string(),
+                    ResourceKind::Proxy(_) => "Proxy".to_string()
                 })
     }
 
@@ -1123,7 +1151,7 @@ impl ResourceKind {
             ResourceKind::SubSpace => {
                 ResourceKey::SubSpace(SubSpaceKey::new(sub_space.space, index as _))
             }
-            ResourceKind::App(_) => {
+            ResourceKind::App => {
                 ResourceKey::App(AppKey::new(sub_space, index as _))
             }
             ResourceKind::Actor(_) => {
@@ -1139,18 +1167,14 @@ impl ResourceKind {
                     id: index as _
                 } )
             }
-            ResourceKind::Artifact(_) => {
-                ResourceKey::Artifact(ArtifactKey{
-                    sub_space: sub_space,
-                    id: index as _
-                })
-            }
-            ResourceKind::FileSystem(_) => {
+
+            ResourceKind::FileSystem => {
                 ResourceKey::FileSystem(FileSystemKey::SubSpace(SubSpaceFilesystemKey{
                     sub_space: sub_space,
                     id: index as _
                 }))
             }
+            _ => {unimplemented!()}
         }
     }
 }
@@ -1161,18 +1185,10 @@ impl FromStr for ResourceKind
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
 
-        if s.starts_with("App:") {
-            let mut split = s.split(":");
-            split.next().ok_or("error")?;
-            return Ok( ResourceKind::App( AppKind::from_str(split.next().ok_or("error")?)? ));
-        } else if s.starts_with("Actor:") {
+        if s.starts_with("Actor:") {
             let mut split = s.split(":");
             split.next().ok_or("error")?;
             return Ok( ResourceKind::Actor( ActorKind::from_str(split.next().ok_or("error")?)? ) );
-        } else if s.starts_with("Artifact:") {
-            let mut split = s.split(":");
-            split.next().ok_or("error")?;
-            return Ok( ResourceKind::Artifact( ArtifactKind::from_str(split.next().ok_or("error")?)? ) );
         }
 
 
@@ -1182,7 +1198,7 @@ impl FromStr for ResourceKind
             "Space" => Ok(ResourceKind::Space),
             "SubSpace" => Ok(ResourceKind::SubSpace),
             "User" => Ok(ResourceKind::User),
-            "Filesystem" => Ok(ResourceKind::FileSystem(FileSystemKind::BottomUp)),
+            "Filesystem" => Ok(ResourceKind::FileSystem),
             _ => {
                 Err(format!("cannot match ResourceKind: {}", s).into())
             }
@@ -1201,7 +1217,9 @@ pub enum ResourceType
     User,
     FileSystem,
     File,
-    Artifact
+    Domain,
+    UrlPathPattern,
+    Proxy,
 }
 
 impl ResourceType{
@@ -1281,7 +1299,9 @@ impl ResourceType{
             ResourceType::User => StarKind::SpaceHost,
             ResourceType::FileSystem => StarKind::FileStore,
             ResourceType::File => StarKind::FileStore,
-            ResourceType::Artifact => StarKind::FileStore
+            ResourceType::UrlPathPattern => StarKind::SpaceHost,
+            ResourceType::Proxy => StarKind::SpaceHost,
+            ResourceType::Domain => StarKind::SpaceHost
         }
     }
 
@@ -1295,7 +1315,9 @@ impl ResourceType{
             ResourceType::User => HashSet::from_iter(vec![StarKind::SpaceHost] ),
             ResourceType::FileSystem => HashSet::from_iter(vec![StarKind::SpaceHost,StarKind::AppHost] ),
             ResourceType::File => HashSet::from_iter(vec![StarKind::FileStore] ),
-            ResourceType::Artifact => HashSet::from_iter(vec![StarKind::SpaceHost] )
+            ResourceType::UrlPathPattern => HashSet::from_iter(vec![StarKind::SpaceHost] ),
+            ResourceType::Proxy=> HashSet::from_iter(vec![StarKind::SpaceHost] ),
+            ResourceType::Domain => HashSet::from_iter(vec![StarKind::SpaceHost] ),
         }
     }
 
@@ -1306,14 +1328,16 @@ impl ResourceType{
     pub fn children(&self)->HashSet<ResourceType> {
         let mut children = match self{
             Self::Nothing => vec![Self::Space],
-            Self::Space => vec![Self::SubSpace,Self::User],
-            Self::SubSpace => vec![Self::App,Self::FileSystem,Self::Artifact],
+            Self::Space => vec![Self::SubSpace,Self::User,Self::Domain,Self::Proxy],
+            Self::SubSpace => vec![Self::App,Self::FileSystem],
             Self::App => vec![Self::Actor,Self::FileSystem],
             Self::Actor => vec![],
             Self::User => vec![],
             Self::FileSystem => vec![Self::File],
             Self::File => vec![],
-            Self::Artifact => vec![]
+            Self::UrlPathPattern => vec![],
+            Self::Proxy => vec![],
+            Self::Domain => vec![Self::UrlPathPattern]
         };
 
         HashSet::from_iter(children.drain(..) )
@@ -1330,7 +1354,9 @@ impl ResourceType{
             ResourceType::User => true,
             ResourceType::FileSystem => false,
             ResourceType::File => false,
-            ResourceType::Artifact => false
+            ResourceType::UrlPathPattern => false,
+            ResourceType::Proxy => false,
+            ResourceType::Domain => false
         }
     }
 }
@@ -1347,7 +1373,9 @@ impl ToString for ResourceType{
             Self::User => "User".to_string(),
             Self::FileSystem => "FileSystem".to_string(),
             Self::File => "File".to_string(),
-            Self::Artifact => "Artifact".to_string(),
+            Self::UrlPathPattern => "UrlPathPattern".to_string(),
+            Self::Proxy => "Proxy".to_string(),
+            Self::Domain => "Domain".to_string(),
         }
     }
 }
@@ -1365,7 +1393,9 @@ impl FromStr for ResourceType {
             "User" => Ok(ResourceType::User),
             "FileSystem" => Ok(ResourceType::FileSystem),
             "File" => Ok(ResourceType::File),
-            "Artifact" => Ok(ResourceType::Artifact),
+            "UrlPathPattern" => Ok(ResourceType::UrlPathPattern),
+            "Proxy" => Ok(ResourceType::Proxy),
+            "Domain" => Ok(ResourceType::Domain),
             what => Err(format!("could not find resource type {}",what).into())
         }
     }
@@ -1448,7 +1478,9 @@ impl ResourceType
             ResourceType::User => ResourceParent::Some(ResourceType::Space),
             ResourceType::File => ResourceParent::Some(ResourceType::FileSystem),
             ResourceType::FileSystem => ResourceParent::Multi(vec![ResourceType::SubSpace,ResourceType::App]),
-            ResourceType::Artifact => ResourceParent::Some(ResourceType::SubSpace)
+            ResourceType::UrlPathPattern => ResourceParent::Some(ResourceType::Domain),
+            ResourceType::Proxy=> ResourceParent::Some(ResourceType::Space),
+            ResourceType::Domain => ResourceParent::Some(ResourceType::Space)
         }
     }
 
@@ -1464,7 +1496,9 @@ impl ResourceType
             ResourceType::User => false,
             ResourceType::File => false,
             ResourceType::FileSystem => false,
-            ResourceType::Artifact => true
+            ResourceType::UrlPathPattern => true,
+            ResourceType::Proxy => true,
+            ResourceType::Domain=> true
         }
     }
 
@@ -1480,26 +1514,9 @@ impl ResourceType
             ResourceType::User => false,
             ResourceType::File => false,
             ResourceType::FileSystem => false,
-            ResourceType::Artifact => false
-        }
-    }
-
-
-    // meaning it's operation can be handled by numerous stars.
-    // this of course will only work if the resource is stateless
-    pub fn is_sliced(&self)->bool
-    {
-        match self
-        {
-            ResourceType::Nothing => false,
-            ResourceType::Space => false,
-            ResourceType::SubSpace => false,
-            ResourceType::App => true,
-            ResourceType::Actor => false,
-            ResourceType::User => false,
-            ResourceType::File => false,
-            ResourceType::FileSystem => false,
-            ResourceType::Artifact => false
+            ResourceType::UrlPathPattern => true,
+            ResourceType::Proxy => true,
+            ResourceType::Domain => true,
         }
     }
 
@@ -1515,10 +1532,11 @@ impl ResourceType
             ResourceType::User => false,
             ResourceType::File => true,
             ResourceType::FileSystem => false,
-            ResourceType::Artifact => true
+            ResourceType::UrlPathPattern => false,
+            ResourceType::Proxy => false,
+            ResourceType::Domain => false,
         }
     }
-
 
     pub fn address_required(&self)->bool
     {
@@ -1532,7 +1550,9 @@ impl ResourceType
             ResourceType::User => false,
             ResourceType::File => true,
             ResourceType::FileSystem => true,
-            ResourceType::Artifact => true
+            ResourceType::UrlPathPattern => true,
+            ResourceType::Proxy => true,
+            ResourceType::Domain => true,
         }
     }
 
@@ -1562,21 +1582,18 @@ impl ResourceType
             ResourceType::File => {
                 &FILE_ADDRESS_STRUCT
             }
-            ResourceType::Artifact => {
-                &ARTIFACT_ADDRESS_STRUCT
+            ResourceType::UrlPathPattern => {
+                &URL_ADDRESS_STRUCT
+            }
+            ResourceType::Proxy => {
+                &PROXY_ADDRESS_STRUCT
+            }
+            ResourceType::Domain => {
+                &DOMAIN_ADDRESS_STRUCT
             }
         }
     }
 }
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceInit
-{
-    pub init: InitData,
-    pub archetype: ResourceArchetype
-}
-
-
 
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -1603,17 +1620,6 @@ impl ResourceArchetype{
     }
 }
 
-pub struct ResourceControl{
-    pub resource_type: ResourceType
-}
-
-impl ResourceControl{
-
-    pub async fn create_child(resource: ResourceInit, register: Option<ResourceRegistryInfo> ) -> Result<ResourceKey,Fail>
-    {
-        unimplemented!()
-    }
-}
 
 #[async_trait]
 pub trait ResourceIdSeq: Send+Sync {
@@ -1940,24 +1946,12 @@ pub trait ResourceHost: Send+Sync {
 
 
 
-impl From<AppKind> for ResourceKind{
-    fn from(e: AppKind) -> Self {
-        ResourceKind::App(e)
-    }
-}
-
-
 impl From<ActorKind> for ResourceKind{
     fn from(e: ActorKind) -> Self {
         ResourceKind::Actor(e)
     }
 }
 
-impl From<ArtifactKind> for ResourceKind{
-    fn from(e: ArtifactKind) -> Self {
-        ResourceKind::Artifact(e)
-    }
-}
 
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -2072,8 +2066,14 @@ impl UniqueSrc for RegistryUniqueSrc{
                ResourceType::File => {
                    Ok(ResourceId::File(index as _))
                }
-               ResourceType::Artifact => {
-                   Ok(ResourceId::Artifact(index as _))
+               ResourceType::Domain => {
+                   Ok(ResourceId::Domain(index as _))
+               }
+               ResourceType::UrlPathPattern => {
+                   Ok(ResourceId::UrlPathPattern(index as _))
+               }
+               ResourceType::Proxy => {
+                   Ok(ResourceId::Proxy(index as _))
                }
            }
        } else {
@@ -2222,7 +2222,10 @@ impl ResourceAddress {
                 }
             }
             ResourceType::File => ResourceType::FileSystem,
-            ResourceType::Artifact => ResourceType::Artifact
+            ResourceType::Domain => ResourceType::Space,
+            ResourceType::UrlPathPattern=> ResourceType::Domain,
+            ResourceType::Proxy => ResourceType::Space,
+
         }
     }
 
@@ -2257,9 +2260,6 @@ impl ResourceAddress {
         ResourceType::File.address_structure().from_str(string )
     }
 
-    pub fn for_artifact(string: &str ) -> Result<Self,Error> {
-        ResourceType::Artifact.address_structure().from_str(string )
-    }
 
     pub fn for_user(string: &str) -> Result<Self,Error> {
         ResourceType::User.address_structure().from_str(string )
@@ -2292,9 +2292,6 @@ impl ResourceAddress {
                 ResourceKey::User(user) => {
                     parts.push(ResourceAddressPart::SkewerCase(SkewerCase::new(format!("user-{}", user.id).as_str())?));
                 }
-                ResourceKey::Artifact(artifact) => {
-                    parts.push(ResourceAddressPart::SkewerCase(SkewerCase::new(format!("artifact-{}", artifact.id).as_str())?));
-                }
                 ResourceKey::File(file) => {
                     parts.push(ResourceAddressPart::SkewerCase(SkewerCase::new(format!("file-{}", file.id).as_str())?));
                 }
@@ -2308,6 +2305,15 @@ impl ResourceAddress {
                             parts.push( ResourceAddressPart::Wildcard );
                         }
                     }
+                }
+                ResourceKey::Domain(domain) => {
+                    parts.push(ResourceAddressPart::Domain(DomainCase::new(format!("domain-{}", domain.id).as_str())?));
+                }
+                ResourceKey::UrlPathPattern(pattern) => {
+                    parts.push(ResourceAddressPart::UrlPathPattern(format!("url-path-pattern-{}", pattern.id)));
+                }
+                ResourceKey::Proxy(proxy) => {
+                    parts.push(ResourceAddressPart::SkewerCase(SkewerCase::from_str(format!("proxy-{}", proxy.id).as_str())?));
                 }
             }
 
@@ -2382,7 +2388,7 @@ impl ResourceAddress {
 
         for (index,part) in self.parts.iter().enumerate() {
             if index != 0{
-                rtn.push_str(":")
+                rtn.push_str(RESOURCE_ADDRESS_DELIM )
             }
             rtn.push_str(part.to_string().as_str() );
         }
@@ -2407,16 +2413,16 @@ impl FromStr for ResourceAddress {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut split = s.split("::");
-        let address_structure = split.next().ok_or("missing address structure at beginning i.e: 'space:sub_space::<SubSpace>")?;
-        let mut resource_type_gen = split.next().ok_or("missing resource type at end i.e.: 'space:sub_space::<SubSpace>")?.to_string();
+        let mut split = s.split("::<");
+        let address_structure = split.next().ok_or("missing address structure at beginning i.e: 'space::sub_space::<SubSpace>")?;
+        let mut resource_type_gen = split.next().ok_or("missing resource type at end i.e.: 'space::sub_space::<SubSpace>")?.to_string();
 
 
         // chop off the generics i.e. <Space> remove '<' and '>'
-        if resource_type_gen.len() < 2 {
+        if resource_type_gen.len() < 1 {
             return Err(format!("not a valid resource type generic '{}'",resource_type_gen).into());
         }
-        resource_type_gen.remove(0);
+//        resource_type_gen.remove(0);
         resource_type_gen.remove(resource_type_gen.len()-1 );
 
         let resource_type = ResourceType::from_str(resource_type_gen.as_str() )?;
@@ -2445,7 +2451,7 @@ impl ResourceAddressStructure
         let mut rtn = String::new();
         for (index,part) in self.parts.iter().enumerate() {
             if index != 0 {
-                rtn.push_str(":");
+                rtn.push_str(RESOURCE_ADDRESS_DELIM );
             }
             rtn.push_str(part.name.as_str() );
         }
@@ -2474,13 +2480,13 @@ impl ResourceAddressStructure
 impl ResourceAddressStructure {
 
     pub fn from_str(&self, s: &str) -> Result<ResourceAddress, Error> {
-        let mut split = s.split(":");
+        let mut split = s.split(RESOURCE_ADDRESS_DELIM );
 
         if split.count()  != self.parts.len() {
             return Err(format!("part count not equal. expected format '{}' received: {}",self.format(),s).into());
         }
 
-        let mut split = s.split(":");
+        let mut split = s.split(RESOURCE_ADDRESS_DELIM );
 
         let mut parts = vec![];
 
@@ -2533,6 +2539,9 @@ impl ResourceAddressPartStruct
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub enum ResourceAddressPartKind
 {
+    Domain,
+    Url,
+    UrlPathPattern,
     Wildcard,
     SkewerCase,
     Email,
@@ -2545,13 +2554,16 @@ pub enum ResourceAddressPartKind
 impl ToString for ResourceAddressPartKind {
     fn to_string(&self) -> String {
         match self {
+            ResourceAddressPartKind::Domain => "Domain".to_string(),
             ResourceAddressPartKind::Wildcard => "Wildcard".to_string(),
             ResourceAddressPartKind::SkewerCase => "Skewer".to_string(),
             ResourceAddressPartKind::Version => "Version".to_string(),
             ResourceAddressPartKind::WildcardOrSkewer => "WildcardOrSkewer".to_string(),
             ResourceAddressPartKind::Path => "Path".to_string(),
             ResourceAddressPartKind::Base64Encoded => "Base64Encoded".to_string(),
-            ResourceAddressPartKind::Email=> "Email".to_string()
+            ResourceAddressPartKind::Email=> "Email".to_string(),
+            ResourceAddressPartKind::Url => "Url".to_string(),
+            ResourceAddressPartKind::UrlPathPattern => "UrlPathPattern".to_string()
         }
     }
 }
@@ -2580,10 +2592,22 @@ impl ResourceAddressPartKind
             ResourceAddressPart::Email(_) => {
                 *self == Self::Email
             }
+            ResourceAddressPart::Url(_) => {
+                *self == Self::Url
+            }
+            ResourceAddressPart::UrlPathPattern(_) => {
+                *self == Self::UrlPathPattern
+            }
+            ResourceAddressPart::Domain(_) => {
+                *self == Self::Domain
+            }
         }
     }
 
     pub fn from_str(&self, s: &str ) -> Result<ResourceAddressPart,Error> {
+       if s.contains(RESOURCE_ADDRESS_DELIM ) {
+           return Err(format!("resource part cannot contain resource address delimeter '{}' as in '{}'", RESOURCE_ADDRESS_DELIM, s).into());
+       }
         match self{
             ResourceAddressPartKind::Wildcard => {
                 if s == "*" {
@@ -2620,6 +2644,15 @@ impl ResourceAddressPartKind
                 validate::rules::email().validate(s)?;
                 Ok(ResourceAddressPart::Email(s.to_string().trim().to_lowercase()))
             }
+            ResourceAddressPartKind::Url => {
+                Ok(ResourceAddressPart::Url(Url::parse(s)?.to_string()))
+            }
+            ResourceAddressPartKind::Domain => {
+                Ok(ResourceAddressPart::Domain(DomainCase::from_str(s)?))
+            }
+            ResourceAddressPartKind::UrlPathPattern => {
+                Ok(ResourceAddressPart::UrlPathPattern(s.to_string()))
+            }
         }
     }
 }
@@ -2633,10 +2666,13 @@ pub enum ResourceAddressPart
 {
     Wildcard,
     SkewerCase(SkewerCase),
+    Domain(DomainCase),
     Base64Encoded(Base64Encoded),
     Path(Path),
     Version(Version),
-    Email(String)
+    Email(String),
+    Url(String),
+    UrlPathPattern(String),
 }
 
 impl ToString for ResourceAddressPart {
@@ -2647,7 +2683,10 @@ impl ToString for ResourceAddressPart {
             ResourceAddressPart::Base64Encoded(base64) => base64.encoded.clone(),
             ResourceAddressPart::Path(path) => path.to_string(),
             ResourceAddressPart::Version(version) => version.to_string(),
-            ResourceAddressPart::Email(email) => email.to_string()
+            ResourceAddressPart::Email(email) => email.to_string(),
+            ResourceAddressPart::Url(url) => url.to_string(),
+            ResourceAddressPart::UrlPathPattern(path) => path.to_string(),
+            ResourceAddressPart::Domain(domain) => domain.to_string()
         }
     }
 }
@@ -2735,6 +2774,47 @@ impl FromStr for SkewerCase {
 
 
 
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub struct DomainCase
+{
+    string: String
+}
+
+impl DomainCase
+{
+    pub fn new( string: &str ) -> Result<Self,Error> {
+        if string.is_empty() {
+            return Err("cannot be empty".into());
+        }
+
+        if string.contains( "..") {
+            return Err("cannot have two dots in a row".into());
+        }
+
+        for c in string.chars() {
+            if !((c.is_lowercase() && c.is_alphanumeric()) || c == '-' || c == '.' ) {
+                return Err("must be lowercase, use only alphanumeric characters & dashes".into());
+            }
+        }
+        Ok(DomainCase {
+            string: string.to_string()
+        })
+    }
+}
+
+impl ToString for DomainCase {
+    fn to_string(&self) -> String {
+        self.string.clone()
+    }
+}
+
+impl FromStr for DomainCase {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(DomainCase::new(s )?)
+    }
+}
 
 
 
@@ -2751,8 +2831,6 @@ mod test
     use tokio::time::timeout;
 
     use crate::actor::{ActorKey, ActorKind};
-    use crate::app::{AppController, AppKind, AppSpecific, ConfigSrc, InitData};
-    use crate::artifact::{Artifact, ArtifactKind, ArtifactLocation};
     use crate::error::Error;
     use crate::id::Id;
     use crate::keys::{AppKey, ResourceKey, SpaceKey, SubSpaceId, SubSpaceKey, UserKey};
@@ -2895,7 +2973,7 @@ mod test
             let actor_key = ResourceKey::Actor(ActorKey::new(app.clone(), Id::new(0, index)));
             let address = ResourceAddress::from_parent( &ResourceType::Actor, Option::Some(&app_address), ResourceAddressPart::SkewerCase(SkewerCase::new(actor_key.encode().unwrap().as_str() ).unwrap())).unwrap();
 
-            let save = create_with_key(actor_key,address, ResourceKind::Actor(ActorKind::Single),specific.clone(),sub_space.clone(),owner.clone());
+            let save = create_with_key(actor_key,address, ResourceKind::Actor(ActorKind::Stateful),specific.clone(),sub_space.clone(),owner.clone());
             let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Commit(save));
             tx.send( request ).await;
             timeout( Duration::from_secs(5),rx).await.unwrap().unwrap();
@@ -2941,7 +3019,7 @@ mod test
         rt.block_on(async {
             let tx = Registry::new().await;
 
-            create_10(tx.clone(), ResourceKind::App(AppKind::Normal),Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
+            create_10(tx.clone(), ResourceKind::App,Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
             let mut selector = ResourceSelector::app_selector();
             let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Select(selector) );
             tx.send(request).await;
@@ -2986,8 +3064,8 @@ mod test
         rt.block_on(async {
             let tx = Registry::new().await;
 
-            create_10(tx.clone(), ResourceKind::App(AppKind::Normal),Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
-            create_10(tx.clone(), ResourceKind::Actor(ActorKind::Single),Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
+            create_10(tx.clone(), ResourceKind::App,Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
+            create_10(tx.clone(), ResourceKind::Actor(ActorKind::Stateful),Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
 
             let mut selector = ResourceSelector::new();
             let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Select(selector) );
@@ -3045,7 +3123,7 @@ mod test
 
             for sub_space in sub_spaces.clone()
             {
-                create_10(tx.clone(), ResourceKind::App(AppKind::Normal),Option::None,sub_space, UserKey::hyper_user() ).await;
+                create_10(tx.clone(), ResourceKind::App,Option::None,sub_space, UserKey::hyper_user() ).await;
             }
 
             let mut selector = ResourceSelector::app_selector();
@@ -3074,8 +3152,8 @@ mod test
             let tx = Registry::new().await;
 
 
-            create_10(tx.clone(), ResourceKind::App(AppKind::Normal),Option::Some(crate::names::TEST_APP_SPEC.clone()), SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
-            create_10(tx.clone(), ResourceKind::App(AppKind::Normal),Option::Some(crate::names::TEST_ACTOR_SPEC.clone()), SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
+            create_10(tx.clone(), ResourceKind::App,Option::Some(crate::names::TEST_APP_SPEC.clone()), SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
+            create_10(tx.clone(), ResourceKind::App,Option::Some(crate::names::TEST_ACTOR_SPEC.clone()), SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
 
             let mut selector = ResourceSelector::app_selector();
             let (request,rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Select(selector) );
@@ -3473,17 +3551,6 @@ pub struct ResourceSliceAssign{
     archetype: ResourceArchetype
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct ResourceSliceInit{
-    key: ResourceKey,
-    profile: ResourceInit
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub enum ResourceSliceCommand {
-    Init(ResourceSliceInit),
-    NotifyInit(ResourceKey)
-}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceStub {

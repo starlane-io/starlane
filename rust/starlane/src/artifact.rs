@@ -4,13 +4,12 @@ use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
 
 use crate::actor::{ActorKind, ActorSpecific};
-use crate::app::AppSpecific;
 use crate::error::Error;
 use crate::keys::SubSpaceKey;
 use crate::names::{Name, Specific};
 use std::fmt;
 use crate::resource::{ResourceAddress, ResourceType};
-
+/*
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct Artifact
 {
@@ -61,6 +60,8 @@ impl ToString for Artifact{
 }
 
 
+
+ */
 
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub enum ArtifactKind

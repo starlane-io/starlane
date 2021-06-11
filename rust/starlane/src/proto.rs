@@ -14,7 +14,6 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{Duration, Instant};
 
 use crate::constellation::Constellation;
-use crate::core::{CoreRunner, CoreRunnerCommand, StarCore, StarCoreCommand, StarCoreExtFactory, StarCoreExtKind, StarCoreFactory};
 use crate::error::Error;
 use crate::file::FileAccess;
 use crate::frame::{Frame, ProtoFrame, SequenceMessage, StarMessage, StarMessagePayload, StarPattern, WindDown, WindHit, WindUp} ;
@@ -27,6 +26,7 @@ use crate::star::{FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBac
 use crate::star::pledge::StarHandleBacking;
 use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
+use crate::core::{CoreRunner, CoreRunnerCommand};
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -40,7 +40,7 @@ pub struct ProtoStar
   lanes: HashMap<StarKey, LaneMeta>,
   connector_ctrls: Vec<ConnectorController>,
   star_manager_factory: Arc<dyn StarManagerFactory>,
-  star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
+//  star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
   core_runner: Arc<CoreRunner>,
   logger: Logger,
   frame_hold: FrameHold,
@@ -50,7 +50,7 @@ pub struct ProtoStar
 
 impl ProtoStar
 {
-    pub fn new(key: Option<StarKey>, kind: StarKind, star_manager_factory: Arc<dyn StarManagerFactory>, core_runner: Arc<CoreRunner>, star_core_ext_factory: Arc<dyn StarCoreExtFactory>, flags: Flags, logger: Logger ) ->(Self, StarController)
+    pub fn new(key: Option<StarKey>, kind: StarKind, star_manager_factory: Arc<dyn StarManagerFactory>, core_runner: Arc<CoreRunner>,  flags: Flags, logger: Logger ) ->(Self, StarController)
     {
         let (command_tx, command_rx) = mpsc::channel(32);
         (ProtoStar{
@@ -62,7 +62,7 @@ impl ProtoStar
             lanes: HashMap::new(),
             connector_ctrls: vec![],
             star_manager_factory: star_manager_factory,
-            star_core_ext_factory: star_core_ext_factory,
+//            star_core_ext_factory: star_core_ext_factory,
             core_runner: core_runner,
             logger: logger,
             frame_hold: FrameHold::new(),
@@ -139,10 +139,8 @@ impl ProtoStar
                             file_access: FileAccess::new("data".to_string()).await?
                         };
 
-                        let core_ext = self.star_core_ext_factory.create(&skel );
                         self.core_runner.send(CoreRunnerCommand::Core{
                             skel: skel.clone(),
-                            ext: StarCoreExtKind::None,
                             rx: core_rx
                         } ).await;
 
