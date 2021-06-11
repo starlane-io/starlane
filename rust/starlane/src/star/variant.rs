@@ -5,6 +5,7 @@ use crate::frame::{StarMessage, StarMessagePayload};
 use crate::star::{CoreRequest, StarKind, StarSkel };
 use crate::star::variant::central::CentralVariant;
 use crate::star::variant::web::WebVariant;
+use tokio::sync::oneshot;
 
 pub mod central;
 pub mod web;
@@ -13,14 +14,14 @@ pub mod web;
 #[async_trait]
 pub trait StarVariant: Send+Sync
 {
-    async fn init(&self) -> Result<(),Error>;
+    async fn init(&self, tx: oneshot::Sender<Result<(),Error>>);
 }
 
 #[async_trait]
 impl StarVariant for PlaceholderStarManager
 {
-    async fn init(&self) -> Result<(), Error> {
-        Ok(())
+    async fn init(&self, tx: oneshot::Sender<Result<(),Error>>){
+        tx.send(Ok(()));
     }
 }
 

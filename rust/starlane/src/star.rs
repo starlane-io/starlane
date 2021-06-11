@@ -107,7 +107,7 @@ impl StarKind
 
     pub fn handles(&self)->HashSet<StarKind>{
         HashSet::from_iter(match self {
-            StarKind::Central => vec![StarKind::AppHost, StarKind::SpaceHost],
+            StarKind::Central => vec![StarKind::SpaceHost],
             StarKind::SpaceHost => vec![StarKind::FileStore,StarKind::Web],
             StarKind::Mesh => vec![],
             StarKind::AppHost => vec![StarKind::ActorHost, StarKind::FileStore],
@@ -320,7 +320,7 @@ impl fmt::Display for StarKind{
             StarKind::Link => "Link".to_string(),
             StarKind::Client => "Client".to_string(),
             StarKind::SpaceHost => "SpaceHost".to_string(),
-            StarKind::Web => "WebHost".to_string()
+            StarKind::Web => "Web".to_string()
         })
     }
 }
@@ -723,6 +723,10 @@ println!("GOT REPLY from GetKey");
                     StarCommand::CheckStatus => {
                         self.check_status().await;
                     }
+                    StarCommand::SetStatus(status) => {
+                        self.status = status;
+                        println!( "{} {}", &self.skel.info.kind, &self.status.to_string());
+                    }
                     StarCommand::Diagnose(diagnose) => {
                         self.diagnose(diagnose).await;
                     }
@@ -785,13 +789,35 @@ println!("GOT REPLY from GetKey");
     async fn check_status(&mut self) {
         if self.status == StarStatus::Pending {
             if let Option::Some(star_handler) = &self.skel.star_handler {
-                if let Result::Ok(Satisfaction::Ok) = star_handler.satisfied(self.skel.info.kind.handles()).await {
-                    self.status = StarStatus::Ready;
-                    println!("{}: Ready", self.skel.info.kind);
-                    self.variant.init().await;
-                } else {
-                    // nothing
+                let satisfied = star_handler.satisfied(self.skel.info.kind.handles()).await;
+                if let Result::Ok(Satisfaction::Ok) = satisfied {
+                    self.status = StarStatus::Initializing;
+                    let( tx, rx ) = oneshot::channel();
+                    self.variant.init(tx).await;
+                    let star_tx = self.skel.star_tx.clone();
+                    tokio::spawn( async move {
+                        // don't really have a mechanism to panic if init fails ... need to add that
+                        rx.await;
+                        star_tx.send(StarCommand::SetStatus(StarStatus::Ready) ).await;
+                    } );
+                } else if let Result::Ok(Satisfaction::Lacking(lacking)) = satisfied {
+
+                    let mut s = String::new();
+                    for lack in lacking {
+                        s.push_str(lack.to_string().as_str());
+                        s.push_str(", ");
+                    }
+//                    eprintln!("handles not satisfied for : {} Lacking: [ {}]", self.skel.info.kind, s);
                 }
+            } else {
+                self.status = StarStatus::Initializing;
+                let( tx, rx ) = oneshot::channel();
+                self.variant.init(tx).await;
+                let star_tx = self.skel.star_tx.clone();
+                tokio::spawn( async move {
+                    rx.await;
+                    star_tx.send(StarCommand::SetStatus(StarStatus::Ready) ).await;
+                } );
             }
         }
     }
@@ -1716,8 +1742,33 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
     }
 
     async fn process_resource_message_request_delivery(&mut self, delivery: Delivery<Message<ResourceRequestMessage>> ) -> Result<(), Error> {
+
         match &delivery.message.payload {
-            ResourceRequestMessage::Create(_) => {}
+            ResourceRequestMessage::Create(create) => {
+                let child_manager = self.get_child_resource_manager(create.parent.clone()).await?;
+                let delivery = delivery.clone();
+                let create = create.clone();
+                tokio::spawn( async move {
+                    let record = child_manager.create( create.clone() ).await.await;
+                    match record{
+                        Ok(record) => {
+                            match record {
+                                Ok(record) => {
+                                    delivery.reply(ResourceResponseMessage::Resource(Option::Some(record))).await;
+                                }
+                                Err(fail) => {
+                                    eprintln!("Fail: {}",fail.to_string());
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            eprintln!("Error: {}",err);
+                        }
+                    }
+
+                });
+
+            }
             ResourceRequestMessage::Select(_) => {}
             ResourceRequestMessage::Unique(resource_type) => {
                 let unique_src = self.skel.registry.as_ref().unwrap().unique_src(delivery.message.to.clone().into()).await;
@@ -2021,6 +2072,7 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
 
                     Diagnose(Diagnose),
                     CheckStatus,
+                    SetStatus(StarStatus),
 
                     ResourceRecordRequest(Request<ResourceIdentifier, ResourceRecord>),
                     ResourceRecordRequestFromStar(Request<(ResourceIdentifier,StarKey), ResourceRecord>),
@@ -2255,6 +2307,7 @@ pub enum CoreRequest
 impl fmt::Display for StarCommand{
                     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                         let r = match self {
+                            StarCommand::Init => "Init".to_string(),
                             StarCommand::AddLane(_) => format!("AddLane").to_string(),
                             StarCommand::AddConnectorController(_) => format!("AddConnectorController").to_string(),
                             StarCommand::AddLogger(_) => format!("AddLogger").to_string(),
@@ -2270,12 +2323,12 @@ impl fmt::Display for StarCommand{
                             StarCommand::SendProtoMessage(_) => format!("SendProtoMessage(_)").to_string(),
                             StarCommand::SetFlags(_) => format!("SetFlags(_)").to_string(),
                             StarCommand::ConstellationConstructionComplete => "ConstellationConstructionComplete".to_string(),
-                            StarCommand::Init => "Init".to_string(),
                             StarCommand::ResourceRecordRequest(_) => "ResourceRecordRequest".to_string(),
                             StarCommand::ResourceRecordSet(_) => "SetResourceLocation".to_string(),
                             StarCommand::Diagnose(_) => "Diagnose".to_string(),
                             StarCommand::CheckStatus => "CheckStatus".to_string(),
                             StarCommand::ResourceRecordRequestFromStar(_) => "ResourceRecordRequestFromStar".to_string(),
+                            StarCommand::SetStatus(_) => "StarStatus".to_string()
                         };
                         write!(f, "{}",r)
                     }
@@ -3242,7 +3295,19 @@ impl fmt::Display for StarCommand{
                 pub enum StarStatus{
                     Unknown,
                     Pending,
+                    Initializing,
                     Ready,
                     Panic
                 }
 
+impl ToString for StarStatus{
+    fn to_string(&self) -> String {
+        match self {
+            StarStatus::Unknown => "Unknown".to_string(),
+            StarStatus::Pending => "Pending".to_string(),
+            StarStatus::Ready => "Ready".to_string(),
+            StarStatus::Panic => "Panic".to_string(),
+            StarStatus::Initializing => "Initializing".to_string()
+        }
+    }
+}

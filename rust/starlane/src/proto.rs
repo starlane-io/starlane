@@ -36,8 +36,8 @@ pub struct ProtoStar
   star_key: Option<StarKey>,
   sequence: Arc<AtomicU64>,
   kind: StarKind,
-  command_tx: mpsc::Sender<StarCommand>,
-  command_rx: mpsc::Receiver<StarCommand>,
+  star_tx: mpsc::Sender<StarCommand>,
+  star_rx: mpsc::Receiver<StarCommand>,
   lanes: HashMap<StarKey, LaneMeta>,
   connector_ctrls: Vec<ConnectorController>,
   star_manager_factory: Arc<dyn StarVariantFactory>,
@@ -58,8 +58,8 @@ impl ProtoStar
             star_key: key,
             sequence: Arc::new(AtomicU64::new(0)),
             kind,
-            command_tx: command_tx.clone(),
-            command_rx: command_rx,
+            star_tx: command_tx.clone(),
+            star_rx: command_rx,
             lanes: HashMap::new(),
             connector_ctrls: vec![],
             star_manager_factory: star_manager_factory,
@@ -92,7 +92,7 @@ impl ProtoStar
                 lanes.push( key.clone() )
             }
 
-            futures.push(self.command_rx.recv().boxed());
+            futures.push(self.star_rx.recv().boxed());
 
             if self.tracker.has_expectation()
             {
@@ -109,8 +109,6 @@ impl ProtoStar
                             key: self.star_key.as_ref().unwrap().clone(),
                             kind: self.kind.clone()};
 
-
-
                         let (core_tx,core_rx) = mpsc::channel(16);
 
                         let resource_registry: Option<Arc<dyn ResourceRegistryBacking>>= if info.kind.is_resource_manager() {
@@ -120,7 +118,7 @@ impl ProtoStar
                         };
 
                         let star_handler: Option<StarHandleBacking>= if !info.kind.handles().is_empty() {
-                            Option::Some(  StarHandleBacking::new().await )
+                            Option::Some(  StarHandleBacking::new(self.star_tx.clone()).await )
                         } else {
                             Option::None
                         };
@@ -128,7 +126,7 @@ impl ProtoStar
                         let skel = StarSkel {
                             info: info,
                             sequence: self.sequence.clone(),
-                            star_tx: self.command_tx.clone(),
+                            star_tx: self.star_tx.clone(),
                             core_tx: core_tx.clone(),
                             logger: self.logger.clone(),
                             flags: self.flags.clone(),
@@ -147,7 +145,7 @@ impl ProtoStar
                         } ).await;
 
                         return Ok(Star::from_proto(skel.clone(),
-                                                   self.command_rx,
+                                                   self.star_rx,
                                                    core_tx,
                                                    self.lanes,
                                                    self.connector_ctrls,

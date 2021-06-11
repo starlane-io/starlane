@@ -508,7 +508,9 @@ eprintln!("{}",err.to_string());
 
             println!("got space ctrl");
 
-            tokio::time::sleep(Duration::from_secs(30)).await;
+            loop {
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            }
 
 
 //            assert_eq!(central_ctrl.diagnose_handlers_satisfaction().await.unwrap(),crate::star::pledge::Satisfaction::Ok)

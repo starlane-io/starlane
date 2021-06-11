@@ -223,14 +223,15 @@ impl <P> Message<P>
     }
 }
 
-pub struct Delivery<M>
+#[derive(Clone)]
+pub struct Delivery<M> where M: Clone
 {
     skel: StarSkel,
     star_message: StarMessage,
     pub message: M
 }
 
-impl <M> Delivery<M> {
+impl <M> Delivery<M>  where M: Clone{
     pub fn new( message: M, star_message: StarMessage, skel: StarSkel ) -> Self {
         Delivery{
             message: message,
@@ -240,7 +241,7 @@ impl <M> Delivery<M> {
     }
 }
 
-impl <P> Delivery<Message<P>>{
+impl <P> Delivery<Message<P>> where P: Clone {
    pub async fn reply(&self, response: ResourceResponseMessage) -> Result<(),Error> {
       let mut proto = ProtoMessageReply::new();
       proto.payload = Option::Some(response);

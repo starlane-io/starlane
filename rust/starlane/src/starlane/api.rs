@@ -15,6 +15,8 @@ use crate::error::Error;
 use crate::resource::file_system::FileSystemState;
 use std::sync::Arc;
 use crate::resource::domain::DomainState;
+use crate::message::resource::{ProtoMessage, ResourceRequestMessage, MessageReply, ResourceResponseMessage};
+use crate::star::StarCommand::ResourceRecordRequest;
 
 
 #[derive(Clone)]
@@ -77,6 +79,28 @@ impl StarlaneApi {
 
      */
 
+
+    /*
+    pub async fn create_resource( &self, create: ResourceCreate ) -> Result<ResourceStub,Fail> {
+        let mut proto = ProtoMessage::new();
+        proto.to( create.parent.clone().into() );
+        proto.payload = Option::Some(ResourceRequestMessage::Create(create));
+        let reply = proto.reply();
+        let proto = proto.to_proto_star_message().await?;
+        self.star_tx.send( StarCommand::SendProtoMessage(proto)).await?;
+
+        let result = reply.await??;
+
+        match result.payload{
+            ResourceResponseMessage::Resource(Option::Some(resource)) => {
+                Ok(resource.stub)
+            }
+            _ => Err(Fail::Unexpected)
+        }
+    }
+
+     */
+
     pub async fn create_resource( &self, create: ResourceCreate ) -> Result<ResourceStub,Fail> {
         let parent_location = match &create.parent{
             ResourceKey::Nothing => {
@@ -104,6 +128,7 @@ impl StarlaneApi {
             }
         }
     }
+
 
     pub async fn create_space( &self, name: &str, display: &str )-> Result<SpaceApi,Fail> {
         let state= SpaceState::new(name.clone(), display);
