@@ -3,7 +3,7 @@ use crate::star::variant::{StarVariant, StarVariantCommand};
 use crate::error::Error;
 use std::thread;
 use tokio::runtime::Runtime;
-use actix_http::{HttpService, Response};
+use actix_http::{HttpService, Response, Request};
 use actix_http::http::HeaderValue;
 use actix_server::Server;
 use futures::future;
@@ -48,12 +48,12 @@ fn start(){
 async fn run() -> Result<(), Error> {
 
     Server::build()
-        .bind("hello-world", "127.0.0.1:8080", || {
+        .bind("starlane", "127.0.0.1:8080", || {
             HttpService::build()
                 .client_timeout(1000)
                 .client_disconnect(1000)
-                .finish(|_req| {
-                    println!("{:?}", _req);
+                .finish(|_req:Request| {
+                    println!("{}", _req.path());
                     let mut res = Response::Ok();
                     res.header("x-head", HeaderValue::from_static("dummy value!"));
                     future::ok::<_, ()>(res.body("Hello world!"))

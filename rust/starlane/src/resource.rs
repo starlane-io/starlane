@@ -3398,6 +3398,11 @@ impl FromStr for Version {
     }
 }
 
+pub enum ResourceCreateStrategy {
+    Create,
+    EnsureAddressExists
+}
+
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceCreate {
@@ -3407,7 +3412,7 @@ pub struct ResourceCreate {
    pub archetype: ResourceArchetype,
    pub src: AssignResourceStateSrc,
    pub registry_info: Option<ResourceRegistryInfo>,
-   pub owner: Option<UserKey>
+   pub owner: Option<UserKey>,
 }
 
 

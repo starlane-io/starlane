@@ -450,10 +450,15 @@ mod test
     use crate::template::{ConstellationData, ConstellationTemplate};
     use crate::starlane::api::SubSpaceApi;
     use crate::message::Fail;
+    use std::fs;
 
     #[test]
     pub fn starlane()
     {
+        let data_dir = "tmp/data";
+        fs::remove_dir_all(data_dir ).unwrap();
+        std::env::set_var("STARLANE_DATA", data_dir );
+
 
         let rt = Runtime::new().unwrap();
         rt.block_on(async {

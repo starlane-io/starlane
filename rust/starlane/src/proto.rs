@@ -134,8 +134,9 @@ impl ProtoStar
                             registry: resource_registry,
                             star_handler: star_handler,
                             persistence: Persistence::Memory,
-                            file_access: FileAccess::new("data".to_string()).await?
+                            file_access: FileAccess::new(std::env::var("STARLANE_DATA")? ).await?
                         };
+
 
                         let variant= self.star_manager_factory.create(skel.clone() ).await;
 

@@ -621,6 +621,15 @@ impl ResourceKey
         }
     }
 
+    pub fn as_filesystem(&self)->Result<FileSystemKey,Fail> {
+        if let ResourceKey::FileSystem(key) = self {
+            Ok(key.clone())
+        } else {
+            Err(Fail::WrongResourceType{expected: HashSet::from_iter(vec![ResourceType::FileSystem]), received: self.resource_type().clone() })
+        }
+    }
+
+
     pub fn encode(&self)->Result<String,Error> {
         Ok(base64::encode(self.bin()?))
     }

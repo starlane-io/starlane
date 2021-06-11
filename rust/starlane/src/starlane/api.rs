@@ -6,7 +6,7 @@ use tokio::sync::{mpsc, oneshot};
 use crate::frame::{ChildManagerResourceAction, Reply, SimpleReply, StarMessagePayload};
 use crate::keys::ResourceKey;
 use crate::message::{Fail, ProtoStarMessage};
-use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord, ResourceType, Path, LocalDataSrc, DataTransfer, ResourceIdentifier, ResourceStub };
+use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord, ResourceType, Path, LocalDataSrc, DataTransfer, ResourceIdentifier, ResourceStub, ResourceCreateStrategy};
 use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
@@ -101,6 +101,7 @@ impl StarlaneApi {
 
      */
 
+
     pub async fn create_resource( &self, create: ResourceCreate ) -> Result<ResourceStub,Fail> {
         let parent_location = match &create.parent{
             ResourceKey::Nothing => {
@@ -145,7 +146,7 @@ impl StarlaneApi {
             },
             src: resource_src,
             registry_info: None,
-            owner: None
+            owner: None,
         };
         let stub = self.create_resource(create).await?;
         Ok(SpaceApi::new( self.star_tx.clone(), stub)?)
@@ -210,7 +211,7 @@ impl SpaceApi {
             },
             src: resource_src,
             registry_info: None,
-            owner: None
+            owner: None,
         };
         let stub = self.starlane_api().create_resource(create).await?;
         Ok(UserApi::new( self.star_tx.clone(), stub)?)
@@ -231,7 +232,7 @@ impl SpaceApi {
             },
             src: resource_src,
             registry_info: None,
-            owner: None
+            owner: None,
         };
         let stub = self.starlane_api().create_resource(create).await?;
         Ok(SubSpaceApi::new( self.star_tx.clone(), stub)?)

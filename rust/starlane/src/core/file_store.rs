@@ -36,21 +36,47 @@ impl FileStoreHost {
             store: ResourceStore::new().await,
         };
 
+
+        rtn.walk().await?;
+
         rtn.watch().await?;
 
         Ok(rtn)
     }
 
-    async fn watch(&self) -> Result<(),Error>{
-        let mut event_rx = self.file_access.watch().await?;
-        let store = self.store.clone();
+    async fn walk(&self) -> Result<(),Error>{
+        let mut event_rx = self.file_access.walk().await?;
         let dir = PathBuf::from(self.file_access.path());
         let root_path = fs::canonicalize(&dir)?.to_str().ok_or("turning path to string")?.to_string();
         let store = self.store.clone();
         let skel = self.skel.clone();
         tokio::spawn( async move {
             while let Option::Some(event) = event_rx.recv().await {
-                Self::handle_event(root_path.clone(), event, store.clone(), skel.clone()).await.unwrap();
+                match Self::handle_event(root_path.clone(), event.clone(), store.clone(), skel.clone()).await{
+                    Ok(_) => {}
+                    Err(error) => {
+                        eprintln!("error when handling path: {} error: {} ", event.path, error.to_string() );
+                    }
+                }
+            }
+        } );
+        Ok(())
+    }
+
+    async fn watch(&self) -> Result<(),Error>{
+        let mut event_rx = self.file_access.watch().await?;
+        let dir = PathBuf::from(self.file_access.path());
+        let root_path = fs::canonicalize(&dir)?.to_str().ok_or("turning path to string")?.to_string();
+        let store = self.store.clone();
+        let skel = self.skel.clone();
+        tokio::spawn( async move {
+            while let Option::Some(event) = event_rx.recv().await {
+                match Self::handle_event(root_path.clone(), event.clone(), store.clone(), skel.clone()).await{
+                    Ok(_) => {}
+                    Err(error) => {
+                        eprintln!("error when handling path: {} error: {} ", event.path, error.to_string() );
+                    }
+                }
             }
         } );
         Ok(())
@@ -63,6 +89,10 @@ impl FileStoreHost {
             path.remove(0);
         }
 
+
+        if path.len() == 0  {
+            return Ok(())
+        }
         // remove leading / for filesystem
         path.remove(0);
         let mut split = path.split("/");
@@ -73,6 +103,11 @@ impl FileStoreHost {
             file_path.push_str(part);
         }
 
+        if event.file_kind == FileKind::Directory {
+            file_path.push_str("/");
+        }
+
+println!("final filepath: {}",file_path );
         let filesystem_key = ResourceKey::FileSystem(FileSystemKey::from_str(filesystem )?);
 
         FileStoreHost::ensure_file(filesystem_key, file_path,  event.file_kind, store, skel ).await?;
@@ -84,7 +119,7 @@ impl FileStoreHost {
     async fn ensure_file(filesystem_key: ResourceKey, file_path: String, kind: FileKind, store: ResourceStore, skel: StarSkel ) -> Result<(),Error> {
 
 
-        let filesystem= store.get(filesystem_key.clone()).await?.ok_or(format!("expected filesystem to be present in hosted environment: {}",filesystem_key.to_string()))?;
+        let filesystem= store.get(filesystem_key.clone()).await?.ok_or(format!("expected filesystem to be present in hosted environment: {}",filesystem_key.as_filesystem()?.to_string()))?;
         let filesystem: ResourceStub = filesystem.into();
 
         let archetype = ResourceArchetype{
