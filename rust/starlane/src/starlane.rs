@@ -494,7 +494,7 @@ mod test
                 timeout(Duration::from_millis(10), rx).await.unwrap().unwrap()
             };
 
-            let sub_space_api = match starlane_api.get_sub_space(ResourceAddress::from_str("hyperspace:default::<SubSpace>").unwrap().into() ).await
+            let sub_space_api = match starlane_api.get_sub_space(ResourceAddress::from_str("hyperspace::default::<SubSpace>").unwrap().into() ).await
             {
                 Ok(api) => api,
                 Err(err) => {

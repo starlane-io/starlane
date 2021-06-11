@@ -1271,11 +1271,11 @@ impl ResourceType{
             ResourceType::FileSystem => {
                 match parent.resource_type(){
                     ResourceType::SubSpace => {
-                        let address = format!("{}:*:{}", parent.to_parts_string(), tail );
+                        let address = format!("{}{}*{}{}", parent.to_parts_string(), RESOURCE_ADDRESS_DELIM, RESOURCE_ADDRESS_DELIM, tail );
                         Ok(self.address_structure().from_str(address.as_str())?)
                     }
                     ResourceType::App => {
-                        let address = format!("{}:{}", parent.to_parts_string(), tail );
+                        let address = format!("{}{}{}", parent.to_parts_string(), RESOURCE_ADDRESS_DELIM, tail );
                         Ok(self.address_structure().from_str(address.as_str())?)
                     }
                     resource_type => Err(format!("illegal resource type parent for FileSystem: {}", resource_type.to_string()).into())
@@ -1283,7 +1283,7 @@ impl ResourceType{
                 }
             }
             _ => {
-                let address = format!("{}:{}", parent.to_parts_string(), tail );
+                let address = format!("{}{}{}", parent.to_parts_string(), RESOURCE_ADDRESS_DELIM, tail );
                 Ok(self.address_structure().from_str(address.as_str())?)
             }
         }
