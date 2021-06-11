@@ -36,7 +36,7 @@ lazy_static!
 
 
 
-#[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
+#[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct Name
 {
     pub sub_space: SubSpaceName,

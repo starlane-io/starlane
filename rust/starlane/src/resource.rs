@@ -1207,7 +1207,7 @@ impl FromStr for ResourceKind
     }
 }
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum ResourceType
 {
     Nothing,
@@ -2162,7 +2162,7 @@ pub enum ResourceManagerKey
 }
 
 
-#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub struct ResourceAddress
 {
    resource_type: ResourceType,
@@ -2662,7 +2662,7 @@ impl ResourceAddressPartKind
 
 
 
-#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub enum ResourceAddressPart
 {
     Wildcard,
@@ -2701,7 +2701,7 @@ impl ResourceAddressPart {
    }
 }
 
-#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub struct Base64Encoded {
     encoded: String
 }
@@ -2735,7 +2735,7 @@ impl Base64Encoded {
     }
 }
 
-#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub struct SkewerCase
 {
     string: String
@@ -2775,7 +2775,7 @@ impl FromStr for SkewerCase {
 
 
 
-#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub struct DomainCase
 {
     string: String
@@ -3241,7 +3241,7 @@ mod test
 
 
 
-#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub struct Path
 {
     string: String
@@ -3293,21 +3293,31 @@ impl Path
     }
 
     pub fn parent(&self) -> Option<Path> {
+        let mut copy = self.string.clone();
+        if copy.len() <= 1 {
+            return Option::None;
+        }
+        copy.remove(0);
         let split = self.string.split("/");
         if split.count() <= 1{
             Option::None
         }
         else{
-            let mut string = String::new();
-            let mut split = self.string.split("/");
+            let mut segments = vec![];
+            let mut split = copy.split("/");
             while let Option::Some(segment) = split.next() {
-                string.push_str("/");
-                string.push_str(segment );
+                segments.push(segment);
             }
-            match Self::new(string.as_str())
-            {
-                Ok(path) => Option::Some(path),
-                Err(_) => Option::None
+            if segments.len() <= 1 {
+                return Option::None
+            } else {
+                segments.pop();
+                let mut string = String::new();
+                for segment in segments {
+                    string.push_str("/");
+                    string.push_str(segment );
+                }
+                Option::Some(Path::new(string.as_str()).unwrap())
             }
         }
     }
@@ -3337,6 +3347,23 @@ impl TryFrom<Arc<Vec<u8>>> for Path{
     }
 }
 
+impl TryFrom<&str> for Path{
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Ok(Path::new(value)?)
+    }
+}
+
+impl TryFrom<String> for Path{
+    type Error = Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Ok(Path::new(value.as_str())?)
+    }
+}
+
+
 impl ToString for Path {
     fn to_string(&self) -> String {
         self.string.clone()
@@ -3354,7 +3381,7 @@ impl FromStr for Path {
 
 
 
-#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub struct Version
 {
     string: String
@@ -3840,7 +3867,7 @@ pub enum ResourceStatePersistenceManager {
     Host
 }
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Debug,Clone,Serialize,Deserialize)]
 pub enum ResourceIdentifier {
     Key(ResourceKey),
     Address(ResourceAddress)

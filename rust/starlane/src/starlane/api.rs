@@ -6,7 +6,7 @@ use tokio::sync::{mpsc, oneshot};
 use crate::frame::{ChildManagerResourceAction, Reply, SimpleReply, StarMessagePayload};
 use crate::keys::ResourceKey;
 use crate::message::{Fail, ProtoStarMessage};
-use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord, ResourceType, Path, LocalDataSrc, DataTransfer, ResourceIdentifier, ResourceStub, ResourceCreateStrategy};
+use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord, ResourceType, Path, LocalDataSrc, DataTransfer, ResourceIdentifier, ResourceStub, ResourceCreateStrategy, FileKind};
 use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
@@ -350,19 +350,21 @@ impl FileSystemApi {
         StarlaneApi::new(self.star_tx.clone())
     }
 
+    pub async fn create_file_from_string( &self, path: &Path, string: String )-> Result<FileApi,Fail> {
+        self.create_file( path, Arc::new(string.into_bytes()) ).await
+    }
 
-    /*
-    pub async fn create_file( &self, path: &Path, data: Box<dyn DataTransfer> )-> Result<FileApi,Fail> {
+    pub async fn create_file( &self, path: &Path, data: Arc<Vec<u8>> )-> Result<FileApi,Fail> {
         // at this time the only way to 'create' a file state is to load the entire thing into memory
         // in the future we want options like "Stream" which will allow us to stream the state contents, etc.
 //        let resource_src = AssignResourceStateSrc::Direct(data.get()?);
-        let resource_src = AssignResourceStateSrc::Direct(Arc::new(vec!()));
+        let resource_src = AssignResourceStateSrc::Direct(data);
         let create = ResourceCreate{
             parent: self.stub.key.clone(),
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Append(path.to_string()),
             archetype: ResourceArchetype {
-                kind: ResourceKind::FileSystem,
+                kind: ResourceKind::File(FileKind::File),
                 specific: None,
                 config: None
             },
@@ -373,8 +375,6 @@ impl FileSystemApi {
         let stub = self.starlane_api().create_resource(create).await?;
         Ok(FileApi::new( self.star_tx.clone(), stub )?)
     }
-
-     */
 
 }
 

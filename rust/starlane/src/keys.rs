@@ -19,7 +19,7 @@ use crate::actor::ActorKey;
 
 pub type SpaceId = u32;
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum SpaceKey
 {
     HyperSpace,
@@ -73,7 +73,7 @@ impl ToString for SpaceKey{
 
 pub type UserId=i32;
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct UserKey
 {
   pub space: SpaceKey,
@@ -169,7 +169,7 @@ impl FromStr for UserKey{
     }
 }
 
-#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub struct SubSpaceKey
 {
     pub space: SpaceKey,
@@ -219,7 +219,7 @@ impl FromStr for SubSpaceKey{
 }
 
 
-#[derive(Clone,Hash,Eq,PartialEq,Serialize,Deserialize)]
+#[derive(Debug,Clone,Hash,Eq,PartialEq,Serialize,Deserialize)]
 pub struct AppKey
 {
     pub sub_space: SubSpaceKey,
@@ -357,7 +357,7 @@ impl ToString for ResourceId{
     }
 }
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum ResourceKey
 {
     Nothing,
@@ -689,7 +689,7 @@ impl ResourceKey
     }
      */
 }
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct DomainKey{
    pub space: SpaceKey,
    pub id: DomainId
@@ -702,7 +702,7 @@ impl ToString for DomainKey{
 }
 
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct ProxyKey{
     pub space: SpaceKey,
     pub id: ProxyId
@@ -714,7 +714,7 @@ impl ToString for ProxyKey{
     }
 }
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct UrlPathPatternKey{
     pub domain: DomainKey,
     pub id: UrlPathPatternId
@@ -727,7 +727,7 @@ impl ToString for UrlPathPatternKey{
 }
 
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum FileSystemKey
 {
     App(AppFilesystemKey),
@@ -795,7 +795,7 @@ impl FromStr for AppFilesystemKey {
 
 pub type FileSystemId = u32;
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct AppFilesystemKey
 {
     pub app: AppKey,
@@ -808,7 +808,7 @@ impl ToString for AppFilesystemKey  {
     }
 }
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct SubSpaceFilesystemKey
 {
     pub sub_space: SubSpaceKey,
@@ -954,7 +954,7 @@ impl ResourceKey
 
 
 
-#[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
+#[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct FileKey
 {
    pub filesystem: FileSystemKey,

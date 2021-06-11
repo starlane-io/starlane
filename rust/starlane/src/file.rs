@@ -17,6 +17,7 @@ use tokio::runtime::Runtime;
 use std::future::Future;
 use crate::util;
 use walkdir::{WalkDir, DirEntry};
+use tokio::io::AsyncWriteExt;
 
 pub enum FileCommand{
     Read{path: Path, tx:tokio::sync::oneshot::Sender<Result<Arc<Vec<u8>>,Error>>},
@@ -199,13 +200,14 @@ impl LocalFileAccess {
     }
 
     pub fn write(&mut self, path: &Path, data: Arc<Vec<u8>>) -> Result<(), Error> {
+
         if let Option::Some(parent) = path.parent(){
             self.mkdir(&parent)?;
         }
 
         let path = self.cat_path(path.to_relative().as_str() )?;
-        let mut file = File::open(&path)?;
-        file.write_all(data.as_slice())?;
+        let mut file = File::create(&path)?;
+        file.write(data.as_slice()).unwrap();
         Ok(())
     }
 

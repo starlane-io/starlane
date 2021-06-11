@@ -380,7 +380,7 @@ impl ResultWaiter
 }
 
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Debug,Clone,Serialize,Deserialize)]
 pub enum Fail
 {
     Timeout,
@@ -437,14 +437,14 @@ impl ToString for Fail {
 
 
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Debug,Clone,Serialize,Deserialize)]
 pub struct Reject
 {
     pub reason: String,
     pub kind: RejectKind
 }
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Debug,Clone,Serialize,Deserialize)]
 pub enum RejectKind
 {
     Error,

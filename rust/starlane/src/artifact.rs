@@ -235,7 +235,7 @@ impl ToString for ArtifactLocation{
     }
 }
 
-#[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
+#[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct DomainName
 {
     pub domain: String
@@ -266,7 +266,7 @@ impl DomainName
     }
 }
 
-#[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
+#[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct SpaceName
 {
     pub hyper: DomainName,
@@ -300,7 +300,7 @@ impl SpaceName
     }
 }
 
-#[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
+#[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct SubSpaceName
 {
     pub space: SpaceName,

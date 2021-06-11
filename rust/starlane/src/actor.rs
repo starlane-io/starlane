@@ -23,7 +23,7 @@ use crate::star::StarKey;
 use crate::app::ConfigSrc;
 
 
-#[derive(Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
+#[derive(Debug,Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
 pub struct ActorKey
 {
     pub app: AppKey,

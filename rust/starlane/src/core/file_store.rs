@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::path::PathBuf;
 
 use rusqlite::Connection;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 
 use crate::core::Host;
 use crate::error::Error;
@@ -24,6 +24,7 @@ pub struct FileStoreHost {
     skel: StarSkel,
     file_access: FileAccess,
     store: ResourceStore,
+    mutex: Arc<Mutex<u8>>
 }
 
 impl FileStoreHost {
@@ -34,6 +35,7 @@ impl FileStoreHost {
             skel: skel,
             file_access: file_access,
             store: ResourceStore::new().await,
+            mutex: Arc::new(Mutex::new(0))
         };
 
 
@@ -69,8 +71,10 @@ impl FileStoreHost {
         let root_path = fs::canonicalize(&dir)?.to_str().ok_or("turning path to string")?.to_string();
         let store = self.store.clone();
         let skel = self.skel.clone();
+        let mutex = self.mutex.clone();
         tokio::spawn( async move {
             while let Option::Some(event) = event_rx.recv().await {
+                let lock = mutex.lock().await;
                 match Self::handle_event(root_path.clone(), event.clone(), store.clone(), skel.clone()).await{
                     Ok(_) => {}
                     Err(error) => {
@@ -152,18 +156,6 @@ impl Host for FileStoreHost {
 
     async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource, Fail> {
         // if there is Initialization to do for assignment THIS is where we do it
-       let data_transfer= match assign.state_src{
-            AssignResourceStateSrc::Direct(data) => {
-                let data_transfer:Arc<dyn DataTransfer> = Arc::new(MemoryDataTransfer::new(data));
-                data_transfer
-            },
-            AssignResourceStateSrc::Hosted => {
-                Arc::new(MemoryDataTransfer::none())
-            }
-           AssignResourceStateSrc::None => {
-               Arc::new(MemoryDataTransfer::none())
-           }
-       };
 
         match assign.stub.key.resource_type(){
             ResourceType::FileSystem => {
@@ -174,13 +166,31 @@ impl Host for FileStoreHost {
                 }
             }
             ResourceType::File => {
-                // we don't do anything for File yet...
 
+                    match assign.state_src {
+                        AssignResourceStateSrc::Direct(data) => {
+                            let filesystem_key = assign.stub.key.parent().ok_or("Wheres the filesystem key?")?.as_filesystem()?;
+                            let filesystem_path = Path::new(format!("/{}",filesystem_key.to_string().as_str()).as_str() )?;
+                            let path = format!( "{}{}", filesystem_path.to_string(), assign.stub.address.last_to_string()? );
+
+                            let lock = self.mutex.lock().await;
+                            self.file_access.write(&Path::from_str(path.as_str())?, data ).await?;
+                        },
+                        AssignResourceStateSrc::Hosted => {
+                            // do nothing, the file should already be present in the filesystem detected by the watcher and
+                            // this call to assign is just making sure the database registry is updated
+                        }
+                        AssignResourceStateSrc::None => {
+                            // do nothing, there is no data (this should never happen of course in a file)
+                        }
+                    }
             }
             rt => {
                 return Err(Fail::WrongResourceType { expected: HashSet::from_iter(vec![ResourceType::FileSystem,ResourceType::File]), received: rt });
             }
         }
+
+        let data_transfer: Arc<dyn DataTransfer> = Arc::new(MemoryDataTransfer::none());
 
         let assign = ResourceAssign{
             stub: assign.stub,

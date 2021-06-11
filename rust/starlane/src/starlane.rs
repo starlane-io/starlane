@@ -451,6 +451,7 @@ mod test
     use crate::starlane::api::SubSpaceApi;
     use crate::message::Fail;
     use std::fs;
+    use std::convert::TryInto;
 
     #[test]
     pub fn starlane()
@@ -509,7 +510,10 @@ eprintln!("{}",err.to_string());
                 }
             };
 
-            sub_space_api.create_file_system("bottom-up").await;
+            let file_api = sub_space_api.create_file_system("website").await.unwrap();
+            file_api.create_file_from_string(&"/README.txt".try_into().unwrap(), "The rain in Spain falls mostly on the plain.".to_string() ).await;
+            file_api.create_file_from_string(&"/images/not-really-an-image.png".try_into().unwrap(), "This is not really an image....".to_string() ).await;
+
 
             println!("got space ctrl");
 
