@@ -839,11 +839,24 @@ println!("GOT REPLY from GetKey");
 
     async fn locate_resource_record(&mut self, request: Request<ResourceIdentifier, ResourceRecord>)
     {
+        if request.log {
+            self.log( LogId(request.payload.to_string()), "locate_resource_record()", "locating...");
+        }
+
         if self.has_resource_record(&request.payload)
         {
+            if request.log {
+                self.log( LogId(request.payload.to_string()), "locate_resource_record()", "found in cache.");
+            }
+
             request.tx.send(Ok(self.get_resource_record(&request.payload).unwrap()));
             return;
         } else if request.payload.resource_type().star_manager().contains(&self.skel.info.kind) {
+
+            if request.log {
+                self.log( LogId(request.payload.to_string()), "locate_resource_record()", format!("<{}> star manager is contained in star kind <{}>.", request.payload.resource_type().to_string(), self.skel.info.kind.to_string() ).as_str() );
+            }
+
             match self.skel.registry.as_ref().unwrap().get(request.payload.clone()).await {
                 Ok(record) => {
                     match record {
@@ -851,6 +864,7 @@ println!("GOT REPLY from GetKey");
                             request.tx.send(Ok(record));
                         }
                         None => {
+                            self.log( LogId(request.payload.to_string()), "locate_resource_record()", "FATAL: ResourceNotFound");
                             request.tx.send(Err(Fail::ResourceNotFound(request.payload)));
                         }
                     }
@@ -860,7 +874,13 @@ println!("GOT REPLY from GetKey");
                 }
             }
         } else if request.payload.resource_type() == ResourceType::Root {
-            let (new_request, rx) = Request::new((request.payload.clone(), StarKey::central()));
+
+            if request.log {
+                self.log( LogId(request.payload.to_string()), "locate_resource_record()", "resource is <Root>");
+            }
+
+            let (mut new_request, rx) = Request::new((request.payload.clone(), StarKey::central()));
+            new_request.log = request.log;
             self.request_resource_record_from_star(new_request).await;
             tokio::spawn(async move {
                 match Star::wait_for_it(rx).await
@@ -874,7 +894,12 @@ println!("GOT REPLY from GetKey");
                 }
             });
         } else if request.payload.parent().is_some() {
-            let (new_request, rx) = Request::new(request.payload.parent().unwrap().clone());
+            if request.log {
+                self.log( LogId(request.payload.to_string()), "locate_resource_record()", format!("locating parent: [{}]", request.payload.parent().unwrap().to_string() ).as_str());
+            }
+
+            let (mut new_request, rx) = Request::new(request.payload.parent().unwrap().clone());
+            new_request.log = request.log;
             self.skel.star_tx.send(StarCommand::ResourceRecordRequest(new_request)).await;
             let skel = self.skel.clone();
             tokio::spawn(async move {
@@ -891,6 +916,8 @@ println!("GOT REPLY from GetKey");
                 }
             });
         } else {
+
+            self.log( LogId(request.payload.to_string()), "locate_resource_record()", "FATAL: failed to find resource.");
             request.tx.send(Err(Fail::Error(format!("cannot find resource_type {} has parent? {}",request.payload.to_string(),request.payload.parent().is_some() ).to_string())));
         }
     }
@@ -902,6 +929,7 @@ println!("GOT REPLY from GetKey");
         let mut proto = ProtoStarMessage::new();
         proto.to = star.into();
         proto.payload = StarMessagePayload::ResourceManager(ChildManagerResourceAction::Find(identifier));
+        proto.log = locate.log;
         let reply = proto.get_ok_result().await;
         self.send_proto_message(proto).await;
         let star_tx = self.skel.star_tx.clone();
@@ -981,27 +1009,50 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
 
     async fn send_proto_message(&mut self, mut proto: ProtoStarMessage)
     {
+        if proto.log {
+           println!("{} => {} : {}", self.skel.info.to_string(), LogId(&proto).to_string(), "send_proto_message()");
+        }
         let id = MessageId::new_v4();
 
-        let star = match &proto.to {
+        let star = match proto.to.clone() {
             ProtoStarMessageTo::None => {
                 eprintln!("ProtoStarMessage to address cannot be None");
+
                 return;
             }
-            ProtoStarMessageTo::Star(star) => { star }
+            ProtoStarMessageTo::Star(star) => {
+                if proto.log {
+                    println!("{} => {} : send_proto_message() => heading to star [{}]", self.skel.info.to_string(), LogId(&proto).to_string(), star.to_string());
+                }
+                star }
             ProtoStarMessageTo::Resource(resource) => {
-                let (request, rx) = Request::new(resource.clone());
+
+                let (mut request, rx) = Request::new(resource.clone());
+                request.log = proto.log;
                 self.skel.star_tx.send(StarCommand::ResourceRecordRequest(request)).await;
                 let skel = self.skel.clone();
 
                 tokio::spawn(async move {
-                    match Star::wait_for_it(rx).await {
+                    if proto.log {
+                        println!("{} => {} : send_proto_message() => fetching star for resource {}", skel.info.to_string(), LogId(&proto).to_string(), resource.to_string());
+                    }
+
+                    let result = Star::wait_for_it(rx).await;
+
+                    match result {
                         Ok(result) => {
+                            if proto.log {
+                                println!("{} => {} : send_proto_message() => found star: {}", skel.info.to_string(), LogId(&proto).to_string(), result.location.host.to_string());
+                            }
                             proto.to = result.location.host.into();
                             skel.star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                         }
                         Err(fail) => {
                             eprintln!("Star failed to find resource record: {}", fail.to_string());
+
+                            if proto.log {
+                                println!("{} => {} : send_proto_message() => FATAL: failed to fetch star for resource. ERROR: {}", skel.info.to_string(), LogId(&proto).to_string(), fail.to_string());
+                            }
                         }
                     }
                 });
@@ -1010,7 +1061,7 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
         };
 
         if let Err(errors) = proto.validate() {
-            eprintln!("ProtoStarMessage is not valid cannot send: {}", errors);
+            println!("{} => {} : send_proto_message() => FATAL: proto not valid. ERROR: {}", self.skel.info.to_string(), LogId(&proto).to_string(), errors.to_string());
             return;
         }
 
@@ -1018,12 +1069,19 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
             id: id,
             from: self.skel.info.key.clone(),
             to: star.clone(),
-            payload: proto.payload,
-            reply_to: proto.reply_to
+            payload: proto.payload.clone(),
+            reply_to: proto.reply_to.clone(),
+            trace: false,
+            log: proto.log
         };
 
-        let delivery = StarMessageDeliveryInsurance::with_txrx(message, proto.expect, proto.tx.clone(), proto.tx.subscribe());
+        let delivery = StarMessageDeliveryInsurance::with_txrx(message, proto.expect.clone(), proto.tx.clone(), proto.tx.subscribe());
         self.message(delivery).await;
+
+        if proto.log {
+            println!("{} => {} : send_proto_message() => SENT", self.skel.info.to_string(), LogId(&proto).to_string());
+        }
+
     }
 
 
@@ -1698,6 +1756,9 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
 
     async fn on_message(&mut self, mut message: StarMessage) -> Result<(), Error>
     {
+        if message.log {
+            println!("{} => {} : {}", self.skel.info.to_string(), LogId(&message).to_string(), "on_message");
+        }
         if message.to != self.skel.info.key
         {
             if self.skel.info.kind.relay() || message.from == self.skel.info.key
@@ -1776,6 +1837,17 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
             }
             ResourceRequestMessage::State => {
 
+println!("RECEVIED --> STATE <-- REQUEST !");
+                let (action,mut rx) = StarCoreAction::new(StarCoreCommand::State(delivery.message.to.clone() ));
+                self.skel.core_tx.send(action).await?;
+                tokio::spawn( async move {
+                    let result = rx.await;
+                    if let Ok(Ok(StarCoreResult::State(state))) = result {
+                        delivery.reply(ResourceResponseMessage::State(state)).await.unwrap_or_default();
+                    } else {
+                        delivery.reply(ResourceResponseMessage::Fail(Fail::Unexpected)).await.unwrap_or_default();
+                    }
+                } );
             }
         }
         Ok(())
@@ -2039,7 +2111,11 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                     }
 
 
-                }
+    pub fn log<T>(&self, sub: LogId<T>, method: &str, message: &str ) where LogId<T>: ToString {
+        println!("{} => {} : {} | {}", LogId(self).to_string(), sub.to_string(), method, message );
+    }
+
+}
 
                 pub trait StarKernel : Send
                 {
@@ -2210,7 +2286,8 @@ pub enum CoreRequest
 
                 pub struct Request<P,R> {
                    pub payload: P,
-                   pub tx: oneshot::Sender<Result<R,Fail>>
+                   pub tx: oneshot::Sender<Result<R,Fail>>,
+                   pub log: bool
                 }
 
                 impl <P,R> Request<P,R>
@@ -2219,7 +2296,8 @@ pub enum CoreRequest
                         let (tx,rx) = oneshot::channel();
                         (Request{
                             payload: payload,
-                            tx: tx
+                            tx: tx,
+                            log: false
                         },rx)
                     }
                 }
@@ -2841,6 +2919,12 @@ impl fmt::Display for StarCommand{
                     }
                 }
 
+                impl ToString for StarInfo {
+                    fn to_string(&self) -> String {
+                        format!("<{}>::[{}]",self.kind.to_string(),self.key.to_string())
+                    }
+                }
+
                 pub struct PublicKeySource
                 {
                 }
@@ -3313,3 +3397,73 @@ impl ToString for StarStatus{
         }
     }
 }
+
+
+
+pub struct LogId<T>(T);
+
+
+impl Into<LogId<String>> for &'static ResourceIdentifier{
+    fn into(self) -> LogId<String> {
+        match self {
+            ResourceIdentifier::Key(key) => {
+                LogId(format!("[{}]",key.to_string()))
+            }
+            ResourceIdentifier::Address(address) => {
+                LogId(format!("'{}'",address.to_string()))
+            }
+        }
+    }
+}
+
+impl Into<LogId<String>> for &'static Star{
+    fn into(self) -> LogId<String> {
+        LogId(self.skel.info.to_string())
+    }
+}
+
+impl Into<LogId<String>> for &'static StarMessage{
+    fn into(self) -> LogId<String> {
+        LogId(format!("<Message>[{}]", self.id.to_string()))
+    }
+}
+
+impl Into<LogId<String>> for &'static ProtoStarMessage{
+    fn into(self) -> LogId<String> {
+        LogId("<proto>".to_string())
+    }
+}
+impl ToString for LogId<String>{
+    fn to_string(&self) -> String {
+        self.0.clone()
+    }
+}
+
+
+impl ToString for LogId<&Star>{
+    fn to_string(&self) -> String {
+        format!("{}", self.0.skel.info.to_string())
+    }
+}
+
+impl ToString for LogId<&mut Star>{
+    fn to_string(&self) -> String {
+        format!("{}", self.0.skel.info.to_string())
+    }
+}
+
+impl ToString for LogId<&StarMessage>{
+    fn to_string(&self) -> String {
+        format!("<Message>[{}]", self.0.id.to_string())
+    }
+}
+
+impl ToString for LogId<&ProtoStarMessage>{
+    fn to_string(&self) -> String {
+        "<proto>".to_string()
+    }
+}
+
+
+
+

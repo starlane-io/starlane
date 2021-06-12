@@ -18,10 +18,12 @@ use crate::logger::Log::ProtoStar;
 use crate::util;
 
 
+
+
 #[derive(Clone,Serialize,Deserialize)]
 pub enum MessageFrom
 {
-    Inject(StarKey),
+    Inject,
     Resource(ResourceIdentifier)
 }
 
@@ -41,6 +43,8 @@ pub struct ProtoMessage<P,R> {
     pub to: Option<MessageTo>,
     pub payload: Option<P>,
     pub reply_tx: Cell<Option<oneshot::Sender<Result<MessageReply<R>,Fail>>>>,
+    pub trace: bool,
+    pub log: bool
 }
 
 impl <P,R> ProtoMessage <P,R>{
@@ -52,15 +56,17 @@ impl <P,R> ProtoMessage <P,R>{
             to: Option::None,
             payload: None,
             reply_tx: Cell::new(Option::None),
+            trace: false,
+            log: false
         }
     }
 
     pub fn validate(&self) -> Result<(),Error> {
         if self.to.is_none() {
-            Err("to must be set".into())
+            Err("RESOURCE to must be set".into())
         }
         else if self.from.is_none() {
-            Err("to must be set".into())
+            Err("from must be set".into())
         }
         else if let Option::None = self.payload{
             Err("message payload cannot be None".into())
@@ -80,6 +86,8 @@ impl <P,R> ProtoMessage <P,R>{
             from: self.from.ok_or("need to set 'from' in ProtoMessage")?,
             to: self.to.ok_or("need to set 'to' in ProtoMessage")?,
             payload: self.payload.ok_or("need to set a payload in ProtoMessage")?,
+            trace: self.trace,
+            log: self.log
         })
     }
 
@@ -115,6 +123,8 @@ impl ProtoMessage<ResourceRequestMessage,ResourceResponseMessage> {
         let message = self.create()?;
         let mut proto = ProtoStarMessage::new();
         proto.to = message.to.clone().into();
+        proto.trace = message.trace;
+        proto.log = message.log;
         proto.payload = StarMessagePayload::MessagePayload(MessagePayload::Request(message));
         let reply = proto.get_ok_result().await;
 
@@ -139,7 +149,9 @@ pub struct ProtoMessageReply<P> {
     pub id: MessageId,
     pub from: Option<MessageFrom>,
     pub payload: Option<P>,
-    pub reply_to: Option<MessageId>
+    pub reply_to: Option<MessageId>,
+    pub trace: bool,
+    pub log: bool
 }
 
 impl <P> ProtoMessageReply <P>{
@@ -149,7 +161,9 @@ impl <P> ProtoMessageReply <P>{
             id: MessageId::new_v4(),
             from: Option::None,
             payload: None,
-            reply_to: Option::None
+            reply_to: Option::None,
+            trace: false,
+            log: false
         }
     }
 
@@ -178,6 +192,8 @@ impl <P> ProtoMessageReply <P>{
             from: self.from.ok_or("need to set 'from' in ProtoMessageReply")?,
             reply_to: self.reply_to.ok_or("need to set 'reply_to' in ProtoMessageReply")?,
             payload: self.payload.ok_or("need to set a payload in ProtoMessageReply")?,
+            trace: self.trace,
+            log: self.log
         })
     }
 
@@ -197,6 +213,8 @@ pub struct Message<P>
     pub from: MessageFrom,
     pub to: MessageTo,
     pub payload: P,
+    pub trace: bool,
+    pub log: bool
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -206,6 +224,8 @@ pub struct MessageReply<P>
     pub from: MessageFrom,
     pub reply_to: MessageId,
     pub payload: P,
+    pub trace: bool,
+    pub log: bool,
 }
 
 impl <P> Message<P>
@@ -268,7 +288,8 @@ pub enum ResourceResponseMessage
     Resource(Option<ResourceRecord>),
     Resources(Vec<ResourceRecord>),
     Unique(ResourceId),
-    State(RemoteDataSrc)
+    State(RemoteDataSrc),
+    Fail(Fail)
 }
 
 #[derive(Clone,Serialize,Deserialize)]

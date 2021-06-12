@@ -266,7 +266,10 @@ impl StarCore2{
                 let resource = self.host.get(identifier).await?;
                 Ok(StarCoreResult::Resource(resource))
             }
-            _ => unimplemented!()
+            StarCoreCommand::State(identifier) => {
+                let state_src= self.host.state(identifier).await?;
+                Ok(StarCoreResult::State(state_src))
+            }
         }
     }
 }

@@ -742,7 +742,7 @@ eprintln!("error setting up db: {}", err );
                 let mut resources = vec![];
                 while let Option::Some(row) = rows.next()?
                 {
-                    resources.push(Self::process_resource_row(row)?);
+                    resources.push(Self::process_resource_row_catch(row)?);
                 }
                 Ok(ResourceRegistryResult::Resources(resources) )
             }
@@ -767,15 +767,16 @@ eprintln!("error setting up db: {}", err );
                            let statement = format!("SELECT {} FROM resources as r WHERE key=?1", RESOURCE_QUERY_FIELDS);
                            let mut statement = self.conn.prepare(statement.as_str())?;
                            statement.query_row( params![key], |row| {
-                               Ok(Self::process_resource_row(row)?)
+                               Ok(Self::process_resource_row_catch(row)?)
                            })
                        }
                        ResourceIdentifier::Address(address) => {
                            let address = address.to_string();
                            let statement = format!("SELECT {} FROM resources as r WHERE address=?1", RESOURCE_QUERY_FIELDS);
+println!("~~statement: {}",statement );
                            let mut statement = self.conn.prepare(statement.as_str())?;
                            statement.query_row( params![address], |row| {
-                               Ok(Self::process_resource_row(row)?)
+                               Ok(Self::process_resource_row_catch(row)?)
                            })
                        }
                    };
@@ -792,9 +793,13 @@ eprintln!("error setting up db: {}", err );
                     Err(err) => {
                         match err{
                             rusqlite::Error::QueryReturnedNoRows => {
+eprintln!("NO ROWS: {}",identifier.to_string() );
                                 Ok(ResourceRegistryResult::Resource(Option::None))
                             }
-                            err => Err(err.into())
+                            err => {
+eprintln!("for {} SQL ERROR: {}",identifier.to_string(), err.to_string() );
+                                Err(err.into())
+                            }
                         }
                     }
                 }
@@ -815,7 +820,8 @@ eprintln!("error setting up db: {}", err );
                 let info = request.info.clone();
                 tokio::spawn( async move {
 
-                    if let Result::Ok((record,result_tx)) = rx.await {
+                    let result = rx.await;
+                    if let Result::Ok((record,result_tx)) = result {
                         let mut params = params;
                         let key = match record.stub.key.bin(){
                             Ok(key) => {
@@ -832,8 +838,12 @@ eprintln!("error setting up db: {}", err );
                         rx.await;
                         result_tx.send(Ok(()));
                     }
-                    else{
-                        eprintln!("RESERVATION DID NOT COMMIT");
+                    else if let Result::Err(error) = result{
+                        eprintln!("RESERVATION DID NOT COMMIT parent {}", request.parent.to_string() );
+                        eprintln!("ERROR: {}",error);
+                    }
+                    else {
+                        eprintln!("~RESERVATION DID NOT COMMIT parent {}", request.parent.to_string() );
                     }
                 } );
                 Ok(ResourceRegistryResult::Reservation(reservation))
@@ -860,6 +870,16 @@ eprintln!("error setting up db: {}", err );
         }
     }
 
+    fn process_resource_row_catch( row: &Row) -> Result<ResourceRecord,Error> {
+        match Self::process_resource_row(row) {
+            Ok(ok) => Ok(ok),
+            Err(error) => {
+                eprintln!("process_resource_rows: {}",error);
+                Err(error)
+            }
+        }
+
+    }
 
     fn process_resource_row( row: &Row) -> Result<ResourceRecord,Error> {
         let key:Vec<u8> = row.get(0)?;
@@ -895,10 +915,8 @@ eprintln!("error setting up db: {}", err );
             Option::Some(config)
         };
 
-
         let host:Vec<u8> = row.get(6)?;
         let host= StarKey::from_bin(host)?;
-
 
         let stub = ResourceStub{
             key: key,
@@ -1033,6 +1051,28 @@ pub enum FileKind
     Directory
 }
 
+impl FromStr for FileKind {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s{
+            "Directory" => Ok(FileKind::Directory),
+            "File" => Ok(FileKind::File),
+            _ => Err(format!("cannot match FileKind: {}",s).into())
+
+        }
+    }
+}
+
+impl ToString for FileKind {
+    fn to_string(&self) -> String {
+        match self {
+            FileKind::File => "File".to_string(),
+            FileKind::Directory => "Directory".to_string()
+        }
+    }
+}
+
 #[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum ProxyKind{
     Http
@@ -1086,9 +1126,9 @@ impl fmt::Display for ResourceKind{
                     ResourceKind::Space=> "Space".to_string(),
                     ResourceKind::SubSpace=> "SubSpace".to_string(),
                     ResourceKind::App=>  "App".to_string(),
-                    ResourceKind::Actor(kind)=> format!("Actor:{}",kind).to_string(),
+                    ResourceKind::Actor(kind)=> format!("Actor::{}",kind).to_string(),
                     ResourceKind::User=> "User".to_string(),
-                    ResourceKind::File(_)=> "File".to_string(),
+                    ResourceKind::File(kind)=> format!("File::{}",kind.to_string()).to_string(),
                     ResourceKind::FileSystem=> format!("Filesystem").to_string(),
                     ResourceKind::Domain => "Domain".to_string(),
                     ResourceKind::UrlPathPattern => "UrlPathPattern".to_string(),
@@ -1146,10 +1186,18 @@ impl FromStr for ResourceKind
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
 
-        if s.starts_with("Actor:") {
-            let mut split = s.split(":");
-            split.next().ok_or("error")?;
-            return Ok( ResourceKind::Actor( ActorKind::from_str(split.next().ok_or("error")?)? ) );
+        if s.contains("::") {
+
+            let mut split = s.split("::");
+            match split.next().ok_or("error")?
+            {
+                "File" => {
+                    return Ok(ResourceKind::File(FileKind::from_str(split.next().ok_or("error")?)?));
+                 }
+                _ => {
+                    return Err(format!("cannot find a match for {}",s).into());
+                }
+            }
         }
 
 
@@ -1878,7 +1926,7 @@ impl ResourceCreationChamber{
 
                     tokio::spawn( async move {
 
-                        if let Ok(Ok(MessageReply{ id:_, from:_, reply_to:_, payload:ResourceResponseMessage::Unique(id) })) = util::wait_for_it_whatever(rx).await {
+                        if let Ok(Ok(MessageReply{ id:_, from:_, reply_to:_, payload:ResourceResponseMessage::Unique(id), trace, log })) = util::wait_for_it_whatever(rx).await {
                             match ResourceKey::new(self.parent.key.clone(), id.clone()) {
                                 Ok(key) => {
                                     let final_create = self.finalize_create(key.clone()).await;

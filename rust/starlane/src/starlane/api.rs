@@ -1,7 +1,6 @@
 use std::convert::{TryInto, TryFrom};
 use std::time::Duration;
 
-use tokio::sync::{mpsc, oneshot};
 
 use crate::frame::{ChildManagerResourceAction, Reply, SimpleReply, StarMessagePayload};
 use crate::keys::ResourceKey;
@@ -15,10 +14,14 @@ use crate::error::Error;
 use crate::resource::file_system::FileSystemState;
 use std::sync::Arc;
 use crate::resource::domain::DomainState;
-use crate::message::resource::{ProtoMessage, ResourceRequestMessage, MessageReply, ResourceResponseMessage};
+use crate::message::resource::{ProtoMessage, ResourceRequestMessage, MessageReply, ResourceResponseMessage, MessageFrom};
 use crate::star::StarCommand::ResourceRecordRequest;
 use std::marker::PhantomData;
 use crate::frame::ChildManagerResourceAction::Register;
+use std::{thread, sync};
+use tokio::runtime::Runtime;
+use tokio::sync::mpsc;
+use futures::channel::oneshot;
 
 
 #[derive(Clone)]
@@ -34,7 +37,7 @@ impl StarlaneApi {
         }
     }
 
-    pub async fn timeout<T>( rx: oneshot::Receiver<Result<T,Fail>>)->Result<T,Fail>{
+    pub async fn timeout<T>( rx: tokio::sync::oneshot::Receiver<Result<T,Fail>>)->Result<T,Fail>{
         match tokio::time::timeout(Duration::from_secs(15),rx).await {
             Ok(result) => {
                match result {
@@ -43,10 +46,12 @@ impl StarlaneApi {
                }
             }
             Err(err) => {
+println!("elapsed error: {}",err );
                 Err(Fail::Timeout)
             }
         }
     }
+
 
     pub async fn fetch_resource_address(&self, key: ResourceKey) -> Result<ResourceAddress,Fail> {
         match self.fetch_resource_record(key.into()).await
@@ -150,21 +155,38 @@ impl StarlaneApi {
         }
     }
 
-    pub async fn get_resource_state( &self, identifier: ResourceIdentifier ) -> Result<RemoteDataSrc,Fail> {
-        let mut proto = ProtoMessage::new();
-        proto.payload = Option::Some(ResourceRequestMessage::State);
-        let reply = proto.reply();
-        let mut proto = proto.to_proto_star_message().await?;
-        self.star_tx.send( StarCommand::SendProtoMessage(proto)).await?;
+    pub async fn get_resource_state(&self, identifier: ResourceIdentifier ) -> Result<Option<Arc<Vec<u8>>>,Fail> {
 
-        let result = reply.await??;
-
-        match result.payload{
-            ResourceResponseMessage::State(data) => {
-                Ok(data)
-            }
-            _ => Err(Fail::Unexpected)
+        match self.get_resource_state_src(identifier).await? {
+            RemoteDataSrc::None => Ok(Option::None),
+            RemoteDataSrc::Memory(data) => Ok(Option::Some(data))
         }
+    }
+
+    pub async fn get_resource_state_src(&self, identifier: ResourceIdentifier ) -> Result<RemoteDataSrc,Fail> {
+
+            let mut proto = ProtoMessage::new();
+            proto.payload = Option::Some(ResourceRequestMessage::State);
+            proto.to = Option::Some(identifier);
+            proto.from = Option::Some(MessageFrom::Inject);
+            proto.log = true;
+            let reply = proto.reply();
+println!("to_proto_star_message()");
+            let mut proto = proto.to_proto_star_message().await?;
+println!("AFTER to_proto_star_message()");
+            self.star_tx.send(StarCommand::SendProtoMessage(proto)).await?;
+
+        //    let result = StarlaneApi::timeout(reply).await?;
+println!("AWaiting return of resource state...");
+        let result = Self::timeout(reply).await?;
+println!("RETURNED from AWaiting resource state...");
+
+        match result.payload {
+                ResourceResponseMessage::State(data) => {
+                    Ok(data)
+                }
+                _ => Err(Fail::Unexpected)
+            }
     }
 
     pub fn create_space( &self, name: &str, display: &str )-> Result<Creation<SpaceApi>,Fail> {
@@ -574,4 +596,81 @@ impl TryFrom<ResourceApi> for DomainApi{
     }
 }
 
+
+
+#[derive(Debug)]
+pub enum StarlaneAction{
+    GetState{ identifier: ResourceIdentifier, tx: tokio::sync::oneshot::Sender<Result<Option<Arc<Vec<u8>>>,Fail>>}
+}
+
+pub struct StarlaneApiRunner{
+    api: StarlaneApi,
+    rx: tokio::sync::mpsc::Receiver<StarlaneAction>
+}
+
+impl StarlaneApiRunner {
+    pub fn new(api: StarlaneApi) -> tokio::sync::mpsc::Sender<StarlaneAction> {
+        let (tx,mut rx) = tokio::sync::mpsc::channel(16);
+
+        let runner = StarlaneApiRunner{
+            api: api,
+            rx: rx
+        };
+
+        runner.run();
+
+        tx
+    }
+
+    fn run(mut self)
+    {
+        thread::spawn( move || {
+            let rt= tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+            rt.block_on(async {
+println!("StarlaneApiRunner is running, waiting to received.... ");
+                while let Option::Some(action) = self.rx.recv().await {
+println!("got an action to process");
+                    self.process(action).await;
+                }
+            });
+        } );
+    }
+
+    async fn process(&self, action: StarlaneAction ) {
+println!("processing action: {:?}", action );
+
+        match action {
+           StarlaneAction::GetState { identifier,tx } => {
+println!("get state command... ");
+               tx.send(self.api.get_resource_state(identifier).await );
+println!("all done from rpocessing")
+           }
+       }
+    }
+}
+
+#[derive(Clone)]
+pub struct StarlaneApiRelay {
+   tx: tokio::sync::mpsc::Sender<StarlaneAction>
+}
+
+impl StarlaneApiRelay {
+
+    pub async fn get_resource_state(&self, identifier: ResourceIdentifier ) -> Result<Option<Arc<Vec<u8>>>,Fail> {
+        let (tx,mut rx) = tokio::sync::oneshot::channel();
+println!("Sending....");
+        self.tx.send( StarlaneAction::GetState{ identifier: identifier, tx:tx }).await;
+println!("Sent... now wating....");
+        rx.await?
+    }
+
+}
+
+impl Into<StarlaneApiRelay> for StarlaneApi {
+    fn into(self) -> StarlaneApiRelay {
+        StarlaneApiRelay {
+            tx: StarlaneApiRunner::new(self)
+        }
+    }
+}
 

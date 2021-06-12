@@ -511,8 +511,8 @@ eprintln!("{}",err.to_string());
             };
 
             let file_api = sub_space_api.create_file_system("website").unwrap().submit().await.unwrap();
-            file_api.create_file_from_string(&"/README.txt".try_into().unwrap(), "The rain in Spain falls mostly on the plain.".to_string() ).unwrap().submit().await.unwrap();
-            file_api.create_file_from_string(&"/images/not-really-an-image.png".try_into().unwrap(), "This is not really an image....".to_string() ).unwrap().submit().await.unwrap();
+            file_api.create_file_from_string(&"/index.html".try_into().unwrap(), "The rain in Spain falls mostly on the plain.".to_string() ).unwrap().submit().await.unwrap();
+            file_api.create_file_from_string(&"/second/index.html".try_into().unwrap(), "This is a second page....".to_string() ).unwrap().submit().await.unwrap();
 
 
             loop {

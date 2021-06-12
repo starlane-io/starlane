@@ -201,10 +201,12 @@ impl Host for FileStoreHost {
     }
 
     async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail> {
+println!("GET identifier in store: {} ", identifier.to_string());
         self.store.get(identifier).await
     }
 
     async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {
+println!("GET STATE request in store: {} ", identifier.to_string());
 
         if let Ok(Option::Some(resource)) = self.store.get(identifier.clone()).await
         {

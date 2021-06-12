@@ -237,7 +237,9 @@ pub struct StarMessage
    pub to: StarKey,
    pub id: MessageId,
    pub payload: StarMessagePayload,
-   pub reply_to: Option<MessageId>
+   pub reply_to: Option<MessageId>,
+   pub trace: bool,
+   pub log: bool
 }
 
 impl StarMessage
@@ -249,7 +251,9 @@ impl StarMessage
             from: from,
             to: to,
             payload: payload,
-            reply_to: Option::None
+            reply_to: Option::None,
+            trace: false,
+            log: false
         }
     }
 
@@ -260,7 +264,9 @@ impl StarMessage
             from: from,
             to: StarKey::central(),
             payload: payload,
-            reply_to: Option::None
+            reply_to: Option::None,
+            trace: false,
+            log: false
         }
     }
 
