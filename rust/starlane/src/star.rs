@@ -44,7 +44,7 @@ use crate::message::{Fail, MessageExpect, MessageExpectWait, MessageReplyTracker
 use crate::message::resource::{Delivery, Message, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage};
 use crate::permissions::{Authentication, AuthToken, AuthTokenSource, Credentials};
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
-use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, ChildResourceManager, ChildResourceManagerCore, FieldSelection, HostedResourceStore, KeyCreationSrc, Labels, LocalDataSrc, LocalHostedResource, LocalResourceHost, MemoryDataTransfer, Registry, RegistryReservation, RegistryUniqueSrc, RemoteResourceManager, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceBinding, ResourceCreate, ResourceHost, ResourceIdentifier, ResourceKind, ResourceLocation, ResourceManager, ResourceManagerKey, ResourceNamesReservationRequest, ResourceParent, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector, ResourceStateSrc, ResourceStub, ResourceType};
+use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, Parent, ParentCore, FieldSelection, HostedResourceStore, KeyCreationSrc, Labels, LocalDataSrc, LocalHostedResource, LocalResourceHost, MemoryDataTransfer, Registry, RegistryReservation, RegistryUniqueSrc, RemoteResourceManager, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceBinding, ResourceCreate, ResourceHost, ResourceIdentifier, ResourceKind, ResourceLocation, ResourceManager, ResourceManagerKey, ResourceNamesReservationRequest, ResourceParent, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector, ResourceStateSrc, ResourceStub, ResourceType};
 use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
@@ -138,7 +138,7 @@ impl StarKind
 
     pub fn hosts(&self)->HashSet<ResourceType>{
         HashSet::from_iter(match self {
-            StarKind::Central => vec![],
+            StarKind::Central => vec![ResourceType::Root],
             StarKind::SpaceHost => vec![ResourceType::Space, ResourceType::SubSpace,ResourceType::User,ResourceType::Domain, ResourceType::UrlPathPattern, ResourceType::Proxy],
             StarKind::Mesh => vec![],
             StarKind::AppHost => vec![ResourceType::App],
@@ -839,6 +839,7 @@ println!("GOT REPLY from GetKey");
 
     async fn locate_resource_record(&mut self, request: Request<ResourceIdentifier, ResourceRecord>)
     {
+println!("attempting to locate resource: {}", &request.payload.to_string() );
         if self.has_resource_record(&request.payload)
         {
             request.tx.send(Ok(self.get_resource_record(&request.payload).unwrap()));
@@ -859,7 +860,7 @@ println!("GOT REPLY from GetKey");
                     request.tx.send(Err(fail));
                 }
             }
-        } else if request.payload.resource_type() == ResourceType::Space {
+        } else if request.payload.resource_type() == ResourceType::Root {
             let (new_request, rx) = Request::new((request.payload.clone(), StarKey::central()));
             self.request_resource_record_from_star(new_request).await;
             tokio::spawn(async move {
@@ -891,7 +892,7 @@ println!("GOT REPLY from GetKey");
                 }
             });
         } else {
-            request.tx.send(Err(Fail::Error("seems like an attempt to get a resource for a ResourceType::Nothing".to_string())));
+            request.tx.send(Err(Fail::Error(format!("cannot find resource_type {} has parent? {}",request.payload.to_string(),request.payload.parent().is_some() ).to_string())));
         }
     }
 
@@ -1915,15 +1916,15 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                         Ok(())
                     }
 
-                    async fn get_child_resource_manager(&mut self, key: ResourceKey) -> Result<ChildResourceManager,Fail> {
+                    async fn get_child_resource_manager(&mut self, key: ResourceKey) -> Result<Parent,Fail> {
 
                         let resource = match key.resource_type(){
-                            ResourceType::Nothing => {
+                            ResourceType::Root => {
                                 if self.skel.info.kind != StarKind::Central {
-                                    return Err(Fail::ResourceNotFound(ResourceKey::Nothing.into()))
+                                    return Err(Fail::ResourceNotFound(ResourceKey::Root.into()))
                                 }
-                                Option::Some(Resource::new(key.clone(), ResourceAddress::nothing(), ResourceArchetype{
-                                    kind: ResourceKind::Nothing,
+                                Option::Some(Resource::new(key.clone(), ResourceAddress::root(), ResourceArchetype{
+                                    kind: ResourceKind::Root,
                                     specific: None,
                                     config: None
                                 }, Arc::new(MemoryDataTransfer::none()) ))
@@ -1935,13 +1936,12 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
 
                         if let Option::Some(resource) = resource {
 
-                            Ok(ChildResourceManager{
-                                core: ChildResourceManagerCore {
-                                    key: key,
-                                    address: resource.address(),
+                            Ok(Parent {
+                                core: ParentCore {
+                                    stub: resource.into(),
                                     selector: ResourceHostSelector::new(self.skel.clone()),
-                                    registry: self.skel.registry.as_ref().unwrap().clone(),
-                                    id_seq: Arc::new(IdSeq::new(0)) // TODO: FIX
+                                    child_registry: self.skel.registry.as_ref().unwrap().clone(),
+                                    skel: self.skel.clone()
                                 }
                             })
                         } else {

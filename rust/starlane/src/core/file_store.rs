@@ -13,7 +13,7 @@ use crate::error::Error;
 use crate::file::{FileAccess, FileEvent};
 use crate::keys::{ResourceKey, FileSystemKey};
 use crate::message::Fail;
-use crate::resource::{AssignResourceStateSrc, DataTransfer, MemoryDataTransfer, Path, Resource, ResourceAddress, ResourceAssign, ResourceStateSrc, ResourceType, ResourceCreationChamber, FileKind, ResourceStub, ResourceCreate, ResourceArchetype, ResourceKind, AddressCreationSrc, KeyCreationSrc};
+use crate::resource::{AssignResourceStateSrc, DataTransfer, MemoryDataTransfer, Path, Resource, ResourceAddress, ResourceAssign, ResourceStateSrc, ResourceType, ResourceCreationChamber, FileKind, ResourceStub, ResourceCreate, ResourceArchetype, ResourceKind, AddressCreationSrc, KeyCreationSrc, ResourceCreateStrategy};
 use crate::resource::store::{ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult};
 use crate::star::StarSkel;
 
@@ -140,6 +140,7 @@ println!("final filepath: {}",file_path );
             src: AssignResourceStateSrc::Hosted,
             registry_info: Option::None,
             owner: Option::None,
+            strategy: ResourceCreateStrategy::Ensure
         };
 
         let rx = ResourceCreationChamber::new(filesystem, create,skel.clone() ).await;
@@ -156,6 +157,8 @@ impl Host for FileStoreHost {
 
     async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource, Fail> {
         // if there is Initialization to do for assignment THIS is where we do it
+
+println!("saving: {}", assign.stub.address.to_string() );
 
         match assign.stub.key.resource_type(){
             ResourceType::FileSystem => {
@@ -197,6 +200,7 @@ impl Host for FileStoreHost {
             state_src: data_transfer
         };
 
+println!("storing: address {} key: {}",assign.stub.address.to_string(), assign.stub.key.to_string());
         Ok(self.store.put( assign ).await?)
     }
 

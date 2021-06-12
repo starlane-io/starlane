@@ -52,7 +52,7 @@ pub mod domain;
 
 lazy_static!
 {
-    pub static ref NOTHING_STRUCT :ResourceAddressStructure = ResourceAddressStructure::new( vec![], ResourceType::Nothing );
+    pub static ref ROOT_STRUCT :ResourceAddressStructure = ResourceAddressStructure::new( vec![], ResourceType::Root );
 
     pub static ref SPACE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase)], ResourceType::Space );
     pub static ref SUB_SPACE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new( vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
@@ -105,14 +105,14 @@ lazy_static!
 
 
     pub static ref HYPERSPACE_ADDRESS: ResourceAddress = SPACE_ADDRESS_STRUCT.from_str("hyperspace").unwrap();
-    pub static ref HYPERSPACE_DEFAULT_ADDRESS: ResourceAddress = SUB_SPACE_ADDRESS_STRUCT.from_str("hyperspace::default").unwrap();
+    pub static ref HYPERSPACE_DEFAULT_ADDRESS: ResourceAddress = SUB_SPACE_ADDRESS_STRUCT.from_str("hyperspace:default").unwrap();
 }
 
-static RESOURCE_ADDRESS_DELIM: &str = "::";
+static RESOURCE_ADDRESS_DELIM: &str = ":";
 
 
 //static RESOURCE_QUERY_FIELDS: &str = "r.key,r.address,r.kind,r.specific,r.owner,r.config,r.host,r.gathering";
-static RESOURCE_QUERY_FIELDS: &str = "r.key,r.address,r.kind,r.specific,r.owner,r.config,r.host,r.gathering";
+static RESOURCE_QUERY_FIELDS: &str = "r.key,r.address,r.kind,r.specific,r.owner,r.config,r.host";
 
 pub type Labels = HashMap<String,String>;
 pub type Names = Vec<String>;
@@ -456,25 +456,22 @@ struct RegistryParams {
    resource_type: String,
    kind: String,
    specific: Option<String>,
-   space: Option<u32>,
-   sub_space: Option<Blob>,
    config: Option<String>,
-   app: Option<Blob>,
    owner: Option<Blob>,
    host: Option<Blob>,
-   gathering: Option<Blob>
+   parent: Option<Blob>
 }
 
 impl RegistryParams {
     pub fn from_registration(registration: ResourceRegistration) -> Result<Self, Error> {
-        Self::new( registration.resource.stub.archetype, registration.resource.stub.key.parent().ok_or("cannot register the parent of a nothing ResourceType::Nothing")?, Option::Some(registration.resource.stub.key), registration.resource.stub.owner, Option::Some(registration.resource.stub.address), Option::Some(registration.resource.location.host),registration.resource.location.gathering)
+        Self::new( registration.resource.stub.archetype, registration.resource.stub.key.parent(), Option::Some(registration.resource.stub.key), registration.resource.stub.owner, Option::Some(registration.resource.stub.address), Option::Some(registration.resource.location.host))
     }
 
-    pub fn from_archetype(archetype: ResourceArchetype, parent: ResourceKey) -> Result<Self, Error> {
-        Self::new( archetype, parent, Option::None, Option::None, Option::None, Option::None, Option::None )
+    pub fn from_archetype(archetype: ResourceArchetype, parent: Option<ResourceKey>) -> Result<Self, Error> {
+        Self::new( archetype, parent, Option::None, Option::None, Option::None, Option::None )
     }
 
-    pub fn new(archetype: ResourceArchetype, parent: ResourceKey, key: Option<ResourceKey>, owner: Option<UserKey>, address: Option<ResourceAddress>, host: Option<StarKey>, gathering: Option<GatheringKey>) -> Result<Self, Error> {
+    pub fn new(archetype: ResourceArchetype, parent: Option<ResourceKey>, key: Option<ResourceKey>, owner: Option<UserKey>, address: Option<ResourceAddress>, host: Option<StarKey>) -> Result<Self, Error> {
         let key = if let Option::Some(key) = key
         {
             Option::Some(key.bin()?)
@@ -519,27 +516,13 @@ impl RegistryParams {
 
 
 
-        let space = match parent.resource_type(){
-            ResourceType::Nothing => Option::None,
-            ResourceType::Space => Option::None,
-            _ => Option::Some(parent.space()?.id())
-        };
 
-        let sub_space = match parent.sub_space()
+        let parent = match parent
             {
-                Ok(sub_space) => {
-                    Option::Some(ResourceKey::SubSpace(sub_space).bin()?)
+                None => {Option::None}
+                Some(parent) => {
+                    Option::Some(parent.bin()?)
                 }
-                Err(_) => Option::None
-            };
-
-        let app =
-            match parent.app()
-            {
-                Ok(app) => {
-                    Option::Some(ResourceKey::App(app).bin()?)
-                }
-                Err(_) => Option::None
             };
 
         let host = match host
@@ -550,13 +533,6 @@ impl RegistryParams {
                 None => Option::None
             };
 
-        let gathering = match gathering
-        {
-            Some(gathering) => {
-                Option::Some(gathering.bin()?)
-            }
-            None => Option::None
-        };
 
 
         Ok(RegistryParams {
@@ -565,13 +541,10 @@ impl RegistryParams {
                 resource_type: resource_type,
                 kind: kind,
                 specific: specific,
-                space: space,
-                sub_space: sub_space,
+                parent: parent,
                 config: config,
-                app: app,
                 owner: owner,
-                host: host,
-                gathering: gathering
+                host: host
             })
 
         }
@@ -657,6 +630,7 @@ eprintln!("error setting up db: {}", err );
 
             ResourceRegistryCommand::Commit(registration) => {
 
+
                 let params= RegistryParams::from_registration(registration.clone())?;
 
                 let trans = self.conn.transaction()?;
@@ -666,7 +640,10 @@ eprintln!("error setting up db: {}", err );
                     trans.execute("DELETE FROM resources WHERE key=?1", [params.key.clone()])?;
                 }
 
-                trans.execute("INSERT INTO resources (key,address,resource_type,kind,specific,space,sub_space,owner,app,config,host,gathering) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)", params![params.key,params.address,params.resource_type,params.kind,params.specific,params.space,params.sub_space,params.owner,params.app,params.config,params.host,params.gathering])?;
+let address = params.address.clone().unwrap_or("NOTHING".to_string() );
+println!("BEFORE {}",address.clone());
+                trans.execute("INSERT INTO resources (key,address,resource_type,kind,specific,parent,owner,config,host) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)", params![params.key,params.address,params.resource_type,params.kind,params.specific,params.parent,params.owner,params.config,params.host])?;
+println!("~AFTER {}",address.clone());
                 if let Option::Some(info) = registration.info {
                     for name in info.names
                     {
@@ -678,7 +655,9 @@ eprintln!("error setting up db: {}", err );
                     }
                 }
 
+println!("commit!");
                 trans.commit()?;
+println!("... post commit!");
                 Ok(ResourceRegistryResult::Ok)
             }
             ResourceRegistryCommand::Select(selector) => {
@@ -786,8 +765,6 @@ eprintln!("error setting up db: {}", err );
                 Ok(ResourceRegistryResult::Ok)
             }
             ResourceRegistryCommand::Get(identifier) => {
-
-
                 //let statement = "SELECT (key,host,gathering) FROM locations WHERE key=?1";
                 let result = match &identifier {
                        ResourceIdentifier::Key(key) => {
@@ -829,13 +806,15 @@ eprintln!("error setting up db: {}", err );
             }
 
             ResourceRegistryCommand::Reserve(request) => {
+println!("RESERVE for kind: {} ", request.archetype.kind  );
                 let trans = self.conn.transaction()?;
                 trans.execute("DELETE FROM names WHERE key IS NULL AND datetime(reservation_timestamp) < datetime('now')", [] )?;
-                let params = RegistryParams::new(request.archetype.clone(),request.parent.clone(),Option::None, Option::None, Option::None, Option::None, Option::None)?;
+                let params = RegistryParams::new(request.archetype.clone(),Option::Some(request.parent.clone()),Option::None, Option::None, Option::None, Option::None)?;
                 if request.info.is_some() {
-                    let params = RegistryParams::from_archetype(request.archetype.clone(), request.parent.clone())?;
+                    let params = RegistryParams::from_archetype(request.archetype.clone(), Option::Some(request.parent.clone()))?;
                     Self::process_names(&trans, &request.info.as_ref().cloned().unwrap().names, &params)?;
                 }
+println!("got here... ");
                 trans.commit()?;
                 let (tx,rx) = oneshot::channel();
                 let reservation = RegistryReservation::new(tx);
@@ -851,6 +830,8 @@ eprintln!("error setting up db: {}", err );
                             }
                             Err(_) => Option::None
                         };
+
+println!("COMMITING address: {},  ", record.stub.address.to_string() );
 
                         params.key = key;
                         params.address = Option::Some(record.stub.address.to_string());
@@ -874,14 +855,16 @@ eprintln!("error setting up db: {}", err );
                     Unique::Sequence => "sequence",
                     Unique::Index => "id_index"
                 };
-                trans.execute("INSERT OR IGNORE INTO uniques (key) VALUES (?1)", params![key])?;
-                trans.execute(format!("UPDATE uniques SET {}={}+1 WHERE key=?1",column,column).as_str(), params![key])?;
-                let rtn = trans.query_row(format!("SELECT {} FROM uniques WHERE key=?1",column).as_str(), params![key], |r| {
-                    let rtn:u64 = r.get(0)?;
-                    Ok(rtn)
-                })?;
+    trans.execute("INSERT OR IGNORE INTO uniques (key) VALUES (?1)", params![key])?;
+    trans.execute(format!("UPDATE uniques SET {}={}+1 WHERE key=?1", column, column).as_str(), params![key])?;
+    let rtn = trans.query_row(format!("SELECT {} FROM uniques WHERE key=?1", column).as_str(), params![key], |r| {
+        let rtn: u64 = r.get(0)?;
+        println!("UNIQUE == {}", rtn);
+        Ok(rtn)
+    })?;
+    trans.commit()?;
 
-                trans.commit()?;
+println!("RTN UNIQUE({})",rtn);
 
                 Ok(ResourceRegistryResult::Unique(rtn))
             }
@@ -927,14 +910,6 @@ eprintln!("error setting up db: {}", err );
         let host:Vec<u8> = row.get(6)?;
         let host= StarKey::from_bin(host)?;
 
-        let gathering = if let ValueRef::Null = row.get_ref(7)? {
-            Option::None
-        } else {
-            let gathering: Vec<u8> = row.get(7)?;
-            let gathering: GatheringKey = GatheringKey::from_bin(gathering)?;
-            Option::Some(gathering)
-        };
-
 
         let stub = ResourceStub{
             key: key,
@@ -951,7 +926,7 @@ eprintln!("error setting up db: {}", err );
             stub: stub,
             location: ResourceLocation {
                 host: host,
-                gathering: gathering
+                gathering: Option::None
             }
         };
 
@@ -960,7 +935,7 @@ eprintln!("error setting up db: {}", err );
 
     fn process_names( trans: &Transaction, names: &Names, params: &RegistryParams) -> Result<(),Error> {
         for name in names{
-            trans.execute("INSERT INTO names (key,name,resource_type,kind,specific,space,sub_space,owner,app,config,reservation_timestamp) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,timestamp('now','+5 minutes')", params![params.key,name,params.resource_type,params.kind,params.specific,params.space,params.sub_space,params.owner,params.app,params.config])?;
+            trans.execute("INSERT INTO names (key,name,resource_type,kind,specific,parent,owner,config,reservation_timestamp) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,timestamp('now','+5 minutes')", params![params.key,name,params.resource_type,params.kind,params.specific,params.parent,params.owner,params.config])?;
         }
         Ok(())
     }
@@ -987,12 +962,11 @@ eprintln!("error setting up db: {}", err );
 	      resource_type TEXT NOT NULL,
           kind BLOB NOT NULL,
           specific TEXT,
-          space INTEGER NOT NULL,
-          sub_space BLOB NOT NULL,
+          parent BLOB,
           app TEXT,
           owner BLOB,
           reservation_timestamp TEXT,
-          UNIQUE(name,resource_type,kind,specific,space,sub_space,app)
+          UNIQUE(name,resource_type,kind,specific,parent)
         )"#;
 
         let resources = r#"CREATE TABLE IF NOT EXISTS resources (
@@ -1002,12 +976,9 @@ eprintln!("error setting up db: {}", err );
          kind BLOB NOT NULL,
          specific TEXT,
          config TEXT,
-         space INTEGER,
-         sub_space BLOB,
-         app TEXT,
+         parent BLOB,
          owner BLOB,
-         host BLOB,
-         gathering BLOB
+         host BLOB
         )"#;
 
         let address_index = "CREATE UNIQUE INDEX resource_address_index ON resources(address)";
@@ -1034,7 +1005,7 @@ eprintln!("error setting up db: {}", err );
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum ResourceKind
 {
-    Nothing,
+    Root,
     Space,
     SubSpace,
     App,
@@ -1050,7 +1021,7 @@ pub enum ResourceKind
 impl ResourceKind{
     pub fn resource_type(&self) -> ResourceType{
        match self {
-           ResourceKind::Nothing=> ResourceType::Nothing,
+           ResourceKind::Root => ResourceType::Root,
            ResourceKind::Space => ResourceType::Space,
            ResourceKind::SubSpace => ResourceType::SubSpace,
            ResourceKind::App => ResourceType::App,
@@ -1084,7 +1055,7 @@ impl ResourceType
     {
         match self
         {
-            ResourceType::Nothing => 255,
+            ResourceType::Root => 255,
             ResourceType::Space => 0,
             ResourceType::SubSpace => 1,
             ResourceType::App => 2,
@@ -1112,7 +1083,7 @@ impl ResourceType
             7 => Ok(ResourceType::Domain),
             8 => Ok(ResourceType::UrlPathPattern),
             9 => Ok(ResourceType::Proxy),
-            255 => Ok(ResourceType::Nothing),
+            255 => Ok(ResourceType::Root),
             _ => Err(format!("no resource type for magic number {}",magic).into())
         }
     }
@@ -1122,7 +1093,7 @@ impl fmt::Display for ResourceKind{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!( f,"{}",
                 match self{
-                    ResourceKind::Nothing=> "Nothing".to_string(),
+                    ResourceKind::Root => "Nothing".to_string(),
                     ResourceKind::Space=> "Space".to_string(),
                     ResourceKind::SubSpace=> "SubSpace".to_string(),
                     ResourceKind::App=>  "App".to_string(),
@@ -1143,8 +1114,8 @@ impl ResourceKind {
     {
         match self
         {
-            ResourceKind::Nothing => {
-                ResourceKey::Nothing
+            ResourceKind::Root => {
+                ResourceKey::Root
             }
             ResourceKind::Space => {
                 ResourceKey::Space(SpaceKey::from_index(index as u32 ))
@@ -1195,7 +1166,7 @@ impl FromStr for ResourceKind
 
         match s
         {
-            "Nothing" => Ok(ResourceKind::Nothing),
+            "Nothing" => Ok(ResourceKind::Root),
             "Space" => Ok(ResourceKind::Space),
             "SubSpace" => Ok(ResourceKind::SubSpace),
             "User" => Ok(ResourceKind::User),
@@ -1210,7 +1181,7 @@ impl FromStr for ResourceKind
 #[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum ResourceType
 {
-    Nothing,
+    Root,
     Space,
     SubSpace,
     App,
@@ -1249,7 +1220,7 @@ impl ResourceType{
 
     pub fn from(parent: &ResourceKey) -> Option<Self> {
         match parent {
-            ResourceKey::Nothing => Option::None,
+            ResourceKey::Root => Option::None,
             parent => Option::Some(parent.resource_type())
         }
     }
@@ -1292,7 +1263,7 @@ impl ResourceType{
 
     pub fn star_host(&self) -> StarKind {
         match self {
-            ResourceType::Nothing => StarKind::Central,
+            ResourceType::Root => StarKind::Central,
             ResourceType::Space => StarKind::SpaceHost,
             ResourceType::SubSpace => StarKind::SpaceHost,
             ResourceType::App => StarKind::AppHost,
@@ -1308,7 +1279,7 @@ impl ResourceType{
 
     pub fn star_manager(&self) -> HashSet<StarKind>{
         match self {
-            ResourceType::Nothing => HashSet::from_iter(vec![] ),
+            ResourceType::Root => HashSet::from_iter(vec![StarKind::Central] ),
             ResourceType::Space => HashSet::from_iter(vec![StarKind::Central] ),
             ResourceType::SubSpace => HashSet::from_iter(vec![StarKind::SpaceHost] ),
             ResourceType::App => HashSet::from_iter(vec![StarKind::SpaceHost] ),
@@ -1328,7 +1299,7 @@ impl ResourceType{
 impl ResourceType{
     pub fn children(&self)->HashSet<ResourceType> {
         let mut children = match self{
-            Self::Nothing => vec![Self::Space],
+            Self::Root => vec![Self::Space],
             Self::Space => vec![Self::SubSpace,Self::User,Self::Domain,Self::Proxy],
             Self::SubSpace => vec![Self::App,Self::FileSystem],
             Self::App => vec![Self::Actor,Self::FileSystem],
@@ -1347,7 +1318,7 @@ impl ResourceType{
     pub fn supports_automatic_key_generation(&self) -> bool {
 
         match self{
-            ResourceType::Nothing => false,
+            ResourceType::Root => false,
             ResourceType::Space => false,
             ResourceType::SubSpace => false,
             ResourceType::App => true,
@@ -1366,7 +1337,7 @@ impl ToString for ResourceType{
     fn to_string(&self) -> String {
         match self
         {
-            Self::Nothing => "Nothing".to_string(),
+            Self::Root => "Nothing".to_string(),
             Self::Space => "Space".to_string(),
             Self::SubSpace => "SubSpace".to_string(),
             Self::App => "App".to_string(),
@@ -1386,7 +1357,7 @@ impl FromStr for ResourceType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "Nothing" => Ok(ResourceType::Nothing),
+            "Nothing" => Ok(ResourceType::Root),
             "Space" => Ok(ResourceType::Space),
             "SubSpace" => Ok(ResourceType::SubSpace),
             "App" => Ok(ResourceType::App),
@@ -1471,8 +1442,8 @@ impl ResourceType
     {
         match self
         {
-            ResourceType::Nothing => ResourceParent::None,
-            ResourceType::Space => ResourceParent::Some(ResourceType::Nothing),
+            ResourceType::Root => ResourceParent::None,
+            ResourceType::Space => ResourceParent::Some(ResourceType::Root),
             ResourceType::SubSpace => ResourceParent::Some(ResourceType::Space),
             ResourceType::App => ResourceParent::Some(ResourceType::SubSpace),
             ResourceType::Actor => ResourceParent::Some(ResourceType::App),
@@ -1489,7 +1460,7 @@ impl ResourceType
     {
         match self
         {
-            ResourceType::Nothing => false,
+            ResourceType::Root => false,
             ResourceType::Space => false,
             ResourceType::SubSpace => false,
             ResourceType::App => true,
@@ -1507,7 +1478,7 @@ impl ResourceType
     {
         match self
         {
-            ResourceType::Nothing => false,
+            ResourceType::Root => false,
             ResourceType::Space => false,
             ResourceType::SubSpace => false,
             ResourceType::App => true,
@@ -1525,7 +1496,7 @@ impl ResourceType
     {
         match self
         {
-            ResourceType::Nothing => false,
+            ResourceType::Root => false,
             ResourceType::Space => false,
             ResourceType::SubSpace => false,
             ResourceType::App => false,
@@ -1543,7 +1514,7 @@ impl ResourceType
     {
         match self
         {
-            ResourceType::Nothing => false,
+            ResourceType::Root => false,
             ResourceType::Space => true,
             ResourceType::SubSpace => true,
             ResourceType::App => false,
@@ -1559,8 +1530,8 @@ impl ResourceType
 
     pub fn address_structure(&self) ->&ResourceAddressStructure{
         match self{
-            ResourceType::Nothing => {
-                &NOTHING_STRUCT
+            ResourceType::Root => {
+                &ROOT_STRUCT
             }
             ResourceType::Space => {
                 &SPACE_ADDRESS_STRUCT
@@ -1607,14 +1578,14 @@ pub struct ResourceArchetype {
 impl ResourceArchetype{
     pub fn nothing()->ResourceArchetype {
         ResourceArchetype{
-            kind: ResourceKind::Nothing,
+            kind: ResourceKind::Root,
             specific: Option::None,
             config: Option::None
         }
     }
 
     pub fn valid(&self)->Result<(),Fail>{
-        if self.kind.resource_type() == ResourceType::Nothing{
+        if self.kind.resource_type() == ResourceType::Root {
             return Err(Fail::CannotCreateNothingResourceTypeItIsThereAsAPlaceholderDummy);
         }
         Ok(())
@@ -1706,20 +1677,71 @@ impl ResourceManager for RemoteResourceManager {
 }
 
 #[derive(Clone)]
-pub struct ChildResourceManagerCore {
-    pub key: ResourceKey,
-    pub address: ResourceAddress,
+pub struct ParentCore {
+    pub skel: StarSkel,
+    pub stub: ResourceStub,
     pub selector: ResourceHostSelector,
-    pub registry: Arc<dyn ResourceRegistryBacking>,
-    pub id_seq: Arc<IdSeq>
+    pub child_registry: Arc<dyn ResourceRegistryBacking>,
 }
 
 
-pub struct ChildResourceManager {
-   pub core: ChildResourceManagerCore
+pub struct Parent {
+   pub core: ParentCore
 }
 
-impl ChildResourceManager {
+impl Parent {
+
+
+    async fn create_child(core: ParentCore, create: ResourceCreate, tx: oneshot::Sender<Result<ResourceRecord,Fail>> ){
+
+        if let Ok(reservation) = core.child_registry.reserve(ResourceNamesReservationRequest{
+            parent: create.parent.clone(),
+            archetype: create.archetype.clone(),
+            info: create.registry_info.clone() } ).await {
+            let mut rx = ResourceCreationChamber::new(core.stub.clone(), create.clone(), core.skel.clone()).await;
+
+            tokio::spawn(async move {
+                if let Ok(Ok(assign)) = rx.await {
+                    if let Ok(mut host) = core.selector.select(create.archetype.kind.resource_type()).await
+                    {
+                        let record = ResourceRecord::new(assign.stub.clone(), host.star_key());
+                        match host.assign(assign).await
+                        {
+                            Ok(_) => {}
+                            Err(err) => {
+                                eprintln!("host assign failed.");
+                                return;
+                            }
+                        }
+                        let (commit_tx, commit_rx) = oneshot::channel();
+                        match reservation.commit(record.clone(), commit_tx) {
+                            Ok(_) => {
+                                if let Ok(Ok(_)) = commit_rx.await {
+                                    tx.send(Ok(record));
+                                } else {
+                                    tx.send(Err("commit failed".into()));
+                                }
+                            }
+                            Err(err) => {
+                                tx.send(Err("commit failed".into()));
+                            }
+                        }
+                    } else {
+                        tx.send(Err("could not select a host".into()));
+                    }
+                } else {
+                    tx.send(Err("RESERVATION FAILED!".into()));
+                }
+            });
+        } else {
+            tx.send(Err("RESERVATION FAILED!".into()));
+        }
+    }
+
+
+
+
+    /*
     async fn process_create(core: ChildResourceManagerCore, create: ResourceCreate ) -> Result<ResourceRecord,Fail>{
 
 
@@ -1780,26 +1802,25 @@ impl ChildResourceManager {
         };
 
         let mut host = core.selector.select(create.archetype.kind.resource_type() ).await?;
-
         host.assign(assign).await?;
-
         let record = ResourceRecord::new( stub, host.star_key() );
-
         let (tx,rx) = oneshot::channel();
         reservation.commit( record.clone(), tx )?;
 
         Ok(record)
     }
+
+     */
 }
 
 #[async_trait]
-impl ResourceManager for ChildResourceManager {
+impl ResourceManager for Parent {
     async fn create( &self, create: ResourceCreate ) -> oneshot::Receiver<Result<ResourceRecord,Fail>> {
         let (tx,rx) = oneshot::channel();
 
         let core = self.core.clone();
         tokio::spawn( async move {
-            tx.send(ChildResourceManager::process_create(core, create ).await).unwrap_or_default();
+            Parent::create_child(core, create, tx ).await;
         });
         rx
     }
@@ -1849,6 +1870,7 @@ impl ResourceCreationChamber{
             let key = match &self.create.key {
                 KeyCreationSrc::None => {
 
+println!("sending create message to : {}", self.parent.key.resource_type().to_string() );
                     let mut proto = ProtoMessage::new();
                     proto.to(self.parent.key.clone().into());
                     proto.from(MessageFrom::Resource(self.parent.key.clone().into()));
@@ -1911,7 +1933,7 @@ impl ResourceCreationChamber{
                 self.create.archetype.kind.resource_type().append_address(self.parent.address.clone(), tail.clone() )?
             }
             AddressCreationSrc::Space(space_name) => {
-                if self.parent.key.resource_type() != ResourceType::Nothing{
+                if self.parent.key.resource_type() != ResourceType::Root {
                     return Err(format!("Space creation can only be used at top level (Nothing) not by {}",self.parent.key.resource_type().to_string()).into());
                 }
                 ResourceAddress::for_space(space_name.as_str())?
@@ -1960,6 +1982,15 @@ pub struct ResourceRegistryInfo
 {
     pub names: Names,
     pub labels: Labels
+}
+
+impl ResourceRegistryInfo{
+    pub fn new()->Self {
+        ResourceRegistryInfo{
+            names: Names::new(),
+            labels: Labels::new()
+        }
+    }
 }
 
 pub struct ResourceNamesReservationRequest{
@@ -2043,8 +2074,8 @@ impl UniqueSrc for RegistryUniqueSrc{
 
        if let ResourceRegistryResult::Unique(index) = rx.await? {
            match resource_type{
-               ResourceType::Nothing => {
-                   Ok(ResourceId::Nothing)
+               ResourceType::Root => {
+                   Ok(ResourceId::Root)
                }
                ResourceType::Space => {
                    Ok(ResourceId::Space(index as _))
@@ -2184,58 +2215,91 @@ impl ResourceAddress {
 
 impl ResourceAddress {
 
+    pub fn root() -> Self {
+        Self{
+            resource_type: ResourceType::Root,
+            parts: vec![]
+        }
+    }
+
     pub fn last_to_string(&self) -> Result<String,Error> {
         Ok(self.parts.last().ok_or("couldn't find last" )?.to_string())
     }
 
     pub fn parent(&self) -> Option<ResourceAddress>{
-        match &self.parent_resource_type(){
-            ResourceType::Nothing => Option::None,
-            parent => {
-                let mut parts = self.parts.clone();
-                if parts.len() == 0 {
-
-                   Option::None
-                } else {
-                    parts.remove(self.parts.len() - 1);
-
-                    Option::Some(ResourceAddress {
-                        resource_type: parent.clone(),
-                        parts: parts
-                    })
+        match &self.resource_type {
+            ResourceType::Root => Option::None,
+            ResourceType::FileSystem=> {
+                match self.parts.last().unwrap().is_wildcard(){
+                    true  => { self.chop(1, ResourceType::App )}
+                    false=> { self.chop(2, ResourceType::SubSpace)}
                 }
+            }
+            ResourceType::Space => {
+                Option::Some(Self::root())
+            }
+            ResourceType::SubSpace => {
+                self.chop(1, ResourceType::Space )
+            }
+            ResourceType::App => {
+                self.chop(1, ResourceType::SubSpace )
+            }
+            ResourceType::Actor => {
+                self.chop(1, ResourceType::Actor )
+            }
+            ResourceType::User => {
+                self.chop(1, ResourceType::User )
+            }
+            ResourceType::File => {
+                self.chop(1, ResourceType::FileSystem )
+            }
+            ResourceType::Domain => {
+                self.chop(1, ResourceType::SubSpace )
+            }
+            ResourceType::UrlPathPattern => {
+                self.chop(1, ResourceType::Space)
+            }
+            ResourceType::Proxy => {
+                self.chop(1, ResourceType::SubSpace)
             }
         }
     }
 
-    pub fn parent_resource_type(&self) -> ResourceType {
+    fn chop( &self, indices: usize, resource_type: ResourceType ) -> Option<Self>{
+        let mut parts = self.parts.clone();
+        for i in 0..indices{
+            if !parts.is_empty() {
+                parts.pop();
+            }
+        }
+        Option::Some( Self{
+            resource_type: resource_type,
+            parts: parts
+        })
+    }
+
+    pub fn parent_resource_type(&self) -> Option<ResourceType> {
         match self.resource_type{
-            ResourceType::Nothing => ResourceType::Nothing,
-            ResourceType::Space => ResourceType::Nothing,
-            ResourceType::SubSpace => ResourceType::Space,
-            ResourceType::App => ResourceType::SubSpace,
-            ResourceType::Actor => ResourceType::App,
-            ResourceType::User => ResourceType::Space,
+            ResourceType::Root => Option::None,
+            ResourceType::Space => Option::Some(ResourceType::Root),
+            ResourceType::SubSpace => Option::Some(ResourceType::Space),
+            ResourceType::App => Option::Some(ResourceType::SubSpace),
+            ResourceType::Actor => Option::Some(ResourceType::App),
+            ResourceType::User => Option::Some(ResourceType::Space),
             ResourceType::FileSystem => {
                 match self.parts.last().unwrap().is_wildcard(){
-                    true => ResourceType::App,
-                    false => ResourceType::SubSpace
+                    true => Option::Some(ResourceType::App),
+                    false => Option::Some(ResourceType::SubSpace)
                 }
             }
-            ResourceType::File => ResourceType::FileSystem,
-            ResourceType::Domain => ResourceType::Space,
-            ResourceType::UrlPathPattern=> ResourceType::Domain,
-            ResourceType::Proxy => ResourceType::Space,
+            ResourceType::File => Option::Some(ResourceType::FileSystem),
+            ResourceType::Domain => Option::Some(ResourceType::Space),
+            ResourceType::UrlPathPattern=> Option::Some(ResourceType::Domain),
+            ResourceType::Proxy => Option::Some(ResourceType::Space),
 
         }
     }
 
-    pub fn nothing() -> ResourceAddress{
-       ResourceAddress{
-           resource_type: ResourceType::Nothing,
-           parts: vec![]
-       }
-    }
 
     pub fn for_space(string : &str) -> Result<Self,Error> {
         ResourceType::Space.address_structure().from_str(string )
@@ -2275,7 +2339,7 @@ impl ResourceAddress {
         {
             match &key
             {
-                ResourceKey::Nothing => {
+                ResourceKey::Root => {
                     // do nothing
                 }
                 ResourceKey::Space(space) => {
@@ -2399,14 +2463,20 @@ impl ResourceAddress {
 
 impl ToString for ResourceAddress {
     fn to_string(&self) -> String {
-        let mut rtn = self.to_parts_string();
 
-        rtn.push_str("::");
-        rtn.push_str("<");
-        rtn.push_str(self.resource_type.to_string().as_str() );
-        rtn.push_str(">");
+        if self.resource_type == ResourceType::Root {
+            return "<Root>".to_string();
+        }
+        else {
+            let mut rtn = self.to_parts_string();
 
-        rtn
+            rtn.push_str("::");
+            rtn.push_str("<");
+            rtn.push_str(self.resource_type.to_string().as_str());
+            rtn.push_str(">");
+
+            rtn
+        }
     }
 }
 
@@ -2414,6 +2484,15 @@ impl FromStr for ResourceAddress {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+
+        if s.trim() == "<Root>"{
+            return Ok(ResourceAddress{
+                parts: vec![],
+                resource_type: ResourceType::Root
+            });
+        }
+
+
         let mut split = s.split("::<");
         let address_structure = split.next().ok_or("missing address structure at beginning i.e: 'space::sub_space::<SubSpace>")?;
         let mut resource_type_gen = split.next().ok_or("missing resource type at end i.e.: 'space::sub_space::<SubSpace>")?.to_string();
@@ -2481,6 +2560,15 @@ impl ResourceAddressStructure
 impl ResourceAddressStructure {
 
     pub fn from_str(&self, s: &str) -> Result<ResourceAddress, Error> {
+
+        if s == "<Root>" {
+            return Ok( ResourceAddress{
+                parts: vec![],
+                resource_type: ResourceType::Root
+            });
+        }
+
+
         let mut split = s.split(RESOURCE_ADDRESS_DELIM );
 
         if split.count()  != self.parts.len() {
@@ -3425,11 +3513,11 @@ impl FromStr for Version {
     }
 }
 
+#[derive(Clone,Serialize,Deserialize)]
 pub enum ResourceCreateStrategy {
     Create,
-    EnsureAddressExists
+    Ensure
 }
-
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct ResourceCreate {
@@ -3440,20 +3528,36 @@ pub struct ResourceCreate {
    pub src: AssignResourceStateSrc,
    pub registry_info: Option<ResourceRegistryInfo>,
    pub owner: Option<UserKey>,
+   pub strategy: ResourceCreateStrategy
 }
 
 
 impl ResourceCreate {
 
-    pub fn new(archetype: ResourceArchetype, src: AssignResourceStateSrc) ->Self {
+    pub fn create(archetype: ResourceArchetype, src: AssignResourceStateSrc) ->Self {
         ResourceCreate {
-            parent: ResourceKey::Nothing,
+            parent: ResourceKey::Root,
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::None,
             archetype: archetype,
             src: src,
             registry_info: Option::None,
             owner: Option::None,
+            strategy: ResourceCreateStrategy::Create
+
+        }
+    }
+
+    pub fn ensure_address(archetype: ResourceArchetype, src: AssignResourceStateSrc) ->Self {
+        ResourceCreate {
+            parent: ResourceKey::Root,
+            key: KeyCreationSrc::None,
+            address: AddressCreationSrc::None,
+            archetype: archetype,
+            src: src,
+            registry_info: Option::None,
+            owner: Option::None,
+            strategy: ResourceCreateStrategy::Ensure
         }
     }
 
@@ -3598,8 +3702,8 @@ pub struct ResourceStub {
 impl ResourceStub {
     pub fn nothing()->ResourceStub{
         ResourceStub{
-            key: ResourceKey::Nothing,
-            address: ResourceAddress::nothing(),
+            key: ResourceKey::Root,
+            address: ResourceAddress::root(),
             archetype: ResourceArchetype::nothing(),
             owner: Option::None
         }

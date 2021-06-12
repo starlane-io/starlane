@@ -292,7 +292,7 @@ pub type ProxyId = u64;
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum ResourceId{
-    Nothing,
+    Root,
     Space(u32),
     SubSpace(SubSpaceId),
     App(AppId),
@@ -308,7 +308,7 @@ pub enum ResourceId{
 impl ResourceId{
     pub fn resource_type(&self)->ResourceType{
         match self{
-            ResourceId::Nothing => ResourceType::Nothing,
+            ResourceId::Root => ResourceType::Root,
             ResourceId::Space(_) => ResourceType::Space,
             ResourceId::SubSpace(_) => ResourceType::SubSpace,
             ResourceId::App(_) => ResourceType::App,
@@ -324,7 +324,7 @@ impl ResourceId{
 
     pub fn new( resource_type: &ResourceType, id: Id ) -> Self{
         match resource_type{
-            ResourceType::Nothing => Self::Nothing,
+            ResourceType::Root => Self::Root,
             ResourceType::Space => Self::Space(id.index as _),
             ResourceType::SubSpace =>  Self::SubSpace(id.index as _),
             ResourceType::App =>  Self::App(id.index as _),
@@ -342,7 +342,7 @@ impl ResourceId{
 impl ToString for ResourceId{
     fn to_string(&self) -> String {
         match self {
-            ResourceId::Nothing => "nothing".to_string(),
+            ResourceId::Root => "Root".to_string(),
             ResourceId::Space(id) => id.to_string(),
             ResourceId::SubSpace(id) => id.to_string(),
             ResourceId::App(id) => id.to_string(),
@@ -360,7 +360,7 @@ impl ToString for ResourceId{
 #[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum ResourceKey
 {
-    Nothing,
+    Root,
     Space(SpaceKey),
     SubSpace(SubSpaceKey),
     App(AppKey),
@@ -378,8 +378,8 @@ impl ResourceKey
     pub fn new(parent: ResourceKey, id: ResourceId) -> Result<Self,Error> {
 
         match id{
-            ResourceId::Nothing => {
-                Ok(Self::Nothing)
+            ResourceId::Root => {
+                Ok(Self::Root)
             }
             ResourceId::Space(id) => {
                 Ok(Self::Space( SpaceKey::from_index(id) ))
@@ -458,7 +458,7 @@ impl ResourceKey
 
     pub fn id(&self)->ResourceId{
        match self{
-           ResourceKey::Nothing => ResourceId::Nothing,
+           ResourceKey::Root => ResourceId::Root,
            ResourceKey::Space(space) => ResourceId::Space(space.id()),
            ResourceKey::SubSpace(sub_space) => {ResourceId::SubSpace(sub_space.id.clone())}
            ResourceKey::App(app) => {ResourceId::App(app.id.clone())}
@@ -474,7 +474,7 @@ impl ResourceKey
 
     pub fn generate_address_tail(&self) -> Result<String,Fail>{
         match self{
-            ResourceKey::Nothing => Err(Fail::ResourceCannotGenerateAddress),
+            ResourceKey::Root => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::Space(_) => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::SubSpace(_) => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::App(app) => {
@@ -501,8 +501,8 @@ impl ResourceKey
 
     pub fn parent(&self)->Option<ResourceKey>{
         match self {
-            ResourceKey::Nothing => Option::None,
-            ResourceKey::Space(_) => Option::Some(ResourceKey::Nothing),
+            ResourceKey::Root => Option::None,
+            ResourceKey::Space(_) => Option::Some(ResourceKey::Root),
             ResourceKey::SubSpace(sub_space) => Option::Some(ResourceKey::Space(sub_space.space.clone())),
             ResourceKey::App(app) =>  Option::Some(ResourceKey::SubSpace(app.sub_space.clone())),
             ResourceKey::Actor(actor) =>  Option::Some(ResourceKey::App(actor.app.clone())),
@@ -528,7 +528,7 @@ impl ResourceKey
 
     pub fn space(&self)->Result<SpaceKey,Fail> {
         match self{
-            ResourceKey::Nothing => Err(Fail::WrongResourceType { expected: HashSet::from_iter(vec![ResourceType::Space, ResourceType::SubSpace, ResourceType::App, ResourceType::Actor, ResourceType::User, ResourceType::FileSystem, ResourceType::File] ), received: ResourceType::Nothing }),
+            ResourceKey::Root => Err(Fail::WrongResourceType { expected: HashSet::from_iter(vec![ResourceType::Space, ResourceType::SubSpace, ResourceType::App, ResourceType::Actor, ResourceType::User, ResourceType::FileSystem, ResourceType::File] ), received: ResourceType::Root }),
             ResourceKey::Space(space) => Ok(space.clone()),
             ResourceKey::SubSpace(sub_space) => Ok(sub_space.space.clone()),
             ResourceKey::App(app) => Ok(app.sub_space.space.clone()),
@@ -871,7 +871,7 @@ impl fmt::Display for ResourceKey {
                     ResourceKey::User(key) => format!("user-{}", key.to_string()),
                     ResourceKey::File(key) => format!("file-{}", key.to_string()),
                     ResourceKey::FileSystem(key) => format!("filesystem-{}", key.to_string()),
-                    ResourceKey::Nothing => "nothing".to_string(),
+                    ResourceKey::Root => "root".to_string(),
                     ResourceKey::Domain(key) => format!("domain-{}", key.to_string()),
                     ResourceKey::UrlPathPattern(key) => format!("url-path-pattern-{}", key.to_string()),
                     ResourceKey::Proxy(key) => format!("proxy-{}", key.to_string()),
@@ -885,7 +885,7 @@ impl ResourceKey
     {
         match self
         {
-            ResourceKey::Nothing => ResourceType::Nothing,
+            ResourceKey::Root => ResourceType::Root,
             ResourceKey::Space(_) => ResourceType::Space,
             ResourceKey::SubSpace(_) => ResourceType::SubSpace,
             ResourceKey::App(_) => ResourceType::App,
@@ -903,7 +903,7 @@ impl ResourceKey
     {
         match self
         {
-            ResourceKey::Nothing => Err("nothign does not have a subspace".into()),
+            ResourceKey::Root => Err("Root does not have a subspace".into()),
             ResourceKey::Space(_) => Err("space does not have a subspace".into()),
             ResourceKey::SubSpace(sub_space) => Ok(sub_space.clone()),
             ResourceKey::App(app) => Ok(app.sub_space.clone()),

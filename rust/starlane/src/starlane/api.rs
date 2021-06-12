@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::convert::{TryInto, TryFrom};
 use std::time::Duration;
 
 use tokio::sync::{mpsc, oneshot};
@@ -6,7 +6,7 @@ use tokio::sync::{mpsc, oneshot};
 use crate::frame::{ChildManagerResourceAction, Reply, SimpleReply, StarMessagePayload};
 use crate::keys::ResourceKey;
 use crate::message::{Fail, ProtoStarMessage};
-use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord, ResourceType, Path, LocalDataSrc, DataTransfer, ResourceIdentifier, ResourceStub, ResourceCreateStrategy, FileKind};
+use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord, ResourceType, Path, LocalDataSrc, DataTransfer, ResourceIdentifier, ResourceStub, ResourceCreateStrategy, FileKind, ResourceRegistryInfo};
 use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
@@ -17,6 +17,8 @@ use std::sync::Arc;
 use crate::resource::domain::DomainState;
 use crate::message::resource::{ProtoMessage, ResourceRequestMessage, MessageReply, ResourceResponseMessage};
 use crate::star::StarCommand::ResourceRecordRequest;
+use std::marker::PhantomData;
+use crate::frame::ChildManagerResourceAction::Register;
 
 
 #[derive(Clone)]
@@ -101,10 +103,28 @@ impl StarlaneApi {
 
      */
 
+    pub async fn create_api<API>( &self, create: ResourceCreate ) -> Result<API,Fail> where API: TryFrom<ResourceApi>{
+
+        let resource_api = ResourceApi {
+            stub: self.create_resource(create).await?,
+            star_tx: self.star_tx.clone()
+        };
+
+        let api  = API::try_from(resource_api );
+
+        match api {
+            Ok(api) => {
+                Ok(api)
+            }
+            Err(error) => {
+                Err(Fail::Error("catastrophic converstion error".into()))
+            }
+        }
+    }
 
     pub async fn create_resource( &self, create: ResourceCreate ) -> Result<ResourceStub,Fail> {
         let parent_location = match &create.parent{
-            ResourceKey::Nothing => {
+            ResourceKey::Root => {
                 ResourceRecord::new(ResourceStub::nothing(), StarKey::central() )
             }
             _ => {
@@ -131,12 +151,12 @@ impl StarlaneApi {
     }
 
 
-    pub async fn create_space( &self, name: &str, display: &str )-> Result<SpaceApi,Fail> {
+    pub fn create_space( &self, name: &str, display: &str )-> Result<Creation<SpaceApi>,Fail> {
         let state= SpaceState::new(name.clone(), display);
         let state_data =  state.try_into()?;
         let resource_src = AssignResourceStateSrc::Direct(state_data);
         let create = ResourceCreate{
-            parent: ResourceKey::Nothing,
+            parent: ResourceKey::Root,
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Space(name.to_string()),
             archetype: ResourceArchetype {
@@ -147,9 +167,9 @@ impl StarlaneApi {
             src: resource_src,
             registry_info: None,
             owner: None,
+            strategy: ResourceCreateStrategy::Create
         };
-        let stub = self.create_resource(create).await?;
-        Ok(SpaceApi::new( self.star_tx.clone(), stub)?)
+        Ok(Creation::new( self.clone(), create ))
     }
 
     pub async fn get_space( &self, identifier: ResourceIdentifier ) -> Result<SpaceApi,Fail> {
@@ -196,7 +216,7 @@ impl SpaceApi {
         StarlaneApi::new(self.star_tx.clone())
     }
 
-    pub async fn create_user( &self, email: &str )-> Result<UserApi,Fail> {
+    pub fn create_user( &self, email: &str )-> Result<Creation<UserApi>,Fail> {
         let state = UserState::new(email.to_string() );
         let state_data =  state.try_into()?;
         let resource_src = AssignResourceStateSrc::Direct(state_data);
@@ -212,12 +232,12 @@ impl SpaceApi {
             src: resource_src,
             registry_info: None,
             owner: None,
+            strategy: ResourceCreateStrategy::Create
         };
-        let stub = self.starlane_api().create_resource(create).await?;
-        Ok(UserApi::new( self.star_tx.clone(), stub)?)
+        Ok(Creation::new( self.starlane_api(), create ))
     }
 
-    pub async fn create_sub_space( &self, sub_space: &str )-> Result<SubSpaceApi,Fail> {
+    pub fn create_sub_space( &self, sub_space: &str )-> Result<Creation<SubSpaceApi>,Fail> {
         let state = SubSpaceState::new(sub_space);
         let state_data =  state.try_into()?;
         let resource_src = AssignResourceStateSrc::Direct(state_data);
@@ -233,12 +253,12 @@ impl SpaceApi {
             src: resource_src,
             registry_info: None,
             owner: None,
+            strategy: ResourceCreateStrategy::Create
         };
-        let stub = self.starlane_api().create_resource(create).await?;
-        Ok(SubSpaceApi::new( self.star_tx.clone(), stub)?)
+        Ok(Creation::new( self.starlane_api(), create ))
     }
 
-    pub async fn create_domain( &self, domain: &str )-> Result<DomainApi,Fail> {
+    pub fn create_domain( &self, domain: &str )-> Result<Creation<DomainApi>,Fail> {
         let resource_src = AssignResourceStateSrc::None;
         let create = ResourceCreate{
             parent: self.stub.key.clone(),
@@ -251,10 +271,10 @@ impl SpaceApi {
             },
             src: resource_src,
             registry_info: None,
-            owner: None
+            owner: None,
+            strategy: ResourceCreateStrategy::Create
         };
-        let stub = self.starlane_api().create_resource(create).await?;
-        Ok(DomainApi::new( self.star_tx.clone(), stub)?)
+        Ok(Creation::new( self.starlane_api(), create ))
     }
 }
 
@@ -293,7 +313,7 @@ impl SubSpaceApi {
         StarlaneApi::new(self.star_tx.clone())
     }
 
-    pub async fn create_file_system( &self, name: &str)-> Result<FileSystemApi,Fail> {
+    pub fn create_file_system( &self, name: &str )-> Result<Creation<FileSystemApi>,Fail> {
         let state = FileSystemState::new();
         let state_data =  state.try_into()?;
         let resource_src = AssignResourceStateSrc::Direct(state_data);
@@ -308,10 +328,10 @@ impl SubSpaceApi {
             },
             src: resource_src,
             registry_info: None,
-            owner: None
+            owner: None,
+            strategy: ResourceCreateStrategy::Create
         };
-        let stub = self.starlane_api().create_resource(create).await?;
-        Ok(FileSystemApi::new(self.star_tx.clone(),stub)?)
+        Ok(Creation::new(self.starlane_api(),create))
     }
 
 }
@@ -350,11 +370,11 @@ impl FileSystemApi {
         StarlaneApi::new(self.star_tx.clone())
     }
 
-    pub async fn create_file_from_string( &self, path: &Path, string: String )-> Result<FileApi,Fail> {
-        self.create_file( path, Arc::new(string.into_bytes()) ).await
+    pub fn create_file_from_string( &self, path: &Path, string: String )-> Result<Creation<FileApi>,Fail> {
+        self.create_file( path, Arc::new(string.into_bytes()) )
     }
 
-    pub async fn create_file( &self, path: &Path, data: Arc<Vec<u8>> )-> Result<FileApi,Fail> {
+    pub fn create_file( &self, path: &Path, data: Arc<Vec<u8>> )-> Result<Creation<FileApi>,Fail> {
         // at this time the only way to 'create' a file state is to load the entire thing into memory
         // in the future we want options like "Stream" which will allow us to stream the state contents, etc.
 //        let resource_src = AssignResourceStateSrc::Direct(data.get()?);
@@ -370,10 +390,10 @@ impl FileSystemApi {
             },
             src: resource_src,
             registry_info: None,
-            owner: None
+            owner: None,
+            strategy: ResourceCreateStrategy::Create
         };
-        let stub = self.starlane_api().create_resource(create).await?;
-        Ok(FileApi::new( self.star_tx.clone(), stub )?)
+        Ok(Creation::new(self.starlane_api(),create))
     }
 
 }
@@ -442,3 +462,100 @@ impl DomainApi {
         })
     }
 }
+
+
+pub struct Creation<API> where API: TryFrom<ResourceApi> {
+    api: StarlaneApi,
+    create: ResourceCreate,
+    phantom: PhantomData<API>
+}
+
+impl <API> Creation <API> where API: TryFrom<ResourceApi> {
+
+    pub fn new( api: StarlaneApi, create: ResourceCreate ) -> Self {
+        Self{
+            api: api,
+            create: create,
+            phantom: PhantomData{}
+        }
+    }
+
+    pub async fn submit(self) -> Result<API,Fail> {
+        self.api.create_api(self.create).await
+    }
+
+    fn registry_info(&mut self) -> &mut ResourceRegistryInfo {
+
+        if self.create.registry_info.is_none(){
+            self.create.registry_info = Option::Some( ResourceRegistryInfo::new() );
+        }
+        self.create.registry_info.as_mut().unwrap()
+    }
+
+    pub fn set_strategy( &mut self, strategy: ResourceCreateStrategy ) {
+        self.create.strategy = strategy;
+    }
+
+    pub fn add_tag( &mut self, tag: String ) {
+        self.registry_info().names.push(tag);
+    }
+
+    pub fn add_label( &mut self, key: String, value: String ) {
+        self.registry_info().labels.insert( key, value );
+    }
+}
+
+pub struct ResourceApi {
+    stub: ResourceStub,
+    star_tx: mpsc::Sender<StarCommand>
+}
+
+impl TryFrom<ResourceApi> for FileSystemApi{
+    type Error = Fail;
+
+    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
+        Ok(Self::new( value.star_tx, value.stub )?)
+    }
+}
+
+impl TryFrom<ResourceApi> for FileApi{
+    type Error = Fail;
+
+    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
+        Ok(Self::new( value.star_tx, value.stub )?)
+    }
+}
+
+impl TryFrom<ResourceApi> for SubSpaceApi{
+    type Error = Fail;
+
+    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
+        Ok(Self::new( value.star_tx, value.stub )?)
+    }
+}
+
+impl TryFrom<ResourceApi> for SpaceApi{
+    type Error = Fail;
+
+    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
+        Ok(Self::new( value.star_tx, value.stub )?)
+    }
+}
+
+impl TryFrom<ResourceApi> for UserApi{
+    type Error = Fail;
+
+    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
+        Ok(Self::new( value.star_tx, value.stub )?)
+    }
+}
+
+impl TryFrom<ResourceApi> for DomainApi{
+    type Error = Fail;
+
+    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
+        Ok(Self::new( value.star_tx, value.stub )?)
+    }
+}
+
+
