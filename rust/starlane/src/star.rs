@@ -427,7 +427,7 @@ impl Star
 
     pub async fn get_resource(&self, key: &ResourceKey) -> Result<Option<Resource>, Fail>
     {
-        let (action, rx) = StarCoreAction::new(StarCoreCommand::Get(key.clone()));
+        let (action, rx) = StarCoreAction::new(StarCoreCommand::Get(key.clone().into()));
         self.skel.core_tx.send(action).await?;
         match rx.await??
         {
@@ -839,7 +839,6 @@ println!("GOT REPLY from GetKey");
 
     async fn locate_resource_record(&mut self, request: Request<ResourceIdentifier, ResourceRecord>)
     {
-println!("attempting to locate resource: {}", &request.payload.to_string() );
         if self.has_resource_record(&request.payload)
         {
             request.tx.send(Ok(self.get_resource_record(&request.payload).unwrap()));
@@ -1774,6 +1773,9 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
             ResourceRequestMessage::Unique(resource_type) => {
                 let unique_src = self.skel.registry.as_ref().unwrap().unique_src(delivery.message.to.clone().into()).await;
                 delivery.reply(ResourceResponseMessage::Unique(unique_src.next(resource_type).await?)).await?;
+            }
+            ResourceRequestMessage::State => {
+
             }
         }
         Ok(())

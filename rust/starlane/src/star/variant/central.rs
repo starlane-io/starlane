@@ -30,8 +30,6 @@ impl StarVariant for CentralVariant
 {
     async fn init(&self, tx: oneshot::Sender<Result<(), Error>>)
     {
-        println!("ensuring root...");
-
         let root_resource = ResourceRecord{
             stub: ResourceStub {
                 key: ResourceKey::Root,
@@ -65,12 +63,10 @@ impl CentralVariant {
     async fn ensure( starlane_api: StarlaneApi ) -> Result<(),Error>
     {
 
-        println!("creating space...");
         let mut creation = starlane_api.create_space("hyperspace", "Hyper Space")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         let space_api = creation.submit().await?;
 
-        println!("creating user...");
         let mut creation = space_api.create_user("hyperuser@starlane.io")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;

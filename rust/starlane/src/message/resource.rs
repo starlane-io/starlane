@@ -8,7 +8,7 @@ use tokio::sync::{oneshot, mpsc};
 use crate::keys::{UserKey, ResourceKey, ResourceId, MessageId};
 use crate::message::{Fail, ProtoStarMessage};
 use crate::error::Error;
-use crate::resource::{ResourceType, ResourceCreate, ResourceSelector, ResourceRecord, ResourceIdentifier};
+use crate::resource::{ResourceType, ResourceCreate, ResourceSelector, ResourceRecord, ResourceIdentifier, RemoteDataSrc};
 use std::iter::FromIterator;
 use crate::id::Id;
 use crate::star::{StarKey, StarCommand, StarSkel};
@@ -258,7 +258,8 @@ pub enum ResourceRequestMessage
 {
     Create(ResourceCreate),
     Select(ResourceSelector),
-    Unique(ResourceType)
+    Unique(ResourceType),
+    State
 }
 
 #[derive(Clone,Serialize,Deserialize)]
@@ -266,7 +267,8 @@ pub enum ResourceResponseMessage
 {
     Resource(Option<ResourceRecord>),
     Resources(Vec<ResourceRecord>),
-    Unique(ResourceId)
+    Unique(ResourceId),
+    State(RemoteDataSrc)
 }
 
 #[derive(Clone,Serialize,Deserialize)]

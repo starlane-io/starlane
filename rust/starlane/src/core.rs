@@ -20,7 +20,7 @@ use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, ResourceKey};
 use crate::message::Fail;
-use crate::resource::{AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource, Resource, ResourceAssign, ResourceSliceAssign};
+use crate::resource::{AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource, Resource, ResourceAssign, ResourceSliceAssign, ResourceIdentifier, RemoteDataSrc};
 use crate::resource::store::ResourceStoreSqlLite;
 use crate::star::{ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel};
 use crate::file::FileAccess;
@@ -50,7 +50,8 @@ impl StarCoreAction{
 
 pub enum StarCoreCommand
 {
-    Get(ResourceKey),
+    Get(ResourceIdentifier),
+    State(ResourceIdentifier),
     Assign(ResourceAssign<AssignResourceStateSrc>),
 }
 
@@ -58,7 +59,8 @@ pub enum StarCoreResult{
     Ok,
     Resource(Option<Resource>),
     LocalLocation(LocalResourceLocation),
-    MessageReply(MessagePayload)
+    MessageReply(MessagePayload),
+    State(RemoteDataSrc)
 }
 
 impl ToString for StarCoreResult{
@@ -67,7 +69,8 @@ impl ToString for StarCoreResult{
             StarCoreResult::Ok => "Ok".to_string(),
             StarCoreResult::LocalLocation(_) => "LocalLocation".to_string(),
             StarCoreResult::MessageReply(_) => "MessageReply".to_string(),
-            StarCoreResult::Resource(_) => "Resource".to_string()
+            StarCoreResult::Resource(_) => "Resource".to_string(),
+            StarCoreResult::State(_) => "State".to_string()
         }
     }
 }
@@ -181,7 +184,11 @@ impl Host for InertHost{
         Err(Fail::Error("This is an InertHost which cannot actually host anything".into()))
     }
 
-    async fn get(&self, key: ResourceKey) -> Result<Option<Resource>, Fail> {
+    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail> {
+        Err(Fail::Error("This is an InertHost which cannot actually host anything".into()))
+    }
+
+    async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {
         Err(Fail::Error("This is an InertHost which cannot actually host anything".into()))
     }
 }
@@ -218,7 +225,8 @@ pub trait StarCoreExtFactory: Send+Sync
 #[async_trait]
 pub trait Host: Send+Sync{
     async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource,Fail>;
-    async fn get(&self, key: ResourceKey) -> Result<Option<Resource>,Fail>;
+    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>,Fail>;
+    async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc,Fail>;
 }
 
 
@@ -254,8 +262,8 @@ impl StarCore2{
             StarCoreCommand::Assign(assign) => {
                 Ok(StarCoreResult::Resource(Option::Some(self.host.assign(assign).await?)))
             }
-            StarCoreCommand::Get(key) => {
-                let resource = self.host.get(key).await?;
+            StarCoreCommand::Get(identifier) => {
+                let resource = self.host.get(identifier).await?;
                 Ok(StarCoreResult::Resource(resource))
             }
             _ => unimplemented!()

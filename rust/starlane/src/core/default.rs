@@ -16,7 +16,7 @@ use crate::file::FileAccess;
 use crate::frame::ResourceHostAction;
 use crate::message::Fail;
 use crate::names::{Name, Specific};
-use crate::resource::{AssignResourceStateSrc, DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Names, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceStatePersistenceManager, ResourceStateSrc, ResourceType};
+use crate::resource::{AssignResourceStateSrc, DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Names, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceStatePersistenceManager, ResourceStateSrc, ResourceType, ResourceIdentifier, RemoteDataSrc};
 use crate::resource;
 use crate::resource::store::{ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult, ResourceStoreSqlLite};
 use crate::resource::user::UserState;
@@ -60,8 +60,16 @@ impl Host for DefaultHost {
         Ok(self.store.put( assign ).await?)
     }
 
-    async fn get(&self, key: ResourceKey) -> Result<Option<Resource>, Fail> {
-        self.store.get(key).await
+    async fn get(&self, identifier: ResourceIdentifier ) -> Result<Option<Resource>, Fail> {
+        self.store.get(identifier).await
     }
 
+    async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {
+        if let Option::Some( resource) = self.store.get(identifier.clone()).await?
+        {
+            Ok(RemoteDataSrc::Memory(resource.state_src().get().await?))
+        } else {
+          Err(Fail::ResourceNotFound(identifier))
+        }
+    }
 }

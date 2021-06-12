@@ -13,7 +13,7 @@ use crate::error::Error;
 use crate::file::{FileAccess, FileEvent};
 use crate::keys::{ResourceKey, FileSystemKey};
 use crate::message::Fail;
-use crate::resource::{AssignResourceStateSrc, DataTransfer, MemoryDataTransfer, Path, Resource, ResourceAddress, ResourceAssign, ResourceStateSrc, ResourceType, ResourceCreationChamber, FileKind, ResourceStub, ResourceCreate, ResourceArchetype, ResourceKind, AddressCreationSrc, KeyCreationSrc, ResourceCreateStrategy};
+use crate::resource::{AssignResourceStateSrc, DataTransfer, MemoryDataTransfer, Path, Resource, ResourceAddress, ResourceAssign, ResourceStateSrc, ResourceType, ResourceCreationChamber, FileKind, ResourceStub, ResourceCreate, ResourceArchetype, ResourceKind, AddressCreationSrc, KeyCreationSrc, ResourceCreateStrategy, ResourceIdentifier, RemoteDataSrc};
 use crate::resource::store::{ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult};
 use crate::star::StarSkel;
 
@@ -111,7 +111,6 @@ impl FileStoreHost {
             file_path.push_str("/");
         }
 
-println!("final filepath: {}",file_path );
         let filesystem_key = ResourceKey::FileSystem(FileSystemKey::from_str(filesystem )?);
 
         FileStoreHost::ensure_file(filesystem_key, file_path,  event.file_kind, store, skel ).await?;
@@ -123,7 +122,7 @@ println!("final filepath: {}",file_path );
     async fn ensure_file(filesystem_key: ResourceKey, file_path: String, kind: FileKind, store: ResourceStore, skel: StarSkel ) -> Result<(),Error> {
 
 
-        let filesystem= store.get(filesystem_key.clone()).await?.ok_or(format!("expected filesystem to be present in hosted environment: {}",filesystem_key.as_filesystem()?.to_string()))?;
+        let filesystem= store.get(filesystem_key.clone().into() ).await?.ok_or(format!("expected filesystem to be present in hosted environment: {}",filesystem_key.as_filesystem()?.to_string()))?;
         let filesystem: ResourceStub = filesystem.into();
 
         let archetype = ResourceArchetype{
@@ -157,8 +156,6 @@ impl Host for FileStoreHost {
 
     async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource, Fail> {
         // if there is Initialization to do for assignment THIS is where we do it
-
-println!("saving: {}", assign.stub.address.to_string() );
 
         match assign.stub.key.resource_type(){
             ResourceType::FileSystem => {
@@ -200,12 +197,32 @@ println!("saving: {}", assign.stub.address.to_string() );
             state_src: data_transfer
         };
 
-println!("storing: address {} key: {}",assign.stub.address.to_string(), assign.stub.key.to_string());
         Ok(self.store.put( assign ).await?)
     }
 
-    async fn get(&self, key: ResourceKey) -> Result<Option<Resource>, Fail> {
-        self.store.get(key).await
+    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail> {
+        self.store.get(identifier).await
     }
 
+    async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {
+
+        if let Ok(Option::Some(resource)) = self.store.get(identifier.clone()).await
+        {
+            match identifier.resource_type() {
+                ResourceType::File => {
+                    let filesystem_key = resource.key().parent().ok_or("Wheres the filesystem key?")?.as_filesystem()?;
+                    let filesystem_path = Path::new(format!("/{}",filesystem_key.to_string().as_str()).as_str() )?;
+                    let path = format!( "{}{}", filesystem_path.to_string(), resource.address().last_to_string()? );
+                    let data = self.file_access.read(&Path::from_str(path.as_str())?).await?;
+                    Ok(RemoteDataSrc::Memory(data))
+                }
+                _ => {
+                    Ok(RemoteDataSrc::None)
+                }
+            }
+        }
+        else{
+            Err(Fail::ResourceNotFound(identifier))
+        }
+    }
 }

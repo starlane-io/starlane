@@ -640,10 +640,7 @@ eprintln!("error setting up db: {}", err );
                     trans.execute("DELETE FROM resources WHERE key=?1", [params.key.clone()])?;
                 }
 
-let address = params.address.clone().unwrap_or("NOTHING".to_string() );
-println!("BEFORE {}",address.clone());
                 trans.execute("INSERT INTO resources (key,address,resource_type,kind,specific,parent,owner,config,host) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)", params![params.key,params.address,params.resource_type,params.kind,params.specific,params.parent,params.owner,params.config,params.host])?;
-println!("~AFTER {}",address.clone());
                 if let Option::Some(info) = registration.info {
                     for name in info.names
                     {
@@ -655,9 +652,7 @@ println!("~AFTER {}",address.clone());
                     }
                 }
 
-println!("commit!");
                 trans.commit()?;
-println!("... post commit!");
                 Ok(ResourceRegistryResult::Ok)
             }
             ResourceRegistryCommand::Select(selector) => {
@@ -806,7 +801,6 @@ println!("... post commit!");
             }
 
             ResourceRegistryCommand::Reserve(request) => {
-println!("RESERVE for kind: {} ", request.archetype.kind  );
                 let trans = self.conn.transaction()?;
                 trans.execute("DELETE FROM names WHERE key IS NULL AND datetime(reservation_timestamp) < datetime('now')", [] )?;
                 let params = RegistryParams::new(request.archetype.clone(),Option::Some(request.parent.clone()),Option::None, Option::None, Option::None, Option::None)?;
@@ -814,7 +808,6 @@ println!("RESERVE for kind: {} ", request.archetype.kind  );
                     let params = RegistryParams::from_archetype(request.archetype.clone(), Option::Some(request.parent.clone()))?;
                     Self::process_names(&trans, &request.info.as_ref().cloned().unwrap().names, &params)?;
                 }
-println!("got here... ");
                 trans.commit()?;
                 let (tx,rx) = oneshot::channel();
                 let reservation = RegistryReservation::new(tx);
@@ -830,8 +823,6 @@ println!("got here... ");
                             }
                             Err(_) => Option::None
                         };
-
-println!("COMMITING address: {},  ", record.stub.address.to_string() );
 
                         params.key = key;
                         params.address = Option::Some(record.stub.address.to_string());
@@ -855,16 +846,14 @@ println!("COMMITING address: {},  ", record.stub.address.to_string() );
                     Unique::Sequence => "sequence",
                     Unique::Index => "id_index"
                 };
-    trans.execute("INSERT OR IGNORE INTO uniques (key) VALUES (?1)", params![key])?;
-    trans.execute(format!("UPDATE uniques SET {}={}+1 WHERE key=?1", column, column).as_str(), params![key])?;
-    let rtn = trans.query_row(format!("SELECT {} FROM uniques WHERE key=?1", column).as_str(), params![key], |r| {
-        let rtn: u64 = r.get(0)?;
-        println!("UNIQUE == {}", rtn);
-        Ok(rtn)
-    })?;
-    trans.commit()?;
 
-println!("RTN UNIQUE({})",rtn);
+                trans.execute("INSERT OR IGNORE INTO uniques (key) VALUES (?1)", params![key])?;
+                trans.execute(format!("UPDATE uniques SET {}={}+1 WHERE key=?1", column, column).as_str(), params![key])?;
+                let rtn = trans.query_row(format!("SELECT {} FROM uniques WHERE key=?1", column).as_str(), params![key], |r| {
+                    let rtn: u64 = r.get(0)?;
+                    Ok(rtn)
+                })?;
+                trans.commit()?;
 
                 Ok(ResourceRegistryResult::Unique(rtn))
             }
@@ -1870,7 +1859,6 @@ impl ResourceCreationChamber{
             let key = match &self.create.key {
                 KeyCreationSrc::None => {
 
-println!("sending create message to : {}", self.parent.key.resource_type().to_string() );
                     let mut proto = ProtoMessage::new();
                     proto.to(self.parent.key.clone().into());
                     proto.from(MessageFrom::Resource(self.parent.key.clone().into()));
@@ -2299,7 +2287,58 @@ impl ResourceAddress {
 
         }
     }
+    /*
+    pub fn from_filename(value: &str) -> Result<Self,Error>{
+        let split = value.split("_");
+    }
 
+    pub fn to_filename(&self) -> String {
+        let mut rtn = String::new();
+        for (index,part) in self.parts.iter().enumerate() {
+            if index != 0 {
+                rtn.push_str("_" );
+            }
+            let part = match part {
+                ResourceAddressPart::Wildcard => {
+                    "~"
+                }
+                ResourceAddressPart::SkewerCase(skewer) => {
+                    skewer.to_string()
+                }
+                ResourceAddressPart::Domain(domain) => {
+                    domain.to_string()
+                }
+                ResourceAddressPart::Base64Encoded(base) => {
+                    base.to_string()
+                }
+                ResourceAddressPart::Path(path) => {
+                    path.to_relative().replace("/", "+")
+                }
+                ResourceAddressPart::Version(version) => {
+                    version.to_string()
+                }
+                ResourceAddressPart::Email(email) => {
+                    email.to_string()
+                }
+                ResourceAddressPart::Url(url) => {
+                    url.replace("/", "+")
+                }
+                ResourceAddressPart::UrlPathPattern(pattern) => {
+                    let result = Base64Encoded::encoded(pattern.to_string());
+                    if result.is_ok() {
+                        result.unwrap().encoded
+                    }
+                    else{
+                        "+++"
+                    }
+                }
+            };
+            rtn.push_str(part);
+        }
+        rtn
+    }
+
+     */
 
     pub fn for_space(string : &str) -> Result<Self,Error> {
         ResourceType::Space.address_structure().from_str(string )
@@ -2820,6 +2859,12 @@ impl Base64Encoded {
                 Err(err.to_string().into())
             }
         }
+    }
+}
+
+impl ToString for Base64Encoded{
+    fn to_string(&self) -> String {
+        self.encoded.clone()
     }
 }
 
@@ -3864,6 +3909,15 @@ pub enum LocalDataSrc {
     File(Path),
     Hosted
 }
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum RemoteDataSrc {
+    None,
+    Memory(Arc<Vec<u8>>)
+}
+
+
+
 
 #[derive(Clone)]
 pub struct SrcTransfer<S> where S:TryInto<Arc<Vec<u8>>>+TryFrom<Arc<Vec<u8>>>{

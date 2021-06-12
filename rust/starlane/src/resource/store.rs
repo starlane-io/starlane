@@ -2,7 +2,7 @@ use std::convert::TryInto;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use rusqlite::{Connection, params, Transaction};
+use rusqlite::{Connection, params, Transaction, Row};
 use rusqlite::types::ValueRef;
 use tokio::sync::{mpsc, oneshot};
 
@@ -12,7 +12,7 @@ use crate::file::FileAccess;
 use crate::keys::ResourceKey;
 use crate::message::Fail;
 use crate::names::Specific;
-use crate::resource::{DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceStatePersistenceManager, ResourceCreate};
+use crate::resource::{DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceStatePersistenceManager, ResourceCreate, ResourceIdentifier};
 
 #[derive(Clone)]
 pub struct ResourceStore{
@@ -44,10 +44,10 @@ impl ResourceStore{
 
     }
 
-    pub async fn get(&self, key: ResourceKey) -> Result<Option<Resource>, Fail> {
+    pub async fn get(&self, identifier: ResourceIdentifier ) -> Result<Option<Resource>, Fail> {
         let (tx,rx) = oneshot::channel();
         self.tx.send( ResourceStoreAction {
-            command: ResourceStoreCommand::Get(key.clone()),
+            command: ResourceStoreCommand::Get(identifier.clone()),
             tx: tx
         }).await?;
         let result = rx.await??;
@@ -70,7 +70,7 @@ pub struct ResourceStoreAction {
 pub enum ResourceStoreCommand {
     Close,
     Put(ResourceAssign<Arc<dyn DataTransfer>>),
-    Get(ResourceKey)
+    Get(ResourceIdentifier)
 }
 
 pub enum ResourceStoreResult {
@@ -166,37 +166,49 @@ impl ResourceStoreSqlLite {
 
                 Ok(ResourceStoreResult::Resource(Option::Some(resource)))
             }
-            ResourceStoreCommand::Get(key) => {
-                let key_bin = key.bin()?;
-                let resource = self.conn.query_row("SELECT address,state_src,kind,specific,config_src FROM resources WHERE key=?1", params![key_bin], |row| {
+            ResourceStoreCommand::Get(identifier) => {
+
+                let statement = match &identifier {
+                    ResourceIdentifier::Key(key) => {
+                        "SELECT key,address,state_src,kind,specific,config_src FROM resources WHERE key=?1"
+                    }
+                    ResourceIdentifier::Address(_) => {
+                        "SELECT key,address,state_src,kind,specific,config_src FROM resources WHERE address=?1"
+                    }
+                };
 
 
-                    let address: String = row.get(0)?;
+                let func = |row:&Row| {
+
+                    let key:Vec<u8> = row.get(0)?;
+                    let key= ResourceKey::from_bin(key)?;
+
+                    let address: String = row.get(1)?;
                     let address= ResourceAddress::from_str(address.as_str())?;
 
-                    let state= if let ValueRef::Null = row.get_ref(1)? {
+                    let state= if let ValueRef::Null = row.get_ref(2)? {
                         Option::None
                     } else {
-                        let state: Vec<u8>= row.get(1)?;
+                        let state: Vec<u8>= row.get(2)?;
                         Option::Some(state)
                     };
 
-                    let kind: String = row.get(2)?;
+                    let kind: String = row.get(3)?;
                     let kind = ResourceKind::from_str( kind.as_str() )?;
 
 
-                    let specific= if let ValueRef::Null = row.get_ref(3)? {
+                    let specific= if let ValueRef::Null = row.get_ref(4)? {
                         Option::None
                     } else {
-                        let specific: String = row.get(3)?;
+                        let specific: String = row.get(4)?;
                         let specific= Specific::from_str(specific.as_str())?;
                         Option::Some(specific)
                     };
 
-                    let config_src= if let ValueRef::Null = row.get_ref(4)? {
+                    let config_src= if let ValueRef::Null = row.get_ref(5)? {
                         Option::None
                     } else {
-                        let config_src: String = row.get(4)?;
+                        let config_src: String = row.get(5)?;
                         let config_src = ConfigSrc::from_str(config_src.as_str())?;
                         Option::Some(config_src)
                     };
@@ -206,7 +218,6 @@ impl ResourceStoreSqlLite {
                         Some(state) => {Arc::new(MemoryDataTransfer::new(Arc::new(state)))}
                     };
 
-
                     let archetype = ResourceArchetype{
                         kind: kind,
                         specific: specific,
@@ -214,7 +225,18 @@ impl ResourceStoreSqlLite {
                     };
 
                     Ok(Resource::new(key,address, archetype, state))
-                });
+                };
+
+                let resource = match identifier.clone() {
+                    ResourceIdentifier::Key(key) => {
+                        let key = key.bin()?;
+                        self.conn.query_row(statement, params![key], func )
+                    }
+                    ResourceIdentifier::Address(address) => {
+                        self.conn.query_row(statement, params![address.to_string()], func )
+                    }
+                };
+
 
                 match resource {
                     Ok(resource) => {

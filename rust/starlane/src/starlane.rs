@@ -515,8 +515,6 @@ eprintln!("{}",err.to_string());
             file_api.create_file_from_string(&"/images/not-really-an-image.png".try_into().unwrap(), "This is not really an image....".to_string() ).unwrap().submit().await.unwrap();
 
 
-            println!("got space ctrl");
-
             loop {
                 tokio::time::sleep(Duration::from_secs(30)).await;
             }

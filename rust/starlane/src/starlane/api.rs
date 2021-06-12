@@ -6,7 +6,7 @@ use tokio::sync::{mpsc, oneshot};
 use crate::frame::{ChildManagerResourceAction, Reply, SimpleReply, StarMessagePayload};
 use crate::keys::ResourceKey;
 use crate::message::{Fail, ProtoStarMessage};
-use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord, ResourceType, Path, LocalDataSrc, DataTransfer, ResourceIdentifier, ResourceStub, ResourceCreateStrategy, FileKind, ResourceRegistryInfo};
+use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord, ResourceType, Path, LocalDataSrc, DataTransfer, ResourceIdentifier, ResourceStub, ResourceCreateStrategy, FileKind, ResourceRegistryInfo, ResourceStateSrc, RemoteDataSrc};
 use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
@@ -150,6 +150,22 @@ impl StarlaneApi {
         }
     }
 
+    pub async fn get_resource_state( &self, identifier: ResourceIdentifier ) -> Result<RemoteDataSrc,Fail> {
+        let mut proto = ProtoMessage::new();
+        proto.payload = Option::Some(ResourceRequestMessage::State);
+        let reply = proto.reply();
+        let mut proto = proto.to_proto_star_message().await?;
+        self.star_tx.send( StarCommand::SendProtoMessage(proto)).await?;
+
+        let result = reply.await??;
+
+        match result.payload{
+            ResourceResponseMessage::State(data) => {
+                Ok(data)
+            }
+            _ => Err(Fail::Unexpected)
+        }
+    }
 
     pub fn create_space( &self, name: &str, display: &str )-> Result<Creation<SpaceApi>,Fail> {
         let state= SpaceState::new(name.clone(), display);
