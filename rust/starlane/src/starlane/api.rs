@@ -169,17 +169,11 @@ println!("elapsed error: {}",err );
             proto.payload = Option::Some(ResourceRequestMessage::State);
             proto.to = Option::Some(identifier);
             proto.from = Option::Some(MessageFrom::Inject);
-            proto.log = true;
             let reply = proto.reply();
-println!("to_proto_star_message()");
             let mut proto = proto.to_proto_star_message().await?;
-println!("AFTER to_proto_star_message()");
             self.star_tx.send(StarCommand::SendProtoMessage(proto)).await?;
 
-        //    let result = StarlaneApi::timeout(reply).await?;
-println!("AWaiting return of resource state...");
         let result = Self::timeout(reply).await?;
-println!("RETURNED from AWaiting resource state...");
 
         match result.payload {
                 ResourceResponseMessage::State(data) => {
@@ -627,9 +621,7 @@ impl StarlaneApiRunner {
         thread::spawn( move || {
             let rt= tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
             rt.block_on(async {
-println!("StarlaneApiRunner is running, waiting to received.... ");
                 while let Option::Some(action) = self.rx.recv().await {
-println!("got an action to process");
                     self.process(action).await;
                 }
             });
@@ -637,13 +629,10 @@ println!("got an action to process");
     }
 
     async fn process(&self, action: StarlaneAction ) {
-println!("processing action: {:?}", action );
 
         match action {
            StarlaneAction::GetState { identifier,tx } => {
-println!("get state command... ");
                tx.send(self.api.get_resource_state(identifier).await );
-println!("all done from rpocessing")
            }
        }
     }
@@ -658,9 +647,7 @@ impl StarlaneApiRelay {
 
     pub async fn get_resource_state(&self, identifier: ResourceIdentifier ) -> Result<Option<Arc<Vec<u8>>>,Fail> {
         let (tx,mut rx) = tokio::sync::oneshot::channel();
-println!("Sending....");
         self.tx.send( StarlaneAction::GetState{ identifier: identifier, tx:tx }).await;
-println!("Sent... now wating....");
         rx.await?
     }
 

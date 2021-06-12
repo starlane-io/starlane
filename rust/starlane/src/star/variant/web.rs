@@ -2,7 +2,7 @@
 use std::net::ToSocketAddrs;
 
 use actix_web::client::Client;
-use actix_web::{middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer};
+use actix_web::{middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer, Responder};
 use clap::{value_t, Arg};
 use url::Url;
 use crate::star::StarSkel;
@@ -14,6 +14,7 @@ use std::str::FromStr;
 use actix_web::web::Data;
 use std::sync::Arc;
 use crate::message::Fail;
+use actix_web::http::StatusCode;
 
 
 pub struct WebVariant
@@ -60,28 +61,27 @@ async fn forward(
     client: web::Data<Client>,
 ) -> Result<HttpResponse, Error> {
 
-    let address = ResourceAddress::from_str("hyperspace:default:*:website:/index.html::<File>").unwrap();
-    let state = match api.get_resource_state(address.into()).await{
+    let address = ResourceAddress::from_str(format!("hyperspace:default:*:website:{}::<File>",req.path()).as_str() ).unwrap();
+    let responder= match api.get_resource_state(address.into()).await{
         Ok(state) => {
             println!("State OK... getting option");
             match state {
                 None => {
                     eprintln!("state was nothing!");
-                    panic!()
+                    "404".to_string()
                 }
                 Some(state) => {
                     println!("found state!");
-                    state
+                    String::from_utf8((*state).clone() ).unwrap()
                 }
             }
         }
         Err(err) => {
             eprintln!("Fail: {}",err.to_string());
-            panic!()
+            "500".to_string()
         }
     };
-    let string = String::from_utf8((*state).clone() ).unwrap();
-    Ok(string.into())
+    Ok(responder.into())
 }
 
 async fn proxy(

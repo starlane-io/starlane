@@ -773,7 +773,6 @@ eprintln!("error setting up db: {}", err );
                        ResourceIdentifier::Address(address) => {
                            let address = address.to_string();
                            let statement = format!("SELECT {} FROM resources as r WHERE address=?1", RESOURCE_QUERY_FIELDS);
-println!("~~statement: {}",statement );
                            let mut statement = self.conn.prepare(statement.as_str())?;
                            statement.query_row( params![address], |row| {
                                Ok(Self::process_resource_row_catch(row)?)
@@ -793,7 +792,6 @@ println!("~~statement: {}",statement );
                     Err(err) => {
                         match err{
                             rusqlite::Error::QueryReturnedNoRows => {
-eprintln!("NO ROWS: {}",identifier.to_string() );
                                 Ok(ResourceRegistryResult::Resource(Option::None))
                             }
                             err => {
