@@ -70,7 +70,7 @@ pub enum StarKind
     Gateway,
     Link,
     Client,
-    Web
+    Web,
 }
 
 impl StarKind
@@ -1837,7 +1837,6 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
             }
             ResourceRequestMessage::State => {
 
-println!("RECEVIED --> STATE <-- REQUEST !");
                 let (action,mut rx) = StarCoreAction::new(StarCoreCommand::State(delivery.message.to.clone() ));
                 self.skel.core_tx.send(action).await?;
                 tokio::spawn( async move {

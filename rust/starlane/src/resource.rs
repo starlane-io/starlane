@@ -83,15 +83,18 @@ lazy_static!
                                                                                                            ResourceAddressPartStruct::new("file-system",ResourceAddressPartKind::SkewerCase),
                                                                                                            ResourceAddressPartStruct::new("path",ResourceAddressPartKind::Path)], ResourceType::File );
 
+     pub static ref ARTIFACT_BUNDLE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure ::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
+                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::SkewerCase),
+                                                                                                           ResourceAddressPartStruct::new("bundle",ResourceAddressPartKind::SkewerCase),
+                                                                                                           ResourceAddressPartStruct::new("version",ResourceAddressPartKind::Version) ], ResourceType::ArtifactBundle );
 
-    /*
+
      pub static ref ARTIFACT_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure ::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
                                                                                                            ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::SkewerCase),
                                                                                                            ResourceAddressPartStruct::new("bundle",ResourceAddressPartKind::SkewerCase),
                                                                                                            ResourceAddressPartStruct::new("version",ResourceAddressPartKind::Version),
                                                                                                            ResourceAddressPartStruct::new("path",ResourceAddressPartKind::Path)], ResourceType::Artifact );
 
-     */
 
      pub static ref URL_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure ::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
                                                                                                       ResourceAddressPartStruct::new("domain",ResourceAddressPartKind::Domain),
@@ -1020,7 +1023,9 @@ pub enum ResourceKind
     File(FileKind),
     Domain,
     UrlPathPattern,
-    Proxy(ProxyKind)
+    Proxy(ProxyKind),
+    ArtifactBundle,
+    Artifact
 }
 
 impl ResourceKind{
@@ -1036,7 +1041,9 @@ impl ResourceKind{
            ResourceKind::FileSystem => ResourceType::FileSystem,
            ResourceKind::Domain => ResourceType::Domain,
            ResourceKind::UrlPathPattern => ResourceType::UrlPathPattern,
-           ResourceKind::Proxy(_) => ResourceType::Proxy
+           ResourceKind::Proxy(_) => ResourceType::Proxy,
+           ResourceKind::ArtifactBundle => ResourceType::ArtifactBundle,
+           ResourceKind::Artifact => ResourceType::Artifact
        }
     }
 }
@@ -1092,7 +1099,9 @@ impl ResourceType
             ResourceType::FileSystem => 6,
             ResourceType::Domain => 7,
             ResourceType::UrlPathPattern => 8,
-            ResourceType::Proxy => 9
+            ResourceType::Proxy => 9,
+            ResourceType::ArtifactBundle => 10,
+            ResourceType::Artifact => 11
         }
     }
 
@@ -1110,6 +1119,8 @@ impl ResourceType
             7 => Ok(ResourceType::Domain),
             8 => Ok(ResourceType::UrlPathPattern),
             9 => Ok(ResourceType::Proxy),
+            10 => Ok(ResourceType::ArtifactBundle),
+            11 => Ok(ResourceType::Artifact),
             255 => Ok(ResourceType::Root),
             _ => Err(format!("no resource type for magic number {}",magic).into())
         }
@@ -1130,7 +1141,9 @@ impl fmt::Display for ResourceKind{
                     ResourceKind::FileSystem=> format!("Filesystem").to_string(),
                     ResourceKind::Domain => "Domain".to_string(),
                     ResourceKind::UrlPathPattern => "UrlPathPattern".to_string(),
-                    ResourceKind::Proxy(_) => "Proxy".to_string()
+                    ResourceKind::Proxy(_) => "Proxy".to_string(),
+                    ResourceKind::ArtifactBundle => "ArtifactBundle".to_string(),
+                    ResourceKind::Artifact => "Artifact".to_string()
                 })
     }
 
@@ -1206,6 +1219,8 @@ impl FromStr for ResourceKind
             "SubSpace" => Ok(ResourceKind::SubSpace),
             "User" => Ok(ResourceKind::User),
             "Filesystem" => Ok(ResourceKind::FileSystem),
+            "ArtifactBundle" => Ok(ResourceKind::ArtifactBundle),
+            "Artifact" => Ok(ResourceKind::Artifact),
             _ => {
                 Err(format!("cannot match ResourceKind: {}", s).into())
             }
@@ -1227,6 +1242,8 @@ pub enum ResourceType
     Domain,
     UrlPathPattern,
     Proxy,
+    ArtifactBundle,
+    Artifact
 }
 
 impl ResourceType{
@@ -1308,7 +1325,9 @@ impl ResourceType{
             ResourceType::File => StarKind::FileStore,
             ResourceType::UrlPathPattern => StarKind::SpaceHost,
             ResourceType::Proxy => StarKind::SpaceHost,
-            ResourceType::Domain => StarKind::SpaceHost
+            ResourceType::Domain => StarKind::SpaceHost,
+            ResourceType::ArtifactBundle => StarKind::FileStore,
+            ResourceType::Artifact => StarKind::FileStore
         }
     }
 
@@ -1325,6 +1344,8 @@ impl ResourceType{
             ResourceType::UrlPathPattern => HashSet::from_iter(vec![StarKind::SpaceHost] ),
             ResourceType::Proxy=> HashSet::from_iter(vec![StarKind::SpaceHost] ),
             ResourceType::Domain => HashSet::from_iter(vec![StarKind::SpaceHost] ),
+            ResourceType::ArtifactBundle => HashSet::from_iter(vec![StarKind::SpaceHost] ),
+            ResourceType::Artifact => HashSet::from_iter(vec![StarKind::FileStore] ),
         }
     }
 
@@ -1344,7 +1365,9 @@ impl ResourceType{
             Self::File => vec![],
             Self::UrlPathPattern => vec![],
             Self::Proxy => vec![],
-            Self::Domain => vec![Self::UrlPathPattern]
+            Self::Domain => vec![Self::UrlPathPattern],
+            Self::ArtifactBundle => vec![Self::Artifact],
+            Self::Artifact => vec![],
         };
 
         HashSet::from_iter(children.drain(..) )
@@ -1363,7 +1386,9 @@ impl ResourceType{
             ResourceType::File => false,
             ResourceType::UrlPathPattern => false,
             ResourceType::Proxy => false,
-            ResourceType::Domain => false
+            ResourceType::Domain => false,
+            ResourceType::ArtifactBundle => false,
+            ResourceType::Artifact => false,
         }
     }
 }
@@ -1383,6 +1408,8 @@ impl ToString for ResourceType{
             Self::UrlPathPattern => "UrlPathPattern".to_string(),
             Self::Proxy => "Proxy".to_string(),
             Self::Domain => "Domain".to_string(),
+            Self::ArtifactBundle => "ArtifactBundle".to_string(),
+            Self::Artifact => "Artifact".to_string()
         }
     }
 }
@@ -1403,6 +1430,8 @@ impl FromStr for ResourceType {
             "UrlPathPattern" => Ok(ResourceType::UrlPathPattern),
             "Proxy" => Ok(ResourceType::Proxy),
             "Domain" => Ok(ResourceType::Domain),
+            "ArtifactBundle" => Ok(ResourceType::ArtifactBundle),
+            "Artifact" => Ok(ResourceType::Artifact),
             what => Err(format!("could not find resource type {}",what).into())
         }
     }
@@ -1487,7 +1516,9 @@ impl ResourceType
             ResourceType::FileSystem => ResourceParent::Multi(vec![ResourceType::SubSpace,ResourceType::App]),
             ResourceType::UrlPathPattern => ResourceParent::Some(ResourceType::Domain),
             ResourceType::Proxy=> ResourceParent::Some(ResourceType::Space),
-            ResourceType::Domain => ResourceParent::Some(ResourceType::Space)
+            ResourceType::Domain => ResourceParent::Some(ResourceType::Space),
+            ResourceType::ArtifactBundle => ResourceParent::Some(ResourceType::SubSpace),
+            ResourceType::Artifact => ResourceParent::Some(ResourceType::ArtifactBundle)
         }
     }
 
@@ -1505,7 +1536,9 @@ impl ResourceType
             ResourceType::FileSystem => false,
             ResourceType::UrlPathPattern => true,
             ResourceType::Proxy => true,
-            ResourceType::Domain=> true
+            ResourceType::Domain=> true,
+            ResourceType::ArtifactBundle => false,
+            ResourceType::Artifact => false
         }
     }
 
@@ -1524,6 +1557,8 @@ impl ResourceType
             ResourceType::UrlPathPattern => true,
             ResourceType::Proxy => true,
             ResourceType::Domain => true,
+            ResourceType::ArtifactBundle => false,
+            ResourceType::Artifact => false
         }
     }
 
@@ -1542,6 +1577,8 @@ impl ResourceType
             ResourceType::UrlPathPattern => false,
             ResourceType::Proxy => false,
             ResourceType::Domain => false,
+            ResourceType::ArtifactBundle => true,
+            ResourceType::Artifact => true
         }
     }
 
@@ -1560,6 +1597,8 @@ impl ResourceType
             ResourceType::UrlPathPattern => true,
             ResourceType::Proxy => true,
             ResourceType::Domain => true,
+            ResourceType::ArtifactBundle => true,
+            ResourceType::Artifact => true
         }
     }
 
@@ -1597,6 +1636,12 @@ impl ResourceType
             }
             ResourceType::Domain => {
                 &DOMAIN_ADDRESS_STRUCT
+            }
+            ResourceType::ArtifactBundle => {
+                &ARTIFACT_BUNDLE_ADDRESS_STRUCT
+            }
+            ResourceType::Artifact => {
+                &ARTIFACT_ADDRESS_STRUCT
             }
         }
     }
@@ -2141,6 +2186,12 @@ impl UniqueSrc for RegistryUniqueSrc{
                ResourceType::Proxy => {
                    Ok(ResourceId::Proxy(index as _))
                }
+               ResourceType::ArtifactBundle => {
+                   Ok(ResourceId::ArtifactBundle(index as _))
+               }
+               ResourceType::Artifact => {
+                   Ok(ResourceId::Artifact(index as _))
+               }
            }
        } else {
            Err(Fail::Unexpected)
@@ -2296,6 +2347,12 @@ impl ResourceAddress {
             ResourceType::Proxy => {
                 self.chop(1, ResourceType::SubSpace)
             }
+            ResourceType::ArtifactBundle => {
+                self.chop(1, ResourceType::SubSpace)
+            }
+            ResourceType::Artifact => {
+                self.chop(1, ResourceType::Artifact)
+            }
         }
     }
 
@@ -2330,7 +2387,8 @@ impl ResourceAddress {
             ResourceType::Domain => Option::Some(ResourceType::Space),
             ResourceType::UrlPathPattern=> Option::Some(ResourceType::Domain),
             ResourceType::Proxy => Option::Some(ResourceType::Space),
-
+            ResourceType::ArtifactBundle => Option::Some(ResourceType::SubSpace),
+            ResourceType::Artifact => Option::Some(ResourceType::ArtifactBundle),
         }
     }
     /*
@@ -2443,7 +2501,7 @@ impl ResourceAddress {
                     parts.push(ResourceAddressPart::SkewerCase(SkewerCase::new(format!("user-{}", user.id).as_str())?));
                 }
                 ResourceKey::File(file) => {
-                    parts.push(ResourceAddressPart::SkewerCase(SkewerCase::new(format!("file-{}", file.id).as_str())?));
+                    parts.push(ResourceAddressPart::Path(Path::new(format!("/files/{}", file.id).as_str())?));
                 }
                 ResourceKey::FileSystem(filesystem) => {
                     match filesystem {
@@ -2464,6 +2522,13 @@ impl ResourceAddress {
                 }
                 ResourceKey::Proxy(proxy) => {
                     parts.push(ResourceAddressPart::SkewerCase(SkewerCase::from_str(format!("proxy-{}", proxy.id).as_str())?));
+                }
+                ResourceKey::ArtifactBundle(bundle) => {
+                    parts.push(ResourceAddressPart::SkewerCase(SkewerCase::from_str(format!("artifact-bundle-{}",bundle.id).as_str())?));
+                    parts.push(ResourceAddressPart::Version(Version::from_str("1.0.0")?));
+                }
+                ResourceKey::Artifact(artifact) => {
+                    parts.push(ResourceAddressPart::Path(Path::new(format!("/artifacts/{}", artifact.id).as_str())?));
                 }
             }
 

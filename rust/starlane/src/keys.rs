@@ -16,6 +16,7 @@ use std::collections::HashSet;
 use std::iter::FromIterator;
 use crate::keys::ResourceId::UrlPathPattern;
 use crate::actor::ActorKey;
+use crate::artifact::{ArtifactId, ArtifactBundleId, ArtifactKey, ArtifactBundleKey};
 
 pub type SpaceId = u32;
 
@@ -303,6 +304,9 @@ pub enum ResourceId{
     Domain(DomainId),
     UrlPathPattern(UrlPathPatternId),
     Proxy(ProxyId),
+    ArtifactBundle(ArtifactBundleId),
+    Artifact(ArtifactId),
+
 }
 
 impl ResourceId{
@@ -319,6 +323,8 @@ impl ResourceId{
             ResourceId::Domain(_) => ResourceType::Domain,
             ResourceId::UrlPathPattern(_) => ResourceType::UrlPathPattern,
             ResourceId::Proxy(_) => ResourceType::Proxy,
+            ResourceId::ArtifactBundle(_) => ResourceType::ArtifactBundle,
+            ResourceId::Artifact(_) => ResourceType::Artifact
         }
     }
 
@@ -334,7 +340,9 @@ impl ResourceId{
             ResourceType::File =>  Self::File(id.index as _),
             ResourceType::Domain => Self::Domain(id.index as _),
             ResourceType::UrlPathPattern => Self::UrlPathPattern(id.index as _),
-            ResourceType::Proxy => Self::Proxy(id.index as _)
+            ResourceType::Proxy => Self::Proxy(id.index as _),
+            ResourceType::ArtifactBundle => Self::ArtifactBundle(id.index as _),
+            ResourceType::Artifact => Self::Artifact(id.index as _)
         }
     }
 }
@@ -353,6 +361,8 @@ impl ToString for ResourceId{
             ResourceId::Domain(id) => id.to_string(),
             ResourceId::UrlPathPattern(id) => id.to_string(),
             ResourceId::Proxy(id) => id.to_string(),
+            ResourceId::ArtifactBundle(id) => id.to_string(),
+            ResourceId::Artifact(id) => id.to_string()
         }
     }
 }
@@ -370,7 +380,9 @@ pub enum ResourceKey
     FileSystem(FileSystemKey),
     Domain(DomainKey),
     UrlPathPattern(UrlPathPatternKey),
-    Proxy(ProxyKey)
+    Proxy(ProxyKey),
+    ArtifactBundle(ArtifactBundleKey),
+    Artifact(ArtifactKey),
 }
 
 impl ResourceKey
@@ -453,6 +465,20 @@ impl ResourceKey
                     Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
                 }
             }
+            ResourceId::ArtifactBundle(index) => {
+                if let Self::SubSpace(parent) = parent {
+                    Ok(Self::ArtifactBundle( ArtifactBundleKey{sub_space:parent,id: index}))
+                } else {
+                    Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                }
+            }
+            ResourceId::Artifact(index) => {
+                if let Self::ArtifactBundle(parent) = parent {
+                    Ok(Self::Artifact( ArtifactKey{bundle:parent,id: index}))
+                } else {
+                    Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                }
+            }
         }
     }
 
@@ -469,6 +495,8 @@ impl ResourceKey
            ResourceKey::Domain(domain) => {ResourceId::Domain(domain.id.clone())}
            ResourceKey::UrlPathPattern(pattern) => {ResourceId::UrlPathPattern(pattern.id.clone())}
            ResourceKey::Proxy(proxy) => {ResourceId::Proxy(proxy.id.clone())}
+           ResourceKey::ArtifactBundle(bundle) => {ResourceId::ArtifactBundle(bundle.id.clone())}
+           ResourceKey::Artifact(artifact) => {ResourceId::Artifact(artifact.id.clone())}
        }
     }
 
@@ -496,6 +524,8 @@ impl ResourceKey
             ResourceKey::Domain(domain) => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::UrlPathPattern(_) => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::Proxy(_) => Err(Fail::ResourceCannotGenerateAddress),
+            ResourceKey::ArtifactBundle(_) => Err(Fail::ResourceCannotGenerateAddress),
+            ResourceKey::Artifact(_) => Err(Fail::ResourceCannotGenerateAddress)
         }
     }
 
@@ -522,7 +552,8 @@ impl ResourceKey
             ResourceKey::UrlPathPattern(pattern) => Option::Some(ResourceKey::Domain(pattern.domain.clone())),
             ResourceKey::Proxy(proxy) => Option::Some(ResourceKey::Space(proxy.space.clone())),
 
-
+            ResourceKey::ArtifactBundle(bundle) => Option::Some(ResourceKey::SubSpace(bundle.sub_space.clone())),
+            ResourceKey::Artifact(artifact) => Option::Some(ResourceKey::ArtifactBundle(artifact.bundle.clone())),
         }
     }
 
@@ -546,7 +577,9 @@ impl ResourceKey
             }
             ResourceKey::Domain(domain) => Ok(domain.space.clone()),
             ResourceKey::UrlPathPattern(pattern) => Ok(pattern.domain.space.clone()),
-            ResourceKey::Proxy(proxy) => Ok(proxy.space.clone())
+            ResourceKey::Proxy(proxy) => Ok(proxy.space.clone()),
+            ResourceKey::ArtifactBundle(bundle) => Ok(bundle.sub_space.space.clone()),
+            ResourceKey::Artifact(artifact) => Ok(artifact.bundle.sub_space.space.clone())
         }
     }
 
@@ -875,6 +908,8 @@ impl fmt::Display for ResourceKey {
                     ResourceKey::Domain(key) => format!("domain-{}", key.to_string()),
                     ResourceKey::UrlPathPattern(key) => format!("url-path-pattern-{}", key.to_string()),
                     ResourceKey::Proxy(key) => format!("proxy-{}", key.to_string()),
+                    ResourceKey::ArtifactBundle(key) => format!("artifact_bundle-{}", key.to_string()),
+                    ResourceKey::Artifact(key) => format!("artifact-{}", key.to_string())
                 })
     }
 }
@@ -895,7 +930,9 @@ impl ResourceKey
             ResourceKey::FileSystem(_) => ResourceType::FileSystem,
             ResourceKey::Domain(_) => ResourceType::Domain,
             ResourceKey::UrlPathPattern(_) => ResourceType::UrlPathPattern,
-            ResourceKey::Proxy(_) => ResourceType::Proxy
+            ResourceKey::Proxy(_) => ResourceType::Proxy,
+            ResourceKey::ArtifactBundle(_) => ResourceType::ArtifactBundle,
+            ResourceKey::Artifact(_) => ResourceType::Artifact
         }
     }
 
@@ -930,6 +967,8 @@ impl ResourceKey
             ResourceKey::Domain(_) => Err("Domain does not have a subspace".into()),
             ResourceKey::UrlPathPattern(_) => Err("UrlPathPattern does not have a subspace".into()),
             ResourceKey::Proxy(_) => Err("Proxy does not have a subspace".into()),
+            ResourceKey::ArtifactBundle(bundle) => Ok(bundle.sub_space.clone()),
+            ResourceKey::Artifact(artifact) => Ok(artifact.bundle.sub_space.clone())
         }
     }
 

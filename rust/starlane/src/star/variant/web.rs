@@ -64,20 +64,16 @@ async fn forward(
     let address = ResourceAddress::from_str(format!("hyperspace:default:*:website:{}::<File>",req.path()).as_str() ).unwrap();
     let responder= match api.get_resource_state(address.into()).await{
         Ok(state) => {
-            println!("State OK... getting option");
             match state {
                 None => {
-                    eprintln!("state was nothing!");
                     "404".to_string()
                 }
                 Some(state) => {
-                    println!("found state!");
                     String::from_utf8((*state).clone() ).unwrap()
                 }
             }
         }
         Err(err) => {
-            eprintln!("Fail: {}",err.to_string());
             "500".to_string()
         }
     };
