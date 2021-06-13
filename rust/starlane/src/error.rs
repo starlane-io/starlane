@@ -12,6 +12,7 @@ use std::string::FromUtf8Error;
 use std::convert::TryFrom;
 use std::sync::Arc;
 use std::num::ParseIntError;
+use std::env::VarError;
 
 #[derive(Debug, Clone)]
 pub struct Error{
@@ -26,6 +27,21 @@ impl fmt::Display for Error{
     }
 }
 
+impl From<VarError> for Error{
+    fn from(e: VarError) -> Self {
+        Error{
+            error: format!("{}",e.to_string())
+        }
+    }
+}
+
+impl From<url::ParseError> for Error{
+    fn from(e: url::ParseError) -> Self {
+        Error{
+            error: format!("{}",e.to_string())
+        }
+    }
+}
 
 impl From<ParseIntError> for Error{
     fn from(e: ParseIntError) -> Self {

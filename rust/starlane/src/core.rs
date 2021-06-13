@@ -16,24 +16,22 @@ use tokio::sync::mpsc::Sender;
 use tokio::time::Duration;
 
 use crate::actor::{ActorKey };
-use crate::app::{AppArchetype, ApplicationStatus, AppMeta};
-use crate::artifact::{Artifact, ArtifactKey};
-use crate::core::server::{ExampleServerStarCoreExt, ServerStarCore, ServerStarCoreExt};
-use crate::core::space::SpaceHost;
 use crate::error::Error;
-use crate::frame::{ResourceHostAction, ResourceHostResult, ServerAppPayload, StarMessage, StarMessagePayload, Watch, WatchInfo, MessagePayload};
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, ResourceKey};
 use crate::message::Fail;
-use crate::resource::{AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource, Resource, ResourceAssign, ResourceInit, ResourceSliceAssign};
+use crate::resource::{AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource, Resource, ResourceAssign, ResourceSliceAssign, ResourceIdentifier, RemoteDataSrc};
 use crate::resource::store::ResourceStoreSqlLite;
-use crate::star::{ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel, StarVariantCommand};
+use crate::star::{ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel};
 use crate::file::FileAccess;
 use crate::core::file_store::FileStoreHost;
+use crate::frame::MessagePayload;
+use crate::core::default::DefaultHost;
+use crate::star::variant::StarVariantCommand;
 
 pub mod server;
-pub mod space;
 pub mod file_store;
+pub mod default;
 
 pub struct StarCoreAction{
     pub command: StarCoreCommand,
@@ -52,7 +50,8 @@ impl StarCoreAction{
 
 pub enum StarCoreCommand
 {
-    Get(ResourceKey),
+    Get(ResourceIdentifier),
+    State(ResourceIdentifier),
     Assign(ResourceAssign<AssignResourceStateSrc>),
 }
 
@@ -60,7 +59,8 @@ pub enum StarCoreResult{
     Ok,
     Resource(Option<Resource>),
     LocalLocation(LocalResourceLocation),
-    MessageReply(MessagePayload)
+    MessageReply(MessagePayload),
+    State(RemoteDataSrc)
 }
 
 impl ToString for StarCoreResult{
@@ -69,55 +69,19 @@ impl ToString for StarCoreResult{
             StarCoreResult::Ok => "Ok".to_string(),
             StarCoreResult::LocalLocation(_) => "LocalLocation".to_string(),
             StarCoreResult::MessageReply(_) => "MessageReply".to_string(),
-            StarCoreResult::Resource(_) => "Resource".to_string()
+            StarCoreResult::Resource(_) => "Resource".to_string(),
+            StarCoreResult::State(_) => "State".to_string()
         }
     }
 }
 
 
 
-pub struct StarCoreAppCommand
-{
-    pub app: AppKey,
-    pub payload: StarCoreAppCommandPayload
-}
-
-pub enum StarCoreAppCommandPayload
-{
-    None,
-    Assign(Request<ResourceAssign<AssignResourceStateSrc>,()>),
-    AssignSlice(Request<ResourceSliceAssign,()>),
-    InitSlice(Request<ResourceInit,()>)
-}
-
-pub enum AppLaunchError
-{
-   Error(String)
-}
-
-pub enum AppCommandResult
-{
-    Ok,
-    Actor(ResourceKey),
-    Error(String)
-}
-
-
-pub enum StarCoreMessagePayload
-{
-}
-
-pub enum StarCoreExtKind
-{
-    None,
-    Server(Box<dyn ServerStarCoreExt>)
-}
 
 pub enum CoreRunnerCommand
 {
     Core{
         skel: StarSkel,
-        ext: StarCoreExtKind,
         rx: mpsc::Receiver<StarCoreAction>
     },
     Shutdown
@@ -137,9 +101,9 @@ impl CoreRunner
       thread::spawn( move || {
          let runtime = Runtime::new().unwrap();
          runtime.block_on( async move {
-            while let Option::Some(CoreRunnerCommand::Core{ skel, ext, rx }) = rx.recv().await
+            while let Option::Some(CoreRunnerCommand::Core{ skel, rx }) = rx.recv().await
             {
-               let core = match factory.create(skel,ext,rx).await{
+               let core = match factory.create(skel,rx).await{
                    Ok(core) => core,
                    Err(err) => {
                        eprintln!("FATAL: {}", err);
@@ -188,19 +152,17 @@ impl StarCoreFactory
         StarCoreFactory{}
     }
 
-    pub async fn create(&self, skel: StarSkel, ext: StarCoreExtKind, core_rx: mpsc::Receiver<StarCoreAction> ) -> Result<StarCore2,Error>
+    pub async fn create(&self, skel: StarSkel, core_rx: mpsc::Receiver<StarCoreAction> ) -> Result<StarCore2,Error>
     {
         let file_access = skel.file_access.with_path(format!("stars/{}",skel.info.key.to_string())).await?;
         let host:Box<dyn Host> =  match skel.info.kind
         {
-            StarKind::SpaceHost => {
-                Box::new(SpaceHost::new().await)
-            }
+
             StarKind::FileStore => {
                 Box::new(FileStoreHost::new(skel.clone(),file_access).await? )
             }
             _ => {
-                Box::new(InertHost::new())
+                Box::new(DefaultHost::new().await )
             }
         };
         Ok(StarCore2::new(skel, core_rx, host ).await)
@@ -219,14 +181,19 @@ impl InertHost{
 #[async_trait]
 impl Host for InertHost{
     async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource, Fail> {
-        Err(Fail::WrongResourceType {expected:HashSet::new(),received:assign.stub.archetype.kind.resource_type()})
+        Err(Fail::Error("This is an InertHost which cannot actually host anything".into()))
     }
 
-    async fn get(&self, key: ResourceKey) -> Result<Option<Resource>, Fail> {
-        Err(Fail::WrongResourceType {expected:HashSet::new(),received:key.resource_type()})
+    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail> {
+        Err(Fail::Error("This is an InertHost which cannot actually host anything".into()))
+    }
+
+    async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {
+        Err(Fail::Error("This is an InertHost which cannot actually host anything".into()))
     }
 }
 
+/*
 pub struct InertStarCore {
 }
 
@@ -243,41 +210,23 @@ impl InertStarCore {
     }
 }
 
+ */
+
+/*
 pub trait StarCoreExtFactory: Send+Sync
 {
     fn create( &self, skell: &StarSkel ) -> StarCoreExtKind;
 }
 
-pub struct ExampleStarCoreExtFactory
-{
-}
+ */
 
-impl ExampleStarCoreExtFactory
-{
-    pub fn new()->Self
-    {
-        ExampleStarCoreExtFactory{}
-    }
-}
-
-impl StarCoreExtFactory for ExampleStarCoreExtFactory
-{
-    fn create(&self, skel: &StarSkel ) -> StarCoreExtKind {
-        match skel.info.kind
-        {
-            StarKind::ActorHost => {
-                StarCoreExtKind::Server( Box::new(ExampleServerStarCoreExt::new(skel.clone()) ) )
-            }
-            _ => StarCoreExtKind::None
-        }
-    }
-}
 
 
 #[async_trait]
 pub trait Host: Send+Sync{
     async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource,Fail>;
-    async fn get(&self, key: ResourceKey) -> Result<Option<Resource>,Fail>;
+    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>,Fail>;
+    async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc,Fail>;
 }
 
 
@@ -313,11 +262,14 @@ impl StarCore2{
             StarCoreCommand::Assign(assign) => {
                 Ok(StarCoreResult::Resource(Option::Some(self.host.assign(assign).await?)))
             }
-            StarCoreCommand::Get(key) => {
-                let resource = self.host.get(key).await?;
+            StarCoreCommand::Get(identifier) => {
+                let resource = self.host.get(identifier).await?;
                 Ok(StarCoreResult::Resource(resource))
             }
-            _ => unimplemented!()
+            StarCoreCommand::State(identifier) => {
+                let state_src= self.host.state(identifier).await?;
+                Ok(StarCoreResult::State(state_src))
+            }
         }
     }
 }

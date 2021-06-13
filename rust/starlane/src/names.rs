@@ -4,8 +4,7 @@ use std::str::{Split, FromStr};
 use crate::actor::ActorKind;
 use crate::actor::ActorSpecific;
 use crate::app::AppSpecific;
-use crate::artifact::{Artifact, SubSpaceName};
-use crate::artifact::ArtifactLocation;
+use crate::artifact::{ArtifactLocation, SubSpaceName};
 use crate::artifact::ArtifactKind;
 use crate::error::Error;
 
@@ -16,6 +15,7 @@ lazy_static!
     pub static ref TEST_APP_SPEC: AppSpecific = AppSpecific::from("starlane.io:starlane:core:/test/test_app").unwrap();
     pub static ref TEST_ACTOR_SPEC: ActorSpecific = ActorSpecific::from("starlane.io:starlane:core:/test/test_actor").unwrap();
 
+    /*
     pub static ref TEST_APP_CONFIG_ARTIFACT: Artifact = Artifact
     {
                     location: ArtifactLocation::from_str("starlane.io:starlane:core:test:1.0.0:/test/test_app.yaml").unwrap(),
@@ -29,13 +29,14 @@ lazy_static!
                     kind: ArtifactKind::ActorConfig,
                     specific:Option::Some(ActorSpecific::from_str("starlane.io:starlane:core:test:/test/test_actor").unwrap())
     };
+     */
 }
 
 
 
 
 
-#[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
+#[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct Name
 {
     pub sub_space: SubSpaceName,

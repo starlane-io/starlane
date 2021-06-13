@@ -4,13 +4,12 @@ use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
 
 use crate::actor::{ActorKind, ActorSpecific};
-use crate::app::AppSpecific;
 use crate::error::Error;
 use crate::keys::SubSpaceKey;
 use crate::names::{Name, Specific};
 use std::fmt;
 use crate::resource::{ResourceAddress, ResourceType};
-
+/*
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct Artifact
 {
@@ -62,6 +61,8 @@ impl ToString for Artifact{
 
 
 
+ */
+
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub enum ArtifactKind
 {
@@ -102,17 +103,34 @@ impl FromStr for ArtifactKind
 
 pub type ArtifactKindExt = Name;
 
-#[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
-pub struct ArtifactKey
+
+#[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
+pub struct ArtifactBundleKey
 {
     pub sub_space: SubSpaceKey,
+    pub id: ArtifactBundleId
+}
+
+impl ArtifactBundleKey{
+    pub fn new( sub_space: SubSpaceKey, id: ArtifactBundleId )->Self{
+        ArtifactBundleKey{
+            sub_space: sub_space,
+            id: id
+        }
+    }
+}
+
+#[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
+pub struct ArtifactKey
+{
+    pub bundle: ArtifactBundleKey,
     pub id: ArtifactId
 }
 
 impl ArtifactKey{
-    pub fn new( sub_space: SubSpaceKey, id: ArtifactId )->Self{
+    pub fn new( bundle: ArtifactBundleKey, id: ArtifactId )->Self{
         ArtifactKey{
-            sub_space: sub_space,
+            bundle: bundle,
             id: id
         }
     }
@@ -120,7 +138,29 @@ impl ArtifactKey{
 
 impl ToString for ArtifactKey{
     fn to_string(&self) -> String {
+        format!("{}-{}",self.bundle.to_string(), self.id.to_string())
+    }
+}
+
+impl ToString for ArtifactBundleKey{
+    fn to_string(&self) -> String {
         format!("{}-{}",self.sub_space.to_string(), self.id.to_string())
+    }
+}
+
+
+impl FromStr for ArtifactBundleKey{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let pos = s.rfind( '-').ok_or("expected '-' between parent and id")?;
+        let (parent,id)= s.split_at(pos);
+        let sub_space= SubSpaceKey::from_str(parent)?;
+        let id = ArtifactBundleId::from_str(id)?;
+        Ok(ArtifactBundleKey{
+            sub_space: sub_space,
+            id: id
+        })
     }
 }
 
@@ -130,17 +170,17 @@ impl FromStr for ArtifactKey{
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let pos = s.rfind( '-').ok_or("expected '-' between parent and id")?;
         let (parent,id)= s.split_at(pos);
-        let sub_space= SubSpaceKey::from_str(parent)?;
+        let bundle = ArtifactBundleKey::from_str(parent)?;
         let id = ArtifactId::from_str(id)?;
         Ok(ArtifactKey{
-            sub_space: sub_space,
+            bundle: bundle,
             id: id
         })
     }
 }
 
-
-pub type ArtifactId = u64;
+pub type ArtifactBundleId = u64;
+pub type ArtifactId = u32;
 
 
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
@@ -234,7 +274,7 @@ impl ToString for ArtifactLocation{
     }
 }
 
-#[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
+#[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct DomainName
 {
     pub domain: String
@@ -265,7 +305,7 @@ impl DomainName
     }
 }
 
-#[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
+#[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct SpaceName
 {
     pub hyper: DomainName,
@@ -299,7 +339,7 @@ impl SpaceName
     }
 }
 
-#[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
+#[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct SubSpaceName
 {
     pub space: SpaceName,

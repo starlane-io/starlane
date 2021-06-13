@@ -37,16 +37,16 @@ impl ConstellationTemplate
         let mut app_host = StarTemplate::new(StarKeyTemplate::central_geodesic(3), StarKind::AppHost, Option::Some("app_host".to_string())  );
         let mut actor_host = StarTemplate::new(StarKeyTemplate::central_geodesic(4), StarKind::ActorHost, Option::Some("actor_host".to_string())  );
         let mut file_store= StarTemplate::new(StarKeyTemplate::central_geodesic(5), StarKind::FileStore, Option::Some("file_store".to_string())  );
-        let mut gateway = StarTemplate::new(StarKeyTemplate::central_geodesic(6), StarKind::Gateway, Option::Some("gateway".to_string())  );
-
+        let mut web_host= StarTemplate::new(StarKeyTemplate::central_geodesic(6), StarKind::Web, Option::Some("web_host".to_string())  );
+        let mut gateway = StarTemplate::new(StarKeyTemplate::central_geodesic(7), StarKind::Gateway, Option::Some("gateway".to_string())  );
 
         ConstellationTemplate::connect(&mut central, &mut mesh );
         ConstellationTemplate::connect(&mut space_host, &mut mesh );
         ConstellationTemplate::connect(&mut app_host, &mut mesh );
         ConstellationTemplate::connect(&mut actor_host, &mut mesh );
         ConstellationTemplate::connect(&mut file_store, &mut mesh );
+        ConstellationTemplate::connect(&mut web_host, &mut mesh );
         ConstellationTemplate::connect(&mut gateway, &mut mesh );
-
 
         template.add_star(central );
         template.add_star(mesh );
@@ -54,6 +54,7 @@ impl ConstellationTemplate
         template.add_star(app_host );
         template.add_star(actor_host );
         template.add_star(file_store );
+        template.add_star(web_host );
         template.add_star(gateway );
 
         template

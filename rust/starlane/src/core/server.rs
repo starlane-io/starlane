@@ -3,13 +3,8 @@ use std::sync::Arc;
 
 use tokio::sync::{mpsc, Mutex, oneshot};
 
-use crate::actor::{ActorArchetype, ActorAssign, ActorContext, ActorInfo, ActorKey, ActorKind, ActorSpecific};
 use crate::actor;
-use crate::app::{ActorMessageResult, Alert, AppArchetype, AppCommandKind, AppContext, AppCreateResult, AppSpecific, AppMessageResult, AppMeta, AppSlice, ConfigSrc, InitData, AppSliceCommand};
-use crate::artifact::Artifact;
-use crate::core::{AppCommandResult, AppLaunchError, StarCore, StarCoreAppCommandPayload, StarCoreCommand, StarCoreExt, StarCoreExtKind};
 use crate::error::Error;
-use crate::frame::{ServerAppPayload, SpaceMessage, SpacePayload, StarMessagePayload, Watch};
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, SubSpaceKey, UserKey, ResourceKey};
 use crate::resource::{Labels, ResourceRegistration};
@@ -18,6 +13,7 @@ use crate::star::{ActorCreate, StarCommand, StarKey, StarSkel, Request, LocalRes
 use tokio::sync::oneshot::error::RecvError;
 use crate::message::resource::Message;
 
+/*
 pub struct ServerStarCore
 {
     pub skel: StarSkel,
@@ -193,3 +189,6 @@ impl TestActor
     }
 }
 
+
+
+ */

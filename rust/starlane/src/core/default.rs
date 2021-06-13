@@ -14,29 +14,28 @@ use crate::core::Host;
 use crate::error::Error;
 use crate::file::FileAccess;
 use crate::frame::ResourceHostAction;
-use crate::keys::{ResourceKey, SpaceId};
 use crate::message::Fail;
 use crate::names::{Name, Specific};
-use crate::resource::{AssignResourceStateSrc, DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Names, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceStatePersistenceManager, ResourceStateSrc, ResourceType};
+use crate::resource::{AssignResourceStateSrc, DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Names, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceStatePersistenceManager, ResourceStateSrc, ResourceType, ResourceIdentifier, RemoteDataSrc};
 use crate::resource;
-use crate::resource::space::{Space, SpaceState};
 use crate::resource::store::{ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult, ResourceStoreSqlLite};
 use crate::resource::user::UserState;
+use crate::keys::ResourceKey;
 
-pub struct SpaceHost {
+pub struct DefaultHost {
   store: ResourceStore
 }
 
-impl SpaceHost {
+impl DefaultHost {
     pub async fn new()->Self{
-        SpaceHost {
+        DefaultHost {
             store: ResourceStore::new().await
         }
     }
 }
 
 #[async_trait]
-impl Host for SpaceHost {
+impl Host for DefaultHost {
 
     async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource, Fail> {
         // if there is Initialization to do for assignment THIS is where we do it
@@ -46,6 +45,9 @@ impl Host for SpaceHost {
                 data_transfer
             },
             AssignResourceStateSrc::Hosted => {
+                Arc::new(MemoryDataTransfer::none())
+            }
+            AssignResourceStateSrc::None => {
                 Arc::new(MemoryDataTransfer::none())
             }
         };
@@ -58,8 +60,16 @@ impl Host for SpaceHost {
         Ok(self.store.put( assign ).await?)
     }
 
-    async fn get(&self, key: ResourceKey) -> Result<Option<Resource>, Fail> {
-        self.store.get(key).await
+    async fn get(&self, identifier: ResourceIdentifier ) -> Result<Option<Resource>, Fail> {
+        self.store.get(identifier).await
     }
 
+    async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {
+        if let Option::Some( resource) = self.store.get(identifier.clone()).await?
+        {
+            Ok(RemoteDataSrc::Memory(resource.state_src().get().await?))
+        } else {
+          Err(Fail::ResourceNotFound(identifier))
+        }
+    }
 }

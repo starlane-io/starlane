@@ -5,9 +5,6 @@ use bincode::deserialize;
 use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
 
-use crate::actor::{Actor, ActorKey, ActorKind};
-use crate::app::AppKind;
-use crate::artifact::{Artifact, ArtifactKey, ArtifactKind, ArtifactId};
 use crate::error::Error;
 use crate::frame::Reply;
 use crate::id::Id;
@@ -17,10 +14,13 @@ use crate::permissions::{Priviledges, User, UserKind};
 use crate::resource::{Labels, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceKind, ResourceManagerKey, ResourceType, SkewerCase, ResourceIdentifier, ResourceStub, ResourceRecord};
 use std::collections::HashSet;
 use std::iter::FromIterator;
+use crate::keys::ResourceId::UrlPathPattern;
+use crate::actor::ActorKey;
+use crate::artifact::{ArtifactId, ArtifactBundleId, ArtifactKey, ArtifactBundleKey};
 
 pub type SpaceId = u32;
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum SpaceKey
 {
     HyperSpace,
@@ -74,7 +74,7 @@ impl ToString for SpaceKey{
 
 pub type UserId=i32;
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct UserKey
 {
   pub space: SpaceKey,
@@ -170,7 +170,7 @@ impl FromStr for UserKey{
     }
 }
 
-#[derive(Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub struct SubSpaceKey
 {
     pub space: SpaceKey,
@@ -220,7 +220,7 @@ impl FromStr for SubSpaceKey{
 }
 
 
-#[derive(Clone,Hash,Eq,PartialEq,Serialize,Deserialize)]
+#[derive(Debug,Clone,Hash,Eq,PartialEq,Serialize,Deserialize)]
 pub struct AppKey
 {
     pub sub_space: SubSpaceKey,
@@ -287,38 +287,50 @@ impl FromStr for AppKey{
 
 
 pub type MessageId = Uuid;
+pub type DomainId = u32;
+pub type UrlPathPatternId = u64;
+pub type ProxyId = u64;
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum ResourceId{
-    Nothing,
+    Root,
     Space(u32),
     SubSpace(SubSpaceId),
     App(AppId),
     Actor(Id),
     User(UserId),
-    Artifact(ArtifactId),
     File(FileId),
     FileSystem(FileSystemId),
+    Domain(DomainId),
+    UrlPathPattern(UrlPathPatternId),
+    Proxy(ProxyId),
+    ArtifactBundle(ArtifactBundleId),
+    Artifact(ArtifactId),
+
 }
 
 impl ResourceId{
     pub fn resource_type(&self)->ResourceType{
         match self{
-            ResourceId::Nothing => ResourceType::Nothing,
+            ResourceId::Root => ResourceType::Root,
             ResourceId::Space(_) => ResourceType::Space,
             ResourceId::SubSpace(_) => ResourceType::SubSpace,
             ResourceId::App(_) => ResourceType::App,
             ResourceId::Actor(_) => ResourceType::Actor,
             ResourceId::User(_) => ResourceType::User,
-            ResourceId::Artifact(_) => ResourceType::Artifact,
             ResourceId::File(_) => ResourceType::File,
             ResourceId::FileSystem(_) => ResourceType::FileSystem,
+            ResourceId::Domain(_) => ResourceType::Domain,
+            ResourceId::UrlPathPattern(_) => ResourceType::UrlPathPattern,
+            ResourceId::Proxy(_) => ResourceType::Proxy,
+            ResourceId::ArtifactBundle(_) => ResourceType::ArtifactBundle,
+            ResourceId::Artifact(_) => ResourceType::Artifact
         }
     }
 
     pub fn new( resource_type: &ResourceType, id: Id ) -> Self{
         match resource_type{
-            ResourceType::Nothing => Self::Nothing,
+            ResourceType::Root => Self::Root,
             ResourceType::Space => Self::Space(id.index as _),
             ResourceType::SubSpace =>  Self::SubSpace(id.index as _),
             ResourceType::App =>  Self::App(id.index as _),
@@ -326,7 +338,11 @@ impl ResourceId{
             ResourceType::User =>  Self::User(id.index as _),
             ResourceType::FileSystem =>  Self::FileSystem(id.index as _),
             ResourceType::File =>  Self::File(id.index as _),
-            ResourceType::Artifact =>  Self::Artifact(id.index as _),
+            ResourceType::Domain => Self::Domain(id.index as _),
+            ResourceType::UrlPathPattern => Self::UrlPathPattern(id.index as _),
+            ResourceType::Proxy => Self::Proxy(id.index as _),
+            ResourceType::ArtifactBundle => Self::ArtifactBundle(id.index as _),
+            ResourceType::Artifact => Self::Artifact(id.index as _)
         }
     }
 }
@@ -334,31 +350,39 @@ impl ResourceId{
 impl ToString for ResourceId{
     fn to_string(&self) -> String {
         match self {
-            ResourceId::Nothing => "nothing".to_string(),
+            ResourceId::Root => "Root".to_string(),
             ResourceId::Space(id) => id.to_string(),
             ResourceId::SubSpace(id) => id.to_string(),
             ResourceId::App(id) => id.to_string(),
             ResourceId::Actor(id) => id.to_string(),
             ResourceId::User(id) =>id.to_string(),
-            ResourceId::Artifact(id) => id.to_string(),
             ResourceId::File(id) => id.to_string(),
-            ResourceId::FileSystem(id) => id.to_string()
+            ResourceId::FileSystem(id) => id.to_string(),
+            ResourceId::Domain(id) => id.to_string(),
+            ResourceId::UrlPathPattern(id) => id.to_string(),
+            ResourceId::Proxy(id) => id.to_string(),
+            ResourceId::ArtifactBundle(id) => id.to_string(),
+            ResourceId::Artifact(id) => id.to_string()
         }
     }
 }
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum ResourceKey
 {
-    Nothing,
+    Root,
     Space(SpaceKey),
     SubSpace(SubSpaceKey),
     App(AppKey),
     Actor(ActorKey),
     User(UserKey),
-    Artifact(ArtifactKey),
     File(FileKey),
     FileSystem(FileSystemKey),
+    Domain(DomainKey),
+    UrlPathPattern(UrlPathPatternKey),
+    Proxy(ProxyKey),
+    ArtifactBundle(ArtifactBundleKey),
+    Artifact(ArtifactKey),
 }
 
 impl ResourceKey
@@ -366,8 +390,8 @@ impl ResourceKey
     pub fn new(parent: ResourceKey, id: ResourceId) -> Result<Self,Error> {
 
         match id{
-            ResourceId::Nothing => {
-                Ok(Self::Nothing)
+            ResourceId::Root => {
+                Ok(Self::Root)
             }
             ResourceId::Space(id) => {
                 Ok(Self::Space( SpaceKey::from_index(id) ))
@@ -400,13 +424,7 @@ impl ResourceKey
                     Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
                 }
             }
-            ResourceId::Artifact(index) => {
-                if let Self::SubSpace(parent) = parent {
-                    Ok(Self::Artifact( ArtifactKey::new(parent,index)))
-                } else {
-                    Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
-                }
-            }
+
             ResourceId::File(index) => {
                 if let Self::FileSystem(parent) = parent {
                     Ok(Self::File( FileKey::new(parent,index)))
@@ -425,26 +443,66 @@ impl ResourceKey
                     Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
                 }
             }
+            ResourceId::Domain(index) => {
+                if let Self::Space(parent) = parent {
+                    Ok(Self::Domain( DomainKey{space:parent,id: index}))
+                } else {
+                    Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                }
+            }
+            ResourceId::UrlPathPattern(index) => {
+                if let Self::Domain(parent) = parent {
+                    Ok(Self::UrlPathPattern( UrlPathPatternKey{domain:parent,id: index}))
+                } else {
+                    Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                }
+
+            }
+            ResourceId::Proxy(index) => {
+                if let Self::Space(parent) = parent {
+                    Ok(Self::Proxy( ProxyKey{space:parent,id: index}))
+                } else {
+                    Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                }
+            }
+            ResourceId::ArtifactBundle(index) => {
+                if let Self::SubSpace(parent) = parent {
+                    Ok(Self::ArtifactBundle( ArtifactBundleKey{sub_space:parent,id: index}))
+                } else {
+                    Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                }
+            }
+            ResourceId::Artifact(index) => {
+                if let Self::ArtifactBundle(parent) = parent {
+                    Ok(Self::Artifact( ArtifactKey{bundle:parent,id: index}))
+                } else {
+                    Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                }
+            }
         }
     }
 
     pub fn id(&self)->ResourceId{
        match self{
-           ResourceKey::Nothing => ResourceId::Nothing,
+           ResourceKey::Root => ResourceId::Root,
            ResourceKey::Space(space) => ResourceId::Space(space.id()),
            ResourceKey::SubSpace(sub_space) => {ResourceId::SubSpace(sub_space.id.clone())}
            ResourceKey::App(app) => {ResourceId::App(app.id.clone())}
            ResourceKey::Actor(actor) => {ResourceId::Actor(actor.id.clone())}
            ResourceKey::User(user) => {ResourceId::User(user.id.clone())}
-           ResourceKey::Artifact(artifact) => {ResourceId::Artifact(artifact.id.clone())}
            ResourceKey::File(file) => {ResourceId::File(file.id.clone())}
            ResourceKey::FileSystem(filesystem) => {filesystem.id()}
+           ResourceKey::Domain(domain) => {ResourceId::Domain(domain.id.clone())}
+           ResourceKey::UrlPathPattern(pattern) => {ResourceId::UrlPathPattern(pattern.id.clone())}
+           ResourceKey::Proxy(proxy) => {ResourceId::Proxy(proxy.id.clone())}
+           ResourceKey::ArtifactBundle(bundle) => {ResourceId::ArtifactBundle(bundle.id.clone())}
+           ResourceKey::Artifact(artifact) => {ResourceId::Artifact(artifact.id.clone())}
        }
     }
 
     pub fn generate_address_tail(&self) -> Result<String,Fail>{
         match self{
-            ResourceKey::Nothing => Err(Fail::ResourceCannotGenerateAddress),
+            ResourceKey::Root => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::Space(_) => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::SubSpace(_) => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::App(app) => {
@@ -454,7 +512,6 @@ impl ResourceKey
                 Ok(actor.id.to_string())
             }
             ResourceKey::User(user) => Err(Fail::ResourceCannotGenerateAddress),
-            ResourceKey::Artifact(_) => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::File(_) => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::FileSystem(filesystem) => match filesystem{
                 FileSystemKey::App(app) => {
@@ -464,18 +521,22 @@ impl ResourceKey
                     Ok(sub.id.to_string())
                 }
             },
+            ResourceKey::Domain(domain) => Err(Fail::ResourceCannotGenerateAddress),
+            ResourceKey::UrlPathPattern(_) => Err(Fail::ResourceCannotGenerateAddress),
+            ResourceKey::Proxy(_) => Err(Fail::ResourceCannotGenerateAddress),
+            ResourceKey::ArtifactBundle(_) => Err(Fail::ResourceCannotGenerateAddress),
+            ResourceKey::Artifact(_) => Err(Fail::ResourceCannotGenerateAddress)
         }
     }
 
     pub fn parent(&self)->Option<ResourceKey>{
         match self {
-            ResourceKey::Nothing => Option::None,
-            ResourceKey::Space(_) => Option::Some(ResourceKey::Nothing),
+            ResourceKey::Root => Option::None,
+            ResourceKey::Space(_) => Option::Some(ResourceKey::Root),
             ResourceKey::SubSpace(sub_space) => Option::Some(ResourceKey::Space(sub_space.space.clone())),
             ResourceKey::App(app) =>  Option::Some(ResourceKey::SubSpace(app.sub_space.clone())),
             ResourceKey::Actor(actor) =>  Option::Some(ResourceKey::App(actor.app.clone())),
             ResourceKey::User(user) => Option::Some(ResourceKey::Space(user.space.clone())),
-            ResourceKey::Artifact(artifact) => Option::Some(ResourceKey::SubSpace(artifact.sub_space.clone())),
             ResourceKey::File(file) => Option::Some(ResourceKey::FileSystem(file.filesystem.clone())),
             ResourceKey::FileSystem(filesystem) => {
                 match filesystem{
@@ -487,18 +548,23 @@ impl ResourceKey
                     }
                 }
             }
+            ResourceKey::Domain(domain) => Option::Some(ResourceKey::Space(domain.space.clone())),
+            ResourceKey::UrlPathPattern(pattern) => Option::Some(ResourceKey::Domain(pattern.domain.clone())),
+            ResourceKey::Proxy(proxy) => Option::Some(ResourceKey::Space(proxy.space.clone())),
+
+            ResourceKey::ArtifactBundle(bundle) => Option::Some(ResourceKey::SubSpace(bundle.sub_space.clone())),
+            ResourceKey::Artifact(artifact) => Option::Some(ResourceKey::ArtifactBundle(artifact.bundle.clone())),
         }
     }
 
     pub fn space(&self)->Result<SpaceKey,Fail> {
         match self{
-            ResourceKey::Nothing => Err(Fail::WrongResourceType { expected: HashSet::from_iter(vec![ResourceType::Space, ResourceType::SubSpace, ResourceType::App, ResourceType::Actor, ResourceType::User, ResourceType::Artifact, ResourceType::FileSystem, ResourceType::File] ), received: ResourceType::Nothing }),
+            ResourceKey::Root => Err(Fail::WrongResourceType { expected: HashSet::from_iter(vec![ResourceType::Space, ResourceType::SubSpace, ResourceType::App, ResourceType::Actor, ResourceType::User, ResourceType::FileSystem, ResourceType::File] ), received: ResourceType::Root }),
             ResourceKey::Space(space) => Ok(space.clone()),
             ResourceKey::SubSpace(sub_space) => Ok(sub_space.space.clone()),
             ResourceKey::App(app) => Ok(app.sub_space.space.clone()),
             ResourceKey::Actor(actor) => Ok(actor.app.sub_space.space.clone()),
             ResourceKey::User(user) => Ok(user.space.clone()),
-            ResourceKey::Artifact(artifact) => Ok(artifact.sub_space.space.clone()),
             ResourceKey::File(file) => Ok(match &file.filesystem{
                 FileSystemKey::App(app) => app.app.sub_space.space.clone(),
                 FileSystemKey::SubSpace(sub_space) => sub_space.sub_space.space.clone(),
@@ -509,6 +575,11 @@ impl ResourceKey
                     FileSystemKey::SubSpace(sub_space) => sub_space.sub_space.space.clone(),
                 })
             }
+            ResourceKey::Domain(domain) => Ok(domain.space.clone()),
+            ResourceKey::UrlPathPattern(pattern) => Ok(pattern.domain.space.clone()),
+            ResourceKey::Proxy(proxy) => Ok(proxy.space.clone()),
+            ResourceKey::ArtifactBundle(bundle) => Ok(bundle.sub_space.space.clone()),
+            ResourceKey::Artifact(artifact) => Ok(artifact.bundle.sub_space.space.clone())
         }
     }
 
@@ -583,6 +654,15 @@ impl ResourceKey
         }
     }
 
+    pub fn as_filesystem(&self)->Result<FileSystemKey,Fail> {
+        if let ResourceKey::FileSystem(key) = self {
+            Ok(key.clone())
+        } else {
+            Err(Fail::WrongResourceType{expected: HashSet::from_iter(vec![ResourceType::FileSystem]), received: self.resource_type().clone() })
+        }
+    }
+
+
     pub fn encode(&self)->Result<String,Error> {
         Ok(base64::encode(self.bin()?))
     }
@@ -593,6 +673,7 @@ impl ResourceKey
 
 
 
+    /*
     pub fn manager(&self)->ResourceManagerKey
     {
         match self
@@ -618,10 +699,6 @@ impl ResourceKey
                 //ResourceManagerKey::Key(ResourceKey::App(file.app.clone()))
                 ResourceManagerKey::Central
             }
-            ResourceKey::Artifact(artifact) => {
-                //ResourceManagerKey::Key(ResourceKey::Space(artifact.sub_space.space.clone()))
-                ResourceManagerKey::Central
-            }
             ResourceKey::FileSystem(key) => {
                 match key
                 {
@@ -635,12 +712,55 @@ impl ResourceKey
                     }
                 }
             }
+            ResourceKey::Domain(_) => {
+
+            }
+            ResourceKey::UrlPathPattern(_) => {}
+            ResourceKey::Proxy(_) => {}
         }
 
     }
+     */
+}
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub struct DomainKey{
+   pub space: SpaceKey,
+   pub id: DomainId
 }
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+impl ToString for DomainKey{
+    fn to_string(&self) -> String {
+        format!("{}-{}", self.space.to_string(), self.id.to_string() )
+    }
+}
+
+
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub struct ProxyKey{
+    pub space: SpaceKey,
+    pub id: ProxyId
+}
+
+impl ToString for ProxyKey{
+    fn to_string(&self) -> String {
+        format!("{}-{}", self.space.to_string(), self.id.to_string() )
+    }
+}
+
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub struct UrlPathPatternKey{
+    pub domain: DomainKey,
+    pub id: UrlPathPatternId
+}
+
+impl ToString for UrlPathPatternKey{
+    fn to_string(&self) -> String {
+        format!("{}-{}", self.domain.to_string(), self.id.to_string() )
+    }
+}
+
+
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum FileSystemKey
 {
     App(AppFilesystemKey),
@@ -708,7 +828,7 @@ impl FromStr for AppFilesystemKey {
 
 pub type FileSystemId = u32;
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct AppFilesystemKey
 {
     pub app: AppKey,
@@ -721,7 +841,7 @@ impl ToString for AppFilesystemKey  {
     }
 }
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct SubSpaceFilesystemKey
 {
     pub sub_space: SubSpaceKey,
@@ -783,9 +903,13 @@ impl fmt::Display for ResourceKey {
                     ResourceKey::Actor(key) => format!("actor-{}", key.to_string()),
                     ResourceKey::User(key) => format!("user-{}", key.to_string()),
                     ResourceKey::File(key) => format!("file-{}", key.to_string()),
-                    ResourceKey::Artifact(key) => format!("artifact-{}", key.to_string()),
                     ResourceKey::FileSystem(key) => format!("filesystem-{}", key.to_string()),
-                    ResourceKey::Nothing => "nothing".to_string()
+                    ResourceKey::Root => "root".to_string(),
+                    ResourceKey::Domain(key) => format!("domain-{}", key.to_string()),
+                    ResourceKey::UrlPathPattern(key) => format!("url-path-pattern-{}", key.to_string()),
+                    ResourceKey::Proxy(key) => format!("proxy-{}", key.to_string()),
+                    ResourceKey::ArtifactBundle(key) => format!("artifact_bundle-{}", key.to_string()),
+                    ResourceKey::Artifact(key) => format!("artifact-{}", key.to_string())
                 })
     }
 }
@@ -796,15 +920,19 @@ impl ResourceKey
     {
         match self
         {
-            ResourceKey::Nothing => ResourceType::Nothing,
+            ResourceKey::Root => ResourceType::Root,
             ResourceKey::Space(_) => ResourceType::Space,
             ResourceKey::SubSpace(_) => ResourceType::SubSpace,
             ResourceKey::App(_) => ResourceType::App,
             ResourceKey::Actor(_) => ResourceType::Actor,
             ResourceKey::User(_) => ResourceType::User,
             ResourceKey::File(_) => ResourceType::File,
-            ResourceKey::Artifact(_) => ResourceType::Artifact,
             ResourceKey::FileSystem(_) => ResourceType::FileSystem,
+            ResourceKey::Domain(_) => ResourceType::Domain,
+            ResourceKey::UrlPathPattern(_) => ResourceType::UrlPathPattern,
+            ResourceKey::Proxy(_) => ResourceType::Proxy,
+            ResourceKey::ArtifactBundle(_) => ResourceType::ArtifactBundle,
+            ResourceKey::Artifact(_) => ResourceType::Artifact
         }
     }
 
@@ -812,7 +940,7 @@ impl ResourceKey
     {
         match self
         {
-            ResourceKey::Nothing => Err("nothign does not have a subspace".into()),
+            ResourceKey::Root => Err("Root does not have a subspace".into()),
             ResourceKey::Space(_) => Err("space does not have a subspace".into()),
             ResourceKey::SubSpace(sub_space) => Ok(sub_space.clone()),
             ResourceKey::App(app) => Ok(app.sub_space.clone()),
@@ -826,7 +954,6 @@ impl ResourceKey
                     Ok(sub_space.sub_space.clone())
                 }
             },
-            ResourceKey::Artifact(artifact) => Ok(artifact.sub_space.clone()),
             ResourceKey::FileSystem(filesystem) => {
                 match filesystem{
                     FileSystemKey::App(app) => {
@@ -837,6 +964,11 @@ impl ResourceKey
                     }
                 }
             }
+            ResourceKey::Domain(_) => Err("Domain does not have a subspace".into()),
+            ResourceKey::UrlPathPattern(_) => Err("UrlPathPattern does not have a subspace".into()),
+            ResourceKey::Proxy(_) => Err("Proxy does not have a subspace".into()),
+            ResourceKey::ArtifactBundle(bundle) => Ok(bundle.sub_space.clone()),
+            ResourceKey::Artifact(artifact) => Ok(artifact.bundle.sub_space.clone())
         }
     }
 
@@ -861,7 +993,7 @@ impl ResourceKey
 
 
 
-#[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
+#[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct FileKey
 {
    pub filesystem: FileSystemKey,

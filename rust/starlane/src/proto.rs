@@ -14,7 +14,6 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{Duration, Instant};
 
 use crate::constellation::Constellation;
-use crate::core::{CoreRunner, CoreRunnerCommand, StarCore, StarCoreCommand, StarCoreExtFactory, StarCoreExtKind, StarCoreFactory};
 use crate::error::Error;
 use crate::file::FileAccess;
 use crate::frame::{Frame, ProtoFrame, SequenceMessage, StarMessage, StarMessagePayload, StarPattern, WindDown, WindHit, WindUp} ;
@@ -23,10 +22,12 @@ use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PRO
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::permissions::AuthTokenSource;
 use crate::resource::HostedResourceStore;
-use crate::star::{FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBacking, ResourceRegistryBackingSqLite, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarManagerFactory, StarSearchTransaction, StarSkel, StarVariantCommand, Transaction};
+use crate::star::{FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBacking, ResourceRegistryBackingSqLite, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarSearchTransaction, StarSkel, Transaction};
 use crate::star::pledge::StarHandleBacking;
 use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
+use crate::core::{CoreRunner, CoreRunnerCommand};
+use crate::star::variant::{StarVariantFactory, StarVariantCommand};
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -35,12 +36,12 @@ pub struct ProtoStar
   star_key: Option<StarKey>,
   sequence: Arc<AtomicU64>,
   kind: StarKind,
-  command_tx: mpsc::Sender<StarCommand>,
-  command_rx: mpsc::Receiver<StarCommand>,
+  star_tx: mpsc::Sender<StarCommand>,
+  star_rx: mpsc::Receiver<StarCommand>,
   lanes: HashMap<StarKey, LaneMeta>,
   connector_ctrls: Vec<ConnectorController>,
-  star_manager_factory: Arc<dyn StarManagerFactory>,
-  star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
+  star_manager_factory: Arc<dyn StarVariantFactory>,
+//  star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
   core_runner: Arc<CoreRunner>,
   logger: Logger,
   frame_hold: FrameHold,
@@ -50,19 +51,19 @@ pub struct ProtoStar
 
 impl ProtoStar
 {
-    pub fn new(key: Option<StarKey>, kind: StarKind, star_manager_factory: Arc<dyn StarManagerFactory>, core_runner: Arc<CoreRunner>, star_core_ext_factory: Arc<dyn StarCoreExtFactory>, flags: Flags, logger: Logger ) ->(Self, StarController)
+    pub fn new(key: Option<StarKey>, kind: StarKind, star_manager_factory: Arc<dyn StarVariantFactory>, core_runner: Arc<CoreRunner>, flags: Flags, logger: Logger ) ->(Self, StarController)
     {
         let (command_tx, command_rx) = mpsc::channel(32);
         (ProtoStar{
             star_key: key,
             sequence: Arc::new(AtomicU64::new(0)),
             kind,
-            command_tx: command_tx.clone(),
-            command_rx: command_rx,
+            star_tx: command_tx.clone(),
+            star_rx: command_rx,
             lanes: HashMap::new(),
             connector_ctrls: vec![],
             star_manager_factory: star_manager_factory,
-            star_core_ext_factory: star_core_ext_factory,
+//            star_core_ext_factory: star_core_ext_factory,
             core_runner: core_runner,
             logger: logger,
             frame_hold: FrameHold::new(),
@@ -91,7 +92,7 @@ impl ProtoStar
                 lanes.push( key.clone() )
             }
 
-            futures.push(self.command_rx.recv().boxed());
+            futures.push(self.star_rx.recv().boxed());
 
             if self.tracker.has_expectation()
             {
@@ -107,8 +108,6 @@ impl ProtoStar
                         let info = StarInfo{
                             key: self.star_key.as_ref().unwrap().clone(),
                             kind: self.kind.clone()};
-                        let manager_tx= self.star_manager_factory.create().await;
-
 
                         let (core_tx,core_rx) = mpsc::channel(16);
 
@@ -119,7 +118,7 @@ impl ProtoStar
                         };
 
                         let star_handler: Option<StarHandleBacking>= if !info.kind.handles().is_empty() {
-                            Option::Some(  StarHandleBacking::new().await )
+                            Option::Some(  StarHandleBacking::new(self.star_tx.clone()).await )
                         } else {
                             Option::None
                         };
@@ -127,34 +126,32 @@ impl ProtoStar
                         let skel = StarSkel {
                             info: info,
                             sequence: self.sequence.clone(),
-                            star_tx: self.command_tx.clone(),
+                            star_tx: self.star_tx.clone(),
                             core_tx: core_tx.clone(),
-                            variant_tx: manager_tx.clone(),
                             logger: self.logger.clone(),
                             flags: self.flags.clone(),
                             auth_token_source: AuthTokenSource {},
                             registry: resource_registry,
                             star_handler: star_handler,
                             persistence: Persistence::Memory,
-                            file_access: FileAccess::new("data".to_string()).await?
+                            file_access: FileAccess::new(std::env::var("STARLANE_DATA")? ).await?
                         };
 
-                        let core_ext = self.star_core_ext_factory.create(&skel );
+
+                        let variant= self.star_manager_factory.create(skel.clone() ).await;
+
                         self.core_runner.send(CoreRunnerCommand::Core{
                             skel: skel.clone(),
-                            ext: StarCoreExtKind::None,
                             rx: core_rx
                         } ).await;
 
-                        // now send star data to manager and core... tricky!
-                        manager_tx.send(StarVariantCommand::StarSkel(skel.clone()) ).await;
-
                         return Ok(Star::from_proto(skel.clone(),
-                                                   self.command_rx,
+                                                   self.star_rx,
                                                    core_tx,
                                                    self.lanes,
                                                    self.connector_ctrls,
-                                                   self.frame_hold ).await );
+                                                   self.frame_hold,
+                                                   variant ).await );
 
                     }
                     StarCommand::AddLane(lane) => {

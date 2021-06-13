@@ -19,14 +19,16 @@ use futures::TryFutureExt;
 
 #[derive(Clone)]
 pub struct StarHandleBacking{
-    tx: mpsc::Sender<StarHandleAction>
+    tx: mpsc::Sender<StarHandleAction>,
+    star_tx: mpsc::Sender<StarCommand>
 }
 
 impl StarHandleBacking {
 
-    pub async fn new()->Self {
+    pub async fn new(star_tx: mpsc::Sender<StarCommand>)->Self {
         StarHandleBacking {
-           tx: StarHandleDb::new().await
+           tx: StarHandleDb::new().await,
+           star_tx: star_tx
         }
     }
 
@@ -34,6 +36,7 @@ impl StarHandleBacking {
        let (action,rx) = StarHandleAction::new(StarHandleCommand::SetStar(handle));
        self.tx.send( action ).await?;
        tokio::time::timeout(Duration::from_secs(5), rx).await??;
+       self.star_tx.send( StarCommand::CheckStatus ).await;
        Ok(())
     }
 

@@ -18,6 +18,7 @@ use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::fmt;
 
+#[derive(Clone)]
 pub enum ProtoStarMessageTo{
     None,
     Star(StarKey),
@@ -62,7 +63,9 @@ pub struct ProtoStarMessage
     pub tx: broadcast::Sender<MessageUpdate>,
     pub rx: broadcast::Receiver<MessageUpdate>,
     pub expect: MessageExpect,
-    pub reply_to: Option<MessageId>
+    pub reply_to: Option<MessageId>,
+    pub trace: bool,
+    pub log: bool
 }
 
 impl ProtoStarMessage
@@ -82,7 +85,9 @@ impl ProtoStarMessage
             tx: tx,
             rx: rx,
             expect: MessageExpect::None,
-            reply_to: Option::None
+            reply_to: Option::None,
+            trace: false,
+            log: false
         }
     }
 
@@ -380,10 +385,9 @@ impl ResultWaiter
 }
 
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Debug,Clone,Serialize,Deserialize)]
 pub enum Fail
 {
-    Timeout,
     Error(String),
     Reject(Reject),
     Unexpected,
@@ -404,7 +408,8 @@ pub enum Fail
     SuitableHostNotAvailable(String),
     SqlError(String),
     CannotCreateNothingResourceTypeItIsThereAsAPlaceholderDummy,
-    ResourceTypeMismatch(String)
+    ResourceTypeMismatch(String),
+    Timeout,
 }
 
 impl ToString for Fail {
@@ -437,14 +442,14 @@ impl ToString for Fail {
 
 
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Debug,Clone,Serialize,Deserialize)]
 pub struct Reject
 {
     pub reason: String,
     pub kind: RejectKind
 }
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Debug,Clone,Serialize,Deserialize)]
 pub enum RejectKind
 {
     Error,

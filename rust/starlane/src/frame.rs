@@ -8,8 +8,6 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 use tokio::time::Instant;
 
-use crate::actor::{ActorKey, ActorStatus };
-use crate::app::{AppArchetype, AppCreateResult, AppLocation, AppMeta, AppSpecific, ConfigSrc };
 use crate::crypt::{Encrypted, HashEncrypted, HashId};
 use crate::error::Error;
 use crate::id::Id;
@@ -18,9 +16,10 @@ use crate::logger::Flags;
 use crate::message::{Fail, MessageExpect, MessageResult, MessageUpdate, ProtoStarMessage};
 use crate::names::Name;
 use crate::permissions::{Authentication, AuthToken};
-use crate::resource::{Labels, ResourceAssign, ResourceRegistration, ResourceSelector, ResourceRecord, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus, ResourceInit, ResourceCreate, AssignResourceStateSrc, ResourceIdentifier, ResourceStub, ResourceType};
+use crate::resource::{Labels, ResourceAssign, ResourceRegistration, ResourceSelector, ResourceRecord, ResourceAddress, ResourceBinding, ResourceSliceAssign, ResourceStatus, ResourceSliceStatus,  ResourceCreate, AssignResourceStateSrc, ResourceIdentifier, ResourceStub, ResourceType};
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey, StarWatchInfo, LocalResourceLocation};
 use crate::message::resource::{Message, RawState, ResourceRequestMessage, ResourceResponseMessage, ActorMessage, MessageReply};
+use crate::actor::ActorKey;
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Frame
@@ -238,7 +237,9 @@ pub struct StarMessage
    pub to: StarKey,
    pub id: MessageId,
    pub payload: StarMessagePayload,
-   pub reply_to: Option<MessageId>
+   pub reply_to: Option<MessageId>,
+   pub trace: bool,
+   pub log: bool
 }
 
 impl StarMessage
@@ -250,7 +251,9 @@ impl StarMessage
             from: from,
             to: to,
             payload: payload,
-            reply_to: Option::None
+            reply_to: Option::None,
+            trace: false,
+            log: false
         }
     }
 
@@ -261,7 +264,9 @@ impl StarMessage
             from: from,
             to: StarKey::central(),
             payload: payload,
-            reply_to: Option::None
+            reply_to: Option::None,
+            trace: false,
+            log: false
         }
     }
 
@@ -569,20 +574,7 @@ pub struct AppLabelRequest
 
 
 
-#[derive(Clone,Serialize,Deserialize)]
-pub enum ServerAppPayload
-{
-   None,
-   Assign(AppMeta),
-   Launch(AppMeta)
-}
 
-#[derive(Clone,Serialize,Deserialize)]
-pub enum ResponseMessage
-{
-    AppNotifyCreated(AppNotifyCreated),
-    AppSupervisorReport(ApplicationSupervisorReport),
-}
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Event
@@ -705,24 +697,7 @@ pub struct Rejection
 
 
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct AppNotifyCreated
-{
-    pub location: AppLocation
-}
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct AppSupervisorLocationRequest
-{
-    pub app: AppKey,
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct ApplicationSupervisorReport
-{
-    pub app: AppKey,
-    pub supervisor: StarKey
-}
 
 impl fmt::Display for Diagnose {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

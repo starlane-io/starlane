@@ -12,7 +12,6 @@ use tokio::sync::oneshot::error::RecvError;
 
 use api::SpaceApi;
 
-use crate::core::{CoreRunner, ExampleStarCoreExtFactory, StarCoreExtFactory, StarCoreFactory};
 use crate::error::Error;
 use crate::frame::{ChildManagerResourceAction, Frame, Reply, SimpleReply, StarMessagePayload};
 use crate::keys::ResourceKey;
@@ -24,9 +23,11 @@ use crate::proto::{local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolu
 use crate::provision::Provisioner;
 use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord};
 use crate::resource::space::SpaceState;
-use crate::star::{Request, Star, StarCommand, StarController, StarKey, StarManagerFactory, StarManagerFactoryDefault, StarName};
+use crate::star::{Request, Star, StarCommand, StarController, StarKey, StarName};
 use crate::template::{ConstellationData, ConstellationTemplate, StarKeyIndexTemplate, StarKeySubgraphTemplate, StarKeyTemplate};
 use crate::starlane::api::StarlaneApi;
+use crate::core::CoreRunner;
+use crate::star::variant::{StarVariantFactory, StarVariantFactoryDefault};
 
 pub mod api;
 
@@ -40,8 +41,8 @@ pub struct Starlane
     rx: mpsc::Receiver<StarlaneCommand>,
     star_controllers: HashMap<StarKey,StarController>,
     star_names: HashMap<StarName,StarKey>,
-    star_manager_factory: Arc<dyn StarManagerFactory>,
-    star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
+    star_manager_factory: Arc<dyn StarVariantFactory>,
+//    star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
     core_runner: Arc<CoreRunner>,
     constellation_names: HashSet<String>,
     pub logger: Logger,
@@ -59,8 +60,8 @@ impl Starlane
             constellation_names: HashSet::new(),
             tx: tx,
             rx: rx,
-            star_manager_factory: Arc::new( StarManagerFactoryDefault{} ),
-            star_core_ext_factory: Arc::new(ExampleStarCoreExtFactory::new() ),
+            star_manager_factory: Arc::new( StarVariantFactoryDefault {} ),
+//            star_core_ext_factory: Arc::new(ExampleStarCoreExtFactory::new() ),
             core_runner: Arc::new(CoreRunner::new()?),
             logger: Logger::new(),
             flags: Flags::new()
@@ -127,7 +128,7 @@ impl Starlane
 
         let link = link.unwrap().clone();
         let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
-        let (proto_star, star_ctrl) = ProtoStar::new(Option::None, link.kind.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.star_core_ext_factory.clone(), self.flags.clone(), self.logger.clone() );
+        let (proto_star, star_ctrl) = ProtoStar::new(Option::None, link.kind.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.flags.clone(), self.logger.clone() );
 
         println!("created proto star: {:?}", &link.kind);
 
@@ -219,7 +220,7 @@ impl Starlane
             let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
             evolve_rxs.push(evolve_rx );
 
-            let (proto_star, star_ctrl) = ProtoStar::new(Option::Some(star_key.clone()), star_template.kind.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.star_core_ext_factory.clone(), self.flags.clone(), self.logger.clone() );
+            let (proto_star, star_ctrl) = ProtoStar::new(Option::Some(star_key.clone()), star_template.kind.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.flags.clone(), self.logger.clone() );
             self.star_controllers.insert(star_key.clone(), star_ctrl.clone() );
             if name.is_some() && star_template.handle.is_some()
             {
@@ -436,24 +437,29 @@ mod test
     use tokio::time::Duration;
     use tokio::time::timeout;
 
-    use crate::app::{AppController, AppKind, AppSpecific, ConfigSrc, InitData};
-    use crate::artifact::{Artifact, ArtifactKind, ArtifactLocation};
+    use crate::artifact::{ArtifactKind, ArtifactLocation};
     use crate::error::Error;
     use crate::keys::{SpaceKey, SubSpaceKey, UserKey};
     use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
     use crate::names::Name;
     use crate::permissions::Authentication;
-    use crate::resource::{Labels, ResourceAddress, FileSystemKind};
+    use crate::resource::{Labels, ResourceAddress};
     use crate::space::CreateAppControllerFail;
     use crate::star::{StarController, StarInfo, StarKey, StarKind};
     use crate::starlane::{ConstellationCreate, StarControlRequestByName, Starlane, StarlaneCommand};
     use crate::template::{ConstellationData, ConstellationTemplate};
     use crate::starlane::api::SubSpaceApi;
     use crate::message::Fail;
+    use std::fs;
+    use std::convert::TryInto;
 
     #[test]
     pub fn starlane()
     {
+        let data_dir = "tmp/data";
+        fs::remove_dir_all(data_dir ).unwrap();
+        std::env::set_var("STARLANE_DATA", data_dir );
+
 
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
@@ -504,11 +510,14 @@ eprintln!("{}",err.to_string());
                 }
             };
 
-            sub_space_api.create_file_system("bottom-up", FileSystemKind::BottomUp ).await;
+            let file_api = sub_space_api.create_file_system("website").unwrap().submit().await.unwrap();
+            file_api.create_file_from_string(&"/index.html".try_into().unwrap(), "The rain in Spain falls mostly on the plain.".to_string() ).unwrap().submit().await.unwrap();
+            file_api.create_file_from_string(&"/second/index.html".try_into().unwrap(), "This is a second page....".to_string() ).unwrap().submit().await.unwrap();
 
-            println!("got space ctrl");
 
-            tokio::time::sleep(Duration::from_secs(30)).await;
+            loop {
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            }
 
 
 //            assert_eq!(central_ctrl.diagnose_handlers_satisfaction().await.unwrap(),crate::star::pledge::Satisfaction::Ok)

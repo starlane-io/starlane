@@ -16,6 +16,10 @@ extern crate error_chain;
 #[macro_use]
 extern crate validate;
 
+#[macro_use]
+extern crate actix_web;
+
+
 pub mod star;
 pub mod lane;
 pub mod frame;
