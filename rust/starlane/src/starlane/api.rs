@@ -5,7 +5,7 @@ use std::time::Duration;
 use crate::frame::{ChildManagerResourceAction, Reply, SimpleReply, StarMessagePayload};
 use crate::keys::ResourceKey;
 use crate::message::{Fail, ProtoStarMessage};
-use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord, ResourceType, Path, LocalDataSrc, DataTransfer, ResourceIdentifier, ResourceStub, ResourceCreateStrategy, FileKind, ResourceRegistryInfo, ResourceStateSrc, RemoteDataSrc};
+use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord, ResourceType, Path, LocalDataSrc, DataTransfer, ResourceIdentifier, ResourceStub, ResourceCreateStrategy, FileKind, ResourceRegistryInfo, ResourceStateSrc, RemoteDataSrc, ArtifactBundleKind};
 use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
@@ -22,6 +22,8 @@ use std::{thread, sync};
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 use futures::channel::oneshot;
+use semver::Version;
+use crate::resource::artifact::ArtifactBundleState;
 
 
 #[derive(Clone)]
@@ -366,6 +368,27 @@ impl SubSpaceApi {
         Ok(Creation::new(self.starlane_api(),create))
     }
 
+    pub fn create_artifact_bundle( &self, name: &str, version: &Version, data: Arc<Vec<u8>>  )-> Result<Creation<ArtifactBundleApi>,Fail> {
+        let resource_src = AssignResourceStateSrc::Direct(data);
+        let kind :ArtifactBundleKind = version.clone().into();
+
+        let create = ResourceCreate{
+            parent: self.stub.key.clone(),
+            key: KeyCreationSrc::None,
+            address: AddressCreationSrc::Appends(vec![name.to_string(),version.to_string()]),
+            archetype: ResourceArchetype {
+                kind: ResourceKind::ArtifactBundle(kind),
+                specific: None,
+                config: None
+            },
+            src: resource_src,
+            registry_info: None,
+            owner: None,
+            strategy: ResourceCreateStrategy::Create
+        };
+        Ok(Creation::new(self.starlane_api(),create))
+    }
+
 }
 
 pub struct FileSystemApi{
@@ -451,7 +474,26 @@ impl FileApi {
     }
 }
 
+pub struct ArtifactBundleApi{
+    stub: ResourceStub,
+    star_tx: mpsc::Sender<StarCommand>
+}
 
+impl ArtifactBundleApi {
+    pub fn new(star_tx: mpsc::Sender<StarCommand>, stub: ResourceStub ) -> Result<Self,Error> {
+        if stub.key.resource_type() != ResourceType::ArtifactBundle{
+            return Err(format!("wrong key resource type for ArtifactBundleApi: {}", stub.key.resource_type().to_string()).into());
+        }
+        if stub.address.resource_type() != ResourceType::ArtifactBundle{
+            return Err(format!("wrong address resource type for ArtifactBundleApi: {}", stub.address.resource_type().to_string()).into());
+        }
+
+        Ok(ArtifactBundleApi{
+            star_tx: star_tx,
+            stub: stub
+        })
+    }
+}
 pub struct UserApi{
     stub: ResourceStub,
     star_tx: mpsc::Sender<StarCommand>
@@ -551,6 +593,14 @@ impl TryFrom<ResourceApi> for FileSystemApi{
 }
 
 impl TryFrom<ResourceApi> for FileApi{
+    type Error = Fail;
+
+    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
+        Ok(Self::new( value.star_tx, value.stub )?)
+    }
+}
+
+impl TryFrom<ResourceApi> for ArtifactBundleApi{
     type Error = Fail;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {

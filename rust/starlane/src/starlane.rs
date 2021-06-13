@@ -452,6 +452,8 @@ mod test
     use crate::message::Fail;
     use std::fs;
     use std::convert::TryInto;
+    use std::fs::File;
+    use std::io::Read;
 
     #[test]
     pub fn starlane()
@@ -513,6 +515,17 @@ eprintln!("{}",err.to_string());
             let file_api = sub_space_api.create_file_system("website").unwrap().submit().await.unwrap();
             file_api.create_file_from_string(&"/index.html".try_into().unwrap(), "The rain in Spain falls mostly on the plain.".to_string() ).unwrap().submit().await.unwrap();
             file_api.create_file_from_string(&"/second/index.html".try_into().unwrap(), "This is a second page....".to_string() ).unwrap().submit().await.unwrap();
+
+println!("... >  filesystems created ...");
+            // upload an artifact bundle
+            {
+                let mut file = File::open("test-data/localhost-config/artifact-bundle.zip").unwrap();
+                let mut data = vec![];
+                file.read_to_end(&mut data).unwrap();
+                let data = Arc::new(data);
+println!("... >  uploading artifact bundle...");
+                let artifact_bundle_api = sub_space_api.create_artifact_bundle("whiz", &semver::Version::from_str("1.0.0").unwrap(), data ).unwrap().submit().await.unwrap();
+            }
 
 
             loop {

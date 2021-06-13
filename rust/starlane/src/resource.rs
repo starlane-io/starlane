@@ -49,6 +49,7 @@ pub mod file_system;
 pub mod file;
 pub mod store;
 pub mod domain;
+pub mod artifact;
 
 lazy_static!
 {
@@ -1054,6 +1055,16 @@ pub enum ArtifactBundleKind
 {
     Volatile,
     Final
+}
+
+impl From<semver::Version> for ArtifactBundleKind{
+
+    fn from(value: semver::Version) -> Self {
+        match value.is_prerelease() {
+            true => ArtifactBundleKind::Volatile,
+            false => ArtifactBundleKind::Final
+        }
+    }
 }
 
 impl TryFrom<ResourceAddress> for ArtifactBundleKind {
@@ -2072,6 +2083,13 @@ impl ResourceCreationChamber{
             }
             AddressCreationSrc::Append(tail) => {
                 self.create.archetype.kind.resource_type().append_address(self.parent.address.clone(), tail.clone() )?
+            }
+            AddressCreationSrc::Appends(tails) => {
+                let segment = self.parent.address.clone();
+                for tail in tails {
+                    let segment = self.create.archetype.kind.resource_type().append_address(segment.clone(), tail.clone())?;
+                }
+                segment
             }
             AddressCreationSrc::Space(space_name) => {
                 if self.parent.key.resource_type() != ResourceType::Root {
@@ -3831,6 +3849,7 @@ impl FromStr for ResourceStatus{
 pub enum AddressCreationSrc{
     None,
     Append(String),
+    Appends(Vec<String>),
     Space(String)
 }
 
