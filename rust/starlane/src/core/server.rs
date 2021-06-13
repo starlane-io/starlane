@@ -7,7 +7,6 @@ use crate::actor;
 use crate::error::Error;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, SubSpaceKey, UserKey, ResourceKey};
-use crate::resource::{Labels, ResourceRegistration};
 use crate::message::{ProtoStarMessage, Fail};
 use crate::star::{ActorCreate, StarCommand, StarKey, StarSkel, Request, LocalResourceLocation};
 use tokio::sync::oneshot::error::RecvError;

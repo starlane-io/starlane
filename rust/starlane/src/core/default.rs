@@ -72,4 +72,8 @@ impl Host for DefaultHost {
           Err(Fail::ResourceNotFound(identifier))
         }
     }
+
+    async fn delete(&self, identifier: ResourceIdentifier) -> Result<(), Fail> {
+        unimplemented!()
+    }
 }

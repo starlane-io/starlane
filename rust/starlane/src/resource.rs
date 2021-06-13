@@ -1024,7 +1024,7 @@ pub enum ResourceKind
     Domain,
     UrlPathPattern,
     Proxy(ProxyKind),
-    ArtifactBundle,
+    ArtifactBundle(ArtifactBundleKind),
     Artifact
 }
 
@@ -1042,9 +1042,66 @@ impl ResourceKind{
            ResourceKind::Domain => ResourceType::Domain,
            ResourceKind::UrlPathPattern => ResourceType::UrlPathPattern,
            ResourceKind::Proxy(_) => ResourceType::Proxy,
-           ResourceKind::ArtifactBundle => ResourceType::ArtifactBundle,
+           ResourceKind::ArtifactBundle(_) => ResourceType::ArtifactBundle,
            ResourceKind::Artifact => ResourceType::Artifact
        }
+    }
+}
+
+
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub enum ArtifactBundleKind
+{
+    Volatile,
+    Final
+}
+
+impl TryFrom<ResourceAddress> for ArtifactBundleKind {
+    type Error = Fail;
+
+    fn try_from(address: ResourceAddress) -> Result<Self, Self::Error> {
+        let address = match address.resource_type() {
+            ResourceType::ArtifactBundle => {
+                address
+            }
+            ResourceType::Artifact => {
+                address.parent().ok_or("expected artifact resource address to have a parent")?
+            }
+            got => {
+                return Err(Fail::WrongResourceType {
+                    expected: HashSet::from_iter(vec![ResourceType::ArtifactBundle,ResourceType::Artifact]),
+                    received: got
+                })
+            }
+        };
+        let version = semver::Version::from_str(address.last_to_string()?.as_str() )?;
+
+        match version.is_prerelease() {
+            true => Ok(ArtifactBundleKind::Volatile),
+            false => Ok(ArtifactBundleKind::Final)
+        }
+    }
+}
+
+impl FromStr for ArtifactBundleKind{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s{
+            "Volatile" => Ok(ArtifactBundleKind::Volatile),
+            "Final" => Ok(ArtifactBundleKind::Final),
+            _ => Err(format!("cannot match ArtifactBundleKind: {}",s).into())
+
+        }
+    }
+}
+
+impl ToString for ArtifactBundleKind{
+    fn to_string(&self) -> String {
+        match self {
+            Self::Volatile=> "Volatile".to_string(),
+            Self::Final => "Final".to_string()
+        }
     }
 }
 
@@ -1081,6 +1138,14 @@ impl ToString for FileKind {
 #[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum ProxyKind{
     Http
+}
+
+impl ToString for ProxyKind {
+    fn to_string(&self) -> String {
+        match self{
+            ProxyKind::Http => "Http".to_string()
+        }
+    }
 }
 
 impl ResourceType
@@ -1141,8 +1206,8 @@ impl fmt::Display for ResourceKind{
                     ResourceKind::FileSystem=> format!("Filesystem").to_string(),
                     ResourceKind::Domain => "Domain".to_string(),
                     ResourceKind::UrlPathPattern => "UrlPathPattern".to_string(),
-                    ResourceKind::Proxy(_) => "Proxy".to_string(),
-                    ResourceKind::ArtifactBundle => "ArtifactBundle".to_string(),
+                    ResourceKind::Proxy(kind) => format!("Proxy::{}",kind.to_string()).to_string(),
+                    ResourceKind::ArtifactBundle(kind) => format!("ArtifactBundle::{}",kind.to_string()).to_string(),
                     ResourceKind::Artifact => "Artifact".to_string()
                 })
     }
@@ -1210,8 +1275,6 @@ impl FromStr for ResourceKind
                 }
             }
         }
-
-
         match s
         {
             "Nothing" => Ok(ResourceKind::Root),
@@ -1219,7 +1282,6 @@ impl FromStr for ResourceKind
             "SubSpace" => Ok(ResourceKind::SubSpace),
             "User" => Ok(ResourceKind::User),
             "Filesystem" => Ok(ResourceKind::FileSystem),
-            "ArtifactBundle" => Ok(ResourceKind::ArtifactBundle),
             "Artifact" => Ok(ResourceKind::Artifact),
             _ => {
                 Err(format!("cannot match ResourceKind: {}", s).into())

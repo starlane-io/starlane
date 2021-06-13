@@ -32,6 +32,7 @@ use crate::star::variant::StarVariantCommand;
 pub mod server;
 pub mod file_store;
 pub mod default;
+pub mod artifact;
 
 pub struct StarCoreAction{
     pub command: StarCoreCommand,
@@ -191,6 +192,10 @@ impl Host for InertHost{
     async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {
         Err(Fail::Error("This is an InertHost which cannot actually host anything".into()))
     }
+
+    async fn delete(&self, identifier: ResourceIdentifier) -> Result<(), Fail> {
+        Err(Fail::Error("This is an InertHost which cannot actually host anything".into()))
+    }
 }
 
 /*
@@ -227,6 +232,7 @@ pub trait Host: Send+Sync{
     async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource,Fail>;
     async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>,Fail>;
     async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc,Fail>;
+    async fn delete(&self, identifier: ResourceIdentifier) -> Result<(),Fail>;
 }
 
 

@@ -8,7 +8,8 @@ use crate::error::Error;
 use crate::keys::SubSpaceKey;
 use crate::names::{Name, Specific};
 use std::fmt;
-use crate::resource::{ResourceAddress, ResourceType};
+use crate::resource::{ResourceAddress, ResourceType, ArtifactBundleKind};
+use std::convert::TryFrom;
 /*
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct Artifact
@@ -119,6 +120,8 @@ impl ArtifactBundleKey{
         }
     }
 }
+
+
 
 #[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct ArtifactKey

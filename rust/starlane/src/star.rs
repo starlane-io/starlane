@@ -67,6 +67,7 @@ pub enum StarKind
     AppHost,
     ActorHost,
     FileStore,
+    ArtifactStore,
     Gateway,
     Link,
     Client,
@@ -86,7 +87,8 @@ impl StarKind
             StarKind::Gateway => false,
             StarKind::Link => false,
             StarKind::Client => false,
-            StarKind::Web => false
+            StarKind::Web => false,
+            StarKind::ArtifactStore => true
         }
     }
 
@@ -101,7 +103,8 @@ impl StarKind
             StarKind::Gateway => false,
             StarKind::Link => false,
             StarKind::Client => true,
-            StarKind::Web => true
+            StarKind::Web => true,
+            StarKind::ArtifactStore => true
         }
     }
 
@@ -116,7 +119,8 @@ impl StarKind
             StarKind::Gateway => vec![],
             StarKind::Link => vec![],
             StarKind::Client => vec![],
-            StarKind::Web => vec![]
+            StarKind::Web => vec![],
+            StarKind::ArtifactStore => vec![]
         }.iter().cloned())
     }
 
@@ -128,11 +132,12 @@ impl StarKind
             StarKind::Mesh => vec![],
             StarKind::AppHost => vec![ResourceType::Actor, ResourceType::FileSystem],
             StarKind::ActorHost => vec![],
-            StarKind::FileStore => vec![ResourceType::File],
             StarKind::Gateway => vec![],
             StarKind::Link => vec![],
             StarKind::Client => vec![],
-            StarKind::Web => vec![ResourceType::Domain, ResourceType::UrlPathPattern]
+            StarKind::Web => vec![ResourceType::Domain, ResourceType::UrlPathPattern],
+            StarKind::FileStore => vec![ResourceType::File],
+            StarKind::ArtifactStore=> vec![ResourceType::Artifact],
         }.iter().cloned())
     }
 
@@ -143,11 +148,12 @@ impl StarKind
             StarKind::Mesh => vec![],
             StarKind::AppHost => vec![ResourceType::App],
             StarKind::ActorHost => vec![ResourceType::Actor],
-            StarKind::FileStore => vec![ResourceType::FileSystem,ResourceType::File],
             StarKind::Gateway => vec![],
             StarKind::Link => vec![],
             StarKind::Client => vec![ResourceType::Actor],
-            StarKind::Web => vec![]
+            StarKind::Web => vec![],
+            StarKind::FileStore => vec![ResourceType::FileSystem,ResourceType::File],
+            StarKind::ArtifactStore=> vec![ResourceType::ArtifactBundle,ResourceType::Artifact],
         }.iter().cloned())
     }
 }
@@ -162,12 +168,13 @@ impl FromStr for StarKind{
             "Mesh"  => Ok(StarKind::Mesh),
             "AppHost"  => Ok(StarKind::AppHost),
             "ActorHost"  => Ok(StarKind::ActorHost),
-            "FileStore"  => Ok(StarKind::FileStore),
             "Gateway"  => Ok(StarKind::Gateway),
             "Link"  => Ok(StarKind::Link),
             "Client"  => Ok(StarKind::Client),
             "SpaceHost"  => Ok(StarKind::SpaceHost),
             "Web"  => Ok(StarKind::Web),
+            "FileStore"  => Ok(StarKind::FileStore),
+            "ArtifactStore"  => Ok(StarKind::ArtifactStore),
             _      => Err(()),
         }
     }
@@ -300,9 +307,10 @@ impl StarKind
             StarKind::Gateway => true,
             StarKind::Client => true,
             StarKind::Link => true,
-            StarKind::FileStore => false,
             StarKind::SpaceHost => false,
-            StarKind::Web => false
+            StarKind::Web => false,
+            StarKind::FileStore => false,
+            StarKind::ArtifactStore => false
         }
     }
 }
@@ -315,12 +323,13 @@ impl fmt::Display for StarKind{
             StarKind::Mesh => "Mesh".to_string(),
             StarKind::AppHost => "AppHost".to_string(),
             StarKind::ActorHost => "ActorHost".to_string(),
-            StarKind::FileStore => "FileStore".to_string(),
             StarKind::Gateway => "Gateway".to_string(),
             StarKind::Link => "Link".to_string(),
             StarKind::Client => "Client".to_string(),
             StarKind::SpaceHost => "SpaceHost".to_string(),
-            StarKind::Web => "Web".to_string()
+            StarKind::Web => "Web".to_string(),
+            StarKind::FileStore => "FileStore".to_string(),
+            StarKind::ArtifactStore => "ArtifactStore".to_string(),
         })
     }
 }

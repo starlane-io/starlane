@@ -224,4 +224,8 @@ impl Host for FileStoreHost {
             Err(Fail::ResourceNotFound(identifier))
         }
     }
+
+    async fn delete(&self, identifier: ResourceIdentifier) -> Result<(), Fail> {
+        unimplemented!()
+    }
 }
