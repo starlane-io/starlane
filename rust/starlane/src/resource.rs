@@ -2456,6 +2456,10 @@ impl ResourceAddress {
             Path::new(base64::encode(self.parts.last().unwrap().to_string().as_bytes() ).as_str() )
         }
     }
+
+    pub fn last(&self) -> Option<ResourceAddressPart> {
+        self.parts.last().cloned()
+    }
 }
 
 impl ResourceAddress {

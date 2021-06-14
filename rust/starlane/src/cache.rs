@@ -13,9 +13,11 @@ use crate::file_access::FileAccess;
 use crate::keys::ResourceId;
 use crate::resource::{Path, ResourceAddress, ResourceIdentifier, ResourceStub, ResourceRecord};
 use crate::starlane::api::StarlaneApi;
-use crate::resource::config::Parser;
+use crate::resource::config::{Parser, FromArtifact};
 use crate::message::Fail;
 use std::convert::TryInto;
+use crate::logger::{elog, LogInfo, StaticLogInfo};
+use crate::util::AsyncHashMap;
 
 pub type Data = Arc<Vec<u8>>;
 pub type ZipFile=Path;
@@ -117,8 +119,7 @@ impl ArtifactBundleCacheRunner {
     }
 
     async fn has( &self, bundle: ArtifactBundleResourceAddress ) -> Result<(),Error>{
-        let bundle: ResourceAddress = bundle.into();
-        let file_access = self.file_access.with_path(bundle.clone().to_parts_string()).await?;
+        let file_access = ArtifactBundleCache::with_bundle_path(self.file_access.clone(), bundle.clone()).await?;
         file_access.read( &Path::new("/.ready")?).await?;
         Ok(())
     }
@@ -130,7 +131,7 @@ impl ArtifactBundleCacheRunner {
 
         let stream = api.get_resource_state(bundle).await?.ok_or("expected bundle to have state")?;
 
-        let mut file_access = file_access.with_path(record.stub.address.clone().to_parts_string()).await?;
+        let mut file_access = ArtifactBundleCache::with_bundle_path(file_access,record.stub.address.try_into()?).await?;
         let bundle_zip = Path::new("/bundle.zip")?;
         let key_file = Path::new("/key.ser")?;
         file_access.write(&key_file, Arc::new(record.stub.key.to_string().as_bytes().to_vec()));
@@ -147,16 +148,20 @@ impl ArtifactBundleCacheRunner {
 
 }
 
+#[derive(Clone)]
 pub struct ArtifactBundleCache {
+    file_access: FileAccess,
     tx: tokio::sync::mpsc::Sender<ArtifactBundleCacheCommand>
 }
 
 impl ArtifactBundleCache {
-    pub fn new( api: StarlaneApi, file_access: FileAccess ) -> Self {
-        let tx = ArtifactBundleCacheRunner::new(api, file_access );
-        ArtifactBundleCache{
+    pub async fn new( api: StarlaneApi, file_access: FileAccess ) -> Result<Self,Error> {
+        let file_access = file_access.with_path("bundles".to_string() ).await?;
+        let tx = ArtifactBundleCacheRunner::new(api, file_access.clone() );
+        Ok(ArtifactBundleCache{
+            file_access: file_access,
             tx: tx
-        }
+        })
     }
 
     pub async fn download( &self, bundle: ArtifactBundleIdentifier ) -> Result<(),Error>{
@@ -164,19 +169,102 @@ impl ArtifactBundleCache {
         self.tx.send( ArtifactBundleCacheCommand::Cache {bundle, tx}).await;
         rx.await?
     }
+
+    pub fn file_access(&self)->FileAccess {
+        self.file_access.clone()
+    }
+
+    pub async fn with_bundle_path(file_access:FileAccess, address: ArtifactBundleResourceAddress ) -> Result<FileAccess,Error> {
+        let address: ResourceAddress = address.into();
+        Ok(file_access.with_path(address.to_parts_string() ).await?)
+    }
+
+
 }
 
 pub struct Caches {
 
 }
 
-pub struct Cached<J> {
+pub struct Cached<J> where J: FromArtifact+Clone+Send+Sync+'static {
     address: ArtifactResourceAddress,
     config: Arc<J>,
     claim: oneshot::Sender<ArtifactResourceAddress>,
-    cache: Arc<Cache<J>>
+    cache: Arc<ParentCache<J>>
 }
 
-pub struct Cache<J>{
-    pub parser: Parser<J>
+pub struct ParentCache<J> where J: FromArtifact+Clone+Send+Sync+'static {
+    map: AsyncHashMap<ArtifactResourceAddress,Result<Arc<J>,Error>>,
+    bundle_cache: ArtifactBundleCache,
+    parser: Arc<dyn Parser<J>>,
+    file_access: FileAccess
+}
+
+impl <J> ParentCache<J> where J: FromArtifact+Clone+Send+Sync+'static{
+    pub async fn cache(&self, artifact: ArtifactResourceAddress ) -> oneshot::Receiver<Result<(),Error>>{
+       let (tx,rx) = oneshot::channel();
+
+        if let Ok(Option::Some(result)) = self.map.get(artifact.clone() ).await {
+            match result {
+                Ok(_) => {
+                    tx.send(Ok(()));
+                }
+                Err(err) => {
+                    tx.send(Err(err.into()));
+                }
+            }
+        } else {
+            let log_info = StaticLogInfo::clone_info(Box::new(self));
+            let file_access = self.file_access.clone();
+            let bundle_cache = self.bundle_cache.clone();
+            let parser = self.parser.clone();
+            let map = self.map.clone();
+            tokio::spawn(async move {
+                let result = Self::cache_final::<J>(bundle_cache, artifact, file_access, parser, map ).await;
+
+                match result {
+                    Ok(ok) => {
+                        tx.send(Ok(()));
+                    }
+                    Err(err) => {
+                        tx.send(Err(err.into()));
+                    }
+                }
+            });
+        }
+
+       rx
+    }
+
+    async fn cache_final<X>( bundle_cache: ArtifactBundleCache, artifact: ArtifactResourceAddress, file_access: FileAccess, parser: Arc<dyn Parser<X>>, mut map: AsyncHashMap<ArtifactResourceAddress,Result<Arc<X>,Error>>) -> Result<Arc<X>,Error> where X: FromArtifact+Clone+Send+Sync+'static{
+        bundle_cache.download(artifact.parent().into()).await?;
+        let bundle = artifact.parent();
+        let file_access = ArtifactBundleCache::with_bundle_path(file_access.clone(), bundle.clone()).await?;
+        let data = file_access.read( &artifact.path()? ).await?;
+        let result = Ok(Arc::new(parser.parse(artifact.clone(), data)?));
+        map.put( artifact, result.clone() ).await;
+
+        result
+    }
+
+    pub async fn get(&self, artifact: &ArtifactResourceAddress ) -> Result<Arc<J>,Error>{
+        Ok(self.map.get(artifact.clone() ).await?.ok_or(format!("ERROR: attempt to get artifact '{}' from cache before calling the cache() method.",artifact.to_string() ) )??)
+    }
+}
+
+
+
+
+impl <P> LogInfo for ParentCache<P> where P: FromArtifact+Clone+Send+Sync+'static {
+    fn log_identifier(&self) -> String {
+        "?".to_string()
+    }
+
+    fn log_kind(&self) -> String {
+        "?".to_string()
+    }
+
+    fn log_object(&self) -> String {
+        "ParentCache".to_string()
+    }
 }

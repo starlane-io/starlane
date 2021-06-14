@@ -12,6 +12,6 @@ pub trait FromArtifact {
     fn artifact(&self)->ArtifactResourceAddress;
 }
 
-pub trait Parser<J: FromArtifact> {
+pub trait Parser<J: FromArtifact> : Send+Sync+'static {
     fn parse( &self, artifact: ArtifactResourceAddress, data: Data ) -> Result<J,Error>;
 }

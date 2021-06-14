@@ -8,11 +8,12 @@ use crate::error::Error;
 use crate::keys::{SubSpaceKey, ResourceKey};
 use crate::names::{Name, Specific};
 use std::fmt;
-use crate::resource::{ResourceAddress, ResourceType, ArtifactBundleKind, ResourceIdentifier};
+use crate::resource::{ResourceAddress, ResourceType, ArtifactBundleKind, ResourceIdentifier, Path, ResourceAddressPart};
 use std::convert::TryFrom;
 use crate::message::Fail;
 use std::collections::HashSet;
 use std::iter::FromIterator;
+use crate::logger::LogInfo;
 /*
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct Artifact
@@ -130,10 +131,60 @@ impl ArtifactBundleKey{
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone,Hash,Eq,PartialEq)]
 pub struct ArtifactResourceAddress{
     address: ResourceAddress
 }
+
+impl ArtifactResourceAddress {
+    pub fn parent(&self)->ArtifactBundleResourceAddress {
+        return ArtifactBundleResourceAddress{
+            address: self.address.parent().expect("artifact should have bundle parent")
+        }
+    }
+
+    pub fn dir(&self)->Result<Option<Path>,Error>{
+        if let Option::Some(ResourceAddressPart::Path(path)) = self.address.last() {
+            Ok(path.clone().parent())
+        }
+        else{
+            Err("expected ArtifactResourceAddress to end in a Path".into())
+        }
+    }
+
+    pub fn path(&self)->Result<Path,Error>{
+        if let Option::Some(ResourceAddressPart::Path(path)) = self.address.last() {
+            Ok(path.clone())
+        }
+        else{
+            Err("expected ArtifactResourceAddress to end in a Path".into())
+        }
+    }
+}
+
+impl ToString for ArtifactResourceAddress {
+    fn to_string(&self) -> String {
+        self.address.to_string()
+    }
+}
+
+impl LogInfo for ArtifactResourceAddress {
+    fn log_identifier(&self) -> String {
+        let address: ResourceAddress = self.clone().into();
+        address.to_parts_string()
+    }
+
+    fn log_kind(&self) -> String {
+        let address: ResourceAddress = self.clone().into();
+        address.resource_type().to_string()
+    }
+
+    fn log_object(&self) -> String {
+        "ArtifactResourceAddress".to_string()
+    }
+}
+
+
 
 impl Into<ResourceAddress> for ArtifactResourceAddress{
     fn into(self) -> ResourceAddress {
@@ -419,6 +470,14 @@ impl SubSpaceName
 pub struct ArtifactBundleResourceAddress{
     address: ResourceAddress
 }
+
+impl Into<ArtifactBundleIdentifier> for ArtifactBundleResourceAddress {
+    fn into(self) -> ArtifactBundleIdentifier {
+        ArtifactBundleIdentifier::Address(self)
+    }
+}
+
+
 
 impl Into<ResourceAddress> for ArtifactBundleResourceAddress{
     fn into(self) -> ResourceAddress {
