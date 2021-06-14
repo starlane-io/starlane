@@ -1417,8 +1417,8 @@ impl ResourceType{
             ResourceType::UrlPathPattern => StarKind::SpaceHost,
             ResourceType::Proxy => StarKind::SpaceHost,
             ResourceType::Domain => StarKind::SpaceHost,
-            ResourceType::ArtifactBundle => StarKind::FileStore,
-            ResourceType::Artifact => StarKind::FileStore
+            ResourceType::ArtifactBundle => StarKind::ArtifactStore,
+            ResourceType::Artifact => StarKind::ArtifactStore
         }
     }
 
@@ -2168,7 +2168,6 @@ impl ResourceCreationChamber{
                 address.push_str(key.resource_type().to_string().as_str() );
                 address.push_str(">" );
 
-println!("ADDRESS: {}",address);
                 ResourceAddress::from_str(address.as_str())?
             }
             AddressCreationSrc::Space(space_name) => {
@@ -2283,6 +2282,7 @@ impl UniqueSrc for RegistryUniqueSrc{
    async fn next(&self, resource_type: &ResourceType ) -> Result<ResourceId,Fail>{
 
        if !resource_type.parent().matches(Option::Some(&self.parent_key.resource_type()) ){
+eprintln!("WRONG RESOURCE TYPE IN UNIQUE SRC");
            return Err(Fail::WrongResourceType {expected: HashSet::from_iter(self.parent_key.resource_type().children()), received: resource_type.clone() })
        }
        let (tx,rx) = oneshot::channel();
