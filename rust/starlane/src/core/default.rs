@@ -12,7 +12,7 @@ use tokio::sync::{mpsc, oneshot};
 use crate::app::ConfigSrc;
 use crate::core::Host;
 use crate::error::Error;
-use crate::file::FileAccess;
+use crate::file_access::FileAccess;
 use crate::frame::ResourceHostAction;
 use crate::message::Fail;
 use crate::names::{Name, Specific};

@@ -1,9 +1,13 @@
 use crate::keys::DomainKey;
-use crate::resource::ResourceAddress;
+use crate::resource::{ResourceAddress, ResourceKind};
 use std::convert::{TryInto, TryFrom};
 use std::sync::Arc;
 use crate::error::Error;
 use serde::{Serialize,Deserialize};
+use crate::cache::Data;
+use crate::artifact::ArtifactResourceAddress;
+use std::collections::HashMap;
+use crate::resource::config::{FromArtifact, Parser, ResourceConfig};
 
 pub struct Domain{
     key: DomainKey,
@@ -55,3 +59,40 @@ impl TryFrom<Vec<u8>> for DomainState{
         Ok(bincode::deserialize::<DomainState>(value.as_slice() )?)
     }
 }
+
+
+
+pub struct HttpResourceSelector{
+
+}
+
+
+struct DomainConfig {
+    artifact: ArtifactResourceAddress,
+    routes: HashMap<String,HttpResourceSelector>
+}
+
+impl FromArtifact for DomainConfig{
+    fn artifact(&self) -> ArtifactResourceAddress {
+        self.artifact.clone()
+    }
+}
+
+impl ResourceConfig for DomainConfigParser{
+    fn kind(&self) -> ResourceKind {
+        ResourceKind::Domain
+    }
+}
+
+
+struct DomainConfigParser;
+
+impl Parser<DomainConfig> for DomainConfigParser{
+    fn parse(&self, artifact: ArtifactResourceAddress, data: Data) -> Result<DomainConfig, Error> {
+        Ok(DomainConfig{
+            artifact: artifact,
+            routes: HashMap::new()
+        })
+    }
+}
+

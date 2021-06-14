@@ -33,7 +33,7 @@ use crate::actor::{ActorKey, ActorKind};
 use crate::core::{StarCoreAction, StarCoreCommand, StarCoreResult};
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
-use crate::file::FileAccess;
+use crate::file_access::FileAccess;
 use crate::frame::{ActorLookup, ChildManagerResourceAction, Event, Frame, FromReply, MessagePayload, ProtoFrame, Reply, ResourceHostAction, SimpleReply, SpaceMessage, StarMessage, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp};
 use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
@@ -394,6 +394,10 @@ impl Star
             resource_address_to_key: LruCache::new(16 * 1024),
             status: StarStatus::Unknown
         }
+    }
+
+    pub fn info(&self) -> StarInfo {
+        self.skel.info.clone()
     }
 
     pub fn has_resource_record(&mut self, identifier: &ResourceIdentifier) -> bool {
@@ -1474,7 +1478,7 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
             max_hops: MAX_HOPS,
         };
 
-        self.logger.log(StarLog::StarSearchInitialized(search.clone()));
+        self.logger.log2(StarLog::StarSearchInitialized(search.clone()));
         for (star,lane) in &self.lanes
         {
             lane.lane.outgoing.tx.send( LaneCommand::Frame( Frame::StarSearch(search.clone()))).await;
@@ -1489,7 +1493,7 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
     async fn on_star_search_result( &mut self, mut search_result: StarSearchResultInner, lane_key: StarKey )
     {
 
-        self.logger.log(StarLog::StarSearchResult(search_result.clone()));
+        self.logger.log2(StarLog::StarSearchResult(search_result.clone()));
         if let Some(search_id) = search_result.transactions.last()
         {
             if let Some(search_trans) = self.star_search_transactions.get_mut(search_id)

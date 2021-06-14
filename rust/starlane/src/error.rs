@@ -13,6 +13,7 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 use std::num::ParseIntError;
 use std::env::VarError;
+use zip::result::ZipError;
 
 #[derive(Debug, Clone)]
 pub struct Error{
@@ -24,6 +25,34 @@ pub struct Error{
 impl fmt::Display for Error{
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}",self.error)
+    }
+}
+
+impl From<ZipError> for Error {
+    fn from(e: ZipError) -> Self {
+
+        match e{
+            ZipError::Io(io) => {
+                Error{
+                    error: io.to_string()
+                }
+            }
+            ZipError::InvalidArchive(err) => {
+                Error{
+                    error: err.to_string()
+                }
+            }
+            ZipError::UnsupportedArchive(un) => {
+                Error{
+                    error: un.to_string()
+                }
+            }
+            ZipError::FileNotFound => {
+                Error{
+                    error: "ZipError: FileNotFound".to_string()
+                }
+            }
+        }
     }
 }
 

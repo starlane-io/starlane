@@ -99,3 +99,7 @@ pub async fn wait_for_it<R>( rx: oneshot::Receiver<Result<R,Error>>) -> Result<R
 pub async fn wait_for_it_whatever<R>( rx: oneshot::Receiver<R>) -> Result<R,Error> {
     Ok(tokio::time::timeout( Duration::from_secs(15), rx).await??)
 }
+
+pub async fn wait_for_it_for<R>( rx: oneshot::Receiver<Result<R,Error>>, duration: Duration ) -> Result<R,Error> {
+    tokio::time::timeout( duration, rx).await??
+}

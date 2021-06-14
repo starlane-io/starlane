@@ -10,7 +10,7 @@ use tokio::sync::{mpsc, Mutex};
 
 use crate::core::Host;
 use crate::error::Error;
-use crate::file::{FileAccess, FileEvent};
+use crate::file_access::{FileAccess, FileEvent};
 use crate::keys::{ResourceKey, FileSystemKey};
 use crate::message::Fail;
 use crate::resource::{AssignResourceStateSrc, DataTransfer, MemoryDataTransfer, Path, Resource, ResourceAddress, ResourceAssign, ResourceStateSrc, ResourceType, ResourceCreationChamber, FileKind, ResourceStub, ResourceCreate, ResourceArchetype, ResourceKind, AddressCreationSrc, KeyCreationSrc, ResourceCreateStrategy, ResourceIdentifier, RemoteDataSrc, ArtifactBundleKind};

@@ -24,6 +24,10 @@ use tokio::sync::mpsc;
 use futures::channel::oneshot;
 use semver::Version;
 use crate::resource::artifact::ArtifactBundleState;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use futures::io::Cursor;
+use tempdir::TempDir;
+use tokio::fs::File;
 
 
 #[derive(Clone)]
@@ -156,6 +160,22 @@ println!("elapsed error: {}",err );
             }
         }
     }
+
+    /*
+    /// this function is acting as a facade for now, later we will not download the entire state in one message
+    pub async fn get_resource_state_stream(&self, identifier: ResourceIdentifier ) -> Result<Option<Box<dyn AsyncReadExt>>,Fail> {
+        match self.get_resource_state(identifier).await? {
+            None => Ok(Option::None),
+            Some(data) => {
+                let file_path= TempDir::new("sometempdir")?.path().with_file_name("temp.out");
+                let mut file = File::create( file_path.as_path() ).await?;
+                file.write_all(data.as_slice()).await?;
+                let mut file = File::open( file_path.as_path() ).await?;
+                Ok(Option::Some(Box::new(file)))
+            }
+        }
+    }
+     */
 
     pub async fn get_resource_state(&self, identifier: ResourceIdentifier ) -> Result<Option<Arc<Vec<u8>>>,Fail> {
 

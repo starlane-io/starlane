@@ -23,7 +23,7 @@ use crate::message::Fail;
 use crate::resource::{AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource, Resource, ResourceAssign, ResourceSliceAssign, ResourceIdentifier, RemoteDataSrc};
 use crate::resource::store::ResourceStoreSqlLite;
 use crate::star::{ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel};
-use crate::file::FileAccess;
+use crate::file_access::FileAccess;
 use crate::core::file_store::FileStoreHost;
 use crate::frame::MessagePayload;
 use crate::core::default::DefaultHost;

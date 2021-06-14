@@ -5,11 +5,14 @@ use uuid::Uuid;
 
 use crate::actor::{ActorKind, ActorSpecific};
 use crate::error::Error;
-use crate::keys::SubSpaceKey;
+use crate::keys::{SubSpaceKey, ResourceKey};
 use crate::names::{Name, Specific};
 use std::fmt;
-use crate::resource::{ResourceAddress, ResourceType, ArtifactBundleKind};
+use crate::resource::{ResourceAddress, ResourceType, ArtifactBundleKind, ResourceIdentifier};
 use std::convert::TryFrom;
+use crate::message::Fail;
+use std::collections::HashSet;
+use std::iter::FromIterator;
 /*
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct Artifact
@@ -112,6 +115,12 @@ pub struct ArtifactBundleKey
     pub id: ArtifactBundleId
 }
 
+impl Into<ResourceKey> for ArtifactBundleKey{
+    fn into(self) -> ResourceKey {
+        ResourceKey::ArtifactBundle(self)
+    }
+}
+
 impl ArtifactBundleKey{
     pub fn new( sub_space: SubSpaceKey, id: ArtifactBundleId )->Self{
         ArtifactBundleKey{
@@ -121,6 +130,35 @@ impl ArtifactBundleKey{
     }
 }
 
+#[derive(Clone)]
+pub struct ArtifactResourceAddress{
+    address: ResourceAddress
+}
+
+impl Into<ResourceAddress> for ArtifactResourceAddress{
+    fn into(self) -> ResourceAddress {
+        self.address
+    }
+}
+
+impl TryFrom<ResourceAddress> for ArtifactResourceAddress {
+    type Error = Fail;
+
+    fn try_from(value: ResourceAddress) -> Result<Self, Self::Error> {
+        if value.resource_type() != ResourceType::Artifact {
+            Err(Fail::WrongResourceType {expected:HashSet::from_iter(vec![ResourceType::Artifact]),received: value.resource_type()})
+        } else {
+            Ok(ArtifactResourceAddress{
+                address: value
+            })
+        }
+    }
+}
+
+pub enum ArtifactIdentifier{
+    Key(ArtifactKey),
+    Address(ArtifactResourceAddress)
+}
 
 
 #[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
@@ -376,3 +414,48 @@ impl SubSpaceName
     }
 }
 
+
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub struct ArtifactBundleResourceAddress{
+    address: ResourceAddress
+}
+
+impl Into<ResourceAddress> for ArtifactBundleResourceAddress{
+    fn into(self) -> ResourceAddress {
+        self.address
+    }
+}
+
+impl TryFrom<ResourceAddress> for ArtifactBundleResourceAddress {
+    type Error = Fail;
+
+    fn try_from(value: ResourceAddress) -> Result<Self, Self::Error> {
+        if value.resource_type() != ResourceType::ArtifactBundle {
+            Err(Fail::WrongResourceType {expected:HashSet::from_iter(vec![ResourceType::ArtifactBundle]),received: value.resource_type()})
+        } else {
+            Ok(ArtifactBundleResourceAddress{
+                address: value
+            })
+        }
+    }
+}
+
+
+impl Into<ResourceIdentifier> for ArtifactBundleIdentifier {
+    fn into(self) -> ResourceIdentifier {
+        match self {
+            ArtifactBundleIdentifier::Key(key) => {
+                ResourceIdentifier::Key(key.into())
+            }
+            ArtifactBundleIdentifier::Address(address) => {
+                ResourceIdentifier::Address(address.into())
+            }
+        }
+    }
+}
+
+
+pub enum ArtifactBundleIdentifier{
+    Key(ArtifactBundleKey),
+    Address(ArtifactBundleResourceAddress)
+}

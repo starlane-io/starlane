@@ -17,14 +17,17 @@ use tokio::runtime::Runtime;
 use std::future::Future;
 use crate::util;
 use walkdir::{WalkDir, DirEntry};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncRead};
+use tokio::time::Duration;
 
 pub enum FileCommand{
     Read{path: Path, tx:tokio::sync::oneshot::Sender<Result<Arc<Vec<u8>>,Error>>},
     Write{ path: Path, data: Arc<Vec<u8>>, tx: tokio::sync::oneshot::Sender<Result<(),Error>> },
+//    WriteStream{ path: Path, stream: Box<dyn AsyncRead>, tx: tokio::sync::oneshot::Sender<Result<(),Error>> },
     MkDir{ path: Path,tx: tokio::sync::oneshot::Sender<Result<(),Error>> },
     Watch{tx: tokio::sync::oneshot::Sender<Result<tokio::sync::mpsc::Receiver<FileEvent>,Error>>},
-    Walk{tx: tokio::sync::oneshot::Sender<Result<tokio::sync::mpsc::Receiver<FileEvent>,Error>>}
+    Walk{tx: tokio::sync::oneshot::Sender<Result<tokio::sync::mpsc::Receiver<FileEvent>,Error>>},
+    UnZip{ source: String, target: String, tx: tokio::sync::oneshot::Sender<Result<(),Error>> },
 }
 
 #[derive(Clone)]
@@ -60,8 +63,24 @@ impl FileAccess{
         Ok(util::wait_for_it(rx).await?)
     }
 
+    /*
+    pub async fn write_stream( &mut self, path: &Path, stream: Box<dyn AsyncReadExt> )->Result<(),Error> {
+        let (tx,mut rx) = tokio::sync::oneshot::channel();
+        self.tx.send( FileCommand::WriteStream{path:path.clone(),stream,tx}).await?;
+        Ok(util::wait_for_it_for(rx, Duration::from_secs(60*15)).await?)
+    }
+
+     */
+
+
     pub async fn with_path(&self, path: String ) -> Result<FileAccess,Error> {
         Ok(FileAccess::new( format!("{}/{}",self.path,path) ).await?)
+    }
+
+    pub async fn unzip( &self, source: String, target: String ) -> Result<(),Error>{
+        let (tx,mut rx) = tokio::sync::oneshot::channel();
+        self.tx.send( FileCommand::UnZip{source,target,tx}).await?;
+        Ok(util::wait_for_it_for(rx, Duration::from_secs(60*2)).await?)
     }
 
     pub async fn mkdir( &mut self, path: &Path ) -> Result<FileAccess,Error> {
@@ -156,6 +175,9 @@ impl LocalFileAccess {
             FileCommand::Write { path: path, data, tx } => {
                 tx.send(self.write(&path,data));
             }
+/*            FileCommand::WriteStream { path: path, stream, tx } => {
+                tx.send(self.write_sream(&path,stream).await);
+            }*/
             FileCommand::MkDir { path, tx } => {
                 tx.send( self.mkdir(&path));
             }
@@ -164,6 +186,9 @@ impl LocalFileAccess {
             }
             FileCommand::Walk{ tx } => {
                 tx.send(self.walk());
+            }
+            FileCommand::UnZip { source,target,tx } => {
+                tx.send(self.unzip(source,target));
             }
         }
         Ok(())
@@ -190,6 +215,30 @@ impl LocalFileAccess {
 
 impl LocalFileAccess {
 
+    pub fn unzip(&mut self, source: String, target: String ) -> Result<(),Error> {
+        let source = format!("{}/{}", self.base_dir, source );
+println!("source: {}",source);
+        let source = File::open(source)?;
+        let mut archive = zip::ZipArchive::new(source )?;
+
+        for i in 0..archive.len() {
+            let mut zip_file = archive.by_index(i)?;
+println!("artifact: {}", zip_file.name() );
+            if !zip_file.is_dir()
+            {
+                let path = Path::new(format!("/{}/{}", target, zip_file.name()).as_str() )?;
+                self.mkdir(&path)?;
+            } else {
+                let path = format!("{}/{}/{}", self.base_dir, target, zip_file.name() );
+println!("path: {}",path);
+                let mut file = fs::File::create(path)?;
+                std::io::copy( &mut zip_file, &mut file )?;
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn read(&self, path: &Path) -> Result<Arc<Vec<u8>>, Error> {
             let path = self.cat_path(path.to_relative().as_str())?;
 
@@ -210,6 +259,22 @@ impl LocalFileAccess {
         file.write(data.as_slice()).unwrap();
         Ok(())
     }
+
+    /*
+    pub async fn write_stream(&mut self, path: &Path, mut stream: Box<dyn AsyncReadExt>) -> Result<(), Error> {
+
+        if let Option::Some(parent) = path.parent(){
+            self.mkdir(&parent)?;
+        }
+
+        let path = self.cat_path(path.to_relative().as_str() )?;
+        let mut file = tokio::fs::File::create(&path).await?;
+
+        tokio::io::copy(&mut stream,&mut file ).await?;
+
+        Ok(())
+    }
+     */
 
 
     fn mkdir(&mut self, path: &Path) -> Result<(), Error> {

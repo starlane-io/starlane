@@ -19,7 +19,7 @@ use tokio::sync::oneshot::Receiver;
 
 use crate::artifact::{ArtifactKey, ArtifactKind};
 use crate::error::Error;
-use crate::file::FileAccess;
+use crate::file_access::FileAccess;
 use crate::frame::{Reply, ResourceHostAction, SimpleReply, StarMessagePayload, ChildManagerResourceAction, MessagePayload};
 use crate::id::{Id, IdSeq};
 use crate::keys::{FileKey, ResourceId, Unique, UniqueSrc};
@@ -50,6 +50,7 @@ pub mod file;
 pub mod store;
 pub mod domain;
 pub mod artifact;
+pub mod config;
 
 lazy_static!
 {

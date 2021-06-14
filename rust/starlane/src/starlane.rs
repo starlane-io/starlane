@@ -459,9 +459,11 @@ mod test
     pub fn starlane()
     {
         let data_dir = "tmp/data";
-        fs::remove_dir_all(data_dir ).unwrap();
+        let cache_dir= "tmp/cache";
+        fs::remove_dir_all(data_dir ).unwrap_or_default();
+        fs::remove_dir_all(cache_dir ).unwrap_or_default();
         std::env::set_var("STARLANE_DATA", data_dir );
-
+        std::env::set_var("STARLANE_CACHE", cache_dir );
 
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
