@@ -112,7 +112,7 @@ impl ProtoStar
                         let (core_tx,core_rx) = mpsc::channel(16);
 
                         let resource_registry: Option<Arc<dyn ResourceRegistryBacking>>= if info.kind.is_resource_manager() {
-                            Option::Some( Arc::new( ResourceRegistryBackingSqLite::new().await? ) )
+                            Option::Some( Arc::new( ResourceRegistryBackingSqLite::new(info.clone()).await? ) )
                         } else {
                             Option::None
                         };

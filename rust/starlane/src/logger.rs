@@ -225,3 +225,59 @@ pub enum StarLogPayload
    PledgeRecv,
    PledgeOkRecv
 }
+
+
+#[derive(Clone)]
+pub struct StaticLogInfo{
+    identifier: String,
+    kind: String,
+    object: String
+}
+
+impl StaticLogInfo{
+    pub fn new( identifier: String, kind: String, object: String )->Self{
+        StaticLogInfo{
+            identifier: identifier,
+            kind: kind,
+            object: object
+        }
+    }
+
+    pub fn clone_info(info: Box<&dyn LogInfo>) -> StaticLogInfo{
+        StaticLogInfo::new(info.log_identifier(),info.log_kind(), info.log_object() )
+    }
+}
+
+impl LogInfo for StaticLogInfo {
+    fn log_identifier(&self) -> String {
+        self.identifier.clone()
+    }
+
+    fn log_kind(&self) -> String {
+        self.kind.clone()
+    }
+
+    fn log_object(&self) -> String {
+        self.object.clone()
+    }
+}
+
+
+pub trait LogInfo {
+    fn log_identifier(&self) -> String;
+    fn log_kind(&self) -> String;
+    fn log_object(&self) -> String;
+}
+
+fn log_info<L>(log: &L ) -> String  where L: LogInfo {
+    format!("<{}>({})", log.log_kind(), log.log_identifier() )
+}
+
+pub fn elog<C,S>( context: &C, subject: &S, method: &str, message: &str ) where C: LogInfo, S: LogInfo {
+    println!("!{}[{}.{}] -> {} | {} ", log_info(context), context.log_object(), method, log_info(subject), message )
+}
+
+pub fn log<C,S>( context: &C, subject: &S, method: &str, message: &str ) where C: LogInfo, S: LogInfo {
+    println!("{}[{}.{}] -> {} | {} ", log_info(context), context.log_object(), method, log_info(subject), message )
+}
+

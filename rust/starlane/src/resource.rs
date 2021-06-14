@@ -30,17 +30,18 @@ use crate::permissions::User;
 use crate::resource::space::{Space, SpaceState};
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
-use crate::star::{ResourceRegistryBacking, StarComm, StarCommand, StarKey, StarKind, StarSkel};
+use crate::star::{ResourceRegistryBacking, StarComm, StarCommand, StarKey, StarKind, StarSkel, StarInfo};
 use crate::star::pledge::{ResourceHostSelector, StarHandle};
 use crate::util::AsyncHashMap;
 use std::path::PathBuf;
 use std::future::Future;
-use crate::util;
+use crate::{util, logger};
 use crate::message::resource::{Message, MessageTo, ProtoMessage, ResourceRequestMessage, MessageFrom, MessageReply, ResourceResponseMessage};
 use crate::actor::{ActorKind, ActorKey};
 use url::Url;
 use crate::resource::ResourceKind::UrlPathPattern;
 use crate::app::ConfigSrc;
+use crate::logger::{LogInfo, StaticLogInfo, elog};
 
 pub mod space;
 pub mod sub_space;
@@ -561,10 +562,11 @@ pub struct Registry {
    pub conn: Connection,
    pub tx: mpsc::Sender<ResourceRegistryAction>,
    pub rx: mpsc::Receiver<ResourceRegistryAction>,
+   star_info: StarInfo
 }
 
 impl Registry {
-    pub async fn new() -> mpsc::Sender<ResourceRegistryAction>
+    pub async fn new(star_info: StarInfo) -> mpsc::Sender<ResourceRegistryAction>
     {
         let (tx, rx) = mpsc::channel(8 * 1024);
 
@@ -578,6 +580,7 @@ impl Registry {
                     conn: conn.unwrap(),
                     tx: tx_clone,
                     rx: rx,
+                    star_info: star_info
                 };
                 db.run().await.unwrap();
             }
@@ -821,6 +824,7 @@ eprintln!("for {} SQL ERROR: {}",identifier.to_string(), err.to_string() );
                 let reservation = RegistryReservation::new(tx);
                 let action_tx = self.tx.clone();
                 let info = request.info.clone();
+                let log_info = StaticLogInfo::clone_info(Box::new(self));
                 tokio::spawn( async move {
 
                     let result = rx.await;
@@ -841,12 +845,11 @@ eprintln!("for {} SQL ERROR: {}",identifier.to_string(), err.to_string() );
                         rx.await;
                         result_tx.send(Ok(()));
                     }
-                    else if let Result::Err(error) = result{
-                        eprintln!("RESERVATION DID NOT COMMIT parent {}", request.parent.to_string() );
-                        eprintln!("ERROR: {}",error);
+                    else if let Result::Err(error) = result {
+                        logger::elog(&log_info,&request.archetype, "Reserve()", format!("ERROR: reservation failed to commit do to RecvErr: '{}'",error.to_string()).as_str() );
                     }
                     else {
-                        eprintln!("~RESERVATION DID NOT COMMIT parent {}", request.parent.to_string() );
+                        logger::elog(&log_info,&request.archetype, "Reserve()", "ERROR: reservation failed to commit.");
                     }
                 } );
                 Ok(ResourceRegistryResult::Reservation(reservation))
@@ -1008,6 +1011,20 @@ eprintln!("for {} SQL ERROR: {}",identifier.to_string(), err.to_string() );
         transaction.commit()?;
 
         Ok(())
+    }
+}
+
+impl LogInfo for Registry {
+    fn log_identifier(&self) -> String {
+        self.star_info.log_identifier()
+    }
+
+    fn log_kind(&self) -> String {
+        self.star_info.log_kind()
+    }
+
+    fn log_object(&self) -> String {
+        "Registry".to_string()
     }
 }
 
@@ -1746,6 +1763,22 @@ impl ResourceArchetype{
     }
 }
 
+impl LogInfo for ResourceArchetype {
+    fn log_identifier(&self) -> String {
+        "?".to_string()
+    }
+
+    fn log_kind(&self) -> String {
+        self.kind.to_string()
+    }
+
+    fn log_object(&self) -> String {
+        "ResourceArchetype".to_string()
+    }
+
+
+}
+
 
 #[async_trait]
 pub trait ResourceIdSeq: Send+Sync {
@@ -1855,44 +1888,69 @@ impl Parent {
             let mut rx = ResourceCreationChamber::new(core.stub.clone(), create.clone(), core.skel.clone()).await;
 
             tokio::spawn(async move {
-                if let Ok(Ok(assign)) = rx.await {
-                    if let Ok(mut host) = core.selector.select(create.archetype.kind.resource_type()).await
-                    {
-                        let record = ResourceRecord::new(assign.stub.clone(), host.star_key());
-                        match host.assign(assign).await
-                        {
-                            Ok(_) => {}
-                            Err(err) => {
-                                eprintln!("host assign failed.");
-                                return;
-                            }
-                        }
-                        let (commit_tx, commit_rx) = oneshot::channel();
-                        match reservation.commit(record.clone(), commit_tx) {
-                            Ok(_) => {
-                                if let Ok(Ok(_)) = commit_rx.await {
-                                    tx.send(Ok(record));
-                                } else {
-                                    tx.send(Err("commit failed".into()));
-                                }
-                            }
-                            Err(err) => {
-                                tx.send(Err("commit failed".into()));
-                            }
-                        }
-                    } else {
-                        tx.send(Err("could not select a host".into()));
+                match Self::process_create(core.clone(),create.clone(),reservation,rx).await
+                {
+                    Ok(resource) => {
+                        tx.send(Ok(resource));
                     }
-                } else {
-                    tx.send(Err("RESERVATION FAILED!".into()));
+                    Err(fail) => {
+                        elog(&core, &create, "create_child()", format!("Failed to create child. FAIL:{}",fail.to_string()).as_str());
+                        tx.send(Err(fail));
+                    }
                 }
             });
         } else {
+            elog( &core, &create, "create_child()", "ERROR: reservation failed." );
             tx.send(Err("RESERVATION FAILED!".into()));
         }
     }
 
+    async fn process_create(core: ParentCore, create: ResourceCreate, reservation: RegistryReservation, rx: oneshot::Receiver<Result<ResourceAssign<AssignResourceStateSrc>,Fail>> ) -> Result<ResourceRecord,Fail>{
+        let assign = rx.await??;
+        let mut host = core.selector.select(create.archetype.kind.resource_type()).await?;
+        let record = ResourceRecord::new(assign.stub.clone(), host.star_key());
+        host.assign(assign).await?;
+        let (commit_tx, commit_rx) = oneshot::channel();
+        reservation.commit(record.clone(), commit_tx)?;
+        Ok(record)
+    }
 
+
+    /*
+    if let Ok(Ok(assign)) = rx.await {
+    if let Ok(mut host) = core.selector.select(create.archetype.kind.resource_type()).await
+    {
+    let record = ResourceRecord::new(assign.stub.clone(), host.star_key());
+    match host.assign(assign).await
+    {
+    Ok(_) => {}
+    Err(err) => {
+    eprintln!("host assign failed.");
+    return;
+    }
+    }
+    let (commit_tx, commit_rx) = oneshot::channel();
+    match reservation.commit(record.clone(), commit_tx) {
+    Ok(_) => {
+    if let Ok(Ok(_)) = commit_rx.await {
+    tx.send(Ok(record));
+    } else {
+    elog( &core, &record.stub, "create_child()", "commit failed" );
+    tx.send(Err("commit failed".into()));
+    }
+    }
+    Err(err) => {
+    elog( &core, &record.stub, "create_child()", format!("ERROR: commit failed '{}'",err.to_string()).as_str() );
+    tx.send(Err("commit failed".into()));
+    }
+    }
+    } else {
+    elog( &core, &assign.stub, "create_child()", "ERROR: could not select a host" );
+    tx.send(Err("could not select a host".into()));
+    }
+    }
+
+     */
 
 
     /*
@@ -1965,6 +2023,20 @@ impl Parent {
     }
 
      */
+}
+
+impl LogInfo for ParentCore {
+    fn log_identifier(&self) -> String {
+        self.skel.info.log_identifier()
+    }
+
+    fn log_kind(&self) -> String {
+        self.skel.info.log_kind()
+    }
+
+    fn log_object(&self) -> String {
+        "Parent".to_string()
+    }
 }
 
 #[async_trait]
@@ -2086,11 +2158,18 @@ impl ResourceCreationChamber{
                 self.create.archetype.kind.resource_type().append_address(self.parent.address.clone(), tail.clone() )?
             }
             AddressCreationSrc::Appends(tails) => {
-                let segment = self.parent.address.clone();
-                for tail in tails {
-                    let segment = self.create.archetype.kind.resource_type().append_address(segment.clone(), tail.clone())?;
+                let mut address = self.parent.address.to_parts_string();
+                for tail in tails{
+                    address.push_str(":");
+                    address.push_str(tail.as_str());
                 }
-                segment
+
+                address.push_str("::<" );
+                address.push_str(key.resource_type().to_string().as_str() );
+                address.push_str(">" );
+
+println!("ADDRESS: {}",address);
+                ResourceAddress::from_str(address.as_str())?
             }
             AddressCreationSrc::Space(space_name) => {
                 if self.parent.key.resource_type() != ResourceType::Root {
@@ -3343,7 +3422,7 @@ mod test
     {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = Registry::new().await;
+            let tx = Registry::new(StarInfo::mock()).await;
 
             create_10(tx.clone(), ResourceKind::App,Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
             let mut selector = ResourceSelector::app_selector();
@@ -3388,7 +3467,7 @@ mod test
     {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = Registry::new().await;
+            let tx = Registry::new(StarInfo::mock()).await;
 
             create_10(tx.clone(), ResourceKind::App,Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
             create_10(tx.clone(), ResourceKind::Actor(ActorKind::Stateful),Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
@@ -3429,7 +3508,7 @@ mod test
     {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = Registry::new().await;
+            let tx = Registry::new(StarInfo::mock()).await;
 
             let spaces = create_10_spaces(tx.clone() ).await;
             let mut sub_spaces = vec![];
@@ -3475,7 +3554,7 @@ mod test
     {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = Registry::new().await;
+            let tx = Registry::new(StarInfo::mock()).await;
 
 
             create_10(tx.clone(), ResourceKind::App,Option::Some(crate::names::TEST_APP_SPEC.clone()), SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
@@ -3502,7 +3581,7 @@ mod test
     {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = Registry::new().await;
+            let tx = Registry::new(StarInfo::mock()).await;
 
             let sub_space = SubSpaceKey::hyper_default();
             let app1 = AppKey::new(sub_space.clone(), 1);
@@ -3768,7 +3847,6 @@ pub struct ResourceCreate {
    pub strategy: ResourceCreateStrategy
 }
 
-
 impl ResourceCreate {
 
     pub fn create(archetype: ResourceArchetype, src: AssignResourceStateSrc) ->Self {
@@ -3814,6 +3892,20 @@ impl ResourceCreate {
         }
 
         Ok(())
+    }
+}
+
+impl LogInfo for ResourceCreate{
+    fn log_identifier(&self) -> String {
+        self.archetype.log_identifier()
+    }
+
+    fn log_kind(&self) -> String {
+        self.archetype.log_kind()
+    }
+
+    fn log_object(&self) -> String {
+        "ResourceCreate".to_string()
     }
 }
 
@@ -3945,6 +4037,20 @@ impl ResourceStub {
             archetype: ResourceArchetype::nothing(),
             owner: Option::None
         }
+    }
+}
+
+impl LogInfo for ResourceStub{
+    fn log_identifier(&self) -> String {
+        self.address.to_parts_string()
+    }
+
+    fn log_kind(&self) -> String {
+        self.archetype.kind.to_string()
+    }
+
+    fn log_object(&self) -> String {
+        "ResourceStub".to_string()
     }
 }
 

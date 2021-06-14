@@ -39,7 +39,7 @@ use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
 use crate::keys::{AppKey, GatheringKey, MessageId, ResourceId, ResourceKey, SpaceKey, Unique, UniqueSrc, UserKey};
 use crate::lane::{ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane, TunnelConnector, TunnelConnectorFactory};
-use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
+use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag, LogInfo, StaticLogInfo};
 use crate::message::{Fail, MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage, ProtoStarMessageTo, StarMessageDeliveryInsurance, TrackerJob};
 use crate::message::resource::{Delivery, Message, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage};
 use crate::permissions::{Authentication, AuthToken, AuthTokenSource, Credentials};
@@ -2929,7 +2929,43 @@ impl fmt::Display for StarCommand{
                             kind: kind
                         }
                     }
+
+                    pub fn mock() -> Self {
+                        StarInfo {
+                            key: StarKey { subgraph: vec![], index: 0 },
+                            kind: StarKind::Central
+                        }
+                    }
                 }
+
+impl LogInfo for StarInfo{
+    fn log_identifier(&self) -> String {
+        self.key.to_string()
+    }
+
+    fn log_kind(&self) -> String {
+        self.kind.to_string()
+    }
+
+    fn log_object(&self) -> String {
+        "StarInfo".to_string()
+    }
+
+}
+
+impl LogInfo for Star{
+    fn log_identifier(&self) -> String {
+        self.skel.info.key.to_string()
+    }
+
+    fn log_kind(&self) -> String {
+        self.skel.info.kind.to_string()
+    }
+
+    fn log_object(&self) -> String {
+        "Star".to_string()
+    }
+}
 
                 impl ToString for StarInfo {
                     fn to_string(&self) -> String {
@@ -3317,11 +3353,11 @@ impl fmt::Display for StarCommand{
 
                 impl ResourceRegistryBackingSqLite
                 {
-                    pub async fn new() ->Result<Self,Error>
+                    pub async fn new(star_info: StarInfo) ->Result<Self,Error>
                     {
                         let rtn = ResourceRegistryBackingSqLite
                         {
-                            registry: Registry::new().await
+                            registry: Registry::new(star_info).await
                         };
 
                         Ok(rtn)
