@@ -28,6 +28,7 @@ use crate::core::file_store::FileStoreHost;
 use crate::frame::MessagePayload;
 use crate::core::default::DefaultHost;
 use crate::star::variant::StarVariantCommand;
+use crate::core::artifact::ArtifactHost;
 
 pub mod server;
 pub mod file_store;
@@ -161,6 +162,9 @@ impl StarCoreFactory
 
             StarKind::FileStore => {
                 Box::new(FileStoreHost::new(skel.clone(),file_access).await? )
+            }
+            StarKind::ArtifactStore=> {
+                Box::new(ArtifactHost::new(skel.clone(),file_access).await? )
             }
             _ => {
                 Box::new(DefaultHost::new().await )

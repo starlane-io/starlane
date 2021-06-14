@@ -111,7 +111,7 @@ impl StarKind
     pub fn handles(&self)->HashSet<StarKind>{
         HashSet::from_iter(match self {
             StarKind::Central => vec![StarKind::SpaceHost],
-            StarKind::SpaceHost => vec![StarKind::FileStore,StarKind::Web],
+            StarKind::SpaceHost => vec![StarKind::FileStore,StarKind::Web,StarKind::ArtifactStore],
             StarKind::Mesh => vec![],
             StarKind::AppHost => vec![StarKind::ActorHost, StarKind::FileStore],
             StarKind::ActorHost => vec![],

@@ -117,7 +117,6 @@ impl ArtifactHost {
 impl Host for ArtifactHost {
 
     async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource, Fail> {
-
         Self::validate(&assign)?;
 
         // if there is Initialization to do for assignment THIS is where we do it
@@ -241,7 +240,6 @@ fn get_artifacts(data: Arc<Vec<u8>> ) -> Result<Vec<String>,Fail>  {
                 let mut file = archive.by_index(i).unwrap();
                 if !file.name().ends_with("/")
                 {
-println!("artifact: {}", file.name() );
                     artifacts.push(file.name().to_string() )
                 }
             }
