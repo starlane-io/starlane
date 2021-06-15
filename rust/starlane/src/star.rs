@@ -53,6 +53,7 @@ use crate::star::variant::web::WebVariant;
 use crate::starlane::api::StarlaneApi;
 use crate::util;
 use crate::util::AsyncHashMap;
+use crate::cache::Caches;
 
 pub mod filestore;
 pub mod pledge;
@@ -2899,7 +2900,8 @@ impl fmt::Display for StarCommand{
                     pub registry: Option<Arc<dyn ResourceRegistryBacking>>,
                     pub star_handler: Option<StarHandleBacking>,
                     pub persistence: Persistence,
-                    pub file_access: FileAccess
+                    pub data_access: FileAccess,
+                    pub caches: Arc<Caches>
                 }
 
                 impl StarSkel

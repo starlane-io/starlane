@@ -30,7 +30,7 @@ pub struct FileStoreHost {
 impl FileStoreHost {
     pub async fn new(skel: StarSkel, file_access: FileAccess)->Result<Self,Error>{
 
-        let mut file_access = file_access.with_path( "filesystems".to_string() ).await?;
+        let mut file_access = file_access.with_path( "filesystems".to_string() )?;
         let rtn = FileStoreHost {
             skel: skel,
             file_access: file_access,

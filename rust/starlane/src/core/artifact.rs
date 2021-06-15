@@ -33,7 +33,7 @@ pub struct ArtifactHost {
 
 impl ArtifactHost {
     pub async fn new(skel: StarSkel, file_access: FileAccess) -> Result<Self, Error> {
-        let mut file_access = file_access.with_path("bundles".to_string()).await?;
+        let mut file_access = file_access.with_path("bundles".to_string())?;
         let rtn = ArtifactHost {
             skel: skel,
             file_access: file_access,
@@ -142,7 +142,7 @@ impl Host for ArtifactHost {
                     AssignResourceStateSrc::Direct(data) => {
                         let artifacts= get_artifacts(data.clone())?;
                         let path = Self::bundle_path(assign.key() )?;
-                        let mut file_access = self.file_access.with_path( path.to_relative() ).await?;
+                        let mut file_access = self.file_access.with_path( path.to_relative() )?;
                         file_access.write(&Path::new("/bundle.zip" )?, data.clone() ).await?;
 
                         artifacts

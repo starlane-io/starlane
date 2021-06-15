@@ -24,9 +24,36 @@ use std::future::Future;
 use std::iter::FromIterator;
 use std::collections::hash_set::Difference;
 use crate::resource::domain::{DomainConfig, DomainConfigParser};
+use crate::star::StarCommand;
 
 pub type Data = Arc<Vec<u8>>;
 pub type ZipFile=Path;
+
+pub struct ProtoCaches{
+    pub star_tx: mpsc::Sender<StarCommand>,
+    pub star_rx: mpsc::Receiver<StarCommand>,
+    pub file_access: FileAccess
+}
+
+pub struct Caches {
+    pub domain_configs: CacheFactory<DomainConfig>
+}
+
+impl Caches {
+    pub fn new(api: StarlaneApi, file_access: FileAccess) -> Result<Caches,Error>{
+
+        let domain_configs = {
+            let parser = Arc::new(DomainConfigParser::new());
+            let configs = Arc::new(RootCache::new(api, file_access, parser)?);
+            CacheFactory::new(configs)
+        };
+
+        Ok(Self{
+            domain_configs
+        })
+    }
+}
+
 
 pub enum ArtifactBundleCacheCommand {
     Cache{ bundle: ArtifactBundleIdentifier, tx: oneshot::Sender<Result<(),Error>> },
@@ -161,8 +188,8 @@ pub struct ArtifactBundleCache {
 }
 
 impl ArtifactBundleCache {
-    pub async fn new( api: StarlaneApi, file_access: FileAccess ) -> Result<Self,Error> {
-        let file_access = file_access.with_path("bundles".to_string() ).await?;
+    pub fn new( api: StarlaneApi, file_access: FileAccess ) -> Result<Self,Error> {
+        let file_access = file_access.with_path("bundles".to_string() )?;
         let tx = ArtifactBundleCacheRunner::new(api, file_access.clone() );
         Ok(ArtifactBundleCache{
             file_access: file_access,
@@ -182,13 +209,13 @@ impl ArtifactBundleCache {
 
     pub async fn with_bundle_path(file_access:FileAccess, address: ArtifactBundleResourceAddress ) -> Result<FileAccess,Error> {
         let address: ResourceAddress = address.into();
-        Ok(file_access.with_path(address.to_parts_string() ).await?)
+        Ok(file_access.with_path(address.to_parts_string() )?)
     }
 }
 
 pub struct Cache<C: Cacheable> {
     root: Arc<RootCache<C>>,
-    map: HashMap<Artifact,Cached<C>>
+    map: AsyncHashMap<Artifact,Cached<C>>
 }
 
 impl <C:Cacheable> Cache<C> {
@@ -196,7 +223,7 @@ impl <C:Cacheable> Cache<C> {
     fn new( root: Arc<RootCache<C>> ) -> Self {
         Self{
             root: root,
-            map: HashMap::new()
+            map: AsyncHashMap::new()
         }
     }
 
@@ -205,9 +232,18 @@ impl <C:Cacheable> Cache<C> {
 
         let parent_rx = self.root.cache(artifacts ).await;
 
+        let map = self.map.clone();
         tokio::spawn( async move {
             match Self::flatten::<C>(parent_rx).await {
                 Ok(cached) => {
+                    for c in cached {
+                        match map.put( c.artifact(), c ).await {
+                            Ok(_) => {}
+                            Err(error) => {
+                                eprintln!("!<Cache> FATAL: could not put Cached<C>");
+                            }
+                        }
+                    }
                     tx.send(Ok(()));
                 }
                 Err(err) => {
@@ -223,8 +259,8 @@ impl <C:Cacheable> Cache<C> {
         Ok(parent_rx.await??)
     }
 
-    pub fn get(&self, artifact: &Artifact) -> Result<Cached<C>,Error>{
-        let cached = self.map.get(artifact);
+    pub async fn get(&self, artifact: &Artifact) -> Result<Cached<C>,Error>{
+        let cached = self.map.get(artifact.clone()).await?;
         if let Some(cached) = cached {
             Ok(cached.clone())
         }
@@ -252,24 +288,6 @@ impl <C:Cacheable> CacheFactory<C> {
     }
 }
 
-pub struct CacheFactories {
-    pub domain_configs: CacheFactory<DomainConfig>
-}
-
-impl CacheFactories {
-    async fn new(api: StarlaneApi, file_access: FileAccess) -> Result<CacheFactories,Error>{
-
-        let domain_configs = {
-            let parser = Arc::new(DomainConfigParser::new());
-            let configs = Arc::new(RootCache::new(api, file_access, parser).await?);
-            CacheFactory::new(configs)
-        };
-
-        Ok(Self{
-           domain_configs
-        })
-    }
-}
 
 pub trait Cacheable: FromArtifact+Send+Sync+'static {}
 
@@ -279,9 +297,9 @@ struct RootCache<C> where C: Cacheable {
 }
 
 impl <C:Cacheable> RootCache<C> {
-    async fn new(api: StarlaneApi, file_access: FileAccess, parser: Arc<dyn Parser<C>>)->Result<Self,Error>{
+    fn new(api: StarlaneApi, file_access: FileAccess, parser: Arc<dyn Parser<C>>)->Result<Self,Error>{
         Ok(RootCache {
-            tx: RootCacheProc::new(api, file_access, parser).await?
+            tx: RootCacheProc::new(api, file_access, parser)?
         })
     }
 
@@ -359,7 +377,7 @@ struct RootCacheProc<C:Cacheable>{
 }
 
 impl <C:Cacheable> RootCacheProc<C> {
-    pub async fn new(api: StarlaneApi, file_access: FileAccess, parser: Arc<dyn Parser<C>>) -> Result<mpsc::Sender<CacheCall<C>>,Error> {
+    pub fn new(api: StarlaneApi, file_access: FileAccess, parser: Arc<dyn Parser<C>>) -> Result<mpsc::Sender<CacheCall<C>>,Error> {
 
         let (tx,rx) = mpsc::channel(16);
         Ok(AsyncRunner::new(
@@ -368,7 +386,7 @@ impl <C:Cacheable> RootCacheProc<C> {
                           tx: tx.clone(),
                           parser: parser,
                           file_access: file_access.clone(),
-                          bundle_cache: ArtifactBundleCache::new(api,file_access).await?,
+                          bundle_cache: ArtifactBundleCache::new(api,file_access)?,
                            map: HashMap::new()
                       }),tx,rx))
     }

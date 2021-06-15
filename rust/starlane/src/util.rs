@@ -38,7 +38,7 @@ pub struct AsyncHashMap<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static,
 }
 
 impl <K,V> AsyncHashMap<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static, V: Clone+Send+Sync+'static {
-    pub async fn new() -> Self {
+    pub fn new() -> Self {
         let (tx,mut rx):(mpsc::Sender<AsyncHashMapCommand<K,V>>,mpsc::Receiver<AsyncHashMapCommand<K,V>>) = mpsc::channel(1);
 
         tokio::spawn( async move {

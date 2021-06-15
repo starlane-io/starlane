@@ -42,8 +42,8 @@ impl FileAccess{
         self.path.clone()
     }
 
-    pub async fn new( path: String ) -> Result<Self,Error>{
-        let tx = LocalFileAccess::new(path.clone()).await?;
+    pub fn new( path: String ) -> Result<Self,Error>{
+        let tx = LocalFileAccess::new(path.clone())?;
         let path = fs::canonicalize(&path)?.to_str().ok_or("turning path to string")?.to_string();
         Ok(FileAccess{
             path: path,
@@ -73,8 +73,8 @@ impl FileAccess{
      */
 
 
-    pub async fn with_path(&self, path: String ) -> Result<FileAccess,Error> {
-        Ok(FileAccess::new( format!("{}/{}",self.path,path) ).await?)
+    pub fn with_path(&self, path: String ) -> Result<FileAccess,Error> {
+        Ok(FileAccess::new( format!("{}/{}",self.path,path) )?)
     }
 
     pub async fn unzip( &self, source: String, target: String ) -> Result<(),Error>{
@@ -87,7 +87,7 @@ impl FileAccess{
         let (tx,rx) = tokio::sync::oneshot::channel();
         self.tx.send( FileCommand::MkDir{path:path.clone(),tx}).await?;
         util::wait_for_it(rx).await?;
-        self.with_path(path.to_relative() ).await
+        self.with_path(path.to_relative() )
     }
 
     pub async fn watch(&self) -> Result<tokio::sync::mpsc::Receiver<FileEvent>,Error> {
@@ -140,7 +140,7 @@ pub struct LocalFileAccess{
 }
 
 impl LocalFileAccess {
-    pub async fn new( base_dir: String) -> Result<tokio::sync::mpsc::Sender<FileCommand>,Error>{
+    pub fn new( base_dir: String) -> Result<tokio::sync::mpsc::Sender<FileCommand>,Error>{
 
         let mut builder = DirBuilder::new();
         builder.recursive(true);
@@ -148,10 +148,12 @@ impl LocalFileAccess {
 
         let (tx,rx) = tokio::sync::mpsc::channel(128 );
 
-        Self{
-            base_dir: base_dir,
-            rx: rx
-        }.run().await;
+        tokio::spawn(async move {
+            Self {
+                base_dir: base_dir,
+                rx: rx
+            }.run().await;
+        });
 
         Ok(tx)
     }

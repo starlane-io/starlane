@@ -1798,7 +1798,7 @@ pub struct HostedResourceStore{
 impl HostedResourceStore{
     pub async fn new( ) -> Self{
         HostedResourceStore{
-            map: AsyncHashMap::new().await
+            map: AsyncHashMap::new()
         }
     }
 

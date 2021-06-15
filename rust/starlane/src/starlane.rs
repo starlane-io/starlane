@@ -28,6 +28,8 @@ use crate::template::{ConstellationData, ConstellationTemplate, StarKeyIndexTemp
 use crate::starlane::api::StarlaneApi;
 use crate::core::CoreRunner;
 use crate::star::variant::{StarVariantFactory, StarVariantFactoryDefault};
+use crate::file_access::FileAccess;
+use crate::cache::Caches;
 
 pub mod api;
 
@@ -45,8 +47,11 @@ pub struct Starlane
 //    star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
     core_runner: Arc<CoreRunner>,
     constellation_names: HashSet<String>,
+    data_access: FileAccess,
+    cache_access: FileAccess,
     pub logger: Logger,
-    pub flags: Flags
+    pub flags: Flags,
+    pub caches: Option<Arc<Caches>>
 }
 
 impl Starlane
@@ -64,7 +69,10 @@ impl Starlane
 //            star_core_ext_factory: Arc::new(ExampleStarCoreExtFactory::new() ),
             core_runner: Arc::new(CoreRunner::new()?),
             logger: Logger::new(),
-            flags: Flags::new()
+            flags: Flags::new(),
+            data_access: FileAccess::new(std::env::var("STARLANE_DATA")? )?,
+            cache_access: FileAccess::new(std::env::var("STARLANE_CACHE")? )?,
+            caches: Option::None
         })
     }
 
@@ -128,7 +136,15 @@ impl Starlane
 
         let link = link.unwrap().clone();
         let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
-        let (proto_star, star_ctrl) = ProtoStar::new(Option::None, link.kind.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.flags.clone(), self.logger.clone() );
+        let (star_tx,star_rx) = mpsc::channel(32);
+
+        if self.caches.is_none() {
+            let api = StarlaneApi::new(star_tx.clone());
+            let caches = Arc::new(Caches::new( api, self.cache_access.clone() )?);
+            self.caches = Option::Some(caches);
+        }
+
+        let (proto_star, star_ctrl) = ProtoStar::new(Option::None, link.kind.clone(), star_tx,star_rx, self.caches.clone().ok_or("already established that caches exists, what gives?")?,self.data_access.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.flags.clone(), self.logger.clone() );
 
         println!("created proto star: {:?}", &link.kind);
 
@@ -220,7 +236,15 @@ impl Starlane
             let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
             evolve_rxs.push(evolve_rx );
 
-            let (proto_star, star_ctrl) = ProtoStar::new(Option::Some(star_key.clone()), star_template.kind.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.flags.clone(), self.logger.clone() );
+            let (star_tx,star_rx) = mpsc::channel(32);
+            if self.caches.is_none() {
+                let api = StarlaneApi::new(star_tx.clone());
+                let caches = Arc::new(Caches::new( api, self.cache_access.clone() )?);
+                self.caches = Option::Some(caches);
+            }
+
+            let (proto_star, star_ctrl) = ProtoStar::new(Option::Some(star_key.clone()), star_template.kind.clone(), star_tx, star_rx, self.caches.as_ref().ok_or("already established that caches exists, what gives?")?.clone(),self.data_access.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.flags.clone(), self.logger.clone() );
+
             self.star_controllers.insert(star_key.clone(), star_ctrl.clone() );
             if name.is_some() && star_template.handle.is_some()
             {
