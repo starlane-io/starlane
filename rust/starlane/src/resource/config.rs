@@ -1,4 +1,4 @@
-use crate::artifact::ArtifactResourceAddress;
+use crate::artifact::Artifact;
 use crate::cache::Data;
 use crate::error::Error;
 use crate::resource::{ResourceType, ResourceKind};
@@ -9,9 +9,10 @@ pub trait ResourceConfig {
 }
 
 pub trait FromArtifact {
-    fn artifact(&self)->ArtifactResourceAddress;
+    fn artifact(&self)-> Artifact;
+    fn dependencies(&self)->Vec<Artifact>;
 }
 
 pub trait Parser<J: FromArtifact> : Send+Sync+'static {
-    fn parse( &self, artifact: ArtifactResourceAddress, data: Data ) -> Result<J,Error>;
+    fn parse(&self, artifact: Artifact, data: Data ) -> Result<J,Error>;
 }

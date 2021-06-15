@@ -132,11 +132,11 @@ impl ArtifactBundleKey{
 }
 
 #[derive(Clone,Hash,Eq,PartialEq)]
-pub struct ArtifactResourceAddress{
+pub struct Artifact {
     address: ResourceAddress
 }
 
-impl ArtifactResourceAddress {
+impl Artifact {
     pub fn parent(&self)->ArtifactBundleResourceAddress {
         return ArtifactBundleResourceAddress{
             address: self.address.parent().expect("artifact should have bundle parent")
@@ -162,13 +162,13 @@ impl ArtifactResourceAddress {
     }
 }
 
-impl ToString for ArtifactResourceAddress {
+impl ToString for Artifact {
     fn to_string(&self) -> String {
         self.address.to_string()
     }
 }
 
-impl LogInfo for ArtifactResourceAddress {
+impl LogInfo for Artifact {
     fn log_identifier(&self) -> String {
         let address: ResourceAddress = self.clone().into();
         address.to_parts_string()
@@ -186,20 +186,20 @@ impl LogInfo for ArtifactResourceAddress {
 
 
 
-impl Into<ResourceAddress> for ArtifactResourceAddress{
+impl Into<ResourceAddress> for Artifact {
     fn into(self) -> ResourceAddress {
         self.address
     }
 }
 
-impl TryFrom<ResourceAddress> for ArtifactResourceAddress {
+impl TryFrom<ResourceAddress> for Artifact {
     type Error = Fail;
 
     fn try_from(value: ResourceAddress) -> Result<Self, Self::Error> {
         if value.resource_type() != ResourceType::Artifact {
             Err(Fail::WrongResourceType {expected:HashSet::from_iter(vec![ResourceType::Artifact]),received: value.resource_type()})
         } else {
-            Ok(ArtifactResourceAddress{
+            Ok(Artifact {
                 address: value
             })
         }
@@ -208,7 +208,7 @@ impl TryFrom<ResourceAddress> for ArtifactResourceAddress {
 
 pub enum ArtifactIdentifier{
     Key(ArtifactKey),
-    Address(ArtifactResourceAddress)
+    Address(Artifact)
 }
 
 

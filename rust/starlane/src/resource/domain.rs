@@ -4,8 +4,8 @@ use std::convert::{TryInto, TryFrom};
 use std::sync::Arc;
 use crate::error::Error;
 use serde::{Serialize,Deserialize};
-use crate::cache::Data;
-use crate::artifact::ArtifactResourceAddress;
+use crate::cache::{Data, Cacheable};
+use crate::artifact::Artifact;
 use std::collections::HashMap;
 use crate::resource::config::{FromArtifact, Parser, ResourceConfig};
 
@@ -67,14 +67,22 @@ pub struct HttpResourceSelector{
 }
 
 
-struct DomainConfig {
-    artifact: ArtifactResourceAddress,
+pub struct DomainConfig {
+    artifact: Artifact,
     routes: HashMap<String,HttpResourceSelector>
 }
 
+impl Cacheable for DomainConfig {
+
+}
+
 impl FromArtifact for DomainConfig{
-    fn artifact(&self) -> ArtifactResourceAddress {
+    fn artifact(&self) -> Artifact {
         self.artifact.clone()
+    }
+
+    fn dependencies(&self) -> Vec<Artifact> {
+        vec!()
     }
 }
 
@@ -85,10 +93,16 @@ impl ResourceConfig for DomainConfigParser{
 }
 
 
-struct DomainConfigParser;
+pub struct DomainConfigParser;
+
+impl DomainConfigParser{
+    pub fn new()->Self{
+        Self{}
+    }
+}
 
 impl Parser<DomainConfig> for DomainConfigParser{
-    fn parse(&self, artifact: ArtifactResourceAddress, data: Data) -> Result<DomainConfig, Error> {
+    fn parse(&self, artifact: Artifact, data: Data) -> Result<DomainConfig, Error> {
         Ok(DomainConfig{
             artifact: artifact,
             routes: HashMap::new()

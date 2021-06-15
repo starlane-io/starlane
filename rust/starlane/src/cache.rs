@@ -4,10 +4,10 @@ use std::thread;
 
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::runtime::Runtime;
-use tokio::sync::{broadcast, oneshot};
+use tokio::sync::{broadcast, oneshot, mpsc};
 use tokio::sync::oneshot::Receiver;
 
-use crate::artifact::{ArtifactBundleId, ArtifactBundleIdentifier, ArtifactBundleResourceAddress, ArtifactIdentifier, ArtifactKey, ArtifactResourceAddress};
+use crate::artifact::{ArtifactBundleId, ArtifactBundleIdentifier, ArtifactBundleResourceAddress, ArtifactIdentifier, ArtifactKey, Artifact};
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::keys::ResourceId;
@@ -17,7 +17,13 @@ use crate::resource::config::{Parser, FromArtifact};
 use crate::message::Fail;
 use std::convert::TryInto;
 use crate::logger::{elog, LogInfo, StaticLogInfo};
-use crate::util::AsyncHashMap;
+use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
+use std::ops::Deref;
+use tokio::sync::oneshot::error::RecvError;
+use std::future::Future;
+use std::iter::FromIterator;
+use std::collections::hash_set::Difference;
+use crate::resource::domain::{DomainConfig, DomainConfigParser};
 
 pub type Data = Arc<Vec<u8>>;
 pub type ZipFile=Path;
@@ -178,84 +184,288 @@ impl ArtifactBundleCache {
         let address: ResourceAddress = address.into();
         Ok(file_access.with_path(address.to_parts_string() ).await?)
     }
-
-
 }
 
-pub struct Caches {
-
+pub struct Cache<C: Cacheable> {
+    parent: ParentCache<C>,
+    map: HashMap<Artifact,Cached<C>>
 }
 
-pub struct Cached<J> where J: FromArtifact+Clone+Send+Sync+'static {
-    address: ArtifactResourceAddress,
-    config: Arc<J>,
-    claim: oneshot::Sender<ArtifactResourceAddress>,
-    cache: Arc<ParentCache<J>>
-}
+impl <C:Cacheable> Cache<C> {
 
-pub struct ParentCache<J> where J: FromArtifact+Clone+Send+Sync+'static {
-    map: AsyncHashMap<ArtifactResourceAddress,Result<Arc<J>,Error>>,
-    bundle_cache: ArtifactBundleCache,
-    parser: Arc<dyn Parser<J>>,
-    file_access: FileAccess
-}
+    pub async fn cache(&self, artifacts: Vec<Artifact> ) -> oneshot::Receiver<Result<(),Error>>{
+        let (tx,rx) = oneshot::channel();
 
-impl <J> ParentCache<J> where J: FromArtifact+Clone+Send+Sync+'static{
-    pub async fn cache(&self, artifact: ArtifactResourceAddress ) -> oneshot::Receiver<Result<(),Error>>{
-       let (tx,rx) = oneshot::channel();
+        let parent_rx = self.parent.cache(artifacts ).await;
 
-        if let Ok(Option::Some(result)) = self.map.get(artifact.clone() ).await {
-            match result {
-                Ok(_) => {
+        tokio::spawn( async move {
+            match Self::flatten::<C>(parent_rx).await {
+                Ok(cached) => {
                     tx.send(Ok(()));
                 }
                 Err(err) => {
                     tx.send(Err(err.into()));
                 }
             }
-        } else {
-            let log_info = StaticLogInfo::clone_info(Box::new(self));
-            let file_access = self.file_access.clone();
-            let bundle_cache = self.bundle_cache.clone();
-            let parser = self.parser.clone();
-            let map = self.map.clone();
-            tokio::spawn(async move {
-                let result = Self::cache_final::<J>(bundle_cache, artifact, file_access, parser, map ).await;
+        });
 
-                match result {
-                    Ok(ok) => {
-                        tx.send(Ok(()));
-                    }
-                    Err(err) => {
-                        tx.send(Err(err.into()));
-                    }
-                }
-            });
+        rx
+    }
+
+    async fn flatten<X: Cacheable>( parent_rx: oneshot::Receiver<Result<Vec<Cached<X>>,Error>> ) -> Result<Vec<Cached<X>>,Error> {
+        Ok(parent_rx.await??)
+    }
+
+    pub fn get(&self, artifact: &Artifact) -> Result<Cached<C>,Error>{
+        let cached = self.map.get(artifact);
+        if let Some(cached) = cached {
+            Ok(cached.clone())
         }
-
-       rx
+        else{
+            Err(format!("must call cache.cache('{}') for this artifact and wait for cache callback before get()",artifact.to_string()).into())
+        }
     }
 
-    async fn cache_final<X>( bundle_cache: ArtifactBundleCache, artifact: ArtifactResourceAddress, file_access: FileAccess, parser: Arc<dyn Parser<X>>, mut map: AsyncHashMap<ArtifactResourceAddress,Result<Arc<X>,Error>>) -> Result<Arc<X>,Error> where X: FromArtifact+Clone+Send+Sync+'static{
-        bundle_cache.download(artifact.parent().into()).await?;
-        let bundle = artifact.parent();
-        let file_access = ArtifactBundleCache::with_bundle_path(file_access.clone(), bundle.clone()).await?;
-        let data = file_access.read( &artifact.path()? ).await?;
-        let result = Ok(Arc::new(parser.parse(artifact.clone(), data)?));
-        map.put( artifact, result.clone() ).await;
-
-        result
-    }
-
-    pub async fn get(&self, artifact: &ArtifactResourceAddress ) -> Result<Arc<J>,Error>{
-        Ok(self.map.get(artifact.clone() ).await?.ok_or(format!("ERROR: attempt to get artifact '{}' from cache before calling the cache() method.",artifact.to_string() ) )??)
-    }
 }
 
 
 
+pub struct ParentCaches {
+    domain_configs: ParentCache<DomainConfig>
+}
 
-impl <P> LogInfo for ParentCache<P> where P: FromArtifact+Clone+Send+Sync+'static {
+impl ParentCaches {
+    pub async fn new(api: StarlaneApi, file_access: FileAccess) -> Result<ParentCaches,Error>{
+        let domain_parser = Arc::new(DomainConfigParser::new());
+        let domain_configs = ParentCache::new(api,file_access,domain_parser).await?;
+
+        Ok(Self{
+            domain_configs
+        })
+    }
+}
+
+pub trait Cacheable: FromArtifact+Send+Sync+'static {}
+
+
+struct ParentCache<C> where C: Cacheable {
+   tx: mpsc::Sender<CacheCall<C>>
+}
+
+impl <C:Cacheable> ParentCache<C> {
+    async fn new(api: StarlaneApi, file_access: FileAccess, parser: Arc<dyn Parser<C>>)->Result<Self,Error>{
+        Ok(ParentCache{
+            tx: ParentCacheProcessor::new(api,file_access,parser).await?
+        })
+    }
+
+    async fn cache(&self, artifacts: Vec<Artifact> ) -> oneshot::Receiver<Result<Vec<Cached<C>>,Error>>{
+        let (tx,rx) = oneshot::channel();
+        self.tx.send( CacheCall::Cache {artifacts, tx }).await;
+        rx
+    }
+
+}
+
+pub enum CacheCall<C:Cacheable> {
+   Cache{artifacts: Vec<Artifact>, tx: oneshot::Sender<Result<Vec<Cached<C>>,Error>>},
+   Increment{artifact: Artifact, item: Arc<C>},
+   Decrement(Artifact)
+}
+
+impl <C:Cacheable> Call for CacheCall<C> {
+
+}
+
+pub struct Cached<C:Cacheable> {
+    item: Arc<C>,
+    deref_tx: mpsc::Sender<CacheCall<C>>
+}
+
+impl <C:Cacheable> Cached<C>{
+    pub fn new(item:Arc<C>, deref_tx:mpsc::Sender<CacheCall<C>>) -> Self{
+
+        let item_cp = item.clone();
+        let deref_tx_cp= deref_tx.clone();
+        tokio::spawn( async move {
+            deref_tx_cp.send(CacheCall::Increment{ artifact: item_cp.artifact(), item: item_cp } ).await;
+        });
+
+        Cached{
+            item: item,
+            deref_tx: deref_tx
+        }
+    }
+}
+
+impl <C:Cacheable> Clone for Cached<C>{
+
+    fn clone(&self) -> Self {
+        Self::new( self.item.clone(), self.deref_tx.clone() )
+    }
+}
+
+impl <C:Cacheable> Deref for Cached<C>{
+    type Target = Arc<C>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.item
+    }
+}
+
+impl <C:Cacheable> Drop for Cached<C> {
+    fn drop(&mut self) {
+        self.deref_tx.send(CacheCall::Decrement(self.item.artifact()));
+    }
+}
+
+struct RefCount<C> {
+    pub count: usize,
+    pub item: Arc<C>
+}
+
+struct ParentCacheProcessor<C:Cacheable>{
+    pub tx: mpsc::Sender<CacheCall<C>>,
+    pub parser: Arc<dyn Parser<C>>,
+    pub bundle_cache: ArtifactBundleCache,
+    pub map: HashMap<Artifact,RefCount<C>>,
+    pub file_access: FileAccess
+}
+
+impl <C:Cacheable> ParentCacheProcessor<C> {
+    pub async fn new(api: StarlaneApi, file_access: FileAccess, parser: Arc<dyn Parser<C>>) -> Result<mpsc::Sender<CacheCall<C>>,Error> {
+
+        let (tx,rx) = mpsc::channel(16);
+        Ok(AsyncRunner::new(
+            Box::new(
+                      ParentCacheProcessor{
+                          tx: tx.clone(),
+                          parser: parser,
+                          file_access: file_access.clone(),
+                          bundle_cache: ArtifactBundleCache::new(api,file_access).await?,
+                           map: HashMap::new()
+                      }),tx,rx))
+    }
+
+    async fn cache(&mut self, artifacts: Vec<Artifact>, tx: oneshot::Sender<Result<Vec<Cached<C>>,Error>> )
+    {
+        let mut rtn = vec![];
+        let mut fetch_artifacts = artifacts.clone();
+        // these are the ones we don't have in our cache yet
+        fetch_artifacts.retain( |artifact| !self.map.contains_key(artifact));
+
+        {
+            let artifacts:HashSet<Artifact> = HashSet::from_iter(artifacts);
+            let fetch_artifacts:HashSet<Artifact> = HashSet::from_iter(fetch_artifacts.clone());
+            let diff:Vec<Artifact> = artifacts.difference(&fetch_artifacts).into_iter().cloned().collect();
+            for artifact in diff {
+                if let Option::Some(ref_count)  = self.map.get(&artifact)
+                {
+                    rtn.push(Cached::new(ref_count.item.clone(), self.tx.clone() ) );
+                }
+            }
+        }
+        let file_access = self.file_access.clone();
+        let parser = self.parser.clone();
+        let bundle_cache = self.bundle_cache.clone();
+        let cache_tx = self.tx.clone();
+
+        tokio::spawn( async move {
+           let mut futures = vec![];
+           for artifact in fetch_artifacts.clone() {
+                futures.push(Self::cache_artifact( artifact, &file_access, &bundle_cache, &parser, &cache_tx ));
+           }
+           let results = futures::future::join_all(futures).await;
+           for result in results {
+                if result.is_err() {
+                    tx.send( Err(result.err().unwrap()) );
+                    return;
+                }
+                if let Ok(cached) = result {
+                    rtn.push(cached);
+                }
+            }
+
+            let mut set = HashSet::new();
+            let mut dependencies = HashSet::new();
+            for cached in &rtn {
+                set.insert(cached.artifact() );
+                for depend in cached.dependencies() {
+                    dependencies.insert(depend);
+                }
+            }
+            let diff = dependencies.difference(&set);
+            let diff:Vec<Artifact> = diff.into_iter().cloned().collect();
+
+            if !diff.is_empty() {
+                let (tx2,rx2) = oneshot::channel();
+                cache_tx.send( CacheCall::Cache{ artifacts: diff, tx: tx2 }).await;
+                rtn.append( & mut match rx2.await {
+                    Ok(result) => {
+                        match result {
+                            Ok(cached) => {
+                                cached
+                            }
+                            Err(err) => {
+                                tx.send(Err(err.into()));
+                                return;
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        tx.send(Err(err.into()));
+                        return;
+                    }
+                });
+            }
+
+            tx.send(Ok(rtn));
+        });
+    }
+
+    async fn cache_artifact(artifact: Artifact, file_access: &FileAccess, bundle_cache: &ArtifactBundleCache, parser: &Arc<dyn Parser<C>>, cache_tx: &mpsc::Sender<CacheCall<C>>) -> Result<Cached<C>,Error>{
+        let bundle = artifact.parent();
+        bundle_cache.download(bundle.clone().into() ).await?;
+        let file_access = ArtifactBundleCache::with_bundle_path(file_access.clone(), bundle.clone()).await?;
+        let data = file_access.read( &artifact.path()? ).await?;
+        let item = parser.parse(artifact, data )?;
+        Ok( Cached::new(  Arc::new(item), cache_tx.clone() ) )
+    }
+}
+
+#[async_trait]
+impl <C:Cacheable> AsyncProcessor<CacheCall<C>> for ParentCacheProcessor<C>{
+    async fn process(&mut self, call: CacheCall<C>) {
+        match call{
+            CacheCall::Cache { artifacts, tx } => {
+
+            }
+            CacheCall::Increment{artifact,item} => {
+                let count = self.map.get_mut(&artifact);
+                if let Option::Some(count) = count {
+                    count.count = count.count + 1;
+                } else {
+                    self.map.insert( artifact, RefCount{
+                        item: item,
+                        count: 1
+                    });
+                }
+            }
+            CacheCall::Decrement(artifact) => {
+                let count = self.map.get_mut(&artifact);
+                if let Option::Some(count) = count {
+                    count.count = count.count - 1;
+                    if count.count <= 0 {
+                        self.map.remove(&artifact);
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+impl <P> LogInfo for ParentCache<P> where P: Cacheable {
     fn log_identifier(&self) -> String {
         "?".to_string()
     }

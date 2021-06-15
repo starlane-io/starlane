@@ -1,9 +1,10 @@
-use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::{Receiver, Sender};
 use crate::error::Error;
 use tokio::sync::{mpsc, oneshot};
 use std::collections::HashMap;
 use std::hash::Hash;
 use tokio::time::Duration;
+use std::future::Future;
 
 pub struct Progress<E>
 {
@@ -103,3 +104,38 @@ pub async fn wait_for_it_whatever<R>( rx: oneshot::Receiver<R>) -> Result<R,Erro
 pub async fn wait_for_it_for<R>( rx: oneshot::Receiver<Result<R,Error>>, duration: Duration ) -> Result<R,Error> {
     tokio::time::timeout( duration, rx).await??
 }
+
+
+#[async_trait]
+pub trait AsyncProcessor<C>: Send+Sync+'static {
+    async fn process(&mut self, call: C);
+}
+
+pub trait Call: Sync+Send+'static {}
+
+pub struct AsyncRunner<C:Call>{
+    tx: mpsc::Sender<C>,
+    rx: mpsc::Receiver<C>,
+    processor: Box<dyn AsyncProcessor<C>>
+}
+
+impl <C:Call> AsyncRunner<C> {
+    pub fn new(processor: Box<dyn AsyncProcessor<C>>, tx: mpsc::Sender<C>, rx: mpsc::Receiver<C> )->mpsc::Sender<C>{
+        let tx_cp = tx.clone();
+        tokio::spawn( async move {
+            AsyncRunner{
+                tx: tx_cp,
+                rx: rx,
+                processor: processor
+            }
+        } );
+        tx
+    }
+
+    async fn run(mut self) {
+        while let Option::Some(call) = self.rx.recv().await {
+            self.processor.process(call).await;
+        }
+    }
+}
+
