@@ -115,6 +115,10 @@ impl Starlane
         }
     }
 
+    pub fn caches(&self) -> Result<Arc<Caches>,Error> {
+        Ok(self.caches.as_ref().ok_or("expected caches to be set")?.clone())
+    }
+
     async fn lookup_star_address( &self, key: &StarKey )->Result<StarAddress,Error>
     {
         if self.star_controllers.contains_key(key)
@@ -140,7 +144,7 @@ impl Starlane
 
         if self.caches.is_none() {
             let api = StarlaneApi::new(star_tx.clone());
-            let caches = Arc::new(Caches::new( api, self.cache_access.clone() )?);
+            let caches = Arc::new(Caches::new( api.into(), self.cache_access.clone() )?);
             self.caches = Option::Some(caches);
         }
 
@@ -239,7 +243,7 @@ impl Starlane
             let (star_tx,star_rx) = mpsc::channel(32);
             if self.caches.is_none() {
                 let api = StarlaneApi::new(star_tx.clone());
-                let caches = Arc::new(Caches::new( api, self.cache_access.clone() )?);
+                let caches = Arc::new(Caches::new( api.into(), self.cache_access.clone() )?);
                 self.caches = Option::Some(caches);
             }
 
@@ -371,35 +375,35 @@ pub enum StarlaneCommand
 {
     Connect(ConnectCommand),
     ConstellationCreate(ConstellationCreate),
-    StarControlRequestByKey(StarControlRequestByKey),
-    StarControlRequestByName(StarControlRequestByName),
+    StarControlRequestByKey(StarlaneApiRequestByKey),
+    StarControlRequestByName(StarlaneApiRequestByName),
     Destroy
 }
 
-pub struct StarControlRequestByKey
+pub struct StarlaneApiRequestByKey
 {
     pub star: StarKey,
     pub tx: oneshot::Sender<StarlaneApi>
 }
 
-pub struct StarControlRequestByName
+pub struct StarlaneApiRequestByName
 {
     pub name: StarName,
     pub tx: oneshot::Sender<StarlaneApi>
 }
 
-impl StarControlRequestByName
+impl StarlaneApiRequestByName
 {
     pub fn new( constellation: String, star: String )->(Self,oneshot::Receiver<StarlaneApi>)
     {
         let (tx,rx) = oneshot::channel();
-        (StarControlRequestByName{
+        (StarlaneApiRequestByName {
             name: StarName {
                 constellation: constellation,
                 star: star
             },
             tx: tx
-        },rx)
+        }, rx)
     }
 }
 
@@ -461,7 +465,7 @@ mod test
     use tokio::time::Duration;
     use tokio::time::timeout;
 
-    use crate::artifact::{ArtifactKind, ArtifactLocation};
+    use crate::artifact::{ArtifactKind, ArtifactLocation, Artifact};
     use crate::error::Error;
     use crate::keys::{SpaceKey, SubSpaceKey, UserKey};
     use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
@@ -470,7 +474,7 @@ mod test
     use crate::resource::{Labels, ResourceAddress};
     use crate::space::CreateAppControllerFail;
     use crate::star::{StarController, StarInfo, StarKey, StarKind};
-    use crate::starlane::{ConstellationCreate, StarControlRequestByName, Starlane, StarlaneCommand};
+    use crate::starlane::{ConstellationCreate, StarlaneApiRequestByName, Starlane, StarlaneCommand};
     use crate::template::{ConstellationData, ConstellationTemplate};
     use crate::starlane::api::SubSpaceApi;
     use crate::message::Fail;
@@ -524,7 +528,7 @@ mod test
             tokio::time::sleep(Duration::from_secs(1)).await;
 
             let starlane_api = {
-                let (request,rx) = StarControlRequestByName::new("standalone".to_owned(), "mesh".to_owned());
+                let (request,rx) = StarlaneApiRequestByName::new("standalone".to_owned(), "mesh".to_owned());
                 tx.send(StarlaneCommand::StarControlRequestByName(request)).await;
                 timeout(Duration::from_millis(10), rx).await.unwrap().unwrap()
             };
@@ -553,6 +557,16 @@ println!("... >  uploading artifact bundle...");
                 let artifact_bundle_api = sub_space_api.create_artifact_bundle("whiz", &semver::Version::from_str("1.0.0").unwrap(), data ).unwrap().submit().await.unwrap();
             }
 
+            {
+                let artifact = Artifact::from_str("hyperspace:default:whiz:1.0.0:/routes.txt").unwrap();
+                let caches = starlane_api.get_caches().await.unwrap();
+                let domain_configs = caches.domain_configs.create();
+                domain_configs.wait_for_cache(artifact.clone() ).await.unwrap();
+                let domain_configs = domain_configs.into_cache().await.unwrap();
+println!("cache Ok!");
+                let domain_config = domain_configs.get(&artifact).unwrap();
+println!("got domain_config!");
+            }
 
             loop {
                 tokio::time::sleep(Duration::from_secs(30)).await;

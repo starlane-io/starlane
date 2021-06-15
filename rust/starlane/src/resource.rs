@@ -3251,7 +3251,7 @@ mod test
     use crate::resource::ResourceRegistryResult::Resources;
     use crate::space::CreateAppControllerFail;
     use crate::star::{StarController, StarInfo, StarKey, StarKind};
-    use crate::starlane::{ConstellationCreate, StarControlRequestByName, Starlane, StarlaneCommand};
+    use crate::starlane::{ConstellationCreate, StarlaneApiRequestByName, Starlane, StarlaneCommand};
     use crate::template::{ConstellationData, ConstellationTemplate};
 
     fn create_save(index: usize, resource: ResourceRecord ) -> ResourceRegistration

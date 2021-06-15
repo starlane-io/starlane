@@ -29,7 +29,9 @@ enum AsyncHashMapCommand<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static
     Contains{
         key: K,
         tx: oneshot::Sender<bool>
-    }
+    },
+    GetMap(oneshot::Sender<HashMap<K,V>>),
+    SetMap(HashMap<K,V>)
 }
 
 #[derive(Clone)]
@@ -58,6 +60,12 @@ impl <K,V> AsyncHashMap<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static,
                     }
                     AsyncHashMapCommand::Contains{key,tx} => {
                         tx.send(map.contains_key(&key) ).unwrap_or_default();
+                    }
+                    AsyncHashMapCommand::GetMap(tx) => {
+                        tx.send(map.clone());
+                    }
+                    AsyncHashMapCommand::SetMap(new_map) => {
+                        map = new_map
                     }
                 }
             }
@@ -91,6 +99,27 @@ impl <K,V> AsyncHashMap<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static,
         Ok(rx.await?)
     }
 
+    pub async fn into_map(self) -> Result<HashMap<K,V>,Error> {
+        let (tx,rx) = oneshot::channel();
+        self.tx.send( AsyncHashMapCommand::GetMap(tx)).await?;
+        Ok(rx.await?)
+    }
+
+    pub fn set_map(&self, map: HashMap<K,V>) {
+        let tx = self.tx.clone();
+        tokio::spawn( async move {
+            tx.send(AsyncHashMapCommand::SetMap(map)).await;
+        });
+    }
+
+}
+
+impl <K,V> From<HashMap<K,V>> for AsyncHashMap<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static, V: Clone+Send+Sync+'static {
+    fn from(map: HashMap<K, V>) -> Self {
+        let async_map = AsyncHashMap::new();
+        async_map.set_map(map);
+        async_map
+    }
 }
 
 pub async fn wait_for_it<R>( rx: oneshot::Receiver<Result<R,Error>>) -> Result<R,Error> {

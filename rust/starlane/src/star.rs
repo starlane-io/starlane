@@ -741,6 +741,9 @@ println!("GOT REPLY from GetKey");
                         self.status = status;
                         println!( "{} {}", &self.skel.info.kind, &self.status.to_string());
                     }
+                    StarCommand::GetCaches(tx) => {
+                        tx.send( self.skel.caches.clone() );
+                    }
                     StarCommand::Diagnose(diagnose) => {
                         self.diagnose(diagnose).await;
                     }
@@ -2169,6 +2172,7 @@ println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
                     ResourceRecordRequestFromStar(Request<(ResourceIdentifier,StarKey), ResourceRecord>),
                     ResourceRecordSet(Set<ResourceRecord>),
 
+                    GetCaches(oneshot::Sender<Arc<Caches>>)
                 }
 
                 pub enum Diagnose{
@@ -2421,7 +2425,8 @@ impl fmt::Display for StarCommand{
                             StarCommand::Diagnose(_) => "Diagnose".to_string(),
                             StarCommand::CheckStatus => "CheckStatus".to_string(),
                             StarCommand::ResourceRecordRequestFromStar(_) => "ResourceRecordRequestFromStar".to_string(),
-                            StarCommand::SetStatus(_) => "StarStatus".to_string()
+                            StarCommand::SetStatus(_) => "StarStatus".to_string(),
+                            StarCommand::GetCaches(_) => "GetCaches".to_string()
                         };
                         write!(f, "{}",r)
                     }

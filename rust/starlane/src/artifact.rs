@@ -9,11 +9,12 @@ use crate::keys::{SubSpaceKey, ResourceKey};
 use crate::names::{Name, Specific};
 use std::fmt;
 use crate::resource::{ResourceAddress, ResourceType, ArtifactBundleKind, ResourceIdentifier, Path, ResourceAddressPart};
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use crate::message::Fail;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 use crate::logger::LogInfo;
+use crate::message::Fail::ResourceAddressAlreadyInUse;
 /*
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct Artifact
@@ -136,6 +137,7 @@ pub struct Artifact {
     address: ResourceAddress
 }
 
+
 impl Artifact {
     pub fn parent(&self)->ArtifactBundleResourceAddress {
         return ArtifactBundleResourceAddress{
@@ -158,6 +160,27 @@ impl Artifact {
         }
         else{
             Err("expected ArtifactResourceAddress to end in a Path".into())
+        }
+    }
+}
+
+
+impl FromStr for Artifact {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+
+        if s.contains("::<") {
+            let address = ResourceAddress::from_str(s)?;
+            let artifact = address.try_into()?;
+            Ok(artifact)
+        } else {
+            let mut string = String::new();
+            string.push_str(s);
+            string.push_str("::<Artifact>");
+            let address = ResourceAddress::from_str(string.as_str())?;
+            let artifact = address.try_into()?;
+            Ok(artifact)
         }
     }
 }

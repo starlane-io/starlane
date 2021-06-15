@@ -28,6 +28,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use futures::io::Cursor;
 use tempdir::TempDir;
 use tokio::fs::File;
+use crate::cache::Caches;
 
 
 #[derive(Clone)]
@@ -82,6 +83,11 @@ println!("elapsed error: {}",err );
         rx.await?
     }
 
+    pub async fn get_caches(&self) -> Result<Arc<Caches>,Fail> {
+        let (tx,rx)  = tokio::sync::oneshot::channel();
+        self.star_tx.send( StarCommand::GetCaches(tx)).await;
+        Ok(rx.await?)
+    }
 
     /*
     pub async fn get_child_resource_manager(&self, key: ResourceKey ) -> Result<ChildResourceManager,Fail> {

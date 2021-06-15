@@ -12,7 +12,6 @@ use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::keys::ResourceId;
 use crate::resource::{Path, ResourceAddress, ResourceIdentifier, ResourceStub, ResourceRecord};
-use crate::starlane::api::StarlaneApi;
 use crate::resource::config::{Parser, FromArtifact};
 use crate::message::Fail;
 use std::convert::TryInto;
@@ -25,6 +24,8 @@ use std::iter::FromIterator;
 use std::collections::hash_set::Difference;
 use crate::resource::domain::{DomainConfig, DomainConfigParser};
 use crate::star::StarCommand;
+use tokio::fs;
+use crate::starlane::api::StarlaneApi;
 
 pub type Data = Arc<Vec<u8>>;
 pub type ZipFile=Path;
@@ -40,11 +41,11 @@ pub struct Caches {
 }
 
 impl Caches {
-    pub fn new(api: StarlaneApi, file_access: FileAccess) -> Result<Caches,Error>{
+    pub fn new(src: ArtifactBundleSrc, file_access: FileAccess) -> Result<Caches,Error>{
 
         let domain_configs = {
             let parser = Arc::new(DomainConfigParser::new());
-            let configs = Arc::new(RootCache::new(api, file_access, parser)?);
+            let configs = Arc::new(RootCache::new(src, file_access, parser)?);
             CacheFactory::new(configs)
         };
 
@@ -63,17 +64,17 @@ pub enum ArtifactBundleCacheCommand {
 pub struct ArtifactBundleCacheRunner {
     tx: tokio::sync::mpsc::Sender<ArtifactBundleCacheCommand>,
     rx: tokio::sync::mpsc::Receiver<ArtifactBundleCacheCommand>,
-    api: StarlaneApi,
+    src: ArtifactBundleSrc,
     file_access: FileAccess,
     notify: HashMap<ArtifactBundleResourceAddress,Vec<oneshot::Sender<Result<(),Error>>>>
 }
 
 impl ArtifactBundleCacheRunner {
-    pub fn new(api: StarlaneApi, file_access: FileAccess) -> tokio::sync::mpsc::Sender<ArtifactBundleCacheCommand> {
+    pub fn new(src: ArtifactBundleSrc, file_access: FileAccess) -> tokio::sync::mpsc::Sender<ArtifactBundleCacheCommand> {
         let (tx,rx) = tokio::sync::mpsc::channel(1024);
         let runner = ArtifactBundleCacheRunner {
             file_access: file_access,
-            api: api,
+            src: src,
             rx: rx,
             tx: tx.clone(),
             notify: HashMap::new()
@@ -93,7 +94,7 @@ impl ArtifactBundleCacheRunner {
             match command {
                 ArtifactBundleCacheCommand::Cache{ bundle,tx} => {
                     let bundle: ResourceIdentifier = bundle.into();
-                    let record = match self.api.fetch_resource_record(bundle.clone()).await{
+                    let record = match self.src.fetch_resource_record(bundle.clone()).await{
                         Ok(record) => record,
                         Err(err) => {
                             tx.send( Err(err.into()));
@@ -121,12 +122,12 @@ impl ArtifactBundleCacheRunner {
                         let notifiers = self.notify.get_mut(&bundle).unwrap();
                         notifiers.push(tx);
 
-                        let api = self.api.clone();
+                        let src = self.src.clone();
                         let file_access = self.file_access.clone();
                         let tx = self.tx.clone();
                         if first {
                             tokio::spawn(async move {
-                                let result = Self::download_and_extract(api, file_access, bundle.clone()).await;
+                                let result = Self::download_and_extract(src, file_access, bundle.clone()).await;
                                 tx.send(ArtifactBundleCacheCommand::Result { bundle: bundle.clone(), result: result }).await;
                             });
                         }
@@ -157,12 +158,12 @@ impl ArtifactBundleCacheRunner {
         Ok(())
     }
 
-    async fn download_and_extract(api: StarlaneApi, mut file_access: FileAccess,  bundle: ArtifactBundleResourceAddress ) -> Result<(),Error> {
+    async fn download_and_extract(src: ArtifactBundleSrc, mut file_access: FileAccess,  bundle: ArtifactBundleResourceAddress ) -> Result<(),Error> {
         let bundle: ResourceAddress = bundle.into();
         let bundle: ResourceIdentifier = bundle.into();
-        let record = api.fetch_resource_record(bundle.clone()).await?;
+        let record = src.fetch_resource_record(bundle.clone()).await?;
 
-        let stream = api.get_resource_state(bundle).await?.ok_or("expected bundle to have state")?;
+        let stream = src.get_resource_state(bundle).await?.ok_or("expected bundle to have state")?;
 
         let mut file_access = ArtifactBundleCache::with_bundle_path(file_access,record.stub.address.try_into()?).await?;
         let bundle_zip = Path::new("/bundle.zip")?;
@@ -188,9 +189,9 @@ pub struct ArtifactBundleCache {
 }
 
 impl ArtifactBundleCache {
-    pub fn new( api: StarlaneApi, file_access: FileAccess ) -> Result<Self,Error> {
+    pub fn new( src: ArtifactBundleSrc, file_access: FileAccess ) -> Result<Self,Error> {
         let file_access = file_access.with_path("bundles".to_string() )?;
-        let tx = ArtifactBundleCacheRunner::new(api, file_access.clone() );
+        let tx = ArtifactBundleCacheRunner::new(src, file_access.clone() );
         Ok(ArtifactBundleCache{
             file_access: file_access,
             tx: tx
@@ -213,12 +214,43 @@ impl ArtifactBundleCache {
     }
 }
 
-pub struct Cache<C: Cacheable> {
+#[derive(Clone)]
+pub struct Cache<C:Cacheable> {
+    root: Arc<RootCache<C>>,
+    map: HashMap<Artifact,Cached<C>>
+}
+
+impl <C:Cacheable> Into<ProtoCache<C>> for Cache<C> {
+    fn into(self) -> ProtoCache<C> {
+        ProtoCache{
+            map: AsyncHashMap::from(self.map),
+            root: self.root
+        }
+    }
+}
+
+impl <C:Cacheable> Cache<C> {
+    pub fn get( &self, artifact: &Artifact ) -> Result<Cached<C>,Error> {
+        let rtn = self.map.get(artifact ).cloned();
+        match rtn {
+            None => {
+                Err(format!("must call ProtoCache.cache('{}') for this artifact and wait for cache callback before get()",artifact.to_string()).into())
+            }
+            Some(cached) => {
+                Ok(cached)
+            }
+        }
+
+    }
+}
+
+#[derive(Clone)]
+pub struct ProtoCache<C: Cacheable> {
     root: Arc<RootCache<C>>,
     map: AsyncHashMap<Artifact,Cached<C>>
 }
 
-impl <C:Cacheable> Cache<C> {
+impl <C:Cacheable> ProtoCache<C> {
 
     fn new( root: Arc<RootCache<C>> ) -> Self {
         Self{
@@ -227,10 +259,22 @@ impl <C:Cacheable> Cache<C> {
         }
     }
 
-    pub async fn cache(&self, artifacts: Vec<Artifact> ) -> oneshot::Receiver<Result<(),Error>>{
+    pub async fn wait_for_cache(&self, artifact: Artifact ) -> Result<(),Error>{
+        self.cache(artifact).await?
+    }
+
+    pub async fn wait_for_cache_all(&self, artifacts: Vec<Artifact> ) -> Result<(),Error>{
+        self.cache_all(artifacts).await?
+    }
+
+    pub fn cache(&self, artifact: Artifact ) -> oneshot::Receiver<Result<(),Error>>{
+        self.cache_all(vec![artifact])
+    }
+
+    pub fn cache_all(&self, artifacts: Vec<Artifact> ) -> oneshot::Receiver<Result<(),Error>>{
         let (tx,rx) = oneshot::channel();
 
-        let parent_rx = self.root.cache(artifacts ).await;
+        let parent_rx = self.root.cache(artifacts);
 
         let map = self.map.clone();
         tokio::spawn( async move {
@@ -259,6 +303,7 @@ impl <C:Cacheable> Cache<C> {
         Ok(parent_rx.await??)
     }
 
+
     pub async fn get(&self, artifact: &Artifact) -> Result<Cached<C>,Error>{
         let cached = self.map.get(artifact.clone()).await?;
         if let Some(cached) = cached {
@@ -269,7 +314,15 @@ impl <C:Cacheable> Cache<C> {
         }
     }
 
+    pub async fn into_cache(self) -> Result<Cache<C>,Error> {
+        Ok(Cache{
+            map: self.map.into_map().await?,
+            root: self.root
+        })
+    }
 }
+
+
 
 
 pub struct CacheFactory<C: Cacheable>{
@@ -283,8 +336,8 @@ impl <C:Cacheable> CacheFactory<C> {
        }
     }
 
-    pub fn create(&self) -> Cache<C> {
-        Cache::new(self.root_cache.clone())
+    pub fn create(&self) -> ProtoCache<C> {
+        ProtoCache::new(self.root_cache.clone())
     }
 }
 
@@ -297,15 +350,20 @@ struct RootCache<C> where C: Cacheable {
 }
 
 impl <C:Cacheable> RootCache<C> {
-    fn new(api: StarlaneApi, file_access: FileAccess, parser: Arc<dyn Parser<C>>)->Result<Self,Error>{
+    fn new(src: ArtifactBundleSrc, file_access: FileAccess, parser: Arc<dyn Parser<C>>)->Result<Self,Error>{
         Ok(RootCache {
-            tx: RootCacheProc::new(api, file_access, parser)?
+            tx: RootCacheProc::new(src, file_access, parser)?
         })
     }
 
-    async fn cache(&self, artifacts: Vec<Artifact> ) -> oneshot::Receiver<Result<Vec<Cached<C>>,Error>>{
+    fn cache(&self, artifacts: Vec<Artifact> ) -> oneshot::Receiver<Result<Vec<Cached<C>>,Error>>{
         let (tx,rx) = oneshot::channel();
-        self.tx.send( CacheCall::Cache {artifacts, tx }).await;
+
+        let cache_tx = self.tx.clone();
+        tokio::spawn(async move {
+            cache_tx.send(CacheCall::Cache { artifacts, tx }).await;
+        });
+
         rx
     }
 
@@ -377,7 +435,7 @@ struct RootCacheProc<C:Cacheable>{
 }
 
 impl <C:Cacheable> RootCacheProc<C> {
-    pub fn new(api: StarlaneApi, file_access: FileAccess, parser: Arc<dyn Parser<C>>) -> Result<mpsc::Sender<CacheCall<C>>,Error> {
+    pub fn new(src: ArtifactBundleSrc, file_access: FileAccess, parser: Arc<dyn Parser<C>>) -> Result<mpsc::Sender<CacheCall<C>>,Error> {
 
         let (tx,rx) = mpsc::channel(16);
         Ok(AsyncRunner::new(
@@ -386,7 +444,7 @@ impl <C:Cacheable> RootCacheProc<C> {
                           tx: tx.clone(),
                           parser: parser,
                           file_access: file_access.clone(),
-                          bundle_cache: ArtifactBundleCache::new(api,file_access)?,
+                          bundle_cache: ArtifactBundleCache::new(src,file_access)?,
                            map: HashMap::new()
                       }),tx,rx))
     }
@@ -506,6 +564,67 @@ impl <C:Cacheable> AsyncProcessor<CacheCall<C>> for RootCacheProc<C>{
             }
         }
     }
+}
+
+#[derive(Clone)]
+pub enum ArtifactBundleSrc {
+  STARLANE_API(StarlaneApi),
+  MOCK(MockArtifactBundleSrc)
+}
+
+impl ArtifactBundleSrc {
+   pub async fn get_resource_state(&self, identifier: ResourceIdentifier ) -> Result<Option<Arc<Vec<u8>>>,Fail> {
+        match self {
+            ArtifactBundleSrc::STARLANE_API(api) => {
+                api.get_resource_state(identifier).await
+            }
+            ArtifactBundleSrc::MOCK(mock) => {
+                mock.get_resource_state(identifier).await
+            }
+        }
+    }
+
+    pub async fn fetch_resource_record(&self, identifier: ResourceIdentifier) -> Result<ResourceRecord,Fail> {
+        match self {
+            ArtifactBundleSrc::STARLANE_API(api) => {
+                api.fetch_resource_record(identifier).await
+            }
+            ArtifactBundleSrc::MOCK(mock) => {
+                mock.fetch_resource_record(identifier).await
+            }
+        }
+    }
+}
+
+impl From<StarlaneApi> for ArtifactBundleSrc {
+    fn from(api: StarlaneApi) -> Self {
+        ArtifactBundleSrc::STARLANE_API(api)
+    }
+}
+
+impl From<MockArtifactBundleSrc> for ArtifactBundleSrc {
+    fn from(mock: MockArtifactBundleSrc) -> Self {
+        ArtifactBundleSrc::MOCK(mock)
+    }
+}
+
+#[derive(Clone)]
+pub struct MockArtifactBundleSrc {
+    pub resource: ResourceRecord,
+}
+
+impl MockArtifactBundleSrc{
+    pub async fn get_resource_state(&self, identifier: ResourceIdentifier ) -> Result<Option<Arc<Vec<u8>>>,Fail> {
+        let mut file = fs::File::open( "test-data/localhost-config/artifact-bundle.zip").await?;
+        let mut data = vec![];
+        file.read_to_end(&mut data).await?;
+        Ok(Option::Some(Arc::new(data)))
+    }
+
+    pub async fn fetch_resource_record(&self, identifier: ResourceIdentifier) -> Result<ResourceRecord,Fail> {
+        Ok(self.resource.clone())
+    }
+
 }
 
 
