@@ -187,16 +187,23 @@ impl ArtifactBundleCache {
 }
 
 pub struct Cache<C: Cacheable> {
-    parent: ParentCache<C>,
+    root: Arc<RootCache<C>>,
     map: HashMap<Artifact,Cached<C>>
 }
 
 impl <C:Cacheable> Cache<C> {
 
+    fn new( root: Arc<RootCache<C>> ) -> Self {
+        Self{
+            root: root,
+            map: HashMap::new()
+        }
+    }
+
     pub async fn cache(&self, artifacts: Vec<Artifact> ) -> oneshot::Receiver<Result<(),Error>>{
         let (tx,rx) = oneshot::channel();
 
-        let parent_rx = self.parent.cache(artifacts ).await;
+        let parent_rx = self.root.cache(artifacts ).await;
 
         tokio::spawn( async move {
             match Self::flatten::<C>(parent_rx).await {
@@ -229,18 +236,37 @@ impl <C:Cacheable> Cache<C> {
 }
 
 
-
-pub struct ParentCaches {
-    domain_configs: ParentCache<DomainConfig>
+pub struct CacheFactory<C: Cacheable>{
+    root_cache: Arc<RootCache<C>>
 }
 
-impl ParentCaches {
-    pub async fn new(api: StarlaneApi, file_access: FileAccess) -> Result<ParentCaches,Error>{
-        let domain_parser = Arc::new(DomainConfigParser::new());
-        let domain_configs = ParentCache::new(api,file_access,domain_parser).await?;
+impl <C:Cacheable> CacheFactory<C> {
+    fn new(root_cache: Arc<RootCache<C>>) -> Self {
+       Self{
+           root_cache: root_cache
+       }
+    }
+
+    pub fn create(&self) -> Cache<C> {
+        Cache::new(self.root_cache.clone())
+    }
+}
+
+pub struct CacheFactories {
+    pub domain_configs: CacheFactory<DomainConfig>
+}
+
+impl CacheFactories {
+    async fn new(api: StarlaneApi, file_access: FileAccess) -> Result<CacheFactories,Error>{
+
+        let domain_configs = {
+            let parser = Arc::new(DomainConfigParser::new());
+            let configs = Arc::new(RootCache::new(api, file_access, parser).await?);
+            CacheFactory::new(configs)
+        };
 
         Ok(Self{
-            domain_configs
+           domain_configs
         })
     }
 }
@@ -248,14 +274,14 @@ impl ParentCaches {
 pub trait Cacheable: FromArtifact+Send+Sync+'static {}
 
 
-struct ParentCache<C> where C: Cacheable {
+struct RootCache<C> where C: Cacheable {
    tx: mpsc::Sender<CacheCall<C>>
 }
 
-impl <C:Cacheable> ParentCache<C> {
+impl <C:Cacheable> RootCache<C> {
     async fn new(api: StarlaneApi, file_access: FileAccess, parser: Arc<dyn Parser<C>>)->Result<Self,Error>{
-        Ok(ParentCache{
-            tx: ParentCacheProcessor::new(api,file_access,parser).await?
+        Ok(RootCache {
+            tx: RootCacheProc::new(api, file_access, parser).await?
         })
     }
 
@@ -324,7 +350,7 @@ struct RefCount<C> {
     pub item: Arc<C>
 }
 
-struct ParentCacheProcessor<C:Cacheable>{
+struct RootCacheProc<C:Cacheable>{
     pub tx: mpsc::Sender<CacheCall<C>>,
     pub parser: Arc<dyn Parser<C>>,
     pub bundle_cache: ArtifactBundleCache,
@@ -332,13 +358,13 @@ struct ParentCacheProcessor<C:Cacheable>{
     pub file_access: FileAccess
 }
 
-impl <C:Cacheable> ParentCacheProcessor<C> {
+impl <C:Cacheable> RootCacheProc<C> {
     pub async fn new(api: StarlaneApi, file_access: FileAccess, parser: Arc<dyn Parser<C>>) -> Result<mpsc::Sender<CacheCall<C>>,Error> {
 
         let (tx,rx) = mpsc::channel(16);
         Ok(AsyncRunner::new(
             Box::new(
-                      ParentCacheProcessor{
+                      RootCacheProc {
                           tx: tx.clone(),
                           parser: parser,
                           file_access: file_access.clone(),
@@ -434,7 +460,7 @@ impl <C:Cacheable> ParentCacheProcessor<C> {
 }
 
 #[async_trait]
-impl <C:Cacheable> AsyncProcessor<CacheCall<C>> for ParentCacheProcessor<C>{
+impl <C:Cacheable> AsyncProcessor<CacheCall<C>> for RootCacheProc<C>{
     async fn process(&mut self, call: CacheCall<C>) {
         match call{
             CacheCall::Cache { artifacts, tx } => {
@@ -465,7 +491,7 @@ impl <C:Cacheable> AsyncProcessor<CacheCall<C>> for ParentCacheProcessor<C>{
 }
 
 
-impl <P> LogInfo for ParentCache<P> where P: Cacheable {
+impl <P> LogInfo for RootCache<P> where P: Cacheable {
     fn log_identifier(&self) -> String {
         "?".to_string()
     }
@@ -475,6 +501,6 @@ impl <P> LogInfo for ParentCache<P> where P: Cacheable {
     }
 
     fn log_object(&self) -> String {
-        "ParentCache".to_string()
+        "RootCache".to_string()
     }
 }
