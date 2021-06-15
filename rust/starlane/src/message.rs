@@ -480,4 +480,14 @@ impl <T> From<tokio::sync::mpsc::error::SendError<T>> for Fail
 
 }
 
+impl From<actix_web::error::Canceled> for Fail
+{
+    fn from(_: actix_web::error::Canceled) -> Self {
+        Fail::Unexpected
+    }
+
+}
+
+
+
 

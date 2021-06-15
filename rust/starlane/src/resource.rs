@@ -3664,17 +3664,17 @@ impl Path
         }
 
         if string.contains(".."){
-            return Err("path cannot contain directory traversal sequence [..]".into());
+            return Err(format!("path cannot contain directory traversal sequence [..] != '{}'",string).into());
         }
 
         for c in string.chars() {
             if c == '*' || c == '?' || c == ':' {
-                return Err("path cannot contain wildcard characters [*,?] or [:]".into());
+                return Err(format!("path cannot contain wildcard characters [*,?] or [:] != '{}'",string).into());
             }
         }
 
         if !string.starts_with("/") {
-            return Err("Paths must be absolute (must start with a '/')".into())
+            return Err(format!("Paths must be absolute (must start with a '/') != '{}'",string).into())
         }
 
         Ok(Path{

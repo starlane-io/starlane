@@ -139,8 +139,8 @@ pub struct Artifact {
 
 
 impl Artifact {
-    pub fn parent(&self)->ArtifactBundleResourceAddress {
-        return ArtifactBundleResourceAddress{
+    pub fn parent(&self)-> Bundle {
+        return Bundle {
             address: self.address.parent().expect("artifact should have bundle parent")
         }
     }
@@ -490,32 +490,51 @@ impl SubSpaceName
 
 
 #[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
-pub struct ArtifactBundleResourceAddress{
+pub struct Bundle {
     address: ResourceAddress
 }
 
-impl Into<ArtifactBundleIdentifier> for ArtifactBundleResourceAddress {
+impl Into<ArtifactBundleIdentifier> for Bundle {
     fn into(self) -> ArtifactBundleIdentifier {
         ArtifactBundleIdentifier::Address(self)
     }
 }
 
+impl FromStr for Bundle {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.contains("::<") {
+            let address = ResourceAddress::from_str(s)?;
+            let artifact = address.try_into()?;
+            Ok(artifact)
+        } else {
+            let mut string = String::new();
+            string.push_str(s);
+            string.push_str("::<ArtifactBundle>");
+            let address = ResourceAddress::from_str(string.as_str())?;
+            let artifact = address.try_into()?;
+            Ok(artifact)
+        }
+    }
+}
 
 
-impl Into<ResourceAddress> for ArtifactBundleResourceAddress{
+
+impl Into<ResourceAddress> for Bundle {
     fn into(self) -> ResourceAddress {
         self.address
     }
 }
 
-impl TryFrom<ResourceAddress> for ArtifactBundleResourceAddress {
+impl TryFrom<ResourceAddress> for Bundle {
     type Error = Fail;
 
     fn try_from(value: ResourceAddress) -> Result<Self, Self::Error> {
         if value.resource_type() != ResourceType::ArtifactBundle {
             Err(Fail::WrongResourceType {expected:HashSet::from_iter(vec![ResourceType::ArtifactBundle]),received: value.resource_type()})
         } else {
-            Ok(ArtifactBundleResourceAddress{
+            Ok(Bundle {
                 address: value
             })
         }
@@ -539,5 +558,5 @@ impl Into<ResourceIdentifier> for ArtifactBundleIdentifier {
 
 pub enum ArtifactBundleIdentifier{
     Key(ArtifactBundleKey),
-    Address(ArtifactBundleResourceAddress)
+    Address(Bundle)
 }

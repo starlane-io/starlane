@@ -19,7 +19,7 @@ use crate::star::StarCommand::ResourceRecordRequest;
 use std::marker::PhantomData;
 use crate::frame::ChildManagerResourceAction::Register;
 use std::{thread, sync};
-use tokio::runtime::Runtime;
+use tokio::runtime::{Runtime, Handle};
 use tokio::sync::mpsc;
 use futures::channel::oneshot;
 use semver::Version;
@@ -183,32 +183,40 @@ println!("elapsed error: {}",err );
     }
      */
 
-    pub async fn get_resource_state(&self, identifier: ResourceIdentifier ) -> Result<Option<Arc<Vec<u8>>>,Fail> {
+    pub fn get_resource_state(&self, identifier: ResourceIdentifier ) -> Result<Option<Arc<Vec<u8>>>,Fail> {
 
-        match self.get_resource_state_src(identifier).await? {
+
+println!("get_resource_state block_on");
+        let state_src = self.get_resource_state_src(identifier)?;
+         match  state_src {
             RemoteDataSrc::None => Ok(Option::None),
             RemoteDataSrc::Memory(data) => Ok(Option::Some(data))
-        }
+         }
     }
 
-    pub async fn get_resource_state_src(&self, identifier: ResourceIdentifier ) -> Result<RemoteDataSrc,Fail> {
+    pub fn get_resource_state_src(&self, identifier: ResourceIdentifier ) -> Result<RemoteDataSrc,Fail> {
 
+        let star_tx = self.star_tx.clone();
+
+        let handle = Handle::current();
+        handle.block_on( async {
             let mut proto = ProtoMessage::new();
             proto.payload = Option::Some(ResourceRequestMessage::State);
             proto.to = Option::Some(identifier);
             proto.from = Option::Some(MessageFrom::Inject);
             let reply = proto.reply();
             let mut proto = proto.to_proto_star_message().await?;
-            self.star_tx.send(StarCommand::SendProtoMessage(proto)).await?;
+            star_tx.send(StarCommand::SendProtoMessage(proto)).await?;
 
-        let result = Self::timeout(reply).await?;
+            let result = Self::timeout(reply).await?;
 
-        match result.payload {
+            match result.payload {
                 ResourceResponseMessage::State(data) => {
                     Ok(data)
                 }
                 _ => Err(Fail::Unexpected)
             }
+        })
     }
 
     pub fn create_space( &self, name: &str, display: &str )-> Result<Creation<SpaceApi>,Fail> {
@@ -696,7 +704,7 @@ impl StarlaneApiRunner {
     {
         thread::spawn( move || {
             let rt= tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-            rt.block_on(async {
+            rt.block_on(async move {
                 while let Option::Some(action) = self.rx.recv().await {
                     self.process(action).await;
                 }
@@ -708,7 +716,7 @@ impl StarlaneApiRunner {
 
         match action {
            StarlaneAction::GetState { identifier,tx } => {
-               tx.send(self.api.get_resource_state(identifier).await );
+               tx.send(self.api.get_resource_state(identifier) );
            }
        }
     }

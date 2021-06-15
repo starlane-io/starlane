@@ -13,7 +13,6 @@ use std::sync::mpsc::{Receiver, RecvError};
 use notify::{raw_watcher, Watcher, RecursiveMode, RawEvent, Op};
 use std::{thread, fs};
 use crate::star::Star;
-use tokio::runtime::Runtime;
 use std::future::Future;
 use crate::util;
 use walkdir::{WalkDir, DirEntry};
@@ -226,17 +225,19 @@ println!("source: {}",source);
         for i in 0..archive.len() {
             let mut zip_file = archive.by_index(i)?;
 println!("artifact: {}", zip_file.name() );
-            if !zip_file.is_dir()
+            if zip_file.is_dir()
             {
                 let path = Path::new(format!("/{}/{}", target, zip_file.name()).as_str() )?;
+println!("dir: {}",path.to_string());
                 self.mkdir(&path)?;
             } else {
                 let path = format!("{}/{}/{}", self.base_dir, target, zip_file.name() );
-println!("path: {}",path);
+println!("target: {}",path);
                 let mut file = fs::File::create(path)?;
                 std::io::copy( &mut zip_file, &mut file )?;
             }
         }
+println!("done with UnZip...");
 
         Ok(())
     }
