@@ -30,7 +30,7 @@ use variant::central::CentralVariant;
 use variant::StarVariant;
 
 use crate::actor::{ActorKey, ActorKind};
-use crate::cache::Caches;
+use crate::cache::ProtoCacheFactory;
 use crate::core::{StarCoreAction, StarCoreCommand, StarCoreResult};
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
@@ -2338,7 +2338,7 @@ pub enum StarCommand {
     ResourceRecordRequestFromStar(Request<(ResourceIdentifier, StarKey), ResourceRecord>),
     ResourceRecordSet(Set<ResourceRecord>),
 
-    GetCaches(oneshot::Sender<Arc<Caches>>),
+    GetCaches(oneshot::Sender<Arc<ProtoCacheFactory>>),
 }
 
 pub enum Diagnose {
@@ -2975,7 +2975,7 @@ pub struct StarSkel {
     pub star_handler: Option<StarHandleBacking>,
     pub persistence: Persistence,
     pub data_access: FileAccess,
-    pub caches: Arc<Caches>,
+    pub caches: Arc<ProtoCacheFactory>,
 }
 
 impl StarSkel {

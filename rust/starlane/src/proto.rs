@@ -28,7 +28,7 @@ use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
 use crate::core::{CoreRunner, CoreRunnerCommand};
 use crate::star::variant::{StarVariantFactory, StarVariantCommand};
-use crate::cache::Caches;
+use crate::cache::ProtoCacheFactory;
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -46,7 +46,7 @@ pub struct ProtoStar
   core_runner: Arc<CoreRunner>,
   logger: Logger,
   frame_hold: FrameHold,
-  caches: Arc<Caches>,
+  caches: Arc<ProtoCacheFactory>,
   data_access: FileAccess,
   flags: Flags,
   tracker: ProtoTracker
@@ -58,7 +58,7 @@ impl ProtoStar
                kind: StarKind,
                star_tx: Sender<StarCommand>,
                star_rx: Receiver<StarCommand>,
-               caches: Arc<Caches>,
+               caches: Arc<ProtoCacheFactory>,
                data_access: FileAccess,
                star_manager_factory: Arc<dyn StarVariantFactory>,
                core_runner: Arc<CoreRunner>,

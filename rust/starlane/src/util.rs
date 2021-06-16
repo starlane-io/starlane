@@ -77,7 +77,7 @@ impl <K,V> AsyncHashMap<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static,
     }
 
     pub async fn put( &self, key:K, value:V )->Result<(),Error>{
-        self.tx.send( AsyncHashMapCommand::Put { key, value}).await?;
+        self.tx.send( AsyncHashMapCommand::Put{ key, value}).await?;
         Ok(())
     }
 
@@ -149,16 +149,14 @@ pub struct AsyncRunner<C:Call>{
 }
 
 impl <C:Call> AsyncRunner<C> {
-    pub fn new(processor: Box<dyn AsyncProcessor<C>>, tx: mpsc::Sender<C>, rx: mpsc::Receiver<C> )->mpsc::Sender<C>{
-        let tx_cp = tx.clone();
+    pub fn new(processor: Box<dyn AsyncProcessor<C>>, tx: mpsc::Sender<C>, rx: mpsc::Receiver<C> ){
         tokio::spawn( async move {
             AsyncRunner{
-                tx: tx_cp,
+                tx: tx,
                 rx: rx,
                 processor: processor
             }.run().await;
         } );
-        tx
     }
 
     async fn run(mut self) {

@@ -29,7 +29,7 @@ use crate::starlane::api::StarlaneApi;
 use crate::core::CoreRunner;
 use crate::star::variant::{StarVariantFactory, StarVariantFactoryDefault};
 use crate::file_access::FileAccess;
-use crate::cache::Caches;
+use crate::cache::ProtoCacheFactory;
 
 pub mod api;
 
@@ -51,7 +51,7 @@ pub struct Starlane
     cache_access: FileAccess,
     pub logger: Logger,
     pub flags: Flags,
-    pub caches: Option<Arc<Caches>>
+    pub caches: Option<Arc<ProtoCacheFactory>>
 }
 
 impl Starlane
@@ -115,7 +115,7 @@ impl Starlane
         }
     }
 
-    pub fn caches(&self) -> Result<Arc<Caches>,Error> {
+    pub fn caches(&self) -> Result<Arc<ProtoCacheFactory>,Error> {
         Ok(self.caches.as_ref().ok_or("expected caches to be set")?.clone())
     }
 
@@ -144,7 +144,7 @@ impl Starlane
 
         if self.caches.is_none() {
             let api = StarlaneApi::new(star_tx.clone());
-            let caches = Arc::new(Caches::new( api.into(), self.cache_access.clone() )?);
+            let caches = Arc::new(ProtoCacheFactory::new(api.into(), self.cache_access.clone() )?);
             self.caches = Option::Some(caches);
         }
 
@@ -243,7 +243,7 @@ impl Starlane
             let (star_tx,star_rx) = mpsc::channel(32);
             if self.caches.is_none() {
                 let api = StarlaneApi::new(star_tx.clone());
-                let caches = Arc::new(Caches::new( api.into(), self.cache_access.clone() )?);
+                let caches = Arc::new(ProtoCacheFactory::new(api.into(), self.cache_access.clone() )?);
                 self.caches = Option::Some(caches);
             }
 
@@ -465,7 +465,7 @@ mod test
     use tokio::time::Duration;
     use tokio::time::timeout;
 
-    use crate::artifact::{ArtifactKind, ArtifactLocation, Artifact};
+    use crate::artifact::{ArtifactKind, ArtifactLocation, ArtifactAddress};
     use crate::error::Error;
     use crate::keys::{SpaceKey, SubSpaceKey, UserKey};
     use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
@@ -558,7 +558,7 @@ println!("... >  uploading artifact bundle...");
             }
 
             {
-                let artifact = Artifact::from_str("hyperspace:default:whiz:1.0.0:/routes.txt").unwrap();
+                let artifact = ArtifactAddress::from_str("hyperspace:default:whiz:1.0.0:/routes.txt").unwrap();
                 let caches = starlane_api.get_caches().await.unwrap();
                 let domain_configs = caches.domain_configs.create();
                 domain_configs.wait_for_cache(artifact.clone() ).await.unwrap();

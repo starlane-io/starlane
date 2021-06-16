@@ -72,20 +72,14 @@ impl ToString for Artifact{
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub enum ArtifactKind
 {
-    File,
-    AppConfig,
-    ActorConfig,
-    ActorInit
+    DomainConfig
 }
 
 impl fmt::Display for ArtifactKind{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!( f,"{}",
                 match self{
-                    ArtifactKind::File => "File".to_string(),
-                    ArtifactKind::AppConfig => "AppConfig".to_string(),
-                    ArtifactKind::ActorConfig => "ActorConfig".to_string(),
-                    ArtifactKind::ActorInit => "ActorInit".to_string(),
+                    ArtifactKind::DomainConfig=> "DomainConfig".to_string(),
                 })
     }
 }
@@ -97,10 +91,7 @@ impl FromStr for ArtifactKind
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s
         {
-            "File" => Ok(ArtifactKind::File),
-            "AppConfig" => Ok(ArtifactKind::AppConfig),
-            "ActorConfig" => Ok(ArtifactKind::ActorConfig),
-            "ActorInit" => Ok(ArtifactKind::ActorInit),
+            "DomainConfig" => Ok(ArtifactKind::DomainConfig),
             _ => Err(format!("could not find ArtifactKind: {}",s).into())
         }
     }
@@ -132,15 +123,15 @@ impl ArtifactBundleKey{
     }
 }
 
-#[derive(Clone,Hash,Eq,PartialEq)]
-pub struct Artifact {
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub struct ArtifactAddress {
     address: ResourceAddress
 }
 
 
-impl Artifact {
-    pub fn parent(&self)-> Bundle {
-        return Bundle {
+impl ArtifactAddress {
+    pub fn parent(&self)-> ArtifactBundleAddress {
+        return ArtifactBundleAddress {
             address: self.address.parent().expect("artifact should have bundle parent")
         }
     }
@@ -165,7 +156,7 @@ impl Artifact {
 }
 
 
-impl FromStr for Artifact {
+impl FromStr for ArtifactAddress {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -185,13 +176,13 @@ impl FromStr for Artifact {
     }
 }
 
-impl ToString for Artifact {
+impl ToString for ArtifactAddress {
     fn to_string(&self) -> String {
         self.address.to_string()
     }
 }
 
-impl LogInfo for Artifact {
+impl LogInfo for ArtifactAddress {
     fn log_identifier(&self) -> String {
         let address: ResourceAddress = self.clone().into();
         address.to_parts_string()
@@ -209,20 +200,20 @@ impl LogInfo for Artifact {
 
 
 
-impl Into<ResourceAddress> for Artifact {
+impl Into<ResourceAddress> for ArtifactAddress {
     fn into(self) -> ResourceAddress {
         self.address
     }
 }
 
-impl TryFrom<ResourceAddress> for Artifact {
+impl TryFrom<ResourceAddress> for ArtifactAddress {
     type Error = Fail;
 
     fn try_from(value: ResourceAddress) -> Result<Self, Self::Error> {
         if value.resource_type() != ResourceType::Artifact {
             Err(Fail::WrongResourceType {expected:HashSet::from_iter(vec![ResourceType::Artifact]),received: value.resource_type()})
         } else {
-            Ok(Artifact {
+            Ok(ArtifactAddress {
                 address: value
             })
         }
@@ -231,7 +222,7 @@ impl TryFrom<ResourceAddress> for Artifact {
 
 pub enum ArtifactIdentifier{
     Key(ArtifactKey),
-    Address(Artifact)
+    Address(ArtifactAddress)
 }
 
 
@@ -490,17 +481,33 @@ impl SubSpaceName
 
 
 #[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
-pub struct Bundle {
+pub struct ArtifactBundleAddress {
     address: ResourceAddress
 }
 
-impl Into<ArtifactBundleIdentifier> for Bundle {
+impl Into<ArtifactBundleIdentifier> for ArtifactBundleAddress {
     fn into(self) -> ArtifactBundleIdentifier {
         ArtifactBundleIdentifier::Address(self)
     }
 }
 
-impl FromStr for Bundle {
+impl TryFrom<ResourceIdentifier> for ArtifactBundleAddress {
+    type Error = Fail;
+
+    fn try_from(value: ResourceIdentifier) -> Result<Self, Self::Error> {
+
+        match value {
+            ResourceIdentifier::Key(_) => {
+                Err(Fail::Error("wrong resource identifier: expected: Address, Received Key".into()))
+            }
+            ResourceIdentifier::Address(address) => {
+                Ok(address.try_into()?)
+            }
+        }
+    }
+}
+
+impl FromStr for ArtifactBundleAddress {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -521,20 +528,20 @@ impl FromStr for Bundle {
 
 
 
-impl Into<ResourceAddress> for Bundle {
+impl Into<ResourceAddress> for ArtifactBundleAddress {
     fn into(self) -> ResourceAddress {
         self.address
     }
 }
 
-impl TryFrom<ResourceAddress> for Bundle {
+impl TryFrom<ResourceAddress> for ArtifactBundleAddress {
     type Error = Fail;
 
     fn try_from(value: ResourceAddress) -> Result<Self, Self::Error> {
         if value.resource_type() != ResourceType::ArtifactBundle {
             Err(Fail::WrongResourceType {expected:HashSet::from_iter(vec![ResourceType::ArtifactBundle]),received: value.resource_type()})
         } else {
-            Ok(Bundle {
+            Ok(ArtifactBundleAddress {
                 address: value
             })
         }
@@ -558,5 +565,11 @@ impl Into<ResourceIdentifier> for ArtifactBundleIdentifier {
 
 pub enum ArtifactBundleIdentifier{
     Key(ArtifactBundleKey),
-    Address(Bundle)
+    Address(ArtifactBundleAddress)
+}
+
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub struct ArtifactRef {
+    pub artifact: ArtifactAddress,
+    pub kind: ArtifactKind
 }
