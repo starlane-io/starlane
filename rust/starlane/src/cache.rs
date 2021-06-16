@@ -100,12 +100,10 @@ impl ArtifactBundleCacheRunner {
     }
 
     async fn run(mut self) {
-        println!("RUNNER RUNNING!");
         while let Option::Some(command) = self.rx.recv().await {
             match command {
                 ArtifactBundleCacheCommand::Cache { bundle, tx } => {
                     let bundle: ResourceIdentifier = bundle.into();
-println!("getting resource record...");
                     let record = match self.src.fetch_resource_record(bundle.clone()).await {
                         Ok(record) => record,
                         Err(err) => {
@@ -224,7 +222,6 @@ pub struct ArtifactBundleCache {
 
 impl ArtifactBundleCache {
     pub fn new(src: ArtifactBundleSrc, file_access: FileAccess) -> Result<Self, Error> {
-        let file_access = file_access.with_path("bundles".to_string())?;
         let tx = ArtifactBundleCacheRunner::new(src, file_access.clone());
         Ok(ArtifactBundleCache {
             file_access: file_access,
@@ -244,19 +241,27 @@ impl ArtifactBundleCache {
         self.file_access.clone()
     }
 
+    pub async fn with_bundle_files_path(
+        file_access: FileAccess,
+        address: Bundle,
+    ) -> Result<FileAccess, Error> {
+        let address: ResourceAddress = address.into();
+        Ok(file_access.with_path(format!("bundles/{}/files",address.to_parts_string()) )?)
+    }
+
     pub async fn with_bundle_path(
         file_access: FileAccess,
         address: Bundle,
     ) -> Result<FileAccess, Error> {
         let address: ResourceAddress = address.into();
-        Ok(file_access.with_path(address.to_parts_string())?)
+        Ok(file_access.with_path(format!("bundles/{}",address.to_parts_string())  )?)
     }
 }
 
 #[derive(Clone)]
 pub struct Cache<C: Cacheable> {
     root: Arc<RootCache<C>>,
-    map: HashMap<Artifact, Cached<C>>,
+    map: HashMap<Artifact, Item<C>>,
 }
 
 impl<C: Cacheable> Into<ProtoCache<C>> for Cache<C> {
@@ -269,7 +274,7 @@ impl<C: Cacheable> Into<ProtoCache<C>> for Cache<C> {
 }
 
 impl<C: Cacheable> Cache<C> {
-    pub fn get(&self, artifact: &Artifact) -> Result<Cached<C>, Error> {
+    pub fn get(&self, artifact: &Artifact) -> Result<Item<C>, Error> {
         let rtn = self.map.get(artifact).cloned();
         match rtn {
             None => {
@@ -285,7 +290,7 @@ impl<C: Cacheable> Cache<C> {
 #[derive(Clone)]
 pub struct ProtoCache<C: Cacheable> {
     root: Arc<RootCache<C>>,
-    map: AsyncHashMap<Artifact, Cached<C>>,
+    map: AsyncHashMap<Artifact, Item<C>>,
 }
 
 impl<C: Cacheable> ProtoCache<C> {
@@ -311,15 +316,16 @@ impl<C: Cacheable> ProtoCache<C> {
     pub fn cache_all(&self, artifacts: Vec<Artifact>) -> oneshot::Receiver<Result<(), Error>> {
         let (tx, rx) = oneshot::channel();
 
-        let parent_rx = self.root.cache(artifacts);
+        let root_rx = self.root.cache(artifacts);
 
         let map = self.map.clone();
         tokio::spawn(async move {
-            match Self::flatten::<C>(parent_rx).await {
+            match Self::flatten::<C>(root_rx).await {
                 Ok(cached) => {
                     for c in cached {
                         match map.put(c.artifact(), c).await {
-                            Ok(_) => {}
+                            Ok(_) => {
+                            }
                             Err(error) => {
                                 eprintln!("!<Cache> FATAL: could not put Cached<C>");
                             }
@@ -337,12 +343,12 @@ impl<C: Cacheable> ProtoCache<C> {
     }
 
     async fn flatten<X: Cacheable>(
-        parent_rx: oneshot::Receiver<Result<Vec<Cached<X>>, Error>>,
-    ) -> Result<Vec<Cached<X>>, Error> {
+        parent_rx: oneshot::Receiver<Result<Vec<Item<X>>, Error>>,
+    ) -> Result<Vec<Item<X>>, Error> {
         Ok(parent_rx.await??)
     }
 
-    pub fn get(&self, artifact: &Artifact) -> Result<Cached<C>, Error> {
+    pub fn get(&self, artifact: &Artifact) -> Result<Item<C>, Error> {
         let handle = Handle::current();
         handle.block_on( async move {
             let cached = self.map.get(artifact.clone()).await?;
@@ -399,7 +405,7 @@ impl<C: Cacheable> RootCache<C> {
         })
     }
 
-    fn cache(&self, artifacts: Vec<Artifact>) -> oneshot::Receiver<Result<Vec<Cached<C>>, Error>> {
+    fn cache(&self, artifacts: Vec<Artifact>) -> oneshot::Receiver<Result<Vec<Item<C>>, Error>> {
         let (tx, rx) = oneshot::channel();
 
         let cache_tx = self.tx.clone();
@@ -414,7 +420,7 @@ impl<C: Cacheable> RootCache<C> {
 pub enum CacheCall<C: Cacheable> {
     Cache {
         artifacts: Vec<Artifact>,
-        tx: oneshot::Sender<Result<Vec<Cached<C>>, Error>>,
+        tx: oneshot::Sender<Result<Vec<Item<C>>, Error>>,
     },
     Increment {
         artifact: Artifact,
@@ -425,12 +431,12 @@ pub enum CacheCall<C: Cacheable> {
 
 impl<C: Cacheable> Call for CacheCall<C> {}
 
-pub struct Cached<C: Cacheable> {
+pub struct Item<C: Cacheable> {
     item: Arc<C>,
     deref_tx: mpsc::Sender<CacheCall<C>>,
 }
 
-impl<C: Cacheable> Cached<C> {
+impl<C: Cacheable> Item<C> {
     pub fn new(item: Arc<C>, deref_tx: mpsc::Sender<CacheCall<C>>) -> Self {
         let item_cp = item.clone();
         let deref_tx_cp = deref_tx.clone();
@@ -443,20 +449,20 @@ impl<C: Cacheable> Cached<C> {
                 .await;
         });
 
-        Cached {
+        Item {
             item: item,
             deref_tx: deref_tx,
         }
     }
 }
 
-impl<C: Cacheable> Clone for Cached<C> {
+impl<C: Cacheable> Clone for Item<C> {
     fn clone(&self) -> Self {
         Self::new(self.item.clone(), self.deref_tx.clone())
     }
 }
 
-impl<C: Cacheable> Deref for Cached<C> {
+impl<C: Cacheable> Deref for Item<C> {
     type Target = Arc<C>;
 
     fn deref(&self) -> &Self::Target {
@@ -464,7 +470,7 @@ impl<C: Cacheable> Deref for Cached<C> {
     }
 }
 
-impl<C: Cacheable> Drop for Cached<C> {
+impl<C: Cacheable> Drop for Item<C> {
     fn drop(&mut self) {
         self.deref_tx
             .send(CacheCall::Decrement(self.item.artifact()));
@@ -507,7 +513,7 @@ impl<C: Cacheable> RootCacheProc<C> {
     async fn cache(
         &mut self,
         artifacts: Vec<Artifact>,
-        tx: oneshot::Sender<Result<Vec<Cached<C>>, Error>>,
+        tx: oneshot::Sender<Result<Vec<Item<C>>, Error>>,
     ) {
         let mut rtn = vec![];
         let mut fetch_artifacts = artifacts.clone();
@@ -524,7 +530,7 @@ impl<C: Cacheable> RootCacheProc<C> {
                 .collect();
             for artifact in diff {
                 if let Option::Some(ref_count) = self.map.get(&artifact) {
-                    rtn.push(Cached::new(ref_count.item.clone(), self.tx.clone()));
+                    rtn.push(Item::new(ref_count.item.clone(), self.tx.clone()));
                 }
             }
         }
@@ -536,7 +542,6 @@ impl<C: Cacheable> RootCacheProc<C> {
         tokio::spawn(async move {
             let mut futures = vec![];
             for artifact in fetch_artifacts.clone() {
-                println!("pushign future...");
                 futures.push(Self::cache_artifact(
                     artifact,
                     &file_access,
@@ -600,15 +605,14 @@ impl<C: Cacheable> RootCacheProc<C> {
         bundle_cache: &ArtifactBundleCache,
         parser: &Arc<dyn Parser<C>>,
         cache_tx: &mpsc::Sender<CacheCall<C>>,
-    ) -> Result<Cached<C>, Error> {
+    ) -> Result<Item<C>, Error> {
         let bundle = artifact.parent();
         bundle_cache.download(bundle.clone().into()).await?;
         let file_access =
-            ArtifactBundleCache::with_bundle_path(file_access.clone(), bundle.clone()).await?;
+            ArtifactBundleCache::with_bundle_files_path(file_access.clone(), bundle.clone()).await?;
         let data = file_access.read(&artifact.path()?).await?;
         let item = parser.parse(artifact, data)?;
-        println!("cache artifact RTN!");
-        Ok(Cached::new(Arc::new(item), cache_tx.clone()))
+        Ok(Item::new(Arc::new(item), cache_tx.clone()))
     }
 }
 
@@ -616,7 +620,9 @@ impl<C: Cacheable> RootCacheProc<C> {
 impl<C: Cacheable> AsyncProcessor<CacheCall<C>> for RootCacheProc<C> {
     async fn process(&mut self, call: CacheCall<C>) {
         match call {
-            CacheCall::Cache { artifacts, tx } => {}
+            CacheCall::Cache { artifacts, tx } => {
+                self.cache(artifacts,tx).await;
+            }
             CacheCall::Increment { artifact, item } => {
                 let count = self.map.get_mut(&artifact);
                 if let Option::Some(count) = count {
@@ -727,7 +733,6 @@ impl MockArtifactBundleSrc {
         &self,
         identifier: ResourceIdentifier,
     ) -> Result<Option<Arc<Vec<u8>>>, Fail> {
-        let handle = Handle::current();
 
         let mut file = fs::File::open("test-data/localhost-config/artifact-bundle.zip").await?;
         let mut data = vec![];
@@ -763,23 +768,43 @@ where
 #[cfg(test)]
 mod test {
     use crate::artifact::Bundle;
-    use crate::cache::{ArtifactBundleCache, ArtifactBundleSrc, MockArtifactBundleSrc};
+    use crate::cache::{ArtifactBundleCache, ArtifactBundleSrc, MockArtifactBundleSrc, Caches};
     use crate::error::Error;
     use crate::file_access::FileAccess;
+    use crate::artifact::Artifact;
     use std::str::FromStr;
     use tokio::runtime::Runtime;
     use tokio::time::{sleep, Duration};
+    use std::fs;
 
     #[test]
     pub fn some_test() -> Result<(), Error> {
+
+        let data_dir = "tmp/data";
+        let cache_dir= "tmp/cache";
+        fs::remove_dir_all(data_dir ).unwrap_or_default();
+        fs::remove_dir_all(cache_dir ).unwrap_or_default();
+        std::env::set_var("STARLANE_DATA", data_dir );
+        std::env::set_var("STARLANE_CACHE", cache_dir );
+
         let mut builder = tokio::runtime::Builder::new_current_thread();
         let rt = builder.enable_time().enable_io().enable_all().build()?;
 
         rt.block_on(async {
-            async_bundle_test().await.unwrap();
+            async_caches().await;
         });
 
         Ok(())
+    }
+
+    pub async fn async_caches()  {
+
+        let caches = Caches::new(MockArtifactBundleSrc::new().unwrap().into(), FileAccess::new("tmp/cache".to_string()).unwrap() ).unwrap();
+        let cache = caches.domain_configs.create();
+        let artifact = Artifact::from_str("hyperspace:default:whiz:1.0.0:/routes.txt").unwrap();
+        cache.wait_for_cache(artifact.clone()).await.unwrap();
+        let cache = cache.into_cache().await.unwrap();
+        let config= cache.get(&artifact).unwrap();
     }
 
     pub async fn async_bundle_test() -> Result<(), Error> {
@@ -788,9 +813,18 @@ mod test {
             FileAccess::new("tmp/cache".to_string())?,
         )?;
         let bundle = Bundle::from_str("hyperspace:default:whiz:1.0.0")?;
-        println!("GOT HERE..");
+
+        // make sure the files aren't there NOW.
+        assert!(fs::File::open("tmp/cache/bundles/hyperspace:default:whiz:1.0.0/bundle.zip" ).is_err());
+        assert!(fs::File::open("tmp/cache/bundles/hyperspace:default:whiz:1.0.0/.ready" ).is_err());
+        assert!(fs::File::open("tmp/cache/bundles/hyperspace:default:whiz:1.0.0/files/routes.txt" ).is_err());
+
         bundle_cache.download(bundle.into()).await?;
-        println!("Retrurned from DOWNLOAD..");
+
+        // here we should verify that the correct files were created.
+        assert!(fs::File::open("tmp/cache/bundles/hyperspace:default:whiz:1.0.0/bundle.zip" ).is_ok());
+        assert!(fs::File::open("tmp/cache/bundles/hyperspace:default:whiz:1.0.0/.ready" ).is_ok());
+        assert!(fs::File::open("tmp/cache/bundles/hyperspace:default:whiz:1.0.0/files/routes.txt" ).is_ok());
 
         Ok(())
     }

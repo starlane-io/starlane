@@ -156,7 +156,7 @@ impl <C:Call> AsyncRunner<C> {
                 tx: tx_cp,
                 rx: rx,
                 processor: processor
-            }
+            }.run().await;
         } );
         tx
     }

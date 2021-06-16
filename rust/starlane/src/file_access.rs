@@ -73,7 +73,9 @@ impl FileAccess{
 
 
     pub fn with_path(&self, path: String ) -> Result<FileAccess,Error> {
-        Ok(FileAccess::new( format!("{}/{}",self.path,path) )?)
+
+        let path = format!("{}/{}",self.path,path);
+        Ok(FileAccess::new(path)?)
     }
 
     pub async fn unzip( &self, source: String, target: String ) -> Result<(),Error>{
@@ -218,26 +220,21 @@ impl LocalFileAccess {
 
     pub fn unzip(&mut self, source: String, target: String ) -> Result<(),Error> {
         let source = format!("{}/{}", self.base_dir, source );
-println!("source: {}",source);
         let source = File::open(source)?;
         let mut archive = zip::ZipArchive::new(source )?;
 
         for i in 0..archive.len() {
             let mut zip_file = archive.by_index(i)?;
-println!("artifact: {}", zip_file.name() );
             if zip_file.is_dir()
             {
                 let path = Path::new(format!("/{}/{}", target, zip_file.name()).as_str() )?;
-println!("dir: {}",path.to_string());
                 self.mkdir(&path)?;
             } else {
                 let path = format!("{}/{}/{}", self.base_dir, target, zip_file.name() );
-println!("target: {}",path);
                 let mut file = fs::File::create(path)?;
                 std::io::copy( &mut zip_file, &mut file )?;
             }
         }
-println!("done with UnZip...");
 
         Ok(())
     }
