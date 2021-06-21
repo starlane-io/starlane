@@ -50,15 +50,7 @@ impl ProtoCacheFactory {
         let logger = AuditLogger::new();
         let bundle_cache = ArtifactBundleCache::new(src, file_access.clone(), logger.clone())?;
         let root_caches = RootCache {
-            domain_configs: {
-                let parser = Arc::new(DomainConfigParser::new());
-                Arc::new(RootItemCache::new(
-                    bundle_cache,
-                    file_access,
-                    parser,
-                    logger.clone(),
-                )?)
-            },
+            item_caches: RootItemCaches { domain_configs: Arc::new(()) }
         };
 
         let (cache_call_tx, cache_call_rx) = mpsc::channel(16 * 1024);
@@ -86,7 +78,7 @@ impl ProtoCacheFactory {
 
 #[derive(Clone)]
 pub struct ProtoCache {
-    map: AsyncHashMap<ArtifactRef,Result<(),Error>>,
+    map: AsyncHashMap<ArtifactRef,Result<Claim,Error>>,
     cache_call_tx: mpsc::Sender<CacheCall>
 }
 
@@ -110,11 +102,18 @@ impl ProtoCache {
         tokio::spawn(async move {
             let (sub_tx,sub_rx) = oneshot::channel();
             cache_call_tx.send(CacheCall::Cache { artifact: artifact.clone(), tx: sub_tx }).await;
+            map.put( artifact, result.clone() ).await;
             let result = match sub_rx.await
             {
                 Ok(result) => {
-                    map.put( artifact, result.clone() ).await;
-                    result
+                    match result {
+                        Ok(claim) => {
+                            Ok(())
+                        }
+                        Err(error) => {
+                            Err(error)
+                        }
+                    }
                 }
                 Err(err) => {
                     eprintln!("ProtoCache: RecvError when waiting for cache artifact: {:?}", artifact );
@@ -144,7 +143,7 @@ impl RootCache {
     async fn cache(
         &mut self,
         artifacts: Vec<ArtifactRef>,
-        tx: oneshot::Sender<Result<HashSet<ArtifactRef>, Error>>,
+        tx: oneshot::Sender<Result<HashSet<Claim>, Error>>,
     ) {
         let mut cache_artifacts = artifacts.clone();
         // these are the ones we don't have in our cache yet
@@ -214,7 +213,7 @@ impl RootCache {
 enum CacheCall {
     Cache {
         artifact: ArtifactRef,
-        tx: oneshot::Sender<Result<(), Error>>,
+        tx: oneshot::Sender<Result<Claim, Error>>,
     },
 }
 
@@ -532,38 +531,6 @@ impl<C: Cacheable> CacheFactory<C> {
 
 pub trait Cacheable: FromArtifact + Send + Sync + 'static {}
 
-struct RootItemCache<C>
-where
-    C: Cacheable,
-{
-    tx: mpsc::Sender<RootCacheCall<C>>,
-    logger: AuditLogger,
-}
-
-impl<C: Cacheable> RootItemCache<C> {
-    fn new(
-        bundle_cache: ArtifactBundleCache,
-        file_access: FileAccess,
-        parser: Arc<dyn Parser<C>>,
-        logger: AuditLogger,
-    ) -> Result<Self, Error> {
-        Ok(RootItemCache {
-            tx: RootCacheProc::new(bundle_cache, file_access, parser)?,
-            logger: logger,
-        })
-    }
-
-    fn cache(&self, artifacts: Vec<ArtifactRef>) -> oneshot::Receiver<Result<Vec<ArtifactRef>, Error>> {
-        let (tx, rx) = oneshot::channel();
-
-        let cache_tx = self.tx.clone();
-        tokio::spawn(async move {
-            cache_tx.send(RootCacheCall::Cache { artifacts, tx }).await;
-        });
-
-        rx
-    }
-}
 
 pub enum RootCacheCall {
     Cache {
