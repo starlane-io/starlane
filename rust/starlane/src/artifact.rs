@@ -69,7 +69,7 @@ impl ToString for Artifact{
 
  */
 
-#[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
+#[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub enum ArtifactKind
 {
     DomainConfig

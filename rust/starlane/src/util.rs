@@ -150,6 +150,7 @@ pub struct AsyncRunner<C:Call>{
 
 impl <C:Call> AsyncRunner<C> {
     pub fn new(processor: Box<dyn AsyncProcessor<C>>, tx: mpsc::Sender<C>, rx: mpsc::Receiver<C> ){
+
         tokio::spawn( async move {
             AsyncRunner{
                 tx: tx,
@@ -163,6 +164,7 @@ impl <C:Call> AsyncRunner<C> {
         while let Option::Some(call) = self.rx.recv().await {
             self.processor.process(call).await;
         }
+println!("ASync Runner terminated");
     }
 }
 

@@ -30,7 +30,6 @@ use variant::central::CentralVariant;
 use variant::StarVariant;
 
 use crate::actor::{ActorKey, ActorKind};
-use crate::cache::ProtoCacheFactory;
 use crate::core::{StarCoreAction, StarCoreCommand, StarCoreResult};
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
@@ -80,6 +79,7 @@ use crate::star::variant::web::WebVariant;
 use crate::starlane::api::StarlaneApi;
 use crate::util;
 use crate::util::AsyncHashMap;
+use crate::cache::ProtoCacheFactory;
 
 pub mod filestore;
 pub mod pledge;

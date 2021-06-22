@@ -557,6 +557,7 @@ println!("... >  uploading artifact bundle...");
                 let artifact_bundle_api = sub_space_api.create_artifact_bundle("whiz", &semver::Version::from_str("1.0.0").unwrap(), data ).unwrap().submit().await.unwrap();
             }
 
+            /*
             {
                 let artifact = ArtifactAddress::from_str("hyperspace:default:whiz:1.0.0:/routes.txt").unwrap();
                 let caches = starlane_api.get_caches().await.unwrap();
@@ -567,6 +568,7 @@ println!("cache Ok!");
                 let domain_config = domain_configs.get(&artifact).unwrap();
 println!("got domain_config!");
             }
+             */
 
             loop {
                 tokio::time::sleep(Duration::from_secs(30)).await;

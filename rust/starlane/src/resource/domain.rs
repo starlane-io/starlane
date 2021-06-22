@@ -7,7 +7,7 @@ use serde::{Serialize,Deserialize};
 use crate::cache::{Data, Cacheable};
 use crate::artifact::{ArtifactAddress, ArtifactRef, ArtifactKind};
 use std::collections::HashMap;
-use crate::resource::config::{FromArtifact, Parser, ResourceConfig};
+use crate::resource::config::{Parser, ResourceConfig};
 
 pub struct Domain{
     key: DomainKey,
@@ -74,9 +74,6 @@ pub struct DomainConfig {
 
 impl Cacheable for DomainConfig {
 
-}
-
-impl FromArtifact for DomainConfig{
     fn artifact(&self) -> ArtifactRef{
         ArtifactRef{
             artifact: self.artifact.clone(),
@@ -105,11 +102,11 @@ impl DomainConfigParser{
 }
 
 impl Parser<DomainConfig> for DomainConfigParser{
-    fn parse(&self, artifact: ArtifactAddress, data: Data) -> Result<DomainConfig, Error> {
-        Ok(DomainConfig{
-            artifact: artifact,
+    fn parse(&self, artifact: ArtifactRef, data: Data) -> Result<Arc<DomainConfig>, Error> {
+        Ok(Arc::new(DomainConfig{
+            artifact: artifact.artifact,
             routes: HashMap::new()
-        })
+        }))
     }
 }
 
