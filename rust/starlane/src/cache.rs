@@ -23,7 +23,6 @@ use crate::resource::{
 use crate::star::{StarCommand, StarKey};
 use crate::starlane::api::StarlaneApi;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
-use actix_web::error::Canceled;
 use std::collections::hash_set::Difference;
 use std::convert::TryInto;
 use std::future::Future;
@@ -34,6 +33,7 @@ use tokio::fs;
 use tokio::sync::oneshot::error::RecvError;
 use std::collections::hash_map::RandomState;
 use std::hash::{Hash, Hasher};
+use futures::FutureExt;
 
 pub type Data = Arc<Vec<u8>>;
 pub type ZipFile = Path;
@@ -44,14 +44,147 @@ pub trait Cacheable: Send+Sync+'static{
 }
 
 pub struct ProtoCacheFactory{
-
+   root_caches: Arc<RootCaches>
 }
 
 impl ProtoCacheFactory {
-    pub(crate) fn new(src: ArtifactBundleSrc, file_access: FileAccess) -> Result<ProtoCacheFactory,Error> {
-        todo!()
+    pub fn new( src: ArtifactBundleSrc, file_access: FileAccess ) -> Result<ProtoCacheFactory,Error> {
+        let bundle_cache = ArtifactBundleCache::new(src, file_access, AuditLogger::new() )?;
+        Ok(Self{
+            root_caches: Arc::new(RootCaches::new(bundle_cache))
+        })
+    }
+
+    pub fn create(&self) -> ProtoCaches{
+        ProtoCaches::new(self.root_caches.clone())
     }
 }
+
+
+pub struct Caches{
+   pub domain_configs: ItemCache<DomainConfig>
+}
+
+impl Caches {
+
+    fn new()->Self {
+        Caches {
+            domain_configs: ItemCache::new()
+        }
+    }
+}
+
+pub struct ItemCache<C:Cacheable>{
+    map: HashMap<ArtifactAddress,Item<C>>
+}
+
+impl <C:Cacheable> ItemCache<C> {
+
+    fn new()->Self{
+        Self{
+            map: HashMap::new()
+        }
+    }
+
+    pub fn get( &self, artifact: &ArtifactAddress ) -> Option<Item<C>> {
+        self.map.get(&artifact).cloned()
+    }
+
+    fn add( &mut self, item: Item<C> ){
+        self.map.insert( item.artifact().address, item );
+    }
+}
+
+pub struct ProtoCaches {
+    root_caches: Arc<RootCaches>,
+    proc_tx: mpsc::Sender<ProtoCacheCall>
+}
+
+impl ProtoCaches {
+
+    fn new( root_caches: Arc<RootCaches> ) -> Self {
+        let( proc_tx, proc_rx ) = mpsc::channel(1024);
+        AsyncRunner::new(Box::new(ProtoCacheProc::new( root_caches.clone(), proc_tx.clone())), proc_tx.clone(), proc_rx );
+
+        ProtoCaches{
+            root_caches: root_caches,
+            proc_tx: proc_tx
+        }
+    }
+
+    pub async fn cache( &mut self, artifacts: Vec<ArtifactRef>) -> Result<(),Error> {
+        let (tx,rx) = oneshot::channel();
+        self.proc_tx.send( ProtoCacheCall::Cache {artifacts,tx}).await;
+        rx.await?
+    }
+}
+
+enum ProtoCacheCall{
+    Cache{artifacts: Vec<ArtifactRef>, tx: oneshot::Sender<Result<(),Error>>}
+}
+
+impl Call for ProtoCacheCall{}
+
+struct ProtoCacheProc{
+   proc_tx: mpsc::Sender<ProtoCacheCall>,
+   claims: AsyncHashMap<ArtifactRef,Claim>,
+   root_caches: Arc<RootCaches>
+}
+
+impl ProtoCacheProc {
+
+    fn new( root_caches: Arc<RootCaches>, proc_tx: mpsc::Sender<ProtoCacheCall> ) -> Self {
+        ProtoCacheProc{
+            proc_tx,
+            root_caches,
+            claims: AsyncHashMap::new()
+        }
+    }
+
+    async fn cache(proc_tx:mpsc::Sender<ProtoCacheCall>, root_caches: Arc<RootCaches>, claims: AsyncHashMap<ArtifactRef,Claim>, artifacts: Vec<ArtifactRef>) -> Result<(),Error> {
+        let mut more = vec!();
+
+        for artifact in artifacts {
+            let claim = root_caches.claim(artifact).await?;
+            let references = claim.references();
+            claims.put(claim.artifact.clone(), claim).await?;
+            for reference in references {
+                if !claims.contains(reference.clone()).await? {
+                    more.push(reference);
+                }
+            }
+        }
+
+        if !more.is_empty() {
+            let (sub_tx, sub_rx) = oneshot::channel();
+            proc_tx.send(ProtoCacheCall::Cache { artifacts: more, tx: sub_tx }).await;
+            sub_rx.await??;
+            Ok(())
+        } else {
+            Ok(())
+        }
+    }
+
+}
+
+#[async_trait]
+impl AsyncProcessor<ProtoCacheCall> for ProtoCacheProc{
+    async fn process(&mut self, call: ProtoCacheCall) {
+
+        match call {
+            ProtoCacheCall::Cache { artifacts, tx } => {
+                let proc_tx = self.proc_tx.clone();
+                let root_caches = self.root_caches.clone();
+                let claims = self.claims.clone();
+                tokio::spawn(async move {
+                    tx.send( ProtoCacheProc::cache( proc_tx.clone(), root_caches.clone(), claims.clone(), artifacts ).await );
+                } );
+            }
+        }
+    }
+}
+
+
 
 pub enum ArtifactBundleCacheCommand {
     Cache {
@@ -418,6 +551,12 @@ impl <C:Cacheable> RootItemCache<C> {
         rx.await?
     }
 
+    pub async fn get( &self, artifact: ArtifactRef ) -> Result<Item<C>,Error>{
+        let (tx,rx)= oneshot::channel();
+        self.tx.send( RootItemCacheCall::Get{artifact,tx}).await?;
+        rx.await?
+    }
+
 }
 
 impl <C:Cacheable> Call for RootItemCacheCall<C>{
@@ -454,13 +593,88 @@ impl <C:Cacheable> Deref for Item<C>{
 
 impl <C:Cacheable> Clone for Item<C> {
     fn clone(&self) -> Self {
-
         Item::new( self.item.clone(), self.ref_tx.clone() )
+    }
+}
+
+enum ClaimCall{
+    Increment,
+    Decrement
+}
+
+impl <C:Cacheable> Into<Claim> for Item<C> {
+    fn into(self) -> Claim {
+        let (tx,mut rx) = mpsc::channel(1);
+        let item = self.item.clone();
+        let ref_tx= self.ref_tx.clone();
+        tokio::spawn( async move {
+            while let Option::Some(call) = rx.recv().await {
+                match call{
+                    ClaimCall::Increment => {
+                        ref_tx.send( RootItemCacheCall::Increment{artifact:item.artifact(),item: item.clone()}).await;
+                    }
+                    ClaimCall::Decrement => {
+                        ref_tx.send( RootItemCacheCall::Decrement(item.artifact())).await;
+                    }
+                }
+            }
+        });
+
+        Claim::new( self.item.artifact(), self.item.references(), tx )
+    }
+}
+
+impl Clone for Claim {
+    fn clone(&self) -> Self {
+        Self::new( self.artifact.clone(), self.references.clone(), self.ref_tx.clone() )
+    }
+}
+
+struct Claim {
+   artifact: ArtifactRef,
+   references: Vec<ArtifactRef>,
+   ref_tx: mpsc::Sender<ClaimCall>
+}
+
+impl Claim {
+    fn new( artifact: ArtifactRef, references: Vec<ArtifactRef>, ref_tx: mpsc::Sender<ClaimCall> ) -> Self {
+        let ref_tx_cp = ref_tx.clone();
+
+        tokio::spawn( async move {
+            ref_tx_cp.send(ClaimCall::Increment).await;
+        });
+
+        Self{
+            artifact: artifact,
+            references: references,
+            ref_tx: ref_tx
+        }
+    }
+}
+
+
+impl Cacheable for Claim {
+    fn artifact(&self) -> ArtifactRef {
+        self.artifact.clone()
+    }
+
+    fn references(&self) -> Vec<ArtifactRef> {
+        self.references.clone()
+    }
+}
+
+impl Drop for Claim{
+    fn drop(&mut self) {
+        let ref_tx = self.ref_tx.clone();
+        tokio::spawn( async move {
+            ref_tx.send(ClaimCall::Decrement).await;
+        });
     }
 }
 
 pub enum RootItemCacheCall<C:Cacheable>{
     Cache{artifact: ArtifactRef, tx: oneshot::Sender<Result<Item<C>,Error>>},
+    Get{artifact: ArtifactRef, tx: oneshot::Sender<Result<Item<C>,Error>>},
     Increment{artifact: ArtifactRef, item: Arc<C> },
     Decrement(ArtifactRef),
     Signal{artifact:ArtifactRef, result: Result<Item<C>,Error>}
@@ -533,14 +747,23 @@ impl <C:Cacheable> AsyncProcessor<RootItemCacheCall<C>> for RootItemCacheProc<C>
                     }
                 }
             }
+            RootItemCacheCall::Get { artifact, tx } => {
+                tx.send( self.get(artifact));
+            }
         }
     }
+
 
 
 
 }
 
 impl <C:Cacheable> RootItemCacheProc<C> {
+
+    fn get(&self, artifact: ArtifactRef ) -> Result<Item<C>,Error> {
+        let ref_count= self.map.get(&artifact).ok_or(format!("could not find artifact: '{}'",artifact.address.to_string()))?;
+        Ok(Item::new( ref_count.reference.clone(), self.proc_tx.clone()  ))
+    }
 
     async fn cache( &self, artifact: ArtifactRef )  {
         let parser = self.parser.clone();
@@ -561,25 +784,41 @@ impl <C:Cacheable> RootItemCacheProc<C> {
     }
 
     async fn cache_artifact<X:Cacheable>( artifact: ArtifactRef, parser: Arc<dyn Parser<X>>, bundle_cache: ArtifactBundleCache ) -> Result<Arc<X>,Error>{
-        bundle_cache.download(artifact.artifact.parent().into() ).await?;
-        let file_access = ArtifactBundleCache::with_bundle_files_path(bundle_cache.file_access(), artifact.artifact.parent() )?;
-        let data = file_access.read(&artifact.artifact.path()?).await?;
+        bundle_cache.download(artifact.address.parent().into() ).await?;
+        let file_access = ArtifactBundleCache::with_bundle_files_path(bundle_cache.file_access(), artifact.address.parent() )?;
+        let data = file_access.read(&artifact.address.path()?).await?;
         parser.parse( artifact, data )
     }
-
 }
 
 
-pub struct RootCaches{
+struct RootCaches{
     bundle_cache: ArtifactBundleCache,
     domain_configs: RootItemCache<DomainConfig>
 }
 
 impl RootCaches{
-    pub fn new(bundle_cache: ArtifactBundleCache)->Self {
+    fn new(bundle_cache: ArtifactBundleCache)->Self {
         Self{
             bundle_cache: bundle_cache.clone(),
             domain_configs: RootItemCache::new(bundle_cache, Arc::new( DomainConfigParser::new() ))
+        }
+    }
+
+    async fn claim( &self, artifact: ArtifactRef ) -> Result<Claim,Error>{
+        let result = match artifact.kind {
+            ArtifactKind::DomainConfig => {
+                self.domain_configs.cache( artifact ).await
+            }
+        };
+
+        match result {
+            Ok(item) => {
+                Ok(item.into())
+            }
+            Err(error) => {
+                Err(error)
+            }
         }
     }
 }
@@ -721,7 +960,7 @@ mod test {
         let bundle_cache = ArtifactBundleCache::new(MockArtifactBundleSrc::new()?.into(), FileAccess::new("tmp/cache".to_string())?, AuditLogger::new() )?;
         let artifact = ArtifactAddress::from_str("hyperspace:default:whiz:1.0.0:/routes.txt")?;
         let artifact = ArtifactRef{
-            artifact: artifact,
+            address: artifact,
             kind: ArtifactKind::DomainConfig
         };
 

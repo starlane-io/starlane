@@ -76,7 +76,7 @@ impl Cacheable for DomainConfig {
 
     fn artifact(&self) -> ArtifactRef{
         ArtifactRef{
-            artifact: self.artifact.clone(),
+            address: self.artifact.clone(),
             kind: ArtifactKind::DomainConfig
         }
     }
@@ -104,7 +104,7 @@ impl DomainConfigParser{
 impl Parser<DomainConfig> for DomainConfigParser{
     fn parse(&self, artifact: ArtifactRef, data: Data) -> Result<Arc<DomainConfig>, Error> {
         Ok(Arc::new(DomainConfig{
-            artifact: artifact.artifact,
+            artifact: artifact.address,
             routes: HashMap::new()
         }))
     }

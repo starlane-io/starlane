@@ -570,6 +570,6 @@ pub enum ArtifactBundleIdentifier{
 
 #[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub struct ArtifactRef {
-    pub artifact: ArtifactAddress,
+    pub address: ArtifactAddress,
     pub kind: ArtifactKind
 }
