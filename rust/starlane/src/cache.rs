@@ -97,18 +97,21 @@ impl <C:Cacheable> ItemCache<C> {
 
 pub struct ProtoCaches {
     root_caches: Arc<RootCaches>,
-    proc_tx: mpsc::Sender<ProtoCacheCall>
+    proc_tx: mpsc::Sender<ProtoCacheCall>,
+    claims: AsyncHashMap<ArtifactRef,Claim>
 }
 
 impl ProtoCaches {
 
     fn new( root_caches: Arc<RootCaches> ) -> Self {
+        let claims = AsyncHashMap::new();
         let( proc_tx, proc_rx ) = mpsc::channel(1024);
-        AsyncRunner::new(Box::new(ProtoCacheProc::new( root_caches.clone(), proc_tx.clone())), proc_tx.clone(), proc_rx );
+        AsyncRunner::new(Box::new(ProtoCacheProc::new( root_caches.clone(),claims.clone(), proc_tx.clone())), proc_tx.clone(), proc_rx );
 
         ProtoCaches{
             root_caches: root_caches,
-            proc_tx: proc_tx
+            proc_tx: proc_tx,
+            claims
         }
     }
 
@@ -116,6 +119,21 @@ impl ProtoCaches {
         let (tx,rx) = oneshot::channel();
         self.proc_tx.send( ProtoCacheCall::Cache {artifacts,tx}).await;
         rx.await?
+    }
+
+    pub async fn to_caches(self) -> Result<Caches,Error> {
+        let mut caches = Caches::new();
+        let claims = self.claims.into_map().await?;
+
+        for (artifact,claim) in claims {
+            match artifact.kind{
+                ArtifactKind::DomainConfig => {
+                    caches.domain_configs.add( self.root_caches.domain_configs.get(artifact).await? );
+                }
+            }
+        }
+
+        Ok(caches)
     }
 }
 
@@ -133,11 +151,11 @@ struct ProtoCacheProc{
 
 impl ProtoCacheProc {
 
-    fn new( root_caches: Arc<RootCaches>, proc_tx: mpsc::Sender<ProtoCacheCall> ) -> Self {
+    fn new( root_caches: Arc<RootCaches>, claims: AsyncHashMap<ArtifactRef,Claim>, proc_tx: mpsc::Sender<ProtoCacheCall> ) -> Self {
         ProtoCacheProc{
             proc_tx,
             root_caches,
-            claims: AsyncHashMap::new()
+            claims
         }
     }
 
@@ -965,11 +983,14 @@ mod test {
         let artifact = ArtifactAddress::from_str("hyperspace:default:whiz:1.0.0:/routes.txt")?;
         let artifact = artifact.as_ref(ArtifactKind::DomainConfig);
 
-        proto_caches.cache(vec![artifact]).await?;
+        proto_caches.cache(vec![artifact.clone()]).await?;
+
+        let caches = proto_caches.to_caches().await?;
+
+        let domain_config = caches.domain_configs.get( &artifact.address ).ok_or(format!("expected address '{}'", artifact.address.to_string() ))?;
 
         Ok(())
     }
-
 
     pub async fn root_item_cache_test() -> Result<(), Error> {
         let bundle_cache = ArtifactBundleCache::new(MockArtifactBundleSrc::new()?.into(), FileAccess::new("tmp/cache".to_string())?, AuditLogger::new() )?;
@@ -981,11 +1002,10 @@ mod test {
 
         let root_caches = RootCaches::new(bundle_cache);
 
-          let rtn = root_caches.domain_configs.cache(artifact).await;
-          assert!(rtn.is_ok());
+        let rtn = root_caches.domain_configs.cache(artifact).await;
+        assert!(rtn.is_ok());
 
-//        tokio::time::sleep( Duration::from_secs(5)).await;
-
+//      tokio::time::sleep( Duration::from_secs(5)).await;
 
         Ok(())
     }
