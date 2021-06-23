@@ -951,10 +951,25 @@ mod test {
             assert!(async_bundle_test().await.is_ok());
             reset();
             assert!(root_item_cache_test().await.is_ok());
+            reset();
+            assert!(proto_caches().await.is_ok());
         });
 
         Ok(())
     }
+
+    pub async fn proto_caches() -> Result<(), Error> {
+        let factory = ProtoCacheFactory::new( MockArtifactBundleSrc::new()?.into(),FileAccess::new("tmp/cache".to_string())? )?;
+
+        let mut proto_caches = factory.create();
+        let artifact = ArtifactAddress::from_str("hyperspace:default:whiz:1.0.0:/routes.txt")?;
+        let artifact = artifact.as_ref(ArtifactKind::DomainConfig);
+
+        proto_caches.cache(vec![artifact]).await?;
+
+        Ok(())
+    }
+
 
     pub async fn root_item_cache_test() -> Result<(), Error> {
         let bundle_cache = ArtifactBundleCache::new(MockArtifactBundleSrc::new()?.into(), FileAccess::new("tmp/cache".to_string())?, AuditLogger::new() )?;

@@ -130,6 +130,14 @@ pub struct ArtifactAddress {
 
 
 impl ArtifactAddress {
+
+    pub fn as_ref( self, kind: ArtifactKind ) -> ArtifactRef {
+        ArtifactRef{
+            address:self,
+            kind:kind
+        }
+    }
+
     pub fn parent(&self)-> ArtifactBundleAddress {
         return ArtifactBundleAddress {
             address: self.address.parent().expect("artifact should have bundle parent")
@@ -573,3 +581,4 @@ pub struct ArtifactRef {
     pub address: ArtifactAddress,
     pub kind: ArtifactKind
 }
+
