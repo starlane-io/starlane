@@ -22,7 +22,6 @@ use crate::resource::ResourceAddressPartKind::Base64Encoded;
 use crate::star::StarKey;
 use crate::app::ConfigSrc;
 
-
 #[derive(Debug,Eq,PartialEq,Hash,Clone,Serialize,Deserialize)]
 pub struct ActorKey
 {
@@ -35,7 +34,6 @@ impl ActorKey{
         Ok(ResourceAddressPart::SkewerCase(SkewerCase::new(self.id.to_string().as_str() )?))
     }
 }
-
 
 impl ActorKey
 {

@@ -28,6 +28,8 @@ use crate::template::{ConstellationData, ConstellationTemplate, StarKeyIndexTemp
 use crate::starlane::api::StarlaneApi;
 use crate::core::CoreRunner;
 use crate::star::variant::{StarVariantFactory, StarVariantFactoryDefault};
+use crate::file_access::FileAccess;
+use crate::cache::ProtoCacheFactory;
 
 pub mod api;
 
@@ -45,8 +47,11 @@ pub struct Starlane
 //    star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
     core_runner: Arc<CoreRunner>,
     constellation_names: HashSet<String>,
+    data_access: FileAccess,
+    cache_access: FileAccess,
     pub logger: Logger,
-    pub flags: Flags
+    pub flags: Flags,
+    pub caches: Option<Arc<ProtoCacheFactory>>
 }
 
 impl Starlane
@@ -64,7 +69,10 @@ impl Starlane
 //            star_core_ext_factory: Arc::new(ExampleStarCoreExtFactory::new() ),
             core_runner: Arc::new(CoreRunner::new()?),
             logger: Logger::new(),
-            flags: Flags::new()
+            flags: Flags::new(),
+            data_access: FileAccess::new(std::env::var("STARLANE_DATA")? )?,
+            cache_access: FileAccess::new(std::env::var("STARLANE_CACHE")? )?,
+            caches: Option::None
         })
     }
 
@@ -107,6 +115,10 @@ impl Starlane
         }
     }
 
+    pub fn caches(&self) -> Result<Arc<ProtoCacheFactory>,Error> {
+        Ok(self.caches.as_ref().ok_or("expected caches to be set")?.clone())
+    }
+
     async fn lookup_star_address( &self, key: &StarKey )->Result<StarAddress,Error>
     {
         if self.star_controllers.contains_key(key)
@@ -128,7 +140,15 @@ impl Starlane
 
         let link = link.unwrap().clone();
         let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
-        let (proto_star, star_ctrl) = ProtoStar::new(Option::None, link.kind.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.flags.clone(), self.logger.clone() );
+        let (star_tx,star_rx) = mpsc::channel(32);
+
+        if self.caches.is_none() {
+            let api = StarlaneApi::new(star_tx.clone());
+            let caches = Arc::new(ProtoCacheFactory::new(api.into(), self.cache_access.clone() )?);
+            self.caches = Option::Some(caches);
+        }
+
+        let (proto_star, star_ctrl) = ProtoStar::new(Option::None, link.kind.clone(), star_tx,star_rx, self.caches.clone().ok_or("already established that caches exists, what gives?")?,self.data_access.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.flags.clone(), self.logger.clone() );
 
         println!("created proto star: {:?}", &link.kind);
 
@@ -220,7 +240,15 @@ impl Starlane
             let (mut evolve_tx,mut evolve_rx) = oneshot::channel();
             evolve_rxs.push(evolve_rx );
 
-            let (proto_star, star_ctrl) = ProtoStar::new(Option::Some(star_key.clone()), star_template.kind.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.flags.clone(), self.logger.clone() );
+            let (star_tx,star_rx) = mpsc::channel(32);
+            if self.caches.is_none() {
+                let api = StarlaneApi::new(star_tx.clone());
+                let caches = Arc::new(ProtoCacheFactory::new(api.into(), self.cache_access.clone() )?);
+                self.caches = Option::Some(caches);
+            }
+
+            let (proto_star, star_ctrl) = ProtoStar::new(Option::Some(star_key.clone()), star_template.kind.clone(), star_tx, star_rx, self.caches.as_ref().ok_or("already established that caches exists, what gives?")?.clone(),self.data_access.clone(), self.star_manager_factory.clone(), self.core_runner.clone(), self.flags.clone(), self.logger.clone() );
+
             self.star_controllers.insert(star_key.clone(), star_ctrl.clone() );
             if name.is_some() && star_template.handle.is_some()
             {
@@ -347,35 +375,35 @@ pub enum StarlaneCommand
 {
     Connect(ConnectCommand),
     ConstellationCreate(ConstellationCreate),
-    StarControlRequestByKey(StarControlRequestByKey),
-    StarControlRequestByName(StarControlRequestByName),
+    StarControlRequestByKey(StarlaneApiRequestByKey),
+    StarControlRequestByName(StarlaneApiRequestByName),
     Destroy
 }
 
-pub struct StarControlRequestByKey
+pub struct StarlaneApiRequestByKey
 {
     pub star: StarKey,
     pub tx: oneshot::Sender<StarlaneApi>
 }
 
-pub struct StarControlRequestByName
+pub struct StarlaneApiRequestByName
 {
     pub name: StarName,
     pub tx: oneshot::Sender<StarlaneApi>
 }
 
-impl StarControlRequestByName
+impl StarlaneApiRequestByName
 {
     pub fn new( constellation: String, star: String )->(Self,oneshot::Receiver<StarlaneApi>)
     {
         let (tx,rx) = oneshot::channel();
-        (StarControlRequestByName{
+        (StarlaneApiRequestByName {
             name: StarName {
                 constellation: constellation,
                 star: star
             },
             tx: tx
-        },rx)
+        }, rx)
     }
 }
 
@@ -437,7 +465,7 @@ mod test
     use tokio::time::Duration;
     use tokio::time::timeout;
 
-    use crate::artifact::{ArtifactKind, ArtifactLocation};
+    use crate::artifact::{ArtifactKind, ArtifactLocation, ArtifactAddress};
     use crate::error::Error;
     use crate::keys::{SpaceKey, SubSpaceKey, UserKey};
     use crate::logger::{Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog, StarLogPayload};
@@ -446,20 +474,24 @@ mod test
     use crate::resource::{Labels, ResourceAddress};
     use crate::space::CreateAppControllerFail;
     use crate::star::{StarController, StarInfo, StarKey, StarKind};
-    use crate::starlane::{ConstellationCreate, StarControlRequestByName, Starlane, StarlaneCommand};
+    use crate::starlane::{ConstellationCreate, StarlaneApiRequestByName, Starlane, StarlaneCommand};
     use crate::template::{ConstellationData, ConstellationTemplate};
     use crate::starlane::api::SubSpaceApi;
     use crate::message::Fail;
     use std::fs;
     use std::convert::TryInto;
+    use std::fs::File;
+    use std::io::Read;
 
     #[test]
     pub fn starlane()
     {
         let data_dir = "tmp/data";
-        fs::remove_dir_all(data_dir ).unwrap();
+        let cache_dir= "tmp/cache";
+        fs::remove_dir_all(data_dir ).unwrap_or_default();
+        fs::remove_dir_all(cache_dir ).unwrap_or_default();
         std::env::set_var("STARLANE_DATA", data_dir );
-
+        std::env::set_var("STARLANE_CACHE", cache_dir );
 
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
@@ -496,7 +528,7 @@ mod test
             tokio::time::sleep(Duration::from_secs(1)).await;
 
             let starlane_api = {
-                let (request,rx) = StarControlRequestByName::new("standalone".to_owned(), "mesh".to_owned());
+                let (request,rx) = StarlaneApiRequestByName::new("standalone".to_owned(), "mesh".to_owned());
                 tx.send(StarlaneCommand::StarControlRequestByName(request)).await;
                 timeout(Duration::from_millis(10), rx).await.unwrap().unwrap()
             };
@@ -514,6 +546,29 @@ eprintln!("{}",err.to_string());
             file_api.create_file_from_string(&"/index.html".try_into().unwrap(), "The rain in Spain falls mostly on the plain.".to_string() ).unwrap().submit().await.unwrap();
             file_api.create_file_from_string(&"/second/index.html".try_into().unwrap(), "This is a second page....".to_string() ).unwrap().submit().await.unwrap();
 
+println!("... >  filesystems created ...");
+            // upload an artifact bundle
+            {
+                let mut file = File::open("test-data/localhost-config/artifact-bundle.zip").unwrap();
+                let mut data = vec![];
+                file.read_to_end(&mut data).unwrap();
+                let data = Arc::new(data);
+println!("... >  uploading artifact bundle...");
+                let artifact_bundle_api = sub_space_api.create_artifact_bundle("whiz", &semver::Version::from_str("1.0.0").unwrap(), data ).unwrap().submit().await.unwrap();
+            }
+
+            /*
+            {
+                let artifact = ArtifactAddress::from_str("hyperspace:default:whiz:1.0.0:/routes.txt").unwrap();
+                let caches = starlane_api.get_caches().await.unwrap();
+                let domain_configs = caches.domain_configs.create();
+                domain_configs.wait_for_cache(artifact.clone() ).await.unwrap();
+                let domain_configs = domain_configs.into_cache().await.unwrap();
+println!("cache Ok!");
+                let domain_config = domain_configs.get(&artifact).unwrap();
+println!("got domain_config!");
+            }
+             */
 
             loop {
                 tokio::time::sleep(Duration::from_secs(30)).await;

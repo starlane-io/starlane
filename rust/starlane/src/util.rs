@@ -1,9 +1,10 @@
-use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::{Receiver, Sender};
 use crate::error::Error;
 use tokio::sync::{mpsc, oneshot};
 use std::collections::HashMap;
 use std::hash::Hash;
 use tokio::time::Duration;
+use std::future::Future;
 
 pub struct Progress<E>
 {
@@ -28,7 +29,9 @@ enum AsyncHashMapCommand<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static
     Contains{
         key: K,
         tx: oneshot::Sender<bool>
-    }
+    },
+    GetMap(oneshot::Sender<HashMap<K,V>>),
+    SetMap(HashMap<K,V>)
 }
 
 #[derive(Clone)]
@@ -37,7 +40,7 @@ pub struct AsyncHashMap<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static,
 }
 
 impl <K,V> AsyncHashMap<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static, V: Clone+Send+Sync+'static {
-    pub async fn new() -> Self {
+    pub fn new() -> Self {
         let (tx,mut rx):(mpsc::Sender<AsyncHashMapCommand<K,V>>,mpsc::Receiver<AsyncHashMapCommand<K,V>>) = mpsc::channel(1);
 
         tokio::spawn( async move {
@@ -58,6 +61,12 @@ impl <K,V> AsyncHashMap<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static,
                     AsyncHashMapCommand::Contains{key,tx} => {
                         tx.send(map.contains_key(&key) ).unwrap_or_default();
                     }
+                    AsyncHashMapCommand::GetMap(tx) => {
+                        tx.send(map.clone());
+                    }
+                    AsyncHashMapCommand::SetMap(new_map) => {
+                        map = new_map
+                    }
                 }
             }
         });
@@ -68,7 +77,7 @@ impl <K,V> AsyncHashMap<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static,
     }
 
     pub async fn put( &self, key:K, value:V )->Result<(),Error>{
-        self.tx.send( AsyncHashMapCommand::Put { key, value}).await?;
+        self.tx.send( AsyncHashMapCommand::Put{ key, value}).await?;
         Ok(())
     }
 
@@ -90,6 +99,27 @@ impl <K,V> AsyncHashMap<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static,
         Ok(rx.await?)
     }
 
+    pub async fn into_map(self) -> Result<HashMap<K,V>,Error> {
+        let (tx,rx) = oneshot::channel();
+        self.tx.send( AsyncHashMapCommand::GetMap(tx)).await?;
+        Ok(rx.await?)
+    }
+
+    pub fn set_map(&self, map: HashMap<K,V>) {
+        let tx = self.tx.clone();
+        tokio::spawn( async move {
+            tx.send(AsyncHashMapCommand::SetMap(map)).await;
+        });
+    }
+
+}
+
+impl <K,V> From<HashMap<K,V>> for AsyncHashMap<K,V> where K: Clone+Hash+Eq+PartialEq+Send+Sync+'static, V: Clone+Send+Sync+'static {
+    fn from(map: HashMap<K, V>) -> Self {
+        let async_map = AsyncHashMap::new();
+        async_map.set_map(map);
+        async_map
+    }
 }
 
 pub async fn wait_for_it<R>( rx: oneshot::Receiver<Result<R,Error>>) -> Result<R,Error> {
@@ -99,3 +129,42 @@ pub async fn wait_for_it<R>( rx: oneshot::Receiver<Result<R,Error>>) -> Result<R
 pub async fn wait_for_it_whatever<R>( rx: oneshot::Receiver<R>) -> Result<R,Error> {
     Ok(tokio::time::timeout( Duration::from_secs(15), rx).await??)
 }
+
+pub async fn wait_for_it_for<R>( rx: oneshot::Receiver<Result<R,Error>>, duration: Duration ) -> Result<R,Error> {
+    tokio::time::timeout( duration, rx).await??
+}
+
+
+#[async_trait]
+pub trait AsyncProcessor<C>: Send+Sync+'static {
+    async fn process(&mut self, call: C);
+}
+
+pub trait Call: Sync+Send+'static {}
+
+pub struct AsyncRunner<C:Call>{
+    tx: mpsc::Sender<C>,
+    rx: mpsc::Receiver<C>,
+    processor: Box<dyn AsyncProcessor<C>>
+}
+
+impl <C:Call> AsyncRunner<C> {
+    pub fn new(processor: Box<dyn AsyncProcessor<C>>, tx: mpsc::Sender<C>, rx: mpsc::Receiver<C> ){
+
+        tokio::spawn( async move {
+            AsyncRunner{
+                tx: tx,
+                rx: rx,
+                processor: processor
+            }.run().await;
+        } );
+    }
+
+    async fn run(mut self) {
+        while let Option::Some(call) = self.rx.recv().await {
+            self.processor.process(call).await;
+        }
+println!("ASync Runner terminated");
+    }
+}
+

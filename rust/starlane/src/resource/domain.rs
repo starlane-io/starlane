@@ -1,9 +1,13 @@
 use crate::keys::DomainKey;
-use crate::resource::ResourceAddress;
+use crate::resource::{ResourceAddress, ResourceKind};
 use std::convert::{TryInto, TryFrom};
 use std::sync::Arc;
 use crate::error::Error;
 use serde::{Serialize,Deserialize};
+use crate::cache::{Data, Cacheable};
+use crate::artifact::{ArtifactAddress, ArtifactRef, ArtifactKind};
+use std::collections::HashMap;
+use crate::resource::config::{Parser, ResourceConfig};
 
 pub struct Domain{
     key: DomainKey,
@@ -55,3 +59,54 @@ impl TryFrom<Vec<u8>> for DomainState{
         Ok(bincode::deserialize::<DomainState>(value.as_slice() )?)
     }
 }
+
+
+
+pub struct HttpResourceSelector{
+
+}
+
+
+pub struct DomainConfig {
+    artifact: ArtifactAddress,
+    routes: HashMap<String,HttpResourceSelector>
+}
+
+impl Cacheable for DomainConfig {
+
+    fn artifact(&self) -> ArtifactRef{
+        ArtifactRef{
+            address: self.artifact.clone(),
+            kind: ArtifactKind::DomainConfig
+        }
+    }
+
+    fn references(&self) -> Vec<ArtifactRef> {
+        vec!()
+    }
+}
+
+impl ResourceConfig for DomainConfigParser{
+    fn kind(&self) -> ResourceKind {
+        ResourceKind::Domain
+    }
+}
+
+
+pub struct DomainConfigParser;
+
+impl DomainConfigParser{
+    pub fn new()->Self{
+        Self{}
+    }
+}
+
+impl Parser<DomainConfig> for DomainConfigParser{
+    fn parse(&self, artifact: ArtifactRef, data: Data) -> Result<Arc<DomainConfig>, Error> {
+        Ok(Arc::new(DomainConfig{
+            artifact: artifact.address,
+            routes: HashMap::new()
+        }))
+    }
+}
+

@@ -5,7 +5,7 @@ use std::time::Duration;
 use crate::frame::{ChildManagerResourceAction, Reply, SimpleReply, StarMessagePayload};
 use crate::keys::ResourceKey;
 use crate::message::{Fail, ProtoStarMessage};
-use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord, ResourceType, Path, LocalDataSrc, DataTransfer, ResourceIdentifier, ResourceStub, ResourceCreateStrategy, FileKind, ResourceRegistryInfo, ResourceStateSrc, RemoteDataSrc};
+use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceKind, ResourceRecord, ResourceType, Path, LocalDataSrc, DataTransfer, ResourceIdentifier, ResourceStub, ResourceCreateStrategy, FileKind, ResourceRegistryInfo, ResourceStateSrc, RemoteDataSrc, ArtifactBundleKind};
 use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
@@ -19,9 +19,16 @@ use crate::star::StarCommand::ResourceRecordRequest;
 use std::marker::PhantomData;
 use crate::frame::ChildManagerResourceAction::Register;
 use std::{thread, sync};
-use tokio::runtime::Runtime;
+use tokio::runtime::{Runtime, Handle};
 use tokio::sync::mpsc;
 use futures::channel::oneshot;
+use semver::Version;
+use crate::resource::artifact::ArtifactBundleState;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use futures::io::Cursor;
+use tempdir::TempDir;
+use tokio::fs::File;
+use crate::cache::ProtoCacheFactory;
 
 
 #[derive(Clone)]
@@ -76,6 +83,11 @@ println!("elapsed error: {}",err );
         rx.await?
     }
 
+    pub async fn get_caches(&self) -> Result<Arc<ProtoCacheFactory>,Fail> {
+        let (tx,rx)  = tokio::sync::oneshot::channel();
+        self.star_tx.send( StarCommand::GetCaches(tx)).await;
+        Ok(rx.await?)
+    }
 
     /*
     pub async fn get_child_resource_manager(&self, key: ResourceKey ) -> Result<ChildResourceManager,Fail> {
@@ -155,32 +167,56 @@ println!("elapsed error: {}",err );
         }
     }
 
-    pub async fn get_resource_state(&self, identifier: ResourceIdentifier ) -> Result<Option<Arc<Vec<u8>>>,Fail> {
-
-        match self.get_resource_state_src(identifier).await? {
-            RemoteDataSrc::None => Ok(Option::None),
-            RemoteDataSrc::Memory(data) => Ok(Option::Some(data))
+    /*
+    /// this function is acting as a facade for now, later we will not download the entire state in one message
+    pub async fn get_resource_state_stream(&self, identifier: ResourceIdentifier ) -> Result<Option<Box<dyn AsyncReadExt>>,Fail> {
+        match self.get_resource_state(identifier).await? {
+            None => Ok(Option::None),
+            Some(data) => {
+                let file_path= TempDir::new("sometempdir")?.path().with_file_name("temp.out");
+                let mut file = File::create( file_path.as_path() ).await?;
+                file.write_all(data.as_slice()).await?;
+                let mut file = File::open( file_path.as_path() ).await?;
+                Ok(Option::Some(Box::new(file)))
+            }
         }
     }
+     */
 
-    pub async fn get_resource_state_src(&self, identifier: ResourceIdentifier ) -> Result<RemoteDataSrc,Fail> {
+    pub fn get_resource_state(&self, identifier: ResourceIdentifier ) -> Result<Option<Arc<Vec<u8>>>,Fail> {
 
+
+println!("get_resource_state block_on");
+        let state_src = self.get_resource_state_src(identifier)?;
+         match  state_src {
+            RemoteDataSrc::None => Ok(Option::None),
+            RemoteDataSrc::Memory(data) => Ok(Option::Some(data))
+         }
+    }
+
+    pub fn get_resource_state_src(&self, identifier: ResourceIdentifier ) -> Result<RemoteDataSrc,Fail> {
+
+        let star_tx = self.star_tx.clone();
+
+        let handle = Handle::current();
+        handle.block_on( async {
             let mut proto = ProtoMessage::new();
             proto.payload = Option::Some(ResourceRequestMessage::State);
             proto.to = Option::Some(identifier);
             proto.from = Option::Some(MessageFrom::Inject);
             let reply = proto.reply();
             let mut proto = proto.to_proto_star_message().await?;
-            self.star_tx.send(StarCommand::SendProtoMessage(proto)).await?;
+            star_tx.send(StarCommand::SendProtoMessage(proto)).await?;
 
-        let result = Self::timeout(reply).await?;
+            let result = Self::timeout(reply).await?;
 
-        match result.payload {
+            match result.payload {
                 ResourceResponseMessage::State(data) => {
                     Ok(data)
                 }
                 _ => Err(Fail::Unexpected)
             }
+        })
     }
 
     pub fn create_space( &self, name: &str, display: &str )-> Result<Creation<SpaceApi>,Fail> {
@@ -366,6 +402,27 @@ impl SubSpaceApi {
         Ok(Creation::new(self.starlane_api(),create))
     }
 
+    pub fn create_artifact_bundle( &self, name: &str, version: &Version, data: Arc<Vec<u8>>  )-> Result<Creation<ArtifactBundleApi>,Fail> {
+        let resource_src = AssignResourceStateSrc::Direct(data);
+        let kind :ArtifactBundleKind = version.clone().into();
+
+        let create = ResourceCreate{
+            parent: self.stub.key.clone(),
+            key: KeyCreationSrc::None,
+            address: AddressCreationSrc::Appends(vec![name.to_string(),version.to_string()]),
+            archetype: ResourceArchetype {
+                kind: ResourceKind::ArtifactBundle(kind),
+                specific: None,
+                config: None
+            },
+            src: resource_src,
+            registry_info: None,
+            owner: None,
+            strategy: ResourceCreateStrategy::Create
+        };
+        Ok(Creation::new(self.starlane_api(),create))
+    }
+
 }
 
 pub struct FileSystemApi{
@@ -451,7 +508,26 @@ impl FileApi {
     }
 }
 
+pub struct ArtifactBundleApi{
+    stub: ResourceStub,
+    star_tx: mpsc::Sender<StarCommand>
+}
 
+impl ArtifactBundleApi {
+    pub fn new(star_tx: mpsc::Sender<StarCommand>, stub: ResourceStub ) -> Result<Self,Error> {
+        if stub.key.resource_type() != ResourceType::ArtifactBundle{
+            return Err(format!("wrong key resource type for ArtifactBundleApi: {}", stub.key.resource_type().to_string()).into());
+        }
+        if stub.address.resource_type() != ResourceType::ArtifactBundle{
+            return Err(format!("wrong address resource type for ArtifactBundleApi: {}", stub.address.resource_type().to_string()).into());
+        }
+
+        Ok(ArtifactBundleApi{
+            star_tx: star_tx,
+            stub: stub
+        })
+    }
+}
 pub struct UserApi{
     stub: ResourceStub,
     star_tx: mpsc::Sender<StarCommand>
@@ -558,6 +634,14 @@ impl TryFrom<ResourceApi> for FileApi{
     }
 }
 
+impl TryFrom<ResourceApi> for ArtifactBundleApi{
+    type Error = Fail;
+
+    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
+        Ok(Self::new( value.star_tx, value.stub )?)
+    }
+}
+
 impl TryFrom<ResourceApi> for SubSpaceApi{
     type Error = Fail;
 
@@ -620,7 +704,7 @@ impl StarlaneApiRunner {
     {
         thread::spawn( move || {
             let rt= tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-            rt.block_on(async {
+            rt.block_on(async move {
                 while let Option::Some(action) = self.rx.recv().await {
                     self.process(action).await;
                 }
@@ -632,7 +716,7 @@ impl StarlaneApiRunner {
 
         match action {
            StarlaneAction::GetState { identifier,tx } => {
-               tx.send(self.api.get_resource_state(identifier).await );
+               tx.send(self.api.get_resource_state(identifier) );
            }
        }
     }

@@ -8,7 +8,7 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::app::ConfigSrc;
 use crate::error::Error;
-use crate::file::FileAccess;
+use crate::file_access::FileAccess;
 use crate::keys::ResourceKey;
 use crate::message::Fail;
 use crate::names::Specific;

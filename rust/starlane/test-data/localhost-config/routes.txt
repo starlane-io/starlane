@@ -1,0 +1,2 @@
+/wordpress => hyperspace:default:[wordpress-proxy]::<Proxy>
+/ => hyperspace:default:*:website::<FileSystem>

@@ -23,15 +23,17 @@ use crate::message::Fail;
 use crate::resource::{AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource, Resource, ResourceAssign, ResourceSliceAssign, ResourceIdentifier, RemoteDataSrc};
 use crate::resource::store::ResourceStoreSqlLite;
 use crate::star::{ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel};
-use crate::file::FileAccess;
+use crate::file_access::FileAccess;
 use crate::core::file_store::FileStoreHost;
 use crate::frame::MessagePayload;
 use crate::core::default::DefaultHost;
 use crate::star::variant::StarVariantCommand;
+use crate::core::artifact::ArtifactHost;
 
 pub mod server;
 pub mod file_store;
 pub mod default;
+pub mod artifact;
 
 pub struct StarCoreAction{
     pub command: StarCoreCommand,
@@ -154,12 +156,15 @@ impl StarCoreFactory
 
     pub async fn create(&self, skel: StarSkel, core_rx: mpsc::Receiver<StarCoreAction> ) -> Result<StarCore2,Error>
     {
-        let file_access = skel.file_access.with_path(format!("stars/{}",skel.info.key.to_string())).await?;
+        let file_access = skel.data_access.with_path(format!("stars/{}", skel.info.key.to_string()))?;
         let host:Box<dyn Host> =  match skel.info.kind
         {
 
             StarKind::FileStore => {
                 Box::new(FileStoreHost::new(skel.clone(),file_access).await? )
+            }
+            StarKind::ArtifactStore=> {
+                Box::new(ArtifactHost::new(skel.clone(),file_access).await? )
             }
             _ => {
                 Box::new(DefaultHost::new().await )
@@ -189,6 +194,10 @@ impl Host for InertHost{
     }
 
     async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {
+        Err(Fail::Error("This is an InertHost which cannot actually host anything".into()))
+    }
+
+    async fn delete(&self, identifier: ResourceIdentifier) -> Result<(), Fail> {
         Err(Fail::Error("This is an InertHost which cannot actually host anything".into()))
     }
 }
@@ -227,6 +236,7 @@ pub trait Host: Send+Sync{
     async fn assign(&mut self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<Resource,Fail>;
     async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>,Fail>;
     async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc,Fail>;
+    async fn delete(&self, identifier: ResourceIdentifier) -> Result<(),Fail>;
 }
 
 

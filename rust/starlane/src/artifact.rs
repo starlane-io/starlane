@@ -5,10 +5,16 @@ use uuid::Uuid;
 
 use crate::actor::{ActorKind, ActorSpecific};
 use crate::error::Error;
-use crate::keys::SubSpaceKey;
+use crate::keys::{SubSpaceKey, ResourceKey};
 use crate::names::{Name, Specific};
 use std::fmt;
-use crate::resource::{ResourceAddress, ResourceType};
+use crate::resource::{ResourceAddress, ResourceType, ArtifactBundleKind, ResourceIdentifier, Path, ResourceAddressPart};
+use std::convert::{TryFrom, TryInto};
+use crate::message::Fail;
+use std::collections::HashSet;
+use std::iter::FromIterator;
+use crate::logger::LogInfo;
+use crate::message::Fail::ResourceAddressAlreadyInUse;
 /*
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct Artifact
@@ -63,23 +69,17 @@ impl ToString for Artifact{
 
  */
 
-#[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
+#[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub enum ArtifactKind
 {
-    File,
-    AppConfig,
-    ActorConfig,
-    ActorInit
+    DomainConfig
 }
 
 impl fmt::Display for ArtifactKind{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!( f,"{}",
                 match self{
-                    ArtifactKind::File => "File".to_string(),
-                    ArtifactKind::AppConfig => "AppConfig".to_string(),
-                    ArtifactKind::ActorConfig => "ActorConfig".to_string(),
-                    ArtifactKind::ActorInit => "ActorInit".to_string(),
+                    ArtifactKind::DomainConfig=> "DomainConfig".to_string(),
                 })
     }
 }
@@ -91,10 +91,7 @@ impl FromStr for ArtifactKind
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s
         {
-            "File" => Ok(ArtifactKind::File),
-            "AppConfig" => Ok(ArtifactKind::AppConfig),
-            "ActorConfig" => Ok(ArtifactKind::ActorConfig),
-            "ActorInit" => Ok(ArtifactKind::ActorInit),
+            "DomainConfig" => Ok(ArtifactKind::DomainConfig),
             _ => Err(format!("could not find ArtifactKind: {}",s).into())
         }
     }
@@ -111,6 +108,12 @@ pub struct ArtifactBundleKey
     pub id: ArtifactBundleId
 }
 
+impl Into<ResourceKey> for ArtifactBundleKey{
+    fn into(self) -> ResourceKey {
+        ResourceKey::ArtifactBundle(self)
+    }
+}
+
 impl ArtifactBundleKey{
     pub fn new( sub_space: SubSpaceKey, id: ArtifactBundleId )->Self{
         ArtifactBundleKey{
@@ -119,6 +122,117 @@ impl ArtifactBundleKey{
         }
     }
 }
+
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub struct ArtifactAddress {
+    address: ResourceAddress
+}
+
+
+impl ArtifactAddress {
+
+    pub fn as_ref( self, kind: ArtifactKind ) -> ArtifactRef {
+        ArtifactRef{
+            address:self,
+            kind:kind
+        }
+    }
+
+    pub fn parent(&self)-> ArtifactBundleAddress {
+        return ArtifactBundleAddress {
+            address: self.address.parent().expect("artifact should have bundle parent")
+        }
+    }
+
+    pub fn dir(&self)->Result<Option<Path>,Error>{
+        if let Option::Some(ResourceAddressPart::Path(path)) = self.address.last() {
+            Ok(path.clone().parent())
+        }
+        else{
+            Err("expected ArtifactResourceAddress to end in a Path".into())
+        }
+    }
+
+    pub fn path(&self)->Result<Path,Error>{
+        if let Option::Some(ResourceAddressPart::Path(path)) = self.address.last() {
+            Ok(path.clone())
+        }
+        else{
+            Err("expected ArtifactResourceAddress to end in a Path".into())
+        }
+    }
+}
+
+
+impl FromStr for ArtifactAddress {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+
+        if s.contains("::<") {
+            let address = ResourceAddress::from_str(s)?;
+            let artifact = address.try_into()?;
+            Ok(artifact)
+        } else {
+            let mut string = String::new();
+            string.push_str(s);
+            string.push_str("::<Artifact>");
+            let address = ResourceAddress::from_str(string.as_str())?;
+            let artifact = address.try_into()?;
+            Ok(artifact)
+        }
+    }
+}
+
+impl ToString for ArtifactAddress {
+    fn to_string(&self) -> String {
+        self.address.to_string()
+    }
+}
+
+impl LogInfo for ArtifactAddress {
+    fn log_identifier(&self) -> String {
+        let address: ResourceAddress = self.clone().into();
+        address.to_parts_string()
+    }
+
+    fn log_kind(&self) -> String {
+        let address: ResourceAddress = self.clone().into();
+        address.resource_type().to_string()
+    }
+
+    fn log_object(&self) -> String {
+        "ArtifactResourceAddress".to_string()
+    }
+}
+
+
+
+impl Into<ResourceAddress> for ArtifactAddress {
+    fn into(self) -> ResourceAddress {
+        self.address
+    }
+}
+
+impl TryFrom<ResourceAddress> for ArtifactAddress {
+    type Error = Fail;
+
+    fn try_from(value: ResourceAddress) -> Result<Self, Self::Error> {
+        if value.resource_type() != ResourceType::Artifact {
+            Err(Fail::WrongResourceType {expected:HashSet::from_iter(vec![ResourceType::Artifact]),received: value.resource_type()})
+        } else {
+            Ok(ArtifactAddress {
+                address: value
+            })
+        }
+    }
+}
+
+pub enum ArtifactIdentifier{
+    Key(ArtifactKey),
+    Address(ArtifactAddress)
+}
+
 
 #[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct ArtifactKey
@@ -371,5 +485,100 @@ impl SubSpaceName
         rtn.push_str(self.sub_space.as_str());
         return rtn;
     }
+}
+
+
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub struct ArtifactBundleAddress {
+    address: ResourceAddress
+}
+
+impl Into<ArtifactBundleIdentifier> for ArtifactBundleAddress {
+    fn into(self) -> ArtifactBundleIdentifier {
+        ArtifactBundleIdentifier::Address(self)
+    }
+}
+
+impl TryFrom<ResourceIdentifier> for ArtifactBundleAddress {
+    type Error = Fail;
+
+    fn try_from(value: ResourceIdentifier) -> Result<Self, Self::Error> {
+
+        match value {
+            ResourceIdentifier::Key(_) => {
+                Err(Fail::Error("wrong resource identifier: expected: Address, Received Key".into()))
+            }
+            ResourceIdentifier::Address(address) => {
+                Ok(address.try_into()?)
+            }
+        }
+    }
+}
+
+impl FromStr for ArtifactBundleAddress {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.contains("::<") {
+            let address = ResourceAddress::from_str(s)?;
+            let artifact = address.try_into()?;
+            Ok(artifact)
+        } else {
+            let mut string = String::new();
+            string.push_str(s);
+            string.push_str("::<ArtifactBundle>");
+            let address = ResourceAddress::from_str(string.as_str())?;
+            let artifact = address.try_into()?;
+            Ok(artifact)
+        }
+    }
+}
+
+
+
+impl Into<ResourceAddress> for ArtifactBundleAddress {
+    fn into(self) -> ResourceAddress {
+        self.address
+    }
+}
+
+impl TryFrom<ResourceAddress> for ArtifactBundleAddress {
+    type Error = Fail;
+
+    fn try_from(value: ResourceAddress) -> Result<Self, Self::Error> {
+        if value.resource_type() != ResourceType::ArtifactBundle {
+            Err(Fail::WrongResourceType {expected:HashSet::from_iter(vec![ResourceType::ArtifactBundle]),received: value.resource_type()})
+        } else {
+            Ok(ArtifactBundleAddress {
+                address: value
+            })
+        }
+    }
+}
+
+
+impl Into<ResourceIdentifier> for ArtifactBundleIdentifier {
+    fn into(self) -> ResourceIdentifier {
+        match self {
+            ArtifactBundleIdentifier::Key(key) => {
+                ResourceIdentifier::Key(key.into())
+            }
+            ArtifactBundleIdentifier::Address(address) => {
+                ResourceIdentifier::Address(address.into())
+            }
+        }
+    }
+}
+
+
+pub enum ArtifactBundleIdentifier{
+    Key(ArtifactBundleKey),
+    Address(ArtifactBundleAddress)
+}
+
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub struct ArtifactRef {
+    pub address: ArtifactAddress,
+    pub kind: ArtifactKind
 }
 

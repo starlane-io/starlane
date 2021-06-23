@@ -392,6 +392,8 @@ pub enum Fail
     Reject(Reject),
     Unexpected,
     DoNotKnowSpecific(Specific),
+    ResourceStateFinal(ResourceIdentifier),
+    ResourceAddressAlreadyInUse(ResourceAddress),
     ResourceNotFound(ResourceIdentifier),
     WrongResourceType{
         expected: HashSet<ResourceType>,
@@ -410,6 +412,7 @@ pub enum Fail
     CannotCreateNothingResourceTypeItIsThereAsAPlaceholderDummy,
     ResourceTypeMismatch(String),
     Timeout,
+    InvalidResourceState(String)
 }
 
 impl ToString for Fail {
@@ -433,7 +436,10 @@ impl ToString for Fail {
             Fail::SuitableHostNotAvailable(detail) => format!("SuitableHostNotAvailable({})", detail.to_string()),
             Fail::SqlError(detail) => format!("SqlError({})", detail.to_string()),
             Fail::CannotCreateNothingResourceTypeItIsThereAsAPlaceholderDummy => "CannotCreateNothingResourceTypeItIsThereAsAPlaceholderDummy".to_string(),
-            Fail::ResourceTypeMismatch(detail) => format!("ResourceTypeMismatch({})", detail.to_string()).to_string()
+            Fail::ResourceTypeMismatch(detail) => format!("ResourceTypeMismatch({})", detail.to_string()).to_string(),
+            Fail::ResourceStateFinal(_) => "ResourceStateFinal".to_string(),
+            Fail::ResourceAddressAlreadyInUse(_) => "ResourceAddressAlreadyInUse".to_string(),
+            Fail::InvalidResourceState(_) => "InvalidResourceState".to_string()
         }
     }
 }
@@ -473,5 +479,15 @@ impl <T> From<tokio::sync::mpsc::error::SendError<T>> for Fail
     }
 
 }
+
+impl From<actix_web::error::Canceled> for Fail
+{
+    fn from(_: actix_web::error::Canceled) -> Self {
+        Fail::Unexpected
+    }
+
+}
+
+
 
 

@@ -15,7 +15,7 @@ use tokio::time::{Duration, Instant};
 
 use crate::constellation::Constellation;
 use crate::error::Error;
-use crate::file::FileAccess;
+use crate::file_access::FileAccess;
 use crate::frame::{Frame, ProtoFrame, SequenceMessage, StarMessage, StarMessagePayload, StarPattern, WindDown, WindHit, WindUp} ;
 use crate::id::{Id, IdSeq};
 use crate::lane::{ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelReceiver, TunnelSender, TunnelSenderState};
@@ -28,6 +28,7 @@ use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
 use crate::core::{CoreRunner, CoreRunnerCommand};
 use crate::star::variant::{StarVariantFactory, StarVariantCommand};
+use crate::cache::ProtoCacheFactory;
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -45,41 +46,49 @@ pub struct ProtoStar
   core_runner: Arc<CoreRunner>,
   logger: Logger,
   frame_hold: FrameHold,
+  caches: Arc<ProtoCacheFactory>,
+  data_access: FileAccess,
   flags: Flags,
   tracker: ProtoTracker
 }
 
 impl ProtoStar
 {
-    pub fn new(key: Option<StarKey>, kind: StarKind, star_manager_factory: Arc<dyn StarVariantFactory>, core_runner: Arc<CoreRunner>, flags: Flags, logger: Logger ) ->(Self, StarController)
+    pub fn new(key: Option<StarKey>,
+               kind: StarKind,
+               star_tx: Sender<StarCommand>,
+               star_rx: Receiver<StarCommand>,
+               caches: Arc<ProtoCacheFactory>,
+               data_access: FileAccess,
+               star_manager_factory: Arc<dyn StarVariantFactory>,
+               core_runner: Arc<CoreRunner>,
+               flags: Flags,
+               logger: Logger ) ->(Self, StarController)
     {
-        let (command_tx, command_rx) = mpsc::channel(32);
+//        let (star_tx, star_rx) = mpsc::channel(32);
         (ProtoStar{
             star_key: key,
             sequence: Arc::new(AtomicU64::new(0)),
             kind,
-            star_tx: command_tx.clone(),
-            star_rx: command_rx,
+            star_tx: star_tx.clone(),
+            star_rx,
             lanes: HashMap::new(),
             connector_ctrls: vec![],
             star_manager_factory: star_manager_factory,
-//            star_core_ext_factory: star_core_ext_factory,
             core_runner: core_runner,
             logger: logger,
             frame_hold: FrameHold::new(),
+            caches: caches,
+            data_access: data_access,
             tracker: ProtoTracker::new(),
             flags: flags
         }, StarController{
-            star_tx: command_tx
+            star_tx
         })
     }
 
     pub async fn evolve(mut self) -> Result<Star,Error>
     {
-        if self.kind.is_central()
-        {
-       }
-
         loop {
 
             // request a sequence from central
@@ -112,7 +121,7 @@ impl ProtoStar
                         let (core_tx,core_rx) = mpsc::channel(16);
 
                         let resource_registry: Option<Arc<dyn ResourceRegistryBacking>>= if info.kind.is_resource_manager() {
-                            Option::Some( Arc::new( ResourceRegistryBackingSqLite::new().await? ) )
+                            Option::Some( Arc::new( ResourceRegistryBackingSqLite::new(info.clone()).await? ) )
                         } else {
                             Option::None
                         };
@@ -134,7 +143,8 @@ impl ProtoStar
                             registry: resource_registry,
                             star_handler: star_handler,
                             persistence: Persistence::Memory,
-                            file_access: FileAccess::new(std::env::var("STARLANE_DATA")? ).await?
+                            data_access: self.data_access,
+                            caches: self.caches.clone()
                         };
 
 

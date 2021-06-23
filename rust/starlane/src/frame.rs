@@ -20,6 +20,7 @@ use crate::resource::{Labels, ResourceAssign, ResourceRegistration, ResourceSele
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey, StarWatchInfo, LocalResourceLocation};
 use crate::message::resource::{Message, RawState, ResourceRequestMessage, ResourceResponseMessage, ActorMessage, MessageReply};
 use crate::actor::ActorKey;
+use semver::SemVerError;
 
 #[derive(Clone,Serialize,Deserialize)]
 pub enum Frame
@@ -852,6 +853,26 @@ impl From<rusqlite::Error> for Fail{
 impl From<()> for Fail{
     fn from(error: ()) -> Self {
         Fail::Unexpected
+    }
+}
+
+/*
+impl <A> From<A> for Fail where A: ToString{
+    fn from(some: A) -> Self {
+        Fail::Error(some)
+    }
+}
+ */
+
+impl From<std::io::Error> for Fail{
+    fn from(error: std::io::Error) -> Self {
+        Fail::Error(error.to_string())
+    }
+}
+
+impl From<SemVerError> for Fail {
+    fn from(error: SemVerError) -> Self {
+        Fail::Error(error.to_string())
     }
 }
 

@@ -19,7 +19,7 @@ use tokio::sync::oneshot::Receiver;
 
 use crate::artifact::{ArtifactKey, ArtifactKind};
 use crate::error::Error;
-use crate::file::FileAccess;
+use crate::file_access::FileAccess;
 use crate::frame::{Reply, ResourceHostAction, SimpleReply, StarMessagePayload, ChildManagerResourceAction, MessagePayload};
 use crate::id::{Id, IdSeq};
 use crate::keys::{FileKey, ResourceId, Unique, UniqueSrc};
@@ -30,17 +30,18 @@ use crate::permissions::User;
 use crate::resource::space::{Space, SpaceState};
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
-use crate::star::{ResourceRegistryBacking, StarComm, StarCommand, StarKey, StarKind, StarSkel};
+use crate::star::{ResourceRegistryBacking, StarComm, StarCommand, StarKey, StarKind, StarSkel, StarInfo};
 use crate::star::pledge::{ResourceHostSelector, StarHandle};
 use crate::util::AsyncHashMap;
 use std::path::PathBuf;
 use std::future::Future;
-use crate::util;
+use crate::{util, logger};
 use crate::message::resource::{Message, MessageTo, ProtoMessage, ResourceRequestMessage, MessageFrom, MessageReply, ResourceResponseMessage};
 use crate::actor::{ActorKind, ActorKey};
 use url::Url;
 use crate::resource::ResourceKind::UrlPathPattern;
 use crate::app::ConfigSrc;
+use crate::logger::{LogInfo, StaticLogInfo, elog};
 
 pub mod space;
 pub mod sub_space;
@@ -49,6 +50,8 @@ pub mod file_system;
 pub mod file;
 pub mod store;
 pub mod domain;
+pub mod artifact;
+pub mod config;
 
 lazy_static!
 {
@@ -559,10 +562,11 @@ pub struct Registry {
    pub conn: Connection,
    pub tx: mpsc::Sender<ResourceRegistryAction>,
    pub rx: mpsc::Receiver<ResourceRegistryAction>,
+   star_info: StarInfo
 }
 
 impl Registry {
-    pub async fn new() -> mpsc::Sender<ResourceRegistryAction>
+    pub async fn new(star_info: StarInfo) -> mpsc::Sender<ResourceRegistryAction>
     {
         let (tx, rx) = mpsc::channel(8 * 1024);
 
@@ -576,6 +580,7 @@ impl Registry {
                     conn: conn.unwrap(),
                     tx: tx_clone,
                     rx: rx,
+                    star_info: star_info
                 };
                 db.run().await.unwrap();
             }
@@ -819,6 +824,7 @@ eprintln!("for {} SQL ERROR: {}",identifier.to_string(), err.to_string() );
                 let reservation = RegistryReservation::new(tx);
                 let action_tx = self.tx.clone();
                 let info = request.info.clone();
+                let log_info = StaticLogInfo::clone_info(Box::new(self));
                 tokio::spawn( async move {
 
                     let result = rx.await;
@@ -839,12 +845,11 @@ eprintln!("for {} SQL ERROR: {}",identifier.to_string(), err.to_string() );
                         rx.await;
                         result_tx.send(Ok(()));
                     }
-                    else if let Result::Err(error) = result{
-                        eprintln!("RESERVATION DID NOT COMMIT parent {}", request.parent.to_string() );
-                        eprintln!("ERROR: {}",error);
+                    else if let Result::Err(error) = result {
+                        logger::elog(&log_info,&request.archetype, "Reserve()", format!("ERROR: reservation failed to commit do to RecvErr: '{}'",error.to_string()).as_str() );
                     }
                     else {
-                        eprintln!("~RESERVATION DID NOT COMMIT parent {}", request.parent.to_string() );
+                        logger::elog(&log_info,&request.archetype, "Reserve()", "ERROR: reservation failed to commit.");
                     }
                 } );
                 Ok(ResourceRegistryResult::Reservation(reservation))
@@ -1009,6 +1014,20 @@ eprintln!("for {} SQL ERROR: {}",identifier.to_string(), err.to_string() );
     }
 }
 
+impl LogInfo for Registry {
+    fn log_identifier(&self) -> String {
+        self.star_info.log_identifier()
+    }
+
+    fn log_kind(&self) -> String {
+        self.star_info.log_kind()
+    }
+
+    fn log_object(&self) -> String {
+        "Registry".to_string()
+    }
+}
+
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum ResourceKind
@@ -1024,7 +1043,7 @@ pub enum ResourceKind
     Domain,
     UrlPathPattern,
     Proxy(ProxyKind),
-    ArtifactBundle,
+    ArtifactBundle(ArtifactBundleKind),
     Artifact
 }
 
@@ -1042,9 +1061,76 @@ impl ResourceKind{
            ResourceKind::Domain => ResourceType::Domain,
            ResourceKind::UrlPathPattern => ResourceType::UrlPathPattern,
            ResourceKind::Proxy(_) => ResourceType::Proxy,
-           ResourceKind::ArtifactBundle => ResourceType::ArtifactBundle,
+           ResourceKind::ArtifactBundle(_) => ResourceType::ArtifactBundle,
            ResourceKind::Artifact => ResourceType::Artifact
        }
+    }
+}
+
+
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub enum ArtifactBundleKind
+{
+    Volatile,
+    Final
+}
+
+impl From<semver::Version> for ArtifactBundleKind{
+
+    fn from(value: semver::Version) -> Self {
+        match value.is_prerelease() {
+            true => ArtifactBundleKind::Volatile,
+            false => ArtifactBundleKind::Final
+        }
+    }
+}
+
+impl TryFrom<ResourceAddress> for ArtifactBundleKind {
+    type Error = Fail;
+
+    fn try_from(address: ResourceAddress) -> Result<Self, Self::Error> {
+        let address = match address.resource_type() {
+            ResourceType::ArtifactBundle => {
+                address
+            }
+            ResourceType::Artifact => {
+                address.parent().ok_or("expected artifact resource address to have a parent")?
+            }
+            got => {
+                return Err(Fail::WrongResourceType {
+                    expected: HashSet::from_iter(vec![ResourceType::ArtifactBundle,ResourceType::Artifact]),
+                    received: got
+                })
+            }
+        };
+        let version = semver::Version::from_str(address.last_to_string()?.as_str() )?;
+
+        match version.is_prerelease() {
+            true => Ok(ArtifactBundleKind::Volatile),
+            false => Ok(ArtifactBundleKind::Final)
+        }
+    }
+}
+
+impl FromStr for ArtifactBundleKind{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s{
+            "Volatile" => Ok(ArtifactBundleKind::Volatile),
+            "Final" => Ok(ArtifactBundleKind::Final),
+            _ => Err(format!("cannot match ArtifactBundleKind: {}",s).into())
+
+        }
+    }
+}
+
+impl ToString for ArtifactBundleKind{
+    fn to_string(&self) -> String {
+        match self {
+            Self::Volatile=> "Volatile".to_string(),
+            Self::Final => "Final".to_string()
+        }
     }
 }
 
@@ -1081,6 +1167,14 @@ impl ToString for FileKind {
 #[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum ProxyKind{
     Http
+}
+
+impl ToString for ProxyKind {
+    fn to_string(&self) -> String {
+        match self{
+            ProxyKind::Http => "Http".to_string()
+        }
+    }
 }
 
 impl ResourceType
@@ -1141,8 +1235,8 @@ impl fmt::Display for ResourceKind{
                     ResourceKind::FileSystem=> format!("Filesystem").to_string(),
                     ResourceKind::Domain => "Domain".to_string(),
                     ResourceKind::UrlPathPattern => "UrlPathPattern".to_string(),
-                    ResourceKind::Proxy(_) => "Proxy".to_string(),
-                    ResourceKind::ArtifactBundle => "ArtifactBundle".to_string(),
+                    ResourceKind::Proxy(kind) => format!("Proxy::{}",kind.to_string()).to_string(),
+                    ResourceKind::ArtifactBundle(kind) => format!("ArtifactBundle::{}",kind.to_string()).to_string(),
                     ResourceKind::Artifact => "Artifact".to_string()
                 })
     }
@@ -1210,8 +1304,6 @@ impl FromStr for ResourceKind
                 }
             }
         }
-
-
         match s
         {
             "Nothing" => Ok(ResourceKind::Root),
@@ -1219,7 +1311,6 @@ impl FromStr for ResourceKind
             "SubSpace" => Ok(ResourceKind::SubSpace),
             "User" => Ok(ResourceKind::User),
             "Filesystem" => Ok(ResourceKind::FileSystem),
-            "ArtifactBundle" => Ok(ResourceKind::ArtifactBundle),
             "Artifact" => Ok(ResourceKind::Artifact),
             _ => {
                 Err(format!("cannot match ResourceKind: {}", s).into())
@@ -1326,8 +1417,8 @@ impl ResourceType{
             ResourceType::UrlPathPattern => StarKind::SpaceHost,
             ResourceType::Proxy => StarKind::SpaceHost,
             ResourceType::Domain => StarKind::SpaceHost,
-            ResourceType::ArtifactBundle => StarKind::FileStore,
-            ResourceType::Artifact => StarKind::FileStore
+            ResourceType::ArtifactBundle => StarKind::ArtifactStore,
+            ResourceType::Artifact => StarKind::ArtifactStore
         }
     }
 
@@ -1672,6 +1763,22 @@ impl ResourceArchetype{
     }
 }
 
+impl LogInfo for ResourceArchetype {
+    fn log_identifier(&self) -> String {
+        "?".to_string()
+    }
+
+    fn log_kind(&self) -> String {
+        self.kind.to_string()
+    }
+
+    fn log_object(&self) -> String {
+        "ResourceArchetype".to_string()
+    }
+
+
+}
+
 
 #[async_trait]
 pub trait ResourceIdSeq: Send+Sync {
@@ -1691,7 +1798,7 @@ pub struct HostedResourceStore{
 impl HostedResourceStore{
     pub async fn new( ) -> Self{
         HostedResourceStore{
-            map: AsyncHashMap::new().await
+            map: AsyncHashMap::new()
         }
     }
 
@@ -1781,44 +1888,69 @@ impl Parent {
             let mut rx = ResourceCreationChamber::new(core.stub.clone(), create.clone(), core.skel.clone()).await;
 
             tokio::spawn(async move {
-                if let Ok(Ok(assign)) = rx.await {
-                    if let Ok(mut host) = core.selector.select(create.archetype.kind.resource_type()).await
-                    {
-                        let record = ResourceRecord::new(assign.stub.clone(), host.star_key());
-                        match host.assign(assign).await
-                        {
-                            Ok(_) => {}
-                            Err(err) => {
-                                eprintln!("host assign failed.");
-                                return;
-                            }
-                        }
-                        let (commit_tx, commit_rx) = oneshot::channel();
-                        match reservation.commit(record.clone(), commit_tx) {
-                            Ok(_) => {
-                                if let Ok(Ok(_)) = commit_rx.await {
-                                    tx.send(Ok(record));
-                                } else {
-                                    tx.send(Err("commit failed".into()));
-                                }
-                            }
-                            Err(err) => {
-                                tx.send(Err("commit failed".into()));
-                            }
-                        }
-                    } else {
-                        tx.send(Err("could not select a host".into()));
+                match Self::process_create(core.clone(),create.clone(),reservation,rx).await
+                {
+                    Ok(resource) => {
+                        tx.send(Ok(resource));
                     }
-                } else {
-                    tx.send(Err("RESERVATION FAILED!".into()));
+                    Err(fail) => {
+                        elog(&core, &create, "create_child()", format!("Failed to create child. FAIL:{}",fail.to_string()).as_str());
+                        tx.send(Err(fail));
+                    }
                 }
             });
         } else {
+            elog( &core, &create, "create_child()", "ERROR: reservation failed." );
             tx.send(Err("RESERVATION FAILED!".into()));
         }
     }
 
+    async fn process_create(core: ParentCore, create: ResourceCreate, reservation: RegistryReservation, rx: oneshot::Receiver<Result<ResourceAssign<AssignResourceStateSrc>,Fail>> ) -> Result<ResourceRecord,Fail>{
+        let assign = rx.await??;
+        let mut host = core.selector.select(create.archetype.kind.resource_type()).await?;
+        let record = ResourceRecord::new(assign.stub.clone(), host.star_key());
+        host.assign(assign).await?;
+        let (commit_tx, commit_rx) = oneshot::channel();
+        reservation.commit(record.clone(), commit_tx)?;
+        Ok(record)
+    }
 
+
+    /*
+    if let Ok(Ok(assign)) = rx.await {
+    if let Ok(mut host) = core.selector.select(create.archetype.kind.resource_type()).await
+    {
+    let record = ResourceRecord::new(assign.stub.clone(), host.star_key());
+    match host.assign(assign).await
+    {
+    Ok(_) => {}
+    Err(err) => {
+    eprintln!("host assign failed.");
+    return;
+    }
+    }
+    let (commit_tx, commit_rx) = oneshot::channel();
+    match reservation.commit(record.clone(), commit_tx) {
+    Ok(_) => {
+    if let Ok(Ok(_)) = commit_rx.await {
+    tx.send(Ok(record));
+    } else {
+    elog( &core, &record.stub, "create_child()", "commit failed" );
+    tx.send(Err("commit failed".into()));
+    }
+    }
+    Err(err) => {
+    elog( &core, &record.stub, "create_child()", format!("ERROR: commit failed '{}'",err.to_string()).as_str() );
+    tx.send(Err("commit failed".into()));
+    }
+    }
+    } else {
+    elog( &core, &assign.stub, "create_child()", "ERROR: could not select a host" );
+    tx.send(Err("could not select a host".into()));
+    }
+    }
+
+     */
 
 
     /*
@@ -1891,6 +2023,20 @@ impl Parent {
     }
 
      */
+}
+
+impl LogInfo for ParentCore {
+    fn log_identifier(&self) -> String {
+        self.skel.info.log_identifier()
+    }
+
+    fn log_kind(&self) -> String {
+        self.skel.info.log_kind()
+    }
+
+    fn log_object(&self) -> String {
+        "Parent".to_string()
+    }
 }
 
 #[async_trait]
@@ -2011,6 +2157,19 @@ impl ResourceCreationChamber{
             AddressCreationSrc::Append(tail) => {
                 self.create.archetype.kind.resource_type().append_address(self.parent.address.clone(), tail.clone() )?
             }
+            AddressCreationSrc::Appends(tails) => {
+                let mut address = self.parent.address.to_parts_string();
+                for tail in tails{
+                    address.push_str(":");
+                    address.push_str(tail.as_str());
+                }
+
+                address.push_str("::<" );
+                address.push_str(key.resource_type().to_string().as_str() );
+                address.push_str(">" );
+
+                ResourceAddress::from_str(address.as_str())?
+            }
             AddressCreationSrc::Space(space_name) => {
                 if self.parent.key.resource_type() != ResourceType::Root {
                     return Err(format!("Space creation can only be used at top level (Nothing) not by {}",self.parent.key.resource_type().to_string()).into());
@@ -2123,6 +2282,7 @@ impl UniqueSrc for RegistryUniqueSrc{
    async fn next(&self, resource_type: &ResourceType ) -> Result<ResourceId,Fail>{
 
        if !resource_type.parent().matches(Option::Some(&self.parent_key.resource_type()) ){
+eprintln!("WRONG RESOURCE TYPE IN UNIQUE SRC");
            return Err(Fail::WrongResourceType {expected: HashSet::from_iter(self.parent_key.resource_type().children()), received: resource_type.clone() })
        }
        let (tx,rx) = oneshot::channel();
@@ -2295,6 +2455,10 @@ impl ResourceAddress {
         else{
             Path::new(base64::encode(self.parts.last().unwrap().to_string().as_bytes() ).as_str() )
         }
+    }
+
+    pub fn last(&self) -> Option<ResourceAddressPart> {
+        self.parts.last().cloned()
     }
 }
 
@@ -3087,7 +3251,7 @@ mod test
     use crate::resource::ResourceRegistryResult::Resources;
     use crate::space::CreateAppControllerFail;
     use crate::star::{StarController, StarInfo, StarKey, StarKind};
-    use crate::starlane::{ConstellationCreate, StarControlRequestByName, Starlane, StarlaneCommand};
+    use crate::starlane::{ConstellationCreate, StarlaneApiRequestByName, Starlane, StarlaneCommand};
     use crate::template::{ConstellationData, ConstellationTemplate};
 
     fn create_save(index: usize, resource: ResourceRecord ) -> ResourceRegistration
@@ -3262,7 +3426,7 @@ mod test
     {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = Registry::new().await;
+            let tx = Registry::new(StarInfo::mock()).await;
 
             create_10(tx.clone(), ResourceKind::App,Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
             let mut selector = ResourceSelector::app_selector();
@@ -3307,7 +3471,7 @@ mod test
     {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = Registry::new().await;
+            let tx = Registry::new(StarInfo::mock()).await;
 
             create_10(tx.clone(), ResourceKind::App,Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
             create_10(tx.clone(), ResourceKind::Actor(ActorKind::Stateful),Option::None,SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
@@ -3348,7 +3512,7 @@ mod test
     {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = Registry::new().await;
+            let tx = Registry::new(StarInfo::mock()).await;
 
             let spaces = create_10_spaces(tx.clone() ).await;
             let mut sub_spaces = vec![];
@@ -3394,7 +3558,7 @@ mod test
     {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = Registry::new().await;
+            let tx = Registry::new(StarInfo::mock()).await;
 
 
             create_10(tx.clone(), ResourceKind::App,Option::Some(crate::names::TEST_APP_SPEC.clone()), SubSpaceKey::hyper_default(), UserKey::hyper_user() ).await;
@@ -3421,7 +3585,7 @@ mod test
     {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = Registry::new().await;
+            let tx = Registry::new(StarInfo::mock()).await;
 
             let sub_space = SubSpaceKey::hyper_default();
             let app1 = AppKey::new(sub_space.clone(), 1);
@@ -3500,17 +3664,17 @@ impl Path
         }
 
         if string.contains(".."){
-            return Err("path cannot contain directory traversal sequence [..]".into());
+            return Err(format!("path cannot contain directory traversal sequence [..] != '{}'",string).into());
         }
 
         for c in string.chars() {
             if c == '*' || c == '?' || c == ':' {
-                return Err("path cannot contain wildcard characters [*,?] or [:]".into());
+                return Err(format!("path cannot contain wildcard characters [*,?] or [:] != '{}'",string).into());
             }
         }
 
         if !string.starts_with("/") {
-            return Err("Paths must be absolute (must start with a '/')".into())
+            return Err(format!("Paths must be absolute (must start with a '/') != '{}'",string).into())
         }
 
         Ok(Path{
@@ -3687,7 +3851,6 @@ pub struct ResourceCreate {
    pub strategy: ResourceCreateStrategy
 }
 
-
 impl ResourceCreate {
 
     pub fn create(archetype: ResourceArchetype, src: AssignResourceStateSrc) ->Self {
@@ -3736,6 +3899,20 @@ impl ResourceCreate {
     }
 }
 
+impl LogInfo for ResourceCreate{
+    fn log_identifier(&self) -> String {
+        self.archetype.log_identifier()
+    }
+
+    fn log_kind(&self) -> String {
+        self.archetype.log_kind()
+    }
+
+    fn log_object(&self) -> String {
+        "ResourceCreate".to_string()
+    }
+}
+
 #[derive(Clone,Serialize,Deserialize)]
 pub enum ResourceStatus {
     Unknown,
@@ -3769,6 +3946,7 @@ impl FromStr for ResourceStatus{
 pub enum AddressCreationSrc{
     None,
     Append(String),
+    Appends(Vec<String>),
     Space(String)
 }
 
@@ -3863,6 +4041,20 @@ impl ResourceStub {
             archetype: ResourceArchetype::nothing(),
             owner: Option::None
         }
+    }
+}
+
+impl LogInfo for ResourceStub{
+    fn log_identifier(&self) -> String {
+        self.address.to_parts_string()
+    }
+
+    fn log_kind(&self) -> String {
+        self.archetype.kind.to_string()
+    }
+
+    fn log_object(&self) -> String {
+        "ResourceStub".to_string()
     }
 }
 
