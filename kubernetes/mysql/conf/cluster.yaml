@@ -1,0 +1,9 @@
+apiVersion: mysql.oracle.com/v2alpha1
+kind: InnoDBCluster
+metadata:
+  name: mysql-cluster 
+spec:
+  secretName: mysql-passwd
+  instances: 2
+  router:
+    instances: 1
