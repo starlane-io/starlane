@@ -290,6 +290,7 @@ pub type MessageId = Uuid;
 pub type DomainId = u32;
 pub type UrlPathPatternId = u64;
 pub type ProxyId = u64;
+pub type DatabaseId = u32;
 
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum ResourceId{
@@ -306,7 +307,7 @@ pub enum ResourceId{
     Proxy(ProxyId),
     ArtifactBundle(ArtifactBundleId),
     Artifact(ArtifactId),
-
+    Database(DatabaseId)
 }
 
 impl ResourceId{
@@ -324,7 +325,8 @@ impl ResourceId{
             ResourceId::UrlPathPattern(_) => ResourceType::UrlPathPattern,
             ResourceId::Proxy(_) => ResourceType::Proxy,
             ResourceId::ArtifactBundle(_) => ResourceType::ArtifactBundle,
-            ResourceId::Artifact(_) => ResourceType::Artifact
+            ResourceId::Artifact(_) => ResourceType::Artifact,
+            ResourceId::Database(_) => ResourceType::Database
         }
     }
 
@@ -342,7 +344,8 @@ impl ResourceId{
             ResourceType::UrlPathPattern => Self::UrlPathPattern(id.index as _),
             ResourceType::Proxy => Self::Proxy(id.index as _),
             ResourceType::ArtifactBundle => Self::ArtifactBundle(id.index as _),
-            ResourceType::Artifact => Self::Artifact(id.index as _)
+            ResourceType::Artifact => Self::Artifact(id.index as _),
+            ResourceType::Database => Self::Database(id.index as _)
         }
     }
 }
@@ -362,7 +365,8 @@ impl ToString for ResourceId{
             ResourceId::UrlPathPattern(id) => id.to_string(),
             ResourceId::Proxy(id) => id.to_string(),
             ResourceId::ArtifactBundle(id) => id.to_string(),
-            ResourceId::Artifact(id) => id.to_string()
+            ResourceId::Artifact(id) => id.to_string(),
+            ResourceId::Database(id) => id.to_string(),
         }
     }
 }
@@ -475,6 +479,17 @@ impl ResourceKey
             ResourceId::Artifact(index) => {
                 if let Self::ArtifactBundle(parent) = parent {
                     Ok(Self::Artifact( ArtifactKey{bundle:parent,id: index}))
+                } else {
+                    Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
+                }
+            }
+            ResourceId::Database(index) => {
+                if let Self::SubSpace(parent) = parent {
+                    Ok(Self::FileSystem(FileSystemKey::SubSpace(SubSpaceFilesystemKey { sub_space: parent, id: index })))
+                }
+                else if let Self::App(parent) = parent {
+                    Ok(Self::FileSystem(FileSystemKey::App(AppFilesystemKey{ app: parent, id: index })))
+
                 } else {
                     Err(format!("mismatched types! parent {} is not compatible with id: {}",parent,id.to_string()).into())
                 }
@@ -761,6 +776,27 @@ impl ToString for UrlPathPatternKey{
 
 
 #[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub enum DatabaseKey
+{
+    App(SubKey<AppKey,DatabaseId>),
+    SubSpace(SubKey<SubSpaceKey,DatabaseId>)
+}
+
+impl DatabaseKey{
+    pub fn id(&self)->ResourceId{
+        match self {
+            Self::App(sub) => {
+                ResourceId::Database(sub.id.clone())
+            }
+            Self::SubSpace(sub) => {
+                ResourceId::Database(sub.id.clone())
+            }
+        }
+    }
+}
+
+
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum FileSystemKey
 {
     App(AppFilesystemKey),
@@ -823,6 +859,14 @@ impl FromStr for AppFilesystemKey {
             id: id
         })
     }
+}
+
+
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub struct SubKey<P,I>
+{
+    pub parent: P,
+    pub id: I
 }
 
 

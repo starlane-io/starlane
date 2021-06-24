@@ -80,6 +80,12 @@ lazy_static!
                                                                                                            ResourceAddressPartStruct::new("file-system",ResourceAddressPartKind::SkewerCase)], ResourceType::FileSystem );
 
 
+    pub static ref DATABASE_ADDRESS_STRUCT:ResourceAddressStructure = ResourceAddressStructure::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
+                                                                                                           ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::SkewerCase),
+                                                                                                           ResourceAddressPartStruct::new("app",ResourceAddressPartKind::WildcardOrSkewer),
+                                                                                                           ResourceAddressPartStruct::new("file-system",ResourceAddressPartKind::SkewerCase)], ResourceType::Database );
+
+
      pub static ref FILE_ADDRESS_STRUCT:ResourceAddressStructure =      ResourceAddressStructure::new(vec![ResourceAddressPartStruct::new("space",ResourceAddressPartKind::SkewerCase),
                                                                                                            ResourceAddressPartStruct::new("sub-space",ResourceAddressPartKind::SkewerCase),
                                                                                                            ResourceAddressPartStruct::new("app",ResourceAddressPartKind::WildcardOrSkewer),
@@ -1044,7 +1050,8 @@ pub enum ResourceKind
     UrlPathPattern,
     Proxy(ProxyKind),
     ArtifactBundle(ArtifactBundleKind),
-    Artifact
+    Artifact,
+    Database(DatabaseKind)
 }
 
 impl ResourceKind{
@@ -1062,7 +1069,8 @@ impl ResourceKind{
            ResourceKind::UrlPathPattern => ResourceType::UrlPathPattern,
            ResourceKind::Proxy(_) => ResourceType::Proxy,
            ResourceKind::ArtifactBundle(_) => ResourceType::ArtifactBundle,
-           ResourceKind::Artifact => ResourceType::Artifact
+           ResourceKind::Artifact => ResourceType::Artifact,
+           ResourceKind::Database(_) => ResourceType::Database
        }
     }
 }
@@ -1073,6 +1081,20 @@ pub enum ArtifactBundleKind
 {
     Volatile,
     Final
+}
+
+
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub enum DatabaseKind{
+    MySQL
+}
+
+impl ToString for DatabaseKind {
+    fn to_string(&self) -> String {
+        match self {
+            DatabaseKind::MySQL => "MySQL".to_string()
+        }
+    }
 }
 
 impl From<semver::Version> for ArtifactBundleKind{
@@ -1195,7 +1217,8 @@ impl ResourceType
             ResourceType::UrlPathPattern => 8,
             ResourceType::Proxy => 9,
             ResourceType::ArtifactBundle => 10,
-            ResourceType::Artifact => 11
+            ResourceType::Artifact => 11,
+            ResourceType::Database=> 12
         }
     }
 
@@ -1215,6 +1238,7 @@ impl ResourceType
             9 => Ok(ResourceType::Proxy),
             10 => Ok(ResourceType::ArtifactBundle),
             11 => Ok(ResourceType::Artifact),
+            12 => Ok(ResourceType::Database),
             255 => Ok(ResourceType::Root),
             _ => Err(format!("no resource type for magic number {}",magic).into())
         }
@@ -1237,7 +1261,8 @@ impl fmt::Display for ResourceKind{
                     ResourceKind::UrlPathPattern => "UrlPathPattern".to_string(),
                     ResourceKind::Proxy(kind) => format!("Proxy::{}",kind.to_string()).to_string(),
                     ResourceKind::ArtifactBundle(kind) => format!("ArtifactBundle::{}",kind.to_string()).to_string(),
-                    ResourceKind::Artifact => "Artifact".to_string()
+                    ResourceKind::Artifact => "Artifact".to_string(),
+                    ResourceKind::Database(kind) => format!("Database::{}",kind.to_string()).to_string()
                 })
     }
 
@@ -1334,7 +1359,8 @@ pub enum ResourceType
     UrlPathPattern,
     Proxy,
     ArtifactBundle,
-    Artifact
+    Artifact,
+    Database
 }
 
 impl ResourceType{
@@ -1418,7 +1444,8 @@ impl ResourceType{
             ResourceType::Proxy => StarKind::SpaceHost,
             ResourceType::Domain => StarKind::SpaceHost,
             ResourceType::ArtifactBundle => StarKind::ArtifactStore,
-            ResourceType::Artifact => StarKind::ArtifactStore
+            ResourceType::Artifact => StarKind::ArtifactStore,
+            ResourceType::Database => StarKind::Database
         }
     }
 
@@ -1437,6 +1464,7 @@ impl ResourceType{
             ResourceType::Domain => HashSet::from_iter(vec![StarKind::SpaceHost] ),
             ResourceType::ArtifactBundle => HashSet::from_iter(vec![StarKind::SpaceHost] ),
             ResourceType::Artifact => HashSet::from_iter(vec![StarKind::FileStore] ),
+            ResourceType::Database=> HashSet::from_iter(vec![StarKind::Database] ),
         }
     }
 
@@ -1459,6 +1487,7 @@ impl ResourceType{
             Self::Domain => vec![Self::UrlPathPattern],
             Self::ArtifactBundle => vec![Self::Artifact],
             Self::Artifact => vec![],
+            Self::Database => vec![]
         };
 
         HashSet::from_iter(children.drain(..) )
@@ -1480,6 +1509,7 @@ impl ResourceType{
             ResourceType::Domain => false,
             ResourceType::ArtifactBundle => false,
             ResourceType::Artifact => false,
+            ResourceType::Database => false,
         }
     }
 }
@@ -1500,7 +1530,8 @@ impl ToString for ResourceType{
             Self::Proxy => "Proxy".to_string(),
             Self::Domain => "Domain".to_string(),
             Self::ArtifactBundle => "ArtifactBundle".to_string(),
-            Self::Artifact => "Artifact".to_string()
+            Self::Artifact => "Artifact".to_string(),
+            Self::Database => "Database".to_string()
         }
     }
 }
@@ -1523,6 +1554,7 @@ impl FromStr for ResourceType {
             "Domain" => Ok(ResourceType::Domain),
             "ArtifactBundle" => Ok(ResourceType::ArtifactBundle),
             "Artifact" => Ok(ResourceType::Artifact),
+            "Database" => Ok(ResourceType::Database),
             what => Err(format!("could not find resource type {}",what).into())
         }
     }
@@ -1609,7 +1641,8 @@ impl ResourceType
             ResourceType::Proxy=> ResourceParent::Some(ResourceType::Space),
             ResourceType::Domain => ResourceParent::Some(ResourceType::Space),
             ResourceType::ArtifactBundle => ResourceParent::Some(ResourceType::SubSpace),
-            ResourceType::Artifact => ResourceParent::Some(ResourceType::ArtifactBundle)
+            ResourceType::Artifact => ResourceParent::Some(ResourceType::ArtifactBundle),
+            ResourceType::Database => ResourceParent::Multi(vec![ResourceType::SubSpace,ResourceType::App])
         }
     }
 
@@ -1629,7 +1662,8 @@ impl ResourceType
             ResourceType::Proxy => true,
             ResourceType::Domain=> true,
             ResourceType::ArtifactBundle => false,
-            ResourceType::Artifact => false
+            ResourceType::Artifact => false,
+            ResourceType::Database => false
         }
     }
 
@@ -1649,7 +1683,8 @@ impl ResourceType
             ResourceType::Proxy => true,
             ResourceType::Domain => true,
             ResourceType::ArtifactBundle => false,
-            ResourceType::Artifact => false
+            ResourceType::Artifact => false,
+            ResourceType::Database => false
         }
     }
 
@@ -1669,7 +1704,8 @@ impl ResourceType
             ResourceType::Proxy => false,
             ResourceType::Domain => false,
             ResourceType::ArtifactBundle => true,
-            ResourceType::Artifact => true
+            ResourceType::Artifact => true,
+            ResourceType::Database => true
         }
     }
 
@@ -1689,7 +1725,8 @@ impl ResourceType
             ResourceType::Proxy => true,
             ResourceType::Domain => true,
             ResourceType::ArtifactBundle => true,
-            ResourceType::Artifact => true
+            ResourceType::Artifact => true,
+            ResourceType::Database=> false
         }
     }
 
@@ -1733,6 +1770,9 @@ impl ResourceType
             }
             ResourceType::Artifact => {
                 &ARTIFACT_ADDRESS_STRUCT
+            }
+            ResourceType::Database => {
+                &DATABASE_ADDRESS_STRUCT
             }
         }
     }
@@ -2352,6 +2392,9 @@ eprintln!("WRONG RESOURCE TYPE IN UNIQUE SRC");
                ResourceType::Artifact => {
                    Ok(ResourceId::Artifact(index as _))
                }
+               ResourceType::Database => {
+                   Ok(ResourceId::Database(index as _))
+               }
            }
        } else {
            Err(Fail::Unexpected)
@@ -2484,6 +2527,12 @@ impl ResourceAddress {
                     false=> { self.chop(2, ResourceType::SubSpace)}
                 }
             }
+            ResourceType::Database=> {
+                match self.parts.last().unwrap().is_wildcard(){
+                    true  => { self.chop(1, ResourceType::App )}
+                    false=> { self.chop(2, ResourceType::SubSpace)}
+                }
+            }
             ResourceType::Space => {
                 Option::Some(Self::root())
             }
@@ -2553,6 +2602,12 @@ impl ResourceAddress {
             ResourceType::Proxy => Option::Some(ResourceType::Space),
             ResourceType::ArtifactBundle => Option::Some(ResourceType::SubSpace),
             ResourceType::Artifact => Option::Some(ResourceType::ArtifactBundle),
+            ResourceType::Database=> {
+                match self.parts.last().unwrap().is_wildcard(){
+                    true => Option::Some(ResourceType::App),
+                    false => Option::Some(ResourceType::SubSpace)
+                }
+            }
         }
     }
     /*

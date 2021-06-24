@@ -98,6 +98,7 @@ pub enum StarKind {
     Link,
     Client,
     Web,
+    Database
 }
 
 impl StarKind {
@@ -114,6 +115,7 @@ impl StarKind {
             StarKind::Client => false,
             StarKind::Web => false,
             StarKind::ArtifactStore => true,
+            StarKind::Database => true
         }
     }
 
@@ -130,6 +132,7 @@ impl StarKind {
             StarKind::Client => true,
             StarKind::Web => true,
             StarKind::ArtifactStore => true,
+            StarKind::Database => true
         }
     }
 
@@ -149,6 +152,7 @@ impl StarKind {
                 StarKind::Client => vec![],
                 StarKind::Web => vec![],
                 StarKind::ArtifactStore => vec![],
+                StarKind::Database => vec![]
             }
             .iter()
             .cloned(),
@@ -164,9 +168,10 @@ impl StarKind {
                     ResourceType::App,
                     ResourceType::FileSystem,
                     ResourceType::Proxy,
+                    ResourceType::Database
                 ],
                 StarKind::Mesh => vec![],
-                StarKind::AppHost => vec![ResourceType::Actor, ResourceType::FileSystem],
+                StarKind::AppHost => vec![ResourceType::Actor, ResourceType::FileSystem,ResourceType::Database],
                 StarKind::ActorHost => vec![],
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
@@ -174,6 +179,7 @@ impl StarKind {
                 StarKind::Web => vec![ResourceType::Domain, ResourceType::UrlPathPattern],
                 StarKind::FileStore => vec![ResourceType::File],
                 StarKind::ArtifactStore => vec![ResourceType::Artifact],
+                StarKind::Database => vec![ResourceType::Database]
             }
             .iter()
             .cloned(),
@@ -203,6 +209,7 @@ impl StarKind {
                 StarKind::ArtifactStore => {
                     vec![ResourceType::ArtifactBundle, ResourceType::Artifact]
                 }
+                StarKind::Database => vec![ResourceType::Database]
             }
             .iter()
             .cloned(),
@@ -226,6 +233,7 @@ impl FromStr for StarKind {
             "Web" => Ok(StarKind::Web),
             "FileStore" => Ok(StarKind::FileStore),
             "ArtifactStore" => Ok(StarKind::ArtifactStore),
+            "Database" => Ok(StarKind::Database),
             _ => Err(()),
         }
     }
@@ -323,6 +331,7 @@ impl StarKind {
             StarKind::Web => false,
             StarKind::FileStore => false,
             StarKind::ArtifactStore => false,
+            StarKind::Database => false
         }
     }
 }
@@ -344,6 +353,7 @@ impl fmt::Display for StarKind {
                 StarKind::Web => "Web".to_string(),
                 StarKind::FileStore => "FileStore".to_string(),
                 StarKind::ArtifactStore => "ArtifactStore".to_string(),
+                StarKind::Database => "Database".to_string()
             }
         )
     }
