@@ -19,6 +19,8 @@ extern crate validate;
 #[macro_use]
 extern crate actix_web;
 
+#[macro_use]
+extern crate nom;
 
 pub mod star;
 pub mod lane;

@@ -8,6 +8,12 @@ use crate::cache::{Data, Cacheable};
 use crate::artifact::{ArtifactAddress, ArtifactRef, ArtifactKind};
 use std::collections::HashMap;
 use crate::resource::config::{Parser, ResourceConfig};
+use nom::IResult;
+use nom::combinator::recognize;
+use nom::sequence::pair;
+use nom::branch::alt;
+use nom::character::streaming::{alpha1, alphanumeric1};
+use nom::multi::many0;
 
 pub struct Domain{
     key: DomainKey,
@@ -110,3 +116,74 @@ impl Parser<DomainConfig> for DomainConfigParser{
     }
 }
 
+
+
+
+
+#[cfg(test)]
+mod test {
+
+    use nom::{branch::alt, bytes::complete::tag, IResult, Err};
+    use nom::sequence::{preceded, pair};
+    use nom::character::is_alphanumeric;
+    use nom::bytes::complete::{take_while, take_while1};
+    use nom::combinator::{recognize, opt};
+    use nom::character::complete::{one_of, digit0, alphanumeric0, alpha0, space0, newline};
+    use nom::error::{Error, ErrorKind};
+
+    fn is_path_char(c: char) -> bool {
+        '-' == c || c.is_alphanumeric() || '_' == c  || '/' == c
+    }
+
+    fn path_pattern(input: &str) -> IResult<&str, &str> {
+        recognize(
+        pair( tag("/"), take_while1(is_path_char) )
+        )
+           (input)
+    }
+
+    fn path_assignment(input: &str) -> IResult<&str, &str> {
+        recognize(
+            pair( tag("/"), take_while1(is_path_char) )
+        )
+            (input)
+    }
+
+    fn line( input: &str ) -> IResult<&str, &str> {
+        recognize(
+        newline
+        ) (input)
+    }
+
+
+    #[test]
+   pub fn test2() {
+        match line(r"/proxy/ => starlane.io:default:[some-proxy]::<Proxy>
+/filesystem/ => starlane.io:default:*:[some-filesystem-tag]::<FileSystem>
+
+        ") {
+            Ok((input,path)) => {
+                println!("path: {}", path);
+                println!("..input: {}", input);
+            }
+            Err(error) => {
+                match error{
+                    Err::Incomplete(incomple) => {
+
+                        println!("error: INCOMPLETE!");
+                    }
+                    Err::Error(error) => {
+
+                        println!("error: ERROR! {:?}", error.code );
+                    }
+                    Err::Failure(failure) => {
+
+                        println!("error: FAILURE!");
+                    }
+                }
+            }
+        }
+
+   }
+
+}
