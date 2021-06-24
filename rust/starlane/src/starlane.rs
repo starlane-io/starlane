@@ -70,8 +70,8 @@ impl Starlane
             core_runner: Arc::new(CoreRunner::new()?),
             logger: Logger::new(),
             flags: Flags::new(),
-            data_access: FileAccess::new(std::env::var("STARLANE_DATA")? )?,
-            cache_access: FileAccess::new(std::env::var("STARLANE_CACHE")? )?,
+            data_access: FileAccess::new(std::env::var("STARLANE_DATA").unwrap_or("data".to_string() ) )?,
+            cache_access: FileAccess::new(std::env::var("STARLANE_CACHE").unwrap_or("cache".to_string()) )?,
             caches: Option::None
         })
     }
