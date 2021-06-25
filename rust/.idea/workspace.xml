@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CargoProjects">
+    <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.name" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-fs.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-fs/Cargo.toml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-fs/src/lib.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/actor.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/actor.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/app.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/app.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/artifact.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/artifact.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/cache.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/cache.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/config.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/config.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/constellation.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/constellation.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/core.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/core/artifact.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/artifact.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/core/default.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/default.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/core/file_store.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/file_store.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/core/server.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/server.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/crypt.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/crypt.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/error.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/error.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/file_access.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/file_access.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/filesystem.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/filesystem.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/frame.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/frame.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/id.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/id.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/keys.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/keys.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/lane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lane.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/layout.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/layout.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/logger.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/logger.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/main.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/message.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/message/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/message/resource.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/names.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/names.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/permissions.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/permissions.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/proto.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/proto.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/provision.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/provision.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/resource/artifact.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource/artifact.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/resource/config.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource/config.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/resource/domain.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource/domain.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/resource/file.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource/file.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/resource/file_system.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource/file_system.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/resource/space.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource/space.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/resource/store.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource/store.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/resource/sub_space.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource/sub_space.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/resource/user.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource/user.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/server.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/server.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/service.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/service.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/space.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/space.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/star.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/star/filestore.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/filestore.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/star/pledge.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/pledge.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/star/variant.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/star/variant/central.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/central.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/star/variant/web.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/web.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/starlane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/starlane/api.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/template.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/template.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/util.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/util.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/starlane.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/test-data/localhost-config/artifact-bundle.zip" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/test-data/localhost-config/artifact-bundle.zip" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/test-data/localhost-config/routes.txt" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/test-data/localhost-config/routes.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane_project.iml" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="KotlinMultiplatform">
+    <allAvailableExecutables />
+  </component>
+  <component name="KubernetesApiPersistence">
+    <option name="context" value="docker-desktop" />
+    <option name="namespace" value="default" />
+  </component>
+  <component name="MacroExpansionManager">
+    <option name="directoryName" value="h1ju9bq2" />
+  </component>
+  <component name="ProjectId" id="1uPX0kefh0HiYYBSxVlBJRcrzs4" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="aspect.path.notification.shown" value="true" />
+    <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
+  </component>
+  <component name="RunManager" selected="Cargo.Run starlane">
+    <configuration default="true" type="ArquillianJUnit" factoryName="" nameIsGenerated="true">
+      <option name="arquillianRunConfiguration">
+        <value>
+          <option name="containerStateName" value="" />
+        </value>
+      </option>
+      <option name="TEST_OBJECT" value="class" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Run starlane" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="run --package starlane --bin starlane" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <envs />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+      <option name="command" value="run --package rust --bin rust" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <envs />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Cargo.Run starlane" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="RustProjectSettings">
+    <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="" />
+      <created>1624567978464</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1624567978464</updated>
+      <workItem from="1624567980551" duration="2603000" />
+    </task>
+    <servers />
+  </component>
+</project>
