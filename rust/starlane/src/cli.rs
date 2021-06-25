@@ -21,7 +21,7 @@ pub struct CliConfig{
 impl CliConfig{
     pub fn default() -> Self {
         Self{
-            hostname: "localhost:3719".to_string(),
+            hostname: format!("localhost:{}", starlane_core::starlane::DEFAULT_PORT.clone() )
         }
     }
     pub fn load_or_default( ) -> Self {

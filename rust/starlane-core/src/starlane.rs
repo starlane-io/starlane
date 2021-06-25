@@ -18,7 +18,7 @@ use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::{ChildManagerResourceAction, Frame, Reply, SimpleReply, StarMessagePayload};
 use crate::keys::ResourceKey;
-use crate::lane::{ConnectionInfo, ConnectionKind, Lane, LocalTunnelConnector};
+use crate::lane::{ConnectionInfo, ConnectionKind, Lane, LocalTunnelConnector, ServerSideTunnelConnector};
 use crate::layout::ConstellationLayout;
 use crate::logger::{Flags, Logger};
 use crate::message::{Fail, ProtoStarMessage};
@@ -38,11 +38,13 @@ use crate::template::{
     ConstellationData, ConstellationTemplate, StarKeyIndexTemplate, StarKeySubgraphTemplate,
     StarKeyTemplate,
 };
+use tokio::net::{TcpListener, TcpStream};
 
 pub mod api;
 
 lazy_static! {
-    pub static ref DATA_DIR: Mutex<String> = Mutex::new("data".to_string());
+//    pub static ref DATA_DIR: Mutex<String> = Mutex::new("data".to_string());
+    pub static ref DEFAULT_PORT: usize = 3719;
 }
 
 pub struct Starlane {
@@ -59,6 +61,8 @@ pub struct Starlane {
     pub logger: Logger,
     pub flags: Flags,
     pub caches: Option<Arc<ProtoCacheFactory>>,
+    port: usize,
+    listening: bool
 }
 
 impl Starlane {
@@ -82,6 +86,8 @@ impl Starlane {
                 std::env::var("STARLANE_CACHE").unwrap_or("cache".to_string()),
             )?,
             caches: Option::None,
+            port: DEFAULT_PORT.clone(),
+            listening: false
         })
     }
 
@@ -116,10 +122,48 @@ impl Starlane {
                     println!("closing rx");
                     self.rx.close();
                 }
-                _ => {}
+                StarlaneCommand::StarControlRequestByKey(_) => {
+                    unimplemented!()
+                }
+                StarlaneCommand::Listen => {
+                    self.listen();
+                }
+                StarlaneCommand::AddStream(stream)=> {
+                    let star_name = StarName{
+                        constellation: "standalone".to_string(),
+                        star: "mesh".to_string()
+                    };
+                    if let Option::Some(key) = self.star_names.get(&star_name) {
+                        if let Option::Some(ctrl) = self.star_controllers.get(key) {
+                            self.add_server_side_lane_ctrl(ctrl.clone(), stream).await;
+                        }
+                    }
+                }
             }
         }
     }
+
+    fn listen(&mut self) {
+        if self.listening {
+            return;
+        }
+
+        self.listening = true;
+        let port = self.port.clone();
+        tokio::spawn( async move {
+
+            let std_listener = std::net::TcpListener::bind(format!("127.0.0.1:{}",port)).unwrap();
+            let listener = TcpListener::from_std(std_listener).unwrap();
+println!("LISTENING!");
+            while let Ok((mut stream,_)) = listener.accept().await {
+println!("new client!");
+
+            }
+            eprintln!("TCP LISTENER TERMINATED");
+        } );
+    }
+
+
 
     pub fn caches(&self) -> Result<Arc<ProtoCacheFactory>, Error> {
         Ok(self
@@ -435,6 +479,25 @@ impl Starlane {
 
         Ok(())
     }
+
+    async fn add_server_side_lane_ctrl(
+        &mut self,
+        low_star_ctrl: StarController,
+        stream: TcpStream
+    ) -> Result<(), Error> {
+        let low_lane = Lane::new(Option::None ).await;
+
+        ServerSideTunnelConnector::new(&low_lane,stream).await?;
+
+        low_star_ctrl
+            .star_tx
+            .send(StarCommand::AddLane(low_lane))
+            .await?;
+
+        Ok(())
+    }
+
+
 }
 
 pub enum StarlaneCommand {
@@ -442,6 +505,8 @@ pub enum StarlaneCommand {
     ConstellationCreate(ConstellationCreate),
     StarControlRequestByKey(StarlaneApiRequestByKey),
     StarControlRequestByName(StarlaneApiRequestByName),
+    Listen,
+    AddStream(TcpStream),
     Destroy,
 }
 
@@ -644,7 +709,10 @@ mod test {
                 .await
                 .unwrap();
 
-            println!("... >  filesystems created ...");
+            tokio::spawn( async {
+                println!("... >  filesystems created ...");
+            });
+
             // upload an artifact bundle
             {
                 let mut file =
@@ -652,7 +720,9 @@ mod test {
                 let mut data = vec![];
                 file.read_to_end(&mut data).unwrap();
                 let data = Arc::new(data);
-                println!("... >  uploading artifact bundle...");
+                tokio::spawn( async {
+                    println!("... >  uploading artifact bundle...");
+                });
                 let artifact_bundle_api = sub_space_api
                     .create_artifact_bundle(
                         "whiz",
@@ -664,6 +734,10 @@ mod test {
                     .await
                     .unwrap();
             }
+
+            tokio::spawn( async {
+                println!("... >  artifact bundle uploaded...");
+            });
 
             /*
                         {
@@ -679,7 +753,7 @@ mod test {
                          */
 
 //            loop {
-                tokio::time::sleep(Duration::from_secs(130)).await;
+                tokio::time::sleep(Duration::from_secs(1)).await;
  //           }
 
             //            assert_eq!(central_ctrl.diagnose_handlers_satisfaction().await.unwrap(),crate::star::pledge::Satisfaction::Ok)

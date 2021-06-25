@@ -612,7 +612,8 @@ impl Registry {
         }
         tokio::spawn(async move {
 
-            let conn = Connection::open(format!("{}/resource_registry.sqlite",path));
+            //let conn = Connection::open(format!("{}/resource_registry.sqlite",path));
+            let conn = Connection::open_in_memory();
             if conn.is_ok() {
                 let mut db = Registry {
                     conn: conn.unwrap(),

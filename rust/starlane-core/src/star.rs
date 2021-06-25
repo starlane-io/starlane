@@ -678,7 +678,7 @@ impl Star {
                             let lane = self.lane_with_shortest_path_to_star(&star);
                             if let Option::Some(lane) = lane {
                                 for frame in frames {
-                                    lane.lane.outgoing.tx.send(LaneCommand::Frame(frame)).await;
+                                    lane.lane.outgoing.out_tx.send(LaneCommand::Frame(frame)).await;
                                 }
                             } else {
                                 eprintln!("release hold called on star that is not ready!")
@@ -1289,7 +1289,7 @@ impl Star {
                         let wind = Frame::StarWind(StarWind::Down(wind_down));
 
                         let lane = self.lanes.get_mut(&lane_key).unwrap();
-                        lane.lane.outgoing.tx.send(LaneCommand::Frame(wind)).await;
+                        lane.lane.outgoing.out_tx.send(LaneCommand::Frame(wind)).await;
                     }
                     Err(error) => {
                         eprintln!(
@@ -1336,7 +1336,7 @@ impl Star {
                     let wind = Frame::StarWind(StarWind::Down(wind_down));
 
                     let lane = self.lanes.get_mut(&lane_key).unwrap();
-                    lane.lane.outgoing.tx.send(LaneCommand::Frame(wind)).await;
+                    lane.lane.outgoing.out_tx.send(LaneCommand::Frame(wind)).await;
                 }
                 Err(error) => {
                     eprintln!(
@@ -1511,7 +1511,7 @@ impl Star {
     async fn send_frame(&mut self, star: StarKey, frame: Frame) {
         let lane = self.lane_with_shortest_path_to_star(&star);
         if let Option::Some(lane) = lane {
-            lane.lane.outgoing.tx.send(LaneCommand::Frame(frame)).await;
+            lane.lane.outgoing.out_tx.send(LaneCommand::Frame(frame)).await;
         } else {
             self.frame_hold.add(&star, frame);
             let (tx, rx) = oneshot::channel();

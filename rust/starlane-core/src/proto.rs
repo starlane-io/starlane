@@ -1,16 +1,20 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
-use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU64, Ordering};
 use std::task::Poll;
 
 use futures::future::{err, join_all, ok, select_all};
-use futures::prelude::*;
 use futures::FutureExt;
+use futures::prelude::*;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpSocket, TcpStream};
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
+use tokio::sync::{broadcast, mpsc, Mutex, oneshot};
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::{broadcast, mpsc, oneshot, Mutex};
+use tokio::sync::mpsc::error::SendError;
 use tokio::time::{Duration, Instant};
 
 use crate::cache::ProtoCacheFactory;
@@ -24,19 +28,19 @@ use crate::frame::{
 };
 use crate::id::{Id, IdSeq};
 use crate::lane::{
-    ConnectorController, Lane, LaneCommand, LaneMeta, TunnelConnector, TunnelReceiver,
-    TunnelSender, TunnelSenderState, STARLANE_PROTOCOL_VERSION,
+    ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector,
+    TunnelIn, TunnelOut, TunnelOutState,
 };
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::permissions::AuthTokenSource;
 use crate::resource::HostedResourceStore;
-use crate::star::pledge::StarHandleBacking;
-use crate::star::variant::{StarVariantCommand, StarVariantFactory};
 use crate::star::{
     FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBacking,
     ResourceRegistryBackingSqLite, ShortestPathStarKey, Star, StarCommand, StarController,
     StarInfo, StarKernel, StarKey, StarKind, StarSearchTransaction, StarSkel, Transaction,
 };
+use crate::star::pledge::StarHandleBacking;
+use crate::star::variant::{StarVariantCommand, StarVariantFactory};
 use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
 
@@ -293,7 +297,7 @@ impl ProtoStar {
     async fn send_frame_no_hold(&mut self, star: &StarKey, frame: Frame) {
         let lane = self.lane_with_shortest_path_to_star(star);
         if let Option::Some(lane) = lane {
-            lane.lane.outgoing.tx.send(LaneCommand::Frame(frame)).await;
+            lane.lane.outgoing.out_tx.send(LaneCommand::Frame(frame)).await;
         } else {
             eprintln!("could not find lane for {}", star.to_string());
         }
@@ -307,7 +311,7 @@ impl ProtoStar {
     async fn send_frame(&mut self, star: &StarKey, frame: Frame) {
         let lane = self.lane_with_shortest_path_to_star(star);
         if let Option::Some(lane) = lane {
-            lane.lane.outgoing.tx.send(LaneCommand::Frame(frame)).await;
+            lane.lane.outgoing.out_tx.send(LaneCommand::Frame(frame)).await;
         } else {
             self.frame_hold.add(star, frame);
         }
@@ -423,7 +427,7 @@ pub struct ProtoTunnel {
 }
 
 impl ProtoTunnel {
-    pub async fn evolve(mut self) -> Result<(TunnelSender, TunnelReceiver), Error> {
+    pub async fn evolve(mut self) -> Result<(TunnelOut, TunnelIn), Error> {
         self.tx
             .send(Frame::Proto(ProtoFrame::StarLaneProtocolVersion(
                 STARLANE_PROTOCOL_VERSION,
@@ -459,11 +463,11 @@ impl ProtoTunnel {
             match recv {
                 ProtoFrame::ReportStarKey(remote_star_key) => {
                     return Ok((
-                        TunnelSender {
+                        TunnelOut {
                             remote_star: remote_star_key.clone(),
                             tx: self.tx,
                         },
-                        TunnelReceiver {
+                        TunnelIn {
                             remote_star: remote_star_key.clone(),
                             rx: self.rx,
                         },

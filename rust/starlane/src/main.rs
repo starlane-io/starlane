@@ -34,6 +34,8 @@ fn main() -> Result<(), Error> {
                 ConstellationData::new(),
                 Option::Some("standalone-with-mysql".to_owned()));
             tx.send(StarlaneCommand::ConstellationCreate(command)).await;
+            tx.send( StarlaneCommand::Listen ).await;
+
             starlane.run().await;
         });
     } else if let Option::Some(matches) = matches.subcommand_matches("config") {
