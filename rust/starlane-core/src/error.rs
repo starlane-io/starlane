@@ -3,7 +3,7 @@ use crate::message::Fail;
 use base64::DecodeError;
 use futures::channel::oneshot::Canceled;
 use semver::SemVerError;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, Infallible};
 use std::env::VarError;
 use std::fmt;
 use std::fmt::{Display, Formatter};
@@ -41,6 +41,29 @@ impl From<ZipError> for Error {
             ZipError::FileNotFound => Error {
                 error: "ZipError: FileNotFound".to_string(),
             },
+        }
+    }
+}
+
+impl From<serde_json::Error> for Error {
+    fn from(i: serde_json::Error) -> Self {
+        Error {
+            error: format!("{}", i.to_string())
+        }
+    }
+}
+
+impl <T> From<std::sync::PoisonError<T>> for Error {
+    fn from(i: std::sync::PoisonError<T>) -> Self {
+        Error {
+            error: format!("{}",i.to_string())
+        }
+    }
+}
+impl From<Infallible> for Error {
+    fn from(i: Infallible) -> Self {
+        Error {
+            error: format!("{}", i.to_string())
         }
     }
 }
