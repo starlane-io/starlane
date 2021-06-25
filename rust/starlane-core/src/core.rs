@@ -34,11 +34,13 @@ use crate::star::variant::StarVariantCommand;
 use crate::star::{
     ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel,
 };
+use crate::core::mysql_database::MySQLDatabaseCore;
 
 pub mod artifact;
 pub mod default;
 pub mod file_store;
 pub mod server;
+mod mysql_database;
 
 pub struct StarCoreAction {
     pub command: StarCoreCommand,
@@ -150,9 +152,14 @@ impl StarCoreFactory {
             .data_access
             .with_path(format!("stars/{}", skel.info.key.to_string()))?;
         let host: Box<dyn Host> = match skel.info.kind {
-            StarKind::FileStore => Box::new(FileStoreHost::new(skel.clone(), file_access).await?),
+            StarKind::FileStore => {
+                Box::new(FileStoreHost::new(skel.clone(), file_access).await?)
+            },
             StarKind::ArtifactStore => {
                 Box::new(ArtifactHost::new(skel.clone(), file_access).await?)
+            }
+            StarKind::Database => {
+                Box::new(MySQLDatabaseCore::new(skel.clone()).await?)
             }
             _ => Box::new(DefaultHost::new().await),
         };

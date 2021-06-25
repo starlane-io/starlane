@@ -18,7 +18,7 @@ fn main() -> Result<(), Error> {
         let (command, _) = ConstellationCreate::new(
             ConstellationTemplate::new_standalone_with_mysql(),
             ConstellationData::new(),
-            Option::Some("standalone".to_owned()),
+            Option::Some("standalone-with-mysql".to_owned()),
         );
         tx.send(StarlaneCommand::ConstellationCreate(command)).await;
         starlane.run().await;
