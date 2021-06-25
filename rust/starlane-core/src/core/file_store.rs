@@ -73,7 +73,7 @@ impl FileStoreHost {
                     Ok(_) => {}
                     Err(error) => {
                         eprintln!(
-                            "error when handling path: {} error: {} ",
+                            "WALK: error when handling path: {} error: {} ",
                             event.path,
                             error.to_string()
                         );
@@ -108,7 +108,7 @@ impl FileStoreHost {
                     Ok(_) => {}
                     Err(error) => {
                         eprintln!(
-                            "error when handling path: {} error: {} ",
+                            "WATCH: error when handling path: {} error: {} ",
                             event.path,
                             error.to_string()
                         );

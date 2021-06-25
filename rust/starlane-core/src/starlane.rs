@@ -617,6 +617,7 @@ mod test {
                     panic!(err)
                 }
             };
+            tokio::time::sleep(Duration::from_secs(1)).await;
 
             let file_api = sub_space_api
                 .create_file_system("website")
@@ -677,9 +678,9 @@ mod test {
                         }
                          */
 
-            loop {
-                tokio::time::sleep(Duration::from_secs(30)).await;
-            }
+//            loop {
+                tokio::time::sleep(Duration::from_secs(130)).await;
+ //           }
 
             //            assert_eq!(central_ctrl.diagnose_handlers_satisfaction().await.unwrap(),crate::star::pledge::Satisfaction::Ok)
         });

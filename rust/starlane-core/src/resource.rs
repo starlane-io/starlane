@@ -53,6 +53,7 @@ use crate::{logger, util};
 use std::future::Future;
 use std::path::PathBuf;
 use url::Url;
+use std::fs::DirBuilder;
 
 pub mod artifact;
 pub mod config;
@@ -597,12 +598,21 @@ pub struct Registry {
 }
 
 impl Registry {
-    pub async fn new(star_info: StarInfo) -> mpsc::Sender<ResourceRegistryAction> {
+    pub async fn new(star_info: StarInfo, path: String) -> mpsc::Sender<ResourceRegistryAction> {
         let (tx, rx) = mpsc::channel(8 * 1024);
-
         let tx_clone = tx.clone();
+
+        // ensure that path directory exists
+        let mut dir_builder = DirBuilder::new();
+        dir_builder.recursive(true);
+        if let Result::Err(_) = dir_builder.create(path.clone())
+        {
+            eprintln!("FATAL: could not create star data directory: {}",path );
+            return tx;
+        }
         tokio::spawn(async move {
-            let conn = Connection::open_in_memory();
+
+            let conn = Connection::open(format!("{}/resource_registry.sqlite",path));
             if conn.is_ok() {
                 let mut db = Registry {
                     conn: conn.unwrap(),
@@ -611,6 +621,18 @@ impl Registry {
                     star_info: star_info,
                 };
                 db.run().await.unwrap();
+            } else {
+                let log_info = StaticLogInfo::new("ResourceRegistry".to_string(), star_info.log_kind().to_string(), star_info.key.to_string()  );
+                eprintln!("connection ERROR!");
+                logger::elog(
+                    &log_info,
+                    &star_info,
+                    "new()",
+                    format!(
+                        "ERROR: could not create SqLite connection to database: '{}'", conn.err().unwrap().to_string(),
+                    )
+                        .as_str(),
+                );
             }
         });
         tx
@@ -913,7 +935,7 @@ impl Registry {
                             &request.archetype,
                             "Reserve()",
                             format!(
-                                "ERROR: reservation failed to commit do to RecvErr: '{}'",
+                                "ERROR: reservation failed to commit due to RecvErr: '{}'",
                                 error.to_string()
                             )
                             .as_str(),
@@ -3562,7 +3584,7 @@ mod test {
     pub fn test10() {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = Registry::new(StarInfo::mock()).await;
+            let tx = Registry::new(StarInfo::mock(), "tmp/mock_registry_path".to_string() ).await;
 
             create_10(
                 tx.clone(),
@@ -3617,7 +3639,7 @@ mod test {
     pub fn test20() {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = Registry::new(StarInfo::mock()).await;
+            let tx = Registry::new(StarInfo::mock(), "tmp/mock_registry_path".to_string() ).await;
 
             create_10(
                 tx.clone(),
@@ -3674,7 +3696,7 @@ mod test {
     pub fn test_spaces() {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = Registry::new(StarInfo::mock()).await;
+            let tx = Registry::new(StarInfo::mock(), "tmp/mock_registry_path".to_string() ).await;
 
             let spaces = create_10_spaces(tx.clone()).await;
             let mut sub_spaces = vec![];
@@ -3730,7 +3752,7 @@ mod test {
     pub fn test_specific() {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = Registry::new(StarInfo::mock()).await;
+            let tx = Registry::new(StarInfo::mock(), "tmp/mock_registry_path".to_string() ).await;
 
             create_10(
                 tx.clone(),
@@ -3771,7 +3793,7 @@ mod test {
     pub fn test_app() {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let tx = Registry::new(StarInfo::mock()).await;
+            let tx = Registry::new(StarInfo::mock(), "tmp/mock_registry_path".to_string() ).await;
 
             let sub_space = SubSpaceKey::hyper_default();
             let app1 = AppKey::new(sub_space.clone(), 1);
@@ -4336,7 +4358,7 @@ impl ResourceHost for RemoteResourceHost {
             .send(StarCommand::SendProtoMessage(proto))
             .await;
 
-        match tokio::time::timeout(Duration::from_secs(5), reply).await {
+        match tokio::time::timeout(Duration::from_secs(25), reply).await {
             Ok(result) => {
                 if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(_))) = result {
                     Ok(())

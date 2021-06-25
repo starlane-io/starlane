@@ -148,9 +148,8 @@ impl StarCoreFactory {
         skel: StarSkel,
         core_rx: mpsc::Receiver<StarCoreAction>,
     ) -> Result<StarCore2, Error> {
-        let file_access = skel
-            .data_access
-            .with_path(format!("stars/{}", skel.info.key.to_string()))?;
+        let file_access = skel.data_access.clone();
+
         let host: Box<dyn Host> = match skel.info.kind {
             StarKind::FileStore => {
                 Box::new(FileStoreHost::new(skel.clone(), file_access).await?)

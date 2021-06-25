@@ -3001,6 +3001,8 @@ impl StarSkel {
     }
 }
 
+
+
 #[derive(Clone)]
 pub struct StarInfo {
     pub key: StarKey,
@@ -3412,12 +3414,16 @@ pub struct ResourceRegistryBackingSqLite {
 }
 
 impl ResourceRegistryBackingSqLite {
-    pub async fn new(star_info: StarInfo) -> Result<Self, Error> {
+    pub async fn new(star_info: StarInfo, star_data_path: String) -> Result<Self, Error> {
         let rtn = ResourceRegistryBackingSqLite {
-            registry: Registry::new(star_info).await,
+            registry: Registry::new(star_info, star_data_path).await,
         };
 
         Ok(rtn)
+    }
+
+    async fn timeout<X>( rx: oneshot::Receiver<X>) -> Result<X,Fail> {
+        Ok(tokio::time::timeout(Duration::from_secs(25), rx).await??)
     }
 }
 
@@ -3429,24 +3435,33 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
     ) -> Result<RegistryReservation, Fail> {
         let (action, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Reserve(request));
         self.registry.send(action).await?;
-        match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
+
+        match Self::timeout( rx ).await? {
+            ResourceRegistryResult::Reservation(reservation) => Result::Ok(reservation),
+            _ => Result::Err(Fail::Unexpected),
+        }
+
+/*        match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
             ResourceRegistryResult::Reservation(reservation) => Result::Ok(reservation),
             _ => Result::Err(Fail::Timeout),
         }
+ */
     }
 
     async fn register(&self, registration: ResourceRegistration) -> Result<(), Fail> {
         let (request, rx) =
             ResourceRegistryAction::new(ResourceRegistryCommand::Commit(registration));
         self.registry.send(request).await?;
-        tokio::time::timeout(Duration::from_secs(5), rx).await??;
+//        tokio::time::timeout(Duration::from_secs(5), rx).await??;
+        Self::timeout(rx).await?;
         Ok(())
     }
 
     async fn select(&self, selector: ResourceSelector) -> Result<Vec<ResourceRecord>, Fail> {
         let (request, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Select(selector));
         self.registry.send(request).await?;
-        match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
+       // match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
+        match Self::timeout( rx).await? {
             ResourceRegistryResult::Resources(resources) => Result::Ok(resources),
             _ => Result::Err(Fail::Timeout),
         }
@@ -3456,14 +3471,16 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
         let (request, rx) =
             ResourceRegistryAction::new(ResourceRegistryCommand::SetLocation(location));
         self.registry.send(request).await;
-        tokio::time::timeout(Duration::from_secs(5), rx).await??;
+        //tokio::time::timeout(Duration::from_secs(5), rx).await??;
+        Self::timeout(rx).await?;
         Ok(())
     }
 
     async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<ResourceRecord>, Fail> {
         let (request, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Get(identifier));
         self.registry.send(request).await;
-        match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
+        //match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
+        match Self::timeout( rx).await? {
             ResourceRegistryResult::Resource(resource) => Ok(resource),
             _ => Err(Fail::Unexpected),
         }

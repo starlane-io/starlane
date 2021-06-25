@@ -126,10 +126,12 @@ impl ProtoStar {
 
                         let (core_tx, core_rx) = mpsc::channel(16);
 
+                        let data_access = self.data_access.with_path(format!("stars/{}", info.key.to_string()))?;
+
                         let resource_registry: Option<Arc<dyn ResourceRegistryBacking>> =
                             if info.kind.is_resource_manager() {
                                 Option::Some(Arc::new(
-                                    ResourceRegistryBackingSqLite::new(info.clone()).await?,
+                                    ResourceRegistryBackingSqLite::new(info.clone(), data_access.path() ).await?,
                                 ))
                             } else {
                                 Option::None
@@ -142,6 +144,7 @@ impl ProtoStar {
                                 Option::None
                             };
 
+
                         let skel = StarSkel {
                             info: info,
                             sequence: self.sequence.clone(),
@@ -153,7 +156,7 @@ impl ProtoStar {
                             registry: resource_registry,
                             star_handler: star_handler,
                             persistence: Persistence::Memory,
-                            data_access: self.data_access,
+                            data_access: data_access,
                             caches: self.caches.clone(),
                         };
 
