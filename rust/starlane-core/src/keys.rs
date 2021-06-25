@@ -339,6 +339,7 @@ pub enum ResourceKey {
     Proxy(ProxyKey),
     ArtifactBundle(ArtifactBundleKey),
     Artifact(ArtifactKey),
+    Database(DatabaseKey),
 }
 
 impl ResourceKey {
@@ -506,17 +507,19 @@ impl ResourceKey {
             }
             ResourceId::Database(index) => {
                 if let Self::SubSpace(parent) = parent {
-                    Ok(Self::FileSystem(FileSystemKey::SubSpace(
-                        SubSpaceFilesystemKey {
-                            sub_space: parent,
+                    Ok(Self::Database(DatabaseKey::SubSpace(
+                        SubKey{
+                            parent: parent,
                             id: index,
                         },
                     )))
                 } else if let Self::App(parent) = parent {
-                    Ok(Self::FileSystem(FileSystemKey::App(AppFilesystemKey {
-                        app: parent,
-                        id: index,
-                    })))
+                    Ok(Self::Database(DatabaseKey::App(
+                        SubKey{
+                            parent: parent,
+                            id: index,
+                        },
+                    )))
                 } else {
                     Err(format!(
                         "mismatched types! parent {} is not compatible with id: {}",
@@ -544,6 +547,7 @@ impl ResourceKey {
             ResourceKey::Proxy(proxy) => ResourceId::Proxy(proxy.id.clone()),
             ResourceKey::ArtifactBundle(bundle) => ResourceId::ArtifactBundle(bundle.id.clone()),
             ResourceKey::Artifact(artifact) => ResourceId::Artifact(artifact.id.clone()),
+            ResourceKey::Database(database) =>  database.id(),
         }
     }
 
@@ -565,6 +569,7 @@ impl ResourceKey {
             ResourceKey::Proxy(_) => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::ArtifactBundle(_) => Err(Fail::ResourceCannotGenerateAddress),
             ResourceKey::Artifact(_) => Err(Fail::ResourceCannotGenerateAddress),
+            ResourceKey::Database(_) =>  Err(Fail::ResourceCannotGenerateAddress),
         }
     }
 
@@ -599,6 +604,12 @@ impl ResourceKey {
             ResourceKey::Artifact(artifact) => {
                 Option::Some(ResourceKey::ArtifactBundle(artifact.bundle.clone()))
             }
+            ResourceKey::Database(filesystem) => match filesystem {
+                DatabaseKey::App(app) => Option::Some(ResourceKey::App(app.parent.clone())),
+                DatabaseKey::SubSpace(sub_space) => {
+                    Option::Some(ResourceKey::SubSpace(sub_space.parent.clone()))
+                }
+            },
         }
     }
 
@@ -634,6 +645,10 @@ impl ResourceKey {
             ResourceKey::Proxy(proxy) => Ok(proxy.space.clone()),
             ResourceKey::ArtifactBundle(bundle) => Ok(bundle.sub_space.space.clone()),
             ResourceKey::Artifact(artifact) => Ok(artifact.bundle.sub_space.space.clone()),
+            ResourceKey::Database(filesystem) => Ok(match filesystem {
+                DatabaseKey::App(app) => app.parent.sub_space.space.clone(),
+                DatabaseKey::SubSpace(sub_space) => sub_space.parent.space.clone(),
+            }),
         }
     }
 
@@ -839,6 +854,19 @@ impl DatabaseKey {
     }
 }
 
+impl ToString for DatabaseKey{
+    fn to_string(&self) -> String {
+        match self {
+            DatabaseKey::App(app) => {
+                format!("app_{}", app.to_string())
+            }
+            DatabaseKey::SubSpace(sub_space) => {
+                format!("subspace_{}", sub_space.to_string())
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum FileSystemKey {
     App(AppFilesystemKey),
@@ -904,9 +932,15 @@ impl FromStr for AppFilesystemKey {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
-pub struct SubKey<P, I> {
+pub struct SubKey<P:ToString, I:ToString> {
     pub parent: P,
     pub id: I,
+}
+
+impl <P:ToString,I:ToString> ToString for SubKey<P,I> {
+    fn to_string(&self) -> String {
+        format!("{}-{}", self.parent.to_string(), self.id.to_string())
+    }
 }
 
 pub type FileSystemId = u32;
@@ -989,6 +1023,7 @@ impl fmt::Display for ResourceKey {
                 ResourceKey::Proxy(key) => format!("proxy-{}", key.to_string()),
                 ResourceKey::ArtifactBundle(key) => format!("artifact_bundle-{}", key.to_string()),
                 ResourceKey::Artifact(key) => format!("artifact-{}", key.to_string()),
+                ResourceKey::Database(key) => format!("database-{}", key.to_string()),
             }
         )
     }
@@ -1010,6 +1045,7 @@ impl ResourceKey {
             ResourceKey::Proxy(_) => ResourceType::Proxy,
             ResourceKey::ArtifactBundle(_) => ResourceType::ArtifactBundle,
             ResourceKey::Artifact(_) => ResourceType::Artifact,
+            ResourceKey::Database(_) => ResourceType::Database
         }
     }
 
@@ -1034,6 +1070,10 @@ impl ResourceKey {
             ResourceKey::Proxy(_) => Err("Proxy does not have a subspace".into()),
             ResourceKey::ArtifactBundle(bundle) => Ok(bundle.sub_space.clone()),
             ResourceKey::Artifact(artifact) => Ok(artifact.bundle.sub_space.clone()),
+            ResourceKey::Database(filesystem) => match filesystem {
+                DatabaseKey::App(app) => Ok(app.parent.sub_space.clone()),
+                DatabaseKey::SubSpace(sub_space) => Ok(sub_space.parent.clone()),
+            },
         }
     }
 

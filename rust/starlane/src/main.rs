@@ -15,14 +15,13 @@ fn main() -> Result<(), Error> {
         let mut starlane = Starlane::new().unwrap();
         let tx = starlane.tx.clone();
 
-        let (command, mut rx) = ConstellationCreate::new(
-            ConstellationTemplate::new_standalone(),
+        let (command, _) = ConstellationCreate::new(
+            ConstellationTemplate::new_standalone_with_mysql(),
             ConstellationData::new(),
             Option::Some("standalone".to_owned()),
         );
         tx.send(StarlaneCommand::ConstellationCreate(command)).await;
         starlane.run().await;
-        rx.await;
     });
 
     Ok(())

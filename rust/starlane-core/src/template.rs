@@ -9,6 +9,7 @@ use crate::layout::ConstellationLayout;
 use crate::proto::ProtoStarKernel::Mesh;
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoStarKernel};
 use crate::star::{ServerKindExt, StarKey, StarKind, StarSubGraphKey};
+use crate::core::StarCoreExt;
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct ConstellationTemplate {
@@ -89,6 +90,27 @@ impl ConstellationTemplate {
         template.add_star(artifact_store);
 
         template
+    }
+
+
+    pub fn new_standalone_with( mut star_templates: Vec<StarTemplate> ) -> Self {
+        let mut standalone = Self::new_standalone();
+        let mut mesh = standalone.get_star("mesh".to_string()).cloned().unwrap();
+        for mut star_template in star_templates {
+            ConstellationTemplate::connect(&mut star_template, &mut mesh);
+            standalone.add_star(star_template);
+        }
+
+        standalone
+    }
+
+    pub fn new_standalone_with_mysql() -> Self {
+        let mut database = StarTemplate::new(
+            StarKeyTemplate::central_geodesic(10),
+            StarKind::Database,
+            Option::Some("database".to_string()),
+        );
+        Self::new_standalone_with(vec![database])
     }
 
     pub fn new_client() -> Self {

@@ -2783,6 +2783,9 @@ impl ResourceAddress {
                         format!("/artifacts/{}", artifact.id).as_str(),
                     )?));
                 }
+                ResourceKey::Database(_) => {
+                    unimplemented!()
+                }
             }
 
             mark = key.parent();
