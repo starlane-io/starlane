@@ -45,10 +45,7 @@ use crate::id::{Id, IdSeq};
 use crate::keys::{
     AppKey, GatheringKey, MessageId, ResourceId, ResourceKey, SpaceKey, Unique, UniqueSrc, UserKey,
 };
-use crate::lane::{
-    ConnectionInfo, ConnectorController, LaneEndpoint, LaneCommand, LaneMeta, OutgoingSide,
-    TunnelConnector, TunnelConnectorFactory,
-};
+use crate::lane::{ConnectionInfo, ConnectorController, LaneEndpoint, LaneCommand, LaneMeta, OutgoingSide, TunnelConnector, TunnelConnectorFactory, ProtoLaneEndpoint};
 use crate::logger::{
     Flag, Flags, Log, LogInfo, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag, StaticLogInfo,
 };
@@ -664,12 +661,8 @@ impl Star {
                         self.skel.flags = set_flags.flags;
                         set_flags.tx.send(());
                     }
-                    StarCommand::AddLane(lane) => {
-                        if let Some(remote_star) = lane.remote_star.as_ref() {
-                            self.lanes.insert(remote_star.clone(), LaneMeta::new(lane));
-                        } else {
-                            eprintln!("for star remote star must be set");
-                        }
+                    StarCommand::AddLaneEndpoint(lane) => {
+                        self.lanes.insert(lane.remote_star.clone(), LaneMeta::new(lane));
                     }
                     StarCommand::AddConnectorController(connector_ctrl) => {
                         self.connector_ctrls.push(connector_ctrl);
@@ -2331,7 +2324,8 @@ unimplemented!();
 pub trait StarKernel: Send {}
 
 pub enum StarCommand {
-    AddLane(LaneEndpoint),
+    AddLaneEndpoint(LaneEndpoint),
+    AddProtoLaneEndpoint(ProtoLaneEndpoint),
     ConstellationConstructionComplete,
     Init,
     AddConnectorController(ConnectorController),
@@ -2558,7 +2552,7 @@ impl fmt::Display for StarCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
             StarCommand::Init => "Init".to_string(),
-            StarCommand::AddLane(_) => format!("AddLane").to_string(),
+            StarCommand::AddLaneEndpoint(_) => format!("AddLane").to_string(),
             StarCommand::AddConnectorController(_) => format!("AddConnectorController").to_string(),
             StarCommand::AddLogger(_) => format!("AddLogger").to_string(),
             StarCommand::Test(_) => format!("Test").to_string(),
@@ -2584,7 +2578,8 @@ impl fmt::Display for StarCommand {
             }
             StarCommand::SetStatus(_) => "StarStatus".to_string(),
             StarCommand::GetCaches(_) => "GetCaches".to_string(),
-            StarCommand::GetStarKey(_) => "GetStarKey".to_string()
+            StarCommand::GetStarKey(_) => "GetStarKey".to_string(),
+            StarCommand::AddProtoLaneEndpoint(_) => "ProtoLaneEndpoint".to_string()
         };
         write!(f, "{}", r)
     }
@@ -2767,7 +2762,7 @@ impl Transaction for StarSearchTransaction {
                 }
 
                 self.hits
-                    .insert(lane.lane.remote_star.clone().unwrap(), lane_hits);
+                    .insert(lane.lane.remote_star.clone(), lane_hits);
             }
         }
 

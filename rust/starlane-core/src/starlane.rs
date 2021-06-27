@@ -19,7 +19,7 @@ use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::{ChildManagerResourceAction, Frame, Reply, SimpleReply, StarMessagePayload};
 use crate::keys::ResourceKey;
-use crate::lane::{ConnectionInfo, ConnectionKind, LaneEndpoint, LocalTunnelConnector, ServerSideTunnelConnector, ClientSideTunnelConnector, ConnectorController };
+use crate::lane::{ConnectionInfo, ConnectionKind, LaneEndpoint, LocalTunnelConnector, ServerSideTunnelConnector, ClientSideTunnelConnector, ConnectorController, ProtoLaneEndpoint};
 use crate::logger::{Flags, Logger};
 use crate::message::{Fail, ProtoStarMessage};
 use crate::proto::{
@@ -214,9 +214,7 @@ if let Err(error) = &result {
 
             let machine = layout.handles_to_machine.get(&star_template.handle  ).ok_or(format!("expected machine mapping for star template handle: {}",star_template.handle.to_string()))?;
             if self.name == *machine {
-println!("ABOUT TO CREATE ...!");
                 let star_key = star_template.key.create();
-println!("AND GOT HERE!");
                 let (mut evolve_tx, mut evolve_rx) = oneshot::channel();
                 evolve_rxs.push(evolve_rx);
 
@@ -225,7 +223,7 @@ println!("AND GOT HERE!");
                 let star_ctrl = StarController {
                     star_tx: star_tx.clone()
                 };
-                self.star_controllers.put(star_template_id, star_ctrl);
+                self.star_controllers.put(star_template_id, star_ctrl).await;
 
                 if self.artifact_caches.is_none() {
                     let api = StarlaneApi::new(star_tx.clone());
@@ -235,7 +233,6 @@ println!("AND GOT HERE!");
                     )?);
                     self.artifact_caches = Option::Some(caches);
                 }
-println!("EVEN HERE!");
 
                 let (proto_star, star_ctrl) = ProtoStar::new(
                     star_key.clone(),
@@ -288,6 +285,7 @@ println!("EVEN HERE!");
         for star_template in &layout.template.stars {
             let machine = layout.handles_to_machine.get(&star_template.handle  ).ok_or(format!("expected machine mapping for star template handle: {}",star_template.handle.to_string()))?;
             let local_star = StarInConstellationTemplateHandle::new( name.clone(), star_template.handle.clone() );
+println!("connecting for local: {}",local_star.star.to_string() );
             if self.name == *machine {
                 for lane in &star_template.lanes {
                     match lane {
@@ -381,6 +379,7 @@ println!("new client!");
 
     async fn add_local_lane(&mut self, local: StarInConstellationTemplateHandle, second: StarInConstellationTemplateHandle ) -> Result<(), Error> {
         let (high, low) = crate::util::sort(local, second)?;
+
         let high_star_ctrl = {
             let high_star_ctrl = self.star_controllers.get(high.clone()).await?;
             match high_star_ctrl {
@@ -420,16 +419,16 @@ println!("new client!");
         high_star_ctrl: StarController,
         low_star_ctrl: StarController,
     ) -> Result<(), Error> {
-        let high_lane = LaneEndpoint::new(Option::None).await;
-        let low_lane = LaneEndpoint::new(Option::None).await;
+        let high_lane = ProtoLaneEndpoint::new(Option::None);
+        let low_lane = ProtoLaneEndpoint::new(Option::None);
         let connector = LocalTunnelConnector::new(&high_lane, &low_lane).await?;
         high_star_ctrl
             .star_tx
-            .send(StarCommand::AddLane(high_lane))
+            .send(StarCommand::AddProtoLaneEndpoint(high_lane))
             .await?;
         low_star_ctrl
             .star_tx
-            .send(StarCommand::AddLane(low_lane))
+            .send(StarCommand::AddProtoLaneEndpoint(low_lane))
             .await?;
         high_star_ctrl
             .star_tx
@@ -444,13 +443,13 @@ println!("new client!");
         low_star_ctrl: StarController,
         stream: TcpStream
     ) -> Result<(), Error> {
-        let low_lane = LaneEndpoint::new(Option::None ).await;
+        let low_lane = ProtoLaneEndpoint::new(Option::None );
 
         ServerSideTunnelConnector::new(&low_lane,stream).await?;
 
         low_star_ctrl
             .star_tx
-            .send(StarCommand::AddLane(low_lane))
+            .send(StarCommand::AddProtoLaneEndpoint(low_lane))
             .await?;
 
         Ok(())
@@ -463,13 +462,13 @@ println!("new client!");
         host_address: String,
         selector: StarInConstellationTemplateSelector
     ) -> Result<ConnectorController, Error> {
-        let lane = LaneEndpoint::new(Option::None ).await;
+        let lane = ProtoLaneEndpoint::new(Option::None );
 
         let ctrl = ClientSideTunnelConnector::new(&lane,host_address,selector).await?;
 
         star_ctrl
             .star_tx
-            .send(StarCommand::AddLane(lane))
+            .send(StarCommand::AddProtoLaneEndpoint(lane))
             .await?;
 
         Ok(ctrl)

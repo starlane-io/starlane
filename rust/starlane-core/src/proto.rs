@@ -27,10 +27,7 @@ use crate::frame::{
     WindHit, WindUp,
 };
 use crate::id::{Id, IdSeq};
-use crate::lane::{
-    ConnectorController, LaneEndpoint, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector,
-    TunnelIn, TunnelOut, TunnelOutState,
-};
+use crate::lane::{ConnectorController, LaneEndpoint, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelIn, TunnelOut, TunnelOutState, ProtoLaneEndpoint, LaneId};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::permissions::AuthTokenSource;
 use crate::resource::HostedResourceStore;
@@ -53,6 +50,7 @@ pub struct ProtoStar {
     star_tx: mpsc::Sender<StarCommand>,
     star_rx: mpsc::Receiver<StarCommand>,
     lanes: HashMap<StarKey, LaneMeta>,
+    proto_lanes: Vec<ProtoLaneEndpoint>,
     connector_ctrls: Vec<ConnectorController>,
     star_manager_factory: Arc<dyn StarVariantFactory>,
     //  star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
@@ -87,6 +85,7 @@ impl ProtoStar {
                 star_tx: star_tx.clone(),
                 star_rx,
                 lanes: HashMap::new(),
+                proto_lanes: vec![],
                 connector_ctrls: vec![],
                 star_manager_factory: star_manager_factory,
                 core_runner: core_runner,
@@ -96,6 +95,7 @@ impl ProtoStar {
                 data_access: data_access,
                 tracker: ProtoTracker::new(),
                 flags: flags,
+
             },
             StarController { star_tx },
         )
@@ -111,6 +111,11 @@ impl ProtoStar {
                 futures.push(lane.lane.incoming.recv().boxed());
                 lanes.push(key.clone())
             }
+            let mut proto_lane_index = vec![];
+            for (index,lane) in &mut self.proto_lanes.iter_mut().enumerate() {
+                futures.push(lane.incoming.recv().boxed());
+                proto_lane_index.push(index);
+            }
 
             futures.push(self.star_rx.recv().boxed());
 
@@ -119,6 +124,14 @@ impl ProtoStar {
             }
 
             let (command, future_index, _) = select_all(futures).await;
+
+            let lane = if future_index < lanes.len() {
+                LaneId::Lane(lanes.get(future_index).unwrap().clone())
+            } else if future_index < lanes.len()+ proto_lane_index.len() {
+                LaneId::ProtoLane(future_index-lanes.len())
+            } else {
+                LaneId::None
+            };
 
             if let Some(command) = command {
                 match command {
@@ -187,21 +200,22 @@ impl ProtoStar {
                         )
                         .await);
                     }
-                    StarCommand::AddLane(lane) => {
-                        if let Some(remote_star) = &lane.remote_star {
-                            let remote_star = remote_star.clone();
-                            self.lanes.insert(remote_star.clone(), LaneMeta::new(lane));
+                    StarCommand::AddLaneEndpoint(lane) => {
+                          let remote_star = lane.remote_star.clone();
+                            self.lanes.insert(lane.remote_star.clone(), LaneMeta::new(lane));
 
                             if let Option::Some(frames) = self.frame_hold.release(&remote_star) {
                                 for frame in frames {
                                     self.send_frame(&remote_star, frame).await;
                                 }
-                            }
                         } else {
                             eprintln!(
                                 "cannot add a lane to a star that doesn't have a remote_star"
                             );
                         }
+                    }
+                    StarCommand::AddProtoLaneEndpoint(lane) => {
+                        self.proto_lanes.push(lane);
                     }
                     StarCommand::AddConnectorController(connector_ctrl) => {
                         self.connector_ctrls.push(connector_ctrl);
@@ -344,23 +358,23 @@ unimplemented!();
 
         for (_, lane) in &mut self.lanes {
             if let Option::Some(hops) = lane.get_hops_to_star(to) {
-                if lane.lane.remote_star.is_some() {
+//                if lane.lane.remote_star.is_some() {
                     if let Option::None = rtn {
                         rtn = Option::Some(ShortestPathStarKey {
                             to: to.clone(),
-                            next_lane: lane.lane.remote_star.as_ref().unwrap().clone(),
+                            next_lane: lane.lane.remote_star.clone(),
                             hops,
                         });
                     } else if let Option::Some(min) = &rtn {
                         if hops < min.hops {
                             rtn = Option::Some(ShortestPathStarKey {
                                 to: to.clone(),
-                                next_lane: lane.lane.remote_star.as_ref().unwrap().clone(),
+                                next_lane: lane.lane.remote_star.clone(),
                                 hops,
                             });
                         }
                     }
-                }
+                //}
             }
         }
 

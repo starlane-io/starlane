@@ -30,6 +30,7 @@ use crate::starlane::StarlaneCommand::Connect;
 use std::cell::Cell;
 use serde::de::DeserializeOwned;
 use crate::template::{ConstellationSelector, StarInConstellationTemplateHandle, StarInConstellationTemplateSelector};
+use std::convert::TryInto;
 
 pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
 pub static LANE_QUEUE_SIZE: usize = 32;
@@ -131,15 +132,15 @@ impl<T> Chamber<T> {
     }
 }
 
-pub struct LaneEndpoint {
+pub struct ProtoLaneEndpoint {
     pub remote_star: Option<StarKey>,
     pub incoming: IncomingSide,
     pub outgoing: OutgoingSide,
     tunnel_receiver_tx: Sender<TunnelInState>,
 }
 
-impl LaneEndpoint {
-    pub async fn new(remote_star: Option<StarKey>) -> Self {
+impl ProtoLaneEndpoint {
+    pub fn new(star_key: Option<StarKey>) -> Self {
         let (mid_tx, mid_rx) = mpsc::channel(LANE_QUEUE_SIZE);
         let (in_tx, in_rx) = mpsc::channel(LANE_QUEUE_SIZE);
         let (tunnel_receiver_tx, tunnel_receiver_rx) = mpsc::channel(1);
@@ -155,8 +156,8 @@ impl LaneEndpoint {
             midlane.run().await;
         });
 
-        LaneEndpoint {
-            remote_star: remote_star,
+        ProtoLaneEndpoint {
+            remote_star: star_key,
             tunnel_receiver_tx: tunnel_receiver_tx,
             incoming: IncomingSide {
                 rx: in_rx,
@@ -166,6 +167,39 @@ impl LaneEndpoint {
             outgoing: OutgoingSide { out_tx: mid_tx },
         }
     }
+
+    pub fn get_tunnel_in_tx(&self) -> Sender<TunnelInState> {
+        self.tunnel_receiver_tx.clone()
+    }
+}
+
+impl TryInto<LaneEndpoint> for ProtoLaneEndpoint{
+    type Error = Error;
+
+    fn try_into(self) -> Result<LaneEndpoint, Self::Error> {
+        if self.remote_star.is_some() {
+            Ok(LaneEndpoint{
+                remote_star: self.remote_star.unwrap(),
+                incoming: self.incoming,
+                outgoing: self.outgoing,
+                tunnel_receiver_tx: self.tunnel_receiver_tx
+            })
+        } else {
+            Err("star_key must be set before ProtoLaneEndpoint can evolve into a LaneEndpoint".into())
+        }
+    }
+}
+
+
+pub struct LaneEndpoint {
+    pub remote_star: StarKey,
+    pub incoming: IncomingSide,
+    pub outgoing: OutgoingSide,
+    tunnel_receiver_tx: Sender<TunnelInState>,
+}
+
+
+impl LaneEndpoint {
 
     pub fn get_tunnel_in_tx(&self) -> Sender<TunnelInState> {
         self.tunnel_receiver_tx.clone()
@@ -240,7 +274,7 @@ pub struct ClientSideTunnelConnector {
 }
 
 impl ClientSideTunnelConnector {
-    pub async fn new(lane: &LaneEndpoint, host_address: String, selector: StarInConstellationTemplateSelector ) -> Result<ConnectorController, Error> {
+    pub async fn new(lane: &ProtoLaneEndpoint, host_address: String, selector: StarInConstellationTemplateSelector ) -> Result<ConnectorController, Error> {
         let (command_tx, command_rx) = mpsc::channel(1);
         let mut connector = Self {
             out: lane.outgoing.clone(),
@@ -317,7 +351,7 @@ pub struct ServerSideTunnelConnector {
 }
 
 impl ServerSideTunnelConnector {
-    pub async fn new(low_lane: &LaneEndpoint, stream: TcpStream) -> Result<ConnectorController, Error> {
+    pub async fn new(low_lane: &ProtoLaneEndpoint, stream: TcpStream) -> Result<ConnectorController, Error> {
         let (command_tx, command_rx) = mpsc::channel(1);
         let mut connector = Self {
             low: low_lane.outgoing.clone(),
@@ -383,12 +417,10 @@ pub struct LocalTunnelConnector {
 }
 
 impl LocalTunnelConnector {
-    pub async fn new(high_lane: &LaneEndpoint, low_lane: &LaneEndpoint) -> Result<ConnectorController, Error> {
+    pub async fn new(high_lane: &ProtoLaneEndpoint, low_lane: &ProtoLaneEndpoint) -> Result<ConnectorController, Error> {
         let high_star = low_lane.remote_star.clone();
         let low_star = high_lane.remote_star.clone();
-        if high_star.cmp(&low_star) != Ordering::Greater {
-            Err("High star must have a greater StarKey (meaning higher constellation index array and star index value".into())
-        } else {
+
             let (command_tx, command_rx) = mpsc::channel(1);
 
             let mut connector = LocalTunnelConnector {
@@ -406,7 +438,6 @@ impl LocalTunnelConnector {
             Ok(ConnectorController {
                 command_tx: command_tx,
             })
-        }
     }
 
     async fn run(&mut self) {
@@ -487,7 +518,7 @@ impl LaneMeta {
     }
 
     pub fn get_hops_to_star(&mut self, star: &StarKey) -> Option<usize> {
-        if self.lane.remote_star.is_some() && star == self.lane.remote_star.as_ref().unwrap() {
+        if *star == self.lane.remote_star {
             return Option::Some(1);
         }
         match self.star_paths.get(star) {
@@ -574,6 +605,13 @@ impl FrameCodex {
 
 }
 
+
+pub enum LaneId {
+    None,
+    Lane(StarKey),
+    ProtoLane(usize)
+}
+
 #[cfg(test)]
 mod test {
     use futures::FutureExt;
@@ -583,7 +621,7 @@ mod test {
     use crate::error::Error;
     use crate::frame::{Diagnose, ProtoFrame};
     use crate::id::Id;
-    use crate::lane::{LaneEndpoint, LaneCommand, FrameCodex};
+    use crate::lane::{LaneEndpoint, LaneCommand, FrameCodex, ProtoLaneEndpoint};
     use crate::lane::ConnectorCommand;
     use crate::lane::Frame;
     use crate::lane::LocalTunnelConnector;
@@ -671,8 +709,8 @@ mod test {
             let high = StarKey::new(2);
             let low = StarKey::new(1);
 
-            let mut high_lane = LaneEndpoint::new(Option::Some(low.clone())).await;
-            let mut low_lane = LaneEndpoint::new(Option::Some(high.clone())).await;
+            let mut high_lane = ProtoLaneEndpoint::new(Option::Some(low.clone()));
+            let mut low_lane = ProtoLaneEndpoint::new(Option::Some(high.clone()));
 
             let connector_ctrl = LocalTunnelConnector::new(&high_lane, &low_lane)
                 .await
