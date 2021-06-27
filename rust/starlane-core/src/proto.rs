@@ -17,7 +17,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::mpsc::error::SendError;
 use tokio::time::{Duration, Instant};
 
-use crate::cache::ProtoCacheFactory;
+use crate::cache::ProtoArtifactCachesFactory;
 use crate::constellation::Constellation;
 use crate::core::{CoreRunner, CoreRunnerCommand};
 use crate::error::Error;
@@ -59,7 +59,7 @@ pub struct ProtoStar {
     core_runner: Arc<CoreRunner>,
     logger: Logger,
     frame_hold: FrameHold,
-    caches: Arc<ProtoCacheFactory>,
+    caches: Arc<ProtoArtifactCachesFactory>,
     data_access: FileAccess,
     flags: Flags,
     tracker: ProtoTracker,
@@ -71,7 +71,7 @@ impl ProtoStar {
         kind: StarKind,
         star_tx: Sender<StarCommand>,
         star_rx: Receiver<StarCommand>,
-        caches: Arc<ProtoCacheFactory>,
+        caches: Arc<ProtoArtifactCachesFactory>,
         data_access: FileAccess,
         star_manager_factory: Arc<dyn StarVariantFactory>,
         core_runner: Arc<CoreRunner>,
@@ -122,6 +122,9 @@ impl ProtoStar {
 
             if let Some(command) = command {
                 match command {
+                    StarCommand::GetStarKey(tx) => {
+                        tx.send( self.star_key.clone() );
+                    }
                     StarCommand::ConstellationConstructionComplete => {
                         let info = StarInfo {
                             key: self.star_key.as_ref().unwrap().clone(),

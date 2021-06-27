@@ -25,7 +25,7 @@ use crate::frame::{Frame, ProtoFrame};
 use crate::id::Id;
 use crate::proto::{local_tunnels, ProtoStar, ProtoTunnel};
 use crate::star::{Star, StarCommand, StarKey};
-use crate::starlane::{ConnectCommand, StarlaneCommand};
+use crate::starlane::{StarlaneCommand, VersionFrame};
 use crate::starlane::StarlaneCommand::Connect;
 use std::cell::Cell;
 
@@ -211,6 +211,7 @@ pub struct TunnelIn {
     pub rx: Receiver<Frame>,
 }
 
+#[derive(Clone)]
 pub struct ConnectorController {
     pub command_tx: mpsc::Sender<ConnectorCommand>,
 }
@@ -228,6 +229,81 @@ pub enum ConnectorCommand {
     Reset,
     Close,
 }
+pub struct ClientSideTunnelConnector {
+    pub in_tx: Sender<TunnelInState>,
+    pub out: OutgoingLane,
+    command_rx: Receiver<ConnectorCommand>,
+    host: String
+}
+
+impl ClientSideTunnelConnector {
+    pub async fn new(lane: &Lane, host: String ) -> Result<ConnectorController, Error> {
+        let (command_tx, command_rx) = mpsc::channel(1);
+        let mut connector = Self {
+            out: lane.outgoing.clone(),
+            in_tx: lane.get_tunnel_in_tx(),
+            command_rx,
+            host: host
+        };
+
+        tokio::spawn(async move { connector.run().await });
+
+        Ok(ConnectorController {
+            command_tx: command_tx,
+        })
+    }
+
+    async fn run(mut self) {
+        loop {
+            if let Result::Ok(stream) = TcpStream::connect(self.host.clone()).await
+            {
+                let (tx, rx) = FrameCodex::new(stream);
+
+                let proto_tunnel = ProtoTunnel {
+                    star: Option::None,
+                    tx: tx,
+                    rx: rx
+                };
+
+                match proto_tunnel.evolve().await {
+                    Ok((tunnel_out, tunnel_in)) => {
+                        self.out.out_tx.send(LaneCommand::Tunnel(TunnelOutState::Out(tunnel_out))).await;
+                        self.in_tx.send(TunnelInState::In(tunnel_in)).await;
+
+                        if let Option::Some(command) = self.command_rx.recv().await
+                        {
+                            self.out.out_tx.send(LaneCommand::Tunnel(TunnelOutState::None)).await;
+                            match command {
+                                ConnectorCommand::Reset => {
+                                    println!("reset connection");
+                                }
+                                ConnectorCommand::Close => {
+                                    eprintln!("CLIENT CONNECTION CLOSING (0)");
+                                    break;
+                                }
+                            }
+                        } else {
+                            eprintln!("CLIENT CONNECTION CLOSING (1)");
+                            break;
+                        }
+                    }
+                    Err(error) => {
+                        eprintln!("CONNECTION ERROR: {}", error.error);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl TunnelConnector for ClientSideTunnelConnector {
+
+
+}
+
+
+
 
 pub struct ServerSideTunnelConnector {
     pub low_in_tx: Sender<TunnelInState>,
@@ -263,7 +339,7 @@ impl ServerSideTunnelConnector {
             Ok(stream) => stream
         };
 
-        let (tx,rx) = FrameConnection::new(stream);
+        let (tx,rx) = FrameCodex::new(stream);
 
         let proto_tunnel = ProtoTunnel{
             star: Option::None,
@@ -437,29 +513,23 @@ pub trait TunnelConnectorFactory: Send {
     fn connector(&self, data: &ConnectionInfo) -> Result<Box<dyn TunnelConnector>, Error>;
 }
 
-pub struct FrameConnection();
+pub struct FrameCodex{
+}
 
-impl FrameConnection {
+impl FrameCodex {
 
     pub fn new(stream: TcpStream) -> (mpsc::Sender<Frame>, mpsc::Receiver<Frame>){
-        let (mut read,mut write) = stream.into_split();
+        let (mut read,mut write)= stream.into_split();
         let (in_tx,in_rx) = mpsc::channel(64);
         let (out_tx,mut out_rx) = mpsc::channel(64);
 
         tokio::spawn( async move {
             while let Option::Some(frame) = out_rx.recv().await {
-
-                if let &Frame::Close = &frame {
-                    FrameConnection::send(&mut write, Frame::Close).await.unwrap_or_default();
-                    break;
-                }
-                else {
-                    match FrameConnection::send(&mut write, frame).await
-                    {
-                        Ok(_) => {}
-                        Err(_) => {
-                            break;
-                        }
+                match FrameCodex::send(&mut write, frame).await
+                {
+                    Ok(_) => {}
+                    Err(_) => {
+                        break;
                     }
                 }
 
@@ -468,16 +538,10 @@ impl FrameConnection {
 
         tokio::spawn( async move {
             while let Result::Ok(frame)= Self::receive(&mut read).await {
-                if let Frame::Close = frame {
-                    break;
-                } else {
-                    match in_tx.send(frame).await {
-                        Ok(_) => {}
-                        Err(_) => {
-                            break;
-                        }
-                    }
-                }
+                in_tx.send(frame).await;
+                // this HACK appears to be necessary in order for the receiver to
+                // consistently receive values, but i do not know why
+               tokio::time::sleep(Duration::from_secs(0)).await;
             }
         });
 
@@ -485,8 +549,8 @@ impl FrameConnection {
     }
 
     async fn receive( read: &mut OwnedReadHalf ) -> Result<Frame,Error> {
-
         let len = read.read_u32().await?;
+
         let mut buf = vec![0 as u8; len as usize];
         let mut buf_ref = buf.as_mut_slice();
 
@@ -515,13 +579,70 @@ mod test {
     use crate::error::Error;
     use crate::frame::{Diagnose, ProtoFrame};
     use crate::id::Id;
-    use crate::lane::{Lane, LaneCommand};
+    use crate::lane::{Lane, LaneCommand, FrameCodex};
     use crate::lane::ConnectorCommand;
     use crate::lane::Frame;
     use crate::lane::LocalTunnelConnector;
     use crate::lane::TunnelConnector;
     use crate::proto::local_tunnels;
     use crate::star::{StarCommand, StarKey};
+    use tokio::net::{TcpListener, TcpStream};
+    use std::net::{ToSocketAddrs, SocketAddr};
+    use std::str::FromStr;
+    use tokio::sync::oneshot;
+
+    #[test]
+    fn frame_codex()
+    {
+        let rt = Runtime::new().unwrap();
+        rt.block_on( async {
+            let (wait_tx,wait_rx) = oneshot::channel();
+            tokio::spawn( async move {
+                let std_listener = std::net::TcpListener::bind("127.0.0.1:7788").unwrap();
+                let listener = TcpListener::from_std(std_listener).unwrap();
+                println!("LISTENING!");
+                if let Ok((mut stream,_)) = listener.accept().await {
+                    println!("new client!");
+                    let (mut tx,mut rx) = FrameCodex::new(stream);
+
+                    tokio::spawn(async move {
+                        println!("waiting for frame...");
+                        while let frame = rx.recv().await.unwrap() {
+                            println!("RECEIVED FRAME: {}", frame);
+                            if let Frame::Close = frame {
+                                break;
+                            }
+                        }
+                        wait_tx.send(());
+                    });
+                }
+            });
+
+            tokio::time::sleep(Duration::from_secs(1)).await;
+
+            let stream = TcpStream::connect(SocketAddr::from_str("127.0.0.1:7788").unwrap() ).await.unwrap();
+            let (mut tx,mut rx) = FrameCodex::new(stream);
+
+            tokio::spawn(async{
+                println!("sending PING.");
+            });
+
+            tx.send( Frame::Ping ).await;
+            tx.send( Frame::Close).await;
+
+            tokio::spawn(async{
+                println!("PING SENT.");
+            });
+
+
+            wait_rx.await;
+
+            tokio::spawn(async{
+                println!("all done.");
+            })
+
+        });
+    }
 
     #[test]
     pub fn proto_tunnel() {
@@ -594,5 +715,7 @@ mod test {
         });
     }
 }
+
+
 
 

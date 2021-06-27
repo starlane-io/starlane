@@ -2,8 +2,10 @@ use clap::{App, SubCommand, Arg, ArgMatches};
 use tokio::runtime::Runtime;
 
 use starlane_core::error::Error;
-use starlane_core::starlane::{ConstellationCreate, Starlane, StarlaneCommand};
-use starlane_core::template::{ConstellationData, ConstellationTemplate};
+use starlane_core::starlane::{ConstellationCreate, StarlaneMachine, StarlaneCommand, StarlaneMachineRunner};
+use starlane_core::template::{ConstellationData, ConstellationTemplate, ConstellationLayout};
+use starlane_core::star::StarName;
+use tokio::sync::oneshot;
 
 mod cli;
 
@@ -26,17 +28,9 @@ fn main() -> Result<(), Error> {
     if let Option::Some(_) = matches.subcommand_matches("run") {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let mut starlane = Starlane::new().unwrap();
-            let tx = starlane.tx.clone();
-
-            let (command, _) = ConstellationCreate::new(
-                ConstellationTemplate::new_standalone_with_mysql(),
-                ConstellationData::new(),
-                Option::Some("standalone-with-mysql".to_owned()));
-            tx.send(StarlaneCommand::ConstellationCreate(command)).await;
-            tx.send( StarlaneCommand::Listen ).await;
-
-            starlane.run().await;
+            let mut starlane = StarlaneMachine::new("server".to_string() ).unwrap();
+            starlane.create_constellation( Option::Some("standalone".to_string()), ConstellationLayout::standalone_with_database().unwrap()  ).await.unwrap();
+            starlane.listen();
         });
     } else if let Option::Some(matches) = matches.subcommand_matches("config") {
         if let Option::Some(_) = matches.subcommand_matches("get-host") {
@@ -52,10 +46,39 @@ fn main() -> Result<(), Error> {
             clap_app.print_long_help().unwrap_or_default();
         }
     } else if let Option::Some(args) = matches.subcommand_matches("push") {
-println!("push {} to {}", args.value_of("dir").ok_or("expected dir")?, args.value_of("address").ok_or("expected address")? )
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            push(args.clone()).await.unwrap();
+        });
+
     } else {
         clap_app.print_long_help().unwrap_or_default();
     }
+
+    Ok(())
+}
+
+async fn push( args: ArgMatches<'_> ) -> Result<(),Error> {
+    println!("push {} to {}", args.value_of("dir").ok_or("expected dir")?, args.value_of("address").ok_or("expected address")? );
+
+    let host = {
+        let config = crate::cli::CLI_CONFIG.lock()?;
+        config.hostname.clone()
+    };
+
+
+        tokio::spawn( async {
+            println!("starting push connnection");
+        } );
+        let mut starlane = StarlaneMachine::new("client".to_string() ).unwrap();
+        starlane.create_constellation( Option::Some("client".to_string()), ConstellationLayout::client()? ).await?;
+        starlane.listen();
+        let star_name = StarName { constellation: "client".to_string(), star: "client".to_string() };
+        let ctrl= starlane.connect( host, star_name ).await?;
+
+        tokio::spawn( async {
+            println!("push connection complete.");
+        });
 
     Ok(())
 }

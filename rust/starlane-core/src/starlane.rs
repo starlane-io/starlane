@@ -11,21 +11,20 @@ use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 
 use api::SpaceApi;
+use serde::{Serialize,Deserialize};
 
-use crate::cache::ProtoCacheFactory;
+use crate::cache::ProtoArtifactCachesFactory;
 use crate::core::CoreRunner;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::{ChildManagerResourceAction, Frame, Reply, SimpleReply, StarMessagePayload};
 use crate::keys::ResourceKey;
-use crate::lane::{ConnectionInfo, ConnectionKind, Lane, LocalTunnelConnector, ServerSideTunnelConnector};
-use crate::layout::ConstellationLayout;
+use crate::lane::{ConnectionInfo, ConnectionKind, Lane, LocalTunnelConnector, ServerSideTunnelConnector, ClientSideTunnelConnector, ConnectorController };
 use crate::logger::{Flags, Logger};
 use crate::message::{Fail, ProtoStarMessage};
 use crate::proto::{
     local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoTunnel,
 };
-use crate::provision::Provisioner;
 use crate::resource::space::SpaceState;
 use crate::resource::{
     AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype,
@@ -34,44 +33,102 @@ use crate::resource::{
 use crate::star::variant::{StarVariantFactory, StarVariantFactoryDefault};
 use crate::star::{Request, Star, StarCommand, StarController, StarKey, StarName};
 use crate::starlane::api::StarlaneApi;
-use crate::template::{
-    ConstellationData, ConstellationTemplate, StarKeyIndexTemplate, StarKeySubgraphTemplate,
-    StarKeyTemplate,
-};
-use tokio::net::{TcpListener, TcpStream};
+use crate::template::{ConstellationData, ConstellationTemplate, StarKeyIndexTemplate, StarKeySubgraphTemplate, StarKeyTemplate, MachineName, ConstellationLayout};
+use tokio::net::{TcpListener, TcpStream, TcpSocket};
+use crate::util::AsyncHashMap;
+use futures::{TryFutureExt, StreamExt};
+use futures::stream::{SplitStream, SplitSink};
+use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
+use std::str::FromStr;
+
 
 pub mod api;
 
 lazy_static! {
 //    pub static ref DATA_DIR: Mutex<String> = Mutex::new("data".to_string());
-    pub static ref DEFAULT_PORT: usize = 3719;
+    pub static ref DEFAULT_PORT: usize= 3719;
+    pub static ref VERSION: VersionFrame = VersionFrame{ product: "Starlane".to_string(), version: "1.0.0".to_string() };
 }
 
-pub struct Starlane {
+#[derive(Clone)]
+pub struct StarlaneMachine {
+    tx: mpsc::Sender<StarlaneCommand>
+}
+
+impl StarlaneMachine {
+    pub fn new(name: MachineName) -> Result<Self,Error> {
+        let mut runner = StarlaneMachineRunner::new(name)?;
+        let starlane = Self {
+            tx: runner.tx.clone()
+        };
+
+        tokio::spawn( async move {
+            runner.run().await;
+        });
+
+        Ok(starlane)
+    }
+
+    pub async fn connect( &self, host: String, star_name: StarName) -> Result<ConnectorController,Error> {
+        let (tx,rx) = oneshot::channel();
+        self.tx.send( StarlaneCommand::Connect {host,star_name, tx }).await?;
+        rx.await?
+    }
+
+    pub async fn create_constellation(&self, name: Option<String>, layout: ConstellationLayout ) -> Result<(),Error> {
+        let (tx,rx) = oneshot::channel();
+        let create = ConstellationCreate{
+            name,
+            layout,
+            tx
+        };
+        self.tx.send( StarlaneCommand::ConstellationCreate(create)).await?;
+        rx.await?
+    }
+
+    pub async fn star_control_request_by_name( &self, name: StarName ) -> Result<StarlaneApi,Error> {
+        let (tx,rx) = oneshot::channel();
+        let request = StarlaneApiRequestByName{
+            name,
+            tx
+        };
+        self.tx.send( StarlaneCommand::StarControlRequestByName(request)).await?;
+        Ok(rx.await?)
+    }
+
+    pub fn listen(&self) {
+        let tx = self.tx.clone();
+        tokio::spawn( async move {
+            tx.send(StarlaneCommand::Listen).await;
+        });
+    }
+}
+
+pub struct StarlaneMachineRunner {
+    name: MachineName,
     pub tx: mpsc::Sender<StarlaneCommand>,
     rx: mpsc::Receiver<StarlaneCommand>,
-    star_controllers: HashMap<StarKey, StarController>,
-    star_names: HashMap<StarName, StarKey>,
+    star_controllers: AsyncHashMap<StarKey, StarController>,
+    star_names: AsyncHashMap<StarName, StarKey>,
     star_manager_factory: Arc<dyn StarVariantFactory>,
     //    star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
     core_runner: Arc<CoreRunner>,
-    constellation_names: HashSet<String>,
     data_access: FileAccess,
     cache_access: FileAccess,
     pub logger: Logger,
     pub flags: Flags,
-    pub caches: Option<Arc<ProtoCacheFactory>>,
+    pub artifact_caches: Option<Arc<ProtoArtifactCachesFactory>>,
     port: usize,
     listening: bool
 }
 
-impl Starlane {
-    pub fn new() -> Result<Self, Error> {
+impl StarlaneMachineRunner {
+    pub fn new(machine: String) -> Result<Self, Error> {
         let (tx, rx) = mpsc::channel(32);
-        Ok(Starlane {
-            star_controllers: HashMap::new(),
-            star_names: HashMap::new(),
-            constellation_names: HashSet::new(),
+        Ok(StarlaneMachineRunner {
+            name: machine,
+            star_controllers: AsyncHashMap::new(),
+            star_names: AsyncHashMap::new(),
             tx: tx,
             rx: rx,
             star_manager_factory: Arc::new(StarVariantFactoryDefault {}),
@@ -85,7 +142,7 @@ impl Starlane {
             cache_access: FileAccess::new(
                 std::env::var("STARLANE_CACHE").unwrap_or("cache".to_string()),
             )?,
-            caches: Option::None,
+            artifact_caches: Option::None,
             port: DEFAULT_PORT.clone(),
             listening: false
         })
@@ -94,26 +151,30 @@ impl Starlane {
     pub async fn run(&mut self) {
         while let Option::Some(command) = self.rx.recv().await {
             match command {
-                StarlaneCommand::Connect(command) => {
-                    /*                    if self.stars.contains_key(&command.key)
-                                       {
-
-                                       }
-                                       else {
-                                           command.oneshot.send( Err(format!("could not find host address for star: {}", &command.key).into()) );
-                                       }
-                    */
-                    unimplemented!()
+                StarlaneCommand::Connect{ host, star_name, tx } => {
+println!("connecting...to {}",host );
+                    if let Ok(Option::Some(key)) = self.star_names.get(star_name.clone()).await {
+println!("got starname...to {}",star_name.star);
+                        if let Ok(Option::Some(ctrl)) = self.star_controllers.get(key).await {
+println!("got controller...");
+                            let result = self.add_client_side_lane_ctrl(ctrl.clone(), host ).await;
+                            tx.send(result);
+                        }
+                    }
                 }
                 StarlaneCommand::ConstellationCreate(command) => {
+println!("constellation CREATE");
                     let result = self
-                        .constellation_create(command.template, command.data, command.name)
+                        .constellation_create(command.layout, command.name)
                         .await;
+if let Err(error) = &result {
+    eprintln!("{}",error.to_string());
+}
                     command.tx.send(result);
                 }
                 StarlaneCommand::StarControlRequestByName(request) => {
-                    if let Option::Some(key) = self.star_names.get(&request.name) {
-                        if let Option::Some(ctrl) = self.star_controllers.get(key) {
+                    if let Ok(Option::Some(key)) = self.star_names.get(request.name).await {
+                        if let Ok(Option::Some(ctrl)) = self.star_controllers.get(key).await {
                             request.tx.send(StarlaneApi::new(ctrl.star_tx.clone()));
                         }
                     }
@@ -133,14 +194,158 @@ impl Starlane {
                         constellation: "standalone".to_string(),
                         star: "mesh".to_string()
                     };
-                    if let Option::Some(key) = self.star_names.get(&star_name) {
-                        if let Option::Some(ctrl) = self.star_controllers.get(key) {
+                    if let Ok(Option::Some(key)) = self.star_names.get(star_name).await {
+                        if let Ok(Option::Some(ctrl)) = self.star_controllers.get(key).await {
                             self.add_server_side_lane_ctrl(ctrl.clone(), stream).await;
                         }
                     }
                 }
             }
         }
+    }
+    async fn constellation_create(
+        &mut self,
+        layout : ConstellationLayout,
+        name: Option<String>,
+    ) -> Result<(), Error> {
+
+        println!("GOT HERE!");
+
+        // create a list of all the machines we need to be able to create external/network lanes too
+        let mut machines = vec![];
+        for star_template in layout.template.stars.clone() {
+            if let StarKeySubgraphTemplate::SubgraphKey(machine) = star_template.key.subgraph {
+                machines.push(machine);
+            }
+        }
+
+        for machine in machines {
+            let host_address = match layout.machine_to_host_address.get(&machine) {
+                None => format!("{}:{}", machine, (DEFAULT_PORT.clone() as usize).to_string()),
+                Some(host_address) => host_address.clone()
+            };
+
+
+
+        }
+        unimplemented!();
+
+        /*
+        let mut evolve_rxs = vec![];
+        for star_template in layout.template.stars.clone() {
+
+
+            println!("ABOUT TO CREATE ...!");
+            let star_key = star_template.key.create(&data)?;
+            println!("AND GOT HERE!");
+            let (mut evolve_tx, mut evolve_rx) = oneshot::channel();
+            evolve_rxs.push(evolve_rx);
+
+            let (star_tx, star_rx) = mpsc::channel(32);
+            if self.artifact_caches.is_none() {
+                let api = StarlaneApi::new(star_tx.clone());
+                let caches = Arc::new(ProtoArtifactCachesFactory::new(
+                    api.into(),
+                    self.cache_access.clone(),
+                )?);
+                self.artifact_caches = Option::Some(caches);
+            }
+            println!("EVEN HERE!");
+
+            let (proto_star, star_ctrl) = ProtoStar::new(
+                star_key.clone(),
+                star_template.kind.clone(),
+                star_tx,
+                star_rx,
+                self.artifact_caches
+                    .as_ref()
+                    .ok_or("already established that caches exists, what gives?")?
+                    .clone(),
+                self.data_access.clone(),
+                self.star_manager_factory.clone(),
+                self.core_runner.clone(),
+                self.flags.clone(),
+                self.logger.clone(),
+            );
+
+            let star_controllers = self.star_controllers.clone();
+            let star_names = self.star_names.clone();
+            let name = name.clone();
+            println!("created proto star: {:?}", &star_template.kind);
+
+            tokio::spawn(async move {
+                let star = proto_star.evolve().await;
+                if let Ok(star) = star {
+                    let key = star.star_key().clone();
+
+                    star_controllers
+                        .put(key.clone(), star_ctrl.clone());
+                    if name.is_some() && star_template.handle.is_some() {
+                        let name = StarName {
+                            constellation: name.as_ref().unwrap().clone(),
+                            star: star_template.handle.as_ref().unwrap().clone(),
+                        };
+                        println!("inserting star {}.{}",name.constellation.clone(),name.star.clone());
+                        star_names.put(name.clone(), key.clone()).await;
+                    }
+
+                    let star_tx = star.star_tx();
+                    tokio::spawn(async move {
+                        star.run().await;
+                    });
+                    evolve_tx.send(ProtoStarEvolution {
+                        star: key.clone(),
+                        controller: StarController { star_tx: star_tx },
+                    });
+                    println!(
+                        "created star: {:?} key: {}",
+                        &star_template.kind,
+                        &key.to_string()
+                    );
+                } else {
+                    eprintln!("experienced serious error could not evolve the proto_star");
+                }
+            });
+        }
+
+        // now make the LANES
+        for star_template in &template.stars {
+            for lane in &star_template.lanes {
+                let local = star_template.key.create(&data)?;
+                let second = lane.star.create(&data)?;
+
+                // since these are all local we should be able to unwrap
+                self.add_local_lane(local.unwrap(), second.unwrap()).await?;
+            }
+        }
+
+        // announce that the constellations is now complete
+        for star_template in &template.stars {
+            if let Ok(Option::Some(star_ctrl)) = self
+                .star_controllers
+                .get(star_template.key.create(&data)?.unwrap() ).await
+            {
+                star_ctrl
+                    .star_tx
+                    .send(StarCommand::ConstellationConstructionComplete)
+                    .await;
+            }
+        }
+
+        let evolutions = join_all(evolve_rxs).await;
+
+        for evolve in evolutions {
+            if let Ok(evolve) = evolve {
+                evolve.controller.star_tx.send(StarCommand::Init).await;
+                self.star_controllers.put(evolve.star, evolve.controller);
+            } else if let Err(error) = evolve {
+                return Err(error.to_string().into());
+            }
+        }
+
+        Ok(())
+
+         */
     }
 
     fn listen(&mut self) {
@@ -150,6 +355,7 @@ impl Starlane {
 
         self.listening = true;
         let port = self.port.clone();
+        let tx = self.tx.clone();
         tokio::spawn( async move {
 
             let std_listener = std::net::TcpListener::bind(format!("127.0.0.1:{}",port)).unwrap();
@@ -157,7 +363,7 @@ impl Starlane {
 println!("LISTENING!");
             while let Ok((mut stream,_)) = listener.accept().await {
 println!("new client!");
-
+                tx.send( StarlaneCommand::AddStream(stream) ).await;
             }
             eprintln!("TCP LISTENER TERMINATED");
         } );
@@ -165,22 +371,23 @@ println!("new client!");
 
 
 
-    pub fn caches(&self) -> Result<Arc<ProtoCacheFactory>, Error> {
+    pub fn caches(&self) -> Result<Arc<ProtoArtifactCachesFactory>, Error> {
         Ok(self
-            .caches
+            .artifact_caches
             .as_ref()
             .ok_or("expected caches to be set")?
             .clone())
     }
 
     async fn lookup_star_address(&self, key: &StarKey) -> Result<StarAddress, Error> {
-        if self.star_controllers.contains_key(key) {
+        if self.star_controllers.contains(key.clone()).await? {
             Ok(StarAddress::Local)
         } else {
             Err(format!("could not find address for starkey: {}", key.to_string()).into())
         }
     }
 
+    /*
     async fn provision_link(
         &mut self,
         template: ConstellationTemplate,
@@ -196,13 +403,13 @@ println!("new client!");
         let (mut evolve_tx, mut evolve_rx) = oneshot::channel();
         let (star_tx, star_rx) = mpsc::channel(32);
 
-        if self.caches.is_none() {
+        if self.artifact_caches.is_none() {
             let api = StarlaneApi::new(star_tx.clone());
-            let caches = Arc::new(ProtoCacheFactory::new(
+            let caches = Arc::new(ProtoArtifactCachesFactory::new(
                 api.into(),
                 self.cache_access.clone(),
             )?);
-            self.caches = Option::Some(caches);
+            self.artifact_caches = Option::Some(caches);
         }
 
         let (proto_star, star_ctrl) = ProtoStar::new(
@@ -210,7 +417,7 @@ println!("new client!");
             link.kind.clone(),
             star_tx,
             star_rx,
-            self.caches
+            self.artifact_caches
                 .clone()
                 .ok_or("already established that caches exists, what gives?")?,
             self.data_access.clone(),
@@ -233,7 +440,7 @@ println!("new client!");
                 let (tx, rx) = oneshot::channel();
                 starlane_ctrl.send(StarlaneCommand::ConstellationCreate(ConstellationCreate {
                     name: Option::None,
-                    template: template,
+                    layout: template,
                     data: data,
                     tx: tx,
                 }));
@@ -255,7 +462,7 @@ println!("new client!");
             ConnectionKind::Starlane => {
                 let high_star_ctrl = star_ctrl.clone();
                 let low_star_ctrl = {
-                    let low_star_ctrl = self.star_controllers.get_mut(&connection_info.gateway);
+                    let low_star_ctrl = self.star_controllers.get(connection_info.gateway.clone()).await?;
                     match low_star_ctrl {
                         None => {
                             return Err(format!(
@@ -282,7 +489,7 @@ println!("new client!");
         }
 
         if let Ok(evolve) = evolve_rx.await {
-            self.star_controllers.insert(evolve.star, evolve.controller);
+            self.star_controllers.put(evolve.star, evolve.controller).await;
         } else {
             eprintln!("got an error message on protostarevolution")
         }
@@ -291,135 +498,14 @@ println!("new client!");
 
         Ok(())
     }
+    */
 
-    async fn constellation_create(
-        &mut self,
-        template: ConstellationTemplate,
-        data: ConstellationData,
-        name: Option<String>,
-    ) -> Result<(), Error> {
-        if name.is_some() && self.constellation_names.contains(name.as_ref().unwrap()) {
-            return Err(format!(
-                "a constellation named: {} already exists!",
-                name.as_ref().unwrap()
-            )
-            .into());
-        }
 
-        let mut evolve_rxs = vec![];
-        for star_template in template.stars.clone() {
-            if let Some(handle) = &star_template.handle {
-                if data.exclude_handles.contains(handle) {
-                    println!("skipping handle: {}", handle);
-                    continue;
-                }
-            }
-
-            let star_key = star_template.key.create(&data)?;
-            let (mut evolve_tx, mut evolve_rx) = oneshot::channel();
-            evolve_rxs.push(evolve_rx);
-
-            let (star_tx, star_rx) = mpsc::channel(32);
-            if self.caches.is_none() {
-                let api = StarlaneApi::new(star_tx.clone());
-                let caches = Arc::new(ProtoCacheFactory::new(
-                    api.into(),
-                    self.cache_access.clone(),
-                )?);
-                self.caches = Option::Some(caches);
-            }
-
-            let (proto_star, star_ctrl) = ProtoStar::new(
-                Option::Some(star_key.clone()),
-                star_template.kind.clone(),
-                star_tx,
-                star_rx,
-                self.caches
-                    .as_ref()
-                    .ok_or("already established that caches exists, what gives?")?
-                    .clone(),
-                self.data_access.clone(),
-                self.star_manager_factory.clone(),
-                self.core_runner.clone(),
-                self.flags.clone(),
-                self.logger.clone(),
-            );
-
-            self.star_controllers
-                .insert(star_key.clone(), star_ctrl.clone());
-            if name.is_some() && star_template.handle.is_some() {
-                let name = StarName {
-                    constellation: name.as_ref().unwrap().clone(),
-                    star: star_template.handle.as_ref().unwrap().clone(),
-                };
-                self.star_names.insert(name, star_key.clone());
-            }
-            println!("created proto star: {:?}", &star_template.kind);
-
-            tokio::spawn(async move {
-                let star = proto_star.evolve().await;
-                if let Ok(star) = star {
-                    let key = star.star_key().clone();
-                    let star_tx = star.star_tx();
-                    tokio::spawn(async move {
-                        star.run().await;
-                    });
-                    evolve_tx.send(ProtoStarEvolution {
-                        star: key,
-                        controller: StarController { star_tx: star_tx },
-                    });
-                    println!(
-                        "created star: {:?} key: {}",
-                        &star_template.kind,
-                        star_key.to_string()
-                    );
-                } else {
-                    eprintln!("experienced serious error could not evolve the proto_star");
-                }
-            });
-        }
-
-        // now make the LANES
-        for star_template in &template.stars {
-            for lane in &star_template.lanes {
-                let local = star_template.key.create(&data)?;
-                let second = lane.star.create(&data)?;
-
-                self.add_local_lane(local, second).await?;
-            }
-        }
-
-        // announce that the constellations is now complete
-        for star_template in &template.stars {
-            if let Option::Some(star_ctrl) = self
-                .star_controllers
-                .get_mut(&star_template.key.create(&data)?)
-            {
-                star_ctrl
-                    .star_tx
-                    .send(StarCommand::ConstellationConstructionComplete)
-                    .await;
-            }
-        }
-
-        let evolutions = join_all(evolve_rxs).await;
-
-        for evolve in evolutions {
-            if let Ok(evolve) = evolve {
-                evolve.controller.star_tx.send(StarCommand::Init).await;
-                self.star_controllers.insert(evolve.star, evolve.controller);
-            } else if let Err(error) = evolve {
-                return Err(error.to_string().into());
-            }
-        }
-
-        Ok(())
-    }
 
     async fn add_local_lane(&mut self, local: StarKey, second: StarKey) -> Result<(), Error> {
         let (high, low) = StarKey::sort(local, second)?;
         let high_star_ctrl = {
-            let high_star_ctrl = self.star_controllers.get_mut(&high);
+            let high_star_ctrl = self.star_controllers.get(high.clone()).await?;
             match high_star_ctrl {
                 None => {
                     return Err(format!(
@@ -433,7 +519,7 @@ println!("new client!");
         };
 
         let low_star_ctrl = {
-            let low_star_ctrl = self.star_controllers.get_mut(&low);
+            let low_star_ctrl = self.star_controllers.get(low.clone()).await?;
             match low_star_ctrl {
                 None => {
                     return Err(format!(
@@ -498,10 +584,33 @@ println!("new client!");
     }
 
 
+    async fn add_client_side_lane_ctrl(
+        &mut self,
+        star_ctrl: StarController,
+        host: String
+    ) -> Result<ConnectorController, Error> {
+        let lane = Lane::new(Option::None ).await;
+
+        let ctrl = ClientSideTunnelConnector::new(&lane,host).await?;
+
+        star_ctrl
+            .star_tx
+            .send(StarCommand::AddLane(lane))
+            .await?;
+
+        Ok(ctrl)
+    }
+
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct VersionFrame {
+    product: String,
+    version: String
 }
 
 pub enum StarlaneCommand {
-    Connect(ConnectCommand),
+    Connect{ host: String, star_name: StarName, tx: oneshot::Sender<Result<ConnectorController,Error>>},
     ConstellationCreate(ConstellationCreate),
     StarControlRequestByKey(StarlaneApiRequestByKey),
     StarControlRequestByName(StarlaneApiRequestByName),
@@ -538,37 +647,21 @@ impl StarlaneApiRequestByName {
 
 pub struct ConstellationCreate {
     name: Option<String>,
-    template: ConstellationTemplate,
-    data: ConstellationData,
+    layout: ConstellationLayout,
     tx: oneshot::Sender<Result<(), Error>>,
 }
 
-pub struct ConnectCommand {
-    pub key: StarKey,
-    pub oneshot: oneshot::Sender<Result<StarAddress, Error>>,
-}
-
-impl ConnectCommand {
-    pub fn new(key: StarKey, oneshot: oneshot::Sender<Result<StarAddress, Error>>) -> Self {
-        ConnectCommand {
-            key: key,
-            oneshot: oneshot,
-        }
-    }
-}
 
 impl ConstellationCreate {
     pub fn new(
-        template: ConstellationTemplate,
-        data: ConstellationData,
+        layout: ConstellationLayout,
         name: Option<String>,
     ) -> (Self, oneshot::Receiver<Result<(), Error>>) {
         let (tx, rx) = oneshot::channel();
         (
             ConstellationCreate {
                 name: name,
-                template: template,
-                data: data,
+                layout: layout,
                 tx: tx,
             },
             rx,
@@ -605,9 +698,9 @@ mod test {
     use crate::star::{StarController, StarInfo, StarKey, StarKind};
     use crate::starlane::api::SubSpaceApi;
     use crate::starlane::{
-        ConstellationCreate, Starlane, StarlaneApiRequestByName, StarlaneCommand,
+        ConstellationCreate, StarlaneMachineRunner, StarlaneApiRequestByName, StarlaneCommand,
     };
-    use crate::template::{ConstellationData, ConstellationTemplate};
+    use crate::template::{ConstellationLayout, ConstellationTemplate};
     use std::convert::TryInto;
     use std::fs;
     use std::fs::File;
@@ -624,7 +717,7 @@ mod test {
 
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let mut starlane = Starlane::new().unwrap();
+            let mut starlane = StarlaneMachineRunner::new("server".to_string() ).unwrap();
             starlane.flags.on(Flag::Star(StarFlag::DiagnosePledge));
             let mut agg = LogAggregate::new();
             agg.watch(starlane.logger.clone()).await;
@@ -636,8 +729,7 @@ mod test {
 
             {
                 let (command, mut rx) = ConstellationCreate::new(
-                    ConstellationTemplate::new_standalone(),
-                    ConstellationData::new(),
+                    ConstellationLayout::standalone().unwrap(),
                     Option::Some("standalone".to_owned()),
                 );
                 tx.send(StarlaneCommand::ConstellationCreate(command)).await;

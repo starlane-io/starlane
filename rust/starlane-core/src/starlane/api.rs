@@ -1,7 +1,7 @@
 use std::convert::{TryFrom, TryInto};
 use std::time::Duration;
 
-use crate::cache::ProtoCacheFactory;
+use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
 use crate::frame::ChildManagerResourceAction::Register;
 use crate::frame::{ChildManagerResourceAction, Reply, SimpleReply, StarMessagePayload};
@@ -86,7 +86,7 @@ impl StarlaneApi {
         rx.await?
     }
 
-    pub async fn get_caches(&self) -> Result<Arc<ProtoCacheFactory>, Fail> {
+    pub async fn get_caches(&self) -> Result<Arc<ProtoArtifactCachesFactory>, Fail> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.star_tx.send(StarCommand::GetCaches(tx)).await;
         Ok(rx.await?)

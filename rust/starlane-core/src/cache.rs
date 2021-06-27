@@ -46,70 +46,70 @@ pub trait Cacheable: Send + Sync + 'static {
     fn references(&self) -> Vec<ArtifactRef>;
 }
 
-pub struct ProtoCacheFactory {
-    root_caches: Arc<RootCaches>,
+pub struct ProtoArtifactCachesFactory {
+    root_caches: Arc<RootArtifactCaches>,
 }
 
-impl ProtoCacheFactory {
+impl ProtoArtifactCachesFactory {
     pub fn new(
         src: ArtifactBundleSrc,
         file_access: FileAccess,
-    ) -> Result<ProtoCacheFactory, Error> {
+    ) -> Result<ProtoArtifactCachesFactory, Error> {
         let bundle_cache = ArtifactBundleCache::new(src, file_access, AuditLogger::new())?;
         Ok(Self {
-            root_caches: Arc::new(RootCaches::new(bundle_cache)),
+            root_caches: Arc::new(RootArtifactCaches::new(bundle_cache)),
         })
     }
 
-    pub fn create(&self) -> ProtoCaches {
-        ProtoCaches::new(self.root_caches.clone())
+    pub fn create(&self) -> ProtoArtifactCaches {
+        ProtoArtifactCaches::new(self.root_caches.clone())
     }
 }
 
-pub struct Caches {
-    pub domain_configs: ItemCache<DomainConfig>,
+pub struct ArtifactCaches {
+    pub domain_configs: ArtifactItemCache<DomainConfig>,
 }
 
-impl Caches {
+impl ArtifactCaches {
     fn new() -> Self {
-        Caches {
-            domain_configs: ItemCache::new(),
+        ArtifactCaches {
+            domain_configs: ArtifactItemCache::new(),
         }
     }
 }
 
-pub struct ItemCache<C: Cacheable> {
-    map: HashMap<ArtifactAddress, Item<C>>,
+pub struct ArtifactItemCache<C: Cacheable> {
+    map: HashMap<ArtifactAddress, ArtifactItem<C>>,
 }
 
-impl<C: Cacheable> ItemCache<C> {
+impl<C: Cacheable> ArtifactItemCache<C> {
     fn new() -> Self {
         Self {
             map: HashMap::new(),
         }
     }
 
-    pub fn get(&self, artifact: &ArtifactAddress) -> Option<Item<C>> {
+    pub fn get(&self, artifact: &ArtifactAddress) -> Option<ArtifactItem<C>> {
         self.map.get(&artifact).cloned()
     }
 
-    fn add(&mut self, item: Item<C>) {
+    fn add(&mut self, item: ArtifactItem<C>) {
         self.map.insert(item.artifact().address, item);
     }
 }
 
-pub struct ProtoCaches {
-    root_caches: Arc<RootCaches>,
-    proc_tx: mpsc::Sender<ProtoCacheCall>,
+pub struct ProtoArtifactCaches {
+    root_caches: Arc<RootArtifactCaches>,
+    proc_tx: mpsc::Sender<ProtoArtifactCall>,
     claims: AsyncHashMap<ArtifactRef, Claim>,
 }
 
-impl ProtoCaches {
-    fn new(root_caches: Arc<RootCaches>) -> Self {
+impl ProtoArtifactCaches {
+    fn new(root_caches: Arc<RootArtifactCaches>) -> Self {
         let claims = AsyncHashMap::new();
         let (proc_tx, proc_rx) = mpsc::channel(1024);
         AsyncRunner::new(
-            Box::new(ProtoCacheProc::new(
+            Box::new(ProtoArtifactCacheProc::new(
                 root_caches.clone(),
                 claims.clone(),
                 proc_tx.clone(),
@@ -118,7 +118,7 @@ impl ProtoCaches {
             proc_rx,
         );
 
-        ProtoCaches {
+        ProtoArtifactCaches {
             root_caches: root_caches,
             proc_tx: proc_tx,
             claims,
@@ -128,13 +128,13 @@ impl ProtoCaches {
     pub async fn cache(&mut self, artifacts: Vec<ArtifactRef>) -> Result<(), Error> {
         let (tx, rx) = oneshot::channel();
         self.proc_tx
-            .send(ProtoCacheCall::Cache { artifacts, tx })
+            .send(ProtoArtifactCall::Cache { artifacts, tx })
             .await;
         rx.await?
     }
 
-    pub async fn to_caches(self) -> Result<Caches, Error> {
-        let mut caches = Caches::new();
+    pub async fn to_caches(self) -> Result<ArtifactCaches, Error> {
+        let mut caches = ArtifactCaches::new();
         let claims = self.claims.into_map().await?;
 
         for (artifact, claim) in claims {
@@ -151,28 +151,28 @@ impl ProtoCaches {
     }
 }
 
-enum ProtoCacheCall {
+enum ProtoArtifactCall {
     Cache {
         artifacts: Vec<ArtifactRef>,
         tx: oneshot::Sender<Result<(), Error>>,
     },
 }
 
-impl Call for ProtoCacheCall {}
+impl Call for ProtoArtifactCall {}
 
-struct ProtoCacheProc {
-    proc_tx: mpsc::Sender<ProtoCacheCall>,
+struct ProtoArtifactCacheProc {
+    proc_tx: mpsc::Sender<ProtoArtifactCall>,
     claims: AsyncHashMap<ArtifactRef, Claim>,
-    root_caches: Arc<RootCaches>,
+    root_caches: Arc<RootArtifactCaches>,
 }
 
-impl ProtoCacheProc {
+impl ProtoArtifactCacheProc {
     fn new(
-        root_caches: Arc<RootCaches>,
+        root_caches: Arc<RootArtifactCaches>,
         claims: AsyncHashMap<ArtifactRef, Claim>,
-        proc_tx: mpsc::Sender<ProtoCacheCall>,
+        proc_tx: mpsc::Sender<ProtoArtifactCall>,
     ) -> Self {
-        ProtoCacheProc {
+        ProtoArtifactCacheProc {
             proc_tx,
             root_caches,
             claims,
@@ -180,8 +180,8 @@ impl ProtoCacheProc {
     }
 
     async fn cache(
-        proc_tx: mpsc::Sender<ProtoCacheCall>,
-        root_caches: Arc<RootCaches>,
+        proc_tx: mpsc::Sender<ProtoArtifactCall>,
+        root_caches: Arc<RootArtifactCaches>,
         claims: AsyncHashMap<ArtifactRef, Claim>,
         artifacts: Vec<ArtifactRef>,
     ) -> Result<(), Error> {
@@ -201,7 +201,7 @@ impl ProtoCacheProc {
         if !more.is_empty() {
             let (sub_tx, sub_rx) = oneshot::channel();
             proc_tx
-                .send(ProtoCacheCall::Cache {
+                .send(ProtoArtifactCall::Cache {
                     artifacts: more,
                     tx: sub_tx,
                 })
@@ -215,16 +215,16 @@ impl ProtoCacheProc {
 }
 
 #[async_trait]
-impl AsyncProcessor<ProtoCacheCall> for ProtoCacheProc {
-    async fn process(&mut self, call: ProtoCacheCall) {
+impl AsyncProcessor<ProtoArtifactCall> for ProtoArtifactCacheProc {
+    async fn process(&mut self, call: ProtoArtifactCall) {
         match call {
-            ProtoCacheCall::Cache { artifacts, tx } => {
+            ProtoArtifactCall::Cache { artifacts, tx } => {
                 let proc_tx = self.proc_tx.clone();
                 let root_caches = self.root_caches.clone();
                 let claims = self.claims.clone();
                 tokio::spawn(async move {
                     tx.send(
-                        ProtoCacheProc::cache(
+                        ProtoArtifactCacheProc::cache(
                             proc_tx.clone(),
                             root_caches.clone(),
                             claims.clone(),
@@ -594,7 +594,7 @@ impl<C: Cacheable> RootItemCache<C> {
         Self { tx: tx }
     }
 
-    pub async fn cache(&self, artifact: ArtifactRef) -> Result<Item<C>, Error> {
+    pub async fn cache(&self, artifact: ArtifactRef) -> Result<ArtifactItem<C>, Error> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(RootItemCacheCall::Cache { artifact, tx })
@@ -602,7 +602,7 @@ impl<C: Cacheable> RootItemCache<C> {
         rx.await?
     }
 
-    pub async fn get(&self, artifact: ArtifactRef) -> Result<Item<C>, Error> {
+    pub async fn get(&self, artifact: ArtifactRef) -> Result<ArtifactItem<C>, Error> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(RootItemCacheCall::Get { artifact, tx })
@@ -613,12 +613,12 @@ impl<C: Cacheable> RootItemCache<C> {
 
 impl<C: Cacheable> Call for RootItemCacheCall<C> {}
 
-pub struct Item<C: Cacheable> {
+pub struct ArtifactItem<C: Cacheable> {
     item: Arc<C>,
     ref_tx: mpsc::Sender<RootItemCacheCall<C>>,
 }
 
-impl<C: Cacheable> Item<C> {
+impl<C: Cacheable> ArtifactItem<C> {
     fn new(item: Arc<C>, ref_tx: mpsc::Sender<RootItemCacheCall<C>>) -> Self {
         let ref_tx_cp = ref_tx.clone();
         let item_cp = item.clone();
@@ -630,14 +630,14 @@ impl<C: Cacheable> Item<C> {
                 })
                 .await;
         });
-        Item {
+        ArtifactItem {
             item: item,
             ref_tx: ref_tx,
         }
     }
 }
 
-impl<C: Cacheable> Deref for Item<C> {
+impl<C: Cacheable> Deref for ArtifactItem<C> {
     type Target = Arc<C>;
 
     fn deref(&self) -> &Self::Target {
@@ -645,9 +645,9 @@ impl<C: Cacheable> Deref for Item<C> {
     }
 }
 
-impl<C: Cacheable> Clone for Item<C> {
+impl<C: Cacheable> Clone for ArtifactItem<C> {
     fn clone(&self) -> Self {
-        Item::new(self.item.clone(), self.ref_tx.clone())
+        ArtifactItem::new(self.item.clone(), self.ref_tx.clone())
     }
 }
 
@@ -656,7 +656,7 @@ enum ClaimCall {
     Decrement,
 }
 
-impl<C: Cacheable> Into<Claim> for Item<C> {
+impl<C: Cacheable> Into<Claim> for ArtifactItem<C> {
     fn into(self) -> Claim {
         let (tx, mut rx) = mpsc::channel(1);
         let item = self.item.clone();
@@ -743,11 +743,11 @@ impl Drop for Claim {
 pub enum RootItemCacheCall<C: Cacheable> {
     Cache {
         artifact: ArtifactRef,
-        tx: oneshot::Sender<Result<Item<C>, Error>>,
+        tx: oneshot::Sender<Result<ArtifactItem<C>, Error>>,
     },
     Get {
         artifact: ArtifactRef,
-        tx: oneshot::Sender<Result<Item<C>, Error>>,
+        tx: oneshot::Sender<Result<ArtifactItem<C>, Error>>,
     },
     Increment {
         artifact: ArtifactRef,
@@ -756,14 +756,14 @@ pub enum RootItemCacheCall<C: Cacheable> {
     Decrement(ArtifactRef),
     Signal {
         artifact: ArtifactRef,
-        result: Result<Item<C>, Error>,
+        result: Result<ArtifactItem<C>, Error>,
     },
 }
 
 struct RootItemCacheProc<C: Cacheable> {
     bundle_cache: ArtifactBundleCache,
     map: HashMap<ArtifactRef, RefCount<C>>,
-    signal_map: HashMap<ArtifactRef, Vec<oneshot::Sender<Result<Item<C>, Error>>>>,
+    signal_map: HashMap<ArtifactRef, Vec<oneshot::Sender<Result<ArtifactItem<C>, Error>>>>,
     parser: Arc<dyn Parser<C>>,
     proc_tx: mpsc::Sender<RootItemCacheCall<C>>,
 }
@@ -813,7 +813,7 @@ impl<C: Cacheable> AsyncProcessor<RootItemCacheCall<C>> for RootItemCacheProc<C>
             RootItemCacheCall::Cache { artifact, tx } => {
                 if self.map.contains_key(&artifact) {
                     let item = self.map.get(&artifact).unwrap().reference.clone();
-                    tx.send(Ok(Item::new(item, self.proc_tx.clone())));
+                    tx.send(Ok(ArtifactItem::new(item, self.proc_tx.clone())));
                 } else {
                     if self.signal_map.contains_key(&artifact) {
                         self.signal_map.get_mut(&artifact).unwrap().push(tx);
@@ -839,12 +839,12 @@ impl<C: Cacheable> AsyncProcessor<RootItemCacheCall<C>> for RootItemCacheProc<C>
 }
 
 impl<C: Cacheable> RootItemCacheProc<C> {
-    fn get(&self, artifact: ArtifactRef) -> Result<Item<C>, Error> {
+    fn get(&self, artifact: ArtifactRef) -> Result<ArtifactItem<C>, Error> {
         let ref_count = self.map.get(&artifact).ok_or(format!(
             "could not find artifact: '{}'",
             artifact.address.to_string()
         ))?;
-        Ok(Item::new(ref_count.reference.clone(), self.proc_tx.clone()))
+        Ok(ArtifactItem::new(ref_count.reference.clone(), self.proc_tx.clone()))
     }
 
     async fn cache(&self, artifact: ArtifactRef) {
@@ -859,7 +859,7 @@ impl<C: Cacheable> RootItemCacheProc<C> {
                     proc_tx
                         .send(RootItemCacheCall::Signal {
                             artifact,
-                            result: Ok(Item::new(item, proc_tx.clone())),
+                            result: Ok(ArtifactItem::new(item, proc_tx.clone())),
                         })
                         .await;
                 }
@@ -892,12 +892,12 @@ impl<C: Cacheable> RootItemCacheProc<C> {
     }
 }
 
-struct RootCaches {
+struct RootArtifactCaches {
     bundle_cache: ArtifactBundleCache,
     domain_configs: RootItemCache<DomainConfig>,
 }
 
-impl RootCaches {
+impl RootArtifactCaches {
     fn new(bundle_cache: ArtifactBundleCache) -> Self {
         Self {
             bundle_cache: bundle_cache.clone(),
@@ -1017,7 +1017,7 @@ mod test {
     use crate::artifact::{ArtifactAddress, ArtifactKind, ArtifactRef};
     use crate::cache::{
         ArtifactBundleCache, ArtifactBundleSrc, AuditLogger, MockArtifactBundleSrc,
-        ProtoCacheFactory, RootCaches, RootItemCache,
+        ProtoArtifactCachesFactory, RootArtifactCaches, RootItemCache,
     };
     use crate::error::Error;
     use crate::file_access::FileAccess;
@@ -1053,7 +1053,7 @@ mod test {
     }
 
     pub async fn proto_caches() -> Result<(), Error> {
-        let factory = ProtoCacheFactory::new(
+        let factory = ProtoArtifactCachesFactory::new(
             MockArtifactBundleSrc::new()?.into(),
             FileAccess::new("tmp/cache".to_string())?,
         )?;
@@ -1086,7 +1086,7 @@ mod test {
             kind: ArtifactKind::DomainConfig,
         };
 
-        let root_caches = RootCaches::new(bundle_cache);
+        let root_caches = RootArtifactCaches::new(bundle_cache);
 
         let rtn = root_caches.domain_configs.cache(artifact).await;
         assert!(rtn.is_ok());

@@ -9,6 +9,7 @@ use crate::proto::{local_tunnels, ProtoStar, ProtoTunnel};
 use crate::star::{Star, StarKey};
 
 pub struct Constellation {
+    pub name: String,
     pub stars: Vec<Arc<Star>>,
 }
 

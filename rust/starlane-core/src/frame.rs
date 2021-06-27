@@ -40,7 +40,9 @@ pub enum Frame {
     StarMessage(StarMessage),
     Watch(Watch),
     Event(Event),
+    Ping
 }
+
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum StarWind {
@@ -641,6 +643,7 @@ impl fmt::Display for Frame {
             Frame::StarWind(wind) => format!("StarWind({})", wind).to_string(),
             Frame::Watch(_) => format!("Watch").to_string(),
             Frame::Event(_) => format!("ActorEvent").to_string(),
+            Frame::Ping => "Ping".to_string()
         };
         write!(f, "{}", r)
     }

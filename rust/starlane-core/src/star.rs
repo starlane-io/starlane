@@ -30,7 +30,7 @@ use variant::central::CentralVariant;
 use variant::StarVariant;
 
 use crate::actor::{ActorKey, ActorKind};
-use crate::cache::ProtoCacheFactory;
+use crate::cache::ProtoArtifactCachesFactory;
 use crate::core::{StarCoreAction, StarCoreCommand, StarCoreResult};
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
@@ -655,6 +655,9 @@ impl Star {
                 match command {
                     StarCommand::Init => {
                         self.init().await;
+                    }
+                    StarCommand::GetStarKey(tx) => {
+                        tx.send( Option::Some(self.skel.info.key.clone()) );
                     }
                     StarCommand::SetFlags(set_flags) => {
                         self.skel.flags = set_flags.flags;
@@ -2332,7 +2335,7 @@ pub enum StarCommand {
     SendProtoMessage(ProtoStarMessage),
     SetFlags(SetFlags),
     ReleaseHold(StarKey),
-
+    GetStarKey(oneshot::Sender<Option<StarKey>>),
     WindInit(Wind),
     WindCommit(WindCommit),
     WindDown(WindDown),
@@ -2352,7 +2355,7 @@ pub enum StarCommand {
     ResourceRecordRequestFromStar(Request<(ResourceIdentifier, StarKey), ResourceRecord>),
     ResourceRecordSet(Set<ResourceRecord>),
 
-    GetCaches(oneshot::Sender<Arc<ProtoCacheFactory>>),
+    GetCaches(oneshot::Sender<Arc<ProtoArtifactCachesFactory>>),
 }
 
 pub enum Diagnose {
@@ -2577,6 +2580,7 @@ impl fmt::Display for StarCommand {
             }
             StarCommand::SetStatus(_) => "StarStatus".to_string(),
             StarCommand::GetCaches(_) => "GetCaches".to_string(),
+            StarCommand::GetStarKey(_) => "GetStarKey".to_string()
         };
         write!(f, "{}", r)
     }
@@ -2606,6 +2610,12 @@ impl StarController {
             .send(StarCommand::Diagnose(Diagnose::HandlersSatisfied(yesno)))
             .await;
         Ok(tokio::time::timeout(Duration::from_secs(5), rx).await??)
+    }
+
+    pub async fn get_star_key( &self )->Result<Option<StarKey>,Error> {
+        let (tx,rx) = oneshot::channel();
+        self.star_tx.send(StarCommand::GetStarKey(tx)).await;
+        Ok(rx.await?)
     }
 }
 
@@ -2989,7 +2999,7 @@ pub struct StarSkel {
     pub star_handler: Option<StarHandleBacking>,
     pub persistence: Persistence,
     pub data_access: FileAccess,
-    pub caches: Arc<ProtoCacheFactory>,
+    pub caches: Arc<ProtoArtifactCachesFactory>,
 }
 
 impl StarSkel {
