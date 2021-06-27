@@ -1,10 +1,13 @@
-use crate::error::Error;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::future::Future;
 use std::hash::Hash;
-use tokio::sync::mpsc::{Receiver, Sender};
+
 use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::Duration;
+
+use crate::error::Error;
 
 pub struct Progress<E> {
     rx: Receiver<E>,
@@ -187,5 +190,20 @@ impl<C: Call> AsyncRunner<C> {
             self.processor.process(call).await;
         }
         println!("ASync Runner terminated");
+    }
+}
+
+pub fn sort<T:Ord+PartialOrd+ToString>(a: T, b: T) -> Result<(T, T), Error> {
+    if a == b {
+        Err(format!(
+            "both items are equal. {}=={}",
+            a.to_string(),
+            b.to_string()
+        )
+            .into())
+    } else if a.cmp(&b) == Ordering::Greater {
+        Ok((a, b))
+    } else {
+        Ok((b, a))
     }
 }

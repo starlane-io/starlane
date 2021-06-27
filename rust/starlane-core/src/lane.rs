@@ -28,22 +28,24 @@ use crate::star::{Star, StarCommand, StarKey};
 use crate::starlane::{StarlaneCommand, VersionFrame};
 use crate::starlane::StarlaneCommand::Connect;
 use std::cell::Cell;
+use serde::de::DeserializeOwned;
+use crate::template::{ConstellationSelector, StarInConstellationTemplateHandle, StarInConstellationTemplateSelector};
 
 pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
 pub static LANE_QUEUE_SIZE: usize = 32;
 
 #[derive(Clone)]
-pub struct OutgoingLane {
+pub struct OutgoingSide {
     pub out_tx: Sender<LaneCommand>,
 }
 
-pub struct IncomingLane {
+pub struct IncomingSide {
     rx: Receiver<Frame>,
     tunnel_receiver_rx: Receiver<TunnelInState>,
     tunnel: TunnelInState,
 }
 
-impl IncomingLane {
+impl IncomingSide {
     pub async fn recv(&mut self) -> Option<StarCommand> {
         loop {
             match &mut self.tunnel {
@@ -73,14 +75,14 @@ impl IncomingLane {
     }
 }
 
-pub struct MidLane {
+pub struct LaneMiddle {
     rx: Receiver<LaneCommand>,
     tx: Sender<Frame>,
     tunnel: TunnelOutState,
     queue: Vec<Frame>,
 }
 
-impl MidLane {
+impl LaneMiddle {
     async fn die(&self, message: String) {
         eprintln!("{}", message.as_str());
     }
@@ -129,20 +131,20 @@ impl<T> Chamber<T> {
     }
 }
 
-pub struct Lane {
+pub struct LaneEndpoint {
     pub remote_star: Option<StarKey>,
-    pub incoming: IncomingLane,
-    pub outgoing: OutgoingLane,
+    pub incoming: IncomingSide,
+    pub outgoing: OutgoingSide,
     tunnel_receiver_tx: Sender<TunnelInState>,
 }
 
-impl Lane {
+impl LaneEndpoint {
     pub async fn new(remote_star: Option<StarKey>) -> Self {
         let (mid_tx, mid_rx) = mpsc::channel(LANE_QUEUE_SIZE);
         let (in_tx, in_rx) = mpsc::channel(LANE_QUEUE_SIZE);
         let (tunnel_receiver_tx, tunnel_receiver_rx) = mpsc::channel(1);
 
-        let midlane = MidLane {
+        let midlane = LaneMiddle {
             rx: mid_rx,
             tx: in_tx,
             tunnel: TunnelOutState::None,
@@ -153,15 +155,15 @@ impl Lane {
             midlane.run().await;
         });
 
-        Lane {
+        LaneEndpoint {
             remote_star: remote_star,
             tunnel_receiver_tx: tunnel_receiver_tx,
-            incoming: IncomingLane {
+            incoming: IncomingSide {
                 rx: in_rx,
                 tunnel_receiver_rx: tunnel_receiver_rx,
                 tunnel: TunnelInState::None,
             },
-            outgoing: OutgoingLane { out_tx: mid_tx },
+            outgoing: OutgoingSide { out_tx: mid_tx },
         }
     }
 
@@ -231,19 +233,21 @@ pub enum ConnectorCommand {
 }
 pub struct ClientSideTunnelConnector {
     pub in_tx: Sender<TunnelInState>,
-    pub out: OutgoingLane,
+    pub out: OutgoingSide,
     command_rx: Receiver<ConnectorCommand>,
-    host: String
+    host_address: String,
+    selector: StarInConstellationTemplateSelector
 }
 
 impl ClientSideTunnelConnector {
-    pub async fn new(lane: &Lane, host: String ) -> Result<ConnectorController, Error> {
+    pub async fn new(lane: &LaneEndpoint, host_address: String, selector: StarInConstellationTemplateSelector ) -> Result<ConnectorController, Error> {
         let (command_tx, command_rx) = mpsc::channel(1);
         let mut connector = Self {
             out: lane.outgoing.clone(),
             in_tx: lane.get_tunnel_in_tx(),
             command_rx,
-            host: host
+            host_address,
+            selector
         };
 
         tokio::spawn(async move { connector.run().await });
@@ -255,7 +259,7 @@ impl ClientSideTunnelConnector {
 
     async fn run(mut self) {
         loop {
-            if let Result::Ok(stream) = TcpStream::connect(self.host.clone()).await
+            if let Result::Ok(stream) = TcpStream::connect(self.host_address.clone()).await
             {
                 let (tx, rx) = FrameCodex::new(stream);
 
@@ -307,13 +311,13 @@ impl TunnelConnector for ClientSideTunnelConnector {
 
 pub struct ServerSideTunnelConnector {
     pub low_in_tx: Sender<TunnelInState>,
-    pub low: OutgoingLane,
+    pub low: OutgoingSide,
     command_rx: Receiver<ConnectorCommand>,
     stream : Cell<Option<TcpStream>>
 }
 
 impl ServerSideTunnelConnector {
-    pub async fn new(low_lane: &Lane, stream: TcpStream) -> Result<ConnectorController, Error> {
+    pub async fn new(low_lane: &LaneEndpoint, stream: TcpStream) -> Result<ConnectorController, Error> {
         let (command_tx, command_rx) = mpsc::channel(1);
         let mut connector = Self {
             low: low_lane.outgoing.clone(),
@@ -371,15 +375,15 @@ impl TunnelConnector for ServerSideTunnelConnector {
 pub struct LocalTunnelConnector {
     pub high_star: Option<StarKey>,
     pub low_star: Option<StarKey>,
-    pub high: OutgoingLane,
-    pub low: OutgoingLane,
+    pub high: OutgoingSide,
+    pub low: OutgoingSide,
     pub high_in_tx: Sender<TunnelInState>,
     pub low_in_tx: Sender<TunnelInState>,
     command_rx: Receiver<ConnectorCommand>,
 }
 
 impl LocalTunnelConnector {
-    pub async fn new(high_lane: &Lane, low_lane: &Lane) -> Result<ConnectorController, Error> {
+    pub async fn new(high_lane: &LaneEndpoint, low_lane: &LaneEndpoint) -> Result<ConnectorController, Error> {
         let high_star = low_lane.remote_star.clone();
         let low_star = high_lane.remote_star.clone();
         if high_star.cmp(&low_star) != Ordering::Greater {
@@ -471,11 +475,11 @@ impl TunnelConnector for LocalTunnelConnector {
 
 pub struct LaneMeta {
     pub star_paths: LruCache<StarKey, usize>,
-    pub lane: Lane,
+    pub lane: LaneEndpoint,
 }
 
 impl LaneMeta {
-    pub fn new(lane: Lane) -> Self {
+    pub fn new(lane: LaneEndpoint) -> Self {
         LaneMeta {
             star_paths: LruCache::new(32 * 1024),
             lane: lane,
@@ -518,7 +522,7 @@ pub struct FrameCodex{
 
 impl FrameCodex {
 
-    pub fn new(stream: TcpStream) -> (mpsc::Sender<Frame>, mpsc::Receiver<Frame>){
+    pub fn new<F: Serialize+DeserializeOwned+Send+Sync+'static>(stream: TcpStream) -> (mpsc::Sender<F>, mpsc::Receiver<F>){
         let (mut read,mut write)= stream.into_split();
         let (in_tx,in_rx) = mpsc::channel(64);
         let (out_tx,mut out_rx) = mpsc::channel(64);
@@ -548,7 +552,7 @@ impl FrameCodex {
         (out_tx,in_rx)
     }
 
-    async fn receive( read: &mut OwnedReadHalf ) -> Result<Frame,Error> {
+    async fn receive<F: Serialize+DeserializeOwned+Send+Sync+'static>( read: &mut OwnedReadHalf ) -> Result<F,Error> {
         let len = read.read_u32().await?;
 
         let mut buf = vec![0 as u8; len as usize];
@@ -556,12 +560,12 @@ impl FrameCodex {
 
         read.read_exact(buf_ref).await?;
 
-        let frame: Frame = bincode::deserialize(buf_ref)?;
+        let frame: F = bincode::deserialize(buf_ref)?;
 
         Ok(frame)
     }
 
-    async fn send( write: &mut OwnedWriteHalf, frame: Frame ) -> Result<(),Error> {
+    async fn send<F: Serialize+DeserializeOwned+Send+Sync+'static>( write: &mut OwnedWriteHalf, frame: F) -> Result<(),Error> {
         let data = bincode::serialize(&frame)?;
         write.write_u32(data.len() as _ ).await?;
         write.write_all(data.as_slice()).await?;
@@ -579,7 +583,7 @@ mod test {
     use crate::error::Error;
     use crate::frame::{Diagnose, ProtoFrame};
     use crate::id::Id;
-    use crate::lane::{Lane, LaneCommand, FrameCodex};
+    use crate::lane::{LaneEndpoint, LaneCommand, FrameCodex};
     use crate::lane::ConnectorCommand;
     use crate::lane::Frame;
     use crate::lane::LocalTunnelConnector;
@@ -667,8 +671,8 @@ mod test {
             let high = StarKey::new(2);
             let low = StarKey::new(1);
 
-            let mut high_lane = Lane::new(Option::Some(low.clone())).await;
-            let mut low_lane = Lane::new(Option::Some(high.clone())).await;
+            let mut high_lane = LaneEndpoint::new(Option::Some(low.clone())).await;
+            let mut low_lane = LaneEndpoint::new(Option::Some(high.clone())).await;
 
             let connector_ctrl = LocalTunnelConnector::new(&high_lane, &low_lane)
                 .await

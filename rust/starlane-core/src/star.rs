@@ -46,7 +46,7 @@ use crate::keys::{
     AppKey, GatheringKey, MessageId, ResourceId, ResourceKey, SpaceKey, Unique, UniqueSrc, UserKey,
 };
 use crate::lane::{
-    ConnectionInfo, ConnectorController, Lane, LaneCommand, LaneMeta, OutgoingLane,
+    ConnectionInfo, ConnectorController, LaneEndpoint, LaneCommand, LaneMeta, OutgoingSide,
     TunnelConnector, TunnelConnectorFactory,
 };
 use crate::logger::{
@@ -80,6 +80,7 @@ use crate::star::variant::web::WebVariant;
 use crate::starlane::api::StarlaneApi;
 use crate::util;
 use crate::util::AsyncHashMap;
+use crate::template::StarTemplateHandle;
 
 pub mod filestore;
 pub mod pledge;
@@ -1720,18 +1721,21 @@ impl Star {
         self.process_transactions(&frame, lane_key).await;
         match frame {
             Frame::Proto(proto) => match &proto {
-                ProtoFrame::RequestSubgraphExpansion => {
+                ProtoFrame::GatewaySelect => {
                     if let Option::Some(lane_key) = lane_key {
                         let mut subgraph = self.skel.info.key.subgraph.clone();
                         subgraph.push(StarSubGraphKey::Big(
                             self.star_subgraph_expansion_seq
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
                         ));
-                        self.send_frame(
+unimplemented!();
+/*                        self.send_frame(
                             lane_key.clone(),
-                            Frame::Proto(ProtoFrame::GrantSubgraphExpansion(subgraph)),
+                            Frame::Proto(ProtoFrame::GatewayAssign(subgraph)),
                         )
+
                         .await;
+ */
                     } else {
                         eprintln!("missing lane key in RequestSubgraphExpansion")
                     }
@@ -2327,7 +2331,7 @@ impl Star {
 pub trait StarKernel: Send {}
 
 pub enum StarCommand {
-    AddLane(Lane),
+    AddLane(LaneEndpoint),
     ConstellationConstructionComplete,
     Init,
     AddConnectorController(ConnectorController),
@@ -2937,12 +2941,13 @@ impl ToString for StarKey {
 }
 
 #[derive(Eq, PartialEq, Hash, Clone)]
-pub struct StarName {
+pub struct StarTemplateId {
     pub constellation: String,
-    pub star: String,
+    pub handle: StarTemplateHandle,
 }
 
 impl StarKey {
+
     pub fn new(index: u16) -> Self {
         StarKey {
             subgraph: vec![],

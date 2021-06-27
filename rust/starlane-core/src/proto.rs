@@ -28,7 +28,7 @@ use crate::frame::{
 };
 use crate::id::{Id, IdSeq};
 use crate::lane::{
-    ConnectorController, Lane, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector,
+    ConnectorController, LaneEndpoint, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector,
     TunnelIn, TunnelOut, TunnelOutState,
 };
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
@@ -214,9 +214,10 @@ impl ProtoStar {
                         let lane_key = lanes.get(future_index).unwrap();
                         let lane = self.lanes.get_mut(&lane_key).unwrap();
                         match frame {
-                            Frame::Proto(ProtoFrame::GrantSubgraphExpansion(subgraph)) => {
-                                let key = StarKey::new_with_subgraph(subgraph.clone(), 0);
-                                self.star_key = Option::Some(key.clone());
+                            Frame::Proto(_) => {
+unimplemented!();
+//                                let key = StarKey::new_with_subgraph(subgraph.clone(), 0);
+//                                self.star_key = Option::Some(key.clone());
                             }
                             _ => {
                                 println!("{} frame unsupported by ProtoStar: {}", self.kind, frame);
@@ -242,9 +243,11 @@ impl ProtoStar {
     }
 
     async fn send_expansion_request(&mut self) {
-        let frame = Frame::Proto(ProtoFrame::RequestSubgraphExpansion);
+        unimplemented!();
+        /*
+        let frame = Frame::Proto(ProtoFrame::GatewaySelect);
         self.tracker.track(frame.clone(), |frame| {
-            if let Frame::Proto(ProtoFrame::GrantSubgraphExpansion(_)) = frame {
+            if let Frame::Proto(ProtoFrame::GatewayAssign(_)) = frame {
                 return true;
             } else {
                 return false;
@@ -252,11 +255,13 @@ impl ProtoStar {
         });
 
         self.broadcast(frame, &Option::None).await;
+
+         */
     }
 
     async fn resend(&mut self, frame: Frame) {
         match frame {
-            Frame::Proto(ProtoFrame::RequestSubgraphExpansion) => {
+            Frame::Proto(ProtoFrame::GatewaySelect) => {
                 self.broadcast_no_hold(frame, &Option::None).await;
             }
             Frame::StarMessage(message) => {

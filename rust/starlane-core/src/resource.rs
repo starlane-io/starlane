@@ -3358,7 +3358,7 @@ mod test {
     use crate::space::CreateAppControllerFail;
     use crate::star::{StarController, StarInfo, StarKey, StarKind};
     use crate::starlane::{
-        ConstellationCreate, StarlaneMachineRunner, StarlaneApiRequestByName, StarlaneCommand,
+        ConstellationCreate, StarlaneMachineRunner, StarlaneApiRequest, StarlaneCommand,
     };
     use crate::template::{ConstellationData, ConstellationTemplate};
 

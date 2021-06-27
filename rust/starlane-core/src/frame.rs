@@ -33,14 +33,15 @@ use semver::SemVerError;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Frame {
-    Close,
     Proto(ProtoFrame),
     Diagnose(Diagnose),
     StarWind(StarWind),
     StarMessage(StarMessage),
     Watch(Watch),
     Event(Event),
-    Ping
+    Ping,
+    Pong,
+    Close
 }
 
 
@@ -54,8 +55,8 @@ pub enum StarWind {
 pub enum ProtoFrame {
     StarLaneProtocolVersion(i32),
     ReportStarKey(StarKey),
-    RequestSubgraphExpansion,
-    GrantSubgraphExpansion(Vec<StarSubGraphKey>),
+    GatewaySelect,
+    GatewayAssign{ gateway: StarKey, subgraph:Vec<StarSubGraphKey> },
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -643,7 +644,8 @@ impl fmt::Display for Frame {
             Frame::StarWind(wind) => format!("StarWind({})", wind).to_string(),
             Frame::Watch(_) => format!("Watch").to_string(),
             Frame::Event(_) => format!("ActorEvent").to_string(),
-            Frame::Ping => "Ping".to_string()
+            Frame::Ping => "Ping".to_string(),
+            Frame::Pong => "Pong".to_string()
         };
         write!(f, "{}", r)
     }
@@ -680,9 +682,9 @@ impl fmt::Display for ProtoFrame {
             ProtoFrame::ReportStarKey(key) => {
                 format!("ReportStarKey({})", key.to_string()).to_string()
             }
-            ProtoFrame::RequestSubgraphExpansion => format!("RequestSubgraphExpansion").to_string(),
-            ProtoFrame::GrantSubgraphExpansion(path) => {
-                format!("GrantSubgraphExpansion({:?})", path).to_string()
+            ProtoFrame::GatewaySelect => format!("GatewaySelect").to_string(),
+            ProtoFrame::GatewayAssign{..} => {
+                "GatewayAssign".to_string()
             }
         };
         write!(f, "{}", r)
