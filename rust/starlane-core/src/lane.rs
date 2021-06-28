@@ -137,6 +137,7 @@ pub struct ProtoLaneEndpoint {
     pub incoming: IncomingSide,
     pub outgoing: OutgoingSide,
     tunnel_receiver_tx: Sender<TunnelInState>,
+    evolution_tx: broadcast::Sender<Result<(),Error>>
 }
 
 impl ProtoLaneEndpoint {
@@ -144,6 +145,7 @@ impl ProtoLaneEndpoint {
         let (mid_tx, mid_rx) = mpsc::channel(LANE_QUEUE_SIZE);
         let (in_tx, in_rx) = mpsc::channel(LANE_QUEUE_SIZE);
         let (tunnel_receiver_tx, tunnel_receiver_rx) = mpsc::channel(1);
+        let (evolution_tx,_) = broadcast::channel(1);
 
         let midlane = LaneMiddle {
             rx: mid_rx,
@@ -165,11 +167,16 @@ impl ProtoLaneEndpoint {
                 tunnel: TunnelInState::None,
             },
             outgoing: OutgoingSide { out_tx: mid_tx },
+            evolution_tx
         }
     }
 
     pub fn get_tunnel_in_tx(&self) -> Sender<TunnelInState> {
         self.tunnel_receiver_tx.clone()
+    }
+
+    pub fn get_evoltion_rx(&self) -> broadcast::Receiver<Result<(),Error>> {
+        self.evolution_tx.subscribe()
     }
 }
 
@@ -178,6 +185,11 @@ impl TryInto<LaneEndpoint> for ProtoLaneEndpoint{
 
     fn try_into(self) -> Result<LaneEndpoint, Self::Error> {
         if self.remote_star.is_some() {
+            let evolution_tx = self.evolution_tx;
+            tokio::spawn(async move {
+                evolution_tx.send(Ok(()));
+            });
+
             Ok(LaneEndpoint{
                 remote_star: self.remote_star.unwrap(),
                 incoming: self.incoming,
@@ -185,6 +197,7 @@ impl TryInto<LaneEndpoint> for ProtoLaneEndpoint{
                 tunnel_receiver_tx: self.tunnel_receiver_tx
             })
         } else {
+            self.evolution_tx.send(Err("star_key must be set before ProtoLaneEndpoint can evolve into a LaneEndpoint".into()));
             Err("star_key must be set before ProtoLaneEndpoint can evolve into a LaneEndpoint".into())
         }
     }
@@ -238,12 +251,12 @@ impl fmt::Display for TunnelInState {
 
 #[derive(Clone)]
 pub struct TunnelOut {
-    pub remote_star: StarKey,
+//    pub remote_star: StarKey,
     pub tx: Sender<Frame>,
 }
 
 pub struct TunnelIn {
-    pub remote_star: StarKey,
+//    pub remote_star: StarKey,
     pub rx: Receiver<Frame>,
 }
 

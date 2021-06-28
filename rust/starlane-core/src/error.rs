@@ -14,6 +14,7 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc::error::SendError;
 use tokio::time::error::Elapsed;
 use zip::result::ZipError;
+use tokio::sync::broadcast::error::RecvError;
 
 #[derive(Debug, Clone)]
 pub struct Error {
@@ -42,6 +43,12 @@ impl From<ZipError> for Error {
                 error: "ZipError: FileNotFound".to_string(),
             },
         }
+    }
+}
+
+impl From<tokio::sync::broadcast::error::RecvError> for Error {
+    fn from(e: RecvError) -> Self {
+        e.to_string().into()
     }
 }
 

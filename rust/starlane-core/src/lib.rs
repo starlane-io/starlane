@@ -22,6 +22,13 @@ extern crate actix_web;
 #[macro_use]
 extern crate nom;
 
+#[macro_use]
+extern crate tracing;
+
+#[macro_use]
+extern crate strum_macros;
+
+
 pub mod actor;
 pub mod app;
 pub mod artifact;

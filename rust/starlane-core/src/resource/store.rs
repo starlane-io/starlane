@@ -64,7 +64,7 @@ impl ResourceStore {
         let result = rx.await??;
         match result {
             ResourceStoreResult::Resource(resource) => Ok(resource),
-            _ => Err(Fail::Unexpected),
+            what => Err(Fail::Unexpected{ expected: "Resource()".to_string(), received: what.to_string()}),
         }
     }
 }
@@ -83,6 +83,15 @@ pub enum ResourceStoreCommand {
 pub enum ResourceStoreResult {
     Ok,
     Resource(Option<Resource>),
+}
+
+impl ToString for ResourceStoreResult{
+    fn to_string(&self) -> String {
+        match self {
+            ResourceStoreResult::Ok => "ResourceStoreResult::Ok".to_string(),
+            ResourceStoreResult::Resource(_) => "ResourceStoreResult::Resource(_)".to_string()
+        }
+    }
 }
 
 pub struct ResourceStoreSqlLite {

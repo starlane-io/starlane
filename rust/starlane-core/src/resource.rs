@@ -9,7 +9,6 @@ use std::time::Duration;
 
 use base64::DecodeError;
 use bincode::ErrorKind;
-use dyn_clone::DynClone;
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 use rusqlite::{params, params_from_iter, Connection, Row, Rows, Statement, ToSql, Transaction};
 use serde::{Deserialize, Serialize};
@@ -54,6 +53,7 @@ use std::future::Future;
 use std::path::PathBuf;
 use url::Url;
 use std::fs::DirBuilder;
+use tokio::sync::oneshot::error::RecvError;
 
 pub mod artifact;
 pub mod config;
@@ -195,20 +195,20 @@ static RESOURCE_QUERY_FIELDS: &str = "r.key,r.address,r.kind,r.specific,r.owner,
 pub type Labels = HashMap<String, String>;
 pub type Names = Vec<String>;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct ResourceSelector {
     pub meta: MetaSelector,
     pub fields: HashSet<FieldSelection>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum MetaSelector {
     None,
     Name(String),
     Label(LabelSelector),
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct LabelSelector {
     pub labels: HashSet<LabelSelection>,
 }
@@ -308,7 +308,7 @@ impl ResourceSelector {
     }
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug,Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum LabelSelection {
     Exact(Label),
 }
@@ -322,7 +322,7 @@ impl LabelSelection {
     }
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug,Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum FieldSelection {
     Key(ResourceKey),
     Type(ResourceType),
@@ -413,7 +413,7 @@ impl ToSql for FieldSelection {
     }
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug,Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Label {
     pub name: String,
     pub value: String,
@@ -1136,7 +1136,7 @@ impl LogInfo for Registry {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Debug,Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum ResourceKind {
     Root,
     Space,
@@ -1820,7 +1820,7 @@ impl ResourceType {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct ResourceArchetype {
     pub kind: ResourceKind,
     pub specific: Option<Specific>,
@@ -2355,7 +2355,7 @@ impl From<ActorKind> for ResourceKind {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct ResourceRegistryInfo {
     pub names: Names,
     pub labels: Labels,
@@ -2387,7 +2387,7 @@ impl RegistryReservation {
         result_tx: oneshot::Sender<Result<(), Fail>>,
     ) -> Result<(), Fail> {
         if let Option::Some(tx) = self.tx {
-            tx.send((record, result_tx)).or(Err(Fail::Unexpected));
+            tx.send((record, result_tx)).or(Err(Fail::Error("could not send to tx".to_string())));
         }
         Ok(())
     }
@@ -2462,30 +2462,33 @@ impl UniqueSrc for RegistryUniqueSrc {
             })
             .await?;
 
-        if let ResourceRegistryResult::Unique(index) = rx.await? {
-            match resource_type {
-                ResourceType::Root => Ok(ResourceId::Root),
-                ResourceType::Space => Ok(ResourceId::Space(index as _)),
-                ResourceType::SubSpace => Ok(ResourceId::SubSpace(index as _)),
-                ResourceType::App => Ok(ResourceId::App(index as _)),
-                ResourceType::Actor => Ok(ResourceId::Actor(Id::new(0, index as _))),
-                ResourceType::User => Ok(ResourceId::User(index as _)),
-                ResourceType::FileSystem => Ok(ResourceId::FileSystem(index as _)),
-                ResourceType::File => Ok(ResourceId::File(index as _)),
-                ResourceType::Domain => Ok(ResourceId::Domain(index as _)),
-                ResourceType::UrlPathPattern => Ok(ResourceId::UrlPathPattern(index as _)),
-                ResourceType::Proxy => Ok(ResourceId::Proxy(index as _)),
-                ResourceType::ArtifactBundle => Ok(ResourceId::ArtifactBundle(index as _)),
-                ResourceType::Artifact => Ok(ResourceId::Artifact(index as _)),
-                ResourceType::Database => Ok(ResourceId::Database(index as _)),
-            }
-        } else {
-            Err(Fail::Unexpected)
+        match rx.await? {
+           ResourceRegistryResult::Unique(index) => {
+               match resource_type {
+                   ResourceType::Root => Ok(ResourceId::Root),
+                   ResourceType::Space => Ok(ResourceId::Space(index as _)),
+                   ResourceType::SubSpace => Ok(ResourceId::SubSpace(index as _)),
+                   ResourceType::App => Ok(ResourceId::App(index as _)),
+                   ResourceType::Actor => Ok(ResourceId::Actor(Id::new(0, index as _))),
+                   ResourceType::User => Ok(ResourceId::User(index as _)),
+                   ResourceType::FileSystem => Ok(ResourceId::FileSystem(index as _)),
+                   ResourceType::File => Ok(ResourceId::File(index as _)),
+                   ResourceType::Domain => Ok(ResourceId::Domain(index as _)),
+                   ResourceType::UrlPathPattern => Ok(ResourceId::UrlPathPattern(index as _)),
+                   ResourceType::Proxy => Ok(ResourceId::Proxy(index as _)),
+                   ResourceType::ArtifactBundle => Ok(ResourceId::ArtifactBundle(index as _)),
+                   ResourceType::Artifact => Ok(ResourceId::Artifact(index as _)),
+                   ResourceType::Database => Ok(ResourceId::Database(index as _)),
+               }
+           }
+           what => {
+               Err(Fail::Unexpected{ expected:"ResourceRegistryResult::Unique".to_string(), received: what.to_string() })
+           }
         }
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct ResourceRegistration {
     pub resource: ResourceRecord,
     pub info: Option<ResourceRegistryInfo>,
@@ -2500,12 +2503,12 @@ impl ResourceRegistration {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct ResourceLocationAffinity {
     pub star: StarKey,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct ResourceRecord {
     pub stub: ResourceStub,
     pub location: ResourceLocation,
@@ -2532,7 +2535,7 @@ impl From<ResourceRecord> for ResourceAddress {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct ResourceLocation {
     pub host: StarKey,
     pub gathering: Option<GatheringKey>,
@@ -4044,13 +4047,13 @@ impl FromStr for Version {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum ResourceCreateStrategy {
     Create,
     Ensure,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct ResourceCreate {
     pub parent: ResourceKey,
     pub key: KeyCreationSrc,
@@ -4122,7 +4125,7 @@ impl LogInfo for ResourceCreate {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum ResourceStatus {
     Unknown,
     Preparing,
@@ -4151,7 +4154,7 @@ impl FromStr for ResourceStatus {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum AddressCreationSrc {
     None,
     Append(String),
@@ -4159,7 +4162,7 @@ pub enum AddressCreationSrc {
     Space(String),
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum KeyCreationSrc {
     None,
     Key(ResourceKey),
@@ -4173,7 +4176,7 @@ pub enum KeySrc {
 }
 
 /// can have other options like to Initialize the state data
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum AssignResourceStateSrc {
     None,
     Direct(Arc<Vec<u8>>),
@@ -4231,7 +4234,7 @@ pub struct ResourceSliceAssign {
     archetype: ResourceArchetype,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct ResourceStub {
     pub key: ResourceKey,
     pub address: ResourceAddress,
@@ -4350,6 +4353,7 @@ impl ResourceHost for RemoteResourceHost {
                 received: assign.stub.key.resource_type().clone(),
             });
         }
+
         let mut proto = ProtoStarMessage::new();
         proto.to = self.handle.key.clone().into();
         proto.payload = StarMessagePayload::ResourceHost(ResourceHostAction::Assign(assign));
@@ -4361,13 +4365,20 @@ impl ResourceHost for RemoteResourceHost {
 
         match tokio::time::timeout(Duration::from_secs(25), reply).await {
             Ok(result) => {
-                if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(_))) = result {
-                    Ok(())
-                } else {
-                    Err(Fail::Unexpected)
+                match result {
+                    Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(_))) => {
+                        Ok(())
+                    }
+                    Result::Ok(what) => {
+                        Err(Fail::expected("Ok(StarMessagePayload::Reply(SimpleReply::Ok(_)))"))
+                    }
+                    Result::Err(err) => {
+                        Err(Fail::expected("Ok(StarMessagePayload::Reply(SimpleReply::Ok(_)))"))
+                    }
                 }
+
             }
-            Err(err) => Err(Fail::Timeout),
+            Err(err) => Err(Fail::Timeout)
         }
     }
 }

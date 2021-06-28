@@ -987,7 +987,7 @@ impl FromStr for SubSpaceFilesystemKey {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Debug,Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum GatheringKey {
     Actor(ActorKey),
 }

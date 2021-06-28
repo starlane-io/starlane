@@ -78,6 +78,7 @@ use crate::starlane::api::StarlaneApi;
 use crate::util;
 use crate::util::AsyncHashMap;
 use crate::template::StarTemplateHandle;
+use std::fmt::{Debug, Formatter};
 
 pub mod filestore;
 pub mod pledge;
@@ -388,6 +389,13 @@ pub struct Star {
     resource_record_cache: LruCache<ResourceKey, ResourceRecord>,
     resource_address_to_key: LruCache<ResourceAddress, ResourceKey>,
     status: StarStatus,
+}
+
+impl Debug for Star{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(),std::fmt::Error> {
+        f.write_str(self.skel.info.to_string().as_str() );
+        Ok(())
+    }
 }
 
 impl Star {
@@ -1035,13 +1043,13 @@ impl Star {
                     if let Result::Ok(record) = rx.await {
                         locate.tx.send(Ok(record));
                     } else {
-                        locate.tx.send(Err(Fail::Unexpected));
+                        locate.tx.send(Err(Fail::expected("ResourceRecord")));
                     }
                 });
             } else if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Fail(fail))) = result {
                 locate.tx.send(Err(fail));
             } else {
-                locate.tx.send(Err(Fail::Unexpected));
+                locate.tx.send(Err(Fail::expected("StarMessagePayload::Reply(SimpleReply::Fail(fail))")));
             }
         });
     }
@@ -1710,6 +1718,7 @@ impl Star {
         }
     }
 
+    #[instrument]
     async fn process_frame(&mut self, frame: Frame, lane_key: Option<&StarKey>) {
         self.process_transactions(&frame, lane_key).await;
         match frame {
@@ -1730,7 +1739,7 @@ unimplemented!();
                         .await;
  */
                     } else {
-                        eprintln!("missing lane key in RequestSubgraphExpansion")
+                        error!("missing lane key in RequestSubgraphExpansion")
                     }
                 }
                 _ => {}
@@ -1740,25 +1749,25 @@ unimplemented!();
                     if let Option::Some(lane_key) = lane_key {
                         self.on_wind_up_hop(wind_up, lane_key.clone()).await;
                     } else {
-                        eprintln!("missing lanekey on WindUp");
+                        error!("missing lanekey on WindUp");
                     }
                 }
                 StarWind::Down(wind_down) => {
                     if let Option::Some(lane_key) = lane_key {
                         self.on_wind_down(wind_down, lane_key.clone()).await;
                     } else {
-                        eprintln!("missing lanekey on WindDown");
+                        error!("missing lanekey on WindDown");
                     }
                 }
             },
             Frame::StarMessage(message) => match self.on_message(message).await {
                 Ok(messages) => {}
                 Err(error) => {
-                    eprintln!("error: {}", error)
+                    error!("X error: {}", error)
                 }
             },
             _ => {
-                eprintln!("star does not handle frame: {}", frame)
+                error!("star does not handle frame: {}", frame)
             }
         }
     }
@@ -1872,14 +1881,17 @@ unimplemented!();
          */
     }
 
+    #[instrument]
     async fn on_message(&mut self, mut message: StarMessage) -> Result<(), Error> {
         if message.log {
-            println!(
+            info!("on_message");
+/*            info!(
                 "{} => {} : {}",
                 self.skel.info.to_string(),
                 LogId(&message).to_string(),
                 "on_message"
             );
+ */
         }
         if message.to != self.skel.info.key {
             if self.skel.info.kind.relay() || message.from == self.skel.info.key {
@@ -1888,6 +1900,7 @@ unimplemented!();
                     .await;
                 return Ok(());
             } else {
+                error!("this star does not relay Messages");
                 return Err(
                     format!("this star {} does not relay Messages", self.skel.info.kind).into(),
                 );
@@ -1899,6 +1912,7 @@ unimplemented!();
         }
     }
 
+    #[instrument]
     async fn process_resource_message(
         &mut self,
         mut star_message: StarMessage,
@@ -1989,7 +2003,7 @@ unimplemented!();
                             .unwrap_or_default();
                     } else {
                         delivery
-                            .reply(ResourceResponseMessage::Fail(Fail::Unexpected))
+                            .reply(ResourceResponseMessage::Fail(Fail::expected("Ok(Ok(StarCoreResult::State(state)))")))
                             .await
                             .unwrap_or_default();
                     }
@@ -1999,6 +2013,7 @@ unimplemented!();
         Ok(())
     }
 
+    #[instrument]
     async fn process_child_manager_resource_action(
         &mut self,
         message: StarMessage,
@@ -2022,6 +2037,7 @@ unimplemented!();
                 }
                 ChildManagerResourceAction::Find(find) => {
                     let result = manager.get(find.to_owned()).await;
+
 
                     match result {
                         Ok(result) => match result {
@@ -2052,9 +2068,7 @@ unimplemented!();
                 ChildManagerResourceAction::Status(report) => {
                     unimplemented!()
                 }
-                ChildManagerResourceAction::SliceStatus(report) => {
-                    unimplemented!()
-                }
+
                 ChildManagerResourceAction::Create(create) => {
                     let child_manager = self
                         .get_child_resource_manager(create.parent.clone())
@@ -2176,7 +2190,7 @@ unimplemented!();
                 } else {
                     self.skel
                         .comm()
-                        .simple_reply(message, SimpleReply::Fail(Fail::Unexpected))
+                        .simple_reply(message, SimpleReply::Fail(Fail::expected("Option::Some(resource)")))
                         .await;
                 }
             }
@@ -2326,7 +2340,7 @@ pub trait StarKernel: Send {}
 pub enum StarCommand {
     AddLaneEndpoint(LaneEndpoint),
     AddProtoLaneEndpoint(ProtoLaneEndpoint),
-    ConstellationConstructionComplete,
+    ConstellationBroadcast(ConstellationBroadcast),
     Init,
     AddConnectorController(ConnectorController),
     AddLogger(broadcast::Sender<Logger>),
@@ -2354,6 +2368,11 @@ pub enum StarCommand {
     ResourceRecordSet(Set<ResourceRecord>),
 
     GetCaches(oneshot::Sender<Arc<ProtoArtifactCachesFactory>>),
+}
+
+#[derive(Clone)]
+pub enum ConstellationBroadcast{
+    ConstellationReady
 }
 
 pub enum Diagnose {
@@ -2566,8 +2585,8 @@ impl fmt::Display for StarCommand {
             StarCommand::WindDown(_) => format!("SearchReturnResult").to_string(),
             StarCommand::SendProtoMessage(_) => format!("SendProtoMessage(_)").to_string(),
             StarCommand::SetFlags(_) => format!("SetFlags(_)").to_string(),
-            StarCommand::ConstellationConstructionComplete => {
-                "ConstellationConstructionComplete".to_string()
+            StarCommand::ConstellationBroadcast(_)=> {
+                "ConstellationBroadcast".to_string()
             }
             StarCommand::ResourceRecordRequest(_) => "ResourceRecordRequest".to_string(),
             StarCommand::ResourceRecordSet(_) => "SetResourceLocation".to_string(),
@@ -3194,15 +3213,15 @@ impl StarComm {
                                 tx.send(Result::Err(fail));
                             }
                             _ => {
-                                tx.send(Result::Err(Fail::Unexpected));
+                                tx.send(Result::Err(Fail::expected("SimpleReply::Ok(reply)")));
                             }
                         },
                         _ => {
-                            tx.send(Result::Err(Fail::Unexpected));
+                            tx.send(Result::Err(Fail::expected("StarMessagePayload::Reply(_)")));
                         }
                     },
                     Err(error) => {
-                        tx.send(Result::Err(Fail::Unexpected));
+                        tx.send(Result::Err(Fail::expected("Result::Ok(_)")) );
                     }
                 },
                 Err(elapsed) => {
@@ -3233,15 +3252,15 @@ impl StarComm {
                                 tx.send(Result::Err(fail));
                             }
                             _ => {
-                                tx.send(Result::Err(Fail::Unexpected));
+                                tx.send(Result::Err(Fail::expected("SimpleReply::Ok(_)")));
                             }
                         },
                         _ => {
-                            tx.send(Result::Err(Fail::Unexpected));
+                            tx.send(Result::Err(Fail::expected("SimpleReply::Ok(_)")));
                         }
                     },
                     Err(error) => {
-                        tx.send(Result::Err(Fail::Unexpected));
+                        tx.send(Result::Err(Fail::Error(error.to_string())));
                     }
                 },
                 Err(elapsed) => {
@@ -3316,7 +3335,7 @@ impl StarComm {
                 },
                 Err(fail) => {
                     let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(
-                        Fail::Unexpected,
+                        Fail::expected("Ok(result)"),
                     )));
                     star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                 }
@@ -3448,7 +3467,7 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
 
         match Self::timeout( rx ).await? {
             ResourceRegistryResult::Reservation(reservation) => Result::Ok(reservation),
-            _ => Result::Err(Fail::Unexpected),
+            _ => Result::Err(Fail::expected("ResourceRegistryResult::Reservation(_)")),
         }
 
 /*        match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
@@ -3492,7 +3511,7 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
         //match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
         match Self::timeout( rx).await? {
             ResourceRegistryResult::Resource(resource) => Ok(resource),
-            _ => Err(Fail::Unexpected),
+            _ => Err(Fail::expected("ResourceRegistryResult::Resource(_)")),
         }
     }
 

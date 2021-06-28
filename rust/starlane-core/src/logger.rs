@@ -95,7 +95,7 @@ impl LogAggregate {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct Flags {
     map: HashMap<Flag, bool>,
 }
@@ -124,12 +124,12 @@ impl Flags {
     }
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug,Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Flag {
     Star(StarFlag),
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug,Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum StarFlag {
     DiagnoseSequence,
     DiagnosePledge,

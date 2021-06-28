@@ -30,28 +30,31 @@ use crate::star::{
     StarSubGraphKey, StarWatchInfo,
 };
 use semver::SemVerError;
+use std::fmt::{Debug, Formatter};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum Frame {
     Proto(ProtoFrame),
     Diagnose(Diagnose),
     StarWind(StarWind),
     StarMessage(StarMessage),
-    Watch(Watch),
-    Event(Event),
+    //Watch(Watch),
+    //Event(Event),
     Ping,
     Pong,
     Close
 }
 
 
-#[derive(Clone, Serialize, Deserialize)]
+
+
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum StarWind {
     Up(WindUp),
     Down(WindDown),
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum ProtoFrame {
     StarLaneProtocolVersion(i32),
     ReportStarKey(StarKey),
@@ -59,32 +62,32 @@ pub enum ProtoFrame {
     GatewayAssign{ gateway: StarKey, subgraph:Vec<StarSubGraphKey> },
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum Watch {
     Add(WatchInfo),
     Remove(WatchInfo),
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct WatchInfo {
     pub id: Id,
     pub actor: ActorKey,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct StarMessageAck {
     pub from: StarKey,
     pub to: StarKey,
     pub id: Id,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum Diagnose {
     Ping,
     Pong,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct WindUp {
     pub from: StarKey,
     pub pattern: StarPattern,
@@ -107,7 +110,7 @@ impl WindUp {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum WindAction {
     SearchHits,
     Flags(Flags),
@@ -142,7 +145,7 @@ impl WindAction {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum WindResults {
     None,
     Hits(Vec<WindHit>),
@@ -155,7 +158,7 @@ impl WindUp {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum StarPattern {
     Any,
     None,
@@ -183,7 +186,7 @@ impl StarPattern {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct WindDown {
     pub missed: Option<StarKey>,
     pub result: WindResults,
@@ -199,13 +202,13 @@ impl WindDown {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Debug,Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct WindHit {
     pub star: StarKey,
     pub hops: usize,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct StarMessage {
     pub from: StarKey,
     pub to: StarKey,
@@ -328,6 +331,21 @@ pub enum StarMessagePayload {
     UniqueId(ResourceId),
 }
 
+impl Debug for StarMessagePayload{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(),std::fmt::Error> {
+        f.write_str(match self {
+            StarMessagePayload::None => "None",
+            StarMessagePayload::MessagePayload(_) => "MessagePayload",
+            StarMessagePayload::ResourceManager(_) => "ResourceManager",
+            StarMessagePayload::ResourceHost(_) => "ResourceHost",
+            StarMessagePayload::Space(_) => "Space",
+            StarMessagePayload::Reply(_) => "Reply",
+            StarMessagePayload::UniqueId(_) => "UniqueId"
+        });
+        Ok(())
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub enum MessagePayload {
     Request(Message<ResourceRequestMessage>),
@@ -346,13 +364,12 @@ pub enum ResourceHostResult {
     Location(LocalResourceLocation),
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum ChildManagerResourceAction {
     Register(ResourceRegistration),
     Location(ResourceRecord),
     Find(ResourceIdentifier),
     Status(ResourceStatusReport),
-    SliceStatus(ResourceSliceStatusReport),
     Create(ResourceCreate),
     Select(ResourceSelector),
     UniqueResourceId {
@@ -361,6 +378,8 @@ pub enum ChildManagerResourceAction {
     },
 }
 
+
+
 impl ToString for ChildManagerResourceAction {
     fn to_string(&self) -> String {
         match self {
@@ -368,7 +387,6 @@ impl ToString for ChildManagerResourceAction {
             ChildManagerResourceAction::Location(_) => "Location".to_string(),
             ChildManagerResourceAction::Find(_) => "Find".to_string(),
             ChildManagerResourceAction::Status(_) => "Status".to_string(),
-            ChildManagerResourceAction::SliceStatus(_) => "SliceStatus".to_string(),
             ChildManagerResourceAction::Create(_) => "Create".to_string(),
             ChildManagerResourceAction::Select(_) => "Select".to_string(),
             ChildManagerResourceAction::UniqueResourceId { .. } => "UniqueResourceId".to_string(),
@@ -376,7 +394,7 @@ impl ToString for ChildManagerResourceAction {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct ResourceStatusReport {
     pub key: ResourceKey,
     pub status: ResourceStatus,
@@ -642,8 +660,8 @@ impl fmt::Display for Frame {
             Frame::Diagnose(diagnose) => format!("Diagnose({})", diagnose).to_string(),
             Frame::StarMessage(inner) => format!("StarMessage({})", inner.payload).to_string(),
             Frame::StarWind(wind) => format!("StarWind({})", wind).to_string(),
-            Frame::Watch(_) => format!("Watch").to_string(),
-            Frame::Event(_) => format!("ActorEvent").to_string(),
+//            Frame::Watch(_) => format!("Watch").to_string(),
+//            Frame::Event(_) => format!("ActorEvent").to_string(),
             Frame::Ping => "Ping".to_string(),
             Frame::Pong => "Pong".to_string()
         };
@@ -744,7 +762,8 @@ impl From<rusqlite::Error> for Fail {
 
 impl From<()> for Fail {
     fn from(error: ()) -> Self {
-        Fail::Unexpected
+        Fail::Error("() From Error".to_string())
+
     }
 }
 

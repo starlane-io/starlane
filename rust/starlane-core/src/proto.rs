@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{RefCell, Cell};
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::sync::Arc;
@@ -31,15 +31,12 @@ use crate::lane::{ConnectorController, LaneEndpoint, LaneCommand, LaneMeta, STAR
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::permissions::AuthTokenSource;
 use crate::resource::HostedResourceStore;
-use crate::star::{
-    FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBacking,
-    ResourceRegistryBackingSqLite, ShortestPathStarKey, Star, StarCommand, StarController,
-    StarInfo, StarKernel, StarKey, StarKind, StarSearchTransaction, StarSkel, Transaction,
-};
+use crate::star::{FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBacking, ResourceRegistryBackingSqLite, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarSearchTransaction, StarSkel, Transaction, ConstellationBroadcast};
 use crate::star::pledge::StarHandleBacking;
 use crate::star::variant::{StarVariantCommand, StarVariantFactory};
 use crate::starlane::StarlaneCommand;
 use crate::template::ConstellationTemplate;
+use std::convert::TryInto;
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -59,6 +56,7 @@ pub struct ProtoStar {
     frame_hold: FrameHold,
     caches: Arc<ProtoArtifactCachesFactory>,
     data_access: FileAccess,
+    proto_constellation_broadcast: Cell<Option<broadcast::Receiver<ConstellationBroadcast>>>,
     flags: Flags,
     tracker: ProtoTracker,
 }
@@ -73,6 +71,7 @@ impl ProtoStar {
         data_access: FileAccess,
         star_manager_factory: Arc<dyn StarVariantFactory>,
         core_runner: Arc<CoreRunner>,
+        proto_constellation_broadcast: broadcast::Receiver<ConstellationBroadcast>,
         flags: Flags,
         logger: Logger,
     ) -> (Self, StarController) {
@@ -93,6 +92,7 @@ impl ProtoStar {
                 frame_hold: FrameHold::new(),
                 caches: caches,
                 data_access: data_access,
+                proto_constellation_broadcast: Cell::new(Option::Some(proto_constellation_broadcast)),
                 tracker: ProtoTracker::new(),
                 flags: flags,
 
@@ -102,6 +102,16 @@ impl ProtoStar {
     }
 
     pub async fn evolve(mut self) -> Result<Star, Error> {
+
+        let mut proto_constellation_broadcast = self.proto_constellation_broadcast.replace(Option::None).ok_or("expected proto_constellation_broadcast to be Option::Some()")?;
+
+        let star_tx = self.star_tx.clone();
+        tokio::spawn( async move {
+           while let Result::Ok(broadcast) =  proto_constellation_broadcast.recv().await {
+               star_tx.send( StarCommand::ConstellationBroadcast(broadcast)).await;
+           }
+        });
+
         loop {
             // request a sequence from central
             let mut futures = vec![];
@@ -112,6 +122,7 @@ impl ProtoStar {
                 lanes.push(key.clone())
             }
             let mut proto_lane_index = vec![];
+//println!("adding proto lane to futures....{}", self.proto_lanes.len() );
             for (index,lane) in &mut self.proto_lanes.iter_mut().enumerate() {
                 futures.push(lane.incoming.recv().boxed());
                 proto_lane_index.push(index);
@@ -138,7 +149,7 @@ impl ProtoStar {
                     StarCommand::GetStarKey(tx) => {
                         tx.send( self.star_key.clone() );
                     }
-                    StarCommand::ConstellationConstructionComplete => {
+                    StarCommand::ConstellationBroadcast(ConstellationBroadcast::ConstellationReady)=> {
                         let info = StarInfo {
                             key: self.star_key.as_ref().unwrap().clone(),
                             kind: self.kind.clone(),
@@ -208,13 +219,13 @@ impl ProtoStar {
                                 for frame in frames {
                                     self.send_frame(&remote_star, frame).await;
                                 }
-                        } else {
-                            eprintln!(
-                                "cannot add a lane to a star that doesn't have a remote_star"
-                            );
-                        }
+                            }
                     }
                     StarCommand::AddProtoLaneEndpoint(lane) => {
+                        if( self.star_key.is_some() )
+                        {
+                            lane.outgoing.out_tx.send(LaneCommand::Frame(Frame::Proto(ProtoFrame::ReportStarKey(self.star_key.clone().unwrap())))).await?;
+                        }
                         self.proto_lanes.push(lane);
                     }
                     StarCommand::AddConnectorController(connector_ctrl) => {
@@ -224,14 +235,22 @@ impl ProtoStar {
                         //                        self.logger =
                     }
                     StarCommand::Frame(frame) => {
+
                         self.tracker.process(&frame);
-                        let lane_key = lanes.get(future_index).unwrap();
-                        let lane = self.lanes.get_mut(&lane_key).unwrap();
                         match frame {
-                            Frame::Proto(_) => {
-unimplemented!();
-//                                let key = StarKey::new_with_subgraph(subgraph.clone(), 0);
-//                                self.star_key = Option::Some(key.clone());
+                            Frame::Proto(proto_frame) => {
+                                match proto_frame
+                                {
+                                    ProtoFrame::ReportStarKey(remote_star) => {
+                                        if let LaneId::ProtoLane(index) = lane {
+                                            let mut lane = self.proto_lanes.remove(index);
+                                            lane.remote_star = Option::Some(remote_star);
+                                            let lane: LaneEndpoint = lane.try_into()?;
+                                            self.star_tx.send(StarCommand::AddLaneEndpoint(lane)).await;
+                                        }
+                                    }
+                                    _ => {}
+                                }
                             }
                             _ => {
                                 println!("{} frame unsupported by ProtoStar: {}", self.kind, frame);
@@ -469,6 +488,17 @@ impl ProtoTunnel {
                     if version == STARLANE_PROTOCOL_VERSION =>
                 {
                     // do nothing... we move onto the next step
+                    return Ok((
+                        TunnelOut {
+//                            remote_star: remote_star_key.clone(),
+                            tx: self.tx,
+                        },
+                        TunnelIn {
+//                            remote_star: remote_star_key.clone(),
+                            rx: self.rx,
+                        },
+                    ));
+
                 }
                 ProtoFrame::StarLaneProtocolVersion(version) => {
                     return Err(format!("wrong version: {}", version).into());
@@ -486,11 +516,11 @@ impl ProtoTunnel {
                 ProtoFrame::ReportStarKey(remote_star_key) => {
                     return Ok((
                         TunnelOut {
-                            remote_star: remote_star_key.clone(),
+//                            remote_star: remote_star_key.clone(),
                             tx: self.tx,
                         },
                         TunnelIn {
-                            remote_star: remote_star_key.clone(),
+//                            remote_star: remote_star_key.clone(),
                             rx: self.rx,
                         },
                     ));

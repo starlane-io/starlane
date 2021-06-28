@@ -337,7 +337,7 @@ impl ResultWaiter {
 pub enum Fail {
     Error(String),
     Reject(Reject),
-    Unexpected,
+    Unexpected{expected:String,received:String},
     DoNotKnowSpecific(Specific),
     ResourceStateFinal(ResourceIdentifier),
     ResourceAddressAlreadyInUse(ResourceAddress),
@@ -362,13 +362,25 @@ pub enum Fail {
     InvalidResourceState(String),
 }
 
+impl Fail{
+
+    pub fn expected( expected: &str) -> Self {
+        error!(expected);
+        Self::Unexpected {expected:expected.to_string(), received: "_".to_string() }
+    }
+
+    pub fn unexpected<T: ToString>( expected: &str, received: T) -> Self {
+        Self::Unexpected {expected:expected.to_string(), received: received.to_string() }
+    }
+}
+
 impl ToString for Fail {
     fn to_string(&self) -> String {
         match self {
             Fail::Timeout => "Timeout".to_string(),
             Fail::Error(message) => format!("Error({})", message),
             Fail::Reject(_) => "Reject".to_string(),
-            Fail::Unexpected => "Unexpected".to_string(),
+            Fail::Unexpected{expected,received} => format!("Unexpected( expected: {}, received: {} )",expected,received).to_string(),
             Fail::DoNotKnowSpecific(_) => "DoNotKnowSpecific".to_string(),
             Fail::ResourceNotFound(_) => "ResourceNotFound".to_string(),
             Fail::WrongResourceType {
@@ -428,13 +440,13 @@ impl From<tokio::sync::oneshot::error::RecvError> for Fail {
 }
 
 impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Fail {
-    fn from(_: tokio::sync::mpsc::error::SendError<T>) -> Self {
-        Fail::Unexpected
+    fn from(e: tokio::sync::mpsc::error::SendError<T>) -> Self {
+        Fail::Error(format!("{}",e.to_string()))
     }
 }
 
 impl From<actix_web::error::Canceled> for Fail {
-    fn from(_: actix_web::error::Canceled) -> Self {
-        Fail::Unexpected
+    fn from(c: actix_web::error::Canceled) -> Self {
+        Fail::Error(c.to_string())
     }
 }

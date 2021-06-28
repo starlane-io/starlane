@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use futures::future::join_all;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, broadcast};
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 
@@ -22,6 +22,7 @@ use crate::keys::ResourceKey;
 use crate::lane::{ConnectionInfo, ConnectionKind, LaneEndpoint, LocalTunnelConnector, ServerSideTunnelConnector, ClientSideTunnelConnector, ConnectorController, ProtoLaneEndpoint};
 use crate::logger::{Flags, Logger};
 use crate::message::{Fail, ProtoStarMessage};
+use crate::star::ConstellationBroadcast;
 use crate::proto::{
     local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoTunnel,
 };
@@ -41,7 +42,6 @@ use futures::stream::{SplitStream, SplitSink};
 use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 use std::str::FromStr;
 use crate::constellation::Constellation;
-
 
 pub mod api;
 
@@ -190,7 +190,7 @@ if let Err(error) = &result {
                         }
                     }
                      */
-                    unimplemented!()
+                    unimplemented!("ADD STREAM IS NOT IMPLEMENTED")
                 }
             }
         }
@@ -205,8 +205,9 @@ if let Err(error) = &result {
         }
 
         let mut constellation = Constellation::new(name.clone());
-
         let mut evolve_rxs = vec![];
+        let (mut constellation_broadcaster,_) = broadcast::channel(16);
+
         for star_template in layout.template.stars.clone() {
             constellation.stars.push(star_template.clone());
 
@@ -246,6 +247,7 @@ if let Err(error) = &result {
                     self.data_access.clone(),
                     self.star_manager_factory.clone(),
                     self.core_runner.clone(),
+                    constellation_broadcaster.subscribe(),
                     self.flags.clone(),
                     self.logger.clone(),
                 );
@@ -282,6 +284,7 @@ if let Err(error) = &result {
         }
 
         // now connect the LANES
+        let mut proto_lane_evolution_rxs = vec![];
         for star_template in &layout.template.stars {
             let machine = layout.handles_to_machine.get(&star_template.handle  ).ok_or(format!("expected machine mapping for star template handle: {}",star_template.handle.to_string()))?;
             let local_star = StarInConstellationTemplateHandle::new( name.clone(), star_template.handle.clone() );
@@ -294,18 +297,21 @@ println!("connecting for local: {}",local_star.star.to_string() );
                                 ConstellationSelector::Local => {
                                     let second_star = constellation.select( constellation_selector.star.clone() ).ok_or("cannot select star from local constellation")?.clone();
                                     let second_star = StarInConstellationTemplateHandle::new( name.clone(), second_star.handle );
-                                    self.add_local_lane(local_star.clone(), second_star).await?;
+                                    let mut evolution_rxs = self.add_local_lane(local_star.clone(), second_star).await?;
+                                    proto_lane_evolution_rxs.append( & mut evolution_rxs );
                                 }
                                 ConstellationSelector::Named(constellation_name) => {
                                     let constellation = self.constellations.get(constellation_name).ok_or(format!("cannot select constellation named '{}' on this StarlaneMachine",constellation_name))?;
                                     let second_star = constellation.select( constellation_selector.star.clone() ).ok_or(format!("cannot select star from constellation {}",constellation_name))?.clone();
                                     let second_star = StarInConstellationTemplateHandle::new( constellation.name.clone(), second_star.handle );
-                                    self.add_local_lane(local_star.clone(), second_star).await?;
+                                    let mut evolution_rxs = self.add_local_lane(local_star.clone(), second_star).await?;
+                                    proto_lane_evolution_rxs.append( & mut evolution_rxs );
                                 }
                                 ConstellationSelector::AnyInsideMachine(machine_name) => {
                                     let host_address = layout.machine_host_address(machine_name.clone());
                                     let star_ctrl = self.star_controllers.get(local_star.clone() ).await?.ok_or("expected local star to have star_ctrl")?;
                                     self.add_client_side_lane_ctrl(star_ctrl, host_address, constellation_selector.clone() ).await?;
+                                    unimplemented!()
                                 }
                             }
                         }
@@ -317,20 +323,15 @@ println!("connecting for local: {}",local_star.star.to_string() );
             }
         }
 
-        /*
-        // announce that the constellations is now complete
-        for star_template in &template.stars {
-            if let Ok(Option::Some(star_ctrl)) = self
-                .star_controllers
-                .get(star_template.key.create(&data)?.unwrap() ).await
-            {
-                star_ctrl
-                    .star_tx
-                    .send(StarCommand::ConstellationConstructionComplete)
-                    .await;
-            }
+        let proto_lane_evolutions = join_all(proto_lane_evolution_rxs.iter_mut().map( |x| x.recv())).await;
+
+        for result in proto_lane_evolutions {
+            result??;
         }
-         */
+
+println!("sending ConstellationReady signal");
+        // announce that the local constellation is now complete
+        constellation_broadcaster.send( ConstellationBroadcast::ConstellationReady );
 
         let evolutions = join_all(evolve_rxs).await;
 
@@ -377,7 +378,7 @@ println!("new client!");
             .clone())
     }
 
-    async fn add_local_lane(&mut self, local: StarInConstellationTemplateHandle, second: StarInConstellationTemplateHandle ) -> Result<(), Error> {
+    async fn add_local_lane(&mut self, local: StarInConstellationTemplateHandle, second: StarInConstellationTemplateHandle ) -> Result<Vec<broadcast::Receiver<Result<(),Error>>>, Error> {
         let (high, low) = crate::util::sort(local, second)?;
 
         let high_star_ctrl = {
@@ -418,9 +419,10 @@ println!("new client!");
         &mut self,
         high_star_ctrl: StarController,
         low_star_ctrl: StarController,
-    ) -> Result<(), Error> {
+    ) -> Result<Vec<broadcast::Receiver<Result<(),Error>>>, Error> {
         let high_lane = ProtoLaneEndpoint::new(Option::None);
         let low_lane = ProtoLaneEndpoint::new(Option::None);
+        let rtn = vec![high_lane.get_evoltion_rx(),low_lane.get_evoltion_rx()];
         let connector = LocalTunnelConnector::new(&high_lane, &low_lane).await?;
         high_star_ctrl
             .star_tx
@@ -435,15 +437,16 @@ println!("new client!");
             .send(StarCommand::AddConnectorController(connector))
             .await?;
 
-        Ok(())
+        Ok(rtn)
     }
 
     async fn add_server_side_lane_ctrl(
         &mut self,
         low_star_ctrl: StarController,
         stream: TcpStream
-    ) -> Result<(), Error> {
+    ) -> Result<broadcast::Receiver<Result<(),Error>>, Error> {
         let low_lane = ProtoLaneEndpoint::new(Option::None );
+        let rtn = low_lane.get_evoltion_rx();
 
         ServerSideTunnelConnector::new(&low_lane,stream).await?;
 
@@ -452,9 +455,8 @@ println!("new client!");
             .send(StarCommand::AddProtoLaneEndpoint(low_lane))
             .await?;
 
-        Ok(())
+        Ok(rtn)
     }
-
 
     async fn add_client_side_lane_ctrl(
         &mut self,
@@ -574,9 +576,25 @@ mod test {
     use std::fs::File;
     use std::io::Read;
     use tokio::sync::oneshot;
+    use tracing::dispatcher::set_global_default;
+    use tracing_subscriber::FmtSubscriber;
+
+    #[test]
+    #[instrument]
+    pub fn tracing()
+    {
+        let subscriber = FmtSubscriber::default();
+        set_global_default(subscriber.into()).expect("setting global default failed");
+        info!("tracing works!");
+    }
 
     #[test]
     pub fn starlane() {
+        let subscriber = FmtSubscriber::default();
+        set_global_default(subscriber.into()).expect("setting global default failed");
+        info!("tracing works!");
+
+
         let data_dir = "tmp/data";
         let cache_dir = "tmp/cache";
         fs::remove_dir_all(data_dir).unwrap_or_default();
@@ -586,6 +604,9 @@ mod test {
 
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
+
+            info!("entered block on!");
+
             let mut starlane = StarlaneMachine::new("server".to_string() ).unwrap();
             starlane.create_constellation("standalone".to_string(), ConstellationLayout::standalone().unwrap() ).await.unwrap();
 

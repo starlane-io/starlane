@@ -219,7 +219,7 @@ impl StarlaneApi {
 
             match result.payload {
                 ResourceResponseMessage::State(data) => Ok(data),
-                _ => Err(Fail::Unexpected),
+                _ => Err(Fail::expected("ResourceResponseMessage::State(data)")),
             }
         })
     }

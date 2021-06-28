@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{mpsc, Arc, Mutex};
 
-use dyn_clone::DynClone;
-
 use crate::error::Error;
 use crate::resource::{FileKind, Path};
 use crate::star::Star;

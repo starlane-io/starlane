@@ -33,7 +33,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum ConfigSrc {
     None,
     //    Artifact(Artifact)

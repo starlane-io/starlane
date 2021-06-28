@@ -67,7 +67,7 @@ impl FromStr for ActorKey {
 pub type ActorSpecific = Name;
 pub type GatheringSpecific = Name;
 
-#[derive(Eq, PartialEq, Hash, Clone, Serialize, Deserialize)]
+#[derive(Debug,Eq, PartialEq, Hash, Clone, Serialize, Deserialize)]
 pub enum ActorKind {
     Stateful,
     Stateless,

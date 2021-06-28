@@ -47,10 +47,13 @@ impl StarHandleBacking {
         let (action, rx) = StarHandleAction::new(StarHandleCommand::Select(selector));
         self.tx.send(action).await?;
         let result = tokio::time::timeout(Duration::from_secs(5), rx).await??;
-        if let StarHandleResult::StarHandles(handles) = result {
-            Ok(handles)
-        } else {
-            Err(Fail::Unexpected)
+        match result {
+            StarHandleResult::StarHandles(handles) => {
+                Ok(handles)
+            }
+            what => {
+                Err(Fail::expected("StarHandleResult::StarHandles(handles)"))
+            }
         }
     }
 
@@ -58,10 +61,14 @@ impl StarHandleBacking {
         let (action, rx) = StarHandleAction::new(StarHandleCommand::Next(selector));
         self.tx.send(action).await?;
         let result = tokio::time::timeout(Duration::from_secs(5), rx).await??;
-        if let StarHandleResult::StarHandle(handles) = result {
-            Ok(handles)
-        } else {
-            Err(Fail::Unexpected)
+        match result {
+            StarHandleResult::StarHandle(handle) => {
+                Ok(handle)
+            }
+            what => {
+
+                Err(Fail::expected("StarHandleResult::StarHandle(handle)"))
+            }
         }
     }
 
@@ -70,10 +77,13 @@ impl StarHandleBacking {
         let (action, rx) = StarHandleAction::new(StarHandleCommand::Satisfied(set));
         self.tx.send(action).await?;
         let result = tokio::time::timeout(Duration::from_secs(5), rx).await??;
-        if let StarHandleResult::Satisfaction(satisfaction) = result {
-            Ok(satisfaction)
-        } else {
-            Err(Fail::Unexpected)
+        match result {
+            StarHandleResult::Satisfaction(satisfaction) => {
+                Ok(satisfaction)
+            }
+            what => {
+                Err(Fail::expected("StarHandleResult::Satisfaction(_)"))
+            }
         }
     }
 }
@@ -210,6 +220,7 @@ impl StarHandleAction {
     }
 }
 
+#[derive(strum_macros::Display)]
 pub enum StarHandleCommand {
     Close,
     SetStar(StarHandle),
@@ -218,6 +229,8 @@ pub enum StarHandleCommand {
     Satisfied(HashSet<StarKind>),
 }
 
+
+#[derive(strum_macros::Display)]
 pub enum StarHandleResult {
     Ok,
     StarHandles(Vec<StarHandle>),
@@ -225,6 +238,8 @@ pub enum StarHandleResult {
     Fail(Fail),
     Satisfaction(Satisfaction),
 }
+
+
 
 #[derive(Eq, PartialEq, Debug)]
 pub enum Satisfaction {
