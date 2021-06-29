@@ -70,6 +70,13 @@ impl StarlaneMachine {
         Ok(starlane)
     }
 
+    pub fn shutdown(&self) {
+        let tx = self.tx.clone();
+        tokio::spawn( async move {
+            tx.send(StarlaneCommand::Shutdown).await;
+        });
+    }
+
     pub async fn connect(&self, host: String, star_name: StarTemplateId) -> Result<ConnectorController,Error> {
         let (tx,rx) = oneshot::channel();
         self.tx.send( StarlaneCommand::Connect {host,star_name, tx }).await?;
@@ -116,7 +123,8 @@ pub struct StarlaneMachineRunner {
     pub artifact_caches: Option<Arc<ProtoArtifactCachesFactory>>,
     constellations: HashMap<String,Constellation>,
     port: usize,
-    listening: bool
+    listening: bool,
+    shutdown: bool
 }
 
 impl StarlaneMachineRunner {
@@ -141,7 +149,8 @@ impl StarlaneMachineRunner {
             artifact_caches: Option::None,
             port: DEFAULT_PORT.clone(),
             listening: false,
-            constellations: HashMap::new()
+            constellations: HashMap::new(),
+            shutdown: false
         })
     }
 
@@ -182,8 +191,8 @@ info!("STARTED StarlaneMachineRunner");
                         let star_ctrl = values.first().cloned().unwrap();
                         tx.send(Ok(StarlaneApi::new(star_ctrl.star_tx)));
                     }
-                    StarlaneCommand::Destroy => {
-                        warn!("closing rx");
+                    StarlaneCommand::Shutdown => {
+                        self.shutdown = true;
                         self.rx.close();
                     }
                    StarlaneCommand::Listen => {
@@ -205,7 +214,6 @@ info!("STARTED StarlaneMachineRunner");
                     }
                 }
             }
-            warn!("StarlaneMachineRunner is DONE.");
         });
     }
 
@@ -494,7 +502,10 @@ println!("new client!");
 
 impl Drop for StarlaneMachineRunner {
     fn drop(&mut self) {
-        warn!("DROPPING StarlaneMachineRunner");
+        if !self.shutdown
+        {
+            warn!("dropping StarlaneMachineRunner unexpectedly");
+        }
     }
 }
 
@@ -511,7 +522,7 @@ pub enum StarlaneCommand {
     StarlaneApiSelectAny(oneshot::Sender<Result<StarlaneApi,Error>>),
     Listen,
     AddStream(TcpStream),
-    Destroy,
+    Shutdown
 }
 
 pub struct StarlaneApiRequestByKey {
@@ -724,6 +735,7 @@ mod test {
  //           }
 
             //            assert_eq!(central_ctrl.diagnose_handlers_satisfaction().await.unwrap(),crate::star::pledge::Satisfaction::Ok)
+            starlane.shutdown();
         });
     }
 }
