@@ -6,11 +6,11 @@ use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::mpsc::Receiver;
 use std::sync::Arc;
-use std::thread;
+use std::{thread, io};
 
 use futures::future::BoxFuture;
 use futures::FutureExt;
-use tokio::runtime::Runtime;
+use tokio::runtime::{Runtime, Builder};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
@@ -35,6 +35,7 @@ use crate::star::{
     ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel,
 };
 use crate::core::mysql_database::MySQLDatabaseCore;
+use std::io::Write;
 
 pub mod artifact;
 pub mod default;
@@ -42,9 +43,17 @@ pub mod file_store;
 pub mod server;
 mod mysql_database;
 
+
+
 pub struct StarCoreAction {
     pub command: StarCoreCommand,
     pub tx: oneshot::Sender<Result<StarCoreResult, Fail>>,
+}
+
+impl ToString for StarCoreAction{
+    fn to_string(&self) -> String {
+        self.command.to_string()
+    }
 }
 
 impl StarCoreAction {
@@ -62,6 +71,7 @@ impl StarCoreAction {
     }
 }
 
+#[derive(strum_macros::Display)]
 pub enum StarCoreCommand {
     Get(ResourceIdentifier),
     State(ResourceIdentifier),
@@ -102,23 +112,37 @@ pub struct CoreRunner {
 
 impl CoreRunner {
     pub fn new() -> Result<Self, Error> {
+
         let factory = StarCoreFactory::new();
         let (tx, mut rx) = mpsc::channel(1);
         thread::spawn(move || {
-            let runtime = Runtime::new().unwrap();
+
+            let runtime = Builder::new_multi_thread()
+                .worker_threads(4)
+                .thread_name("star-core-runner")
+                .thread_stack_size(3 * 1024 * 1024)
+                .enable_all()
+                .build()
+                .unwrap();
+
+
             runtime.block_on(async move {
                 while let Option::Some(CoreRunnerCommand::Core { skel, rx }) = rx.recv().await {
                     let core = match factory.create(skel, rx).await {
                         Ok(core) => core,
                         Err(err) => {
-                            eprintln!("FATAL: {}", err);
-                            std::process::exit(1);
+                            error!("FATAL: {}", err);
+                            panic!("FATAL: {}", err);
+//                            std::process::exit(1);
                         }
                     };
-                    tokio::spawn(async move { core.run().await });
+                    tokio::spawn(async move {
+                        core.run().await;
+                    });
                 }
             });
         });
+
 
         Ok(CoreRunner { tx: tx })
     }
@@ -261,14 +285,36 @@ impl StarCore2 {
         }
     }
 
+
     pub async fn run(mut self) {
         while let Option::Some(action) = self.rx.recv().await {
             let result = self.process(action.command).await;
-            if action.tx.send(result).is_err() {
-                println!("Warning: Core sent response but got error.");
-            }
+            action.tx.send(result);
         }
     }
+
+
+    /*
+    pub async fn run(mut self) {
+        info!("CORE running");
+        loop {
+            let tick = tokio::time::timeout(Duration::from_secs(5), self.rx.recv()).await;
+            if let Result::Ok(Option::Some(action)) = tick {
+                info!("processing {}", action.to_string());
+                let result = self.process(action.command).await;
+                action.tx.send(result);
+                info!("looping...");
+            } else {
+                info!("{} tick!", self.skel.info.to_string());
+            }
+
+        }
+        error!("CoreRunner terminated")
+    }
+
+     */
+
+
 
     async fn process(&mut self, command: StarCoreCommand) -> Result<StarCoreResult, Fail> {
         match command {

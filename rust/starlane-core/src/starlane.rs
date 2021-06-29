@@ -42,6 +42,8 @@ use futures::stream::{SplitStream, SplitSink};
 use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 use std::str::FromStr;
 use crate::constellation::Constellation;
+use tokio::time::sleep;
+use std::collections::hash_map::RandomState;
 
 pub mod api;
 
@@ -63,9 +65,7 @@ impl StarlaneMachine {
             tx: runner.tx.clone()
         };
 
-        tokio::spawn( async move {
-            runner.run().await;
-        });
+        runner.run();
 
         Ok(starlane)
     }
@@ -145,41 +145,52 @@ impl StarlaneMachineRunner {
         })
     }
 
-    pub async fn run(&mut self) {
-        while let Option::Some(command) = self.rx.recv().await {
-            match command {
-                StarlaneCommand::Connect{ host, star_name, tx } => {
-unimplemented!();
-                }
-                StarlaneCommand::ConstellationCreate(command) => {
-println!("constellation CREATE");
-                    let result = self
-                        .constellation_create(command.layout, command.name)
-                        .await;
-if let Err(error) = &result {
-    eprintln!("{}",error.to_string());
-}
-                    command.tx.send(result);
-                }
-                StarlaneCommand::StarlaneApiSelectAny(tx) => {
-                    for (_,star_ctrl) in self.star_controllers.clone().into_map().await.unwrap_or(HashMap::new()) {
-                        tx.send(Ok(StarlaneApi::new(star_ctrl.star_tx)));
-                        return;
+    pub fn run(mut self) {
+        tokio::spawn( async move {
+info!("STARTED StarlaneMachineRunner");
+            while let Option::Some(command) = self.rx.recv().await {
+                match command {
+                    StarlaneCommand::Connect { host, star_name, tx } => {
+//                        unimplemented!();
+                        tx.send(Err(Error::from("not implemented")));
                     }
-                    tx.send(Err("ERROR: cannot create StarlaneApi: no StarControllers available.".into()));
-                }
-                StarlaneCommand::Destroy => {
-                    println!("closing rx");
-                    self.rx.close();
-                }
-                StarlaneCommand::StarControlRequestByKey(_) => {
-                    unimplemented!()
-                }
-                StarlaneCommand::Listen => {
-                    self.listen();
-                }
-                StarlaneCommand::AddStream(stream)=> {
-                    /*
+                    StarlaneCommand::ConstellationCreate(command) => {
+                        println!("constellation CREATE");
+                        let result = self
+                            .constellation_create(command.layout, command.name)
+                            .await;
+
+//sleep(Duration::from_secs(10)).await;
+                        if let Err(error) = &result {
+                            eprintln!("{}", error.to_string());
+                        }
+                        command.tx.send(result);
+                    }
+                    StarlaneCommand::StarlaneApiSelectAny(tx) => {
+                        let mut map = match self.star_controllers.clone().into_map().await{
+                            Ok(map) => {map}
+                            Err(err) => {
+                                tx.send(Err(err));
+                                continue;
+                            }
+                        };
+                        if map.is_empty() {
+                            tx.send(Err("ERROR: cannot create StarlaneApi: no StarControllers available.".into()));
+                            continue;
+                        }
+                        let values: Vec<StarController> = map.into_iter().map( |(k,v)| v ).collect();
+                        let star_ctrl = values.first().cloned().unwrap();
+                        tx.send(Ok(StarlaneApi::new(star_ctrl.star_tx)));
+                    }
+                    StarlaneCommand::Destroy => {
+                        warn!("closing rx");
+                        self.rx.close();
+                    }
+                   StarlaneCommand::Listen => {
+                        self.listen();
+                    }
+                    StarlaneCommand::AddStream(stream) => {
+                        /*
                     let star_name = StarTemplateId {
                         constellation: "standalone".to_string(),
                         handle: "mesh".into()
@@ -190,11 +201,15 @@ if let Err(error) = &result {
                         }
                     }
                      */
-                    unimplemented!("ADD STREAM IS NOT IMPLEMENTED")
+                        warn!("ADD STREAM IS NOT IMPLEMENTED")
+                    }
                 }
             }
-        }
+            warn!("StarlaneMachineRunner is DONE.");
+        });
     }
+
+
     async fn constellation_create(
         &mut self,
         layout : ConstellationLayout,
@@ -329,7 +344,6 @@ println!("connecting for local: {}",local_star.star.to_string() );
             result??;
         }
 
-println!("sending ConstellationReady signal");
         // announce that the local constellation is now complete
         constellation_broadcaster.send( ConstellationBroadcast::ConstellationReady );
 
@@ -343,8 +357,8 @@ println!("sending ConstellationReady signal");
             }
         }
 
-        Ok(())
 
+        Ok(())
     }
 
     fn listen(&mut self) {
@@ -478,16 +492,22 @@ println!("new client!");
 
 }
 
+impl Drop for StarlaneMachineRunner {
+    fn drop(&mut self) {
+        warn!("DROPPING StarlaneMachineRunner");
+    }
+}
+
 #[derive(Clone,Serialize,Deserialize)]
 pub struct VersionFrame {
     product: String,
     version: String
 }
 
+#[derive(strum_macros::Display)]
 pub enum StarlaneCommand {
     Connect{ host: String, star_name: StarTemplateId, tx: oneshot::Sender<Result<ConnectorController,Error>>},
     ConstellationCreate(ConstellationCreate),
-    StarControlRequestByKey(StarlaneApiRequestByKey),
     StarlaneApiSelectAny(oneshot::Sender<Result<StarlaneApi,Error>>),
     Listen,
     AddStream(TcpStream),
@@ -699,6 +719,7 @@ mod test {
                          */
 
 //            loop {
+
                 tokio::time::sleep(Duration::from_secs(1)).await;
  //           }
 

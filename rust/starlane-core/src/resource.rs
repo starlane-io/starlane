@@ -4286,7 +4286,7 @@ impl ResourceStub {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct ResourceAssign<S> {
     pub stub: ResourceStub,
     pub state_src: S,

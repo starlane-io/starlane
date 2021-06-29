@@ -362,7 +362,14 @@ pub enum Fail {
     InvalidResourceState(String),
 }
 
+
+
 impl Fail{
+
+    pub fn trace( fail: Fail )->Self{
+        error!("{}",fail.to_string().as_str());
+        fail
+    }
 
     pub fn expected( expected: &str) -> Self {
         error!(expected);

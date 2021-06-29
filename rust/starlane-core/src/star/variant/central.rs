@@ -62,7 +62,7 @@ impl CentralVariant {
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         let space_api = creation.submit().await?;
 
-        let mut creation = space_api.create_user("hyperuser@starlane-core.io")?;
+        let mut creation = space_api.create_user("hyperuser@starlane.io")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
 

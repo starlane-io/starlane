@@ -30,6 +30,7 @@ use crate::resource::{
     ResourceType,
 };
 
+#[derive(Debug)]
 pub struct DefaultHost {
     store: ResourceStore,
 }
@@ -44,6 +45,7 @@ impl DefaultHost {
 
 #[async_trait]
 impl Host for DefaultHost {
+    #[instrument]
     async fn assign(
         &mut self,
         assign: ResourceAssign<AssignResourceStateSrc>,

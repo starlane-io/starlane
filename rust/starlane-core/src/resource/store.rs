@@ -18,7 +18,7 @@ use crate::resource::{
     ResourceStatePersistenceManager,
 };
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct ResourceStore {
     tx: mpsc::Sender<ResourceStoreAction>,
 }

@@ -79,6 +79,7 @@ use crate::util;
 use crate::util::AsyncHashMap;
 use crate::template::StarTemplateHandle;
 use std::fmt::{Debug, Formatter};
+use tracing::field::{Field, Visit};
 
 pub mod filestore;
 pub mod pledge;
@@ -466,6 +467,9 @@ impl Star {
 
     pub async fn get_resource(&self, key: &ResourceKey) -> Result<Option<Resource>, Fail> {
         let (action, rx) = StarCoreAction::new(StarCoreCommand::Get(key.clone().into()));
+if self.skel.core_tx.is_closed() {
+    error!("core_tx CLOSED");
+}
         self.skel.core_tx.send(action).await?;
         match rx.await?? {
             StarCoreResult::Resource(has) => Ok(has),
@@ -641,7 +645,13 @@ impl Star {
         }
          */
 
+    #[instrument]
     pub async fn run(mut self) {
+        let skel = self.skel.clone();
+        tokio::spawn(async move {
+            skel.core_tx.closed().await;
+            warn!("core_tx_closed: {}",skel.info.to_string());
+        });
         loop {
             let mut futures = vec![];
             let mut lanes = vec![];
@@ -833,9 +843,10 @@ impl Star {
                     let (tx, rx) = oneshot::channel();
                     self.variant.init(tx).await;
                     let star_tx = self.skel.star_tx.clone();
+                    let skel = self.skel.clone();
                     tokio::spawn(async move {
                         // don't really have a mechanism to panic if init fails ... need to add that
-                        rx.await;
+                        rx.await.unwrap();
                         star_tx
                             .send(StarCommand::SetStatus(StarStatus::Ready))
                             .await;
@@ -1718,7 +1729,6 @@ impl Star {
         }
     }
 
-    #[instrument]
     async fn process_frame(&mut self, frame: Frame, lane_key: Option<&StarKey>) {
         self.process_transactions(&frame, lane_key).await;
         match frame {
@@ -1881,10 +1891,8 @@ unimplemented!();
          */
     }
 
-    #[instrument]
     async fn on_message(&mut self, mut message: StarMessage) -> Result<(), Error> {
         if message.log {
-            info!("on_message");
 /*            info!(
                 "{} => {} : {}",
                 self.skel.info.to_string(),
@@ -1912,7 +1920,6 @@ unimplemented!();
         }
     }
 
-    #[instrument]
     async fn process_resource_message(
         &mut self,
         mut star_message: StarMessage,
@@ -2013,13 +2020,14 @@ unimplemented!();
         Ok(())
     }
 
-    #[instrument]
     async fn process_child_manager_resource_action(
         &mut self,
         message: StarMessage,
         action: ChildManagerResourceAction,
     ) -> Result<(), Error> {
+
         if let Option::Some(manager) = self.skel.registry.clone() {
+
             match action {
                 ChildManagerResourceAction::Register(registration) => {
                     let result = manager.register(registration.clone()).await;
@@ -3032,11 +3040,13 @@ impl StarSkel {
 
 
 
-#[derive(Clone)]
+#[derive(Debug,Clone)]
 pub struct StarInfo {
     pub key: StarKey,
     pub kind: StarKind,
 }
+
+
 
 impl StarInfo {
     pub fn new(star: StarKey, kind: StarKind) -> Self {
