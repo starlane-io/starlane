@@ -146,8 +146,15 @@ impl ProtoStar {
 
             if let Some(command) = command {
                 match command {
-                    StarCommand::GetStarKey(tx) => {
-                        tx.send( self.star_key.clone() );
+                    StarCommand::GetStarInfo(tx) => {
+                        if self.star_key.is_none() {
+                            tx.send(Option::None);
+                        } else {
+                            tx.send( Option::Some(StarInfo{
+                                key: self.star_key.as_ref().unwrap().clone(),
+                                kind: self.kind.clone()
+                            })  );
+                        }
                     }
                     StarCommand::ConstellationBroadcast(ConstellationBroadcast::ConstellationReady)=> {
                         let info = StarInfo {

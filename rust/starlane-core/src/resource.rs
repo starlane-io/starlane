@@ -54,6 +54,7 @@ use std::path::PathBuf;
 use url::Url;
 use std::fs::DirBuilder;
 use tokio::sync::oneshot::error::RecvError;
+use std::fmt::{Debug, Formatter};
 
 pub mod artifact;
 pub mod config;
@@ -1951,11 +1952,18 @@ pub struct ParentCore {
     pub child_registry: Arc<dyn ResourceRegistryBacking>,
 }
 
+impl Debug for ParentCore {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("ParentCore").field(&self.skel).field(&self.stub).finish()
+    }
+}
+
 pub struct Parent {
     pub core: ParentCore,
 }
 
 impl Parent {
+    #[instrument]
     async fn create_child(
         core: ParentCore,
         create: ResourceCreate,
@@ -1980,12 +1988,7 @@ impl Parent {
                         tx.send(Ok(resource));
                     }
                     Err(fail) => {
-                        elog(
-                            &core,
-                            &create,
-                            "create_child()",
-                            format!("Failed to create child. FAIL:{}", fail.to_string()).as_str(),
-                        );
+                        error!("Failed to create child: FAIL: {}",fail.to_string());
                         tx.send(Err(fail));
                     }
                 }

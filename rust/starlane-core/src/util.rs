@@ -5,9 +5,12 @@ use std::hash::Hash;
 
 use tokio::sync::{mpsc, oneshot};
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::oneshot::error::RecvError;
 use tokio::time::Duration;
+use tokio::time::error::Elapsed;
 
 use crate::error::Error;
+use crate::message::Fail;
 
 pub struct Progress<E> {
     rx: Receiver<E>,
@@ -145,18 +148,74 @@ where
 }
 
 pub async fn wait_for_it<R>(rx: oneshot::Receiver<Result<R, Error>>) -> Result<R, Error> {
-    tokio::time::timeout(Duration::from_secs(15), rx).await??
+    match tokio::time::timeout(Duration::from_secs(4), rx).await {
+        Ok(result) => {
+            match result {
+                Ok(result) => {
+                    match result {
+                        Ok(result) => {
+                            Ok(result)
+                        }
+                        Err(error) => {
+                            log_err(error)
+                        }
+                    }
+                }
+                Err(error) => {
+                    log_err(error)
+                }
+            }
+        }
+        Err(err) => {
+            log_err(Fail::Timeout)
+        }
+    }
 }
 
 pub async fn wait_for_it_whatever<R>(rx: oneshot::Receiver<R>) -> Result<R, Error> {
-    Ok(tokio::time::timeout(Duration::from_secs(26), rx).await??)
+    match tokio::time::timeout(Duration::from_secs(4), rx).await {
+        Ok(result) => {
+            match result {
+                Ok(result) => {
+                    Ok(result)
+                }
+                Err(error) => {
+                    log_err(error)
+                }
+            }
+        }
+        Err(err) => {
+            log_err(Fail::Timeout)
+        }
+    }
 }
 
 pub async fn wait_for_it_for<R>(
     rx: oneshot::Receiver<Result<R, Error>>,
     duration: Duration,
 ) -> Result<R, Error> {
-    tokio::time::timeout(duration, rx).await??
+    match tokio::time::timeout(duration, rx).await {
+        Ok(result) => {
+            match result {
+                Ok(result) => {
+                    match result {
+                        Ok(result) => {
+                            Ok(result)
+                        }
+                        Err(error) => {
+                            log_err(error)
+                        }
+                    }
+                }
+                Err(error) => {
+                    log_err(error)
+                }
+            }
+        }
+        Err(err) => {
+            log_err(Fail::Timeout)
+        }
+    }
 }
 
 #[async_trait]
@@ -206,4 +265,9 @@ pub fn sort<T:Ord+PartialOrd+ToString>(a: T, b: T) -> Result<(T, T), Error> {
     } else {
         Ok((b, a))
     }
+}
+
+pub fn log_err<E:ToString,OK,O:From<E>>(err: E ) -> Result<OK,O>{
+  error!("{}",err.to_string());
+  Err(err.into())
 }

@@ -66,7 +66,6 @@ impl StarHandleBacking {
                 Ok(handle)
             }
             what => {
-
                 Err(Fail::expected("StarHandleResult::StarHandle(handle)"))
             }
         }
@@ -88,7 +87,7 @@ impl StarHandleBacking {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug,Clone)]
 pub struct ResourceHostSelector {
     skel: StarSkel,
 }

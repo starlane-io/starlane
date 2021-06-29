@@ -1,4 +1,13 @@
-pub mod resource;
+use std::cell::Cell;
+use std::collections::HashSet;
+use std::fmt;
+use std::fmt::{Display, Formatter};
+
+use serde::{Deserialize, Serialize};
+use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::broadcast::error::RecvError;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::oneshot::Receiver;
 
 use crate::error::Error;
 use crate::frame::{
@@ -10,15 +19,8 @@ use crate::lane::LaneMeta;
 use crate::names::Specific;
 use crate::resource::{ResourceAddress, ResourceIdentifier, ResourceType};
 use crate::star::{StarCommand, StarKey, StarSearchTransaction, Transaction, TransactionResult};
-use serde::{Deserialize, Serialize};
-use std::cell::Cell;
-use std::collections::HashSet;
-use std::fmt;
-use std::fmt::{Display, Formatter};
-use tokio::sync::broadcast::error::RecvError;
-use tokio::sync::mpsc::Sender;
-use tokio::sync::oneshot::Receiver;
-use tokio::sync::{broadcast, mpsc, oneshot};
+
+pub mod resource;
 
 #[derive(Clone)]
 pub enum ProtoStarMessageTo {
@@ -362,8 +364,6 @@ pub enum Fail {
     InvalidResourceState(String),
 }
 
-
-
 impl Fail{
 
     pub fn trace( fail: Fail )->Self{
@@ -389,7 +389,7 @@ impl ToString for Fail {
             Fail::Reject(_) => "Reject".to_string(),
             Fail::Unexpected{expected,received} => format!("Unexpected( expected: {}, received: {} )",expected,received).to_string(),
             Fail::DoNotKnowSpecific(_) => "DoNotKnowSpecific".to_string(),
-            Fail::ResourceNotFound(_) => "ResourceNotFound".to_string(),
+            Fail::ResourceNotFound(id) => format!("ResourceNotFound({})",id.to_string()).to_string(),
             Fail::WrongResourceType {
                 expected: expected,
                 received: received,
@@ -442,7 +442,7 @@ pub enum RejectKind {
 
 impl From<tokio::sync::oneshot::error::RecvError> for Fail {
     fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
-        Fail::Timeout
+        Fail::ChannelRecvErr
     }
 }
 

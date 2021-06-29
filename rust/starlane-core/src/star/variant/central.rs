@@ -61,18 +61,22 @@ impl CentralVariant {
         let mut creation = starlane_api.create_space("hyperspace", "Hyper Space")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         let space_api = creation.submit().await?;
+        info!("hyperspace creation ensured.");
 
         let mut creation = space_api.create_user("hyperuser@starlane.io")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
+        info!("hyperuser creation ensured.");
 
         let mut creation = space_api.create_sub_space("default")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
+        info!("hyperspace:default sub_space creation ensured.");
 
         let mut creation = space_api.create_domain("localhost")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
+        info!("locahost domain creation ensured.");
 
         Ok(())
     }

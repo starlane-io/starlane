@@ -672,8 +672,8 @@ if self.skel.core_tx.is_closed() {
                     StarCommand::Init => {
                         self.init().await;
                     }
-                    StarCommand::GetStarKey(tx) => {
-                        tx.send( Option::Some(self.skel.info.key.clone()) );
+                    StarCommand::GetStarInfo(tx) => {
+                        tx.send( Option::Some(self.skel.info.clone()) );
                     }
                     StarCommand::SetFlags(set_flags) => {
                         self.skel.flags = set_flags.flags;
@@ -824,7 +824,7 @@ if self.skel.core_tx.is_closed() {
                             }
                         }
                     } else {
-                        eprintln!(
+                        error!(
                             "error encountered when attempting to get a handle for: {}",
                             kind
                         );
@@ -884,10 +884,12 @@ if self.skel.core_tx.is_closed() {
         }
     }
 
+    #[instrument]
     async fn locate_resource_record(
         &mut self,
         request: Request<ResourceIdentifier, ResourceRecord>,
     ) {
+info!("locating resource");
         if request.log {
             self.log(
                 LogId(request.payload.to_string()),
@@ -941,11 +943,7 @@ if self.skel.core_tx.is_closed() {
                         request.tx.send(Ok(record));
                     }
                     None => {
-                        self.log(
-                            LogId(request.payload.to_string()),
-                            "locate_resource_record()",
-                            "FATAL: ResourceNotFound",
-                        );
+                        error!("resource not found");
                         request
                             .tx
                             .send(Err(Fail::ResourceNotFound(request.payload)));
@@ -2355,7 +2353,7 @@ pub enum StarCommand {
     SendProtoMessage(ProtoStarMessage),
     SetFlags(SetFlags),
     ReleaseHold(StarKey),
-    GetStarKey(oneshot::Sender<Option<StarKey>>),
+    GetStarInfo(oneshot::Sender<Option<StarInfo>>),
     WindInit(Wind),
     WindCommit(WindCommit),
     WindDown(WindDown),
@@ -2482,13 +2480,21 @@ impl LocalResourceLocation {
     }
 }
 
-pub struct Request<P, R> {
+pub struct Request<P:Debug, R> {
     pub payload: P,
     pub tx: oneshot::Sender<Result<R, Fail>>,
     pub log: bool,
 }
 
-impl<P, R> Request<P, R> {
+impl<P:Debug, R> Debug for Request<P,R>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.payload.fmt(f)
+    }
+}
+
+
+impl<P:Debug, R> Request<P, R> {
     pub fn new(payload: P) -> (Self, oneshot::Receiver<Result<R, Fail>>) {
         let (tx, rx) = oneshot::channel();
         (
@@ -2605,7 +2611,7 @@ impl fmt::Display for StarCommand {
             }
             StarCommand::SetStatus(_) => "StarStatus".to_string(),
             StarCommand::GetCaches(_) => "GetCaches".to_string(),
-            StarCommand::GetStarKey(_) => "GetStarKey".to_string(),
+            StarCommand::GetStarInfo(_) => "GetStarInfo".to_string(),
             StarCommand::AddProtoLaneEndpoint(_) => "ProtoLaneEndpoint".to_string()
         };
         write!(f, "{}", r)
@@ -2638,9 +2644,9 @@ impl StarController {
         Ok(tokio::time::timeout(Duration::from_secs(5), rx).await??)
     }
 
-    pub async fn get_star_key( &self )->Result<Option<StarKey>,Error> {
+    pub async fn get_star_info( &self )->Result<Option<StarInfo>,Error> {
         let (tx,rx) = oneshot::channel();
-        self.star_tx.send(StarCommand::GetStarKey(tx)).await;
+        self.star_tx.send(StarCommand::GetStarInfo(tx)).await;
         Ok(rx.await?)
     }
 }
@@ -3027,6 +3033,12 @@ pub struct StarSkel {
     pub persistence: Persistence,
     pub data_access: FileAccess,
     pub caches: Arc<ProtoArtifactCachesFactory>,
+}
+
+impl Debug for StarSkel{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.info.fmt(f)
+    }
 }
 
 impl StarSkel {

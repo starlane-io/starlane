@@ -22,7 +22,7 @@ use crate::keys::ResourceKey;
 use crate::lane::{ConnectionInfo, ConnectionKind, LaneEndpoint, LocalTunnelConnector, ServerSideTunnelConnector, ClientSideTunnelConnector, ConnectorController, ProtoLaneEndpoint};
 use crate::logger::{Flags, Logger};
 use crate::message::{Fail, ProtoStarMessage};
-use crate::star::ConstellationBroadcast;
+use crate::star::{ConstellationBroadcast, StarKind};
 use crate::proto::{
     local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoTunnel,
 };
@@ -96,7 +96,7 @@ impl StarlaneMachine {
 
     pub async fn get_starlane_api(&self) -> Result<StarlaneApi,Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send( StarlaneCommand::StarlaneApiSelectAny(tx)).await?;
+        self.tx.send( StarlaneCommand::StarlaneApiSelectBest(tx)).await?;
         rx.await?
     }
 
@@ -175,7 +175,7 @@ info!("STARTED StarlaneMachineRunner");
                         }
                         command.tx.send(result);
                     }
-                    StarlaneCommand::StarlaneApiSelectAny(tx) => {
+                    StarlaneCommand::StarlaneApiSelectBest(tx) => {
                         let mut map = match self.star_controllers.clone().into_map().await{
                             Ok(map) => {map}
                             Err(err) => {
@@ -188,7 +188,32 @@ info!("STARTED StarlaneMachineRunner");
                             continue;
                         }
                         let values: Vec<StarController> = map.into_iter().map( |(k,v)| v ).collect();
-                        let star_ctrl = values.first().cloned().unwrap();
+
+                        let mut best = Option::None;
+
+                        for star_ctrl in values {
+                            let info = star_ctrl.get_star_info().await.unwrap().unwrap();
+                            if best.is_none() {
+                                best = Option::Some((info, star_ctrl));
+                            } else {
+                                let (prev_info,_) = best.as_ref().unwrap();
+                                match info.kind {
+                                    StarKind::Mesh => {
+                                        best = Option::Some((info,star_ctrl));
+                                    }
+                                    StarKind::Client => {
+                                        if prev_info.kind != StarKind::Mesh {
+                                            best = Option::Some((info,star_ctrl));
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+
+                        let (info,star_ctrl) = best.unwrap();
+                        info!("selected {:?}", info );
+
                         tx.send(Ok(StarlaneApi::new(star_ctrl.star_tx)));
                     }
                     StarlaneCommand::Shutdown => {
@@ -365,6 +390,8 @@ println!("connecting for local: {}",local_star.star.to_string() );
             }
         }
 
+// give it a second to finish setup... need to remove this eventually:
+tokio::time::sleep(Duration::from_secs(1)).await;
 
         Ok(())
     }
@@ -378,7 +405,6 @@ println!("connecting for local: {}",local_star.star.to_string() );
         let port = self.port.clone();
         let tx = self.tx.clone();
         tokio::spawn( async move {
-
             let std_listener = std::net::TcpListener::bind(format!("127.0.0.1:{}",port)).unwrap();
             let listener = TcpListener::from_std(std_listener).unwrap();
 println!("LISTENING!");
@@ -519,7 +545,7 @@ pub struct VersionFrame {
 pub enum StarlaneCommand {
     Connect{ host: String, star_name: StarTemplateId, tx: oneshot::Sender<Result<ConnectorController,Error>>},
     ConstellationCreate(ConstellationCreate),
-    StarlaneApiSelectAny(oneshot::Sender<Result<StarlaneApi,Error>>),
+    StarlaneApiSelectBest(oneshot::Sender<Result<StarlaneApi,Error>>),
     Listen,
     AddStream(TcpStream),
     Shutdown
@@ -641,7 +667,6 @@ mod test {
             let mut starlane = StarlaneMachine::new("server".to_string() ).unwrap();
             starlane.create_constellation("standalone".to_string(), ConstellationLayout::standalone().unwrap() ).await.unwrap();
 
-            tokio::time::sleep(Duration::from_secs(1)).await;
 
             let starlane_api = starlane.get_starlane_api().await.unwrap();
 
@@ -659,7 +684,6 @@ mod test {
                     panic!(err)
                 }
             };
-            tokio::time::sleep(Duration::from_secs(1)).await;
 
             let file_api = sub_space_api
                 .create_file_system("website")
@@ -731,7 +755,7 @@ mod test {
 
 //            loop {
 
-                tokio::time::sleep(Duration::from_secs(1)).await;
+//                tokio::time::sleep(Duration::from_secs(1)).await;
  //           }
 
             //            assert_eq!(central_ctrl.diagnose_handlers_satisfaction().await.unwrap(),crate::star::pledge::Satisfaction::Ok)
