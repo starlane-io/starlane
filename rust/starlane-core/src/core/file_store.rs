@@ -4,6 +4,7 @@ use std::iter::FromIterator;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::fmt;
 
 use rusqlite::Connection;
 use tokio::sync::{mpsc, Mutex};
@@ -26,12 +27,19 @@ use crate::star::StarSkel;
 
 use crate::util;
 use std::fs;
+use std::fmt::{Debug, Formatter};
 
 pub struct FileStoreHost {
     skel: StarSkel,
     file_access: FileAccess,
     store: ResourceStore,
     mutex: Arc<Mutex<u8>>,
+}
+
+impl Debug for FileStoreHost {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(format!("FileStoreHost: {:?}", self.skel).as_str() )
+    }
 }
 
 impl FileStoreHost {
@@ -46,7 +54,7 @@ impl FileStoreHost {
 
         rtn.walk().await?;
 
-        rtn.watch().await?;
+        //rtn.watch().await?;
 
         Ok(rtn)
     }
@@ -84,6 +92,7 @@ impl FileStoreHost {
         Ok(())
     }
 
+    #[instrument]
     async fn watch(&self) -> Result<(), Error> {
         let mut event_rx = self.file_access.watch().await?;
         let dir = PathBuf::from(self.file_access.path());
@@ -107,7 +116,7 @@ impl FileStoreHost {
                 {
                     Ok(_) => {}
                     Err(error) => {
-                        eprintln!(
+                        error!(
                             "WATCH: error when handling path: {} error: {} ",
                             event.path,
                             error.to_string()

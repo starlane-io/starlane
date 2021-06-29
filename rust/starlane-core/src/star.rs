@@ -889,7 +889,6 @@ if self.skel.core_tx.is_closed() {
         &mut self,
         request: Request<ResourceIdentifier, ResourceRecord>,
     ) {
-info!("locating resource");
         if request.log {
             self.log(
                 LogId(request.payload.to_string()),
