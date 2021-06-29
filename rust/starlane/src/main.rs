@@ -29,7 +29,7 @@ fn main() -> Result<(), Error> {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
             let mut starlane = StarlaneMachine::new("server".to_string() ).unwrap();
-            starlane.create_constellation( Option::Some("standalone".to_string()), ConstellationLayout::standalone_with_database().unwrap()  ).await.unwrap();
+            starlane.create_constellation( "standalone", ConstellationLayout::standalone_with_database().unwrap()  ).await.unwrap();
             starlane.listen();
         });
     } else if let Option::Some(matches) = matches.subcommand_matches("config") {
@@ -71,7 +71,7 @@ async fn push( args: ArgMatches<'_> ) -> Result<(),Error> {
             println!("starting push connnection");
         } );
         let mut starlane = StarlaneMachine::new("client".to_string() ).unwrap();
-        starlane.create_constellation( Option::Some("client".to_string()), ConstellationLayout::client()? ).await?;
+        starlane.create_constellation( "client", ConstellationLayout::client()? ).await?;
         starlane.listen();
         let star_name = StarName { constellation: "client".to_string(), star: "client".to_string() };
         let ctrl= starlane.connect( host, star_name ).await?;

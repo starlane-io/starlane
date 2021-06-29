@@ -476,6 +476,9 @@ pub struct ProtoTunnel {
 
 impl ProtoTunnel {
     pub async fn evolve(mut self) -> Result<(TunnelOut, TunnelIn), Error> {
+
+
+info!("sending STARLANE_PROTOCOL_VERSION {}",STARLANE_PROTOCOL_VERSION );
         self.tx
             .send(Frame::Proto(ProtoFrame::StarLaneProtocolVersion(
                 STARLANE_PROTOCOL_VERSION,
@@ -490,6 +493,7 @@ impl ProtoTunnel {
 
         // first we confirm that the version is as expected
         if let Option::Some(Frame::Proto(recv)) = self.rx.recv().await {
+info!("received PROTOFRAME {}", recv );
             match recv {
                 ProtoFrame::StarLaneProtocolVersion(version)
                     if version == STARLANE_PROTOCOL_VERSION =>

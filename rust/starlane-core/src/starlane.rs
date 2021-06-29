@@ -19,7 +19,7 @@ use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::{ChildManagerResourceAction, Frame, Reply, SimpleReply, StarMessagePayload};
 use crate::keys::ResourceKey;
-use crate::lane::{ConnectionInfo, ConnectionKind, LaneEndpoint, LocalTunnelConnector, ServerSideTunnelConnector, ClientSideTunnelConnector, ConnectorController, ProtoLaneEndpoint};
+use crate::lane::{ConnectionInfo, ConnectionKind, LaneEndpoint, LocalTunnelConnector, ServerSideTunnelConnector, ClientSideTunnelConnector, ConnectorController, ProtoLaneEndpoint, FrameCodex};
 use crate::logger::{Flags, Logger};
 use crate::message::{Fail, ProtoStarMessage};
 use crate::star::{ConstellationBroadcast, StarKind};
@@ -44,12 +44,14 @@ use std::str::FromStr;
 use crate::constellation::Constellation;
 use tokio::time::sleep;
 use std::collections::hash_map::RandomState;
+use std::cell::Cell;
 
 pub mod api;
 
 lazy_static! {
 //    pub static ref DATA_DIR: Mutex<String> = Mutex::new("data".to_string());
-    pub static ref DEFAULT_PORT: usize = 4343;
+    pub static ref DEFAULT_PORT: usize = { std::env::var("STARLANE_PORT").unwrap_or("4343".to_string()).parse::<usize>().unwrap_or(4343) };
+
     pub static ref VERSION: VersionFrame = VersionFrame{ product: "Starlane".to_string(), version: "1.0.0".to_string() };
 }
 
@@ -62,7 +64,7 @@ impl StarlaneMachine {
     pub fn new(name: MachineName) -> Result<Self,Error> {
         let mut runner = StarlaneMachineRunner::new(name)?;
         let starlane = Self {
-            tx: runner.tx.clone()
+            tx: runner.command_tx.clone()
         };
 
         runner.run();
@@ -83,7 +85,8 @@ impl StarlaneMachine {
         rx.await?
     }
 
-    pub async fn create_constellation(&self, name: String, layout: ConstellationLayout ) -> Result<(),Error> {
+    pub async fn create_constellation(&self, name: &str, layout: ConstellationLayout ) -> Result<(),Error> {
+        let name = name.to_string();
         let (tx,rx) = oneshot::channel();
         let create = ConstellationCreate{
             name,
@@ -100,18 +103,18 @@ impl StarlaneMachine {
         rx.await?
     }
 
-    pub fn listen(&self) {
-        let tx = self.tx.clone();
-        tokio::spawn( async move {
-            tx.send(StarlaneCommand::Listen).await;
-        });
+    pub async fn listen(&self) -> Result<(),Error>{
+        let command_tx = self.tx.clone();
+        let (tx,rx) = oneshot::channel();
+        command_tx.send(StarlaneCommand::Listen(tx)).await;
+        rx.await?
     }
 }
 
 pub struct StarlaneMachineRunner {
     name: MachineName,
-    pub tx: mpsc::Sender<StarlaneCommand>,
-    rx: mpsc::Receiver<StarlaneCommand>,
+    pub command_tx: mpsc::Sender<StarlaneCommand>,
+    command_rx: mpsc::Receiver<StarlaneCommand>,
     star_controllers: AsyncHashMap<StarInConstellationTemplateHandle, StarController>,
     star_manager_factory: Arc<dyn StarVariantFactory>,
     //    star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
@@ -123,18 +126,17 @@ pub struct StarlaneMachineRunner {
     pub artifact_caches: Option<Arc<ProtoArtifactCachesFactory>>,
     constellations: HashMap<String,Constellation>,
     port: usize,
-    listening: bool,
-    shutdown: bool
+    inner_flags: Arc<Mutex<Cell<StarlaneInnerFlags>>>,
 }
 
 impl StarlaneMachineRunner {
     pub fn new(machine: String) -> Result<Self, Error> {
-        let (tx, rx) = mpsc::channel(32);
+        let (command_tx, command_rx) = mpsc::channel(32);
         Ok(StarlaneMachineRunner {
             name: machine,
             star_controllers: AsyncHashMap::new(),
-            tx: tx,
-            rx: rx,
+            command_tx,
+            command_rx,
             star_manager_factory: Arc::new(StarVariantFactoryDefault {}),
             //            star_core_ext_factory: Arc::new(ExampleStarCoreExtFactory::new() ),
             core_runner: Arc::new(CoreRunner::new()?),
@@ -148,16 +150,16 @@ impl StarlaneMachineRunner {
             )?,
             artifact_caches: Option::None,
             port: DEFAULT_PORT.clone(),
-            listening: false,
             constellations: HashMap::new(),
-            shutdown: false
+            inner_flags: Arc::new(Mutex::new(Cell::new(StarlaneInnerFlags::new()) )),
         })
     }
 
     pub fn run(mut self) {
         tokio::spawn( async move {
 info!("STARTED StarlaneMachineRunner");
-            while let Option::Some(command) = self.rx.recv().await {
+            while let Option::Some(command) = self.command_rx.recv().await {
+info!("processing command: {}", command.to_string() );
                 match command {
                     StarlaneCommand::Connect { host, star_name, tx } => {
 //                        unimplemented!();
@@ -212,34 +214,58 @@ info!("STARTED StarlaneMachineRunner");
                         }
 
                         let (info,star_ctrl) = best.unwrap();
-                        info!("selected {:?}", info );
 
                         tx.send(Ok(StarlaneApi::new(star_ctrl.star_tx)));
                     }
                     StarlaneCommand::Shutdown => {
-                        self.shutdown = true;
-                        self.rx.close();
+warn!("SHUTDOWN CALLED");
+                        let mut inner_flags= self.inner_flags.lock().unwrap();
+                        inner_flags.get_mut().shutdown = true;
+
+                        self.command_rx.close();
                     }
-                   StarlaneCommand::Listen => {
-                        self.listen();
+                   StarlaneCommand::Listen(tx) => {
+                        self.listen(tx);
                     }
                     StarlaneCommand::AddStream(stream) => {
-                        /*
-                    let star_name = StarTemplateId {
-                        constellation: "standalone".to_string(),
-                        handle: "mesh".into()
-                    };
-                    if let Ok(Option::Some(key)) = self.star_names.get(star_name).await {
-                        if let Ok(Option::Some(ctrl)) = self.star_controllers.get(key).await {
-                            self.add_server_side_lane_ctrl(ctrl.clone(), stream).await;
-                        }
+info!("AddStream");
+                        match self.select_star_kind(&StarKind::Gateway ).await {
+                           Ok(Option::Some(star_ctrl)) => {
+                               match self.add_server_side_lane_ctrl(star_ctrl,stream).await{
+                                   Ok(result) => {
+                                       info!("added server side proto");
+                                   }
+                                   Err(error) => {
+                                       error!("{}",error);
+                                   }
+                               }
+
+                           }
+                           Ok(Option::None) => {
+                               error!("cannot find StarController for kind: StarKind::Gateway");
+                           }
+                           Err(err) => {
+                               error!("{}",err);
+                           }
+                       }
                     }
-                     */
-                        warn!("ADD STREAM IS NOT IMPLEMENTED")
-                    }
-                }
+               }
             }
         });
+    }
+
+    async fn select_star_kind( &self, kind: &StarKind ) -> Result<Option<StarController>,Error> {
+        let map = self.star_controllers.clone().into_map().await?;
+        let values: Vec<StarController> = map.into_iter().map( |(k,v)| v ).collect();
+
+        for star_ctrl in values {
+            let info = star_ctrl.get_star_info().await?.ok_or("expected StarInfo")?;
+            if info.kind == *kind {
+                return Ok(Option::Some(star_ctrl));
+            }
+        }
+
+        Ok(Option::None)
     }
 
 
@@ -356,10 +382,12 @@ println!("connecting for local: {}",local_star.star.to_string() );
                                     proto_lane_evolution_rxs.append( & mut evolution_rxs );
                                 }
                                 ConstellationSelector::AnyInsideMachine(machine_name) => {
-                                    let host_address = layout.machine_host_address(machine_name.clone());
+info!("connecting to {}", machine_name);
+                                    let host_address = layout.get_machine_host_adddress(machine_name.clone());
+info!("host_address to {}", host_address );
                                     let star_ctrl = self.star_controllers.get(local_star.clone() ).await?.ok_or("expected local star to have star_ctrl")?;
-                                    self.add_client_side_lane_ctrl(star_ctrl, host_address, constellation_selector.clone() ).await?;
-                                    unimplemented!()
+                                    let proto_lane_evolution_rx= self.add_client_side_lane_ctrl(star_ctrl, host_address, constellation_selector.clone() ).await?;
+                                    proto_lane_evolution_rxs.push( proto_lane_evolution_rx );
                                 }
                             }
                         }
@@ -396,24 +424,64 @@ tokio::time::sleep(Duration::from_secs(1)).await;
         Ok(())
     }
 
-    fn listen(&mut self) {
-        if self.listening {
-            return;
+    fn listen(&mut self, result_tx: oneshot::Sender<Result<(),Error>>){
+
+        {
+            let mut inner_flags = self.inner_flags.lock().unwrap();
+            let flags = inner_flags.get_mut();
+
+            if flags.listening {
+                result_tx.send(Ok(()));
+                return;
+            }
+            flags.listening = true;
         }
 
-        self.listening = true;
+
+        {
+            let port = self.port.clone();
+            let inner_flags = self.inner_flags.clone();
+
+            ctrlc::set_handler( move || {
+                Self::unlisten(inner_flags.clone(), port.clone());
+            }).expect("expected to be able to set ctrl-c handler");
+
+        }
+
         let port = self.port.clone();
-        let tx = self.tx.clone();
+        let command_tx = self.command_tx.clone();
+        let flags = self.inner_flags.clone();
         tokio::spawn( async move {
-            let std_listener = std::net::TcpListener::bind(format!("127.0.0.1:{}",port)).unwrap();
-            let listener = TcpListener::from_std(std_listener).unwrap();
+            match std::net::TcpListener::bind(format!("127.0.0.1:{}",port)){
+                Ok(std_listener) => {
+                    let listener = TcpListener::from_std(std_listener).unwrap();
 println!("LISTENING!");
-            while let Ok((mut stream,_)) = listener.accept().await {
-println!("new client!");
-                tx.send( StarlaneCommand::AddStream(stream) ).await;
+                    result_tx.send(Ok(()) );
+                    while let Ok((mut stream,_)) = listener.accept().await {
+                        {
+                            let mut flags = flags.lock().unwrap();
+                            let flags = flags.get_mut();
+                            if flags.shutdown {
+                                info!("shutting down TcpListener");
+                                drop(listener);
+                                return;
+                            }
+                        }
+                        info!("new client!");
+                        let ok = command_tx.send( StarlaneCommand::AddStream(stream) ).await.is_ok();
+                        tokio::time::sleep(Duration::from_secs(0)).await;
+                        info!("SEND ADD STREAM: {}", ok );
+info!("Add stream sent...!");
+                    }
+                    eprintln!("TCP LISTENER TERMINATED");
+                }
+                Err(error) => {
+                    error!("FATAL: could not setup TcpListener {}", error);
+                    result_tx.send(Err(error.into()) );
+                }
             }
-            eprintln!("TCP LISTENER TERMINATED");
         } );
+info!("Return from LISTEN");
     }
 
 
@@ -511,27 +579,48 @@ println!("new client!");
         star_ctrl: StarController,
         host_address: String,
         selector: StarInConstellationTemplateSelector
-    ) -> Result<ConnectorController, Error> {
-        let lane = ProtoLaneEndpoint::new(Option::None );
+        ) -> Result<broadcast::Receiver<Result<(),Error>>, Error> {
 
-        let ctrl = ClientSideTunnelConnector::new(&lane,host_address,selector).await?;
+        let lane = ProtoLaneEndpoint::new(Option::None );
+        let rtn = lane.get_evoltion_rx();
+
+        let connector= ClientSideTunnelConnector::new(&lane,host_address,selector).await?;
 
         star_ctrl
             .star_tx
             .send(StarCommand::AddProtoLaneEndpoint(lane))
             .await?;
 
-        Ok(ctrl)
+        star_ctrl
+            .star_tx
+            .send(StarCommand::AddConnectorController(connector))
+            .await?;
+
+       Ok(rtn)
+    }
+
+    fn unlisten(inner_flags: Arc<Mutex<Cell<StarlaneInnerFlags>>>, port: usize ){
+        {
+            let mut flags = inner_flags.lock().unwrap();
+            flags.get_mut().shutdown = true;
+        }
+        std::net::TcpStream::connect(format!("localhost:{}",port) );
+        std::thread::sleep(std::time::Duration::from_secs(1) );
     }
 
 }
 
 impl Drop for StarlaneMachineRunner {
     fn drop(&mut self) {
-        if !self.shutdown
         {
-            warn!("dropping StarlaneMachineRunner unexpectedly");
+            let mut flags =self.inner_flags.lock().unwrap();
+
+            if !flags.get_mut().shutdown
+            {
+                warn!("dropping StarlaneMachineRunner({}) unexpectedly", self.name);
+            }
         }
+        Self::unlisten(self.inner_flags.clone(), self.port.clone());
     }
 }
 
@@ -546,7 +635,7 @@ pub enum StarlaneCommand {
     Connect{ host: String, star_name: StarTemplateId, tx: oneshot::Sender<Result<ConnectorController,Error>>},
     ConstellationCreate(ConstellationCreate),
     StarlaneApiSelectBest(oneshot::Sender<Result<StarlaneApi,Error>>),
-    Listen,
+    Listen(oneshot::Sender<Result<(),Error>>),
     AddStream(TcpStream),
     Shutdown
 }
@@ -600,6 +689,21 @@ impl ConstellationCreate {
 
 pub enum StarAddress {
     Local,
+}
+
+#[derive(Clone)]
+struct  StarlaneInnerFlags {
+    pub shutdown: bool,
+    pub listening: bool
+}
+
+impl StarlaneInnerFlags{
+    pub fn new()->Self{
+        Self{
+            shutdown: false,
+            listening: false
+        }
+    }
 }
 
 #[cfg(test)]
@@ -665,8 +769,9 @@ mod test {
             info!("entered block on!");
 
             let mut starlane = StarlaneMachine::new("server".to_string() ).unwrap();
-            starlane.create_constellation("standalone".to_string(), ConstellationLayout::standalone().unwrap() ).await.unwrap();
+            starlane.listen().await.unwrap();
 
+            starlane.create_constellation("standalone", ConstellationLayout::standalone().unwrap() ).await.unwrap();
 
             let starlane_api = starlane.get_starlane_api().await.unwrap();
 
@@ -710,10 +815,6 @@ mod test {
                 .await
                 .unwrap();
 
-            tokio::spawn( async {
-                println!("... >  filesystems created ...");
-            });
-
             // upload an artifact bundle
             {
                 let mut file =
@@ -721,9 +822,6 @@ mod test {
                 let mut data = vec![];
                 file.read_to_end(&mut data).unwrap();
                 let data = Arc::new(data);
-                tokio::spawn( async {
-                    println!("... >  uploading artifact bundle...");
-                });
                 let artifact_bundle_api = sub_space_api
                     .create_artifact_bundle(
                         "whiz",
@@ -736,29 +834,15 @@ mod test {
                     .unwrap();
             }
 
-            tokio::spawn( async {
-                println!("... >  artifact bundle uploaded...");
-            });
 
-            /*
-                        {
-                            let artifact = ArtifactAddress::from_str("hyperspace:default:whiz:1.0.0:/routes.txt").unwrap();
-                            let caches = starlane_api.get_caches().await.unwrap();
-                            let domain_configs = caches.domain_configs.create();
-                            domain_configs.wait_for_cache(artifact.clone() ).await.unwrap();
-                            let domain_configs = domain_configs.into_cache().await.unwrap();
-            println!("cache Ok!");
-                            let domain_config = domain_configs.get(&artifact).unwrap();
-            println!("got domain_config!");
-                        }
-                         */
+            let mut client = StarlaneMachine::new("client".to_string() ).unwrap();
+            let mut client_layout = ConstellationLayout::client("gateway".to_string() ).unwrap();
+            client_layout.set_machine_host_address("gateway".to_lowercase(), format!("localhost:{}", crate::starlane::DEFAULT_PORT.clone()));
+            client.create_constellation("client", client_layout  ).await.unwrap();
 
-//            loop {
 
-//                tokio::time::sleep(Duration::from_secs(1)).await;
- //           }
 
-            //            assert_eq!(central_ctrl.diagnose_handlers_satisfaction().await.unwrap(),crate::star::pledge::Satisfaction::Ok)
+            client.shutdown();
             starlane.shutdown();
         });
     }

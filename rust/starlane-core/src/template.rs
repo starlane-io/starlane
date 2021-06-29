@@ -115,16 +115,18 @@ impl ConstellationTemplate {
         Self::new_basic_with(vec![database])
     }
 
-    pub fn new_client() -> Self {
+    pub fn new_client(gateway_machine: MachineName) -> Self {
         let mut template = ConstellationTemplate { stars: vec![] };
 
         let subgraph_data_key = "client".to_string();
 
         let mut client = StarTemplate::new(
-            StarKeyTemplate::subraph_data_key(subgraph_data_key, 1),
+            StarKeyTemplate::subgraph_data_key(subgraph_data_key, 1),
             StarKind::Client,
             "client".into(),
         );
+
+        client.add_lane(StarSelector::StarInConstellationTemplate(StarInConstellationTemplateSelector { constellation: ConstellationSelector::AnyInsideMachine(gateway_machine), star: StarTemplateSelector::Kind(StarKind::Gateway) } ));
 
         template.add_star(client);
 
@@ -290,14 +292,18 @@ impl ConstellationLayout {
         standalone.try_into()
     }
 
-    pub fn client() -> Result<Self,Error> {
-        let mut standalone = ProtoConstellationLayout::new(ConstellationTemplate::new_client());
+    pub fn client(gateway_machine: MachineName) -> Result<Self,Error> {
+        let mut standalone = ProtoConstellationLayout::new(ConstellationTemplate::new_client(gateway_machine));
         standalone.set_default_machine("client".to_string());
         standalone.try_into()
     }
 
-    pub fn machine_host_address( &self, name: MachineName ) -> String {
-        self.machine_to_host_address.get(&name).unwrap_or(&format!("{}:{}",name,crate::starlane::DEFAULT_PORT.clone())).clone()
+    pub fn set_machine_host_address( &mut self, machine: MachineName, host_address: String ) {
+        self.machine_to_host_address.insert(machine, host_address );
+    }
+
+    pub fn get_machine_host_adddress(&self, machine: MachineName ) -> String {
+        self.machine_to_host_address.get(&machine).unwrap_or(&format!("{}:{}", machine, crate::starlane::DEFAULT_PORT.clone())).clone()
     }
 }
 
@@ -353,7 +359,7 @@ impl StarKeyTemplate {
         }
     }
 
-    pub fn subraph_data_key(subgraph_key: String, index: u16) -> Self {
+    pub fn subgraph_data_key(subgraph_key: String, index: u16) -> Self {
         StarKeyTemplate {
             subgraph: StarKeySubgraphTemplate::SubgraphKey(subgraph_key),
             index: StarKeyIndexTemplate::Exact(index),

@@ -679,6 +679,9 @@ if self.skel.core_tx.is_closed() {
                         self.skel.flags = set_flags.flags;
                         set_flags.tx.send(());
                     }
+                    StarCommand::AddProtoLaneEndpoint(lane) => {
+info!("Add ProtoLaneEndpoint: {}",self.skel.info.kind.to_string() );
+                    }
                     StarCommand::AddLaneEndpoint(lane) => {
                         self.lanes.insert(lane.remote_star.clone(), LaneMeta::new(lane));
                     }
@@ -843,7 +846,6 @@ if self.skel.core_tx.is_closed() {
                     let (tx, rx) = oneshot::channel();
                     self.variant.init(tx).await;
                     let star_tx = self.skel.star_tx.clone();
-                    let skel = self.skel.clone();
                     tokio::spawn(async move {
                         // don't really have a mechanism to panic if init fails ... need to add that
                         rx.await.unwrap();

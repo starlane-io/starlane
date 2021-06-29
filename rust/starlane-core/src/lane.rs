@@ -52,7 +52,7 @@ impl IncomingSide {
             match &mut self.tunnel {
                 TunnelInState::None => match self.tunnel_receiver_rx.recv().await {
                     None => {
-                        eprintln!("received None from tunnel");
+                        eprintln!("received TunnelInState::None");
                         return Option::None;
                     }
                     Some(tunnel) => {
@@ -62,9 +62,11 @@ impl IncomingSide {
                 TunnelInState::In(tunnel) => {
                     match tunnel.rx.recv().await {
                         None => {
-                            eprintln!("received None from tunnel.rx");
+                            error!("received None from TunnelInState::In");
+                            tokio::time::sleep(Duration::from_secs(5)).await;
+                            return Option::None;
+//panic!("received None from tunnel.rx");
                             // let's hope the tunnel is reset soon
-                            break None;
                         }
                         Some(frame) => {
                             return Option::Some(StarCommand::Frame(frame));
@@ -308,6 +310,7 @@ impl ClientSideTunnelConnector {
         loop {
             if let Result::Ok(stream) = TcpStream::connect(self.host_address.clone()).await
             {
+info!("CLIENT: connected to {}", self.host_address );
                 let (tx, rx) = FrameCodex::new(stream);
 
                 let proto_tunnel = ProtoTunnel {
@@ -316,8 +319,12 @@ impl ClientSideTunnelConnector {
                     rx: rx
                 };
 
+                info!("CLIENT: evolving proto tunnel");
+
                 match proto_tunnel.evolve().await {
                     Ok((tunnel_out, tunnel_in)) => {
+
+info!("CLIENT: got tunnel.");
                         self.out.out_tx.send(LaneCommand::Tunnel(TunnelOutState::Out(tunnel_out))).await;
                         self.in_tx.send(TunnelInState::In(tunnel_in)).await;
 
@@ -566,7 +573,7 @@ pub struct FrameCodex{
 
 impl FrameCodex {
 
-    pub fn new<F: Serialize+DeserializeOwned+Send+Sync+'static>(stream: TcpStream) -> (mpsc::Sender<F>, mpsc::Receiver<F>){
+    pub fn new<F: Serialize+DeserializeOwned+Send+Sync+ToString+'static>(stream: TcpStream) -> (mpsc::Sender<F>, mpsc::Receiver<F>){
         let (mut read,mut write)= stream.into_split();
         let (in_tx,in_rx) = mpsc::channel(64);
         let (out_tx,mut out_rx) = mpsc::channel(64);
@@ -596,7 +603,8 @@ impl FrameCodex {
         (out_tx,in_rx)
     }
 
-    async fn receive<F: Serialize+DeserializeOwned+Send+Sync+'static>( read: &mut OwnedReadHalf ) -> Result<F,Error> {
+    async fn receive<F: Serialize+DeserializeOwned+Send+Sync+ToString+'static>( read: &mut OwnedReadHalf ) -> Result<F,Error> {
+info!("receive");
         let len = read.read_u32().await?;
 
         let mut buf = vec![0 as u8; len as usize];
@@ -606,10 +614,12 @@ impl FrameCodex {
 
         let frame: F = bincode::deserialize(buf_ref)?;
 
+info!("receive frame: {}", frame.to_string() );
         Ok(frame)
     }
 
-    async fn send<F: Serialize+DeserializeOwned+Send+Sync+'static>( write: &mut OwnedWriteHalf, frame: F) -> Result<(),Error> {
+    async fn send<F: Serialize+DeserializeOwned+Send+Sync+ToString+'static>( write: &mut OwnedWriteHalf, frame: F) -> Result<(),Error> {
+info!("send frame {}", frame.to_string());
         let data = bincode::serialize(&frame)?;
         write.write_u32(data.len() as _ ).await?;
         write.write_all(data.as_slice()).await?;
