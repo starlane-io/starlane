@@ -26,7 +26,6 @@ use tokio::time::error::Elapsed;
 use tokio::time::{timeout, Duration, Instant};
 use url::Url;
 
-use variant::central::CentralVariant;
 use variant::StarVariant;
 
 use crate::actor::{ActorKey, ActorKind};
@@ -45,7 +44,7 @@ use crate::id::{Id, IdSeq};
 use crate::keys::{
     AppKey, GatheringKey, MessageId, ResourceId, ResourceKey, SpaceKey, Unique, UniqueSrc, UserKey,
 };
-use crate::lane::{ConnectionInfo, ConnectorController, LaneEndpoint, LaneCommand, LaneMeta, OutgoingSide, TunnelConnector, TunnelConnectorFactory, ProtoLaneEndpoint, LaneId};
+use crate::lane::{ConnectionInfo, ConnectorController, LaneEndpoint, LaneCommand, LaneMeta, OutgoingSide, TunnelConnector, TunnelConnectorFactory, ProtoLaneEndpoint, LaneIndex, LaneWrapper};
 use crate::logger::{
     Flag, Flags, Log, LogInfo, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag, StaticLogInfo,
 };
@@ -81,6 +80,7 @@ use crate::template::StarTemplateHandle;
 use std::fmt::{Debug, Formatter};
 use tracing::field::{Field, Visit};
 use crate::constellation::ConstellationStatus;
+use crate::star::variant::StarShellInstructions;
 
 pub mod filestore;
 pub mod pledge;
@@ -380,8 +380,8 @@ pub struct Star {
     star_rx: mpsc::Receiver<StarCommand>,
     core_tx: mpsc::Sender<StarCoreAction>,
     variant: Box<dyn StarVariant>,
-    lanes: HashMap<StarKey, LaneMeta>,
-    proto_lanes: Vec<ProtoLaneEndpoint>,
+    lanes: HashMap<StarKey, LaneWrapper>,
+    proto_lanes: Vec<LaneWrapper>,
     connector_ctrls: Vec<ConnectorController>,
     transactions: HashMap<u64, Box<dyn Transaction>>,
     frame_hold: FrameHold,
@@ -407,8 +407,8 @@ impl Star {
         data: StarSkel,
         star_rx: mpsc::Receiver<StarCommand>,
         core_tx: mpsc::Sender<StarCoreAction>,
-        lanes: HashMap<StarKey, LaneMeta>,
-        proto_lanes: Vec<ProtoLaneEndpoint>,
+        lanes: HashMap<StarKey, LaneWrapper>,
+        proto_lanes: Vec<LaneWrapper>,
         connector_ctrls: Vec<ConnectorController>,
         frame_hold: FrameHold,
         variant: Box<dyn StarVariant>,
@@ -663,13 +663,13 @@ if self.skel.core_tx.is_closed() {
             let mut futures = vec![];
             let mut lanes = vec![];
             for (key, mut lane) in &mut self.lanes {
-                futures.push(lane.lane.incoming.recv().boxed());
+                futures.push(lane.incoming().recv().boxed());
                 lanes.push(key.clone())
             }
             let mut proto_lane_index = vec![];
 
             for (index,lane) in &mut self.proto_lanes.iter_mut().enumerate() {
-                futures.push(lane.incoming.recv().boxed());
+                futures.push(lane.incoming().recv().boxed());
                 proto_lane_index.push(index);
             }
 
@@ -677,59 +677,69 @@ if self.skel.core_tx.is_closed() {
 
             let (command, future_index, _) = select_all(futures).await;
 
-            let lane = if future_index < lanes.len() {
-                LaneId::Lane(lanes.get(future_index).unwrap().clone())
+            let lane_index = if future_index < lanes.len() {
+                LaneIndex::Lane(lanes.get(future_index).expect("expected a lane at this index").clone())
             } else if future_index < lanes.len()+ proto_lane_index.len() {
-                LaneId::ProtoLane(future_index-lanes.len())
+                LaneIndex::ProtoLane(future_index-lanes.len())
             } else {
-                LaneId::None
+                LaneIndex::None
             };
 
+            let mut lane = if future_index < lanes.len() {
+                Option::Some(self.lanes.get_mut(lanes.get(future_index).as_ref().unwrap() ).expect("expected to get lane"))
+            } else if future_index < lanes.len()+ proto_lane_index.len() {
+                Option::Some(self.proto_lanes.get_mut( future_index-lanes.len()).expect("expected to get proto_lane"))
+            } else {
+                Option::None
+            };
 
             if let Some(command) = command {
-                match command {
-                    StarCommand::Init => {
-                        self.init().await;
-                    }
-                    StarCommand::GetStarInfo(tx) => {
-                        tx.send( Option::Some(self.skel.info.clone()) );
-                    }
-                    StarCommand::SetFlags(set_flags) => {
-                        self.skel.flags = set_flags.flags;
-                        set_flags.tx.send(());
-                    }
-                    StarCommand::AddProtoLaneEndpoint(lane) => {
-info!("Add ProtoLaneEndpoint: {}",self.skel.info.kind.to_string() );
-                        //lane.outgoing.out_tx.send( LaneCommand::Frame(Frame::Proto(ProtoFrame::ReportStarKey(self.skel.info.key.clone())))).await;
-                        self.proto_lanes.push(lane);
-                    }
-                    StarCommand::AddLaneEndpoint(lane) => {
-                        self.lanes.insert(lane.remote_star.clone(), LaneMeta::new(lane));
-                    }
-                    StarCommand::AddConnectorController(connector_ctrl) => {
-                        self.connector_ctrls.push(connector_ctrl);
-                    }
-                    StarCommand::SendProtoMessage(message) => {
-                        self.send_proto_message(message).await;
-                    }
-                    StarCommand::ReleaseHold(star) => {
-                        if let Option::Some(frames) = self.frame_hold.release(&star) {
-                            let lane = self.lane_with_shortest_path_to_star(&star);
-                            if let Option::Some(lane) = lane {
-                                for frame in frames {
-                                    lane.lane.outgoing.out_tx.send(LaneCommand::Frame(frame)).await;
+
+                let instructions = self.variant.filter(&command, &mut lane);
+
+                if let StarShellInstructions::Handle = instructions {
+                    match command {
+                        StarCommand::Init => {
+                            self.init().await;
+                        }
+                        StarCommand::GetStarInfo(tx) => {
+                            tx.send(Option::Some(self.skel.info.clone()));
+                        }
+                        StarCommand::SetFlags(set_flags) => {
+                            self.skel.flags = set_flags.flags;
+                            set_flags.tx.send(());
+                        }
+                        StarCommand::AddProtoLaneEndpoint(lane) => {
+                            let result = lane.outgoing.out_tx.try_send( LaneCommand::Frame(Frame::Proto(ProtoFrame::ReportStarKey(self.skel.info.key.clone()))));
+                            self.proto_lanes.push(LaneWrapper::Proto(LaneMeta::new(lane)));
+                        }
+                        StarCommand::AddLaneEndpoint(lane) => {
+                            self.lanes.insert(lane.remote_star.clone(), LaneWrapper::Lane(LaneMeta::new(lane)));
+                        }
+                        StarCommand::AddConnectorController(connector_ctrl) => {
+                            self.connector_ctrls.push(connector_ctrl);
+                        }
+                        StarCommand::SendProtoMessage(message) => {
+                            self.send_proto_message(message).await;
+                        }
+                        StarCommand::ReleaseHold(star) => {
+                            if let Option::Some(frames) = self.frame_hold.release(&star) {
+                                let lane = self.lane_with_shortest_path_to_star(&star);
+                                if let Option::Some(lane) = lane {
+                                    for frame in frames {
+                                        lane.outgoing().out_tx.send(LaneCommand::Frame(frame)).await;
+                                    }
+                                } else {
+                                    eprintln!("release hold called on star that is not ready!")
                                 }
-                            } else {
-                                eprintln!("release hold called on star that is not ready!")
                             }
                         }
-                    }
 
-                    StarCommand::AddLogger(tx) => {
-                        //                        self.logger.tx.push(tx);
-                    }
-                    StarCommand::Test(test) => {
-                        /*                        match test
+                        StarCommand::AddLogger(tx) => {
+                            //                        self.logger.tx.push(tx);
+                        }
+                        StarCommand::Test(test) => {
+                            /*                        match test
                                                {
                                                    StarTest::StarSearchForStarKey(star) => {
                                                        let search = Search{
@@ -742,38 +752,34 @@ info!("Add ProtoLaneEndpoint: {}",self.skel.info.kind.to_string() );
                                                }
 
                         */
-                    }
-                    StarCommand::WindInit(search) => {
-                        self.do_wind(search).await;
-                    }
-                    StarCommand::WindCommit(commit) => {
-                        for lane in commit.result.lane_hits.keys() {
-                            let hits = commit.result.lane_hits.get(lane).unwrap();
-                            for (star, size) in hits {
-                                self.lanes
-                                    .get_mut(lane)
-                                    .unwrap()
-                                    .star_paths
-                                    .put(star.clone(), size.clone());
-                            }
                         }
-                        commit.tx.send(commit.result);
-                    }
-                    StarCommand::WindDown(result) => {
-                        let lane = result.hops.last().unwrap();
-                        self.send_frame(lane.clone(), Frame::StarWind(StarWind::Down(result)))
-                            .await;
-                    }
-                    StarCommand::Frame(frame) => {
-                        match lane {
-                            LaneId::None => {}
-                            LaneId::Lane(lane_key) => {
-                                self.process_frame(frame, Option::Some(&lane_key)).await;
+                        StarCommand::WindInit(search) => {
+                            self.do_wind(search).await;
+                        }
+                        StarCommand::WindCommit(commit) => {
+                            for lane in commit.result.lane_hits.keys() {
+                                let hits = commit.result.lane_hits.get(lane).unwrap();
+                                for (star, size) in hits {
+                                    self.lanes
+                                        .get_mut(lane)
+                                        .unwrap()
+                                        .star_paths()
+                                        .put(star.clone(), size.clone());
+                                }
                             }
-                            LaneId::ProtoLane(proto_lane) => {
-                                if let Frame::Proto( ProtoFrame::ReportStarKey(remote_star)) = frame {
-                                        let mut lane = self.proto_lanes.remove(proto_lane);
-                                        lane.remote_star = Option::Some(remote_star);
+                            commit.tx.send(commit.result);
+                        }
+                        StarCommand::WindDown(result) => {
+                            let lane = result.hops.last().unwrap();
+                            self.send_frame(lane.clone(), Frame::StarWind(StarWind::Down(result)))
+                                .await;
+                        }
+                        StarCommand::Frame(frame) => {
+                            if let Frame::Proto(ProtoFrame::ReportStarKey(remote_star)) = frame {
+                                match lane_index.expect_proto_lane()
+                                {
+                                    Ok(proto_lane_index) => {
+                                        let lane = self.proto_lanes.remove(proto_lane_index).expect_proto_lane().unwrap();
                                         let lane = match lane.try_into() {
                                             Ok(lane) => {
                                                 lane
@@ -783,46 +789,54 @@ info!("Add ProtoLaneEndpoint: {}",self.skel.info.kind.to_string() );
                                                 continue;
                                             }
                                         };
-info!("proto lane evolved!");
                                         self.skel.star_tx.send(StarCommand::AddLaneEndpoint(lane)).await;
+                                    }
+                                    Err(err) => {
+                                        error!("{}", err)
+                                    }
+                                }
+                            } else {
+                                if lane_index.is_lane()
+                                {
+                                    self.process_frame(frame, Option::Some(&lane_index.expect_lane().unwrap())).await;
                                 }
                             }
                         }
-                    }
-                    StarCommand::ForwardFrame(forward) => {
-                        self.send_frame(forward.to.clone(), forward.frame).await;
-                    }
+                        StarCommand::ForwardFrame(forward) => {
+                            self.send_frame(forward.to.clone(), forward.frame).await;
+                        }
 
-                    StarCommand::ResourceRecordRequest(request) => {
-                        self.locate_resource_record(request).await;
-                    }
-                    StarCommand::ResourceRecordRequestFromStar(request) => {
-                        self.request_resource_record_from_star(request).await;
-                    }
-                    StarCommand::ResourceRecordSet(set) => {
-                        self.resource_record_cache
-                            .put(set.payload.stub.key.clone(), set.payload.clone());
-                        set.commit();
-                    }
-                    StarCommand::CheckStatus => {
-                        self.check_status().await;
-                    }
-                    StarCommand::SetStatus(status) => {
-                        self.set_status(status.clone());
-                        println!("{} {}", &self.skel.info.kind, &self.status.to_string());
-                    }
-                    StarCommand::GetCaches(tx) => {
-                        tx.send(self.skel.caches.clone());
-                    }
-                    StarCommand::Diagnose(diagnose) => {
-                        self.diagnose(diagnose).await;
-                    },
-                    StarCommand::GetStatusListener(tx) => {
-                        tx.send( self.status_broadcast.subscribe() );
-                        self.status_broadcast.send( self.status.clone() );
-                    }
-                    _ => {
-                        eprintln!("cannot process command: {}", command.to_string());
+                        StarCommand::ResourceRecordRequest(request) => {
+                            self.locate_resource_record(request).await;
+                        }
+                        StarCommand::ResourceRecordRequestFromStar(request) => {
+                            self.request_resource_record_from_star(request).await;
+                        }
+                        StarCommand::ResourceRecordSet(set) => {
+                            self.resource_record_cache
+                                .put(set.payload.stub.key.clone(), set.payload.clone());
+                            set.commit();
+                        }
+                        StarCommand::CheckStatus => {
+                            self.check_status().await;
+                        }
+                        StarCommand::SetStatus(status) => {
+                            self.set_status(status.clone());
+                            println!("{} {}", &self.skel.info.kind, &self.status.to_string());
+                        }
+                        StarCommand::GetCaches(tx) => {
+                            tx.send(self.skel.caches.clone());
+                        }
+                        StarCommand::Diagnose(diagnose) => {
+                            self.diagnose(diagnose).await;
+                        },
+                        StarCommand::GetStatusListener(tx) => {
+                            tx.send(self.status_broadcast.subscribe());
+                            self.status_broadcast.send(self.status.clone());
+                        }
+                        _ => {
+                            eprintln!("cannot process command: {}", command.to_string());
+                        }
                     }
                 }
             } else {
@@ -895,7 +909,7 @@ info!("proto lane evolved!");
                 if let Result::Ok(Satisfaction::Ok) = satisfied {
                     self.set_status(StarStatus::Initializing);
                     let (tx, rx) = oneshot::channel();
-                    self.variant.init(tx).await;
+                    self.variant.init(tx);
                     let star_tx = self.skel.star_tx.clone();
                     tokio::spawn(async move {
                         // don't really have a mechanism to panic if init fails ... need to add that
@@ -915,7 +929,7 @@ info!("proto lane evolved!");
             } else {
                 self.set_status(StarStatus::Initializing);
                 let (tx, rx) = oneshot::channel();
-                self.variant.init(tx).await;
+                self.variant.init(tx);
                 let star_tx = self.skel.star_tx.clone();
                 tokio::spawn(async move {
                     rx.await;
@@ -1355,7 +1369,7 @@ info!("proto lane evolved!");
                         let wind = Frame::StarWind(StarWind::Down(wind_down));
 
                         let lane = self.lanes.get_mut(&lane_key).unwrap();
-                        lane.lane.outgoing.out_tx.send(LaneCommand::Frame(wind)).await;
+                        lane.outgoing().out_tx.send(LaneCommand::Frame(wind)).await;
                     }
                     Err(error) => {
                         eprintln!(
@@ -1402,7 +1416,7 @@ info!("proto lane evolved!");
                     let wind = Frame::StarWind(StarWind::Down(wind_down));
 
                     let lane = self.lanes.get_mut(&lane_key).unwrap();
-                    lane.lane.outgoing.out_tx.send(LaneCommand::Frame(wind)).await;
+                    lane.outgoing().out_tx.send(LaneCommand::Frame(wind)).await;
                 }
                 Err(error) => {
                     eprintln!(
@@ -1577,7 +1591,7 @@ info!("proto lane evolved!");
     async fn send_frame(&mut self, star: StarKey, frame: Frame) {
         let lane = self.lane_with_shortest_path_to_star(&star);
         if let Option::Some(lane) = lane {
-            lane.lane.outgoing.out_tx.send(LaneCommand::Frame(frame)).await;
+            lane.outgoing().out_tx.send(LaneCommand::Frame(frame)).await;
         } else {
             self.frame_hold.add(&star, frame);
             let (tx, rx) = oneshot::channel();
@@ -1597,7 +1611,7 @@ info!("proto lane evolved!");
         }
     }
 
-    fn lane_with_shortest_path_to_star(&mut self, star: &StarKey) -> Option<&mut LaneMeta> {
+    fn lane_with_shortest_path_to_star(&mut self, star: &StarKey) -> Option<&mut LaneWrapper> {
         let mut min_hops = usize::MAX;
         let mut rtn = Option::None;
 
@@ -1782,28 +1796,6 @@ info!("proto lane evolved!");
     async fn process_frame(&mut self, frame: Frame, lane_key: Option<&StarKey>) {
         self.process_transactions(&frame, lane_key).await;
         match frame {
-            Frame::Proto(proto) => match &proto {
-                ProtoFrame::GatewaySelect => {
-                    if let Option::Some(lane_key) = lane_key {
-                        let mut subgraph = self.skel.info.key.subgraph.clone();
-                        subgraph.push(StarSubGraphKey::Big(
-                            self.star_subgraph_expansion_seq
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
-                        ));
-unimplemented!();
-/*                        self.send_frame(
-                            lane_key.clone(),
-                            Frame::Proto(ProtoFrame::GatewayAssign(subgraph)),
-                        )
-
-                        .await;
- */
-                    } else {
-                        error!("missing lane key in RequestSubgraphExpansion")
-                    }
-                }
-                _ => {}
-            },
             Frame::StarWind(wind) => match wind {
                 StarWind::Up(wind_up) => {
                     if let Option::Some(lane_key) = lane_key {
@@ -2731,7 +2723,7 @@ impl Transaction for ResourceLocationRequestTransaction {
     async fn on_frame(
         &mut self,
         frame: &Frame,
-        lane: Option<&mut LaneMeta>,
+        lane: Option<&mut LaneWrapper>,
         command_tx: &mut mpsc::Sender<StarCommand>,
     ) -> TransactionResult {
         /*
@@ -2826,7 +2818,7 @@ impl Transaction for StarSearchTransaction {
     async fn on_frame(
         &mut self,
         frame: &Frame,
-        lane: Option<&mut LaneMeta>,
+        lane: Option<&mut LaneWrapper>,
         command_tx: &mut mpsc::Sender<StarCommand>,
     ) -> TransactionResult {
         if let Option::None = lane {
@@ -2852,7 +2844,7 @@ impl Transaction for StarSearchTransaction {
                 }
 
                 self.hits
-                    .insert(lane.lane.remote_star.clone(), lane_hits);
+                    .insert(lane.get_remote_star().unwrap(), lane_hits);
             }
         }
 
@@ -2912,7 +2904,7 @@ pub trait Transaction: Send + Sync {
     async fn on_frame(
         &mut self,
         frame: &Frame,
-        lane: Option<&mut LaneMeta>,
+        lane: Option<&mut LaneWrapper>,
         command_tx: &mut mpsc::Sender<StarCommand>,
     ) -> TransactionResult;
 }
@@ -3068,6 +3060,12 @@ impl StarKey {
         } else {
             Ok((b, a))
         }
+    }
+
+    pub fn child_subgraph( &self ) -> Vec<StarSubGraphKey>{
+        let mut subgraph = self.subgraph.clone();
+        subgraph.push( StarSubGraphKey::Small(self.index));
+        subgraph
     }
 }
 

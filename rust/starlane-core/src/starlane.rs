@@ -157,23 +157,20 @@ impl StarlaneMachineRunner {
 
     pub fn run(mut self) {
         tokio::spawn( async move {
-info!("STARTED StarlaneMachineRunner");
             while let Option::Some(command) = self.command_rx.recv().await {
-info!("processing command: {}", command.to_string() );
                 match command {
                     StarlaneCommand::Connect { host, star_name, tx } => {
 //                        unimplemented!();
                         tx.send(Err(Error::from("not implemented")));
                     }
                     StarlaneCommand::ConstellationCreate(command) => {
-                        println!("constellation CREATE");
                         let result = self
                             .constellation_create(command.layout, command.name)
                             .await;
 
 //sleep(Duration::from_secs(10)).await;
                         if let Err(error) = &result {
-                            eprintln!("{}", error.to_string());
+                            error!("CONSTELLATION CREATE ERROR: {}", error.to_string());
                         }
                         command.tx.send(result);
                     }
@@ -218,7 +215,6 @@ info!("processing command: {}", command.to_string() );
                         tx.send(Ok(StarlaneApi::new(star_ctrl.star_tx)));
                     }
                     StarlaneCommand::Shutdown => {
-warn!("SHUTDOWN CALLED");
                         let mut inner_flags= self.inner_flags.lock().unwrap();
                         inner_flags.get_mut().shutdown = true;
 
@@ -228,12 +224,10 @@ warn!("SHUTDOWN CALLED");
                         self.listen(tx);
                     }
                     StarlaneCommand::AddStream(stream) => {
-info!("AddStream");
                         match self.select_star_kind(&StarKind::Gateway ).await {
                            Ok(Option::Some(star_ctrl)) => {
                                match self.add_server_side_lane_ctrl(star_ctrl,stream).await{
                                    Ok(result) => {
-                                       info!("added server side proto");
                                    }
                                    Err(error) => {
                                        error!("{}",error);
@@ -381,9 +375,7 @@ println!("connecting for local: {}",local_star.star.to_string() );
                                     proto_lane_evolution_rxs.append( & mut evolution_rxs );
                                 }
                                 ConstellationSelector::AnyWithGatewayInsideMachine(machine_name) => {
-info!("connecting to {}", machine_name);
                                     let host_address = layout.get_machine_host_adddress(machine_name.clone());
-info!("host_address to {}", host_address );
                                     let star_ctrl = self.star_controllers.get(local_star.clone() ).await?.ok_or("expected local star to have star_ctrl")?;
                                     let proto_lane_evolution_rx= self.add_client_side_lane_ctrl(star_ctrl, host_address, lane.star_selector.clone(), true ).await?;
                                     proto_lane_evolution_rxs.push( proto_lane_evolution_rx );
@@ -393,6 +385,8 @@ info!("host_address to {}", host_address );
                 }
             }
         }
+
+
 
         let proto_lane_evolutions = join_all(proto_lane_evolution_rxs.iter_mut().map( |x| x.recv())).await;
 
@@ -472,25 +466,19 @@ info!("host_address to {}", host_address );
             match std::net::TcpListener::bind(format!("127.0.0.1:{}",port)){
                 Ok(std_listener) => {
                     let listener = TcpListener::from_std(std_listener).unwrap();
-println!("LISTENING!");
                     result_tx.send(Ok(()) );
                     while let Ok((mut stream,_)) = listener.accept().await {
                         {
                             let mut flags = flags.lock().unwrap();
                             let flags = flags.get_mut();
                             if flags.shutdown {
-                                info!("shutting down TcpListener");
                                 drop(listener);
                                 return;
                             }
                         }
-                        info!("new client!");
                         let ok = command_tx.send( StarlaneCommand::AddStream(stream) ).await.is_ok();
                         tokio::time::sleep(Duration::from_secs(0)).await;
-                        info!("SEND ADD STREAM: {}", ok );
-info!("Add stream sent...!");
                     }
-                    eprintln!("TCP LISTENER TERMINATED");
                 }
                 Err(error) => {
                     error!("FATAL: could not setup TcpListener {}", error);
@@ -498,7 +486,6 @@ info!("Add stream sent...!");
                 }
             }
         } );
-info!("Return from LISTEN");
     }
 
 
@@ -581,11 +568,16 @@ info!("Return from LISTEN");
         let low_lane = ProtoLaneEndpoint::new(Option::None );
         let rtn = low_lane.get_evoltion_rx();
 
-        ServerSideTunnelConnector::new(&low_lane,stream).await?;
+        let connector_ctrl = ServerSideTunnelConnector::new(&low_lane,stream).await?;
 
         low_star_ctrl
             .star_tx
             .send(StarCommand::AddProtoLaneEndpoint(low_lane))
+            .await?;
+
+        low_star_ctrl
+            .star_tx
+            .send(StarCommand::AddConnectorController(connector_ctrl))
             .await?;
 
         Ok(rtn)
@@ -864,6 +856,9 @@ mod test {
 
             client.shutdown();
             starlane.shutdown();
+
+            std::thread::sleep(std::time::Duration::from_secs(5) );
+
         });
     }
 }

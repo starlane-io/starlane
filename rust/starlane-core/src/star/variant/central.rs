@@ -23,7 +23,7 @@ impl CentralVariant {
 
 #[async_trait]
 impl StarVariant for CentralVariant {
-    async fn init(&self, tx: oneshot::Sender<Result<(), Error>>) {
+    fn init(&self, tx: oneshot::Sender<Result<(), Error>>) {
         let root_resource = ResourceRecord {
             stub: ResourceStub {
                 key: ResourceKey::Root,
@@ -46,12 +46,13 @@ impl StarVariant for CentralVariant {
             info: None,
         };
 
-        let registry = self.skel.registry.as_ref().unwrap();
-        registry.register(registration).await.unwrap();
 
-        let starlane_api = StarlaneApi::new(self.skel.star_tx.clone());
+        let skel = self.skel.clone();
         tokio::spawn(async move {
-            tx.send(Self::ensure(starlane_api).await);
+           let registry = skel.registry.as_ref().unwrap();
+           registry.register(registration).await.unwrap();
+           let starlane_api = StarlaneApi::new(skel.star_tx.clone());
+           tx.send(Self::ensure(starlane_api).await);
         });
     }
 }
@@ -61,22 +62,18 @@ impl CentralVariant {
         let mut creation = starlane_api.create_space("hyperspace", "Hyper Space")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         let space_api = creation.submit().await?;
-        info!("hyperspace creation ensured.");
 
         let mut creation = space_api.create_user("hyperuser@starlane.io")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
-        info!("hyperuser creation ensured.");
 
         let mut creation = space_api.create_sub_space("default")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
-        info!("hyperspace:default sub_space creation ensured.");
 
         let mut creation = space_api.create_domain("localhost")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
-        info!("locahost domain creation ensured.");
 
         Ok(())
     }

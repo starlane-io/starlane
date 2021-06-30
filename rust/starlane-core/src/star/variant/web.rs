@@ -26,7 +26,7 @@ impl WebVariant {
 
 #[async_trait]
 impl StarVariant for WebVariant {
-    async fn init(&self, tx: tokio::sync::oneshot::Sender<Result<(), crate::error::Error>>) {
+    fn init(&self, tx: tokio::sync::oneshot::Sender<Result<(), crate::error::Error>>) {
         let api = StarlaneApi::new(self.skel.star_tx.clone()).into();
         start(api);
 

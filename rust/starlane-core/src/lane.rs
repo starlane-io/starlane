@@ -32,6 +32,7 @@ use serde::de::DeserializeOwned;
 use crate::template::{ConstellationSelector, StarInConstellationTemplateHandle, StarInConstellationTemplateSelector};
 use std::convert::TryInto;
 use std::fmt::{Debug, Formatter};
+use std::ops::{Deref, DerefMut};
 
 pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
 pub static LANE_QUEUE_SIZE: usize = 32;
@@ -54,7 +55,6 @@ impl IncomingSide {
             match &mut self.tunnel {
                 TunnelInState::None => match self.tunnel_receiver_rx.recv().await {
                     None => {
-                        eprintln!("received TunnelInState::None");
                         return Option::None;
                     }
                     Some(tunnel) => {
@@ -64,7 +64,6 @@ impl IncomingSide {
                 TunnelInState::In(tunnel) => {
                     match tunnel.rx.recv().await {
                         None => {
-                            error!("received None from TunnelInState::In");
                             self.tunnel = TunnelInState::None;
                         }
                         Some(frame) => {
@@ -139,6 +138,106 @@ impl<T> Chamber<T> {
     }
 }
 
+
+pub enum LaneWrapper {
+    Proto(LaneMeta<ProtoLaneEndpoint>),
+    Lane(LaneMeta<LaneEndpoint>),
+}
+
+impl LaneWrapper {
+
+    pub fn star_paths(&mut self) -> &mut LruCache<StarKey,usize> {
+        match self {
+            LaneWrapper::Proto(meta) => meta.star_paths(),
+            LaneWrapper::Lane(meta) => meta.star_paths()
+        }
+    }
+
+
+    pub fn expect_proto_lane(self) -> LaneMeta<ProtoLaneEndpoint> {
+        match self {
+            LaneWrapper::Proto(lane) => {
+                lane
+            }
+            _ => {
+                panic!("expected proto lane")
+            }
+        }
+    }
+
+    pub fn expect_lane(self) -> LaneMeta<LaneEndpoint> {
+        match self {
+            LaneWrapper::Lane(lane) => {
+                lane
+            }
+            _ => {
+                panic!("expected proto lane")
+            }
+        }
+    }
+
+
+    pub fn set_remote_star( &mut self, remote_star: StarKey  ) {
+        match self {
+            LaneWrapper::Proto(lane) => {
+                lane.remote_star = Option::Some(remote_star)
+            }
+            LaneWrapper::Lane(lane) => {
+                error!("cannot set the remote star for a lane, it should be already set.");
+            }
+        }
+    }
+
+    pub fn get_remote_star(&self) -> Option<StarKey> {
+        match self {
+            LaneWrapper::Proto(lane) => {
+                lane.get_remote_star()
+            }
+            LaneWrapper::Lane(lane) => {
+                lane.get_remote_star()
+            }
+        }
+    }
+
+    pub fn outgoing(&mut self) -> &mut OutgoingSide {
+        match self {
+            LaneWrapper::Proto(lane) => {
+                &mut lane.outgoing
+            }
+            LaneWrapper::Lane(lane) => {
+                &mut lane.outgoing
+            }
+        }
+    }
+
+    pub fn incoming(&mut self) -> &mut IncomingSide {
+        match self {
+            LaneWrapper::Proto(lane) => {
+                &mut lane.incoming
+            }
+            LaneWrapper::Lane(lane) => {
+                &mut lane.incoming
+            }
+        }
+    }
+
+
+    pub fn get_hops_to_star(&mut self, star: &StarKey) -> Option<usize> {
+        match self {
+            LaneWrapper::Proto(lane) => lane.get_hops_to_star(star),
+            LaneWrapper::Lane(lane) => lane.get_hops_to_star(star)
+        }
+    }
+
+    pub fn set_hops_to_star(&mut self, star: StarKey, hops: usize) {
+        match self {
+            LaneWrapper::Proto(lane) => lane.set_hops_to_star(star, hops),
+            LaneWrapper::Lane(lane) => lane.set_hops_to_star(star, hops)
+        }
+    }
+}
+
+
 pub struct ProtoLaneEndpoint {
     pub remote_star: Option<StarKey>,
     pub incoming: IncomingSide,
@@ -190,6 +289,12 @@ impl ProtoLaneEndpoint {
     }
 }
 
+impl AbstractLaneEndpoint for ProtoLaneEndpoint {
+    fn get_remote_star(&self) -> Option<StarKey> {
+        self.remote_star.clone()
+    }
+}
+
 impl TryInto<LaneEndpoint> for ProtoLaneEndpoint{
     type Error = Error;
 
@@ -228,6 +333,13 @@ impl LaneEndpoint {
         self.tunnel_receiver_tx.clone()
     }
 }
+
+impl AbstractLaneEndpoint for LaneEndpoint {
+    fn get_remote_star(&self) -> Option<StarKey> {
+        Option::Some(self.remote_star.clone())
+    }
+}
+
 
 pub enum TunnelOutState {
     Out(TunnelOut),
@@ -288,6 +400,9 @@ pub enum ConnectorCommand {
     Reset,
     Close,
 }
+
+
+
 pub struct ClientSideTunnelConnector {
     pub in_tx: Sender<TunnelInState>,
     pub out: OutgoingSide,
@@ -298,7 +413,7 @@ pub struct ClientSideTunnelConnector {
 
 impl ClientSideTunnelConnector {
     pub async fn new(lane: &ProtoLaneEndpoint, host_address: String, selector: StarInConstellationTemplateSelector ) -> Result<ConnectorController, Error> {
-        let (command_tx, command_rx) = mpsc::channel(1);
+        let (command_tx, command_rx) = mpsc::channel(16);
         let mut connector = Self {
             out: lane.outgoing.clone(),
             in_tx: lane.get_tunnel_in_tx(),
@@ -319,49 +434,32 @@ impl ClientSideTunnelConnector {
         loop {
             if let Result::Ok(stream) = TcpStream::connect(self.host_address.clone()).await
             {
-info!("CLIENT: connected to {}", self.host_address );
                 let (tx, rx) = FrameCodex::new(stream);
 
                 let proto_tunnel = ProtoTunnel {
-                    star: Option::None,
                     tx: tx,
                     rx: rx
                 };
 
-                info!("CLIENT: evolving proto tunnel");
-
                 match proto_tunnel.evolve().await {
-                    Ok((tunnel_out, tunnel_in)) => {
-
-info!("CLIENT: got tunnel.");
-                        self.out.out_tx.send(LaneCommand::Tunnel(TunnelOutState::Out(tunnel_out))).await;
+                    Ok((tunnel_out,tunnel_in)) => {
+                        self.out.out_tx.send(LaneCommand::Tunnel(TunnelOutState::Out(tunnel_out))) .await;
                         self.in_tx.send(TunnelInState::In(tunnel_in)).await;
 
-                        if let Option::Some(command) = self.command_rx.recv().await
-                        {
-                            self.out.out_tx.send(LaneCommand::Tunnel(TunnelOutState::None)).await;
-                            match command {
-                                ConnectorCommand::Reset => {
-                                    println!("reset connection");
-                                }
-                                ConnectorCommand::Close => {
-                                    eprintln!("CLIENT CONNECTION CLOSING (0)");
-                                    break;
-                                }
-                            }
-                        } else {
-                            eprintln!("CLIENT CONNECTION CLOSING (1)");
-                            break;
-                        }
+                        let command = self.command_rx.recv().await;
+                        self.out.out_tx.send(LaneCommand::Tunnel(TunnelOutState::None)).await;
+
                     }
                     Err(error) => {
-                        eprintln!("CONNECTION ERROR: {}", error.error);
+                        error!("CONNECTION ERROR: {}",error.error );
                     }
                 }
             }
         }
     }
 }
+
+
 
 #[async_trait]
 impl TunnelConnector for ClientSideTunnelConnector {
@@ -378,8 +476,8 @@ impl Debug for ClientSideTunnelConnector{
 
 
 pub struct ServerSideTunnelConnector {
-    pub low_in_tx: Sender<TunnelInState>,
-    pub low: OutgoingSide,
+    pub tunnel_in_tx: Sender<TunnelInState>,
+    pub out: OutgoingSide,
     command_rx: Receiver<ConnectorCommand>,
     stream : Cell<Option<TcpStream>>
 }
@@ -394,8 +492,8 @@ impl ServerSideTunnelConnector {
     pub async fn new(low_lane: &ProtoLaneEndpoint, stream: TcpStream) -> Result<ConnectorController, Error> {
         let (command_tx, command_rx) = mpsc::channel(1);
         let mut connector = Self {
-            low: low_lane.outgoing.clone(),
-            low_in_tx: low_lane.get_tunnel_in_tx(),
+            out: low_lane.outgoing.clone(),
+            tunnel_in_tx: low_lane.get_tunnel_in_tx(),
             command_rx,
             stream: Cell::new(Option::Some( stream ))
         };
@@ -419,25 +517,21 @@ impl ServerSideTunnelConnector {
         };
 
         let (tx,rx) = FrameCodex::new(stream);
-info!("SERVER: creating proto tunnel");
         let proto_tunnel = ProtoTunnel{
-            star: Option::None,
             tx: tx,
             rx: rx
         };
 
         match proto_tunnel.evolve().await {
-            Ok((low_out,low_in)) => {
-info!("SERVER: evolved.... ");
-                self.low.out_tx.send(LaneCommand::Tunnel(TunnelOutState::Out(low_out))) .await;
-                self.low_in_tx.send(TunnelInState::In(low_in)).await;
-info!("SERVER: waiting for command_rx.... ");
+            Ok((tunnel_out, tunnel_in)) => {
+                self.out.out_tx.send(LaneCommand::Tunnel(TunnelOutState::Out(tunnel_out))) .await;
+                self.tunnel_in_tx.send(TunnelInState::In(tunnel_in)).await;
 
                 self.command_rx.recv().await;
-                self.low.out_tx.send(LaneCommand::Tunnel(TunnelOutState::None)).await;
+                self.out.out_tx.send(LaneCommand::Tunnel(TunnelOutState::None)).await;
             }
             Err(error) => {
-                eprintln!("CONNECTION ERROR: {}",error.error );
+                error!("CONNECTION ERROR: {}",error.error );
             }
         }
     }
@@ -485,7 +579,7 @@ impl LocalTunnelConnector {
 
     async fn run(&mut self) {
         loop {
-            let (mut high, mut low) = local_tunnels(self.high_star.clone(), self.low_star.clone());
+            let (mut high, mut low) = local_tunnels();
 
             let (high, low) = tokio::join!(high.evolve(), low.evolve());
 
@@ -547,13 +641,36 @@ impl TunnelConnector for LocalTunnelConnector {
 
 }
 
-pub struct LaneMeta {
+pub struct LaneMeta<L:AbstractLaneEndpoint> {
     pub star_paths: LruCache<StarKey, usize>,
-    pub lane: LaneEndpoint,
+    pub lane: L,
 }
 
-impl LaneMeta {
-    pub fn new(lane: LaneEndpoint) -> Self {
+impl <L:AbstractLaneEndpoint> Deref for LaneMeta<L> {
+    type Target = L;
+
+    fn deref(&self) -> &Self::Target {
+        &self.lane
+    }
+}
+
+impl <L:AbstractLaneEndpoint> DerefMut for LaneMeta<L> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.lane
+    }
+}
+
+impl <L:AbstractLaneEndpoint> LaneMeta<L> {
+
+    pub fn star_paths(&mut self) -> &mut LruCache<StarKey,usize> {
+        &mut self.star_paths
+    }
+
+    pub fn unwrap(self) -> L {
+        self.lane
+    }
+
+    pub fn new(lane: L ) -> Self {
         LaneMeta {
             star_paths: LruCache::new(32 * 1024),
             lane: lane,
@@ -561,7 +678,7 @@ impl LaneMeta {
     }
 
     pub fn get_hops_to_star(&mut self, star: &StarKey) -> Option<usize> {
-        if *star == self.lane.remote_star {
+        if self.lane.get_remote_star().is_some() &&  *star == self.lane.get_remote_star().unwrap() {
             return Option::Some(1);
         }
         match self.star_paths.get(star) {
@@ -573,6 +690,10 @@ impl LaneMeta {
     pub fn set_hops_to_star(&mut self, star: StarKey, hops: usize) {
         self.star_paths.put(star, hops);
     }
+}
+
+pub trait AbstractLaneEndpoint{
+    fn get_remote_star(&self) -> Option<StarKey>;
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
@@ -597,6 +718,7 @@ pub struct FrameCodex{
 impl FrameCodex {
 
     pub fn new<F: Serialize+DeserializeOwned+Send+Sync+ToString+'static>(stream: TcpStream) -> (mpsc::Sender<F>, mpsc::Receiver<F>){
+
         let (mut read,mut write)= stream.into_split();
         let (in_tx,in_rx) = mpsc::channel(64);
         let (out_tx,mut out_rx) = mpsc::channel(64);
@@ -606,7 +728,8 @@ impl FrameCodex {
                 match FrameCodex::send(&mut write, frame).await
                 {
                     Ok(_) => {}
-                    Err(_) => {
+                    Err(error) => {
+                        error!("FrameCodex ERROR: {}",error.to_string());
                         break;
                     }
                 }
@@ -627,7 +750,6 @@ impl FrameCodex {
     }
 
     async fn receive<F: Serialize+DeserializeOwned+Send+Sync+ToString+'static>( read: &mut OwnedReadHalf ) -> Result<F,Error> {
-info!("receive");
         let len = read.read_u32().await?;
 
         let mut buf = vec![0 as u8; len as usize];
@@ -637,12 +759,10 @@ info!("receive");
 
         let frame: F = bincode::deserialize(buf_ref)?;
 
-info!("receive frame: {}", frame.to_string() );
         Ok(frame)
     }
 
     async fn send<F: Serialize+DeserializeOwned+Send+Sync+ToString+'static>( write: &mut OwnedWriteHalf, frame: F) -> Result<(),Error> {
-info!("send frame {}", frame.to_string());
         let data = bincode::serialize(&frame)?;
         write.write_u32(data.len() as _ ).await?;
         write.write_all(data.as_slice()).await?;
@@ -652,10 +772,37 @@ info!("send frame {}", frame.to_string());
 }
 
 
-pub enum LaneId {
+pub enum LaneIndex {
     None,
     Lane(StarKey),
     ProtoLane(usize)
+}
+
+impl LaneIndex {
+    pub fn expect_proto_lane(&self) -> Result<usize,Error>{
+        if let LaneIndex::ProtoLane(index) = self {
+            Ok(index.clone())
+        } else {
+            Err("expected proto lane".into())
+        }
+    }
+
+    pub fn expect_lane(&self) -> Result<StarKey,Error>{
+        if let LaneIndex::Lane(key) = self {
+            Ok(key.clone())
+        } else {
+            Err("expected lane".into())
+        }
+    }
+
+    pub fn is_lane(&self) -> bool{
+       if let LaneIndex::Lane(_) = self {
+           return true;
+       } else {
+           return false;
+       }
+    }
+
 }
 
 #[cfg(test)]
@@ -737,7 +884,7 @@ mod test {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
             let (mut p1, mut p2) =
-                local_tunnels(Option::Some(StarKey::new(2)), Option::Some(StarKey::new(1)));
+                local_tunnels();
 
             let future1 = p1.evolve();
             let future2 = p2.evolve();
@@ -773,7 +920,7 @@ mod test {
                 println!("RECEIVED PING!");
                 assert!(true);
             } else if let Some(frame) = result {
-                println!("RECEIVED {}", frame);
+                println!("RECEIVED {}", frame.to_string());
                 assert!(false);
             } else {
                 println!("RECEIVED NONE");
@@ -794,7 +941,7 @@ mod test {
                 println!("RECEIVED PoNG!");
                 assert!(true);
             } else if let Some(frame) = result {
-                println!("RECEIVED {}", frame);
+                println!("RECEIVED {}", frame.to_string());
                 assert!(false);
             } else {
                 println!("RECEIVED NONE");
