@@ -8,10 +8,12 @@ use crate::core::StarCoreExt;
 use crate::error::Error;
 use crate::id::Id;
 use crate::lane::{ConnectionInfo, ConnectionKind};
-use crate::proto::{PlaceholderKernel, ProtoStar, ProtoStarKernel};
+use crate::proto::{PlaceholderKernel, ProtoStar, ProtoStarKernel, ProtoStarKey};
 use crate::proto::ProtoStarKernel::Mesh;
 use crate::star::{ServerKindExt, StarKey, StarKind, StarSubGraphKey, StarTemplateId};
 use crate::star::pledge::StarHandle;
+
+pub type StarKeyConstellationIndex=u16;
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct ConstellationTemplate {
@@ -23,6 +25,10 @@ impl ConstellationTemplate {
         ConstellationTemplate { stars: vec![] }
     }
 
+    pub fn next_index(&self) -> StarKeyConstellationIndex {
+        (self.stars.len()+1) as StarKeyConstellationIndex
+    }
+
     pub fn new_basic() -> Self {
         let mut template = ConstellationTemplate { stars: vec![] };
 
@@ -31,6 +37,7 @@ impl ConstellationTemplate {
             StarKind::Central,
             "central".into(),
         );
+
         let mut mesh = StarTemplate::new(
             StarKeyTemplate::central_geodesic(1),
             StarKind::Mesh,
@@ -99,6 +106,7 @@ impl ConstellationTemplate {
         let mut standalone = Self::new_basic();
         let mut mesh = standalone.get_star("mesh".into()).cloned().unwrap();
         for mut star_template in star_templates {
+            star_template.key = StarKeyTemplate::central_geodesic( standalone.next_index() );
             ConstellationTemplate::connect(&mut star_template, &mut mesh);
             standalone.add_star(star_template);
         }
@@ -120,13 +128,18 @@ impl ConstellationTemplate {
 
         let subgraph_data_key = "client".to_string();
 
+        let request_from_constellation = ConstellationSelector::AnyWithGatewayInsideMachine(gateway_machine.clone());
+
         let mut client = StarTemplate::new(
-            StarKeyTemplate::subgraph_data_key(subgraph_data_key, 1),
+            StarKeyTemplate::subgraph_data_key(request_from_constellation, 1),
             StarKind::Client,
             "client".into(),
         );
 
-        client.add_lane(StarSelector::StarInConstellationTemplate(StarInConstellationTemplateSelector { constellation: ConstellationSelector::AnyInsideMachine(gateway_machine), star: StarTemplateSelector::Kind(StarKind::Gateway) } ));
+        let mut lane = LaneTemplate::new(StarInConstellationTemplateSelector { constellation: ConstellationSelector::AnyWithGatewayInsideMachine(gateway_machine), star: StarTemplateSelector::Kind(StarKind::Gateway) } );
+        lane.as_key_requestor();
+
+        client.add_lane(lane);
 
         template.add_star(client);
 
@@ -134,8 +147,8 @@ impl ConstellationTemplate {
     }
 
     pub fn connect(a: &mut StarTemplate, b: &mut StarTemplate) {
-        a.add_lane(StarSelector::StarInConstellationTemplate(StarInConstellationTemplateSelector { constellation: ConstellationSelector::Local, star: StarTemplateSelector::Handle(b.handle.clone()) } ));
-        b.add_lane(StarSelector::StarInConstellationTemplate(StarInConstellationTemplateSelector { constellation: ConstellationSelector::Local, star: StarTemplateSelector::Handle(a.handle.clone()) } ));
+        a.add_lane(LaneTemplate::new(StarInConstellationTemplateSelector { constellation: ConstellationSelector::Local, star: StarTemplateSelector::Handle(b.handle.clone()) } ));
+        b.add_lane(LaneTemplate::new(StarInConstellationTemplateSelector { constellation: ConstellationSelector::Local, star: StarTemplateSelector::Handle(a.handle.clone()) } ));
     }
 
     pub fn add_star(&mut self, star: StarTemplate) {
@@ -183,11 +196,11 @@ pub enum StarSelector {
     StarInConstellationTemplate(StarInConstellationTemplateSelector)
 }
 
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Serialize, Deserialize)]
 pub enum ConstellationSelector {
     Local,
-    Named(String),
-    AnyInsideMachine(MachineName)
+    Named(ConstellationName),
+    AnyWithGatewayInsideMachine(MachineName)
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
@@ -341,69 +354,70 @@ impl ConstellationData {
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Serialize, Deserialize)]
 pub struct StarKeyTemplate {
     pub subgraph: StarKeySubgraphTemplate,
-    pub index: StarKeyIndexTemplate,
+    pub index: StarKeyConstellationIndexTemplate,
 }
 
 impl StarKeyTemplate {
-    pub fn central_geodesic(index: u16) -> Self {
+    pub fn central_geodesic(index: StarKeyConstellationIndex ) -> Self {
         StarKeyTemplate {
             subgraph: StarKeySubgraphTemplate::Core,
-            index: StarKeyIndexTemplate::Exact(index),
+            index: StarKeyConstellationIndexTemplate::Exact(index),
         }
     }
 
     pub fn central() -> Self {
         StarKeyTemplate {
             subgraph: StarKeySubgraphTemplate::Core,
-            index: StarKeyIndexTemplate::Central,
+            index: StarKeyConstellationIndexTemplate::Central,
         }
     }
 
-    pub fn subgraph_data_key(subgraph_key: String, index: u16) -> Self {
+    pub fn subgraph_data_key(request_from_constellation: ConstellationSelector, index: StarKeyConstellationIndex) -> Self {
         StarKeyTemplate {
-            subgraph: StarKeySubgraphTemplate::SubgraphKey(subgraph_key),
-            index: StarKeyIndexTemplate::Exact(index),
+            subgraph: StarKeySubgraphTemplate::RequestStarSubGraphKeyFromConstellation(request_from_constellation),
+            index: StarKeyConstellationIndexTemplate::Exact(index),
         }
     }
 
-    pub fn create(&self) -> Option<StarKey> {
+    pub fn create(&self) -> ProtoStarKey {
+        let index = match self.index {
+            StarKeyConstellationIndexTemplate::Central => 0,
+            StarKeyConstellationIndexTemplate::Exact(index) => index,
+        };
+
         let subgraph = match &self.subgraph {
             StarKeySubgraphTemplate::Core => {
                 vec![]
             }
-            StarKeySubgraphTemplate::SubgraphKey(subgraph_data_key) => {
-                return Option::None;
+            StarKeySubgraphTemplate::RequestStarSubGraphKeyFromConstellation(_) => {
+                return ProtoStarKey::RequestSubKeyExpansion(index)
             }
-            StarKeySubgraphTemplate::Path(path) => path.to_owned(),
-        };
-        let index = match self.index {
-            StarKeyIndexTemplate::Central => 0,
-            StarKeyIndexTemplate::Exact(index) => index,
         };
 
-        Option::Some(StarKey::new_with_subgraph(subgraph, index))
+        ProtoStarKey::Key( StarKey::new_with_subgraph(subgraph, index))
     }
 }
 
 pub type MachineName = String;
+pub type ConstellationName = String;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Serialize, Deserialize)]
 pub enum StarKeySubgraphTemplate {
     Core,
-    SubgraphKey(MachineName),
-    Path(Vec<StarSubGraphKey>),
+    RequestStarSubGraphKeyFromConstellation(ConstellationSelector),
+//    Path(Vec<StarSubGraphKey>),
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Serialize, Deserialize)]
-pub enum StarKeyIndexTemplate {
+pub enum StarKeyConstellationIndexTemplate {
     Central,
-    Exact(u16),
+    Exact(StarKeyConstellationIndex),
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct StarTemplate {
     pub key: StarKeyTemplate,
-    pub lanes: Vec<StarSelector>,
+    pub lanes: Vec<LaneTemplate>,
     pub kind: StarKind,
     pub handle: StarTemplateHandle,
 }
@@ -418,8 +432,39 @@ impl StarTemplate {
         }
     }
 
-    pub fn add_lane(&mut self, lane: StarSelector ) {
+    pub fn add_lane(&mut self, lane: LaneTemplate) -> Result<(),Error> {
+
+        if lane.key_requestor {
+            for lane in &self.lanes {
+                if lane.key_requestor {
+                    error!("a star template can only have one key_requestor lane");
+                    return Err("a star template can only have one key_requestor lane".into());
+                }
+            }
+        }
+
         self.lanes.push(lane);
+
+        Ok(())
+    }
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
+pub struct LaneTemplate {
+    pub star_selector: StarInConstellationTemplateSelector,
+    pub key_requestor: bool
+}
+
+impl LaneTemplate{
+    pub fn new( star_selector: StarInConstellationTemplateSelector )-> Self {
+        Self{
+            star_selector: star_selector,
+            key_requestor: false
+        }
+    }
+
+    pub fn as_key_requestor(&mut self) {
+        self.key_requestor = true;
     }
 }
 

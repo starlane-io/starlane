@@ -45,7 +45,7 @@ use crate::id::{Id, IdSeq};
 use crate::keys::{
     AppKey, GatheringKey, MessageId, ResourceId, ResourceKey, SpaceKey, Unique, UniqueSrc, UserKey,
 };
-use crate::lane::{ConnectionInfo, ConnectorController, LaneEndpoint, LaneCommand, LaneMeta, OutgoingSide, TunnelConnector, TunnelConnectorFactory, ProtoLaneEndpoint};
+use crate::lane::{ConnectionInfo, ConnectorController, LaneEndpoint, LaneCommand, LaneMeta, OutgoingSide, TunnelConnector, TunnelConnectorFactory, ProtoLaneEndpoint, LaneId};
 use crate::logger::{
     Flag, Flags, Log, LogInfo, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag, StaticLogInfo,
 };
@@ -80,6 +80,7 @@ use crate::util::AsyncHashMap;
 use crate::template::StarTemplateHandle;
 use std::fmt::{Debug, Formatter};
 use tracing::field::{Field, Visit};
+use crate::constellation::ConstellationStatus;
 
 pub mod filestore;
 pub mod pledge;
@@ -380,6 +381,7 @@ pub struct Star {
     core_tx: mpsc::Sender<StarCoreAction>,
     variant: Box<dyn StarVariant>,
     lanes: HashMap<StarKey, LaneMeta>,
+    proto_lanes: Vec<ProtoLaneEndpoint>,
     connector_ctrls: Vec<ConnectorController>,
     transactions: HashMap<u64, Box<dyn Transaction>>,
     frame_hold: FrameHold,
@@ -390,6 +392,7 @@ pub struct Star {
     resource_record_cache: LruCache<ResourceKey, ResourceRecord>,
     resource_address_to_key: LruCache<ResourceAddress, ResourceKey>,
     status: StarStatus,
+    status_broadcast: broadcast::Sender<StarStatus>
 }
 
 impl Debug for Star{
@@ -405,16 +408,19 @@ impl Star {
         star_rx: mpsc::Receiver<StarCommand>,
         core_tx: mpsc::Sender<StarCoreAction>,
         lanes: HashMap<StarKey, LaneMeta>,
+        proto_lanes: Vec<ProtoLaneEndpoint>,
         connector_ctrls: Vec<ConnectorController>,
         frame_hold: FrameHold,
         variant: Box<dyn StarVariant>,
     ) -> Self {
+        let (status_broadcast,_) = broadcast::channel(8);
         Star {
             skel: data,
             variant: variant,
             star_rx: star_rx,
             core_tx: core_tx,
             lanes: lanes,
+            proto_lanes: proto_lanes,
             connector_ctrls: connector_ctrls,
             transactions: HashMap::new(),
             frame_hold: frame_hold,
@@ -425,6 +431,7 @@ impl Star {
             resource_record_cache: LruCache::new(16 * 1024),
             resource_address_to_key: LruCache::new(16 * 1024),
             status: StarStatus::Unknown,
+            status_broadcast: status_broadcast
         }
     }
 
@@ -655,17 +662,29 @@ if self.skel.core_tx.is_closed() {
         loop {
             let mut futures = vec![];
             let mut lanes = vec![];
+            for (key, mut lane) in &mut self.lanes {
+                futures.push(lane.lane.incoming.recv().boxed());
+                lanes.push(key.clone())
+            }
+            let mut proto_lane_index = vec![];
 
-            {
-                for (key, mut lane) in &mut self.lanes {
-                    futures.push(lane.lane.incoming.recv().boxed());
-                    lanes.push(key.clone())
-                }
+            for (index,lane) in &mut self.proto_lanes.iter_mut().enumerate() {
+                futures.push(lane.incoming.recv().boxed());
+                proto_lane_index.push(index);
             }
 
             futures.push(self.star_rx.recv().boxed());
 
-            let (command, index, _) = select_all(futures).await;
+            let (command, future_index, _) = select_all(futures).await;
+
+            let lane = if future_index < lanes.len() {
+                LaneId::Lane(lanes.get(future_index).unwrap().clone())
+            } else if future_index < lanes.len()+ proto_lane_index.len() {
+                LaneId::ProtoLane(future_index-lanes.len())
+            } else {
+                LaneId::None
+            };
+
 
             if let Some(command) = command {
                 match command {
@@ -681,6 +700,8 @@ if self.skel.core_tx.is_closed() {
                     }
                     StarCommand::AddProtoLaneEndpoint(lane) => {
 info!("Add ProtoLaneEndpoint: {}",self.skel.info.kind.to_string() );
+                        //lane.outgoing.out_tx.send( LaneCommand::Frame(Frame::Proto(ProtoFrame::ReportStarKey(self.skel.info.key.clone())))).await;
+                        self.proto_lanes.push(lane);
                     }
                     StarCommand::AddLaneEndpoint(lane) => {
                         self.lanes.insert(lane.remote_star.clone(), LaneMeta::new(lane));
@@ -744,8 +765,29 @@ info!("Add ProtoLaneEndpoint: {}",self.skel.info.kind.to_string() );
                             .await;
                     }
                     StarCommand::Frame(frame) => {
-                        let lane_key = lanes.get(index);
-                        self.process_frame(frame, lane_key).await;
+                        match lane {
+                            LaneId::None => {}
+                            LaneId::Lane(lane_key) => {
+                                self.process_frame(frame, Option::Some(&lane_key)).await;
+                            }
+                            LaneId::ProtoLane(proto_lane) => {
+                                if let Frame::Proto( ProtoFrame::ReportStarKey(remote_star)) = frame {
+                                        let mut lane = self.proto_lanes.remove(proto_lane);
+                                        lane.remote_star = Option::Some(remote_star);
+                                        let lane = match lane.try_into() {
+                                            Ok(lane) => {
+                                                lane
+                                            }
+                                            Err(error) => {
+                                                error!("error converting proto_lane to lane");
+                                                continue;
+                                            }
+                                        };
+info!("proto lane evolved!");
+                                        self.skel.star_tx.send(StarCommand::AddLaneEndpoint(lane)).await;
+                                }
+                            }
+                        }
                     }
                     StarCommand::ForwardFrame(forward) => {
                         self.send_frame(forward.to.clone(), forward.frame).await;
@@ -766,7 +808,7 @@ info!("Add ProtoLaneEndpoint: {}",self.skel.info.kind.to_string() );
                         self.check_status().await;
                     }
                     StarCommand::SetStatus(status) => {
-                        self.status = status;
+                        self.set_status(status.clone());
                         println!("{} {}", &self.skel.info.kind, &self.status.to_string());
                     }
                     StarCommand::GetCaches(tx) => {
@@ -774,9 +816,13 @@ info!("Add ProtoLaneEndpoint: {}",self.skel.info.kind.to_string() );
                     }
                     StarCommand::Diagnose(diagnose) => {
                         self.diagnose(diagnose).await;
+                    },
+                    StarCommand::GetStatusListener(tx) => {
+                        tx.send( self.status_broadcast.subscribe() );
+                        self.status_broadcast.send( self.status.clone() );
                     }
                     _ => {
-                        eprintln!("cannot process command: {}", command);
+                        eprintln!("cannot process command: {}", command.to_string());
                     }
                 }
             } else {
@@ -791,9 +837,14 @@ info!("Add ProtoLaneEndpoint: {}",self.skel.info.kind.to_string() );
         self.check_status().await;
     }
 
+    fn set_status( &mut self, status: StarStatus ) {
+        self.status = status.clone();
+        self.status_broadcast.send(status);
+    }
+
     async fn refresh_handles(&mut self) {
         if self.status == StarStatus::Unknown {
-            self.status = StarStatus::Pending
+            self.set_status(StarStatus::Pending)
         }
 
         if let Option::Some(star_handler) = &self.skel.star_handler {
@@ -842,7 +893,7 @@ info!("Add ProtoLaneEndpoint: {}",self.skel.info.kind.to_string() );
             if let Option::Some(star_handler) = &self.skel.star_handler {
                 let satisfied = star_handler.satisfied(self.skel.info.kind.handles()).await;
                 if let Result::Ok(Satisfaction::Ok) = satisfied {
-                    self.status = StarStatus::Initializing;
+                    self.set_status(StarStatus::Initializing);
                     let (tx, rx) = oneshot::channel();
                     self.variant.init(tx).await;
                     let star_tx = self.skel.star_tx.clone();
@@ -862,7 +913,7 @@ info!("Add ProtoLaneEndpoint: {}",self.skel.info.kind.to_string() );
                     //                    eprintln!("handles not satisfied for : {} Lacking: [ {}]", self.skel.info.kind, s);
                 }
             } else {
-                self.status = StarStatus::Initializing;
+                self.set_status(StarStatus::Initializing);
                 let (tx, rx) = oneshot::channel();
                 self.variant.init(tx).await;
                 let star_tx = self.skel.star_tx.clone();
@@ -2343,8 +2394,10 @@ unimplemented!();
 }
 
 pub trait StarKernel: Send {}
-
+#[derive(strum_macros::Display)]
 pub enum StarCommand {
+    InvokeProtoStarEvolution,
+    GetStatusListener(oneshot::Sender<broadcast::Receiver<StarStatus>>),
     AddLaneEndpoint(LaneEndpoint),
     AddProtoLaneEndpoint(ProtoLaneEndpoint),
     ConstellationBroadcast(ConstellationBroadcast),
@@ -2379,7 +2432,7 @@ pub enum StarCommand {
 
 #[derive(Clone)]
 pub enum ConstellationBroadcast{
-    ConstellationReady
+    Status(ConstellationStatus)
 }
 
 pub enum Diagnose {
@@ -2582,6 +2635,7 @@ pub enum StarTest {
     StarSearchForStarKey(StarKey),
 }
 
+/*
 impl fmt::Display for StarCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
@@ -2618,6 +2672,8 @@ impl fmt::Display for StarCommand {
         write!(f, "{}", r)
     }
 }
+
+ */
 
 #[derive(Clone)]
 pub struct StarController {

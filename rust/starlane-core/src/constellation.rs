@@ -41,6 +41,13 @@ impl Constellation{
     }
 }
 
+#[derive(Clone,Eq,PartialEq)]
+pub enum ConstellationStatus{
+    Unknown,
+    Assembled,
+    Ready
+}
+
 #[cfg(test)]
 mod test {
     use tokio::runtime::Runtime;

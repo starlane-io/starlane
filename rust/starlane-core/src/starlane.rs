@@ -22,7 +22,7 @@ use crate::keys::ResourceKey;
 use crate::lane::{ConnectionInfo, ConnectionKind, LaneEndpoint, LocalTunnelConnector, ServerSideTunnelConnector, ClientSideTunnelConnector, ConnectorController, ProtoLaneEndpoint, FrameCodex};
 use crate::logger::{Flags, Logger};
 use crate::message::{Fail, ProtoStarMessage};
-use crate::star::{ConstellationBroadcast, StarKind};
+use crate::star::{ConstellationBroadcast, StarKind, StarStatus};
 use crate::proto::{
     local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoTunnel,
 };
@@ -34,14 +34,14 @@ use crate::resource::{
 use crate::star::variant::{StarVariantFactory, StarVariantFactoryDefault};
 use crate::star::{Request, Star, StarCommand, StarController, StarKey, StarTemplateId, StarInfo};
 use crate::starlane::api::StarlaneApi;
-use crate::template::{ConstellationData, ConstellationTemplate, StarKeyIndexTemplate, StarKeySubgraphTemplate, StarKeyTemplate, MachineName, ConstellationLayout, StarSelector, ConstellationSelector, StarTemplate, StarInConstellationTemplateHandle, StarTemplateHandle, StarInConstellationTemplateSelector, ConstellationTemplateHandle};
+use crate::template::{ConstellationData, ConstellationTemplate, StarKeyConstellationIndexTemplate, StarKeySubgraphTemplate, StarKeyTemplate, MachineName, ConstellationLayout, StarSelector, ConstellationSelector, StarTemplate, StarInConstellationTemplateHandle, StarTemplateHandle, StarInConstellationTemplateSelector, ConstellationTemplateHandle};
 use tokio::net::{TcpListener, TcpStream, TcpSocket};
 use crate::util::AsyncHashMap;
 use futures::{TryFutureExt, StreamExt};
 use futures::stream::{SplitStream, SplitSink};
 use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 use std::str::FromStr;
-use crate::constellation::Constellation;
+use crate::constellation::{Constellation, ConstellationStatus};
 use tokio::time::sleep;
 use std::collections::hash_map::RandomState;
 use std::cell::Cell;
@@ -290,6 +290,7 @@ info!("AddStream");
             let machine = layout.handles_to_machine.get(&star_template.handle  ).ok_or(format!("expected machine mapping for star template handle: {}",star_template.handle.to_string()))?;
             if self.name == *machine {
                 let star_key = star_template.key.create();
+
                 let (mut evolve_tx, mut evolve_rx) = oneshot::channel();
                 evolve_rxs.push(evolve_rx);
 
@@ -365,35 +366,29 @@ info!("AddStream");
 println!("connecting for local: {}",local_star.star.to_string() );
             if self.name == *machine {
                 for lane in &star_template.lanes {
-                    match lane {
-                        StarSelector::StarInConstellationTemplate(constellation_selector) => {
-                            match &constellation_selector.constellation{
+                    match &lane.star_selector.constellation {
                                 ConstellationSelector::Local => {
-                                    let second_star = constellation.select( constellation_selector.star.clone() ).ok_or("cannot select star from local constellation")?.clone();
+                                    let second_star = constellation.select( lane.star_selector.star.clone() ).ok_or("cannot select star from local constellation")?.clone();
                                     let second_star = StarInConstellationTemplateHandle::new( name.clone(), second_star.handle );
                                     let mut evolution_rxs = self.add_local_lane(local_star.clone(), second_star).await?;
                                     proto_lane_evolution_rxs.append( & mut evolution_rxs );
                                 }
                                 ConstellationSelector::Named(constellation_name) => {
                                     let constellation = self.constellations.get(constellation_name).ok_or(format!("cannot select constellation named '{}' on this StarlaneMachine",constellation_name))?;
-                                    let second_star = constellation.select( constellation_selector.star.clone() ).ok_or(format!("cannot select star from constellation {}",constellation_name))?.clone();
+                                    let second_star = constellation.select( lane.star_selector.star.clone() ).ok_or(format!("cannot select star from constellation {}",constellation_name))?.clone();
                                     let second_star = StarInConstellationTemplateHandle::new( constellation.name.clone(), second_star.handle );
                                     let mut evolution_rxs = self.add_local_lane(local_star.clone(), second_star).await?;
                                     proto_lane_evolution_rxs.append( & mut evolution_rxs );
                                 }
-                                ConstellationSelector::AnyInsideMachine(machine_name) => {
+                                ConstellationSelector::AnyWithGatewayInsideMachine(machine_name) => {
 info!("connecting to {}", machine_name);
                                     let host_address = layout.get_machine_host_adddress(machine_name.clone());
 info!("host_address to {}", host_address );
                                     let star_ctrl = self.star_controllers.get(local_star.clone() ).await?.ok_or("expected local star to have star_ctrl")?;
-                                    let proto_lane_evolution_rx= self.add_client_side_lane_ctrl(star_ctrl, host_address, constellation_selector.clone() ).await?;
+                                    let proto_lane_evolution_rx= self.add_client_side_lane_ctrl(star_ctrl, host_address, lane.star_selector.clone(), true ).await?;
                                     proto_lane_evolution_rxs.push( proto_lane_evolution_rx );
                                 }
-                            }
-                        }
-                        _ => {
-                            return Err("create constellation can only work with Template StarSelectors.".into());
-                        }
+
                     }
                 }
             }
@@ -406,7 +401,7 @@ info!("host_address to {}", host_address );
         }
 
         // announce that the local constellation is now complete
-        constellation_broadcaster.send( ConstellationBroadcast::ConstellationReady );
+        constellation_broadcaster.send( ConstellationBroadcast::Status( ConstellationStatus::Assembled ));
 
         let evolutions = join_all(evolve_rxs).await;
 
@@ -418,8 +413,30 @@ info!("host_address to {}", host_address );
             }
         }
 
-// give it a second to finish setup... need to remove this eventually:
-tokio::time::sleep(Duration::from_secs(1)).await;
+        let mut ready_futures = vec![];
+        for star_template in &layout.template.stars {
+            let machine = layout.handles_to_machine.get(&star_template.handle).ok_or(format!("expected machine mapping for star template handle: {}", star_template.handle.to_string()))?;
+            if self.name == *machine {
+                let local_star = StarInConstellationTemplateHandle::new(name.clone(), star_template.handle.clone());
+                let star_ctrl = self.star_controllers.get(local_star.clone()).await?.ok_or(format!("expected star controller: {}",local_star.to_string()) )?;
+                let (tx,rx) = oneshot::channel();
+                star_ctrl.star_tx.send(StarCommand::GetStatusListener(tx)).await;
+                let mut star_status_receiver = rx.await?;
+                let (ready_status_tx,ready_status_rx) = oneshot::channel();
+                tokio::spawn( async move {
+                   while let Result::Ok( status) = star_status_receiver.recv().await {
+                       if status == StarStatus::Ready {
+                           ready_status_tx.send(());
+                           break;
+                       }
+                   }
+                });
+                ready_futures.push(ready_status_rx);
+            }
+        }
+
+        // wait for all stars to be StarStatus::Ready
+        join_all(ready_futures ).await;
 
         Ok(())
     }
@@ -578,10 +595,13 @@ info!("Return from LISTEN");
         &mut self,
         star_ctrl: StarController,
         host_address: String,
-        selector: StarInConstellationTemplateSelector
+        selector: StarInConstellationTemplateSelector,
+        key_requestor: bool
         ) -> Result<broadcast::Receiver<Result<(),Error>>, Error> {
 
-        let lane = ProtoLaneEndpoint::new(Option::None );
+        let mut lane = ProtoLaneEndpoint::new(Option::None );
+        lane.key_requestor = key_requestor;
+
         let rtn = lane.get_evoltion_rx();
 
         let connector= ClientSideTunnelConnector::new(&lane,host_address,selector).await?;

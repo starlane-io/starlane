@@ -18,7 +18,7 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::time::{Duration, Instant};
 
 use crate::cache::ProtoArtifactCachesFactory;
-use crate::constellation::Constellation;
+use crate::constellation::{Constellation, ConstellationStatus};
 use crate::core::{CoreRunner, CoreRunnerCommand};
 use crate::error::Error;
 use crate::file_access::FileAccess;
@@ -35,13 +35,13 @@ use crate::star::{FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBac
 use crate::star::pledge::StarHandleBacking;
 use crate::star::variant::{StarVariantCommand, StarVariantFactory};
 use crate::starlane::StarlaneCommand;
-use crate::template::ConstellationTemplate;
+use crate::template::{ConstellationTemplate, StarKeyConstellationIndex};
 use std::convert::TryInto;
 
 pub static MAX_HOPS: i32 = 32;
 
 pub struct ProtoStar {
-    star_key: Option<StarKey>,
+    star_key: ProtoStarKey,
     sequence: Arc<AtomicU64>,
     kind: StarKind,
     star_tx: mpsc::Sender<StarCommand>,
@@ -57,13 +57,14 @@ pub struct ProtoStar {
     caches: Arc<ProtoArtifactCachesFactory>,
     data_access: FileAccess,
     proto_constellation_broadcast: Cell<Option<broadcast::Receiver<ConstellationBroadcast>>>,
+    constellation_status: ConstellationStatus,
     flags: Flags,
     tracker: ProtoTracker,
 }
 
 impl ProtoStar {
     pub fn new(
-        key: Option<StarKey>,
+        key: ProtoStarKey,
         kind: StarKind,
         star_tx: Sender<StarCommand>,
         star_rx: Receiver<StarCommand>,
@@ -95,7 +96,7 @@ impl ProtoStar {
                 proto_constellation_broadcast: Cell::new(Option::Some(proto_constellation_broadcast)),
                 tracker: ProtoTracker::new(),
                 flags: flags,
-
+                constellation_status: ConstellationStatus::Unknown
             },
             StarController { star_tx },
         )
@@ -147,18 +148,37 @@ impl ProtoStar {
             if let Some(command) = command {
                 match command {
                     StarCommand::GetStarInfo(tx) => {
-                        if self.star_key.is_none() {
-                            tx.send(Option::None);
-                        } else {
-                            tx.send( Option::Some(StarInfo{
-                                key: self.star_key.as_ref().unwrap().clone(),
-                                kind: self.kind.clone()
-                            })  );
+                        match &self.star_key{
+                            ProtoStarKey::Key(key) => {
+                                tx.send( Option::Some(StarInfo{
+                                    key: key.clone(),
+                                    kind: self.kind.clone()
+                                })  );
+
+                            }
+                            ProtoStarKey::RequestSubKeyExpansion(_) => {
+                                tx.send(Option::None);
+                            }
                         }
                     }
-                    StarCommand::ConstellationBroadcast(ConstellationBroadcast::ConstellationReady)=> {
+                    StarCommand::ConstellationBroadcast(broadcast)=> {
+                        match broadcast {
+                            ConstellationBroadcast::Status(constellation_status) => {
+                                self.constellation_status = constellation_status;
+                                self.check_ready();
+                            }
+                        }
+                    }
+                    StarCommand::InvokeProtoStarEvolution=> {
+
+                        let star_key = match self.star_key
+                        {
+                            ProtoStarKey::Key(star_key) => star_key,
+                            _ => panic!("proto star not ready for proto star evolution because it does not have a star_key yet assigned")
+                        };
+
                         let info = StarInfo {
-                            key: self.star_key.as_ref().unwrap().clone(),
+                            key: star_key,
                             kind: self.kind.clone(),
                         };
 
@@ -212,6 +232,7 @@ impl ProtoStar {
                             self.star_rx,
                             core_tx,
                             self.lanes,
+                            self.proto_lanes,
                             self.connector_ctrls,
                             self.frame_hold,
                             variant,
@@ -229,9 +250,14 @@ impl ProtoStar {
                             }
                     }
                     StarCommand::AddProtoLaneEndpoint(lane) => {
-                        if( self.star_key.is_some() )
+                        match &self.star_key
                         {
-                            lane.outgoing.out_tx.send(LaneCommand::Frame(Frame::Proto(ProtoFrame::ReportStarKey(self.star_key.clone().unwrap())))).await?;
+                            ProtoStarKey::Key(star_key) => {
+                                lane.outgoing.out_tx.send(LaneCommand::Frame(Frame::Proto(ProtoFrame::ReportStarKey(star_key.clone())))).await?;
+                            }
+                            ProtoStarKey::RequestSubKeyExpansion(index) => {
+                                lane.outgoing.out_tx.send(LaneCommand::Frame(Frame::Proto(ProtoFrame::GatewaySelect))).await?;
+                            }
                         }
                         self.proto_lanes.push(lane);
                     }
@@ -254,6 +280,17 @@ impl ProtoStar {
                                             lane.remote_star = Option::Some(remote_star);
                                             let lane: LaneEndpoint = lane.try_into()?;
                                             self.star_tx.send(StarCommand::AddLaneEndpoint(lane)).await;
+                                        }
+                                    }
+                                    ProtoFrame::GatewayAssign(star_sub_graph_keys) => {
+                                        match self.star_key{
+                                            ProtoStarKey::Key(_) => {
+                                                error!("attempt to assign a subgraph to a star that already has a proper star_key!")
+                                            }
+                                            ProtoStarKey::RequestSubKeyExpansion(index) => {
+                                                self.star_key = ProtoStarKey::Key(StarKey::new_with_subgraph(star_sub_graph_keys, index ));
+                                                self.check_ready();
+                                            }
                                         }
                                     }
                                     _ => {}
@@ -282,21 +319,13 @@ impl ProtoStar {
         }
     }
 
-    async fn send_expansion_request(&mut self) {
-        unimplemented!();
-        /*
-        let frame = Frame::Proto(ProtoFrame::GatewaySelect);
-        self.tracker.track(frame.clone(), |frame| {
-            if let Frame::Proto(ProtoFrame::GatewayAssign(_)) = frame {
-                return true;
-            } else {
-                return false;
-            }
-        });
-
-        self.broadcast(frame, &Option::None).await;
-
-         */
+    fn check_ready(&mut self) {
+        if self.constellation_status == ConstellationStatus::Assembled && self.star_key.is_some() {
+            let star_tx = self.star_tx.clone();
+            tokio::spawn( async move {
+                star_tx.send( StarCommand::InvokeProtoStarEvolution ).await;
+            } );
+        }
     }
 
     async fn resend(&mut self, frame: Frame) {
@@ -642,4 +671,23 @@ pub enum LaneToCentralState {
 pub struct LaneToCentral {
     remote_star: StarKey,
     hops: usize,
+}
+
+
+#[derive(Clone)]
+pub enum ProtoStarKey {
+    Key(StarKey),
+    RequestSubKeyExpansion(StarKeyConstellationIndex)
+}
+
+
+impl ProtoStarKey {
+
+    pub fn is_some(&self) -> bool {
+        match self {
+            ProtoStarKey::Key(_) => true,
+            ProtoStarKey::RequestSubKeyExpansion(_) => false
+        }
+    }
+
 }

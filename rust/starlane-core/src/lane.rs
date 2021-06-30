@@ -31,6 +31,7 @@ use std::cell::Cell;
 use serde::de::DeserializeOwned;
 use crate::template::{ConstellationSelector, StarInConstellationTemplateHandle, StarInConstellationTemplateSelector};
 use std::convert::TryInto;
+use std::fmt::{Debug, Formatter};
 
 pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
 pub static LANE_QUEUE_SIZE: usize = 32;
@@ -47,6 +48,7 @@ pub struct IncomingSide {
 }
 
 impl IncomingSide {
+    #[instrument]
     pub async fn recv(&mut self) -> Option<StarCommand> {
         loop {
             match &mut self.tunnel {
@@ -63,10 +65,7 @@ impl IncomingSide {
                     match tunnel.rx.recv().await {
                         None => {
                             error!("received None from TunnelInState::In");
-                            tokio::time::sleep(Duration::from_secs(5)).await;
-                            return Option::None;
-//panic!("received None from tunnel.rx");
-                            // let's hope the tunnel is reset soon
+                            self.tunnel = TunnelInState::None;
                         }
                         Some(frame) => {
                             return Option::Some(StarCommand::Frame(frame));
@@ -75,6 +74,12 @@ impl IncomingSide {
                 }
             }
         }
+    }
+}
+
+impl Debug for IncomingSide {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str("IncomingSide")
     }
 }
 
@@ -139,7 +144,8 @@ pub struct ProtoLaneEndpoint {
     pub incoming: IncomingSide,
     pub outgoing: OutgoingSide,
     tunnel_receiver_tx: Sender<TunnelInState>,
-    evolution_tx: broadcast::Sender<Result<(),Error>>
+    evolution_tx: broadcast::Sender<Result<(),Error>>,
+    pub key_requestor: bool
 }
 
 impl ProtoLaneEndpoint {
@@ -169,9 +175,11 @@ impl ProtoLaneEndpoint {
                 tunnel: TunnelInState::None,
             },
             outgoing: OutgoingSide { out_tx: mid_tx },
-            evolution_tx
+            evolution_tx,
+            key_requestor: false
         }
     }
+
 
     pub fn get_tunnel_in_tx(&self) -> Sender<TunnelInState> {
         self.tunnel_receiver_tx.clone()
@@ -306,6 +314,7 @@ impl ClientSideTunnelConnector {
         })
     }
 
+    #[instrument]
     async fn run(mut self) {
         loop {
             if let Result::Ok(stream) = TcpStream::connect(self.host_address.clone()).await
@@ -360,6 +369,11 @@ impl TunnelConnector for ClientSideTunnelConnector {
 
 }
 
+impl Debug for ClientSideTunnelConnector{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str("ClientSideTunnelConnector")
+    }
+}
 
 
 
@@ -368,6 +382,12 @@ pub struct ServerSideTunnelConnector {
     pub low: OutgoingSide,
     command_rx: Receiver<ConnectorCommand>,
     stream : Cell<Option<TcpStream>>
+}
+
+impl Debug for ServerSideTunnelConnector{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str("ServerSideTunnelConnector")
+    }
 }
 
 impl ServerSideTunnelConnector {
@@ -387,6 +407,7 @@ impl ServerSideTunnelConnector {
         })
     }
 
+    #[instrument]
     async fn run(mut self) {
 
         let stream = match self.stream.replace(Option::None).ok_or("expected stream to be Some"){
@@ -398,7 +419,7 @@ impl ServerSideTunnelConnector {
         };
 
         let (tx,rx) = FrameCodex::new(stream);
-
+info!("SERVER: creating proto tunnel");
         let proto_tunnel = ProtoTunnel{
             star: Option::None,
             tx: tx,
@@ -407,8 +428,10 @@ impl ServerSideTunnelConnector {
 
         match proto_tunnel.evolve().await {
             Ok((low_out,low_in)) => {
+info!("SERVER: evolved.... ");
                 self.low.out_tx.send(LaneCommand::Tunnel(TunnelOutState::Out(low_out))) .await;
                 self.low_in_tx.send(TunnelInState::In(low_in)).await;
+info!("SERVER: waiting for command_rx.... ");
 
                 self.command_rx.recv().await;
                 self.low.out_tx.send(LaneCommand::Tunnel(TunnelOutState::None)).await;

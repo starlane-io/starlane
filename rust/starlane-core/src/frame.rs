@@ -59,7 +59,7 @@ pub enum ProtoFrame {
     StarLaneProtocolVersion(i32),
     ReportStarKey(StarKey),
     GatewaySelect,
-    GatewayAssign{ gateway: StarKey, subgraph:Vec<StarSubGraphKey> },
+    GatewayAssign( Vec<StarSubGraphKey> ),
 }
 
 #[derive(Debug,Clone, Serialize, Deserialize)]
