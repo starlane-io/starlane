@@ -811,7 +811,12 @@ mod test {
 
             starlane.create_constellation("standalone", ConstellationLayout::standalone().unwrap() ).await.unwrap();
 
-            let starlane_api = starlane.get_starlane_api().await.unwrap();
+            let mut client = StarlaneMachine::new_with_artifact_caches("client".to_string(), starlane.get_proto_artifact_caches_factory().await.unwrap() ).unwrap();
+            let mut client_layout = ConstellationLayout::client("gateway".to_string() ).unwrap();
+            client_layout.set_machine_host_address("gateway".to_lowercase(), format!("localhost:{}", crate::starlane::DEFAULT_PORT.clone()));
+            client.create_constellation("client", client_layout  ).await.unwrap();
+
+            let starlane_api = client.get_starlane_api().await.unwrap();
 
             let sub_space_api = match starlane_api
                 .get_sub_space(
@@ -872,11 +877,6 @@ mod test {
                     .unwrap();
             }
 
-
-            let mut client = StarlaneMachine::new_with_artifact_caches("client".to_string(), starlane.get_proto_artifact_caches_factory().await.unwrap() ).unwrap();
-            let mut client_layout = ConstellationLayout::client("gateway".to_string() ).unwrap();
-            client_layout.set_machine_host_address("gateway".to_lowercase(), format!("localhost:{}", crate::starlane::DEFAULT_PORT.clone()));
-            client.create_constellation("client", client_layout  ).await.unwrap();
 
 
             std::thread::sleep(std::time::Duration::from_secs(5) );
