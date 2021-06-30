@@ -654,11 +654,7 @@ if self.skel.core_tx.is_closed() {
 
     #[instrument]
     pub async fn run(mut self) {
-        let skel = self.skel.clone();
-        tokio::spawn(async move {
-            skel.core_tx.closed().await;
-            warn!("core_tx_closed: {}",skel.info.to_string());
-        });
+
         loop {
             let mut futures = vec![];
             let mut lanes = vec![];

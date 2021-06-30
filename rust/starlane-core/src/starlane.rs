@@ -62,7 +62,11 @@ pub struct StarlaneMachine {
 
 impl StarlaneMachine {
     pub fn new(name: MachineName) -> Result<Self,Error> {
-        let mut runner = StarlaneMachineRunner::new(name)?;
+        Self::new_with_artifact_caches(name, Option::None)
+    }
+
+    pub fn new_with_artifact_caches(name: MachineName, artifact_caches: Option<Arc<ProtoArtifactCachesFactory>>) -> Result<Self,Error> {
+        let mut runner = StarlaneMachineRunner::new_with_artifact_caches(name, artifact_caches )?;
         let starlane = Self {
             tx: runner.command_tx.clone()
         };
@@ -70,6 +74,13 @@ impl StarlaneMachine {
         runner.run();
 
         Ok(starlane)
+    }
+
+    pub async fn get_proto_artifact_caches_factory( &self ) -> Result<Option<Arc<ProtoArtifactCachesFactory>>,Error>
+    {
+        let (tx,rx) = oneshot::channel();
+        self.tx.send( StarlaneCommand::GetProtoArtifactCachesFactory(tx)).await?;
+        Ok(rx.await?)
     }
 
     pub fn shutdown(&self) {
@@ -131,6 +142,10 @@ pub struct StarlaneMachineRunner {
 
 impl StarlaneMachineRunner {
     pub fn new(machine: String) -> Result<Self, Error> {
+        Self::new_with_artifact_caches(machine,Option::None)
+    }
+
+    pub fn new_with_artifact_caches(machine: String, artifact_caches: Option<Arc<ProtoArtifactCachesFactory>>) -> Result<Self, Error> {
         let (command_tx, command_rx) = mpsc::channel(32);
         Ok(StarlaneMachineRunner {
             name: machine,
@@ -148,7 +163,7 @@ impl StarlaneMachineRunner {
             cache_access: FileAccess::new(
                 std::env::var("STARLANE_CACHE").unwrap_or("cache".to_string()),
             )?,
-            artifact_caches: Option::None,
+            artifact_caches: artifact_caches,
             port: DEFAULT_PORT.clone(),
             constellations: HashMap::new(),
             inner_flags: Arc::new(Mutex::new(Cell::new(StarlaneInnerFlags::new()) )),
@@ -243,7 +258,17 @@ impl StarlaneMachineRunner {
                            }
                        }
                     }
-               }
+                    StarlaneCommand::GetProtoArtifactCachesFactory(tx) => {
+                        match self.artifact_caches.as_ref(){
+                            None => {
+                                tx.send(Option::None);
+                            }
+                            Some(caches) => {
+                                tx.send(Option::Some(caches.clone()));
+                            }
+                        }
+                    }
+                }
             }
         });
     }
@@ -649,6 +674,7 @@ pub enum StarlaneCommand {
     StarlaneApiSelectBest(oneshot::Sender<Result<StarlaneApi,Error>>),
     Listen(oneshot::Sender<Result<(),Error>>),
     AddStream(TcpStream),
+    GetProtoArtifactCachesFactory(oneshot::Sender<Option<Arc<ProtoArtifactCachesFactory>>>),
     Shutdown
 }
 
@@ -847,17 +873,19 @@ mod test {
             }
 
 
-            let mut client = StarlaneMachine::new("client".to_string() ).unwrap();
+            let mut client = StarlaneMachine::new_with_artifact_caches("client".to_string(), starlane.get_proto_artifact_caches_factory().await.unwrap() ).unwrap();
             let mut client_layout = ConstellationLayout::client("gateway".to_string() ).unwrap();
             client_layout.set_machine_host_address("gateway".to_lowercase(), format!("localhost:{}", crate::starlane::DEFAULT_PORT.clone()));
             client.create_constellation("client", client_layout  ).await.unwrap();
 
 
+            std::thread::sleep(std::time::Duration::from_secs(5) );
 
             client.shutdown();
             starlane.shutdown();
 
-            std::thread::sleep(std::time::Duration::from_secs(5) );
+            std::thread::sleep(std::time::Duration::from_secs(1) );
+
 
         });
     }
