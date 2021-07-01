@@ -27,19 +27,23 @@ fn main() -> Result<(), Error> {
     let subscriber = FmtSubscriber::default();
     set_global_default(subscriber.into()).expect("setting global default tracer failed");
 
+    ctrlc::set_handler( move || {
+        std::process::exit(1);
+    }).expect("expected to be able to set ctrl-c handler");
+
     let mut clap_app = App::new("Starlane")
         .version("0.1.0")
         .author("Scott Williams <scott@mightydevco.com>")
-        .about("A Resource Mesh").subcommands(vec![SubCommand::with_name("server").usage("run an instance of starlane server").display_order(0),
+        .about("A Resource Mesh").subcommands(vec![SubCommand::with_name("serve").usage("serve a starlane machine instance").display_order(0),
                                                             SubCommand::with_name("config").subcommands(vec![SubCommand::with_name("set-host").usage("set the host that the starlane CLI connects to").arg(Arg::with_name("hostname").required(true).help("the hostname of the starlane instance you wish to connect to")).display_order(0),
                                                                                                                             SubCommand::with_name("get-host").usage("get the host that the starlane CLI connects to")]).usage("read or manipulate the cli config").display_order(1).display_order(1),
-                                                            SubCommand::with_name("push").usage("push an artifact bundle").args(vec![Arg::with_name("dir").required(true).help("the source directory for this bundle"),
+                                                            SubCommand::with_name("publish").usage("publish an artifact bundle").args(vec![Arg::with_name("dir").required(true).help("the source directory for this bundle"),
                                                                                                                                                                                        Arg::with_name("address").required(true).help("the publish address of this bundle i.e. 'space:sub_space:bundle:1.0.0'")].as_slice())
     ]);
 
     let matches = clap_app.clone().get_matches();
 
-    if let Option::Some(_) = matches.subcommand_matches("server") {
+    if let Option::Some(_) = matches.subcommand_matches("serve") {
         let rt = Runtime::new().unwrap();
         rt.block_on(async move {
             let mut starlane = StarlaneMachine::new("server".to_string() ).unwrap();
@@ -60,10 +64,10 @@ fn main() -> Result<(), Error> {
         else{
             clap_app.print_long_help().unwrap_or_default();
         }
-    } else if let Option::Some(args) = matches.subcommand_matches("push") {
+    } else if let Option::Some(args) = matches.subcommand_matches("publish") {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            push(args.clone()).await.unwrap();
+            publish(args.clone()).await.unwrap();
         });
 
     } else {
@@ -73,7 +77,7 @@ fn main() -> Result<(), Error> {
     Ok(())
 }
 
-async fn push( args: ArgMatches<'_> ) -> Result<(),Error> {
+async fn publish(args: ArgMatches<'_> ) -> Result<(),Error> {
     let bundle = ArtifactBundleAddress::from_str( args.value_of("address").ok_or("expected address")? )?;
 
     let input = Path::new(args.value_of("dir").ok_or("expected directory")?);

@@ -10,6 +10,8 @@ use crate::starlane::api::{SpaceApi, StarlaneApi};
 use std::convert::TryInto;
 use std::str::FromStr;
 use tokio::sync::oneshot;
+use std::thread;
+use tokio::runtime::{Runtime, Handle};
 
 pub struct CentralVariant {
     skel: StarSkel,
@@ -48,12 +50,13 @@ impl StarVariant for CentralVariant {
 
 
         let skel = self.skel.clone();
-        tokio::spawn(async move {
-           let registry = skel.registry.as_ref().unwrap();
-           registry.register(registration).await.unwrap();
-           let starlane_api = StarlaneApi::new(skel.star_tx.clone());
-           tx.send(Self::ensure(starlane_api).await);
-        });
+
+         tokio::spawn( async move {
+            let registry = skel.registry.as_ref().unwrap();
+            registry.register(registration).await.unwrap();
+            let starlane_api = StarlaneApi::new(skel.star_tx.clone());
+            tx.send(Self::ensure(starlane_api).await);
+         });
     }
 }
 
@@ -74,6 +77,8 @@ impl CentralVariant {
         let mut creation = space_api.create_domain("localhost")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
+
+        info!("central creation checklist completed.");
 
         Ok(())
     }

@@ -296,7 +296,9 @@ impl ProtoStar {
                                                 warn!("should not receive a subgraph for starkey as starkey is already assigned");
                                             }
                                             ProtoStarKey::RequestSubKeyExpansion(index) => {
-                                                self.star_key = ProtoStarKey::Key(StarKey::new_with_subgraph(subgraph, index));
+                                                let star_key = StarKey::new_with_subgraph(subgraph, index);
+                                                self.star_key = ProtoStarKey::Key(star_key.clone());
+                                                self.broadcast(Frame::Proto(ProtoFrame::ReportStarKey(star_key)), &Option::None ).await;
                                                 self.check_ready();
                                             }
                                         }
@@ -361,6 +363,10 @@ impl ProtoStar {
         for star in stars {
             self.send_frame(&star, frame.clone()).await;
         }
+
+        for proto_lane in &mut self.proto_lanes {
+            proto_lane.outgoing().out_tx.send(LaneCommand::Frame(frame.clone())).await;
+        }
     }
 
     async fn broadcast_no_hold(&mut self, frame: Frame, exclude: &Option<HashSet<StarKey>>) {
@@ -372,6 +378,10 @@ impl ProtoStar {
         }
         for star in stars {
             self.send_frame_no_hold(&star, frame.clone()).await;
+        }
+
+        for proto_lane in &mut self.proto_lanes {
+            proto_lane.outgoing().out_tx.send(LaneCommand::Frame(frame.clone())).await;
         }
     }
 

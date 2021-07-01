@@ -480,9 +480,10 @@ println!("connecting for local: {}",local_star.star.to_string() );
             let port = self.port.clone();
             let inner_flags = self.inner_flags.clone();
 
-            ctrlc::set_handler( move || {
+/*            ctrlc::set_handler( move || {
                 Self::unlisten(inner_flags.clone(), port.clone());
             }).expect("expected to be able to set ctrl-c handler");
+ */
 
         }
 
@@ -655,12 +656,17 @@ impl Drop for StarlaneMachineRunner {
         {
             let mut flags =self.inner_flags.lock().unwrap();
 
-            if !flags.get_mut().shutdown
+            let flags_mut = flags.get_mut();
+
+            if !flags_mut.shutdown
             {
-                warn!("dropping StarlaneMachineRunner({}) unexpectedly", self.name);
+                warn!("dropping Starlane( {} ) unexpectedly", self.name);
+            }
+
+            if !flags_mut.listening {
+                Self::unlisten(self.inner_flags.clone(), self.port.clone());
             }
         }
-        Self::unlisten(self.inner_flags.clone(), self.port.clone());
     }
 }
 
@@ -818,7 +824,25 @@ mod test {
             client_layout.set_machine_host_address("gateway".to_lowercase(), format!("localhost:{}", crate::starlane::DEFAULT_PORT.clone()));
             client.create_constellation("client", client_layout  ).await.unwrap();
 
+            tokio::time::sleep(Duration::from_secs(1)).await;
+
             let starlane_api = client.get_starlane_api().await.unwrap();
+
+            tokio::spawn( async move {
+                println!("ping gateway...");
+            });
+
+
+            if starlane_api.ping_gateway().await.is_err() {
+                error!("failed to ping gateway");
+                client.shutdown();
+                starlane.shutdown();
+                return;
+            }
+
+            tokio::spawn( async move {
+                println!("getting subspace_api....");
+            });
 
             let sub_space_api = match starlane_api
                 .get_sub_space(
@@ -834,6 +858,10 @@ mod test {
                     panic!(err)
                 }
             };
+
+            tokio::spawn( async move {
+                println!("on to filesystem api ...");
+            });
 
             let file_api = sub_space_api
                 .create_file_system("website")
@@ -860,6 +888,7 @@ mod test {
                 .await
                 .unwrap();
 
+            /*
             // upload an artifact bundle
             {
                 let mut file =
@@ -877,8 +906,30 @@ mod test {
                     .await
                     .unwrap();
             }
+             */
 
+            // upload an artifact bundle
+            {
+                let mut file =
+                    File::open("test-data/localhost-config/artifact-bundle.zip").unwrap();
+                let mut data = vec![];
+                file.read_to_end(&mut data).unwrap();
+                let data = Arc::new(data);
+                let artifact_bundle_api = sub_space_api
+                    .create_artifact_bundle(
+                        "filo",
+                        &semver::Version::from_str("1.0.0").unwrap(),
+                        data,
+                    )
+                    .unwrap()
+                    .submit()
+                    .await
+                    .unwrap();
+            }
 
+            tokio::spawn(async move {
+              info!("done");
+            });
 
             std::thread::sleep(std::time::Duration::from_secs(5) );
 
@@ -886,8 +937,6 @@ mod test {
             starlane.shutdown();
 
             std::thread::sleep(std::time::Duration::from_secs(1) );
-
-
         });
     }
 }

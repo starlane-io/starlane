@@ -706,6 +706,7 @@ if self.skel.core_tx.is_closed() {
                             set_flags.tx.send(());
                         }
                         StarCommand::AddProtoLaneEndpoint(lane) => {
+info!("Star {} AddProtoLaneEndpoint", self.skel.info.kind.to_string() );
                             let result = lane.outgoing.out_tx.try_send( LaneCommand::Frame(Frame::Proto(ProtoFrame::ReportStarKey(self.skel.info.key.clone()))));
                             self.proto_lanes.push(LaneWrapper::Proto(LaneMeta::new(lane)));
                         }
@@ -775,13 +776,15 @@ if self.skel.core_tx.is_closed() {
                                 match lane_index.expect_proto_lane()
                                 {
                                     Ok(proto_lane_index) => {
-                                        let lane = self.proto_lanes.remove(proto_lane_index).expect_proto_lane().unwrap();
+                                        let mut lane = self.proto_lanes.remove(proto_lane_index).expect_proto_lane().unwrap();
+                                        lane.remote_star = Option::Some(remote_star);
                                         let lane = match lane.try_into() {
                                             Ok(lane) => {
+info!("ProtoLane into Lane");
                                                 lane
                                             }
                                             Err(error) => {
-                                                error!("error converting proto_lane to lane");
+                                                error!("error converting proto_lane into lane: {}", error);
                                                 continue;
                                             }
                                         };
@@ -867,7 +870,8 @@ if self.skel.core_tx.is_closed() {
                 let skel = self.skel.clone();
                 tokio::spawn(async move {
                     let result = tokio::time::timeout(Duration::from_secs(5), rx).await;
-                    if let Ok(Ok(hits)) = result {
+                    match result {
+                        Ok(Ok(hits)) => {
                         for (star, hops) in hits.hits {
                             let handle = StarHandle {
                                 key: star,
@@ -887,11 +891,20 @@ if self.skel.core_tx.is_closed() {
                                 }
                             }
                         }
-                    } else {
+                    }
+                    Err(error) => {
                         error!(
-                            "error encountered when attempting to get a handle for: {}",
-                            kind
+                            "error encountered when attempting to get a handle for: {} TIMEOUT: {}",
+                            kind, error.to_string()
                         );
+                    }
+                    Ok(Err(error)) => {
+                            error!(
+                                "error encountered when attempting to get a handle for: {} ERROR: {}",
+                                kind, error.to_string()
+                            );
+                    }
+
                     }
                 });
             }

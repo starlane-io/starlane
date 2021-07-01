@@ -63,6 +63,7 @@ impl IncomingSide {
                 TunnelInState::In(tunnel) => {
                     match tunnel.rx.recv().await {
                         None => {
+warn!("tunnel.rx received None");
                             self.tunnel = TunnelInState::None;
                         }
                         Some(frame) => {

@@ -316,7 +316,7 @@ impl ConstellationLayout {
     }
 
     pub fn get_machine_host_adddress(&self, machine: MachineName ) -> String {
-        self.machine_to_host_address.get(&machine).unwrap_or(&format!("{}:{}", machine, crate::starlane::DEFAULT_PORT.clone())).clone()
+        self.machine_to_host_address.get(&machine).unwrap_or(&format!("starlane-{}:{}", machine, crate::starlane::DEFAULT_PORT.clone())).clone()
     }
 }
 

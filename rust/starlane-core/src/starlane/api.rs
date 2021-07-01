@@ -4,7 +4,7 @@ use std::time::Duration;
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
 use crate::frame::ChildManagerResourceAction::Register;
-use crate::frame::{ChildManagerResourceAction, Reply, SimpleReply, StarMessagePayload};
+use crate::frame::{ChildManagerResourceAction, Reply, SimpleReply, StarMessagePayload, StarPattern, WindAction};
 use crate::keys::ResourceKey;
 use crate::message::resource::{
     MessageFrom, MessageReply, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage,
@@ -23,7 +23,7 @@ use crate::resource::{
     ResourceRegistryInfo, ResourceStateSrc, ResourceStub, ResourceType,
 };
 use crate::star::StarCommand::ResourceRecordRequest;
-use crate::star::{Request, StarCommand, StarKey};
+use crate::star::{Request, StarCommand, StarKey, Wind, StarKind};
 use futures::channel::oneshot;
 use futures::io::Cursor;
 use semver::Version;
@@ -60,6 +60,16 @@ impl StarlaneApi {
                 Err(Fail::Timeout)
             }
         }
+    }
+
+    pub async fn ping_gateway(&self) -> Result<(),Fail> {
+
+        let (wind,gateway_search_rx) = Wind::new(StarPattern::StarKind(StarKind::Gateway), WindAction::SearchHits);
+        self.star_tx.send( StarCommand::WindInit(wind)).await;
+
+        let result = tokio::time::timeout( Duration::from_secs(5), gateway_search_rx ).await;
+        result??;
+        Ok(())
     }
 
     pub async fn fetch_resource_address(&self, key: ResourceKey) -> Result<ResourceAddress, Fail> {
