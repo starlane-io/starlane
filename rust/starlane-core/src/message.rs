@@ -422,7 +422,7 @@ impl ToString for Fail {
             }
             Fail::ResourceStateFinal(_) => "ResourceStateFinal".to_string(),
             Fail::ResourceAddressAlreadyInUse(_) => "ResourceAddressAlreadyInUse".to_string(),
-            Fail::InvalidResourceState(_) => "InvalidResourceState".to_string(),
+            Fail::InvalidResourceState(message) => format!("InvalidResourceState({})",message).to_string(),
         }
     }
 }
