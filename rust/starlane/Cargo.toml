@@ -17,3 +17,8 @@ dirs = "3.0.2"
 serde_json = "1.0"
 serde = { version="1.0.69", features=['derive','rc'] }
 lazy_static = "1.4.0"
+tempfile = "3.2.0"
+zip = "0.5.13"
+tracing = "0.1.26"
+tracing-subscriber = '0.2.19'
+tracing-futures = "0.2.5"

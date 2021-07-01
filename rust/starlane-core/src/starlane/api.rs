@@ -35,6 +35,7 @@ use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::mpsc;
+use crate::artifact::ArtifactBundleAddress;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -254,6 +255,17 @@ impl StarlaneApi {
         let record = self.fetch_resource_record(identifier).await?;
         Ok(SubSpaceApi::new(self.star_tx.clone(), record.stub)?)
     }
+
+    pub async fn create_artifact_bundle(
+        &self,
+        address: &ArtifactBundleAddress,
+        data: Arc<Vec<u8>>,
+    ) -> Result<Creation<ArtifactBundleApi>, Fail> {
+
+        let sub_space = self.get_sub_space(address.sub_space().into() ).await?;
+        sub_space.create_artifact_bundle( address.name().as_str(), &address.version(), data )
+    }
+
 }
 
 pub struct SpaceApi {

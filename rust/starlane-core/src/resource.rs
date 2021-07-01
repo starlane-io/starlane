@@ -2840,7 +2840,7 @@ impl ResourceAddress {
         if self.resource_type == ResourceType::Space {
             Err("Space ResourceAddress does not have a SubSpace".into())
         } else {
-            Ok(SPACE_ADDRESS_STRUCT.from_str(
+            Ok(SUB_SPACE_ADDRESS_STRUCT.from_str(
                 format!(
                     "{}:{}",
                     self.parts.get(0).ok_or("expected space")?.to_string(),

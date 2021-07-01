@@ -475,6 +475,22 @@ pub struct ArtifactBundleAddress {
     address: ResourceAddress,
 }
 
+impl ArtifactBundleAddress{
+
+    pub fn version(&self)->semver::Version{
+        semver::Version::from_str(self.address.last_to_string().unwrap().as_str()).unwrap()
+    }
+
+    pub fn name(&self)->String{
+        self.address.parent().expect("expected bundle parent 'name'").last_to_string().unwrap()
+    }
+
+    pub fn sub_space(&self) -> ResourceAddress {
+        self.address.sub_space().unwrap()
+    }
+
+}
+
 impl Into<ArtifactBundleIdentifier> for ArtifactBundleAddress {
     fn into(self) -> ArtifactBundleIdentifier {
         ArtifactBundleIdentifier::Address(self)
@@ -529,6 +545,9 @@ impl TryFrom<ResourceAddress> for ArtifactBundleAddress {
                 received: value.resource_type(),
             })
         } else {
+            value.sub_space()?;
+            value.parent().ok_or("ArtifactBundle: expected version to have parent 'name'")?.last_to_string()?;
+            semver::Version::from_str(value.last_to_string()?.as_str() )?;
             Ok(ArtifactBundleAddress { address: value })
         }
     }

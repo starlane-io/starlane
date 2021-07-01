@@ -26,7 +26,6 @@ use crate::id::Id;
 use crate::proto::{local_tunnels, ProtoStar, ProtoTunnel};
 use crate::star::{Star, StarCommand, StarKey};
 use crate::starlane::{StarlaneCommand, VersionFrame};
-use crate::starlane::StarlaneCommand::Connect;
 use std::cell::Cell;
 use serde::de::DeserializeOwned;
 use crate::template::{ConstellationSelector, StarInConstellationTemplateHandle, StarInConstellationTemplateSelector};
