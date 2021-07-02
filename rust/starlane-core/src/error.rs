@@ -11,7 +11,7 @@ use std::num::ParseIntError;
 use std::string::FromUtf8Error;
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use tokio::sync::mpsc::error::SendError;
+use tokio::sync::mpsc::error::{SendError, TrySendError};
 use tokio::time::error::Elapsed;
 use zip::result::ZipError;
 use tokio::sync::broadcast::error::RecvError;
@@ -43,6 +43,12 @@ impl From<ZipError> for Error {
                 error: "ZipError: FileNotFound".to_string(),
             },
         }
+    }
+}
+
+impl <T> From<tokio::sync::mpsc::error::TrySendError<T>> for Error {
+    fn from(e: TrySendError<T>) -> Self {
+        e.to_string().into()
     }
 }
 

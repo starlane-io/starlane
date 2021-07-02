@@ -833,6 +833,22 @@ info!("ProtoLane into Lane");
                             tx.send(self.status_broadcast.subscribe());
                             self.status_broadcast.send(self.status.clone());
                         }
+                        StarCommand::Shutdown => {
+                            info!("shtudown star: {}", self.skel.info.kind);
+
+                            for (_,lane) in &mut self.lanes {
+                                lane.outgoing().out_tx.try_send(LaneCommand::Shutdown );
+                            }
+                            for lane in &mut self.proto_lanes{
+                                lane.outgoing().out_tx.try_send(LaneCommand::Shutdown );
+                            }
+
+                            self.lanes.clear();
+                            self.proto_lanes.clear();
+
+                            self.skel.core_tx.send( StarCoreAction::new(StarCoreCommand::Shutdown).0 ).await;
+                            break;
+                        },
                         _ => {
                             eprintln!("cannot process command: {}", command.to_string());
                         }
@@ -2429,6 +2445,7 @@ pub enum StarCommand {
     ResourceRecordSet(Set<ResourceRecord>),
 
     GetCaches(oneshot::Sender<Arc<ProtoArtifactCachesFactory>>),
+    Shutdown
 }
 
 #[derive(Clone)]

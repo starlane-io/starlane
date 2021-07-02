@@ -67,6 +67,19 @@ impl ResourceStore {
             what => Err(Fail::Unexpected{ expected: "Resource()".to_string(), received: what.to_string()}),
         }
     }
+
+    pub fn close(&self) {
+        let tx = self.tx.clone();
+        tokio::spawn( async move {
+            tx
+                .send(ResourceStoreAction {
+                    command: ResourceStoreCommand::Close,
+                    tx: oneshot::channel().0
+                })
+                .await;
+        });
+
+    }
 }
 
 pub struct ResourceStoreAction {

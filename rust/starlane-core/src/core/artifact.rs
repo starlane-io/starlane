@@ -52,6 +52,7 @@ impl ArtifactHost {
         Ok(rtn)
     }
 
+
     fn bundle_key(key: ResourceKey) -> Result<ArtifactBundleKey, Fail> {
         let bundle_key = match key {
             ResourceKey::ArtifactBundle(key) => key,
@@ -247,6 +248,12 @@ impl Host for ArtifactHost {
         unimplemented!("I don't know how to DELETE yet.");
         Ok(())
     }
+
+    fn shutdown(&self) {
+        self.store.close();
+        self.file_access.close();
+    }
+
 }
 
 fn get_artifacts(data: Arc<Vec<u8>>) -> Result<Vec<String>, Fail> {

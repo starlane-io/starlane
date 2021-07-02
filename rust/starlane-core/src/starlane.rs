@@ -174,6 +174,14 @@ impl StarlaneMachineRunner {
     }
 
     pub fn run(mut self) -> broadcast::Sender<()> {
+
+        let command_tx = self.command_tx.clone();
+        tokio::spawn( async move {
+            let mut shutdown_rx = crate::util::SHUTDOWN_TX.subscribe();
+            shutdown_rx.recv().await;
+            command_tx.try_send( StarlaneCommand::Shutdown );
+        });
+
         let (run_complete_signal_tx, _) = broadcast::channel(1);
         let run_complete_signal_tx_rtn = run_complete_signal_tx.clone();
 
@@ -233,10 +241,25 @@ impl StarlaneMachineRunner {
                         tx.send(Ok(StarlaneApi::new(star_ctrl.star_tx)));
                     }
                     StarlaneCommand::Shutdown => {
-                        let mut inner_flags = self.inner_flags.lock().unwrap();
-                        inner_flags.get_mut().shutdown = true;
+                        let listening = {
+                            let mut inner_flags = self.inner_flags.lock().unwrap();
+                            let mut_flags = inner_flags.get_mut();
+                            mut_flags.shutdown = true;
+                            mut_flags.listening
+                        };
 
+                        if listening {
+                            Self::unlisten(self.inner_flags.clone(), self.port.clone());
+                        }
+
+                        for (_,star_ctrl) in self.star_controllers.clone().into_map().await.unwrap_or(Default::default())
+                        {
+                            star_ctrl.star_tx.try_send(StarCommand::Shutdown);
+                        }
+
+                        self.star_controllers.clear();
                         self.command_rx.close();
+                        break;
                     }
                     StarlaneCommand::Listen(tx) => {
                         self.listen(tx);
@@ -646,7 +669,6 @@ info!("client connection made");
             flags.get_mut().shutdown = true;
         }
         std::net::TcpStream::connect(format!("localhost:{}",port) );
-        std::thread::sleep(std::time::Duration::from_secs(1) );
     }
 
 }
@@ -938,5 +960,6 @@ mod test {
 
             std::thread::sleep(std::time::Duration::from_secs(1) );
         });
+        println!("GOT HERE!");
     }
 }

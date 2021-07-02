@@ -113,6 +113,13 @@ impl LaneMiddle {
                         self.queue.push(frame);
                     }
                 },
+                LaneCommand::Shutdown => {
+                    if let TunnelOutState::Out(tunnel) = &self.tunnel {
+                        tunnel.tx.send(Frame::Close).await;
+                    }
+                    self.rx.close();
+                    break;
+                }
             }
         }
         // need to signal to Connector that this lane is now DEAD
@@ -124,6 +131,7 @@ impl LaneMiddle {
 pub enum LaneCommand {
     Tunnel(TunnelOutState),
     Frame(Frame),
+    Shutdown
 }
 
 pub struct Chamber<T> {

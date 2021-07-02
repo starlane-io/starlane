@@ -76,6 +76,7 @@ pub enum StarCoreCommand {
     Get(ResourceIdentifier),
     State(ResourceIdentifier),
     Assign(ResourceAssign<AssignResourceStateSrc>),
+    Shutdown
 }
 
 pub enum StarCoreResult {
@@ -264,6 +265,7 @@ pub trait Host: Send + Sync {
     async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail>;
     async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail>;
     async fn delete(&self, identifier: ResourceIdentifier) -> Result<(), Fail>;
+    fn shutdown(&self) {}
 }
 
 pub struct StarCore2 {
@@ -288,6 +290,10 @@ impl StarCore2 {
 
     pub async fn run(mut self) {
         while let Option::Some(action) = self.rx.recv().await {
+            if let StarCoreCommand::Shutdown = action.command  {
+                self.process(action.command).await;
+                break;
+            }
             let result = self.process(action.command).await;
             action.tx.send(result);
         }
@@ -328,6 +334,10 @@ impl StarCore2 {
             StarCoreCommand::State(identifier) => {
                 let state_src = self.host.state(identifier).await?;
                 Ok(StarCoreResult::State(state_src))
+            }
+            StarCoreCommand::Shutdown => {
+                self.host.shutdown();
+                Ok(StarCoreResult::Ok)
             }
         }
     }

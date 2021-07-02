@@ -7,7 +7,7 @@ use starlane_core::template::{ConstellationData, ConstellationTemplate, Constell
 use tokio::sync::oneshot;
 use starlane_core::resource::{ResourceAddress, Version};
 use std::str::FromStr;
-use std::fs;
+use std::{fs, thread};
 use std::path::Path;
 use std::fs::File;
 use std::sync::Arc;
@@ -17,6 +17,7 @@ use tracing_subscriber::FmtSubscriber;
 use tracing::dispatcher::set_global_default;
 use tokio::time::Duration;
 use starlane_core::starlane::api::StarlaneApi;
+use starlane_core::util::shutdown;
 
 mod cli;
 
@@ -28,6 +29,8 @@ fn main() -> Result<(), Error> {
     set_global_default(subscriber.into()).expect("setting global default tracer failed");
 
     ctrlc::set_handler( move || {
+        shutdown();
+        thread::sleep(std::time::Duration::from_secs(1));
         std::process::exit(1);
     }).expect("expected to be able to set ctrl-c handler");
 
@@ -37,8 +40,8 @@ fn main() -> Result<(), Error> {
         .about("A Resource Mesh").subcommands(vec![SubCommand::with_name("serve").usage("serve a starlane machine instance").display_order(0),
                                                             SubCommand::with_name("config").subcommands(vec![SubCommand::with_name("set-host").usage("set the host that the starlane CLI connects to").arg(Arg::with_name("hostname").required(true).help("the hostname of the starlane instance you wish to connect to")).display_order(0),
                                                                                                                             SubCommand::with_name("get-host").usage("get the host that the starlane CLI connects to")]).usage("read or manipulate the cli config").display_order(1).display_order(1),
-                                                            SubCommand::with_name("publish").usage("publish an artifact bundle").args(vec![Arg::with_name("dir").required(true).help("the source directory for this bundle"),
-                                                                                                                                                                                       Arg::with_name("address").required(true).help("the publish address of this bundle i.e. 'space:sub_space:bundle:1.0.0'")].as_slice())
+                                                            SubCommand::with_name("publish").usage("publish an artifact bundle").args(vec![Arg::with_name("dir").required(true).help("the source directory for this bundle"),Arg::with_name("address").required(true).help("the publish address of this bundle i.e. 'space:sub_space:bundle:1.0.0'")].as_slice()),
+                                                            SubCommand::with_name("ls").usage("list resources").args(vec![Arg::with_name("address").required(true).help("the resource address to list"),Arg::with_name("child-pattern").required(false).help("a pattern describing the children to be listed .i.e '<File>' for returning resource type File")].as_slice())
     ]);
 
     let matches = clap_app.clone().get_matches();
@@ -68,6 +71,12 @@ fn main() -> Result<(), Error> {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
             publish(args.clone()).await.unwrap();
+        });
+
+    } else if let Option::Some(args) = matches.subcommand_matches("ls") {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            list(args.clone()).await.unwrap();
         });
 
     } else {
@@ -107,6 +116,11 @@ async fn publish(args: ArgMatches<'_> ) -> Result<(),Error> {
     Ok(())
 }
 
+async fn list(args: ArgMatches<'_> ) -> Result<(),Error> {
+    let starlane_api = starlane_api().await?;
+
+    Ok(())
+}
 
 pub async fn starlane_api() -> Result<StarlaneApi,Error>{
     let mut starlane = StarlaneMachine::new("client".to_string() ).unwrap();

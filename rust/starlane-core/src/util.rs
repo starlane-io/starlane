@@ -6,11 +6,18 @@ use std::hash::Hash;
 use tokio::sync::{mpsc, oneshot};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::error::RecvError;
+use tokio::sync::broadcast;
 use tokio::time::Duration;
 use tokio::time::error::Elapsed;
 
 use crate::error::Error;
 use crate::message::Fail;
+
+lazy_static!{
+    pub static ref SHUTDOWN_TX: broadcast::Sender<()> = {
+        broadcast::channel(1).0
+    };
+}
 
 pub struct Progress<E> {
     rx: Receiver<E>,
@@ -41,6 +48,7 @@ where
     },
     GetMap(oneshot::Sender<HashMap<K, V>>),
     SetMap(HashMap<K, V>),
+    Clear
 }
 
 #[derive(Clone)]
@@ -85,11 +93,19 @@ where
                         tx.send(map.clone());
                     }
                     AsyncHashMapCommand::SetMap(new_map) => map = new_map,
+                    AsyncHashMapCommand::Clear => {
+                        map.clear();
+                    }
                 }
             }
         });
 
         AsyncHashMap { tx: tx }
+    }
+
+    pub fn clear(&self) -> Result<(), Error> {
+        self.tx.try_send(AsyncHashMapCommand::Clear )?;
+        Ok(())
     }
 
     pub async fn put(&self, key: K, value: V) -> Result<(), Error> {
@@ -270,4 +286,9 @@ pub fn sort<T:Ord+PartialOrd+ToString>(a: T, b: T) -> Result<(T, T), Error> {
 pub fn log_err<E:ToString,OK,O:From<E>>(err: E ) -> Result<OK,O>{
   error!("{}",err.to_string());
   Err(err.into())
+}
+
+
+pub fn shutdown() {
+    SHUTDOWN_TX.send(());
 }

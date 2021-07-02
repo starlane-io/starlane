@@ -43,6 +43,7 @@ pub enum FileCommand {
         target: String,
         tx: tokio::sync::oneshot::Sender<Result<(), Error>>,
     },
+    Shutdown
 }
 
 #[derive(Clone)]
@@ -133,6 +134,10 @@ impl FileAccess {
         self.tx.send(FileCommand::Walk { tx }).await?;
         Ok(util::wait_for_it(rx).await?)
     }
+
+    pub fn close(&self) {
+        self.tx.try_send(FileCommand::Shutdown);
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -191,6 +196,11 @@ impl LocalFileAccess {
     async fn run(mut self) {
         tokio::spawn(async move {
             while let Option::Some(command) = self.rx.recv().await {
+
+                if let FileCommand::Shutdown = command {
+                    break;
+                }
+
                 match self.process(command).await {
                     Ok(_) => {}
                     Err(error) => {
@@ -227,6 +237,9 @@ impl LocalFileAccess {
             }
             FileCommand::UnZip { source, target, tx } => {
                 tx.send(self.unzip(source, target));
+            }
+            FileCommand::Shutdown => {
+                // do nothing
             }
         }
         Ok(())
