@@ -2059,7 +2059,13 @@ error!("I just don't have the info you NEEDEDEDEDED")                ;;
                     }
                 });
             }
-            ResourceRequestMessage::Select(_) => {}
+            ResourceRequestMessage::Select(selector) => {
+                let selector = selector.clone().to_keyed(self.starlane_api() ).await?;
+                let resources = self.skel.registry.as_ref().unwrap().select(selector).await?;
+                delivery
+                    .reply(ResourceResponseMessage::Resources( resources ))
+                    .await?;
+            }
             ResourceRequestMessage::Unique(resource_type) => {
                 let unique_src = self
                     .skel
@@ -2208,14 +2214,6 @@ error!("I just don't have the info you NEEDEDEDEDED")                ;;
                                                 skel.comm().simple_reply(message, SimpleReply::Fail(Fail::Unexpected)).await;
                                             }
                                         });*/
-                }
-                ChildManagerResourceAction::Select(selector) => {
-                    let mut selector = selector.clone();
-                    let result = manager.select(selector).await;
-                    self.skel
-                        .comm()
-                        .reply_result(message, Reply::from_result(result))
-                        .await;
                 }
                 ChildManagerResourceAction::UniqueResourceId { parent, child_type } => {
                     let unique_src = self
@@ -2418,6 +2416,10 @@ error!("I just don't have the info you NEEDEDEDEDED")                ;;
             method,
             message
         );
+    }
+
+    pub fn starlane_api(&self) -> StarlaneApi {
+        StarlaneApi::new(self.skel.star_tx.clone())
     }
 }
 

@@ -56,6 +56,9 @@ use std::fs::DirBuilder;
 use tokio::sync::oneshot::error::RecvError;
 use std::fmt::{Debug, Formatter};
 use nom::AsChar;
+use crate::starlane::api::StarlaneApi;
+use std::hash::Hash;
+use serde::de::DeserializeOwned;
 
 pub mod artifact;
 pub mod config;
@@ -197,11 +200,55 @@ static RESOURCE_QUERY_FIELDS: &str = "r.key,r.address,r.kind,r.specific,r.owner,
 pub type Labels = HashMap<String, String>;
 pub type Names = Vec<String>;
 
+
+
 #[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct ResourceSelector {
-    pub meta: MetaSelector,
-    pub fields: HashSet<FieldSelection>,
+    meta: MetaSelector,
+    fields: HashSet<FieldSelection>,
 }
+
+
+impl ResourceSelector {
+    pub async fn to_keyed(self, starlane_api: StarlaneApi ) -> Result<ResourceSelector,Error>{
+        let mut fields:HashSet<FieldSelection> = HashSet::new();
+        for field in self.fields  {
+            fields.insert(field.to_keyed(&starlane_api).await?.into() );
+        }
+
+        Ok(ResourceSelector {
+            meta: self.meta,
+            fields: fields
+        })
+    }
+
+    pub fn children_selector( parent: ResourceIdentifier ) -> Self {
+        let mut selector = Self::new();
+        selector.add_field(FieldSelection::Parent(parent));
+        selector
+    }
+
+    pub fn children_of_type_selector( parent: ResourceIdentifier, child_type: ResourceType ) -> Self {
+        let mut selector = Self::new();
+        selector.add_field(FieldSelection::Parent(parent));
+        selector.add_field(FieldSelection::Type(child_type));
+        selector
+    }
+
+
+    pub fn app_selector() -> Self {
+        let mut selector = Self::new();
+        selector.add_field(FieldSelection::Type(ResourceType::App));
+        selector
+    }
+
+    pub fn actor_selector() -> Self {
+        let mut selector = Self::new();
+        selector.add_field(FieldSelection::Type(ResourceType::Actor));
+        selector
+    }
+}
+
 
 #[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum MetaSelector {
@@ -215,11 +262,13 @@ pub struct LabelSelector {
     pub labels: HashSet<LabelSelection>,
 }
 
-impl ResourceSelector {
-    pub fn new() -> ResourceSelector {
+impl ResourceSelector{
+    pub fn new() -> Self{
+        let mut fields = HashSet::new();
+        fields.insert( FieldSelection::Parent(ResourceKey::Root.into()));
         ResourceSelector {
             meta: MetaSelector::None,
-            fields: HashSet::new(),
+            fields: fields
         }
     }
 
@@ -293,22 +342,6 @@ impl ResourceSelector {
     }
 }
 
-pub type AppSelector = ResourceSelector;
-pub type ActorSelector = ResourceSelector;
-
-impl ResourceSelector {
-    pub fn app_selector() -> AppSelector {
-        let mut selector = AppSelector::new();
-        selector.add(FieldSelection::Type(ResourceType::App));
-        selector
-    }
-
-    pub fn actor_selector() -> ActorSelector {
-        let mut selector = ActorSelector::new();
-        selector.add(FieldSelection::Type(ResourceType::Actor));
-        selector
-    }
-}
 
 #[derive(Debug,Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum LabelSelection {
@@ -326,12 +359,29 @@ impl LabelSelection {
 
 #[derive(Debug,Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum FieldSelection {
-    Key(ResourceKey),
+    Identifier(ResourceIdentifier),
     Type(ResourceType),
     Kind(ResourceKind),
     Specific(Specific),
     Owner(UserKey),
-    Parent(ResourceKey)
+    Parent(ResourceIdentifier)
+}
+
+impl FieldSelection {
+    pub async fn to_keyed(mut self, starlane_api: &StarlaneApi ) -> Result<FieldSelection,Error> {
+        match self{
+            FieldSelection::Identifier(id) => {
+                Ok(FieldSelection::Identifier(id.to_key(starlane_api).await?.into()))
+            }
+            FieldSelection::Type(resource_type) => Ok(FieldSelection::Type(resource_type)),
+            FieldSelection::Kind(kind) => Ok(FieldSelection::Kind(kind)),
+            FieldSelection::Specific(specific) => Ok(FieldSelection::Specific(specific)),
+            FieldSelection::Owner(owner) => Ok(FieldSelection::Owner(owner)),
+            FieldSelection::Parent(id) => {
+                Ok(FieldSelection::Identifier(id.to_key(starlane_api).await?.into()))
+            }
+        }
+    }
 }
 
 impl ToSql for Name {
@@ -340,11 +390,11 @@ impl ToSql for Name {
     }
 }
 
-impl FieldSelection {
+impl  FieldSelection {
     pub fn is_matching_kind(&self, field: &FieldSelection) -> bool {
         match self {
-            FieldSelection::Key(_) => {
-                if let FieldSelection::Key(_) = field {
+            FieldSelection::Identifier(_) => {
+                if let FieldSelection::Identifier(_) = field {
                     return true;
                 }
             }
@@ -381,7 +431,7 @@ impl FieldSelection {
 impl ToSql for FieldSelection {
     fn to_sql(&self) -> Result<ToSqlOutput<'_>, rusqlite::Error> {
         match self {
-            FieldSelection::Key(key) => Ok(ToSqlOutput::Owned(Value::Blob(key.bin()?))),
+            FieldSelection::Identifier(id) => Ok(ToSqlOutput::Owned(Value::Blob(id.clone().key_or("(Identifier) selection fields must be turned into ResourceKeys before they can be used by the ResourceRegistry")?.bin()?))),
             FieldSelection::Type(resource_type) => {
                 Ok(ToSqlOutput::Owned(Value::Text(resource_type.to_string())))
             }
@@ -392,7 +442,7 @@ impl ToSql for FieldSelection {
             FieldSelection::Owner(owner) => {
                 Ok(ToSqlOutput::Owned(Value::Blob(owner.clone().bin()?)))
             }
-            FieldSelection::Parent(parent_key) => Ok(ToSqlOutput::Owned(Value::Blob(parent_key.bin()?))),
+            FieldSelection::Parent(parent_id) => Ok(ToSqlOutput::Owned(Value::Blob(parent_id.clone().key_or("(Parent) selection fields must be turned into ResourceKeys before they can be used by the ResourceRegistry")?.bin()?))),
         }
     }
 }
@@ -712,7 +762,7 @@ impl Registry {
                     }
 
                     let f = match field {
-                        FieldSelection::Key(_) => {
+                        FieldSelection::Identifier(_) => {
                             format!("r.key=?{}", index + 1)
                         }
                         FieldSelection::Type(_) => {
@@ -2582,6 +2632,10 @@ impl ResourceAddress {
     }
 }
 
+
+impl ResourceSelectorId for ResourceAddress {}
+
+
 impl ResourceAddress {
     pub fn root() -> Self {
         Self {
@@ -3736,8 +3790,9 @@ mod test {
 
 
             let mut selector = ResourceSelector::app_selector();
+            let sub_space: ResourceKey = sub_spaces.get(0).cloned().unwrap().into();
             selector.fields.insert(FieldSelection::Parent(
-                ResourceKey::SubSpace(sub_spaces.get(0).cloned().unwrap()),
+                sub_space.into()
             ));
             let (request, rx) =
                 ResourceRegistryAction::new(ResourceRegistryCommand::Select(selector));
@@ -3829,7 +3884,8 @@ mod test {
             assert_result_count(result, 20);
 
             let mut selector = ResourceSelector::actor_selector();
-            selector.add_field(FieldSelection::Parent(ResourceKey::App(app1.clone())));
+            let app1: ResourceKey = app1.clone().into();
+            selector.add_field(FieldSelection::Parent(app1.into()));
             let (request, rx) =
                 ResourceRegistryAction::new(ResourceRegistryCommand::Select(selector));
             tx.send(request).await;
@@ -4540,10 +4596,61 @@ pub enum ResourceStatePersistenceManager {
     Host,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+
+pub trait ResourceSelectorId: Debug+Clone+Serialize+for <'de> Deserialize<'de>+Eq+PartialEq+Hash+Into<ResourceIdentifier>+Sized{}
+
+#[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
 pub enum ResourceIdentifier {
     Key(ResourceKey),
     Address(ResourceAddress),
+}
+
+impl ResourceSelectorId for ResourceIdentifier {}
+
+
+impl ResourceIdentifier{
+
+    pub fn key_or(self,error_message: &str ) -> Result<ResourceKey,Error> {
+        match self {
+            ResourceIdentifier::Key(key) => {
+                Ok(key)
+            }
+            ResourceIdentifier::Address(_) => {
+                Err(error_message.into())
+            }
+        }
+    }
+
+    pub fn address_or(self,error_message: &str ) -> Result<ResourceAddress,Error> {
+        match self {
+            ResourceIdentifier::Key(_) => {
+                Err(error_message.into())
+            }
+            ResourceIdentifier::Address(address) => {
+                Ok(address)
+            }
+        }
+    }
+
+
+
+    pub async fn to_key(mut self, starlane_api: &StarlaneApi ) -> Result<ResourceKey,Error> {
+        match self{
+            ResourceIdentifier::Key(key) => {Ok(key)}
+            ResourceIdentifier::Address(address) => {
+                Ok(starlane_api.fetch_resource_key(address).await?)
+            }
+        }
+    }
+
+    pub async fn to_address(mut self, starlane_api: &StarlaneApi ) -> Result<ResourceAddress,Error> {
+        match self{
+            ResourceIdentifier::Address(address) => {Ok(address)}
+            ResourceIdentifier::Key(key) => {
+                Ok(starlane_api.fetch_resource_address(key).await?)
+            }
+        }
+    }
 }
 
 impl ResourceIdentifier {

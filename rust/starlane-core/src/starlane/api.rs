@@ -16,12 +16,7 @@ use crate::resource::file_system::FileSystemState;
 use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
-use crate::resource::{
-    AddressCreationSrc, ArtifactBundleKind, AssignResourceStateSrc, DataTransfer, FileKind,
-    KeyCreationSrc, LocalDataSrc, Path, RemoteDataSrc, ResourceAddress, ResourceArchetype,
-    ResourceCreate, ResourceCreateStrategy, ResourceIdentifier, ResourceKind, ResourceRecord,
-    ResourceRegistryInfo, ResourceStateSrc, ResourceStub, ResourceType,
-};
+use crate::resource::{AddressCreationSrc, ArtifactBundleKind, AssignResourceStateSrc, DataTransfer, FileKind, KeyCreationSrc, LocalDataSrc, Path, RemoteDataSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceIdentifier, ResourceKind, ResourceRecord, ResourceRegistryInfo, ResourceStateSrc, ResourceStub, ResourceType, ResourceSelector, FieldSelection};
 use crate::star::StarCommand::ResourceRecordRequest;
 use crate::star::{Request, StarCommand, StarKey, Wind, StarKind};
 use futures::channel::oneshot;
@@ -79,8 +74,8 @@ impl StarlaneApi {
         }
     }
 
-    pub async fn fetch_resource_key(&self, key: ResourceKey) -> Result<ResourceKey, Fail> {
-        match self.fetch_resource_record(key.into()).await {
+    pub async fn fetch_resource_key(&self, address: ResourceAddress) -> Result<ResourceKey, Fail> {
+        match self.fetch_resource_record(address.into()).await {
             Ok(record) => Ok(record.stub.key),
             Err(fail) => Err(fail),
         }
@@ -112,7 +107,7 @@ impl StarlaneApi {
 
      */
 
-    pub async fn create_resource( &self, create: ResourceCreate ) -> Result<ResourceStub,Fail> {
+    pub async fn create_resource( &self, create: ResourceCreate ) -> Result<ResourceRecord,Fail> {
         let mut proto = ProtoMessage::new();
         proto.to( create.parent.clone().into() );
         proto.from( MessageFrom::Inject );
@@ -125,11 +120,40 @@ impl StarlaneApi {
 
         match result.payload{
             ResourceResponseMessage::Resource(Option::Some(resource)) => {
-                Ok(resource.stub)
+                Ok(resource)
             }
             _ => Err(Fail::expected("ResourceResponseMessage::Resource(Option::Some(resource))"))
         }
     }
+
+    pub async fn select(&self, resource: &ResourceIdentifier, mut selector: ResourceSelector ) -> Result<Vec<ResourceRecord>,Fail> {
+        let resource = resource.clone();
+
+        selector.add_field( FieldSelection::Parent(resource.clone()));
+
+        let mut proto = ProtoMessage::new();
+        proto.to( resource );
+        proto.from( MessageFrom::Inject );
+        proto.payload = Option::Some(ResourceRequestMessage::Select(selector));
+        let reply = proto.reply();
+        let proto = proto.to_proto_star_message().await?;
+        self.star_tx.send( StarCommand::SendProtoMessage(proto)).await?;
+
+        let result = Self::timeout(reply).await?;
+
+        match result.payload{
+            ResourceResponseMessage::Resources(resources) => {
+                Ok(resources)
+            }
+            _ => Err(Fail::expected("ResourceResponseMessage::Resource(Option::Some(resource))"))
+        }
+    }
+
+    pub async fn list( &self, identifier: &ResourceIdentifier ) -> Result<Vec<ResourceRecord>,Fail> {
+        let mut selector = ResourceSelector::new();
+        self.select(identifier, selector).await
+    }
+
 
     /*
     pub async fn create_resource(&self, create: ResourceCreate) -> Result<ResourceStub, Fail> {
@@ -170,7 +194,7 @@ impl StarlaneApi {
         API: TryFrom<ResourceApi>,
     {
         let resource_api = ResourceApi {
-            stub: self.create_resource(create).await?,
+            stub: self.create_resource(create).await?.stub,
             star_tx: self.star_tx.clone(),
         };
 

@@ -14,10 +14,7 @@ use crate::keys::ResourceId::UrlPathPattern;
 use crate::message::Fail;
 use crate::names::Name;
 use crate::permissions::{Priviledges, User, UserKind};
-use crate::resource::{
-    Labels, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceIdentifier,
-    ResourceKind, ResourceManagerKey, ResourceRecord, ResourceStub, ResourceType, SkewerCase,
-};
+use crate::resource::{Labels, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceIdentifier, ResourceKind, ResourceManagerKey, ResourceRecord, ResourceStub, ResourceType, SkewerCase, ResourceSelectorId};
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
@@ -156,6 +153,12 @@ impl SubSpaceKey {
     }
 }
 
+impl Into<ResourceKey> for SubSpaceKey {
+    fn into(self) -> ResourceKey {
+        ResourceKey::SubSpace(self)
+    }
+}
+
 pub type SubSpaceId = u32;
 
 impl ToString for SubSpaceKey {
@@ -204,6 +207,12 @@ impl AppKey {
     pub fn from_bin(mut bin: Vec<u8>) -> Result<AppKey, Error> {
         let mut key = bincode::deserialize::<AppKey>(bin.as_slice())?;
         Ok(key)
+    }
+}
+
+impl Into<ResourceKey> for AppKey {
+    fn into(self) -> ResourceKey {
+        ResourceKey::App(self)
     }
 }
 
@@ -803,6 +812,11 @@ impl ResourceKey {
     }
      */
 }
+
+
+impl ResourceSelectorId for ResourceKey {}
+
+
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct DomainKey {
     pub space: SpaceKey,

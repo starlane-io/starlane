@@ -1,6 +1,6 @@
 use crate::app::{AppSpecific, ConfigSrc};
 use crate::error::Error;
-use crate::keys::{AppKey, SpaceKey, SubSpaceKey, UserKey};
+use crate::keys::{AppKey, SpaceKey, SubSpaceKey, UserKey, ResourceKey};
 use crate::message::Fail;
 use crate::names::Name;
 use crate::permissions::Authentication;

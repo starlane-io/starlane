@@ -371,7 +371,6 @@ pub enum ChildManagerResourceAction {
     Find(ResourceIdentifier),
     Status(ResourceStatusReport),
     Create(ResourceCreate),
-    Select(ResourceSelector),
     UniqueResourceId {
         parent: ResourceIdentifier,
         child_type: ResourceType,
@@ -388,7 +387,6 @@ impl ToString for ChildManagerResourceAction {
             ChildManagerResourceAction::Find(_) => "Find".to_string(),
             ChildManagerResourceAction::Status(_) => "Status".to_string(),
             ChildManagerResourceAction::Create(_) => "Create".to_string(),
-            ChildManagerResourceAction::Select(_) => "Select".to_string(),
             ChildManagerResourceAction::UniqueResourceId { .. } => "UniqueResourceId".to_string(),
         }
     }
