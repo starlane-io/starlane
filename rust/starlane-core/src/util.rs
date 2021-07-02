@@ -12,6 +12,8 @@ use tokio::time::error::Elapsed;
 
 use crate::error::Error;
 use crate::message::Fail;
+use std::thread;
+use std::thread::sleep;
 
 lazy_static!{
     pub static ref SHUTDOWN_TX: broadcast::Sender<()> = {
@@ -291,4 +293,8 @@ pub fn log_err<E:ToString,OK,O:From<E>>(err: E ) -> Result<OK,O>{
 
 pub fn shutdown() {
     SHUTDOWN_TX.send(());
+    thread::spawn( move || {
+        std::thread::sleep( std::time::Duration::from_secs(1));
+        std::process::exit(0);
+    });
 }

@@ -29,8 +29,6 @@ fn main() -> Result<(), Error> {
     set_global_default(subscriber.into()).expect("setting global default tracer failed");
 
     ctrlc::set_handler( move || {
-        shutdown();
-        thread::sleep(std::time::Duration::from_secs(1));
         std::process::exit(1);
     }).expect("expected to be able to set ctrl-c handler");
 
@@ -50,7 +48,7 @@ fn main() -> Result<(), Error> {
         let rt = Runtime::new().unwrap();
         rt.block_on(async move {
             let mut starlane = StarlaneMachine::new("server".to_string() ).unwrap();
-            starlane.create_constellation("standalone", ConstellationLayout::standalone_with_database().unwrap()).await.unwrap();
+            starlane.create_constellation("standalone", ConstellationLayout::standalone().unwrap()).await.unwrap();
             starlane.listen().await.expect("expected listen to work");
             starlane.join().await;
         });
@@ -117,7 +115,18 @@ async fn publish(args: ArgMatches<'_> ) -> Result<(),Error> {
 }
 
 async fn list(args: ArgMatches<'_> ) -> Result<(),Error> {
+    let address = ResourceAddress::from_str( args.value_of("address").ok_or("expected resource address")? )?;
     let starlane_api = starlane_api().await?;
+    let resources = starlane_api.list(&address.into()).await?;
+
+    println!();
+    for resource in resources {
+        println!("{: <16} {: <92} {: <16}", resource.stub.key.to_string(), resource.stub.address.to_string(), resource.location.host.to_string() );
+    }
+    println!();
+
+    starlane_api.shutdown();
+    shutdown();
 
     Ok(())
 }

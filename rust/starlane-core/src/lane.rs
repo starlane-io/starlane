@@ -54,7 +54,7 @@ impl IncomingSide {
             match &mut self.tunnel {
                 TunnelInState::None => match self.tunnel_receiver_rx.recv().await {
                     None => {
-                        return Option::None;
+                        return Option::Some(StarCommand::Frame(Frame::Close));
                     }
                     Some(tunnel) => {
                         self.tunnel = tunnel;
@@ -63,8 +63,8 @@ impl IncomingSide {
                 TunnelInState::In(tunnel) => {
                     match tunnel.rx.recv().await {
                         None => {
-warn!("tunnel.rx received None");
                             self.tunnel = TunnelInState::None;
+                            return Option::Some(StarCommand::Frame(Frame::Close));
                         }
                         Some(frame) => {
                             return Option::Some(StarCommand::Frame(frame));

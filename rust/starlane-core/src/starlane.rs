@@ -238,7 +238,7 @@ impl StarlaneMachineRunner {
 
                         let (info, star_ctrl) = best.unwrap();
 
-                        tx.send(Ok(StarlaneApi::new(star_ctrl.star_tx)));
+                        tx.send(Ok(StarlaneApi::with_starlane_ctrl(star_ctrl.star_tx, self.command_tx.clone())));
                     }
                     StarlaneCommand::Shutdown => {
                         let listening = {

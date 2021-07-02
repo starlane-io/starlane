@@ -31,15 +31,33 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::mpsc;
 use crate::artifact::ArtifactBundleAddress;
+use crate::starlane::StarlaneCommand;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
     star_tx: mpsc::Sender<StarCommand>,
+    starlane_tx: Option<mpsc::Sender<StarlaneCommand>>
 }
 
 impl StarlaneApi {
     pub fn new(star_tx: mpsc::Sender<StarCommand>) -> Self {
-        StarlaneApi { star_tx: star_tx }
+        Self {
+            star_tx,
+            starlane_tx: Option::None
+        }
+    }
+
+    pub fn with_starlane_ctrl(star_tx: mpsc::Sender<StarCommand>, starlane_tx: mpsc::Sender<StarlaneCommand>) -> Self {
+        Self {
+            star_tx,
+            starlane_tx: Option::Some(starlane_tx)
+        }
+    }
+
+
+    pub fn shutdown(&self) -> Result<(),Error>{
+        self.starlane_tx.as_ref().ok_or("this api does not have access to the StarlaneMachine and therefore cannot do a shutdown")?.try_send(StarlaneCommand::Shutdown);
+        Ok(())
     }
 
     pub async fn timeout<T>(
@@ -342,7 +360,7 @@ impl SpaceApi {
     }
 
     pub fn starlane_api(&self) -> StarlaneApi {
-        StarlaneApi::new(self.star_tx.clone())
+        StarlaneApi::new(self.star_tx.clone() )
     }
 
     pub fn create_user(&self, email: &str) -> Result<Creation<UserApi>, Fail> {
@@ -532,7 +550,7 @@ impl FileSystemApi {
     }
 
     pub fn starlane_api(&self) -> StarlaneApi {
-        StarlaneApi::new(self.star_tx.clone())
+        StarlaneApi::new(self.star_tx.clone() )
     }
 
     pub fn create_file_from_string(

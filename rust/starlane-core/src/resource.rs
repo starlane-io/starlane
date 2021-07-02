@@ -213,11 +213,9 @@ impl ResourceSelector {
     pub async fn to_keyed(self, starlane_api: StarlaneApi ) -> Result<ResourceSelector,Error>{
         let mut fields:HashSet<FieldSelection> = HashSet::new();
 
-println!("CALL to_keyed() ");
         for field in self.fields  {
             fields.insert(field.to_keyed(&starlane_api).await?.into() );
         }
-println!("RETURNED FROM to_keyed() ");
 
         Ok(ResourceSelector {
             meta: self.meta,

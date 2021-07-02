@@ -771,6 +771,7 @@ if self.skel.core_tx.is_closed() {
                         }
                         StarCommand::Frame(frame) => {
                             if let Frame::Close = frame {
+
                                 match lane_index {
                                     LaneIndex::None => {}
                                     LaneIndex::Lane(key) => {
