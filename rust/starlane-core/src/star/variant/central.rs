@@ -55,7 +55,11 @@ impl StarVariant for CentralVariant {
             let registry = skel.registry.as_ref().unwrap();
             registry.register(registration).await.unwrap();
             let starlane_api = StarlaneApi::new(skel.star_tx.clone());
-            tx.send(Self::ensure(starlane_api).await);
+            let result =   Self::ensure(starlane_api).await;
+            if let Result::Err(error) = result.as_ref() {
+                error!("Central Init Error: {}",error.to_string() );
+            }
+            tx.send(result);
          });
     }
 }

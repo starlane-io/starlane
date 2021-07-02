@@ -6,7 +6,12 @@
   <component name="ChangeListManager">
     <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/message.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/message/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/message/resource.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant/central.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/central.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -65,7 +70,7 @@
       <recent name="$PROJECT_DIR$/starlane/src" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test resource::test::test_spaces">
+  <component name="RunManager" selected="Cargo.Test starlane::test::starlane">
     <configuration default="true" type="ArquillianTestNG" factoryName="" nameIsGenerated="true">
       <option name="arquillianRunConfiguration">
         <value>
@@ -187,9 +192,9 @@
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Test starlane::test::starlane" />
         <item itemvalue="Cargo.Test resource::test::test_spaces" />
         <item itemvalue="Cargo.Test resource::test::test10" />
-        <item itemvalue="Cargo.Test starlane::test::starlane" />
         <item itemvalue="Cargo.Run starlane" />
         <item itemvalue="Cargo.Test lane::test::frame_codex" />
       </list>
@@ -208,7 +213,7 @@
       <option name="presentableId" value="Default" />
       <updated>1624567978464</updated>
       <workItem from="1624567980551" duration="193344000" />
-      <workItem from="1625052009343" duration="59616000" />
+      <workItem from="1625052009343" duration="66655000" />
     </task>
     <servers />
   </component>

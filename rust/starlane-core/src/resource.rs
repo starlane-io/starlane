@@ -821,7 +821,11 @@ println!("query is run.");
                 Ok(ResourceRegistryResult::Ok)
             }
             ResourceRegistryCommand::Get(identifier) => {
-                //let statement = "SELECT (key,host,gathering) FROM locations WHERE key=?1";
+
+                if( identifier.resource_type() == ResourceType::Root ) {
+                    return Ok(ResourceRegistryResult::Resource(Option::Some(ResourceRecord::root())));
+                }
+
                 let result = match &identifier {
                     ResourceIdentifier::Key(key) => {
                         let key = key.bin()?;
@@ -1813,7 +1817,7 @@ pub struct ResourceArchetype {
 }
 
 impl ResourceArchetype {
-    pub fn nothing() -> ResourceArchetype {
+    pub fn root() -> ResourceArchetype {
         ResourceArchetype {
             kind: ResourceKind::Root,
             specific: Option::None,
@@ -2508,6 +2512,13 @@ impl ResourceRecord {
             location: ResourceLocation::new(host),
         }
     }
+
+    pub fn root() -> Self {
+        Self{
+            stub: ResourceStub::root(),
+            location: ResourceLocation::root()
+        }
+    }
 }
 
 impl From<ResourceRecord> for ResourceKey {
@@ -2533,6 +2544,13 @@ impl ResourceLocation {
         ResourceLocation {
             host: host,
             gathering: Option::None,
+        }
+    }
+
+    pub fn root() -> Self {
+        Self{
+            host: StarKey::central(),
+            gathering: Option::None
         }
     }
 }
@@ -4220,14 +4238,15 @@ pub struct ResourceStub {
 }
 
 impl ResourceStub {
-    pub fn nothing() -> ResourceStub {
+    pub fn root() -> ResourceStub {
         ResourceStub {
             key: ResourceKey::Root,
             address: ResourceAddress::root(),
-            archetype: ResourceArchetype::nothing(),
+            archetype: ResourceArchetype::root(),
             owner: Option::None,
         }
     }
+
 }
 
 impl LogInfo for ResourceStub {

@@ -112,44 +112,26 @@ impl StarlaneApi {
 
      */
 
-    /*
     pub async fn create_resource( &self, create: ResourceCreate ) -> Result<ResourceStub,Fail> {
         let mut proto = ProtoMessage::new();
         proto.to( create.parent.clone().into() );
+        proto.from( MessageFrom::Inject );
         proto.payload = Option::Some(ResourceRequestMessage::Create(create));
         let reply = proto.reply();
         let proto = proto.to_proto_star_message().await?;
         self.star_tx.send( StarCommand::SendProtoMessage(proto)).await?;
 
-        let result = reply.await??;
+        let result = Self::timeout(reply).await?;
 
         match result.payload{
             ResourceResponseMessage::Resource(Option::Some(resource)) => {
                 Ok(resource.stub)
             }
-            _ => Err(Fail::Unexpected)
+            _ => Err(Fail::expected("ResourceResponseMessage::Resource(Option::Some(resource))"))
         }
     }
 
-     */
-
-    pub async fn create_api<API>(&self, create: ResourceCreate) -> Result<API, Fail>
-    where
-        API: TryFrom<ResourceApi>,
-    {
-        let resource_api = ResourceApi {
-            stub: self.create_resource(create).await?,
-            star_tx: self.star_tx.clone(),
-        };
-
-        let api = API::try_from(resource_api);
-
-        match api {
-            Ok(api) => Ok(api),
-            Err(error) => Err(Fail::Error("catastrophic converstion error".into())),
-        }
-    }
-
+    /*
     pub async fn create_resource(&self, create: ResourceCreate) -> Result<ResourceStub, Fail> {
         let parent_location = match &create.parent {
             ResourceKey::Root => ResourceRecord::new(ResourceStub::nothing(), StarKey::central()),
@@ -181,6 +163,26 @@ impl StarlaneApi {
             }
         }
     }
+    */
+
+    pub async fn create_api<API>(&self, create: ResourceCreate) -> Result<API, Fail>
+    where
+        API: TryFrom<ResourceApi>,
+    {
+        let resource_api = ResourceApi {
+            stub: self.create_resource(create).await?,
+            star_tx: self.star_tx.clone(),
+        };
+
+        let api = API::try_from(resource_api);
+
+        match api {
+            Ok(api) => Ok(api),
+            Err(error) => Err(Fail::Error("catastrophic converstion error".into())),
+        }
+    }
+
+
 
     /*
     /// this function is acting as a facade for now, later we will not download the entire state in one message

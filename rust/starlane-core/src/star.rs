@@ -706,7 +706,6 @@ if self.skel.core_tx.is_closed() {
                             set_flags.tx.send(());
                         }
                         StarCommand::AddProtoLaneEndpoint(lane) => {
-info!("Star {} AddProtoLaneEndpoint", self.skel.info.kind.to_string() );
                             let result = lane.outgoing.out_tx.try_send( LaneCommand::Frame(Frame::Proto(ProtoFrame::ReportStarKey(self.skel.info.key.clone()))));
                             self.proto_lanes.push(LaneWrapper::Proto(LaneMeta::new(lane)));
                         }
@@ -780,7 +779,6 @@ info!("Star {} AddProtoLaneEndpoint", self.skel.info.kind.to_string() );
                                         lane.remote_star = Option::Some(remote_star);
                                         let lane = match lane.try_into() {
                                             Ok(lane) => {
-info!("ProtoLane into Lane");
                                                 lane
                                             }
                                             Err(error) => {
@@ -1149,7 +1147,18 @@ info!("ProtoLane into Lane");
             } else if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Fail(fail))) = result {
                 locate.tx.send(Err(fail));
             } else {
-                locate.tx.send(Err(Fail::expected("StarMessagePayload::Reply(SimpleReply::Fail(fail))")));
+error!("I just don't have the info you NEEDEDEDEDED")                ;;
+                match result {
+                    Ok(result) => {
+                        error!("payload: {}", result );
+                        locate.tx.send(Err(Fail::unexpected("Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Resource(record))))", format!("{}",result.to_string()))));
+
+                    }
+                    Err(error) => {
+                        error!("{}",error.to_string());
+                        locate.tx.send(Err(Fail::expected("Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Resource(record))))")));
+                    }
+                }
             }
         });
     }
@@ -2023,6 +2032,7 @@ info!("ProtoLane into Lane");
         &mut self,
         delivery: Delivery<Message<ResourceRequestMessage>>,
     ) -> Result<(), Error> {
+
         match &delivery.message.payload {
             ResourceRequestMessage::Create(create) => {
                 let child_manager = self
@@ -2087,6 +2097,7 @@ info!("ProtoLane into Lane");
         Ok(())
     }
 
+
     async fn process_child_manager_resource_action(
         &mut self,
         message: StarMessage,
@@ -2111,8 +2122,8 @@ info!("ProtoLane into Lane");
                         .await;
                 }
                 ChildManagerResourceAction::Find(find) => {
-                    let result = manager.get(find.to_owned()).await;
 
+                    let result = manager.get(find.to_owned()).await;
 
                     match result {
                         Ok(result) => match result {
@@ -2439,6 +2450,7 @@ pub enum StarCommand {
     Diagnose(Diagnose),
     CheckStatus,
     SetStatus(StarStatus),
+    RefreshHandles,
 
     ResourceRecordRequest(Request<ResourceIdentifier, ResourceRecord>),
     ResourceRecordRequestFromStar(Request<(ResourceIdentifier, StarKey), ResourceRecord>),

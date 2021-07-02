@@ -377,6 +377,7 @@ impl Fail{
     }
 
     pub fn unexpected<T: ToString>( expected: &str, received: T) -> Self {
+        error!("expected: {}, received: {}", expected, received.to_string() );
         Self::Unexpected {expected:expected.to_string(), received: received.to_string() }
     }
 }

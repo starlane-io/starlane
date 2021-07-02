@@ -59,11 +59,11 @@ impl<P, R> ProtoMessage<P, R> {
 
     pub fn validate(&self) -> Result<(), Error> {
         if self.to.is_none() {
-            Err("RESOURCE to must be set".into())
+            Err("ProtoMessage: RESOURCE to must be set".into())
         } else if self.from.is_none() {
-            Err("from must be set".into())
+            Err("ProtoMessage: from must be set".into())
         } else if let Option::None = self.payload {
-            Err("message payload cannot be None".into())
+            Err("ProtoMessage: message payload cannot be None".into())
         } else {
             Ok(())
         }
@@ -163,11 +163,11 @@ impl<P> ProtoMessageReply<P> {
 
     pub fn validate(&self) -> Result<(), Error> {
         if self.reply_to.is_none() {
-            Err("reply_to must be set".into())
+            Err("ProtoMessageReply:reply_to must be set".into())
         } else if self.from.is_none() {
-            Err("from must be set".into())
+            Err("ProtoMessageReply: from must be set".into())
         } else if let Option::None = self.payload {
-            Err("message payload cannot be None".into())
+            Err("ProtoMessageReply: message payload cannot be None".into())
         } else {
             Ok(())
         }
