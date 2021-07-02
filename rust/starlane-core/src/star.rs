@@ -776,6 +776,7 @@ if self.skel.core_tx.is_closed() {
                                     LaneIndex::None => {}
                                     LaneIndex::Lane(key) => {
                                         self.lanes.remove(&key);
+                                        self.on_lane_closed(&key).await;
                                     }
                                     LaneIndex::ProtoLane(index) => {
                                         self.proto_lanes.remove(index);
@@ -981,6 +982,7 @@ if self.skel.core_tx.is_closed() {
             Err(_) => Err(Fail::Timeout),
         }
     }
+
 
     #[instrument]
     async fn locate_resource_record(
@@ -1364,21 +1366,26 @@ error!("I just don't have the info you NEEDEDEDEDED");
             .sequence
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-        let num_excludes: usize = match &exclude {
-            None => 0,
-            Some(exclude) => exclude.len(),
-        };
 
         let local_hit = match wind.pattern.is_match(&self.skel.info) {
             true => Option::Some(self.skel.info.key.clone()),
             false => Option::None,
         };
 
+        let mut lanes = HashSet::from_iter(self.lanes.keys().cloned().into_iter());
+
+        match &exclude {
+            None => {},
+            Some(exclude) => {
+                lanes.retain( |k| !exclude.contains(k));
+            },
+        }
+
         let transaction = Box::new(StarSearchTransaction::new(
             wind.pattern.clone(),
             self.skel.star_tx.clone(),
             tx,
-            self.lanes.len() - num_excludes,
+            lanes,
             local_hit,
         ));
         self.transactions.insert(tid.clone(), transaction);
@@ -1816,6 +1823,19 @@ error!("I just don't have the info you NEEDEDEDEDED");
             }
         }
     }
+
+    async fn on_lane_closed( &mut self, key: &StarKey ) {
+        // we should notify any waiting WIND transactions that this lane is no longer participating
+        let mut remove = HashSet::new();
+        for (tid,transaction) in self.transactions.iter_mut() {
+            if let TransactionResult::Done = transaction.on_lane_closed(key).await {
+                remove.insert(tid.clone() );
+            }
+        }
+
+        self.transactions.retain( |k,_| !remove.contains(k) );
+    }
+
 
     async fn process_message_reply(&mut self, message: &StarMessage) {
         if message.reply_to.is_some()
@@ -2789,8 +2809,8 @@ impl Transaction for ResourceLocationRequestTransaction {
 
 pub struct StarSearchTransaction {
     pub pattern: StarPattern,
-    pub reported_lane_count: usize,
-    pub lanes: usize,
+    pub reported_lanes: HashSet<StarKey>,
+    pub lanes: HashSet<StarKey>,
     pub hits: HashMap<StarKey, HashMap<StarKey, usize>>,
     command_tx: mpsc::Sender<StarCommand>,
     tx: Vec<oneshot::Sender<WindHits>>,
@@ -2802,12 +2822,12 @@ impl StarSearchTransaction {
         pattern: StarPattern,
         command_tx: mpsc::Sender<StarCommand>,
         tx: oneshot::Sender<WindHits>,
-        lanes: usize,
+        lanes: HashSet<StarKey>,
         local_hit: Option<StarKey>,
     ) -> Self {
         StarSearchTransaction {
             pattern: pattern,
-            reported_lane_count: 0,
+            reported_lanes: HashSet::new(),
             hits: HashMap::new(),
             command_tx: command_tx,
             tx: vec![tx],
@@ -2858,6 +2878,19 @@ impl StarSearchTransaction {
 
 #[async_trait]
 impl Transaction for StarSearchTransaction {
+
+    async fn on_lane_closed( &mut self, key: &StarKey ) -> TransactionResult  {
+        self.lanes.remove(key );
+        self.reported_lanes.remove(key );
+
+        if self.reported_lanes == self.lanes {
+            self.commit().await;
+            TransactionResult::Done
+        } else {
+            TransactionResult::Continue
+        }
+    }
+
     async fn on_frame(
         &mut self,
         frame: &Frame,
@@ -2891,9 +2924,9 @@ impl Transaction for StarSearchTransaction {
             }
         }
 
-        self.reported_lane_count = self.reported_lane_count + 1;
+        self.reported_lanes.insert( lane.get_remote_star().expect("expected the lane to have a remote star key") );
 
-        if self.reported_lane_count >= self.lanes {
+        if self.reported_lanes == self.lanes {
             self.commit().await;
             TransactionResult::Done
         } else {
@@ -2944,6 +2977,10 @@ pub enum TransactionResult {
 
 #[async_trait]
 pub trait Transaction: Send + Sync {
+    async fn on_lane_closed( &mut self, key: &StarKey ) -> TransactionResult  {
+            TransactionResult::Continue
+    }
+
     async fn on_frame(
         &mut self,
         frame: &Frame,
