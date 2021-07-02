@@ -55,6 +55,7 @@ use url::Url;
 use std::fs::DirBuilder;
 use tokio::sync::oneshot::error::RecvError;
 use std::fmt::{Debug, Formatter};
+use nom::AsChar;
 
 pub mod artifact;
 pub mod config;
@@ -330,9 +331,7 @@ pub enum FieldSelection {
     Kind(ResourceKind),
     Specific(Specific),
     Owner(UserKey),
-    Space(SpaceKey),
-    SubSpace(SubSpaceKey),
-    App(AppKey),
+    Parent(ResourceKey)
 }
 
 impl ToSql for Name {
@@ -369,18 +368,8 @@ impl FieldSelection {
                     return true;
                 }
             }
-            FieldSelection::Space(_) => {
-                if let FieldSelection::Space(_) = field {
-                    return true;
-                }
-            }
-            FieldSelection::SubSpace(_) => {
-                if let FieldSelection::SubSpace(_) = field {
-                    return true;
-                }
-            }
-            FieldSelection::App(_) => {
-                if let FieldSelection::App(_) = field {
+            FieldSelection::Parent(_) => {
+                if let FieldSelection::Parent(_) = field {
                     return true;
                 }
             }
@@ -403,13 +392,7 @@ impl ToSql for FieldSelection {
             FieldSelection::Owner(owner) => {
                 Ok(ToSqlOutput::Owned(Value::Blob(owner.clone().bin()?)))
             }
-            FieldSelection::Space(space) => Ok(ToSqlOutput::Owned(Value::Integer(space.id() as _))),
-            FieldSelection::SubSpace(sub_space) => Ok(ToSqlOutput::Owned(Value::Blob(
-                ResourceKey::SubSpace(sub_space.clone()).bin()?,
-            ))),
-            FieldSelection::App(app) => Ok(ToSqlOutput::Owned(Value::Blob(
-                ResourceKey::App(app.clone()).bin()?,
-            ))),
+            FieldSelection::Parent(parent_key) => Ok(ToSqlOutput::Owned(Value::Blob(parent_key.bin()?))),
         }
     }
 }
@@ -730,39 +713,36 @@ impl Registry {
 
                     let f = match field {
                         FieldSelection::Key(_) => {
-                            format!("key=?{}", index + 1)
+                            format!("r.key=?{}", index + 1)
                         }
                         FieldSelection::Type(_) => {
-                            format!("resource_type=?{}", index + 1)
+                            format!("r.resource_type=?{}", index + 1)
                         }
                         FieldSelection::Kind(_) => {
-                            format!("kind=?{}", index + 1)
+                            format!("r.kind=?{}", index + 1)
                         }
                         FieldSelection::Specific(_) => {
-                            format!("specific=?{}", index + 1)
+                            format!("r.specific=?{}", index + 1)
                         }
                         FieldSelection::Owner(_) => {
-                            format!("owner=?{}", index + 1)
+                            format!("r.owner=?{}", index + 1)
                         }
-                        FieldSelection::Space(_) => {
-                            format!("space=?{}", index + 1)
-                        }
-                        FieldSelection::SubSpace(_) => {
-                            format!("sub_space=?{}", index + 1)
-                        }
-                        FieldSelection::App(_) => {
-                            format!("app=?{}", index + 1)
+                        FieldSelection::Parent(_) => {
+                            format!("r.parent=?{}", index + 1)
                         }
                     };
                     where_clause.push_str(f.as_str());
                     params.push(field);
                 }
 
+                /*
                 if !params.is_empty() {
                     where_clause.push_str(" AND ");
                 }
 
                 where_clause.push_str(" key IS NOT NULL");
+
+                 */
 
                 let mut statement = match &selector.meta {
                     MetaSelector::None => {
@@ -812,9 +792,12 @@ impl Registry {
                     )
                     .to_string();
                 }
+println!("{}",statement);
 
                 let mut statement = self.conn.prepare(statement.as_str())?;
+println!("statement prepared...");
                 let mut rows = statement.query(params_from_iter(params.iter()))?;
+println!("query is run.");
 
                 let mut resources = vec![];
                 while let Option::Some(row) = rows.next()? {
@@ -1417,6 +1400,7 @@ impl FromStr for ResourceKind {
             "User" => Ok(ResourceKind::User),
             "Filesystem" => Ok(ResourceKind::FileSystem),
             "Artifact" => Ok(ResourceKind::Artifact),
+            "App" => Ok(ResourceKind::App),
             _ => Err(format!("cannot match ResourceKind: {}", s).into()),
         }
     }
@@ -3267,8 +3251,8 @@ impl SkewerCase {
         }
 
         for c in string.chars() {
-            if !((c.is_lowercase() && c.is_alphanumeric()) || c == '-') {
-                return Err("must be lowercase, use only alphanumeric characters & dashes".into());
+            if !((c.is_lowercase() && c.is_ascii_alphabetic()) || c.is_numeric() || c == '-') {
+                return Err(format!("must be lowercase, use only alphanumeric characters & dashes RECEIVED: '{}'", string).into());
             }
         }
         Ok(SkewerCase {
@@ -3352,7 +3336,6 @@ mod test {
     };
     use crate::names::{Name, Specific};
     use crate::permissions::Authentication;
-    use crate::resource::FieldSelection::SubSpace;
     use crate::resource::ResourceRegistryResult::Resources;
     use crate::resource::{
         FieldSelection, LabelSelection, Labels, Names, Registry, ResourceAddress,
@@ -3733,19 +3716,10 @@ mod test {
                 .await;
             }
 
-            let mut selector = ResourceSelector::app_selector();
-            selector
-                .fields
-                .insert(FieldSelection::Space(spaces.get(0).cloned().unwrap()));
-            let (request, rx) =
-                ResourceRegistryAction::new(ResourceRegistryCommand::Select(selector));
-            tx.send(request).await;
-            let result = timeout(Duration::from_secs(5), rx).await.unwrap().unwrap();
-            assert_result_count(result, 100);
 
             let mut selector = ResourceSelector::app_selector();
-            selector.fields.insert(FieldSelection::SubSpace(
-                sub_spaces.get(0).cloned().unwrap(),
+            selector.fields.insert(FieldSelection::Parent(
+                ResourceKey::SubSpace(sub_spaces.get(0).cloned().unwrap()),
             ));
             let (request, rx) =
                 ResourceRegistryAction::new(ResourceRegistryCommand::Select(selector));
@@ -3837,7 +3811,7 @@ mod test {
             assert_result_count(result, 20);
 
             let mut selector = ResourceSelector::actor_selector();
-            selector.add_field(FieldSelection::App(app1.clone()));
+            selector.add_field(FieldSelection::Parent(ResourceKey::App(app1.clone())));
             let (request, rx) =
                 ResourceRegistryAction::new(ResourceRegistryCommand::Select(selector));
             tx.send(request).await;
