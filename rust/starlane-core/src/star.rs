@@ -73,7 +73,6 @@ use crate::resource::{
 };
 use crate::star::pledge::{ResourceHostSelector, Satisfaction, StarHandle, StarHandleBacking};
 use crate::star::variant::web::WebVariant;
-use crate::starlane::api::StarlaneApi;
 use crate::util;
 use crate::util::AsyncHashMap;
 use crate::template::StarTemplateHandle;
@@ -771,7 +770,17 @@ if self.skel.core_tx.is_closed() {
                                 .await;
                         }
                         StarCommand::Frame(frame) => {
-                            if let Frame::Proto(ProtoFrame::ReportStarKey(remote_star)) = frame {
+                            if let Frame::Close = frame {
+                                match lane_index {
+                                    LaneIndex::None => {}
+                                    LaneIndex::Lane(key) => {
+                                        self.lanes.remove(&key);
+                                    }
+                                    LaneIndex::ProtoLane(index) => {
+                                        self.proto_lanes.remove(index);
+                                    }
+                                }
+                            } else if let Frame::Proto(ProtoFrame::ReportStarKey(remote_star)) = frame {
                                 match lane_index.expect_proto_lane()
                                 {
                                     Ok(proto_lane_index) => {
@@ -819,7 +828,7 @@ if self.skel.core_tx.is_closed() {
                         }
                         StarCommand::SetStatus(status) => {
                             self.set_status(status.clone());
-                            println!("{} {}", &self.skel.info.kind, &self.status.to_string());
+//                            println!("{} {}", &self.skel.info.kind, &self.status.to_string());
                         }
                         StarCommand::GetCaches(tx) => {
                             tx.send(self.skel.caches.clone());
@@ -832,8 +841,6 @@ if self.skel.core_tx.is_closed() {
                             self.status_broadcast.send(self.status.clone());
                         }
                         StarCommand::Shutdown => {
-                            info!("shtudown star: {}", self.skel.info.kind);
-
                             for (_,lane) in &mut self.lanes {
                                 lane.outgoing().out_tx.try_send(LaneCommand::Shutdown );
                             }
@@ -1147,7 +1154,7 @@ if self.skel.core_tx.is_closed() {
             } else if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Fail(fail))) = result {
                 locate.tx.send(Err(fail));
             } else {
-error!("I just don't have the info you NEEDEDEDEDED")                ;;
+error!("I just don't have the info you NEEDEDEDEDED");
                 match result {
                     Ok(result) => {
                         error!("payload: {}", result );
@@ -2060,8 +2067,7 @@ error!("I just don't have the info you NEEDEDEDEDED")                ;;
                 });
             }
             ResourceRequestMessage::Select(selector) => {
-                let selector = selector.clone().to_keyed(self.starlane_api() ).await?;
-                let resources = self.skel.registry.as_ref().unwrap().select(selector).await?;
+                let resources = self.skel.registry.as_ref().unwrap().select(selector.clone()).await?;
                 delivery
                     .reply(ResourceResponseMessage::Resources( resources ))
                     .await?;
@@ -2416,10 +2422,6 @@ error!("I just don't have the info you NEEDEDEDEDED")                ;;
             method,
             message
         );
-    }
-
-    pub fn starlane_api(&self) -> StarlaneApi {
-        StarlaneApi::new(self.skel.star_tx.clone())
     }
 }
 

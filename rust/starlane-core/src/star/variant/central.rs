@@ -82,8 +82,6 @@ impl CentralVariant {
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
 
-        info!("central creation checklist completed.");
-
         Ok(())
     }
 }

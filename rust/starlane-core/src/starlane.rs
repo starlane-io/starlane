@@ -373,7 +373,7 @@ impl StarlaneMachineRunner {
                 );
 
 
-                println!("created proto star: {:?}", &star_template.kind);
+//                println!("created proto star: {:?}", &star_template.kind);
 
                 tokio::spawn(async move {
                     let star = proto_star.evolve().await;
@@ -389,11 +389,14 @@ impl StarlaneMachineRunner {
                             star: key.clone(),
                             controller: StarController { star_tx: star_tx },
                         });
+                        /*
                         println!(
                             "created star: {:?} key: {}",
                             &star_template.kind,
                             &key.to_string()
                         );
+
+                         */
                     } else {
                         eprintln!("experienced serious error could not evolve the proto_star");
                     }
@@ -408,7 +411,6 @@ impl StarlaneMachineRunner {
         for star_template in &layout.template.stars {
             let machine = layout.handles_to_machine.get(&star_template.handle  ).ok_or(format!("expected machine mapping for star template handle: {}",star_template.handle.to_string()))?;
             let local_star = StarInConstellationTemplateHandle::new( name.clone(), star_template.handle.clone() );
-println!("connecting for local: {}",local_star.star.to_string() );
             if self.name == *machine {
                 for lane in &star_template.lanes {
                     match &lane.star_selector.constellation {
@@ -527,7 +529,6 @@ println!("connecting for local: {}",local_star.star.to_string() );
                                 return;
                             }
                         }
-info!("client connection made");
                         let ok = command_tx.send( StarlaneCommand::AddStream(stream) ).await.is_ok();
                         tokio::time::sleep(Duration::from_secs(0)).await;
                     }
@@ -821,7 +822,6 @@ mod test {
     pub fn starlane() {
         let subscriber = FmtSubscriber::default();
         set_global_default(subscriber.into()).expect("setting global default failed");
-        info!("tracing works!");
 
 
         let data_dir = "tmp/data";
@@ -833,8 +833,6 @@ mod test {
 
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-
-            info!("entered block on!");
 
             let mut starlane = StarlaneMachine::new("server".to_string() ).unwrap();
             starlane.listen().await.unwrap();
@@ -850,21 +848,12 @@ mod test {
 
             let starlane_api = client.get_starlane_api().await.unwrap();
 
-            tokio::spawn( async move {
-                println!("ping gateway...");
-            });
-
-
             if starlane_api.ping_gateway().await.is_err() {
                 error!("failed to ping gateway");
                 client.shutdown();
                 starlane.shutdown();
                 return;
             }
-
-            tokio::spawn( async move {
-                println!("getting subspace_api....");
-            });
 
             let sub_space_api = match starlane_api
                 .get_sub_space(
@@ -880,10 +869,6 @@ mod test {
                     panic!(err)
                 }
             };
-
-            tokio::spawn( async move {
-                println!("on to filesystem api ...");
-            });
 
             let file_api = sub_space_api
                 .create_file_system("website")
@@ -949,8 +934,24 @@ mod test {
                     .unwrap();
             }
 
-            tokio::spawn(async move {
-              info!("done");
+            let bundle: ResourceAddress = match ResourceAddress::from_str("hyperspace::<Space>"){
+                Ok(ok) => {
+                     ok
+                }
+                Err(error) => {
+                    error!("error: {}",error);
+                    panic!("cannot continue")
+                }
+            };
+
+//            let bundle: ResourceAddress = ArtifactBundleAddress::from_str("hyperspace:default:filo:1.0.0").unwrap().into();
+            let resources = starlane_api.list( &bundle.clone().into() ).await.unwrap();
+
+            tokio::spawn( async move {
+                println!("returned resources: {} from {}", resources.len(), bundle.to_string() );
+                for resource in resources {
+                    println!("{}\t{}", resource.stub.key.to_string(), resource.stub.address.to_string())
+                }
             });
 
             std::thread::sleep(std::time::Duration::from_secs(5) );
@@ -960,6 +961,5 @@ mod test {
 
             std::thread::sleep(std::time::Duration::from_secs(1) );
         });
-        println!("GOT HERE!");
     }
 }

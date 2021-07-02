@@ -85,11 +85,9 @@ impl StarlaneApi {
         &self,
         identifier: ResourceIdentifier,
     ) -> Result<ResourceRecord, Fail> {
-        let (request, rx) = Request::new(identifier);
-        self.star_tx
-            .send(StarCommand::ResourceRecordRequest(request))
-            .await;
-        rx.await?
+        let (mut request, rx) = Request::new(identifier);
+        self.star_tx.send(StarCommand::ResourceRecordRequest(request)).await;
+        Self::timeout(rx).await
     }
 
     pub async fn get_caches(&self) -> Result<Arc<ProtoArtifactCachesFactory>, Fail> {
@@ -130,6 +128,9 @@ impl StarlaneApi {
         let resource = resource.clone();
 
         selector.add_field( FieldSelection::Parent(resource.clone()));
+
+        // before sending
+        let selector = selector.to_keyed(self.clone()).await?;
 
         let mut proto = ProtoMessage::new();
         proto.to( resource );

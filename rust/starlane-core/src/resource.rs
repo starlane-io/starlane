@@ -212,9 +212,12 @@ pub struct ResourceSelector {
 impl ResourceSelector {
     pub async fn to_keyed(self, starlane_api: StarlaneApi ) -> Result<ResourceSelector,Error>{
         let mut fields:HashSet<FieldSelection> = HashSet::new();
+
+println!("CALL to_keyed() ");
         for field in self.fields  {
             fields.insert(field.to_keyed(&starlane_api).await?.into() );
         }
+println!("RETURNED FROM to_keyed() ");
 
         Ok(ResourceSelector {
             meta: self.meta,
@@ -265,7 +268,6 @@ pub struct LabelSelector {
 impl ResourceSelector{
     pub fn new() -> Self{
         let mut fields = HashSet::new();
-        fields.insert( FieldSelection::Parent(ResourceKey::Root.into()));
         ResourceSelector {
             meta: MetaSelector::None,
             fields: fields
@@ -378,7 +380,7 @@ impl FieldSelection {
             FieldSelection::Specific(specific) => Ok(FieldSelection::Specific(specific)),
             FieldSelection::Owner(owner) => Ok(FieldSelection::Owner(owner)),
             FieldSelection::Parent(id) => {
-                Ok(FieldSelection::Identifier(id.to_key(starlane_api).await?.into()))
+                Ok(FieldSelection::Parent(id.to_key(starlane_api).await?.into()))
             }
         }
     }
@@ -842,12 +844,9 @@ impl Registry {
                     )
                     .to_string();
                 }
-println!("{}",statement);
 
                 let mut statement = self.conn.prepare(statement.as_str())?;
-println!("statement prepared...");
                 let mut rows = statement.query(params_from_iter(params.iter()))?;
-println!("query is run.");
 
                 let mut resources = vec![];
                 while let Option::Some(row) = rows.next()? {
@@ -1455,6 +1454,7 @@ impl FromStr for ResourceKind {
             "Filesystem" => Ok(ResourceKind::FileSystem),
             "Artifact" => Ok(ResourceKind::Artifact),
             "App" => Ok(ResourceKind::App),
+            "Domain" => Ok(ResourceKind::Domain),
             _ => Err(format!("cannot match ResourceKind: {}", s).into()),
         }
     }
@@ -4631,8 +4631,6 @@ impl ResourceIdentifier{
             }
         }
     }
-
-
 
     pub async fn to_key(mut self, starlane_api: &StarlaneApi ) -> Result<ResourceKey,Error> {
         match self{
