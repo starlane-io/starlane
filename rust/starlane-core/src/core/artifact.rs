@@ -16,13 +16,7 @@ use crate::message::Fail;
 use crate::resource::store::{
     ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult,
 };
-use crate::resource::{
-    AddressCreationSrc, ArtifactBundleKind, AssignResourceStateSrc, DataTransfer, FileKind,
-    KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress,
-    ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy,
-    ResourceCreationChamber, ResourceIdentifier, ResourceKind, ResourceStateSrc, ResourceStub,
-    ResourceType,
-};
+use crate::resource::{AddressCreationSrc, ArtifactBundleKind, AssignResourceStateSrc, DataTransfer, FileKind, KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceIdentifier, ResourceKind, ResourceStateSrc, ResourceStub, ResourceType, ResourceRegistryInfo, ResourceRegistration, ResourceRecord};
 use crate::star::StarSkel;
 
 use crate::artifact::ArtifactBundleKey;
@@ -31,6 +25,7 @@ use std::fs;
 use std::fs::File;
 use std::io::Write;
 use tempdir::TempDir;
+use tracing_futures::WithSubscriber;
 
 pub struct ArtifactHost {
     skel: StarSkel,
@@ -119,13 +114,15 @@ impl ArtifactHost {
         let rx = ResourceCreationChamber::new(parent, create, skel.clone()).await;
 
         let assign = util::wait_for_it_whatever(rx).await??;
+        let stub = assign.stub.clone();
         let (action,mut rx) = StarCoreAction::new(StarCoreCommand::Assign(assign));
         skel.core_tx.send( action ).await;
-println!("assignging artifact..." );
 
         util::wait_for_it_whatever(rx).await??;
 
-println!("artifact assigned.");
+        let resource_record = ResourceRecord::new(stub, skel.info.key.clone() );
+        let registration = ResourceRegistration::new(resource_record, Option::None );
+        skel.registry.as_ref().expect("expected resource register to be available on ArtifactStore").register(registration).await;
 
         Ok(())
     }
@@ -138,7 +135,6 @@ impl Host for ArtifactHost {
         assign: ResourceAssign<AssignResourceStateSrc>,
     ) -> Result<Resource, Fail> {
 
-println!("assigning : {}", assign.stub.address.to_string());
         Self::validate(&assign)?;
 
         // if there is Initialization to do for assignment THIS is where we do it
@@ -184,7 +180,6 @@ println!("assigning : {}", assign.stub.address.to_string());
                 }
             }
             ResourceType::Artifact => {
-println!("with parent: {}", assign.stub.address.parent().unwrap().to_string());
                 vec![]
             }
             rt => {

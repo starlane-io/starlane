@@ -384,6 +384,31 @@ impl FieldSelection {
     }
 }
 
+impl ToString for FieldSelection{
+    fn to_string(&self) -> String {
+        match self {
+            FieldSelection::Identifier(id) => {
+                id.to_string()
+            }
+            FieldSelection::Type(rt) => {
+                rt.to_string()
+            }
+            FieldSelection::Kind(kind) => {
+                kind.to_string()
+            }
+            FieldSelection::Specific(specific) => {
+                specific.to_string()
+            }
+            FieldSelection::Owner(owner) => {
+                owner.to_string()
+            }
+            FieldSelection::Parent(parent) => {
+                parent.to_string()
+            }
+        }
+    }
+}
+
 impl ToSql for Name {
     fn to_sql(&self) -> Result<ToSqlOutput<'_>, rusqlite::Error> {
         Ok(ToSqlOutput::Owned(Value::Text(self.to())))
@@ -602,7 +627,9 @@ impl RegistryParams {
 
         let parent = match parent {
             None => Option::None,
-            Some(parent) => Option::Some(parent.bin()?),
+            Some(parent) => {
+                Option::Some(parent.bin()?)
+            },
         };
 
         let host = match host {
@@ -2372,7 +2399,6 @@ impl ResourceCreationChamber {
             }
 
         };
-println!("created address: {}", address.to_string() );
 
         let stub = ResourceStub {
             key: key,

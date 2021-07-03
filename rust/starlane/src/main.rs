@@ -127,7 +127,6 @@ async fn list(args: ArgMatches<'_> ) -> Result<(),Error> {
     starlane_api.shutdown();
 
     Ok(())
-
 }
 
 pub async fn starlane_api() -> Result<StarlaneApi,Error>{
