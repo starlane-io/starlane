@@ -124,6 +124,8 @@ impl StarlaneApi {
      */
 
     pub async fn create_resource( &self, create: ResourceCreate ) -> Result<ResourceRecord,Fail> {
+        let create = create.to_keyed(self.clone() ).await?;
+
         let mut proto = ProtoMessage::new();
         proto.to( create.parent.clone().into() );
         proto.from( MessageFrom::Inject );
@@ -281,11 +283,11 @@ impl StarlaneApi {
     }
 
     pub fn create_space(&self, name: &str, display: &str) -> Result<Creation<SpaceApi>, Fail> {
-        let state = SpaceState::new(name.clone(), display);
+        let state = SpaceState::new(display);
         let state_data = state.try_into()?;
         let resource_src = AssignResourceStateSrc::Direct(state_data);
         let create = ResourceCreate {
-            parent: ResourceKey::Root,
+            parent: ResourceKey::Root.into(),
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Space(name.to_string()),
             archetype: ResourceArchetype {
@@ -368,7 +370,7 @@ impl SpaceApi {
         let state_data = state.try_into()?;
         let resource_src = AssignResourceStateSrc::Direct(state_data);
         let create = ResourceCreate {
-            parent: self.stub.key.clone(),
+            parent: self.stub.key.clone().into(),
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Append(email.to_string()),
             archetype: ResourceArchetype {
@@ -389,7 +391,7 @@ impl SpaceApi {
         let state_data = state.try_into()?;
         let resource_src = AssignResourceStateSrc::Direct(state_data);
         let create = ResourceCreate {
-            parent: self.stub.key.clone(),
+            parent: self.stub.key.clone().into(),
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Append(sub_space.to_string()),
             archetype: ResourceArchetype {
@@ -408,7 +410,7 @@ impl SpaceApi {
     pub fn create_domain(&self, domain: &str) -> Result<Creation<DomainApi>, Fail> {
         let resource_src = AssignResourceStateSrc::None;
         let create = ResourceCreate {
-            parent: self.stub.key.clone(),
+            parent: self.stub.key.clone().into(),
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Append(domain.to_string()),
             archetype: ResourceArchetype {
@@ -470,7 +472,7 @@ impl SubSpaceApi {
         let state_data = state.try_into()?;
         let resource_src = AssignResourceStateSrc::Direct(state_data);
         let create = ResourceCreate {
-            parent: self.stub.key.clone(),
+            parent: self.stub.key.clone().into(),
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Append(name.to_string()),
             archetype: ResourceArchetype {
@@ -496,7 +498,7 @@ impl SubSpaceApi {
         let kind: ArtifactBundleKind = version.clone().into();
 
         let create = ResourceCreate {
-            parent: self.stub.key.clone(),
+            parent: self.stub.key.clone().into(),
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Appends(vec![name.to_string(), version.to_string()]),
             archetype: ResourceArchetype {
@@ -567,7 +569,7 @@ impl FileSystemApi {
         //        let resource_src = AssignResourceStateSrc::Direct(data.get()?);
         let resource_src = AssignResourceStateSrc::Direct(data);
         let create = ResourceCreate {
-            parent: self.stub.key.clone(),
+            parent: self.stub.key.clone().into(),
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Append(path.to_string()),
             archetype: ResourceArchetype {

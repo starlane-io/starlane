@@ -5,7 +5,7 @@ use starlane_core::error::Error;
 use starlane_core::starlane::{ConstellationCreate, StarlaneMachine, StarlaneCommand, StarlaneMachineRunner};
 use starlane_core::template::{ConstellationData, ConstellationTemplate, ConstellationLayout};
 use tokio::sync::oneshot;
-use starlane_core::resource::{ResourceAddress, Version, ResourceSelector, FieldSelection};
+use starlane_core::resource::{ResourceAddress, Version, ResourceSelector, FieldSelection, ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceArchetype, ResourceCreateStrategy, AssignResourceStateSrc};
 use std::str::FromStr;
 use std::{fs, thread};
 use std::path::Path;
@@ -40,6 +40,7 @@ fn main() -> Result<(), Error> {
                                                             SubCommand::with_name("config").subcommands(vec![SubCommand::with_name("set-host").usage("set the host that the starlane CLI connects to").arg(Arg::with_name("hostname").required(true).help("the hostname of the starlane instance you wish to connect to")).display_order(0),
                                                                                                                             SubCommand::with_name("get-host").usage("get the host that the starlane CLI connects to")]).usage("read or manipulate the cli config").display_order(1).display_order(1),
                                                             SubCommand::with_name("publish").usage("publish an artifact bundle").args(vec![Arg::with_name("dir").required(true).help("the source directory for this bundle"),Arg::with_name("address").required(true).help("the publish address of this bundle i.e. 'space:sub_space:bundle:1.0.0'")].as_slice()),
+                                                            SubCommand::with_name("create").usage("create a resource").args(vec![Arg::with_name("address").required(true).help("the address of your new resource")].as_slice()),
                                                             SubCommand::with_name("ls").usage("list resources").args(vec![Arg::with_name("address").required(true).help("the resource address to list"),Arg::with_name("child-pattern").required(false).help("a pattern describing the children to be listed .i.e '<File>' for returning resource type File")].as_slice())
     ]);
 
@@ -72,7 +73,12 @@ fn main() -> Result<(), Error> {
             publish(args.clone()).await.unwrap();
         });
         shutdown();
-
+    } else if let Option::Some(args) = matches.subcommand_matches("create") {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            list(args.clone()).await.unwrap();
+        });
+        shutdown();
     } else if let Option::Some(args) = matches.subcommand_matches("ls") {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
@@ -132,6 +138,31 @@ async fn list(args: ArgMatches<'_> ) -> Result<(),Error> {
         println!("{}", resource.stub.address.to_string() );
     }
     println!();
+
+    starlane_api.shutdown();
+
+    Ok(())
+}
+
+async fn create(args: ArgMatches<'_> ) -> Result<(),Error> {
+    let address = ResourceAddress::from_str( args.value_of("address").ok_or("expected resource address")? )?;
+    let starlane_api = starlane_api().await?;
+
+    let create = ResourceCreate {
+        parent: address.parent().expect("must have an address with a parent" ).into(),
+        key: KeyCreationSrc::None,
+        address: AddressCreationSrc::Exact(address.clone()),
+        archetype: ResourceArchetype{
+            kind: address.resource_type().default_kind()?,
+            specific: None,
+            config: None
+        },
+        src: AssignResourceStateSrc::None,
+        registry_info: Option::None,
+        owner: Option::None,
+        strategy: ResourceCreateStrategy::Create
+    };
+    starlane_api.create_resource(create).await?;
 
     starlane_api.shutdown();
 

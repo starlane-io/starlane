@@ -58,6 +58,7 @@ impl Host for DefaultHost {
             }
             AssignResourceStateSrc::Hosted => Arc::new(MemoryDataTransfer::none()),
             AssignResourceStateSrc::None => Arc::new(MemoryDataTransfer::none()),
+            AssignResourceStateSrc::InitArgs(_) => Arc::new(MemoryDataTransfer::none()),
         };
 
         let assign = ResourceAssign {

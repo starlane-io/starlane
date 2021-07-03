@@ -2067,8 +2067,14 @@ if self.skel.core_tx.is_closed() {
 
         match &delivery.message.payload {
             ResourceRequestMessage::Create(create) => {
+                let parent_key = match create.parent.clone().key_or("expected parent to be a ResourceKey"){
+                    Ok(key) => {key}
+                    Err(error) => {
+                        return Err(error);
+                    }
+                };
                 let child_manager = self
-                    .get_child_resource_manager(create.parent.clone())
+                    .get_child_resource_manager(parent_key)
                     .await?;
                 let delivery = delivery.clone();
                 let create = create.clone();
@@ -2193,8 +2199,9 @@ if self.skel.core_tx.is_closed() {
                 }
 
                 ChildManagerResourceAction::Create(create) => {
-                    let child_manager = self
-                        .get_child_resource_manager(create.parent.clone())
+                    unimplemented!();
+/*                    let child_manager = self
+                        .get_child_resource_manager(parent )
                         .await?;
                     let skel = self.skel.clone();
                     tokio::spawn(async move {
@@ -2215,6 +2222,8 @@ if self.skel.core_tx.is_closed() {
                             }
                         }
                     });
+
+ */
 
                     //        println!("child {} location host: {}", record.key, record.location.host );
 

@@ -190,7 +190,7 @@ impl FileStoreHost {
 
         let create = ResourceCreate {
             key: KeyCreationSrc::None,
-            parent: filesystem.key.clone(),
+            parent: filesystem.key.clone().into(),
             archetype: archetype,
             address: AddressCreationSrc::Append(file_path),
             src: AssignResourceStateSrc::Hosted,
@@ -253,6 +253,11 @@ impl Host for FileStoreHost {
                     AssignResourceStateSrc::None => {
                         // do nothing, there is no data (this should never happen of course in a file)
                     }
+                    AssignResourceStateSrc::InitArgs(_) => {
+                        return Err("File cannot be created with InitArgs".into());
+                        // cannot create with init_args
+                    }
+
                 }
             }
             rt => {

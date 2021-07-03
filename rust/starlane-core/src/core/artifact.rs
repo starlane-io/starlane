@@ -102,7 +102,7 @@ impl ArtifactHost {
 
         let create = ResourceCreate {
             key: KeyCreationSrc::None,
-            parent: parent.key.clone(),
+            parent: parent.key.clone().into(),
             archetype: archetype,
             address: AddressCreationSrc::Append(artifact_path),
             src: AssignResourceStateSrc::Hosted,
@@ -175,6 +175,11 @@ impl Host for ArtifactHost {
                     AssignResourceStateSrc::None => {
                         return Err(Fail::Error(
                             "ArtifactBundle state should never be None".to_string(),
+                        ));
+                    }
+                    AssignResourceStateSrc::InitArgs(_) => {
+                        return Err(Fail::Error(
+                            "ArtifactBundle cannot be created from InitArgs".to_string(),
                         ));
                     }
                 }

@@ -1,8 +1,6 @@
 use crate::error::Error;
 use crate::keys::{ResourceKey, SpaceKey};
-use crate::resource::{
-    AssignResourceStateSrc, LocalDataSrc, Resource, ResourceAddress, ResourceType, SrcTransfer,
-};
+use crate::resource::{AssignResourceStateSrc, LocalDataSrc, Resource, ResourceAddress, ResourceType, SrcTransfer, InitArgs, ResourceKind};
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
@@ -34,20 +32,14 @@ impl Space {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SpaceState {
-    name: String,
     display: String,
 }
 
 impl SpaceState {
-    pub fn new(name: &str, display: &str) -> Self {
+    pub fn new(display: &str) -> Self {
         SpaceState {
-            name: name.to_string(),
             display: display.to_string(),
         }
-    }
-
-    pub fn name(&self) -> String {
-        self.name.clone()
     }
 
     pub fn display(&self) -> String {
@@ -56,6 +48,16 @@ impl SpaceState {
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
         Ok(bincode::deserialize(bytes)?)
+    }
+}
+
+impl TryFrom<InitArgs> for SpaceState{
+    type Error = Error;
+
+    fn try_from(init_args: InitArgs) -> Result<Self, Self::Error> {
+        ResourceKind::Space.init_args().ok_or("expected init_args for Space")?.validate(&init_args)?;
+        let display:String = init_args.args.get("display").cloned().ok_or("expected init arg 'display'")?.try_into()?;
+        Ok(Self::new(display.as_str()))
     }
 }
 
@@ -90,3 +92,6 @@ impl TryFrom<Vec<u8>> for SpaceState {
         Ok(bincode::deserialize::<SpaceState>(value.as_slice())?)
     }
 }
+
+
+

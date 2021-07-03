@@ -1236,6 +1236,19 @@ impl ResourceKind {
             ResourceKind::Database(_) => ResourceType::Database,
         }
     }
+
+    pub fn init_args(&self) -> Option<InitArgsDesc>{
+        match self{
+            ResourceKind::Space => {
+                let mut args = InitArgsDesc::new();
+                args.args.push( InitArgDesc::new("display", InitArgType::Display, "a human readable display name for the new Space"));
+                Option::Some(args)
+            }
+            _ => {
+                Option::None
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
@@ -1524,6 +1537,23 @@ impl ResourceType {
         }*/
         // for now let's not worry about owners
         false
+    }
+
+    pub fn default_kind(&self) -> Result<ResourceKind,Error>{
+        match self{
+            ResourceType::Root => Ok(ResourceKind::Root),
+            ResourceType::Space => Ok(ResourceKind::Space),
+            ResourceType::SubSpace => Ok(ResourceKind::SubSpace),
+            ResourceType::App => Ok(ResourceKind::App),
+            ResourceType::User => Ok(ResourceKind::User),
+            ResourceType::FileSystem => Ok(ResourceKind::FileSystem),
+            ResourceType::Domain => Ok(ResourceKind::Domain),
+            ResourceType::UrlPathPattern => Ok(ResourceKind::UrlPathPattern),
+            ResourceType::Artifact => Ok(ResourceKind::Artifact),
+            _ => {
+                Err(format!("no default kind for resource: {}",self.to_string()).into())
+            }
+        }
     }
 
     pub fn state_persistence(&self) -> ResourceStatePersistenceManager {
@@ -1898,6 +1928,16 @@ pub struct ResourceArchetype {
 }
 
 impl ResourceArchetype {
+
+    pub fn from_resource_type( kind: ResourceKind ) -> Self {
+        ResourceArchetype {
+            kind: kind,
+            specific: Option::None,
+            config: Option::None,
+        }
+    }
+
+
     pub fn root() -> ResourceArchetype {
         ResourceArchetype {
             kind: ResourceKind::Root,
@@ -2038,10 +2078,19 @@ impl Parent {
         create: ResourceCreate,
         tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
     ) {
+
+        let parent = match create.parent.clone().key_or("expected create.parent to already be a key") {
+            Ok(key) => {key}
+            Err(error) => {
+                tx.send(Err(Fail::from(error)));
+                return;
+            }
+        };
+
         if let Ok(reservation) = core
             .child_registry
             .reserve(ResourceNamesReservationRequest {
-                parent: create.parent.clone(),
+                parent: parent,
                 archetype: create.archetype.clone(),
                 info: create.registry_info.clone(),
             })
@@ -2242,6 +2291,8 @@ impl ResourceCreationChamber {
         create: ResourceCreate,
         skel: StarSkel,
     ) -> oneshot::Receiver<Result<ResourceAssign<AssignResourceStateSrc>, Fail>> {
+
+
         let (tx, rx) = oneshot::channel();
         let chamber = ResourceCreationChamber {
             parent: parent,
@@ -2255,6 +2306,12 @@ impl ResourceCreationChamber {
 
     async fn run(self) {
         tokio::spawn(async move {
+
+            if !self.create.parent.is_key() {
+                self.tx.send( Err(Fail::Error("ResourceCreationChamber requires keyed ResourceCreate object.  Call ResourceCreate::to_keyed(starlane_api) to modify".to_string())) );
+                return;
+            }
+
             if !self
                 .create
                 .archetype
@@ -2399,6 +2456,9 @@ impl ResourceCreationChamber {
                 ResourceAddress::for_space(space_name.as_str())?
             }
 
+            AddressCreationSrc::Exact(address) => {
+                address.clone()
+            }
         };
 
         let stub = ResourceStub {
@@ -3379,6 +3439,38 @@ impl FromStr for SkewerCase {
     }
 }
 
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub struct DisplayValue{
+    string: String,
+}
+
+impl DisplayValue{
+    pub fn new(string: &str) -> Result<Self, Error> {
+        if string.is_empty() {
+            return Err("cannot be empty".into());
+        }
+
+        Ok(DisplayValue{
+            string: string.to_string(),
+        })
+    }
+}
+
+impl ToString for DisplayValue{
+    fn to_string(&self) -> String {
+        self.string.clone()
+    }
+}
+
+impl FromStr for DisplayValue{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(DisplayValue::new(s)?)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct DomainCase {
     string: String,
@@ -4138,7 +4230,7 @@ pub enum ResourceCreateStrategy {
 
 #[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct ResourceCreate {
-    pub parent: ResourceKey,
+    pub parent: ResourceIdentifier,
     pub key: KeyCreationSrc,
     pub address: AddressCreationSrc,
     pub archetype: ResourceArchetype,
@@ -4151,7 +4243,7 @@ pub struct ResourceCreate {
 impl ResourceCreate {
     pub fn create(archetype: ResourceArchetype, src: AssignResourceStateSrc) -> Self {
         ResourceCreate {
-            parent: ResourceKey::Root,
+            parent: ResourceKey::Root.into(),
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::None,
             archetype: archetype,
@@ -4164,7 +4256,7 @@ impl ResourceCreate {
 
     pub fn ensure_address(archetype: ResourceArchetype, src: AssignResourceStateSrc) -> Self {
         ResourceCreate {
-            parent: ResourceKey::Root,
+            parent: ResourceKey::Root.into(),
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::None,
             archetype: archetype,
@@ -4192,6 +4284,29 @@ impl ResourceCreate {
 
         Ok(())
     }
+
+    pub async fn to_keyed(self, starlane_api: StarlaneApi )->Result<Self,Error>{
+        Ok(Self{
+            parent: self.parent.to_key(&starlane_api).await?.into(),
+            key: self.key,
+            address: self.address,
+            archetype: self.archetype,
+            src: self.src,
+            registry_info: self.registry_info,
+            owner: self.owner,
+            strategy: self.strategy
+        })
+    }
+
+    pub fn keyed_or(self, message: &str) -> Result<Self,Error> {
+        if self.parent.is_key() {
+            return Ok(self)
+        } else {
+            Err(message.into())
+        }
+    }
+
+
 }
 
 impl LogInfo for ResourceCreate {
@@ -4243,6 +4358,7 @@ pub enum AddressCreationSrc {
     Append(String),
     Appends(Vec<String>),
     Space(String),
+    Exact(ResourceAddress)
 }
 
 #[derive(Debug,Clone, Serialize, Deserialize)]
@@ -4259,10 +4375,11 @@ pub enum KeySrc {
 }
 
 /// can have other options like to Initialize the state data
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum AssignResourceStateSrc {
     None,
     Direct(Arc<Vec<u8>>),
+    InitArgs(InitArgs),
     Hosted,
 }
 
@@ -4274,6 +4391,100 @@ impl TryInto<ResourceStateSrc> for AssignResourceStateSrc {
             AssignResourceStateSrc::Direct(state) => Ok(ResourceStateSrc::Memory(state)),
             AssignResourceStateSrc::Hosted => Ok(ResourceStateSrc::Hosted),
             AssignResourceStateSrc::None => Ok(ResourceStateSrc::None),
+            _ => {
+                Err(format!("cannot turn {}", self.to_string() ).into())
+            }
+        }
+    }
+}
+
+#[derive(Debug,Clone, Serialize, Deserialize)]
+pub struct InitArgs{
+   pub args: HashMap<String,InitArgValue>
+}
+
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
+pub struct InitArgsDesc{
+    pub args: Vec<InitArgDesc>
+}
+
+impl InitArgsDesc{
+    pub fn new()->Self {
+        Self{
+            args: vec![]
+        }
+    }
+
+    fn get( &self, key: &String ) -> Option<&InitArgDesc>{
+        for arg in &self.args {
+            if arg.key == *key{
+                return Option::Some(arg);
+            }
+        }
+        return Option::None;
+    }
+
+    pub fn validate( &self, init_args: &InitArgs ) -> Result<(),Error> {
+       for desc in &self.args {
+           if let Option::Some(arg) = init_args.args.get(&desc.key ) {
+               let type_match = match arg {
+                   InitArgValue::DisplayValue(_) => {
+                       desc.arg_type == InitArgType::Display
+                   }
+                   InitArgValue::SkewerCase(_) => {
+                       desc.arg_type == InitArgType::SkewerCase
+                   }
+               };
+
+               if !type_match {
+                   return Err(format!("InitArg '{}' requires value of type '{}'", &desc.key, desc.arg_type.to_string()).into() );
+               }
+
+
+           } else {
+               return Err(format!("InitArgs missing init key: {}",desc.key).into());
+           }
+       }
+       Ok(())
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
+pub struct InitArgDesc{
+    pub key: String,
+    pub arg_type: InitArgType,
+    pub description: String
+}
+
+impl InitArgDesc {
+    pub fn new(key: &str, arg_type: InitArgType, description: &str) -> Self {
+        Self{
+            key: key.to_string(),
+            arg_type: arg_type,
+            description: description.to_string()
+        }
+    }
+}
+
+#[derive(Clone,Eq,PartialEq,Serialize,Deserialize,strum_macros::Display)]
+pub enum InitArgType{
+    Display,
+    SkewerCase
+}
+
+#[derive(Debug,Clone,Eq,PartialEq,Serialize,Deserialize)]
+pub enum InitArgValue{
+    DisplayValue(DisplayValue),
+    SkewerCase(SkewerCase)
+}
+
+impl TryInto<String> for InitArgValue{
+    type Error = Error;
+
+    fn try_into(self) -> Result<String, Self::Error> {
+        match self{
+            InitArgValue::DisplayValue(value) => Ok(value.to_string()),
+            InitArgValue::SkewerCase(value) => Ok(value.to_string())
         }
     }
 }
@@ -4641,6 +4852,29 @@ impl ResourceSelectorId for ResourceIdentifier {}
 
 
 impl ResourceIdentifier{
+
+    pub fn is_key(&self) -> bool {
+        match self {
+            ResourceIdentifier::Key(_) => {
+                true
+            }
+            ResourceIdentifier::Address(_) => {
+                false
+            }
+        }
+    }
+
+    pub fn is_address(&self) -> bool {
+        match self {
+            ResourceIdentifier::Key(_) => {
+                false
+            }
+            ResourceIdentifier::Address(_) => {
+                true
+            }
+        }
+    }
+
 
     pub fn key_or(self,error_message: &str ) -> Result<ResourceKey,Error> {
         match self {
