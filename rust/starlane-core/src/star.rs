@@ -1157,8 +1157,12 @@ if self.skel.core_tx.is_closed() {
             } else if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Fail(fail))) = result {
                 locate.tx.send(Err(fail));
             } else {
-error!("I just don't have the info you NEEDEDEDEDED");
                 match result {
+                    Ok(StarMessagePayload::Reply(SimpleReply::Fail(Fail::ResourceNotFound(id)))) => {
+                        error!("resource not found : {}", id.to_string());
+                        locate.tx.send(Err(Fail::ResourceNotFound(id) ) );
+                    }
+
                     Ok(result) => {
                         error!("payload: {}", result );
                         locate.tx.send(Err(Fail::unexpected("Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Resource(record))))", format!("{}",result.to_string()))));

@@ -148,7 +148,7 @@ mod test {
                     println!("error: INCOMPLETE!");
                 }
                 Err::Error(error) => {
-                    println!("error: ERROR! {:?}", error.code);
+                    println!("error: ERROR! {}", error.code.description());
                 }
                 Err::Failure(failure) => {
                     println!("error: FAILURE!");

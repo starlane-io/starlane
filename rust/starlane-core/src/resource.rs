@@ -1439,6 +1439,11 @@ impl FromStr for ResourceKind {
                         split.next().ok_or("error")?,
                     )?));
                 }
+                "ArtifactBundle" => {
+                    return Ok(ResourceKind::ArtifactBundle(ArtifactBundleKind::from_str(
+                        split.next().ok_or("error")?,
+                    )?));
+                }
                 _ => {
                     return Err(format!("cannot find a match for {}", s).into());
                 }
@@ -2666,7 +2671,7 @@ impl ResourceAddress {
             ResourceType::Domain => self.chop(1, ResourceType::SubSpace),
             ResourceType::UrlPathPattern => self.chop(1, ResourceType::Space),
             ResourceType::Proxy => self.chop(1, ResourceType::SubSpace),
-            ResourceType::ArtifactBundle => self.chop(1, ResourceType::SubSpace),
+            ResourceType::ArtifactBundle => self.chop(2, ResourceType::SubSpace),
             ResourceType::Artifact => self.chop(1, ResourceType::Artifact),
         }
     }

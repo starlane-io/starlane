@@ -294,7 +294,7 @@ pub fn log_err<E:ToString,OK,O:From<E>>(err: E ) -> Result<OK,O>{
 pub fn shutdown() {
     SHUTDOWN_TX.send(());
     thread::spawn( move || {
-        std::thread::sleep( std::time::Duration::from_secs(1));
+        std::thread::sleep( std::time::Duration::from_millis(100));
         std::process::exit(0);
     });
 }

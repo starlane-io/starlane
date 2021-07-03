@@ -70,12 +70,14 @@ fn main() -> Result<(), Error> {
         rt.block_on(async {
             publish(args.clone()).await.unwrap();
         });
+        shutdown();
 
     } else if let Option::Some(args) = matches.subcommand_matches("ls") {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
             list(args.clone()).await.unwrap();
         });
+        shutdown();
 
     } else {
         clap_app.print_long_help().unwrap_or_default();
@@ -106,11 +108,8 @@ async fn publish(args: ArgMatches<'_> ) -> Result<(),Error> {
     let data = Arc::new(data);
 
     let starlane_api = starlane_api().await?;
-    println!("creating.");
     let create_artifact_bundle = starlane_api.create_artifact_bundle(&bundle,data).await?;
-    println!("submitting.");
     create_artifact_bundle.submit().await?;
-    println!("done");
     Ok(())
 }
 
@@ -121,14 +120,14 @@ async fn list(args: ArgMatches<'_> ) -> Result<(),Error> {
 
     println!();
     for resource in resources {
-        println!("{: <16} {: <92} {: <16}", resource.stub.key.to_string(), resource.stub.address.to_string(), resource.location.host.to_string() );
+        println!("{: <24} {: <92} {: <16}", resource.stub.key.to_string(), resource.stub.address.to_string(), resource.location.host.to_string() );
     }
     println!();
 
     starlane_api.shutdown();
-    shutdown();
 
     Ok(())
+
 }
 
 pub async fn starlane_api() -> Result<StarlaneApi,Error>{
