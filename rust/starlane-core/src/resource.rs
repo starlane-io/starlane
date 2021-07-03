@@ -1,7 +1,12 @@
 use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
+use std::fmt::{Debug, Formatter};
+use std::fs::DirBuilder;
+use std::future::Future;
+use std::hash::Hash;
 use std::iter::FromIterator;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::string::FromUtf8Error;
 use std::sync::Arc;
@@ -9,13 +14,18 @@ use std::time::Duration;
 
 use base64::DecodeError;
 use bincode::ErrorKind;
+use nom::AsChar;
+use rusqlite::{Connection, params, params_from_iter, Row, Rows, Statement, ToSql, Transaction};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
-use rusqlite::{params, params_from_iter, Connection, Row, Rows, Statement, ToSql, Transaction};
 use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 use serde_json::to_string;
-use tokio::sync::oneshot::Receiver;
 use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot::error::RecvError;
+use tokio::sync::oneshot::Receiver;
+use url::Url;
 
+use crate::{logger, util};
 use crate::actor::{ActorKey, ActorKind};
 use crate::app::ConfigSrc;
 use crate::artifact::{ArtifactKey, ArtifactKind};
@@ -32,33 +42,23 @@ use crate::keys::{
 };
 use crate::keys::{FileKey, ResourceId, Unique, UniqueSrc};
 use crate::logger::{elog, LogInfo, StaticLogInfo};
+use crate::message::{Fail, ProtoStarMessage};
 use crate::message::resource::{
     Message, MessageFrom, MessageReply, MessageTo, ProtoMessage, ResourceRequestMessage,
     ResourceResponseMessage,
 };
-use crate::message::{Fail, ProtoStarMessage};
 use crate::names::{Name, Specific};
 use crate::permissions::User;
+use crate::resource::ResourceKind::UrlPathPattern;
 use crate::resource::space::{Space, SpaceState};
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
-use crate::resource::ResourceKind::UrlPathPattern;
-use crate::star::pledge::{ResourceHostSelector, StarHandle};
 use crate::star::{
     ResourceRegistryBacking, StarComm, StarCommand, StarInfo, StarKey, StarKind, StarSkel,
 };
-use crate::util::AsyncHashMap;
-use crate::{logger, util};
-use std::future::Future;
-use std::path::PathBuf;
-use url::Url;
-use std::fs::DirBuilder;
-use tokio::sync::oneshot::error::RecvError;
-use std::fmt::{Debug, Formatter};
-use nom::AsChar;
+use crate::star::pledge::{ResourceHostSelector, StarHandle};
 use crate::starlane::api::StarlaneApi;
-use std::hash::Hash;
-use serde::de::DeserializeOwned;
+use crate::util::AsyncHashMap;
 
 pub mod artifact;
 pub mod config;
@@ -69,6 +69,7 @@ pub mod space;
 pub mod store;
 pub mod sub_space;
 pub mod user;
+pub mod selector;
 
 lazy_static! {
     pub static ref ROOT_STRUCT: ResourceAddressStructure =
@@ -3426,8 +3427,8 @@ mod test {
     use tokio::runtime::Runtime;
     use tokio::sync::mpsc;
     use tokio::sync::oneshot::error::RecvError;
-    use tokio::time::timeout;
     use tokio::time::Duration;
+    use tokio::time::timeout;
 
     use crate::actor::{ActorKey, ActorKind};
     use crate::error::Error;
@@ -3439,18 +3440,18 @@ mod test {
     };
     use crate::names::{Name, Specific};
     use crate::permissions::Authentication;
-    use crate::resource::ResourceRegistryResult::Resources;
     use crate::resource::{
-        FieldSelection, LabelSelection, Labels, Names, Registry, ResourceAddress,
+        FieldSelection, Labels, LabelSelection, Names, Registry, ResourceAddress,
         ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceKind, ResourceRecord,
         ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand,
         ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector, ResourceStub, ResourceType,
         SkewerCase,
     };
+    use crate::resource::ResourceRegistryResult::Resources;
     use crate::space::CreateAppControllerFail;
     use crate::star::{StarController, StarInfo, StarKey, StarKind};
     use crate::starlane::{
-        ConstellationCreate, StarlaneMachineRunner, StarlaneApiRequest, StarlaneCommand,
+        ConstellationCreate, StarlaneApiRequest, StarlaneCommand, StarlaneMachineRunner,
     };
     use crate::template::{ConstellationData, ConstellationTemplate};
 

@@ -5,9 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/starlane-core/src/resource/selector.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/core/artifact.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/artifact.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/error.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/error.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/main.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -145,8 +147,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test resource::test::test_spaces" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib resource::test::test_spaces -- --exact" />
+    <configuration name="Test resource::selector::test::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib resource::selector::test::test -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -183,17 +185,17 @@
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Run starlane" />
       <item itemvalue="Cargo.Test starlane::test::starlane" />
-      <item itemvalue="Cargo.Test resource::test::test_spaces" />
       <item itemvalue="Cargo.Test domain::test" />
       <item itemvalue="Cargo.Test resource::domain::test::test2" />
+      <item itemvalue="Cargo.Test resource::selector::test::test" />
     </list>
     <recent_temporary>
       <list>
         <item itemvalue="Cargo.Run starlane" />
+        <item itemvalue="Cargo.Test resource::selector::test::test" />
         <item itemvalue="Cargo.Test resource::domain::test::test2" />
         <item itemvalue="Cargo.Test domain::test" />
         <item itemvalue="Cargo.Test starlane::test::starlane" />
-        <item itemvalue="Cargo.Test resource::test::test_spaces" />
       </list>
     </recent_temporary>
   </component>
@@ -210,7 +212,7 @@
       <option name="presentableId" value="Default" />
       <updated>1624567978464</updated>
       <workItem from="1624567980551" duration="193344000" />
-      <workItem from="1625052009343" duration="103759000" />
+      <workItem from="1625052009343" duration="110979000" />
     </task>
     <servers />
   </component>

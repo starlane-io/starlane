@@ -142,8 +142,8 @@ impl StarlaneApi {
         }
     }
 
-    pub async fn select(&self, resource: &ResourceIdentifier, mut selector: ResourceSelector ) -> Result<Vec<ResourceRecord>,Fail> {
-        let resource = resource.clone();
+    pub async fn select(&self, parent_resource: &ResourceIdentifier, mut selector: ResourceSelector ) -> Result<Vec<ResourceRecord>,Fail> {
+        let resource = parent_resource.clone();
 
         selector.add_field( FieldSelection::Parent(resource.clone()));
 

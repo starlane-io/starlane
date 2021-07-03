@@ -15,6 +15,7 @@ use tokio::sync::mpsc::error::{SendError, TrySendError};
 use tokio::time::error::Elapsed;
 use zip::result::ZipError;
 use tokio::sync::broadcast::error::RecvError;
+use nom::error::VerboseError;
 
 #[derive(Debug, Clone)]
 pub struct Error {
@@ -60,6 +61,15 @@ impl From<tokio::sync::broadcast::error::RecvError> for Error {
 
 impl From<serde_json::Error> for Error {
     fn from(i: serde_json::Error) -> Self {
+        Error {
+            error: format!("{}", i )
+        }
+    }
+}
+
+
+impl From<nom::Err<VerboseError<&str>>> for Error {
+    fn from(i: nom::Err<VerboseError<&str>>) -> Self {
         Error {
             error: format!("{}", i.to_string())
         }

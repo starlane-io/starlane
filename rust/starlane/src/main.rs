@@ -5,7 +5,7 @@ use starlane_core::error::Error;
 use starlane_core::starlane::{ConstellationCreate, StarlaneMachine, StarlaneCommand, StarlaneMachineRunner};
 use starlane_core::template::{ConstellationData, ConstellationTemplate, ConstellationLayout};
 use tokio::sync::oneshot;
-use starlane_core::resource::{ResourceAddress, Version};
+use starlane_core::resource::{ResourceAddress, Version, ResourceSelector, FieldSelection};
 use std::str::FromStr;
 use std::{fs, thread};
 use std::path::Path;
@@ -18,6 +18,7 @@ use tracing::dispatcher::set_global_default;
 use tokio::time::Duration;
 use starlane_core::starlane::api::StarlaneApi;
 use starlane_core::util::shutdown;
+use starlane_core::resource::selector::MultiResourceSelector;
 
 mod cli;
 
@@ -116,11 +117,19 @@ async fn publish(args: ArgMatches<'_> ) -> Result<(),Error> {
 async fn list(args: ArgMatches<'_> ) -> Result<(),Error> {
     let address = ResourceAddress::from_str( args.value_of("address").ok_or("expected resource address")? )?;
     let starlane_api = starlane_api().await?;
-    let resources = starlane_api.list(&address.into()).await?;
+
+    let mut selector = if args.value_of("child-pattern" ).is_some(){
+        let selector = MultiResourceSelector::from_str( args.value_of("child-pattern").unwrap() )?;
+        selector.into()
+    } else {
+        ResourceSelector::new()
+    };
+
+    let resources = starlane_api.select(&address.into(), selector).await?;
 
     println!();
     for resource in resources {
-        println!("{: <24} {: <92} {: <16}", resource.stub.key.to_string(), resource.stub.address.to_string(), resource.location.host.to_string() );
+        println!("{}", resource.stub.address.to_string() );
     }
     println!();
 
