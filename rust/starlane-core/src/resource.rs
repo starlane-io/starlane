@@ -2370,7 +2370,9 @@ impl ResourceCreationChamber {
                 }
                 ResourceAddress::for_space(space_name.as_str())?
             }
+
         };
+println!("created address: {}", address.to_string() );
 
         let stub = ResourceStub {
             key: key,
@@ -2672,7 +2674,7 @@ impl ResourceAddress {
             ResourceType::UrlPathPattern => self.chop(1, ResourceType::Space),
             ResourceType::Proxy => self.chop(1, ResourceType::SubSpace),
             ResourceType::ArtifactBundle => self.chop(2, ResourceType::SubSpace),
-            ResourceType::Artifact => self.chop(1, ResourceType::Artifact),
+            ResourceType::Artifact => self.chop(1, ResourceType::ArtifactBundle),
         }
     }
 

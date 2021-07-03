@@ -8,7 +8,7 @@ use std::sync::Arc;
 use rusqlite::Connection;
 use tokio::sync::{mpsc, Mutex};
 
-use crate::core::Host;
+use crate::core::{Host, StarCoreAction, StarCoreCommand};
 use crate::error::Error;
 use crate::file_access::{FileAccess, FileEvent};
 use crate::keys::{FileSystemKey, ResourceKey};
@@ -118,7 +118,15 @@ impl ArtifactHost {
 
         let rx = ResourceCreationChamber::new(parent, create, skel.clone()).await;
 
-        let x = util::wait_for_it_whatever(rx).await??;
+        let assign = util::wait_for_it_whatever(rx).await??;
+        let (action,mut rx) = StarCoreAction::new(StarCoreCommand::Assign(assign));
+        skel.core_tx.send( action ).await;
+println!("assignging artifact..." );
+
+        util::wait_for_it_whatever(rx).await??;
+
+println!("artifact assigned.");
+
         Ok(())
     }
 }
@@ -129,6 +137,8 @@ impl Host for ArtifactHost {
         &mut self,
         assign: ResourceAssign<AssignResourceStateSrc>,
     ) -> Result<Resource, Fail> {
+
+println!("assigning : {}", assign.stub.address.to_string());
         Self::validate(&assign)?;
 
         // if there is Initialization to do for assignment THIS is where we do it
@@ -153,7 +163,7 @@ impl Host for ArtifactHost {
                 match &assign.state_src {
                     AssignResourceStateSrc::Direct(data) => {
                         let artifacts = get_artifacts(data.clone())?;
-                        let path = Self::bundle_path(assign.key())?;
+                       let path = Self::bundle_path(assign.key())?;
                         let mut file_access = self.file_access.with_path(path.to_relative())?;
                         file_access
                             .write(&Path::new("/bundle.zip")?, data.clone())
@@ -174,6 +184,7 @@ impl Host for ArtifactHost {
                 }
             }
             ResourceType::Artifact => {
+println!("with parent: {}", assign.stub.address.parent().unwrap().to_string());
                 vec![]
             }
             rt => {
@@ -203,7 +214,13 @@ impl Host for ArtifactHost {
             let parent: ResourceStub = resource.clone().into();
             tokio::spawn(async move {
                 for artifact in artifacts {
-                    Self::ensure_artifact(parent.clone(), artifact, skel.clone());
+                    let artifact = format!("/{}", artifact);
+                    match Self::ensure_artifact(parent.clone(), artifact, skel.clone()).await{
+                        Ok(_) => {}
+                        Err(error) => {
+                            error!("ensure artifact ERROR: {}",error.to_string());
+                        }
+                    }
                 }
             });
         }

@@ -482,7 +482,7 @@ impl ArtifactBundleAddress{
     }
 
     pub fn name(&self)->String{
-        self.address.parent().expect("expected bundle parent 'name'").last_to_string().unwrap()
+        self.address.part_to_string("bundle").expect("since this is known to be a ResourceAddress that is of type ArtifactBundle we should have been okay just expecting that 'bundle' part be set")
     }
 
     pub fn sub_space(&self) -> ResourceAddress {
