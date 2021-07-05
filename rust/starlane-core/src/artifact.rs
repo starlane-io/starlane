@@ -160,6 +160,12 @@ impl ArtifactAddress {
             Err("expected ArtifactResourceAddress to end in a Path".into())
         }
     }
+
+    pub fn with_parent( parent: &ArtifactBundleAddress, artifact: &str ) -> Result<ArtifactAddress,Error> {
+        let parent:ResourceAddress = parent.clone().into();
+        let address = ResourceAddress::from_parent(&ResourceType::Artifact, Option::Some(&parent), ResourceAddressPart::Path(Path::new(artifact)?))?;
+        Ok(ArtifactAddress::try_from(address)?)
+    }
 }
 
 impl FromStr for ArtifactAddress {

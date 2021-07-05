@@ -76,7 +76,7 @@ impl CentralVariant {
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
 
-        let mut creation = space_api.create_sub_space("core")?;
+        let mut creation = space_api.create_sub_space("starlane")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
 

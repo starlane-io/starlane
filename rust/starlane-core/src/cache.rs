@@ -67,12 +67,14 @@ impl ProtoArtifactCachesFactory {
 }
 
 pub struct ArtifactCaches {
+    pub raw: ArtifactItemCache<Raw>,
     pub domain_configs: ArtifactItemCache<DomainConfig>,
 }
 
 impl ArtifactCaches {
     fn new() -> Self {
         ArtifactCaches {
+            raw: ArtifactItemCache::new(),
             domain_configs: ArtifactItemCache::new(),
         }
     }
@@ -894,6 +896,7 @@ impl<C: Cacheable> RootItemCacheProc<C> {
 
 struct RootArtifactCaches {
     bundle_cache: ArtifactBundleCache,
+    raw: RootItemCache<Raw>,
     domain_configs: RootItemCache<DomainConfig>,
 }
 
@@ -901,6 +904,7 @@ impl RootArtifactCaches {
     fn new(bundle_cache: ArtifactBundleCache) -> Self {
         Self {
             bundle_cache: bundle_cache.clone(),
+            raw: RootItemCache::new(bundle_cache.clone(), Arc::new(RawParser::new())),
             domain_configs: RootItemCache::new(bundle_cache, Arc::new(DomainConfigParser::new())),
         }
     }
@@ -1127,5 +1131,45 @@ mod test {
         );
 
         Ok(())
+    }
+}
+
+pub struct Raw{
+    data: Data,
+    artifact: ArtifactRef,
+}
+
+impl Raw {
+    pub fn data(&self)->Data {
+        self.data.clone()
+    }
+}
+
+impl Cacheable for Raw {
+
+    fn artifact(&self) -> ArtifactRef {
+        self.artifact.clone()
+    }
+
+    fn references(&self) -> Vec<ArtifactRef> {
+        vec!()
+    }
+}
+
+
+pub struct RawParser;
+
+impl RawParser {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Parser<Raw> for RawParser {
+    fn parse(&self, artifact: ArtifactRef, data: Data) -> Result<Arc<Raw>, Error> {
+        Ok(Arc::new(Raw{
+            artifact: artifact,
+            data: data
+        }))
     }
 }

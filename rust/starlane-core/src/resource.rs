@@ -1239,10 +1239,13 @@ impl ResourceKind {
         }
     }
 
-    pub fn init_args_clap_config(&self) -> Result<Option<ArtifactAddress>,Error>{
+    pub fn init_clap_config(&self) -> Result<Option<ArtifactAddress>,Error>{
         match self{
             ResourceKind::Space => {
-                Ok(Option::Some(ArtifactAddress::from_str("starlane:core:kind:1.0.0")?))
+                Ok(Option::Some(ArtifactAddress::with_parent(&init_args::ARTIFACT_BUNDLE, "/init-args/space.yaml")?))
+            }
+            ResourceKind::SubSpace => {
+                Ok(Option::Some(ArtifactAddress::with_parent(&init_args::ARTIFACT_BUNDLE, "/init-args/sub_space.yaml")?))
             }
             _ => {
                 Ok(Option::None)
@@ -4379,7 +4382,7 @@ pub enum KeySrc {
 pub enum AssignResourceStateSrc {
     None,
     Direct(Arc<Vec<u8>>),
-    InitArgs(InitArgs),
+    InitArgs(String),
     Hosted,
 }
 
@@ -4398,101 +4401,7 @@ impl TryInto<ResourceStateSrc> for AssignResourceStateSrc {
     }
 }
 
-#[derive(Debug,Clone, Serialize, Deserialize)]
-pub struct InitArgs{
-   pub args: HashMap<String,InitArgValue>
-}
 
-#[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
-pub struct InitArgsDesc{
-    pub name: String,
-    pub args: Vec<InitArgDesc>
-}
-
-impl InitArgsDesc{
-    pub fn new(name: &str)->Self {
-        Self{
-            name: name.to_string(),
-            args: vec![]
-        }
-    }
-
-    fn get( &self, key: &String ) -> Option<&InitArgDesc>{
-        for arg in &self.args {
-            if arg.key == *key{
-                return Option::Some(arg);
-            }
-        }
-        return Option::None;
-    }
-
-    pub fn validate( &self, init_args: &InitArgs ) -> Result<(),Error> {
-       for desc in &self.args {
-           if let Option::Some(arg) = init_args.args.get(&desc.key ) {
-               let type_match = match arg {
-                   InitArgValue::DisplayValue(_) => {
-                       desc.arg_type == InitArgType::Display
-                   }
-                   InitArgValue::SkewerCase(_) => {
-                       desc.arg_type == InitArgType::SkewerCase
-                   }
-               };
-
-               if !type_match {
-                   return Err(format!("InitArg '{}' requires value of type '{}'", &desc.key, desc.arg_type.to_string()).into() );
-               }
-
-
-           } else {
-               return Err(format!("InitArgs missing init key: {}",desc.key).into());
-           }
-       }
-       Ok(())
-    }
-
-
-}
-
-
-#[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
-pub struct InitArgDesc{
-    pub key: String,
-    pub arg_type: InitArgType,
-    pub description: String
-}
-
-impl InitArgDesc {
-    pub fn new(key: &str, arg_type: InitArgType, description: &str) -> Self {
-        Self{
-            key: key.to_string(),
-            arg_type: arg_type,
-            description: description.to_string()
-        }
-    }
-}
-
-#[derive(Clone,Eq,PartialEq,Serialize,Deserialize,strum_macros::Display)]
-pub enum InitArgType{
-    Display,
-    SkewerCase
-}
-
-#[derive(Debug,Clone,Eq,PartialEq,Serialize,Deserialize)]
-pub enum InitArgValue{
-    DisplayValue(DisplayValue),
-    SkewerCase(SkewerCase)
-}
-
-impl TryInto<String> for InitArgValue{
-    type Error = Error;
-
-    fn try_into(self) -> Result<String, Self::Error> {
-        match self{
-            InitArgValue::DisplayValue(value) => Ok(value.to_string()),
-            InitArgValue::SkewerCase(value) => Ok(value.to_string())
-        }
-    }
-}
 
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum ResourceSliceStatus {
