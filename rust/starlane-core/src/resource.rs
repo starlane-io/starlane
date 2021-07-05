@@ -71,6 +71,7 @@ pub mod store;
 pub mod sub_space;
 pub mod user;
 pub mod selector;
+pub mod init_args;
 
 lazy_static! {
     pub static ref ROOT_STRUCT: ResourceAddressStructure =

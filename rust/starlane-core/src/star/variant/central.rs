@@ -2,7 +2,7 @@ use crate::error::Error;
 use crate::keys::ResourceKey;
 use crate::resource::{
     ResourceAddress, ResourceArchetype, ResourceCreateStrategy, ResourceKind, ResourceLocation,
-    ResourceRecord, ResourceRegistration, ResourceStub,
+    ResourceRecord, ResourceRegistration, ResourceStub, init_args
 };
 use crate::star::variant::{StarVariant, StarVariantCommand};
 use crate::star::{PublicKeySource, StarKey, StarSkel};
@@ -12,6 +12,8 @@ use std::str::FromStr;
 use tokio::sync::oneshot;
 use std::thread;
 use tokio::runtime::{Runtime, Handle};
+use crate::message::resource;
+use std::sync::Arc;
 
 pub struct CentralVariant {
     skel: StarSkel,
@@ -74,12 +76,16 @@ impl CentralVariant {
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
 
-        let mut creation = space_api.create_sub_space("default")?;
+        let mut creation = space_api.create_sub_space("core")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
 
         let mut creation = space_api.create_domain("localhost")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
+        creation.submit().await?;
+
+        let init_args = Arc::new(init_args::create_init_args_artifact_bundle()?);
+        let creation = starlane_api.create_artifact_bundle(&init_args::artifact_bundle_address(), init_args ).await?;
         creation.submit().await?;
 
         Ok(())
