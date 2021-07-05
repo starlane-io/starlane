@@ -34,7 +34,7 @@ args:
 }
 
 pub fn artifact_bundle_address() -> ArtifactBundleAddress{
-   let address = format!("hyperspace:core:kinds:{}", crate::VERSION.to_string() );
+   let address = format!("hyperspace:core:resources:{}", crate::VERSION.to_string() );
    ArtifactBundleAddress::from_str(address.as_str() ).expect(format!("FATAL: expected artifact_bundle_address '{}' to be parse-able",address).as_str() )
 }
 
@@ -42,8 +42,8 @@ pub fn create_init_args_artifact_bundle() -> Result<Vec<u8>,Error> {
    let mut zipfile = tempfile::NamedTempFile::new()?;
    let mut zip = ZipWriter::new(zipfile.reopen() ? );
 
-   write_file_to_zip(&mut zip, "space.yaml", &SPACE )?;
-   write_file_to_zip(&mut zip, "sub_space.yaml", &SUB_SPACE )?;
+   write_file_to_zip(&mut zip, "init-args/space.yaml", &SPACE )?;
+   write_file_to_zip(&mut zip, "init-args/sub_space.yaml", &SUB_SPACE )?;
 
    zip.finish()?;
 
