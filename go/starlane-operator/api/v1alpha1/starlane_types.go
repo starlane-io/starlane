@@ -29,7 +29,7 @@ type StarlaneSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of Starlane. Edit starlane_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	//	Foo string `json:"foo,omitempty"`
 }
 
 // StarlaneStatus defines the observed state of Starlane
@@ -42,6 +42,7 @@ type StarlaneStatus struct {
 //+kubebuilder:subresource:status
 
 // Starlane is the Schema for the starlanes API
+//+kubebuilder:subresource:status
 type Starlane struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

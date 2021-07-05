@@ -8,6 +8,8 @@ COPY rust .
 
 WORKDIR /usr/src/starlane/starlane
 
+RUN cargo fetch 
+
 RUN cargo install --path .
 
 
