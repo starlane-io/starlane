@@ -38,7 +38,7 @@ pub struct SpaceState {
 impl SpaceState {
     pub fn new(display: &str) -> Self {
         SpaceState {
-            display: display.to_string(),
+            display: display.to_string()
         }
     }
 
@@ -51,15 +51,19 @@ impl SpaceState {
     }
 }
 
+
+/*
 impl TryFrom<InitArgs> for SpaceState{
     type Error = Error;
 
     fn try_from(init_args: InitArgs) -> Result<Self, Self::Error> {
-        ResourceKind::Space.init_args().ok_or("expected init_args for Space")?.validate(&init_args)?;
+        ResourceKind::Space.init_args_clap_config()?.ok_or("expected init_args for Space")?.validate(&init_args)?;
         let display:String = init_args.args.get("display").cloned().ok_or("expected init arg 'display'")?.try_into()?;
         Ok(Self::new(display.as_str()))
     }
 }
+
+ */
 
 impl TryInto<Vec<u8>> for SpaceState {
     type Error = Error;

@@ -28,7 +28,7 @@ use url::Url;
 use crate::{logger, util};
 use crate::actor::{ActorKey, ActorKind};
 use crate::app::ConfigSrc;
-use crate::artifact::{ArtifactKey, ArtifactKind};
+use crate::artifact::{ArtifactKey, ArtifactKind, ArtifactAddress};
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::{
@@ -59,6 +59,7 @@ use crate::star::{
 use crate::star::pledge::{ResourceHostSelector, StarHandle};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
+use clap::{App, Arg};
 
 pub mod artifact;
 pub mod config;
@@ -1237,15 +1238,13 @@ impl ResourceKind {
         }
     }
 
-    pub fn init_args(&self) -> Option<InitArgsDesc>{
+    pub fn init_args_clap_config(&self) -> Result<Option<ArtifactAddress>,Error>{
         match self{
             ResourceKind::Space => {
-                let mut args = InitArgsDesc::new();
-                args.args.push( InitArgDesc::new("display", InitArgType::Display, "a human readable display name for the new Space"));
-                Option::Some(args)
+                Ok(Option::Some(ArtifactAddress::from_str("starlane:core:kind:1.0.0")?))
             }
             _ => {
-                Option::None
+                Ok(Option::None)
             }
         }
     }
@@ -4405,12 +4404,14 @@ pub struct InitArgs{
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub struct InitArgsDesc{
+    pub name: String,
     pub args: Vec<InitArgDesc>
 }
 
 impl InitArgsDesc{
-    pub fn new()->Self {
+    pub fn new(name: &str)->Self {
         Self{
+            name: name.to_string(),
             args: vec![]
         }
     }
@@ -4447,7 +4448,10 @@ impl InitArgsDesc{
        }
        Ok(())
     }
+
+
 }
+
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub struct InitArgDesc{
