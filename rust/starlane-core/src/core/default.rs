@@ -29,15 +29,20 @@ use crate::resource::{
     ResourceIdentifier, ResourceKind, ResourceStatePersistenceManager, ResourceStateSrc,
     ResourceType,
 };
+use crate::star::StarSkel;
+use crate::artifact::{ArtifactRef, ArtifactKind};
+use clap::App;
 
 #[derive(Debug)]
 pub struct DefaultHost {
+    skel: StarSkel,
     store: ResourceStore,
 }
 
 impl DefaultHost {
-    pub async fn new() -> Self {
+    pub async fn new(skel: StarSkel) -> Self {
         DefaultHost {
+            skel: skel,
             store: ResourceStore::new().await,
         }
     }
@@ -50,6 +55,7 @@ impl Host for DefaultHost {
         &mut self,
         assign: ResourceAssign<AssignResourceStateSrc>,
     ) -> Result<Resource, Fail> {
+info!("DefaultHost assign...");
         // if there is Initialization to do for assignment THIS is where we do it
         let data_transfer = match assign.state_src {
             AssignResourceStateSrc::Direct(data) => {
@@ -58,7 +64,48 @@ impl Host for DefaultHost {
             }
             AssignResourceStateSrc::Hosted => Arc::new(MemoryDataTransfer::none()),
             AssignResourceStateSrc::None => Arc::new(MemoryDataTransfer::none()),
-            AssignResourceStateSrc::InitArgs(_) => Arc::new(MemoryDataTransfer::none()),
+            AssignResourceStateSrc::InitArgs(ref args) =>  {
+                Arc::new(if args.trim().is_empty() && assign.stub.archetype.kind.init_clap_config()?.is_none() {
+                    MemoryDataTransfer::none()
+                } else if assign.stub.archetype.kind.init_clap_config()?.is_none(){
+                    return Err(format!("resource {} does not take init args",assign.archetype().kind).into());
+                }
+                else {
+info!("enter");
+                    let artifact = assign.archetype().kind.init_clap_config()?.expect("expected init clap config");
+info!("got init clapConfig");
+                    let mut cache = self.skel.caches.create();
+println!("artifact is::: {}",artifact.to_string());
+info!("got self.skel.caches.create()");
+                    let artifact_ref = ArtifactRef::new(artifact.clone(), ArtifactKind::Raw );
+                    match cache.cache(vec![artifact_ref]).await {
+                        Ok(_) => {}
+                        Err(err) => {error!("{}",err);
+                            return Err(err.into());
+                        }
+                    };
+info!("artifact cached: {}", artifact.to_string() );
+                    let caches = cache.to_caches().await?;
+info!("cache.to_caches()." );
+                    let yaml_config = caches.raw.get(&artifact).ok_or("expected artifact")?;
+info!("caches.raw.get()." );
+                    let data = (*yaml_config.data()).clone();
+                    let data = String::from_utf8(data)?;
+info!("String::from_utf8()." );
+                    let yaml = clap::YamlLoader::load_from_str(data.as_str() )?;
+info!("clap::YamlLoader::load_from_str(data.as_str() )" );
+                    let yaml = yaml.get(0).ok_or("expected at least one Yaml expression")?.clone();
+info!("at least one yaml" );
+                    let mut app = App::from(&yaml);
+info!("App::from(&yaml)" );
+                    let matches = app.get_matches_from_safe(args.split(" "))?;
+                    // now not sure what to do with matches
+println!("seems to have worked....");
+                    MemoryDataTransfer::none()
+                })
+            }
+
+
         };
 
         let assign = ResourceAssign {

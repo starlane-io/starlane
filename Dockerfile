@@ -29,4 +29,4 @@ WORKDIR /
 
 RUN apk add --no-cache sqlite-libs gcc
 
-CMD ["starlane"]
+ENTRYPOINT ["starlane"]

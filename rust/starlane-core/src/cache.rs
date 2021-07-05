@@ -146,6 +146,11 @@ impl ProtoArtifactCaches {
                         .domain_configs
                         .add(self.root_caches.domain_configs.get(artifact).await?);
                 }
+                ArtifactKind::Raw => {
+                    caches
+                        .raw
+                        .add(self.root_caches.raw.get(artifact).await?);
+                }
             }
         }
 
@@ -190,16 +195,20 @@ impl ProtoArtifactCacheProc {
         let mut more = vec![];
 
         for artifact in artifacts {
+println!(".... CACHING... {}", artifact.clone().address.to_string() );
             let claim = root_caches.claim(artifact).await?;
+println!("claimed...");
             let references = claim.references();
             claims.put(claim.artifact.clone(), claim).await?;
+println!("put...");
             for reference in references {
                 if !claims.contains(reference.clone()).await? {
                     more.push(reference);
                 }
             }
+println!("processed artifact...");
         }
-
+println!("more is_empty(): {}",more.is_empty() );
         if !more.is_empty() {
             let (sub_tx, sub_rx) = oneshot::channel();
             proc_tx
@@ -293,6 +302,7 @@ impl ArtifactBundleCacheRunner {
             match command {
                 ArtifactBundleCacheCommand::Cache { bundle, tx } => {
                     let bundle: ResourceIdentifier = bundle.into();
+println!("fetching resource record..." );
                     let record = match self.src.fetch_resource_record(bundle.clone()).await {
                         Ok(record) => record,
                         Err(err) => {
@@ -300,6 +310,7 @@ impl ArtifactBundleCacheRunner {
                             continue;
                         }
                     };
+println!("fetchED resource record.");
                     let bundle: ArtifactBundleAddress = match record.stub.address.try_into() {
                         Ok(ok) => ok,
                         Err(err) => {
@@ -377,7 +388,9 @@ impl ArtifactBundleCacheRunner {
     ) -> Result<(), Error> {
         let bundle: ResourceAddress = bundle.into();
         let bundle: ResourceIdentifier = bundle.into();
+println!("download&extract src.fetch_resource_record...");
         let record = src.fetch_resource_record(bundle.clone()).await?;
+println!("download&extract src.fetch_resource_record DONE");
 
         let stream = src
             .get_resource_state(bundle.clone())
@@ -882,14 +895,18 @@ impl<C: Cacheable> RootItemCacheProc<C> {
         parser: Arc<dyn Parser<X>>,
         bundle_cache: ArtifactBundleCache,
     ) -> Result<Arc<X>, Error> {
+println!("root: cache_artifact: {}", artifact.address.to_string());
         bundle_cache
             .download(artifact.address.parent().into())
             .await?;
+println!("bundle cached : parsing: {}", artifact.address.to_string());
         let file_access = ArtifactBundleCache::with_bundle_files_path(
             bundle_cache.file_access(),
             artifact.address.parent(),
         )?;
+println!("file acces scached : parsing: {}", artifact.address.to_string());
         let data = file_access.read(&artifact.address.path()?).await?;
+println!("root: parsing: {}", artifact.address.to_string());
         parser.parse(artifact, data)
     }
 }
@@ -910,14 +927,13 @@ impl RootArtifactCaches {
     }
 
     async fn claim(&self, artifact: ArtifactRef) -> Result<Claim, Error> {
-        let result = match artifact.kind {
-            ArtifactKind::DomainConfig => self.domain_configs.cache(artifact).await,
+        let claim= match artifact.kind {
+            ArtifactKind::DomainConfig => self.domain_configs.cache(artifact).await?.into(),
+            ArtifactKind::Raw => self.raw.cache(artifact).await?.into(),
         };
 
-        match result {
-            Ok(item) => Ok(item.into()),
-            Err(error) => Err(error),
-        }
+        Ok(claim)
+
     }
 }
 
@@ -1056,6 +1072,8 @@ mod test {
         Ok(())
     }
 
+
+
     pub async fn proto_caches() -> Result<(), Error> {
         let factory = ProtoArtifactCachesFactory::new(
             MockArtifactBundleSrc::new()?.into(),
@@ -1087,13 +1105,19 @@ mod test {
         let artifact = ArtifactAddress::from_str("hyperspace:default:whiz:1.0.0:/routes.txt")?;
         let artifact = ArtifactRef {
             address: artifact,
-            kind: ArtifactKind::DomainConfig,
+            kind: ArtifactKind::Raw,
         };
 
         let root_caches = RootArtifactCaches::new(bundle_cache);
 
-        let rtn = root_caches.domain_configs.cache(artifact).await;
+        let rtn = root_caches.raw.cache(artifact).await;
         assert!(rtn.is_ok());
+
+        let raw = rtn.expect("expeted to get raw data");
+        let raw = String::from_utf8((*raw.data()).clone() )?;
+
+        println!("RAW {}", raw );
+
 
         //      tokio::time::sleep( Duration::from_secs(5)).await;
 

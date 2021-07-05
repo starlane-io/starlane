@@ -185,7 +185,7 @@ impl StarCoreFactory {
             StarKind::Database => {
                 Box::new(MySQLDatabaseCore::new(skel.clone()).await?)
             }
-            _ => Box::new(DefaultHost::new().await),
+            _ => Box::new(DefaultHost::new(skel.clone()).await),
         };
         Ok(StarCore2::new(skel, core_rx, host).await)
     }

@@ -19,6 +19,7 @@ use crate::lane::LaneMeta;
 use crate::names::Specific;
 use crate::resource::{ResourceAddress, ResourceIdentifier, ResourceType};
 use crate::star::{StarCommand, StarKey, StarSearchTransaction, Transaction, TransactionResult};
+use std::string::FromUtf8Error;
 
 pub mod resource;
 
@@ -447,6 +448,19 @@ impl From<tokio::sync::oneshot::error::RecvError> for Fail {
     }
 }
 
+impl From<FromUtf8Error> for Fail {
+    fn from(e: FromUtf8Error) -> Self {
+        Fail::Error(e.to_string())
+    }
+}
+
+
+impl From<yaml_rust::scanner::ScanError> for Fail {
+    fn from(e: yaml_rust::scanner::ScanError) -> Self {
+        Fail::Error(e.to_string())
+    }
+}
+
 impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Fail {
     fn from(e: tokio::sync::mpsc::error::SendError<T>) -> Self {
         Fail::Error(format!("{}",e.to_string()))
@@ -456,5 +470,11 @@ impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Fail {
 impl From<actix_web::error::Canceled> for Fail {
     fn from(c: actix_web::error::Canceled) -> Self {
         Fail::Error(c.to_string())
+    }
+}
+
+impl From<clap::Error> for Fail{
+    fn from(e: clap::Error) -> Self {
+        Fail::Error(e.to_string())
     }
 }

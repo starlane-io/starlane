@@ -75,6 +75,7 @@ impl ToString for Artifact{
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum ArtifactKind {
     DomainConfig,
+    Raw
 }
 
 impl fmt::Display for ArtifactKind {
@@ -84,6 +85,7 @@ impl fmt::Display for ArtifactKind {
             "{}",
             match self {
                 ArtifactKind::DomainConfig => "DomainConfig".to_string(),
+                ArtifactKind::Raw=> "Raw".to_string(),
             }
         )
     }
@@ -95,6 +97,7 @@ impl FromStr for ArtifactKind {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "DomainConfig" => Ok(ArtifactKind::DomainConfig),
+            "Raw" => Ok(ArtifactKind::Raw),
             _ => Err(format!("could not find ArtifactKind: {}", s).into()),
         }
     }
@@ -579,4 +582,13 @@ pub enum ArtifactBundleIdentifier {
 pub struct ArtifactRef {
     pub address: ArtifactAddress,
     pub kind: ArtifactKind,
+}
+
+impl ArtifactRef{
+    pub fn new( address: ArtifactAddress, kind: ArtifactKind ) -> Self {
+        Self {
+            address: address,
+            kind: kind
+        }
+    }
 }
