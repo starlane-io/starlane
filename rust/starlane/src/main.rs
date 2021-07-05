@@ -1,4 +1,4 @@
-use clap::{App, SubCommand, Arg, ArgMatches };
+use clap::{App, SubCommand, Arg, ArgMatches, Values};
 
 use tokio::runtime::Runtime;
 
@@ -151,40 +151,22 @@ async fn list(args: ArgMatches<'_> ) -> Result<(),Error> {
 
 async fn create(args: ArgMatches<'_> ) -> Result<(),Error> {
 
-        let address = ResourceAddress::from_str( args.value_of("address").ok_or("expected resource address")? )?;
-        let resource_type = address.resource_type();
-        let kind = resource_type.default_kind()?;
+    let address = ResourceAddress::from_str( args.value_of("address").ok_or("expected resource address")? )?;
+    let resource_type = address.resource_type();
+    let kind = resource_type.default_kind()?;
 
-
-    /*
-        if let Option::Some(init_args) = kind.init_args() {
-            let mut app = App::new(init_args.name.clone() );
-            let mut var_args= vec![];
-
-            for arg in init_args.args {
-                var_args.push( Arg::with_name(arg.key.as_str() ).help(arg.description.as_str() ) );
-            }
-            app.args(var_args.as_slice());
-
-            // all we have to do is make sure it matches
-            app.get_matches_from(args.values_of("init-args").unwrap() );
+    let init_args = match args.values_of("init-args") {
+        None => {"".to_string()}
+        Some(args) => {
+            let init_args:Vec<&str>  = args.collect();
+            let init_args:Vec<String> = init_args.iter().map(|s| (*s).to_string() ).collect();
+            init_args.join(" ")
         }
+    };
 
-     */
+    let starlane_api = starlane_api().await?;
 
-
-
-    let x:Vec<&str>  = args.values_of("init-args").unwrap().collect();
-        for arg in x.clone() {
-            println!("init-arg: {}", arg );
-        }
-
-    let app2 = App::new("app2").setting(clap::AppSettings::NoBinaryName).args( &[] ).get_matches_from(x );
-
-    /*
-        let starlane_api = starlane_api().await?;
-
-        let create = ResourceCreate {
+    let create = ResourceCreate {
             parent: address.parent().expect("must have an address with a parent" ).into(),
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Exact(address.clone()),
@@ -193,16 +175,14 @@ async fn create(args: ArgMatches<'_> ) -> Result<(),Error> {
                 specific: None,
                 config: None
             },
-            src: AssignResourceStateSrc::None,
+            src: AssignResourceStateSrc::InitArgs(init_args),
             registry_info: Option::None,
             owner: Option::None,
             strategy: ResourceCreateStrategy::Create
-        };
-        starlane_api.create_resource(create).await?;
+    };
+    starlane_api.create_resource(create).await?;
 
-        starlane_api.shutdown();
-
-     */
+    starlane_api.shutdown();
 
     Ok(())
 }
