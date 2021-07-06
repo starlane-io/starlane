@@ -6,15 +6,21 @@
   <component name="ChangeListManager">
     <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/../go/starlane-operator/PROJECT" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/PROJECT" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/starlaneprovisioningjob_types.go" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/zz_generated.deepcopy.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/zz_generated.deepcopy.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/crd/bases/starlane.starlane.io_starlaneprovisioningjobs.yaml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/crd/kustomization.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/config/crd/kustomization.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/crd/patches/cainjection_in_starlaneprovisioningjobs.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/crd/patches/webhook_in_starlaneprovisioningjobs.yaml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/rbac/role.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/config/rbac/role.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/rbac/starlaneprovisioningjob_editor_role.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/rbac/starlaneprovisioningjob_viewer_role.yaml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/samples/kustomization.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/config/samples/kustomization.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlane_controller.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlane_controller.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/samples/starlane_v1alpha1_starlaneprovisioningjob.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlaneprovisioningjob_controller.go" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../go/starlane-operator/controllers/suite_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/controllers/suite_test.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/go.mod" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/job-test.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/job-test.sh" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../go/starlane-operator/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../kubernetes/mysql/jobs/create/.cmd.sh.swp" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../kubernetes/mysql/jobs/create/cmd.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../kubernetes/mysql/jobs/create/cmd.sh" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
@@ -216,7 +222,7 @@
       <option name="presentableId" value="Default" />
       <updated>1624567978464</updated>
       <workItem from="1624567980551" duration="193344000" />
-      <workItem from="1625052009343" duration="155786000" />
+      <workItem from="1625052009343" duration="158048000" />
     </task>
     <servers />
   </component>

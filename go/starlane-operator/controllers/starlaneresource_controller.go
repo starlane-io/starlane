@@ -18,47 +18,47 @@ package controllers
 
 import (
 	"context"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	starlanev1alpha1 "github.com/mechtronium/starlane/api/v1alpha1"
-	batchv1 "k8s.io/api/batch/v1"
 )
 
-// StarlaneProvisioningJobReconciler reconciles a StarlaneProvisioningJob object
-type StarlaneProvisioningJobReconciler struct {
+// StarlaneResourceReconciler reconciles a StarlaneResource object
+type StarlaneResourceReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=starlane.starlane.io,resources=starlaneprovisioningjobs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=starlane.starlane.io,resources=starlaneprovisioningjobs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=starlane.starlane.io,resources=starlaneprovisioningjobs/finalizers,verbs=update
+//+kubebuilder:rbac:groups=starlane.starlane.io,resources=starlaneresources,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=starlane.starlane.io,resources=starlaneresources/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=starlane.starlane.io,resources=starlaneresources/finalizers,verbs=update
 //+kubebuilder:rbac:groups=apps,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the StarlaneProvisioningJob object against the actual cluster state, and then
+// the StarlaneResource object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
-func (r *StarlaneProvisioningJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *StarlaneResourceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
+	log.Info("STARLANE RESOURCE UDPATE ")
 	// Check if the job already exists, if not create a new one
 
-	provisioning_job := &starlanev1alpha1.StarlaneProvisioningJob{}
-	err := r.Get(ctx, req.NamespacedName, provisioning_job)
+	starlane_resource := &starlanev1alpha1.StarlaneResource{}
+	err := r.Get(ctx, req.NamespacedName, starlane_resource)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -68,14 +68,14 @@ func (r *StarlaneProvisioningJobReconciler) Reconcile(ctx context.Context, req c
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		log.Error(err, "Failed to get StarlaneProvisioningJob")
+		log.Error(err, "Failed to get StarlaneResource")
 		return ctrl.Result{}, err
 	}
 
 	provisioner := &starlanev1alpha1.StarlaneProvisioner{}
 	provisioner_name := types.NamespacedName{
-		Namespace: provisioning_job.Namespace,
-		Name:      provisioning_job.Spec.Provisioner,
+		Namespace: starlane_resource.Namespace,
+		Name:      starlane_resource.Spec.Provisioner,
 	}
 
 	err = r.Get(ctx, provisioner_name, provisioner)
@@ -90,33 +90,57 @@ func (r *StarlaneProvisioningJobReconciler) Reconcile(ctx context.Context, req c
 		return ctrl.Result{}, err
 	}
 
-	job := &batchv1.Job{}
-	err = r.Get(ctx, req.NamespacedName, job)
+	if starlane_resource.Status.LifecycleStage == "" {
+		starlane_resource.Status.LifecycleStage = "Creating"
+		err = r.Status().Update(ctx, starlane_resource)
+		if err != nil {
+			log.Error(err, "Failed to update")
+			return ctrl.Result{}, err
+		}
 
-	if err != nil && errors.IsNotFound(err) {
-		// Define a new job
-		dep := r.provisioningJob(provisioning_job, provisioner)
-		log.Info("Creating a new Job", "Job.Namespace", dep.Namespace, "Job.Name", dep.Name)
+		dep := r.provisioningJob(starlane_resource, provisioner)
 		err = r.Create(ctx, dep)
+
 		if err != nil {
 			log.Error(err, "Failed to create new Job", "Job.Namespace", dep.Namespace, "Job.Name", dep.Name)
 			return ctrl.Result{}, err
 		}
 		// Deployment created successfully - return and requeue
 		return ctrl.Result{Requeue: true}, nil
-	} else if err != nil {
-		log.Error(err, "Failed to get Job")
-		return ctrl.Result{}, err
+	} else if starlane_resource.Status.LifecycleStage == "Creating" {
+		job := &batchv1.Job{}
+
+		r.Get(ctx, req.NamespacedName, job)
+		starlane_resource.Status.LifecycleStage = statusFromJob(job)
+		err = r.Status().Update(ctx, starlane_resource)
+
+		if err != nil {
+			log.Error(err, "Failed to update")
+			return ctrl.Result{}, err
+		}
 	}
 
 	return ctrl.Result{}, nil
 }
 
+func statusFromJob(job *batchv1.Job) string {
+	for _, c := range job.Status.Conditions {
+		if c.Type == "Failed" {
+			return "Failed"
+		} else if c.Type == "Complete" {
+			return "Ready"
+		}
+	}
+	return "Creating"
+}
+
 // deploymentForStarlane returns a memcached Deployment object
-func (r *StarlaneProvisioningJobReconciler) provisioningJob(m *starlanev1alpha1.StarlaneProvisioningJob, p *starlanev1alpha1.StarlaneProvisioner) *batchv1.Job {
+func (r *StarlaneResourceReconciler) provisioningJob(m *starlanev1alpha1.StarlaneResource, p *starlanev1alpha1.StarlaneProvisioner) *batchv1.Job {
 
 	commandArgs := []string{"create", m.Spec.StarlaneResourceAddress, m.Spec.ResourceName}
 	initArgs := append(commandArgs, m.Spec.InitArgs...)
+
+	var backoffLimit = int32(0)
 
 	dep := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -124,6 +148,7 @@ func (r *StarlaneProvisioningJobReconciler) provisioningJob(m *starlanev1alpha1.
 			Namespace: m.Namespace,
 		},
 		Spec: batchv1.JobSpec{
+			BackoffLimit: &backoffLimit,
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
@@ -143,9 +168,9 @@ func (r *StarlaneProvisioningJobReconciler) provisioningJob(m *starlanev1alpha1.
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *StarlaneProvisioningJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *StarlaneResourceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&starlanev1alpha1.StarlaneProvisioningJob{}).
+		For(&starlanev1alpha1.StarlaneResource{}).
 		Owns(&batchv1.Job{}).
 		Complete(r)
 }

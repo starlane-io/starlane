@@ -6,21 +6,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.4.1
   creationTimestamp: null
-  name: starlaneprovisioningjobs.starlane.starlane.io
+  name: starlaneresources.starlane.starlane.io
 spec:
   group: starlane.starlane.io
   names:
-    kind: StarlaneProvisioningJob
-    listKind: StarlaneProvisioningJobList
-    plural: starlaneprovisioningjobs
-    singular: starlaneprovisioningjob
+    kind: StarlaneResource
+    listKind: StarlaneResourceList
+    plural: starlaneresources
+    singular: starlaneresource
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: StarlaneProvisioningJob is the Schema for the starlaneprovisioningjobs
-          API
+        description: StarlaneResource is the Schema for the starlaneresources API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -35,9 +34,10 @@ spec:
           metadata:
             type: object
           spec:
-            description: StarlaneProvisioningJobSpec defines the desired state of
-              StarlaneProvisioningJob
+            description: StarlaneResourceSpec defines the desired state of StarlaneResource
             properties:
+              foo:
+                type: string
               init-args:
                 items:
                   type: string
@@ -54,8 +54,10 @@ spec:
             - starlane-resource-address
             type: object
           status:
-            description: StarlaneProvisioningJobStatus defines the observed state
-              of StarlaneProvisioningJob
+            description: StarlaneResourceStatus defines the observed state of StarlaneResource
+            properties:
+              lifecycleStage:
+                type: string
             type: object
         type: object
     served: true

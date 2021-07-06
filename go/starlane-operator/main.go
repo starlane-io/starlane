@@ -85,11 +85,12 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Starlane")
 		os.Exit(1)
 	}
-	if err = (&controllers.StarlaneProvisioningJobReconciler{
+
+	if err = (&controllers.StarlaneResourceReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "StarlaneProvisioningJob")
+		setupLog.Error(err, "unable to create controller", "controller", "StarlaneResource")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

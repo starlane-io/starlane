@@ -4,4 +4,4 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: $(CERTIFICATE_NAMESPACE)/$(CERTIFICATE_NAME)
-  name: starlaneprovisioningjobs.starlane.starlane.io
+  name: starlaneresources.starlane.starlane.io

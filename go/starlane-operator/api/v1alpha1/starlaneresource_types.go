@@ -23,44 +23,41 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// StarlaneProvisioningJobSpec defines the desired state of StarlaneProvisioningJob
-type StarlaneProvisioningJobSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
+// StarlaneResourceSpec defines the desired state of StarlaneResource
+type StarlaneResourceSpec struct {
+	Foo                     string   `json:"foo,omitempty"`
 	ResourceName            string   `json:"resourceName"`
 	Provisioner             string   `json:"provisioner"`
 	StarlaneResourceAddress string   `json:"starlane-resource-address"`
 	InitArgs                []string `json:"init-args,omitempty"`
 }
 
-// StarlaneProvisioningJobStatus defines the observed state of StarlaneProvisioningJob
-type StarlaneProvisioningJobStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+// StarlaneResourceStatus defines the observed state of StarlaneResource
+type StarlaneResourceStatus struct {
+	LifecycleStage string `json:"lifecycleStage,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// StarlaneProvisioningJob is the Schema for the starlaneprovisioningjobs API
-type StarlaneProvisioningJob struct {
+// StarlaneResource is the Schema for the starlaneresources API
+type StarlaneResource struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   StarlaneProvisioningJobSpec   `json:"spec,omitempty"`
-	Status StarlaneProvisioningJobStatus `json:"status,omitempty"`
+	Spec   StarlaneResourceSpec   `json:"spec,omitempty"`
+	Status StarlaneResourceStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// StarlaneProvisioningJobList contains a list of StarlaneProvisioningJob
-type StarlaneProvisioningJobList struct {
+// StarlaneResourceList contains a list of StarlaneResource
+type StarlaneResourceList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []StarlaneProvisioningJob `json:"items"`
+	Items           []StarlaneResource `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&StarlaneProvisioningJob{}, &StarlaneProvisioningJobList{})
+	SchemeBuilder.Register(&StarlaneResource{}, &StarlaneResourceList{})
 }

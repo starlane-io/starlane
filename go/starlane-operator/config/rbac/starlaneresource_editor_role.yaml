@@ -1,20 +1,24 @@
-# permissions for end users to view starlaneprovisioningjobs.
+# permissions for end users to edit starlaneresources.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: starlaneprovisioningjob-viewer-role
+  name: starlaneresource-editor-role
 rules:
 - apiGroups:
   - starlane.starlane.io
   resources:
-  - starlaneprovisioningjobs
+  - starlaneresources
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - starlane.starlane.io
   resources:
-  - starlaneprovisioningjobs/status
+  - starlaneresources/status
   verbs:
   - get

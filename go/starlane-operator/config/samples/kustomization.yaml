@@ -3,4 +3,5 @@ resources:
 - starlane_v1alpha1_starlane.yaml
 - starlane_v1alpha1_starlaneprovisioner.yaml
 - starlane_v1alpha1_starlaneprovisioningjob.yaml
+- starlane_v1alpha1_starlaneresource.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

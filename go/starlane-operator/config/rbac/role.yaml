@@ -52,7 +52,7 @@ rules:
 - apiGroups:
   - starlane.starlane.io
   resources:
-  - starlaneprovisioningjobs
+  - starlaneresources
   verbs:
   - create
   - delete
@@ -64,13 +64,13 @@ rules:
 - apiGroups:
   - starlane.starlane.io
   resources:
-  - starlaneprovisioningjobs/finalizers
+  - starlaneresources/finalizers
   verbs:
   - update
 - apiGroups:
   - starlane.starlane.io
   resources:
-  - starlaneprovisioningjobs/status
+  - starlaneresources/status
   verbs:
   - get
   - patch
