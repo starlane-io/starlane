@@ -16,4 +16,21 @@ resources:
   kind: Starlane
   path: github.com/mechtronium/starlane/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: starlane.io
+  group: starlane
+  kind: StarlaneProvisioner
+  path: github.com/mechtronium/starlane/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: starlane.io
+  group: starlane
+  kind: StarlaneProvisioningJob
+  path: github.com/mechtronium/starlane/api/v1alpha1
+  version: v1alpha1
 version: "3"

@@ -19,12 +19,62 @@ rules:
   - update
   - watch
 - apiGroups:
+  - apps
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - ""
   resources:
   - pods
   verbs:
   - get
   - list
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - starlaneprovisioningjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - starlaneprovisioningjobs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - starlaneprovisioningjobs/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - starlane.starlane.io
   resources:

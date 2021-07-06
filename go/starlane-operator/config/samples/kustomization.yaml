@@ -1,4 +1,6 @@
 ## Append samples you want in your CSV to this file as resources ##
 resources:
 - starlane_v1alpha1_starlane.yaml
+- starlane_v1alpha1_starlaneprovisioner.yaml
+- starlane_v1alpha1_starlaneprovisioningjob.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples
