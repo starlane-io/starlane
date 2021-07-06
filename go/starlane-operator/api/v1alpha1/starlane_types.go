@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,8 +29,8 @@ type StarlaneSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of Starlane. Edit starlane_types.go to remove/update
-	//	Foo string `json:"foo,omitempty"`
+	WebServiceType     corev1.ServiceType `json:"web-service-type,omitempty" protobuf:"bytes,4,opt,name=web-service-type,casttype=ServiceType"`
+	GatewayServiceType corev1.ServiceType `json:"gateway-service-type,omitempty" protobuf:"bytes,4,opt,name=gateway-service-type,casttype=ServiceType"`
 }
 
 // StarlaneStatus defines the observed state of Starlane

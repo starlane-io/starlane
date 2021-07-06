@@ -21,6 +21,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -91,6 +93,70 @@ func (r *StarlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
+	{
+		// Check if the web service already exists, if not create a new one
+		service := &corev1.Service{}
+		err = r.Get(ctx, types.NamespacedName{Name: starlane.Name + "-web", Namespace: starlane.Namespace}, service)
+		if err != nil && errors.IsNotFound(err) {
+			// Define a new deployment
+			srv := r.webServiceForStarlane(starlane)
+			log.Info("Creating a new Service", "Service.Namespace", srv.Namespace, "Service.Name", srv.Name)
+			err = r.Create(ctx, srv)
+			if err != nil {
+				log.Error(err, "Failed to create new Service", "Service.Namespace", srv.Namespace, "Service.Name", srv.Name)
+				return ctrl.Result{}, err
+			}
+			// Deployment created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Service")
+			return ctrl.Result{}, err
+		} else if service.Spec.Type != starlane.Spec.WebServiceType {
+			service.Spec.Type = starlane.Spec.WebServiceType
+			err = r.Update(ctx, service)
+			if err != nil {
+				log.Error(err, "Failed to update Service", "Service.Namespace", found.Namespace, "Service.Name", found.Name)
+				return ctrl.Result{}, err
+			}
+			// Ask to requeue after 1 minute in order to give enough time for the
+			// pods be created on the cluster side and the operand be able
+			// to do the next update step accurately.
+			return ctrl.Result{RequeueAfter: time.Minute}, nil
+		}
+	}
+
+	{
+		// Check if the web service already exists, if not create a new one
+		service := &corev1.Service{}
+		err = r.Get(ctx, types.NamespacedName{Name: starlane.Name + "-gateway", Namespace: starlane.Namespace}, service)
+		if err != nil && errors.IsNotFound(err) {
+			// Define a new deployment
+			srv := r.gatewayServiceForStarlane(starlane)
+			log.Info("Creating a new Service", "Service.Namespace", srv.Namespace, "Service.Name", srv.Name)
+			err = r.Create(ctx, srv)
+			if err != nil {
+				log.Error(err, "Failed to create new Service", "Service.Namespace", srv.Namespace, "Service.Name", srv.Name)
+				return ctrl.Result{}, err
+			}
+			// Deployment created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Service")
+			return ctrl.Result{}, err
+		} else if service.Spec.Type != starlane.Spec.GatewayServiceType {
+			service.Spec.Type = starlane.Spec.GatewayServiceType
+			err = r.Update(ctx, service)
+			if err != nil {
+				log.Error(err, "Failed to update Service", "Service.Namespace", found.Namespace, "Service.Name", found.Name)
+				return ctrl.Result{}, err
+			}
+			// Ask to requeue after 1 minute in order to give enough time for the
+			// pods be created on the cluster side and the operand be able
+			// to do the next update step accurately.
+			return ctrl.Result{RequeueAfter: time.Minute}, nil
+		}
+	}
+
 	// your logic here
 
 	return ctrl.Result{}, nil
@@ -98,7 +164,7 @@ func (r *StarlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 // deploymentForStarlane returns a memcached Deployment object
 func (r *StarlaneReconciler) deploymentForStarlane(m *starlanev1alpha1.Starlane) *appsv1.Deployment {
-	ls := labelsForStarlane(m.Name)
+	ls := labelsForStandalone(m.Name)
 	replicas := int32(1)
 
 	dep := &appsv1.Deployment{
@@ -122,7 +188,10 @@ func (r *StarlaneReconciler) deploymentForStarlane(m *starlanev1alpha1.Starlane)
 						Args:  []string{"serve"},
 						Ports: []corev1.ContainerPort{{
 							ContainerPort: 4343,
-							Name:          "starlane",
+							Name:          "gateway",
+						}, {
+							ContainerPort: 8080,
+							Name:          "http",
 						}},
 					}},
 				},
@@ -134,10 +203,66 @@ func (r *StarlaneReconciler) deploymentForStarlane(m *starlanev1alpha1.Starlane)
 	return dep
 }
 
-// labelsForStarlane returns the labels for selecting the resources
-// belonging to the given memcached CR name.
-func labelsForStarlane(galaxy string) map[string]string {
-	return map[string]string{"app": "starlane", "galaxy": galaxy}
+// deploymentForStarlane returns a memcached Deployment object
+func (r *StarlaneReconciler) webServiceForStarlane(m *starlanev1alpha1.Starlane) *corev1.Service {
+
+	dep := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      m.Name + "-web",
+			Namespace: m.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Type: m.Spec.WebServiceType,
+			Ports: []corev1.ServicePort{
+				{Name: "http",
+					Port:       80,
+					TargetPort: intstr.FromInt(8080),
+					Protocol:   corev1.ProtocolTCP,
+				},
+			},
+			Selector: labelsForWeb(m.Name),
+		},
+	}
+	// Set Starlane instance as the owner and controller
+	ctrl.SetControllerReference(m, dep, r.Scheme)
+	return dep
+}
+
+// deploymentForStarlane returns a memcached Deployment object
+func (r *StarlaneReconciler) gatewayServiceForStarlane(m *starlanev1alpha1.Starlane) *corev1.Service {
+
+	dep := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      m.Name + "-gateway",
+			Namespace: m.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Type: m.Spec.GatewayServiceType,
+			Ports: []corev1.ServicePort{
+				{Name: "gateway",
+					Port:       4343,
+					TargetPort: intstr.FromInt(4343),
+					Protocol:   corev1.ProtocolTCP,
+				},
+			},
+			Selector: labelsForGateway(m.Name),
+		},
+	}
+	// Set Starlane instance as the owner and controller
+	ctrl.SetControllerReference(m, dep, r.Scheme)
+	return dep
+}
+
+func labelsForStandalone(galaxy string) map[string]string {
+	return map[string]string{"app": "starlane", "galaxy": galaxy, "web": "true", "gateway": "true"}
+}
+
+func labelsForWeb(galaxy string) map[string]string {
+	return map[string]string{"app": "starlane", "galaxy": galaxy, "web": "true"}
+}
+
+func labelsForGateway(galaxy string) map[string]string {
+	return map[string]string{"app": "starlane", "galaxy": galaxy, "gateway": "true"}
 }
 
 // getPodNames returns the pod names of the array of pods passed in
@@ -154,5 +279,6 @@ func (r *StarlaneReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&starlanev1alpha1.Starlane{}).
 		Owns(&appsv1.Deployment{}).
+		Owns(&corev1.Service{}).
 		Complete(r)
 }
