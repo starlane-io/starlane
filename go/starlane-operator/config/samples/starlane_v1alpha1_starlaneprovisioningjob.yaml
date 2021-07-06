@@ -1,0 +1,9 @@
+apiVersion: starlane.starlane.io/v1alpha1
+kind: StarlaneProvisioningJob
+metadata:
+  generateName: mysql-job-
+spec:
+  resourceName: "db_4"
+  provisioner: mysql
+  init-args: []
+  starlane-resource-address: "hyperspace:core:database<Database>"
