@@ -9,9 +9,11 @@ spec:
   env:
   - name: HOST
     value: my-cluster-mysql
-  - name: USER
+  - name: PORT
+    value: "3306"
+  - name: ROOT_USER
     value: root
-  - name: PASSWORD
+  - name: ROOT_PASSWORD
     valueFrom:
       secretKeyRef:
         name: my-cluster-secret

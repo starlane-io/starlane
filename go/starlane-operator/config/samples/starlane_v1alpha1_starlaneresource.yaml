@@ -1,9 +1,9 @@
 apiVersion: starlane.starlane.io/v1alpha1
 kind: StarlaneResource
 metadata:
-  name: db-6
+  name: db-$INDEX
 spec:
-  resourceName: "db_6"
+  resourceName: "db_$INDEX"
   provisioner: mysql
   init-args: []
   starlane-resource-address: "hyperspace:core:database<Database>"

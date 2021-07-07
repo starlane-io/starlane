@@ -137,7 +137,7 @@ func statusFromJob(job *batchv1.Job) string {
 // deploymentForStarlane returns a memcached Deployment object
 func (r *StarlaneResourceReconciler) provisioningJob(m *starlanev1alpha1.StarlaneResource, p *starlanev1alpha1.StarlaneProvisioner) *batchv1.Job {
 
-	commandArgs := []string{"create", m.Spec.StarlaneResourceAddress, m.Spec.ResourceName}
+	commandArgs := []string{"create", m.Spec.StarlaneResourceAddress, m.Name, m.Spec.ResourceName}
 	initArgs := append(commandArgs, m.Spec.InitArgs...)
 
 	var backoffLimit = int32(0)

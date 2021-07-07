@@ -29,6 +29,7 @@ type StarlaneProvisionerSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	Starlane         string `json:"starlane"`
 	InitArgsArtifact string `json:"init-args-artifact,omitempty"`
 	Kind             string `json:"kind"`
 	Image            string `json:"image"`

@@ -167,7 +167,7 @@ async fn create(args: ArgMatches<'_> ) -> Result<(),Error> {
     let starlane_api = starlane_api().await?;
 
     let create = ResourceCreate {
-            parent: address.parent().expect("must have an address with a parent" ).into(),
+            parent: address.parent().ok_or("must have an address with a parent" )?.into(),
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Exact(address.clone()),
             archetype: ResourceArchetype{

@@ -1,4 +1,6 @@
 #!/bin/bash
 
+export INDEX=$1
 
-kubectl create -f config/samples/starlane_v1alpha1_starlaneresource.yaml
+echo "`envsubst < config/samples/starlane_v1alpha1_starlaneresource.yaml`" | kubectl create -f -
+
