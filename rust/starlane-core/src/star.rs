@@ -98,7 +98,7 @@ pub enum StarKind {
     Link,
     Client,
     Web,
-    Database,
+    Kube,
 }
 
 impl StarKind {
@@ -115,7 +115,7 @@ impl StarKind {
             StarKind::Client => false,
             StarKind::Web => false,
             StarKind::ArtifactStore => true,
-            StarKind::Database => true,
+            StarKind::Kube => true,
         }
     }
 
@@ -132,7 +132,7 @@ impl StarKind {
             StarKind::Client => true,
             StarKind::Web => true,
             StarKind::ArtifactStore => true,
-            StarKind::Database => true,
+            StarKind::Kube => true,
         }
     }
 
@@ -152,7 +152,7 @@ impl StarKind {
                 StarKind::Client => vec![],
                 StarKind::Web => vec![],
                 StarKind::ArtifactStore => vec![],
-                StarKind::Database => vec![],
+                StarKind::Kube => vec![],
             }
             .iter()
             .cloned(),
@@ -183,7 +183,7 @@ impl StarKind {
                 StarKind::Web => vec![ResourceType::Domain, ResourceType::UrlPathPattern],
                 StarKind::FileStore => vec![ResourceType::File],
                 StarKind::ArtifactStore => vec![ResourceType::Artifact],
-                StarKind::Database => vec![ResourceType::Database],
+                StarKind::Kube => vec![ResourceType::Database],
             }
             .iter()
             .cloned(),
@@ -213,7 +213,7 @@ impl StarKind {
                 StarKind::ArtifactStore => {
                     vec![ResourceType::ArtifactBundle, ResourceType::Artifact]
                 }
-                StarKind::Database => vec![ResourceType::Database],
+                StarKind::Kube => vec![ResourceType::Database],
             }
             .iter()
             .cloned(),
@@ -237,7 +237,7 @@ impl FromStr for StarKind {
             "Web" => Ok(StarKind::Web),
             "FileStore" => Ok(StarKind::FileStore),
             "ArtifactStore" => Ok(StarKind::ArtifactStore),
-            "Database" => Ok(StarKind::Database),
+            "Database" => Ok(StarKind::Kube),
             _ => Err(()),
         }
     }
@@ -335,7 +335,7 @@ impl StarKind {
             StarKind::Web => false,
             StarKind::FileStore => false,
             StarKind::ArtifactStore => false,
-            StarKind::Database => false,
+            StarKind::Kube => false,
         }
     }
 }
@@ -357,7 +357,7 @@ impl fmt::Display for StarKind {
                 StarKind::Web => "Web".to_string(),
                 StarKind::FileStore => "FileStore".to_string(),
                 StarKind::ArtifactStore => "ArtifactStore".to_string(),
-                StarKind::Database => "Database".to_string(),
+                StarKind::Kube => "Database".to_string(),
             }
         )
     }

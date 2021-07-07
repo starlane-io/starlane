@@ -117,7 +117,7 @@ impl ConstellationTemplate {
     pub fn new_basic_with_database() -> Self {
         let mut database = StarTemplate::new(
             StarKeyTemplate::central_geodesic(10),
-            StarKind::Database,
+            StarKind::Kube,
             "database".into(),
         );
         Self::new_basic_with(vec![database])

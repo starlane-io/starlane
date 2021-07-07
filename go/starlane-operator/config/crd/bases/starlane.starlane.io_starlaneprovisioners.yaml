@@ -145,11 +145,11 @@ spec:
                 type: array
               image:
                 type: string
-              kind:
+              typeKindSpecific:
                 type: string
             required:
             - image
-            - kind
+            - typeKindSpecific
             type: object
           status:
             description: StarlaneProvisionerStatus defines the observed state of StarlaneProvisioner

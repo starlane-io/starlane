@@ -2,7 +2,7 @@ use crate::error::Error;
 use crate::keys::ResourceKey;
 use crate::resource::{
     ResourceAddress, ResourceArchetype, ResourceCreateStrategy, ResourceKind, ResourceLocation,
-    ResourceRecord, ResourceRegistration, ResourceStub, init_args
+    ResourceRecord, ResourceRegistration, ResourceStub, create_args
 };
 use crate::star::variant::{StarVariant, StarVariantCommand};
 use crate::star::{PublicKeySource, StarKey, StarSkel};
@@ -84,8 +84,8 @@ impl CentralVariant {
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
 
-        let init_args = Arc::new(init_args::create_init_args_artifact_bundle()?);
-        let creation = starlane_api.create_artifact_bundle(&init_args::artifact_bundle_address(), init_args ).await?;
+        let init_args = Arc::new(create_args::create_init_args_artifact_bundle()?);
+        let creation = starlane_api.create_artifact_bundle(&create_args::artifact_bundle_address(), init_args ).await?;
         creation.submit().await?;
 
         Ok(())

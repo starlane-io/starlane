@@ -30,7 +30,7 @@ type StarlaneProvisionerSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	CreateArgsArtifact string `json:"createArgsArtifact,omitempty"`
-	Kind               string `json:"kind"`
+	TypeKindSpecific   string `json:"typeKindSpecific"`
 	Image              string `json:"image"`
 
 	// List of environment variables to set in the container.

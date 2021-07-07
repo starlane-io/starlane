@@ -13,6 +13,7 @@ lazy_static!{
 
    pub static ref ARTIFACT_BUNDLE: ArtifactBundleAddress = artifact_bundle_address();
 
+
    pub static ref SPACE: &'static str = r#"
 name: Space
 args:

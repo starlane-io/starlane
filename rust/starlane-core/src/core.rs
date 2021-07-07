@@ -34,7 +34,7 @@ use crate::star::variant::StarVariantCommand;
 use crate::star::{
     ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel,
 };
-use crate::core::mysql_database::MySQLDatabaseCore;
+use crate::core::mysql_database::KubeCore;
 use std::io::Write;
 
 pub mod artifact;
@@ -182,8 +182,8 @@ impl StarCoreFactory {
             StarKind::ArtifactStore => {
                 Box::new(ArtifactHost::new(skel.clone(), file_access).await?)
             }
-            StarKind::Database => {
-                Box::new(MySQLDatabaseCore::new(skel.clone()).await?)
+            StarKind::Kube => {
+                Box::new(KubeCore::new(skel.clone()).await?)
             }
             _ => Box::new(DefaultHost::new(skel.clone()).await),
         };

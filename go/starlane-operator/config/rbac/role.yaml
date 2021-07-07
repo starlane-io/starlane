@@ -52,6 +52,32 @@ rules:
 - apiGroups:
   - starlane.starlane.io
   resources:
+  - starlaneprovisioners
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - starlaneprovisioners/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - starlaneprovisioners/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - starlane.starlane.io
+  resources:
   - starlaneresources
   verbs:
   - create

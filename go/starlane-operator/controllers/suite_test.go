@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	starlanev1alpha1 "github.com/mechtronium/starlane/api/v1alpha1"
-	//+kubebuilder:scaffold:imports
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -84,3 +83,31 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
+
+/*
+type KindSpecific struct {
+	TypeKindSpecific     string  `"<" @String "<"`
+	Specific *string `@@String ">""`
+}
+
+*/
+
+func TestParse(t *testing.T) {
+
+	tks := ParseTypeKindSpecific("<Database<Relational<mysql.org:mysql:innodb:7.0.1>>>")
+	if tks.Type != "Database" {
+		t.Errorf("expected tks.Type to be Database, was instead %s", tks.Type)
+		t.Fail()
+	}
+
+	if tks.Kind != "Relational" {
+		t.Errorf("expected tks.Kindto be Relational, was instead %s", tks.Kind)
+		t.Fail()
+	}
+
+	if tks.Specific.Vendor != "mysql.org" {
+		t.Errorf("expected tks.Specific.Vendor to be mysql.org, was instead %s", tks.Specific.Vendor)
+		t.Fail()
+	}
+
+}

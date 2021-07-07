@@ -32,19 +32,14 @@ use std::fs::File;
 use std::io::Write;
 use tempdir::TempDir;
 
-pub struct MySQLDatabaseCore {
+pub struct KubeCore {
     skel: StarSkel,
     store: ResourceStore,
-    host: String,
-    password: String
 }
 
-impl MySQLDatabaseCore {
+impl KubeCore {
     pub async fn new(skel: StarSkel) -> Result<Self, Error> {
 
-        if std::env::var("MYSQL_CLUSTER_HOST").is_err() || std::env::var("MYSQL_CLUSTER_PASSWORD").is_err() {
-            eprintln!("FATAL: expected environment variables not set: 'MYSQL_CLUSTER_HOST' and 'MYSQL_CLUSTER_PASSWORD'");
-        }
 
         /*
         let rtn = MySQLDatabaseCore {
@@ -56,11 +51,9 @@ impl MySQLDatabaseCore {
 
          */
 
-        let rtn = MySQLDatabaseCore {
+        let rtn = KubeCore {
             skel: skel,
-            store: ResourceStore::new().await,
-            host: "localhost".to_string(),
-            password: "password".to_string()
+            store: ResourceStore::new().await
         };
 
 
@@ -70,7 +63,7 @@ impl MySQLDatabaseCore {
 
 
 #[async_trait]
-impl Host for MySQLDatabaseCore {
+impl Host for KubeCore {
     async fn assign(
         &mut self,
         assign: ResourceAssign<AssignResourceStateSrc>,

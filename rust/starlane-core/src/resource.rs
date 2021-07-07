@@ -71,7 +71,7 @@ pub mod store;
 pub mod sub_space;
 pub mod user;
 pub mod selector;
-pub mod init_args;
+pub mod create_args;
 
 lazy_static! {
     pub static ref ROOT_STRUCT: ResourceAddressStructure =
@@ -1242,10 +1242,10 @@ impl ResourceKind {
     pub fn init_clap_config(&self) -> Result<Option<ArtifactAddress>,Error>{
         match self{
             ResourceKind::Space => {
-                Ok(Option::Some(ArtifactAddress::with_parent(&init_args::ARTIFACT_BUNDLE, "/init-args/space.yaml")?))
+                Ok(Option::Some(ArtifactAddress::with_parent(&create_args::ARTIFACT_BUNDLE, "/init-args/space.yaml")?))
             }
             ResourceKind::SubSpace => {
-                Ok(Option::Some(ArtifactAddress::with_parent(&init_args::ARTIFACT_BUNDLE, "/init-args/sub_space.yaml")?))
+                Ok(Option::Some(ArtifactAddress::with_parent(&create_args::ARTIFACT_BUNDLE, "/init-args/sub_space.yaml")?))
             }
             _ => {
                 Ok(Option::None)
@@ -1645,7 +1645,7 @@ impl ResourceType {
             ResourceType::Domain => StarKind::SpaceHost,
             ResourceType::ArtifactBundle => StarKind::ArtifactStore,
             ResourceType::Artifact => StarKind::ArtifactStore,
-            ResourceType::Database => StarKind::Database,
+            ResourceType::Database => StarKind::Kube,
         }
     }
 
@@ -1666,7 +1666,7 @@ impl ResourceType {
             ResourceType::Domain => HashSet::from_iter(vec![StarKind::SpaceHost]),
             ResourceType::ArtifactBundle => HashSet::from_iter(vec![StarKind::SpaceHost]),
             ResourceType::Artifact => HashSet::from_iter(vec![StarKind::FileStore]),
-            ResourceType::Database => HashSet::from_iter(vec![StarKind::Database]),
+            ResourceType::Database => HashSet::from_iter(vec![StarKind::Kube]),
         }
     }
 }
