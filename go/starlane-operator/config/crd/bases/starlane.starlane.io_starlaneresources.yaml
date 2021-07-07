@@ -36,22 +36,20 @@ spec:
           spec:
             description: StarlaneResourceSpec defines the desired state of StarlaneResource
             properties:
-              foo:
+              address:
                 type: string
-              init-args:
+              createArgs:
                 items:
                   type: string
                 type: array
               provisioner:
                 type: string
-              resourceName:
-                type: string
-              starlane-resource-address:
+              snakeKey:
                 type: string
             required:
+            - address
             - provisioner
-            - resourceName
-            - starlane-resource-address
+            - snakeKey
             type: object
           status:
             description: StarlaneResourceStatus defines the observed state of StarlaneResource

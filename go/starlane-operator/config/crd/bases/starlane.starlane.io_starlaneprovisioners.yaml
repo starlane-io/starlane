@@ -37,6 +37,8 @@ spec:
           spec:
             description: StarlaneProvisionerSpec defines the desired state of StarlaneProvisioner
             properties:
+              createArgsArtifact:
+                type: string
               env:
                 description: List of environment variables to set in the container.
                   Cannot be updated.
@@ -142,8 +144,6 @@ spec:
                   type: object
                 type: array
               image:
-                type: string
-              init-args-artifact:
                 type: string
               kind:
                 type: string

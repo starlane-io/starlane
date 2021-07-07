@@ -5,7 +5,7 @@ metadata:
 spec:
   image: "starlane/mysql-provisioner:latest"
   kind: "<Database<Relational<mysql.org:mysql:innodb:7.0.0>>>"
-  init-args-artifact: "starlane:datagbase:mysql:1.0.0:/mysql/innodb/7.1.3/init-args.yaml"
+  createArgsArtifact: "starlane:datagbase:mysql:1.0.0:/mysql/innodb/7.1.3/init-args.yaml"
   env:
   - name: HOST
     value: my-cluster-mysql

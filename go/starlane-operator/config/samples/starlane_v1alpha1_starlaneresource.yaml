@@ -2,8 +2,15 @@ apiVersion: starlane.starlane.io/v1alpha1
 kind: StarlaneResource
 metadata:
   name: db-$INDEX
+  ownerReferences:
+  - apiVersion: starlane.starlane.io/v1alpha1
+    blockOwnerDeletion: true
+    controller: true
+    kind: StarlaneResource
+    name: starlane
+    uid: $STARLANE_UID
+
 spec:
-  resourceName: "db_$INDEX"
+  snakeKey: "db_$INDEX"
   provisioner: mysql
-  init-args: []
-  starlane-resource-address: "hyperspace:core:database<Database>"
+  address: "hyperspace:core:database<Database>"

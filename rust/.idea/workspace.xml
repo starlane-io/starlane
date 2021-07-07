@@ -5,15 +5,20 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/PROJECT" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/PROJECT" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/starlaneprovisioner_types.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/starlaneprovisioner_types.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/starlaneresource_types.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/starlaneresource_types.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/zz_generated.deepcopy.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/zz_generated.deepcopy.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/crd/bases/starlane.starlane.io_starlaneprovisioners.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/config/crd/bases/starlane.starlane.io_starlaneprovisioners.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/crd/bases/starlane.starlane.io_starlaneresources.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/config/crd/bases/starlane.starlane.io_starlaneresources.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/samples/starlane_v1alpha1_starlane.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/config/samples/starlane_v1alpha1_starlane.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/samples/starlane_v1alpha1_starlaneprovisioner.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/config/samples/starlane_v1alpha1_starlaneprovisioner.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/samples/starlane_v1alpha1_starlaneresource.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/config/samples/starlane_v1alpha1_starlaneresource.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlaneresource_controller.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlaneresource_controller.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../go/starlane-operator/job-test.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/job-test.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../kubernetes/mysql/jobs/create/Dockerfile" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../kubernetes/mysql/jobs/create/build.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../kubernetes/mysql/jobs/create/cmd.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../kubernetes/mysql/provisioner/cmd.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../kubernetes/mysql/provisioner/cmd.sh" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/main.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -213,7 +218,7 @@
       <option name="presentableId" value="Default" />
       <updated>1624567978464</updated>
       <workItem from="1624567980551" duration="193344000" />
-      <workItem from="1625052009343" duration="158729000" />
+      <workItem from="1625052009343" duration="159040000" />
     </task>
     <servers />
   </component>

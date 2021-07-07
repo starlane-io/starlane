@@ -25,11 +25,10 @@ import (
 
 // StarlaneResourceSpec defines the desired state of StarlaneResource
 type StarlaneResourceSpec struct {
-	Foo                     string   `json:"foo,omitempty"`
-	ResourceName            string   `json:"resourceName"`
-	Provisioner             string   `json:"provisioner"`
-	StarlaneResourceAddress string   `json:"starlane-resource-address"`
-	InitArgs                []string `json:"init-args,omitempty"`
+	SnakeKey    string   `json:"snakeKey"`
+	Provisioner string   `json:"provisioner"`
+	Address     string   `json:"address"`
+	CreateArgs  []string `json:"createArgs,omitempty"`
 }
 
 // StarlaneResourceStatus defines the observed state of StarlaneResource

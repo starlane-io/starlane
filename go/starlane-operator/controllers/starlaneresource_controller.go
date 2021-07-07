@@ -137,8 +137,14 @@ func statusFromJob(job *batchv1.Job) string {
 // deploymentForStarlane returns a memcached Deployment object
 func (r *StarlaneResourceReconciler) provisioningJob(m *starlanev1alpha1.StarlaneResource, p *starlanev1alpha1.StarlaneProvisioner) *batchv1.Job {
 
-	commandArgs := []string{"create", m.Spec.StarlaneResourceAddress, m.Name, m.Spec.ResourceName}
-	initArgs := append(commandArgs, m.Spec.InitArgs...)
+	commandArgs := []string{"create"}
+	env := []corev1.EnvVar{{Name: "STARLANE_RESOURCE_NAME", Value: m.Name},
+		{Name: "STARLANE_RESOURCE_SNAKE_KEY", Value: m.Spec.SnakeKey},
+		{Name: "STARLANE_RESOURCE_UID", Value: string(m.UID)},
+		{Name: "STARLANE_RESOURCE_API_VERSION", Value: starlanev1alpha1.GroupVersion.String()},
+	}
+	initArgs := append(commandArgs, m.Spec.CreateArgs...)
+	env = append(p.Spec.Env, env...)
 
 	var backoffLimit = int32(0)
 
@@ -156,7 +162,7 @@ func (r *StarlaneResourceReconciler) provisioningJob(m *starlanev1alpha1.Starlan
 						Image: p.Spec.Image,
 						Name:  "starlane",
 						Args:  initArgs,
-						Env:   p.Spec.Env,
+						Env:   env,
 					}},
 				},
 			},
