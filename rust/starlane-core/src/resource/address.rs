@@ -1,15 +1,16 @@
 use crate::resource::{ResourceKind, ResourceType};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
-use nom::character::complete::{alpha0, alpha1, digit0, digit1};
+use nom::character::complete::{alpha0, alpha1, digit0, digit1, one_of};
 use nom::combinator::{not, opt};
-use nom::error::{context, ErrorKind, VerboseError};
-use nom::multi::{many1, many_m_n};
+use nom::error::{context, ErrorKind, VerboseError, ParseError};
+use nom::multi::{many1, many_m_n, many0};
 use nom::sequence::{delimited, preceded, terminated, tuple};
 use nom::{AsChar, IResult, InputTakeAtPosition};
 use serde::Deserialize;
 use serde::Serialize;
 use std::str::FromStr;
+use nom::character::is_digit;
 
 pub type Domain = String;
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
@@ -74,6 +75,22 @@ fn domain(input: &str) -> Res<&str, Domain> {
         (next_input, res.0.join("."))
     })
 }
+
+
+fn zero( input: &str ) -> Res<&str,&str> {
+    context("zero", tag("0") )(input)
+}
+
+
+
+
+/*
+fn integer( input: &str) -> Res<&str,String> {
+    context( "int",
+             alt( (tag("0"),tuple((one_of("123456789"), opt(digit1)) ))) )(input).map( |(input,output)|{})
+}
+
+ */
 
 fn version_major_minor_patch(input: &str) -> Res<&str, String> {
     context(
@@ -224,8 +241,8 @@ mod test {
     #[test]
     pub fn test_version() {
         assert_eq!(
-            version("1.2.3-beta|on and on"),
-            Ok(("|on and on", "1.2.3-beta".to_string()))
+            version("1.24.3-beta|on and on"),
+            Ok(("|on and on", "1.24.3-beta".to_string()))
         );
 
         assert_eq!(
@@ -237,18 +254,22 @@ mod test {
     #[test]
     pub fn test_version_major_minor_patch() {
         assert_eq!(
-            version_major_minor_patch("1.2.3-beta"),
-            Ok(("-beta", "1.2.3".to_string()))
+            version_major_minor_patch("55.2.3-beta"),
+            Ok(("-beta", "55.2.3".to_string()))
         );
 
         assert_eq!(
             version_major_minor_patch("1.2.3"),
             Ok(("", "1.2.3".to_string()))
         );
+
+       // assert!( version_major_minor_patch("01.2.3").is_err() )
     }
 
     #[test]
     pub fn test_domain() {
+        assert_eq!(domain("mysql.org"), Ok(("", "mysql.org".to_string())));
+
         assert_eq!(domain("hello.com"), Ok(("", "hello.com".to_string())));
 
         assert_eq!(
