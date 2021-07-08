@@ -272,6 +272,12 @@ impl FromStr for ResourceAddressKind {
     }
 }
 
+impl Into<ResourceAddress> for ResourceAddressKind {
+    fn into(self) -> ResourceAddress {
+        self.address
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::resource::address::{domain, host, specific, version, version_major_minor_patch, Specific, parse_kind, ResourceKindParts, parse_address, ResourceAddressKind};

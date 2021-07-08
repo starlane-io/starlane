@@ -1600,7 +1600,6 @@ impl TryFrom<ResourceKindParts> for ResourceKind {
             },
             ResourceType::Artifact => ResourceKind::Artifact,
             ResourceType::Database => {
-println!("DATABASE");
                 let kind = match parts.kind.ok_or( "expected Database to have Kind <Relational<specific>>?")?.as_str()
                 {
                     "Relational" => {
