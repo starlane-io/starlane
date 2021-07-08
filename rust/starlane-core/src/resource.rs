@@ -14,7 +14,6 @@ use std::time::Duration;
 
 use base64::DecodeError;
 use bincode::ErrorKind;
-use nom::AsChar;
 use rusqlite::{Connection, params, params_from_iter, Row, Rows, Statement, ToSql, Transaction};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 use serde::{Deserialize, Serialize};
@@ -25,7 +24,7 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::oneshot::Receiver;
 use url::Url;
 
-use crate::{logger, util};
+use crate::{logger, util, resource};
 use crate::actor::{ActorKey, ActorKind};
 use crate::app::ConfigSrc;
 use crate::artifact::{ArtifactKey, ArtifactKind, ArtifactAddress};
@@ -72,6 +71,7 @@ pub mod sub_space;
 pub mod user;
 pub mod selector;
 pub mod create_args;
+pub mod address;
 
 lazy_static! {
     pub static ref ROOT_STRUCT: ResourceAddressStructure =
@@ -1262,13 +1262,13 @@ pub enum ArtifactBundleKind {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum DatabaseKind {
-    MySQL,
+    Relational(resource::address::Specific),
 }
 
 impl ToString for DatabaseKind {
     fn to_string(&self) -> String {
         match self {
-            DatabaseKind::MySQL => "MySQL".to_string(),
+            DatabaseKind::Relational(specific) => format!("<Database<Relational<{}>>>",specific.to_string())
         }
     }
 }
