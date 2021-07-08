@@ -55,7 +55,6 @@ impl Host for DefaultHost {
         &mut self,
         assign: ResourceAssign<AssignResourceStateSrc>,
     ) -> Result<Resource, Fail> {
-info!("DefaultHost assign...");
         // if there is Initialization to do for assignment THIS is where we do it
         let data_transfer = match assign.state_src {
             AssignResourceStateSrc::Direct(data) => {

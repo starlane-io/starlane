@@ -52,7 +52,6 @@ impl KubeCore {
             store: ResourceStore::new().await
         };
 
-
         Ok(rtn)
     }
 }
@@ -65,6 +64,7 @@ impl Host for KubeCore {
         assign: ResourceAssign<AssignResourceStateSrc>,
     ) -> Result<Resource, Fail> {
 
+println!("CREATE KIND: {}", assign.stub.archetype.kind.to_string() );
 /*        let client = Client::try_default().await?;
         let pods: Api<Pod> = Api::default_namespaced(client);
         let pods = pods.list(&ListParams::default()).await?;

@@ -114,13 +114,13 @@ impl ConstellationTemplate {
         standalone
     }
 
-    pub fn new_basic_with_database() -> Self {
-        let mut database = StarTemplate::new(
+    pub fn new_basic_with_external() -> Self {
+        let mut external = StarTemplate::new(
             StarKeyTemplate::central_geodesic(10),
             StarKind::Kube,
             "database".into(),
         );
-        Self::new_basic_with(vec![database])
+        Self::new_basic_with(vec![external])
     }
 
     pub fn new_client(gateway_machine: MachineName) -> Self {
@@ -299,8 +299,8 @@ impl ConstellationLayout {
         standalone.try_into()
     }
 
-    pub fn standalone_with_database() -> Result<Self,Error> {
-        let mut standalone = ProtoConstellationLayout::new(ConstellationTemplate::new_basic_with_database());
+    pub fn standalone_with_external() -> Result<Self,Error> {
+        let mut standalone = ProtoConstellationLayout::new(ConstellationTemplate::new_basic_with_external());
         standalone.set_default_machine("server".to_string());
         standalone.try_into()
     }

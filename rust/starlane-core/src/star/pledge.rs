@@ -112,7 +112,7 @@ impl ResourceHostSelector {
         } else {
             let handler = self.skel.star_handler.as_ref().ok_or(format!(
                 "non-manager star {} does not have a host star selector",
-                self.skel.info.kind
+                self.skel.info.kind.to_string()
             ))?;
             let mut selector = StarSelector::new();
             selector.add(StarFieldSelection::Kind(resource_type.star_host()));
@@ -177,7 +177,7 @@ pub enum StarFieldSelection {
 impl ToString for StarFieldSelection {
     fn to_string(&self) -> String {
         match self {
-            StarFieldSelection::Kind(kind) => format!("Kind:{}", kind),
+            StarFieldSelection::Kind(kind) => format!("Kind:{}", kind.to_string()),
             StarFieldSelection::MinHops => format!("MinHops"),
         }
     }

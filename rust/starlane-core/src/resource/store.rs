@@ -87,6 +87,7 @@ pub struct ResourceStoreAction {
     pub tx: oneshot::Sender<Result<ResourceStoreResult, Fail>>,
 }
 
+#[derive(strum_macros::Display)]
 pub enum ResourceStoreCommand {
     Close,
     Put(ResourceAssign<Arc<dyn DataTransfer>>),

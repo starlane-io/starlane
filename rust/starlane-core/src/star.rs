@@ -85,7 +85,7 @@ pub mod filestore;
 pub mod pledge;
 pub mod variant;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize, Hash, strum_macros::EnumString, strum_macros::Display )]
 pub enum StarKind {
     Central,
     SpaceHost,
@@ -141,7 +141,7 @@ impl StarKind {
             match self {
                 StarKind::Central => vec![StarKind::SpaceHost],
                 StarKind::SpaceHost => {
-                    vec![StarKind::FileStore, StarKind::Web, StarKind::ArtifactStore]
+                    vec![StarKind::FileStore, StarKind::Web, StarKind::ArtifactStore, StarKind::Kube]
                 }
                 StarKind::Mesh => vec![],
                 StarKind::AppHost => vec![StarKind::ActorHost, StarKind::FileStore],
@@ -221,6 +221,7 @@ impl StarKind {
     }
 }
 
+/*
 impl FromStr for StarKind {
     type Err = ();
 
@@ -237,11 +238,13 @@ impl FromStr for StarKind {
             "Web" => Ok(StarKind::Web),
             "FileStore" => Ok(StarKind::FileStore),
             "ArtifactStore" => Ok(StarKind::ArtifactStore),
-            "Database" => Ok(StarKind::Kube),
+            "Kube" => Ok(StarKind::Kube),
             _ => Err(()),
         }
     }
 }
+
+ */
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
 pub struct ServerKindExt {
@@ -340,6 +343,7 @@ impl StarKind {
     }
 }
 
+/*
 impl fmt::Display for StarKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -362,6 +366,8 @@ impl fmt::Display for StarKind {
         )
     }
 }
+
+ */
 
 impl fmt::Display for ActorLookup {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -2018,7 +2024,7 @@ if self.skel.core_tx.is_closed() {
             } else {
                 error!("this star does not relay Messages");
                 return Err(
-                    format!("this star {} does not relay Messages", self.skel.info.kind).into(),
+                    format!("this star {} does not relay Messages", self.skel.info.kind.to_string()).into(),
                 );
             }
         } else {

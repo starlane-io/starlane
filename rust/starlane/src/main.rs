@@ -22,6 +22,8 @@ use starlane_core::util::shutdown;
 use starlane_core::resource::selector::MultiResourceSelector;
 use std::ffi::OsString;
 use starlane_core::util;
+use starlane_core::resource::address::ResourceAddressKind;
+use starlane_core::star::StarKind;
 
 mod cli;
 
@@ -29,6 +31,7 @@ mod cli;
 extern crate lazy_static;
 
 fn main() -> Result<(), Error> {
+
     let subscriber = FmtSubscriber::default();
     set_global_default(subscriber.into()).expect("setting global default tracer failed");
 
@@ -39,7 +42,7 @@ fn main() -> Result<(), Error> {
     let mut clap_app = App::new("Starlane")
         .version("0.1.0")
         .author("Scott Williams <scott@mightydevco.com>")
-        .about("A Resource Mesh").subcommands(vec![SubCommand::with_name("serve").usage("serve a starlane machine instance").display_order(0),
+        .about("A Resource Mesh").subcommands(vec![SubCommand::with_name("serve").usage("serve a starlane machine instance").arg(Arg::with_name("with-external").long("with-external").takes_value(false).required(false)).display_order(0),
                                                             SubCommand::with_name("config").subcommands(vec![SubCommand::with_name("set-host").usage("set the host that the starlane CLI connects to").arg(Arg::with_name("hostname").required(true).help("the hostname of the starlane instance you wish to connect to")).display_order(0),
                                                                                                                             SubCommand::with_name("get-host").usage("get the host that the starlane CLI connects to")]).usage("read or manipulate the cli config").display_order(1).display_order(1),
                                                             SubCommand::with_name("publish").usage("publish an artifact bundle").args(vec![Arg::with_name("dir").required(true).help("the source directory for this bundle"),Arg::with_name("address").required(true).help("the publish address of this bundle i.e. 'space:sub_space:bundle:1.0.0'")].as_slice()),
@@ -51,11 +54,19 @@ fn main() -> Result<(), Error> {
 
     let matches = clap_app.clone().get_matches();
 
-    if let Option::Some(_) = matches.subcommand_matches("serve") {
+    if let Option::Some(serve) = matches.subcommand_matches("serve") {
         let rt = Runtime::new().unwrap();
         rt.block_on(async move {
             let mut starlane = StarlaneMachine::new("server".to_string() ).unwrap();
-            starlane.create_constellation("standalone", ConstellationLayout::standalone().unwrap()).await.unwrap();
+            let layout = match serve.is_present("with-external"){
+                false  => {
+                    ConstellationLayout::standalone().unwrap()}
+                true => {
+                    ConstellationLayout::standalone_with_external().unwrap()}
+            };
+
+
+            starlane.create_constellation("standalone", layout).await.unwrap();
             starlane.listen().await.expect("expected listen to work");
             starlane.join().await;
         });
@@ -151,9 +162,10 @@ async fn list(args: ArgMatches<'_> ) -> Result<(),Error> {
 
 async fn create(args: ArgMatches<'_> ) -> Result<(),Error> {
 
-    let address = ResourceAddress::from_str( args.value_of("address").ok_or("expected resource address")? )?;
-    let resource_type = address.resource_type();
-    let kind = resource_type.default_kind()?;
+    let address = ResourceAddressKind::from_str( args.value_of("address").ok_or("expected resource address")? )?;
+    let kind = address.kind.clone();
+    let address:ResourceAddress = address.into();
+println!("HOST StarKind: {}", kind.resource_type().star_host().to_string());
 
     let init_args = match args.values_of("init-args") {
         None => {"".to_string()}
@@ -169,9 +181,9 @@ async fn create(args: ArgMatches<'_> ) -> Result<(),Error> {
     let create = ResourceCreate {
             parent: address.parent().ok_or("must have an address with a parent" )?.into(),
             key: KeyCreationSrc::None,
-            address: AddressCreationSrc::Exact(address.clone()),
+            address: AddressCreationSrc::Exact(address),
             archetype: ResourceArchetype{
-                kind: address.resource_type().default_kind()?,
+                kind: kind,
                 specific: None,
                 config: None
             },
@@ -195,6 +207,8 @@ pub async fn starlane_api() -> Result<StarlaneApi,Error>{
         config.hostname.clone()
     };
     layout.set_machine_host_address("host".to_string(), host );
+println!("getting ready to create constellation...");
     starlane.create_constellation( "client", layout ).await?;
+println!("client constellation created.");
     Ok(starlane.get_starlane_api().await?)
 }

@@ -456,10 +456,10 @@ impl ClientSideTunnelConnector {
 
                         let command = self.command_rx.recv().await;
                         self.out.out_tx.send(LaneCommand::Tunnel(TunnelOutState::None)).await;
-
                     }
                     Err(error) => {
                         error!("CONNECTION ERROR: {}",error.error );
+                        break;
                     }
                 }
             }

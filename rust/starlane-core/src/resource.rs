@@ -1269,6 +1269,7 @@ impl ResourceKind {
 
     pub fn has_specific(&self)->bool{
         match self {
+
            ResourceKind::Database(_) => true,
             _ => {
                 false
@@ -1278,6 +1279,10 @@ impl ResourceKind {
 
     pub fn sub_string(&self) -> Option<String> {
         match self {
+            ResourceKind::Actor(v) => Option::Some(v.to_string()),
+            ResourceKind::File(v) => Option::Some(v.to_string()),
+            ResourceKind::Proxy(v) =>Option::Some(v.to_string()),
+            ResourceKind::ArtifactBundle(v) => Option::Some(v.to_string()),
             ResourceKind::Database(kind) => Option::Some(kind.to_string()),
             _ => Option::None
         }
@@ -1305,7 +1310,6 @@ impl Into<ResourceKindParts> for ResourceKind {
     }
 }
 
-/*
 impl ToString for ResourceKind {
     fn to_string(&self) -> String {
         if self.has_specific() {
@@ -1319,7 +1323,6 @@ impl ToString for ResourceKind {
         }
     }
 }
- */
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum ArtifactBundleKind {
@@ -1492,6 +1495,7 @@ impl ResourceType {
 }
 
 
+/*
 impl fmt::Display for ResourceKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -1518,6 +1522,8 @@ impl fmt::Display for ResourceKind {
         )
     }
 }
+
+ */
 
 impl ResourceKind {
     pub fn test_key(&self, sub_space: SubSpaceKey, index: usize) -> ResourceKey {

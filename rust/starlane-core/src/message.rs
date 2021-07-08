@@ -478,3 +478,11 @@ impl From<clap::Error> for Fail{
         Fail::Error(e.to_string())
     }
 }
+
+impl From<strum::ParseError> for Fail {
+
+    fn from(e: strum::ParseError) -> Self {
+        Fail::Error(e.to_string())
+    }
+}
+

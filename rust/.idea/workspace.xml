@@ -6,8 +6,16 @@
   <component name="ChangeListManager">
     <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/core/default.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/default.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/core/kube.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/kube.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/lane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lane.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/message.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/resource/address.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource/address.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/resource/store.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource/store.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/pledge.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/pledge.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/template.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/template.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/main.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -66,16 +74,14 @@
       <recent name="$PROJECT_DIR$/starlane/src" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test resource::address::test::test_address_kind">
-    <configuration default="true" type="ArquillianTestNG" factoryName="" nameIsGenerated="true">
+  <component name="RunManager" selected="Cargo.Serve">
+    <configuration default="true" type="ArquillianJUnit" factoryName="" nameIsGenerated="true">
       <option name="arquillianRunConfiguration">
         <value>
           <option name="containerStateName" value="" />
         </value>
       </option>
-      <option name="TEST_OBJECT" value="CLASS" />
-      <properties />
-      <listeners />
+      <option name="TEST_OBJECT" value="class" />
       <method v="2">
         <option name="Make" enabled="true" />
       </method>
@@ -96,8 +102,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test resource::address::test::test_address_kind" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib resource::address::test::test_address_kind -- --exact" />
+    <configuration name="Serve" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="run --package starlane --bin starlane -- serve --with-external" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -112,8 +118,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test resource::address::test::test_domain" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib resource::address::test::test_domain -- --exact" />
+    <configuration name="Test resource::address::test::test_address_kind" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib resource::address::test::test_address_kind -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -178,19 +184,19 @@
     </configuration>
     <list>
       <item itemvalue="Cargo.Run" />
-      <item itemvalue="Cargo.Test resource::address::test::test_version_major_minor_patch" />
-      <item itemvalue="Cargo.Test resource::address::test::test_specific" />
-      <item itemvalue="Cargo.Test resource::address::test::test_kind" />
-      <item itemvalue="Cargo.Test resource::address::test::test_domain" />
+      <item itemvalue="Cargo.Serve" />
       <item itemvalue="Cargo.Test resource::address::test::test_address_kind" />
+      <item itemvalue="Cargo.Test resource::address::test::test_kind" />
+      <item itemvalue="Cargo.Test resource::address::test::test_specific" />
+      <item itemvalue="Cargo.Test resource::address::test::test_version_major_minor_patch" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Cargo.Test resource::address::test::test_address_kind" />
-        <item itemvalue="Cargo.Test resource::address::test::test_kind" />
+        <item itemvalue="Cargo.Serve" />
         <item itemvalue="Cargo.Test resource::address::test::test_version_major_minor_patch" />
         <item itemvalue="Cargo.Test resource::address::test::test_specific" />
-        <item itemvalue="Cargo.Test resource::address::test::test_domain" />
+        <item itemvalue="Cargo.Test resource::address::test::test_kind" />
+        <item itemvalue="Cargo.Test resource::address::test::test_address_kind" />
       </list>
     </recent_temporary>
   </component>
@@ -207,7 +213,8 @@
       <option name="presentableId" value="Default" />
       <updated>1624567978464</updated>
       <workItem from="1624567980551" duration="193344000" />
-      <workItem from="1625052009343" duration="192673000" />
+      <workItem from="1625052009343" duration="195350000" />
+      <workItem from="1625759977203" duration="10225000" />
     </task>
     <servers />
   </component>
