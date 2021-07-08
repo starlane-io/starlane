@@ -37,7 +37,7 @@ use serde::{Serialize,Deserialize};
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{Api, Client, Config};
 use k8s_openapi::api::core::v1::Pod;
-use kube::api::ListParams;
+use kube::api::{ListParams, PostParams};
 use kube::client::ConfigExt;
 use crate::resource::address::ResourceKindParts;
 
@@ -83,16 +83,27 @@ impl Host for KubeCore {
             list_params = list_params.labels(format!("version={}", specific.version).as_str());
         }
 
-        let provisioners = provisioners.list(&list_params ).await?;
+        let mut provisioners = provisioners.list(&list_params ).await?;
 
-        if provisioners.items.len() == 0 {
-            println!("no provisioners matching {}", assign.archetype().kind.to_string() )
-        } else {
-            for provisioner in provisioners {
-                println!("PROVISIONER: {}", provisioner.metadata.name.unwrap() )
-            }
+        //let provisioner:StarlaneProvisioner  = provisioners.items.get_mut(0).ok_or_else(||)?;
+
+        if provisioners.items.is_empty() {
+           return Err(Fail::NoProvisioner(assign.stub.archetype.kind.clone()));
         }
 
+        let mut provisioner:StarlaneProvisioner  = provisioners.items.remove(0);
+        let provisioner_name = provisioner.metadata.name.ok_or("expected provisioner to have a name")?;
+
+        let starlane_resource_api: Api<StarlaneResource> = Api::default_namespaced(self.client.clone());
+        let mut starlane_resource = StarlaneResource::new(assign.stub.key.clone().to_skewer_case().as_str(), StarlaneResourceSpec::default());
+        let starlane_resource_spec: &mut StarlaneResourceSpec = & mut starlane_resource.spec;
+        starlane_resource_spec.address = assign.stub.address.to_string();
+        starlane_resource_spec.createArgs = Option::None;
+        starlane_resource_spec.provisioner = provisioner_name;
+        starlane_resource_spec.snakeKey = assign.stub.key.clone().to_snake_case();
+        let starlane_resource: StarlaneResource = starlane_resource_api.create(&PostParams::default(), &starlane_resource ).await?;
+
+        println!("STARLANE RESOURCE CREATED!");
 
         let data_transfer: Arc<dyn DataTransfer> = Arc::new(MemoryDataTransfer::none());
 
@@ -146,7 +157,7 @@ struct StarlaneResourceSpec{
     pub createArgs: Option<Vec<String>>,
 }
 
-#[derive(kube::CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
+#[derive(CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
 #[kube(group = "starlane.starlane.io", version = "v1alpha1", kind = "StarlaneProvisioner", namespaced)]
 struct StarlaneProvisionerSpec{
 

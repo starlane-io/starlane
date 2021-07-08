@@ -541,6 +541,15 @@ impl ResourceKey {
         }
     }
 
+    pub fn to_snake_case(self) -> String {
+        self.to_string().replace("-", "_")
+    }
+
+    pub fn to_skewer_case(self) -> String {
+        self.to_string().replace("_", "-")
+    }
+
+
     pub fn id(&self) -> ResourceId {
         match self {
             ResourceKey::Root => ResourceId::Root,

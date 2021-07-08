@@ -17,7 +17,7 @@ use crate::id::Id;
 use crate::keys::{MessageId, ResourceId, ResourceKey, SubSpaceKey, UserKey};
 use crate::lane::LaneMeta;
 use crate::names::Specific;
-use crate::resource::{ResourceAddress, ResourceIdentifier, ResourceType};
+use crate::resource::{ResourceAddress, ResourceIdentifier, ResourceType, ResourceKind};
 use crate::star::{StarCommand, StarKey, StarSearchTransaction, Transaction, TransactionResult};
 use std::string::FromUtf8Error;
 
@@ -363,6 +363,7 @@ pub enum Fail {
     ResourceTypeMismatch(String),
     Timeout,
     InvalidResourceState(String),
+    NoProvisioner(ResourceKind)
 }
 
 impl Fail{
@@ -425,6 +426,7 @@ impl ToString for Fail {
             Fail::ResourceStateFinal(_) => "ResourceStateFinal".to_string(),
             Fail::ResourceAddressAlreadyInUse(_) => "ResourceAddressAlreadyInUse".to_string(),
             Fail::InvalidResourceState(message) => format!("InvalidResourceState({})",message).to_string(),
+            Fail::NoProvisioner(kind) => format!("NoProvisioner({})",kind.to_string()).to_string()
         }
     }
 }
