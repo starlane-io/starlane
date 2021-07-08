@@ -39,6 +39,7 @@ use kube::{Api, Client, Config};
 use k8s_openapi::api::core::v1::Pod;
 use kube::api::ListParams;
 use kube::client::ConfigExt;
+use crate::resource::address::ResourceKindParts;
 
 pub struct KubeCore {
     skel: StarSkel,
@@ -68,11 +69,28 @@ impl Host for KubeCore {
     ) -> Result<Resource, Fail> {
 
 
-        let pods: Api<Pod> = Api::default_namespaced(self.client.clone() );
-        let pods = pods.list(&ListParams::default()).await?;
+        let provisioners: Api<StarlaneProvisioner> = Api::default_namespaced(self.client.clone() );
+        let parts:ResourceKindParts = assign.archetype().kind.into();
+        let mut list_params = ListParams::default();
+        list_params = list_params.labels(format!("type={}",parts.resource_type).as_str() );
+        if let Option::Some(kind) = parts.kind {
+            list_params = list_params.labels(format!("kind={}", kind).as_str());
+        }
+        if let Option::Some(specific) = parts.specific {
+            list_params = list_params.labels(format!("vendor={}", specific.vendor).as_str());
+            list_params = list_params.labels(format!("product={}", specific.product).as_str());
+            list_params = list_params.labels(format!("variant={}", specific.variant).as_str());
+            list_params = list_params.labels(format!("version={}", specific.version).as_str());
+        }
 
-        for pod in pods {
-            println!("POD: {}", pod.metadata.name.unwrap() )
+        let provisioners = provisioners.list(&list_params ).await?;
+
+        if provisioners.items.len() == 0 {
+            println!("no provisioners matching {}", assign.archetype().kind.to_string() )
+        } else {
+            for provisioner in provisioners {
+                println!("PROVISIONER: {}", provisioner.metadata.name.unwrap() )
+            }
         }
 
 

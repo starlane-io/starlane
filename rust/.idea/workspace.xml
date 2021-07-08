@@ -6,9 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/core/kube.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/kube.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/error.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/error.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -68,6 +66,19 @@
     </key>
   </component>
   <component name="RunManager" selected="Cargo.Serve">
+    <configuration default="true" type="ArquillianTestNG" factoryName="" nameIsGenerated="true">
+      <option name="arquillianRunConfiguration">
+        <value>
+          <option name="containerStateName" value="" />
+        </value>
+      </option>
+      <option name="TEST_OBJECT" value="CLASS" />
+      <properties />
+      <listeners />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
       <option name="command" value="run --package rust --bin rust" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -93,7 +104,9 @@
       <option name="emulateTerminal" value="false" />
       <option name="withSudo" value="false" />
       <option name="backtrace" value="SHORT" />
-      <envs />
+      <envs>
+        <env name="STARLANE_PORT" value="7501" />
+      </envs>
       <option name="isRedirectInput" value="false" />
       <option name="redirectInputPath" value="" />
       <method v="2">
@@ -197,7 +210,7 @@
       <workItem from="1624567980551" duration="193344000" />
       <workItem from="1625052009343" duration="195350000" />
       <workItem from="1625759977203" duration="11299000" />
-      <workItem from="1625777595261" duration="4210000" />
+      <workItem from="1625777595261" duration="5510000" />
     </task>
     <servers />
   </component>
