@@ -486,3 +486,12 @@ impl From<strum::ParseError> for Fail {
     }
 }
 
+
+impl From<kube::Error> for Fail {
+
+    fn from(e: kube::Error) -> Self {
+        Fail::Error(e.to_string())
+    }
+}
+
+

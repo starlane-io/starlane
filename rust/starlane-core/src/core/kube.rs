@@ -35,9 +35,12 @@ use std::io::Write;
 use tempdir::TempDir;
 use serde::{Serialize,Deserialize};
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
-use kube::{Api, Client};
+use kube::{Api, Client, Config};
 use k8s_openapi::api::core::v1::Pod;
 use kube::api::ListParams;
+use kube::client::ConfigExt;
+use hyper_native_tls::NativeTlsClient;
+use hyper_tls::native_tls::TlsConnector;
 
 pub struct KubeCore {
     skel: StarSkel,
@@ -65,7 +68,27 @@ impl Host for KubeCore {
     ) -> Result<Resource, Fail> {
 
 println!("CREATE KIND: {}", assign.stub.archetype.kind.to_string() );
-/*        let client = Client::try_default().await?;
+        let config = Config::infer().await?;
+println!("CONFIG: cluster url {}", config.cluster_url.to_string()) ;
+
+
+
+//        let client = Client::try_default().await?;
+
+
+
+        let config = Config::infer().await?;
+
+        /*
+        let mut https = hyper_tls::HttpsConnector::new();
+        let client = hyper::Client::builder()
+            .build::<_, hyper::Body>(https);
+
+         */
+
+        let client = kube::Client::try_default().await?;
+
+
         let pods: Api<Pod> = Api::default_namespaced(client);
         let pods = pods.list(&ListParams::default()).await?;
 
@@ -73,7 +96,6 @@ println!("CREATE KIND: {}", assign.stub.archetype.kind.to_string() );
             println!("POD: {}", pod.metadata.name.unwrap() )
         }
 
- */
 
 
         let data_transfer: Arc<dyn DataTransfer> = Arc::new(MemoryDataTransfer::none());

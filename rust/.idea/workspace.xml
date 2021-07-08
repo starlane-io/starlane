@@ -6,16 +6,9 @@
   <component name="ChangeListManager">
     <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/core/default.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/default.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/core/kube.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/kube.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/lane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lane.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/message.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/resource/store.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource/store.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/pledge.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/pledge.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/template.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/template.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/main.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -75,17 +68,6 @@
     </key>
   </component>
   <component name="RunManager" selected="Cargo.Serve">
-    <configuration default="true" type="ArquillianJUnit" factoryName="" nameIsGenerated="true">
-      <option name="arquillianRunConfiguration">
-        <value>
-          <option name="containerStateName" value="" />
-        </value>
-      </option>
-      <option name="TEST_OBJECT" value="class" />
-      <method v="2">
-        <option name="Make" enabled="true" />
-      </method>
-    </configuration>
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
       <option name="command" value="run --package rust --bin rust" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -214,7 +196,8 @@
       <updated>1624567978464</updated>
       <workItem from="1624567980551" duration="193344000" />
       <workItem from="1625052009343" duration="195350000" />
-      <workItem from="1625759977203" duration="10225000" />
+      <workItem from="1625759977203" duration="11299000" />
+      <workItem from="1625777595261" duration="3271000" />
     </task>
     <servers />
   </component>
