@@ -47,6 +47,13 @@ impl From<ZipError> for Error {
     }
 }
 
+impl From<kube::Error> for Error {
+    fn from(e: kube::Error) -> Self {
+        e.to_string().into()
+    }
+}
+
+
 impl <T> From<tokio::sync::mpsc::error::TrySendError<T>> for Error {
     fn from(e: TrySendError<T>) -> Self {
         e.to_string().into()
