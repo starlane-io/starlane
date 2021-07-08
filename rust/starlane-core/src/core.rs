@@ -34,14 +34,14 @@ use crate::star::variant::StarVariantCommand;
 use crate::star::{
     ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel,
 };
-use crate::core::mysql_database::KubeCore;
+use crate::core::kube::KubeCore;
 use std::io::Write;
 
 pub mod artifact;
 pub mod default;
 pub mod file_store;
 pub mod server;
-mod mysql_database;
+mod kube;
 
 
 

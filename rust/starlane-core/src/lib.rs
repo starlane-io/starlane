@@ -28,6 +28,17 @@ extern crate tracing;
 #[macro_use]
 extern crate strum_macros;
 
+#[macro_use]
+extern crate k8s_openapi;
+
+#[macro_use]
+extern crate kube;
+
+#[macro_use]
+extern crate kube_derive;
+
+#[macro_use]
+extern crate schemars;
 
 pub mod actor;
 pub mod app;

@@ -1,7 +1,7 @@
-use crate::resource::{ResourceKind, ResourceType};
+use crate::resource::{ResourceKind, ResourceType, ResourceAddress};
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take};
-use nom::character::complete::{alpha0, alpha1, digit0, digit1, one_of};
+use nom::bytes::complete::{tag, take, take_until, take_while};
+use nom::character::complete::{alpha0, alpha1, digit0, digit1, one_of, anychar};
 use nom::combinator::{not, opt};
 use nom::error::{context, ErrorKind, VerboseError, ParseError};
 use nom::multi::{many1, many_m_n, many0};
@@ -11,6 +11,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::str::FromStr;
 use nom::character::is_digit;
+use crate::error::Error;
+use std::convert::TryFrom;
 
 pub type Domain = String;
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
@@ -24,6 +26,20 @@ where
         |item| {
             let char_item = item.as_char();
             !(char_item == '-') && !(char_item.is_alpha() || char_item.is_dec_digit() )
+        },
+        ErrorKind::AlphaNumeric,
+    )
+}
+
+fn address<T>(i: T) -> Res<T, T>
+    where
+        T: InputTakeAtPosition,
+        <T as InputTakeAtPosition>::Item: AsChar,
+{
+    i.split_at_position1_complete(
+        |item| {
+            let char_item = item.as_char();
+            !(char_item == '.') && !(char_item == '/') && !(char_item == ':') && !(char_item == '-') && !(char_item.is_alpha() || char_item.is_dec_digit() )
         },
         ErrorKind::AlphaNumeric,
     )
@@ -155,22 +171,44 @@ pub fn parse_kind(input: &str) -> Res<&str, ResourceKindParts> {
             tag("<"),
             tuple((
                 alpha1,
-                delimited(
+                opt(delimited(
                     tag("<"),
-                    tuple((alpha1, delimited(tag("<"), specific, tag(">")))),
+                    tuple((alpha1, opt(delimited(tag("<"), specific, tag(">"))))),
                     tag(">"),
-                ),
+                )),
             )),
             tag(">"),
         ),
-    )(input).map( |(input, (rt,(kind,spec)) )| {
+    )(input).map( |(input, (rt,more) )| {
+
+        let kind = match &more {
+            None => { Option::None }
+            Some((kind,_)) => {
+                Option::Some((*kind).clone().to_string())
+            }
+        };
+        let spec = match &more {
+            None => { Option::None }
+            Some((_,Option::Some(spec))) => {
+                Option::Some(spec.clone())
+            }
+            _ => Option::None
+        };
         (input, ResourceKindParts {
             resource_type: rt.to_string(),
-            kind: kind.to_string(),
+            kind: kind,
             specific: spec
         })
     } )
 }
+
+pub fn parse_address(input: &str) -> Res<&str, (&str,ResourceKindParts)> {
+    context(
+        "address",
+         tuple( (take_while(|c| c != '<'),parse_kind)),
+    )(input)
+}
+
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Specific {
@@ -192,15 +230,71 @@ impl ToString for Specific {
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ResourceKindParts{
     pub resource_type: String,
-    pub kind: String,
-    pub specific: Specific
+    pub kind: Option<String>,
+    pub specific: Option<Specific>
+}
+
+impl FromStr for ResourceKindParts {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (leftover, rtn) = parse_kind(s)?;
+        if leftover.len() > 0 {
+            return Err(format!("ResourceKindParts ERROR: could not parse extra: '{}' in string '{}'", leftover, s ).into());
+        }
+        Ok(rtn)
+    }
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ResourceAddressKind {
+    pub address: ResourceAddress,
+    pub kind: ResourceKind
+}
+
+impl FromStr for ResourceAddressKind {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (leftover,(address,kind)) = parse_address(s)?;
+        if leftover.len() > 0 {
+            return Err(format!("Parse Error for ResourceAddressKind: leftover '{}' when parsing '{}'",leftover,s).into());
+        }
+
+        let kind = ResourceKind::try_from(kind)?;
+        let address = format!("{}::<{}>",address,kind.resource_type().to_string());
+        let address = ResourceAddress::from_str(address.as_str())?;
+
+        Ok(ResourceAddressKind{
+            address,
+            kind
+        })
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::resource::address::{domain, host, specific, version, version_major_minor_patch, Specific, parse_kind, ResourceKindParts};
+    use crate::resource::address::{domain, host, specific, version, version_major_minor_patch, Specific, parse_kind, ResourceKindParts, parse_address, ResourceAddressKind};
     use std::str::FromStr;
+    use crate::resource::{ResourceAddress, ResourceKind, ResourceType, DatabaseKind};
 
+    #[test]
+    pub fn test_address_kind() {
+        assert_eq!(
+            ResourceAddressKind::from_str("space:sub-space:app:database<Database<Relational<mysql.org:mysql:innodb:7.0.1>>>"),
+            Ok(ResourceAddressKind{
+                    address: ResourceAddress::from_str("space:sub-space:app:database::<Database>").unwrap(),
+                    kind: ResourceKind::Database(DatabaseKind::Relational(Specific{
+                        vendor: "mysql.org".to_string(),
+                        product: "mysql".to_string(),
+                        variant: "innodb".to_string(),
+                        version: "7.0.1".to_string()
+                    }))
+                })
+        );
+
+
+    }
 
     #[test]
     pub fn test_kind() {
@@ -210,13 +304,35 @@ mod test {
                 "",
                 ResourceKindParts{
                     resource_type: "Database".to_string(),
-                    kind: "Relational".to_string(),
-                    specific: Specific {
+                    kind: Option::Some("Relational".to_string()),
+                    specific: Option::Some(Specific {
                     vendor: "mysql.org".to_string(),
                     product: "mysql".to_string(),
                     variant: "innodb".to_string(),
                     version: "7.0.1".to_string()
-                }}
+                })}
+            ))
+        );
+
+        assert_eq!(
+            parse_kind("<Database<Relational>>"),
+            Ok((
+                "",
+                ResourceKindParts{
+                    resource_type: "Database".to_string(),
+                    kind: Option::Some("Relational".to_string()),
+                    specific: Option::None }
+            ))
+        );
+
+        assert_eq!(
+            parse_kind("<Database>"),
+            Ok((
+                "",
+                ResourceKindParts{
+                    resource_type: "Database".to_string(),
+                    kind: Option::None,
+                    specific: Option::None }
             ))
         );
     }

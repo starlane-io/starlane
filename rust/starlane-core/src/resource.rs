@@ -59,6 +59,7 @@ use crate::star::pledge::{ResourceHostSelector, StarHandle};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
 use clap::{App, Arg};
+use crate::resource::address::ResourceKindParts;
 
 pub mod artifact;
 pub mod config;
@@ -1252,7 +1253,73 @@ impl ResourceKind {
             }
         }
     }
+
+    pub fn has_sub(&self)->bool{
+        match self {
+            ResourceKind::Actor(_) => true,
+            ResourceKind::File(_) => true,
+            ResourceKind::Proxy(_) => true,
+            ResourceKind::ArtifactBundle(_) => true,
+            ResourceKind::Database(_) => true,
+            _ => {
+                false
+            }
+        }
+    }
+
+    pub fn has_specific(&self)->bool{
+        match self {
+           ResourceKind::Database(_) => true,
+            _ => {
+                false
+            }
+        }
+    }
+
+    pub fn sub_string(&self) -> Option<String> {
+        match self {
+            ResourceKind::Database(kind) => Option::Some(kind.to_string()),
+            _ => Option::None
+        }
+    }
+    pub fn specific(&self) -> Option<resource::address::Specific> {
+        match self {
+            ResourceKind::Database(kind) => Option::Some(kind.specific()),
+            _ => Option::None
+        }
+    }
 }
+
+
+
+impl Into<ResourceKindParts> for ResourceKind {
+    fn into(self) -> ResourceKindParts {
+
+        let specific = self.specific();
+        let sub_kind = self.sub_string();
+        ResourceKindParts{
+            resource_type: self.resource_type().to_string(),
+            kind: sub_kind,
+            specific: specific
+        }
+    }
+}
+
+/*
+impl ToString for ResourceKind {
+    fn to_string(&self) -> String {
+        if self.has_specific() {
+            format!("<{}<{}<{}>>>", self.resource_type().to_string(), self.sub_string().expect("expected subtring"), self.specific().expect("expected specific").to_string())
+        }
+        else if self.has_sub() {
+            format!("<{}<{}>>", self.resource_type().to_string(), self.sub_string().expect("expected subtring"))
+        }
+        else{
+          format!("<{}>",self.resource_type().to_string())
+        }
+    }
+}
+ */
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum ArtifactBundleKind {
@@ -1264,6 +1331,18 @@ pub enum ArtifactBundleKind {
 pub enum DatabaseKind {
     Relational(resource::address::Specific),
 }
+
+impl DatabaseKind{
+    pub fn specific(&self) -> resource::address::Specific {
+
+        match self {
+            DatabaseKind::Relational(specific) => {
+                specific.clone()
+            }
+        }
+    }
+}
+
 
 impl ToString for DatabaseKind {
     fn to_string(&self) -> String {
@@ -1412,6 +1491,7 @@ impl ResourceType {
     }
 }
 
+
 impl fmt::Display for ResourceKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -1471,6 +1551,81 @@ impl ResourceKind {
     }
 }
 
+impl TryFrom<ResourceKindParts> for ResourceKind {
+    type Error = Error;
+
+    fn try_from(parts: ResourceKindParts) -> Result<Self,Self::Error> {
+        let resource_type = ResourceType::from_str(parts.resource_type.as_str() )?;
+        Ok(match resource_type{
+            ResourceType::Root => ResourceKind::Root,
+            ResourceType::Space => ResourceKind::Space,
+            ResourceType::SubSpace => ResourceKind::SubSpace,
+            ResourceType::App => ResourceKind::App,
+            ResourceType::Actor => {
+                ResourceKind::Actor(ActorKind::from_str(parts.kind.ok_or("expected Actor to have Kind <Statless|Stateful>")?.as_str() )?)
+            }
+            ResourceType::User => ResourceKind::User,
+            ResourceType::FileSystem => ResourceKind::FileSystem,
+            ResourceType::File => {
+                ResourceKind::File(FileKind::from_str(parts.kind.ok_or("expected File to have Kind <Directory|File>")?.as_str() )?)
+            }
+            ResourceType::Domain => ResourceKind::Domain,
+            ResourceType::UrlPathPattern => ResourceKind::UrlPathPattern,
+            ResourceType::Proxy => {
+                let kind = match parts.kind.ok_or( "expected Proxy to have Kind <Http>")?.as_str()
+                {
+                    "Http" => {
+                        ProxyKind::Http
+                    }
+                    kind => {
+                        return Err(format!("could not find proxy kind matching {}",kind).into());
+                    }
+                };
+                ResourceKind::Proxy(kind)
+            }
+            ResourceType::ArtifactBundle => {
+                let kind = match parts.kind.ok_or( "expected ArtifactBundle to have Kind <Final|Volatile>")?.as_str()
+                {
+                    "Final" => {
+                        ArtifactBundleKind::Final
+                    }
+                    "Volatile" => {
+                        ArtifactBundleKind::Volatile
+                    }
+                    kind => {
+                        return Err(format!("could not find ArtifactBundle kind matching {}",kind).into());
+                    }
+                };
+                ResourceKind::ArtifactBundle(kind)
+            },
+            ResourceType::Artifact => ResourceKind::Artifact,
+            ResourceType::Database => {
+println!("DATABASE");
+                let kind = match parts.kind.ok_or( "expected Database to have Kind <Relational<specific>>?")?.as_str()
+                {
+                    "Relational" => {
+                        DatabaseKind::Relational(parts.specific.ok_or("expected DatabaseKind::Relational to have a Specific <Database<Relational<vendor:product:variant:version>>>")?)
+                    }
+                    kind => {
+                        return Err(format!("could not find database kind matching {}",kind).into());
+                    }
+                };
+                ResourceKind::Database(kind)
+            }
+        })
+    }
+}
+
+impl FromStr for ResourceKind {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts = ResourceKindParts::from_str(s)?;
+        Self::try_from(parts)
+    }
+}
+
+/*
 impl FromStr for ResourceKind {
     type Err = Error;
 
@@ -1506,6 +1661,8 @@ impl FromStr for ResourceKind {
         }
     }
 }
+
+ */
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum ResourceType {

@@ -68,7 +68,7 @@ info!("DefaultHost assign...");
                 Arc::new(if args.trim().is_empty() && assign.stub.archetype.kind.init_clap_config()?.is_none() {
                     MemoryDataTransfer::none()
                 } else if assign.stub.archetype.kind.init_clap_config()?.is_none(){
-                    return Err(format!("resource {} does not take init args",assign.archetype().kind).into());
+                    return Err(format!("resource {} does not take init args",assign.archetype().kind.to_string()).into());
                 }
                 else {
 info!("enter");

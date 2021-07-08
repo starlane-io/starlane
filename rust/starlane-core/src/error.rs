@@ -17,7 +17,7 @@ use zip::result::ZipError;
 use tokio::sync::broadcast::error::RecvError;
 use nom::error::VerboseError;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone,Eq,PartialEq)]
 pub struct Error {
     pub error: String,
 }

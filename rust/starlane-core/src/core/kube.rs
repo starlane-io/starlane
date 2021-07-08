@@ -16,6 +16,8 @@ use crate::message::Fail;
 use crate::resource::store::{
     ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult,
 };
+
+
 use crate::resource::{
     AddressCreationSrc, ArtifactBundleKind, AssignResourceStateSrc, DataTransfer, FileKind,
     KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress,
@@ -31,6 +33,11 @@ use std::fs;
 use std::fs::File;
 use std::io::Write;
 use tempdir::TempDir;
+use serde::{Serialize,Deserialize};
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+use kube::{Api, Client};
+use k8s_openapi::api::core::v1::Pod;
+use kube::api::ListParams;
 
 pub struct KubeCore {
     skel: StarSkel,
@@ -39,17 +46,6 @@ pub struct KubeCore {
 
 impl KubeCore {
     pub async fn new(skel: StarSkel) -> Result<Self, Error> {
-
-
-        /*
-        let rtn = MySQLDatabaseCore {
-            skel: skel,
-            store: ResourceStore::new().await,
-            url: std::env::var("MYSQL_CLUSTER_HOST")?,
-            password: std::env::var("MYSQL_CLUSTER_PASSWORD")?
-        };
-
-         */
 
         let rtn = KubeCore {
             skel: skel,
@@ -68,6 +64,17 @@ impl Host for KubeCore {
         &mut self,
         assign: ResourceAssign<AssignResourceStateSrc>,
     ) -> Result<Resource, Fail> {
+
+/*        let client = Client::try_default().await?;
+        let pods: Api<Pod> = Api::default_namespaced(client);
+        let pods = pods.list(&ListParams::default()).await?;
+
+        for pod in pods {
+            println!("POD: {}", pod.metadata.name.unwrap() )
+        }
+
+ */
+
 
         let data_transfer: Arc<dyn DataTransfer> = Arc::new(MemoryDataTransfer::none());
 
@@ -97,3 +104,48 @@ impl Host for KubeCore {
         Ok(())
     }
 }
+
+
+
+#[derive(kube::CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
+#[kube(group = "starlane.starlane.io", version = "v1alpha1", kind = "Starlane", namespaced)]
+struct StarlaneSpec{
+}
+
+
+
+#[derive(kube::CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
+#[kube(group = "starlane.starlane.io", version = "v1alpha1", kind = "StarlaneResource", namespaced)]
+struct StarlaneResourceSpec{
+    pub snakeKey: String,
+    pub address: String,
+    pub provisioner: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub createArgs: Option<Vec<String>>,
+}
+
+#[derive(kube::CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
+#[kube(group = "starlane.starlane.io", version = "v1alpha1", kind = "StarlaneProvisioner", namespaced)]
+struct StarlaneProvisionerSpec{
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
