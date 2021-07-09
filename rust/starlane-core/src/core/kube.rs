@@ -29,7 +29,7 @@ use crate::star::StarSkel;
 
 use crate::artifact::ArtifactBundleKey;
 use crate::util;
-use std::fs;
+use std::{fs, env};
 use std::fs::File;
 use std::io::Write;
 use tempdir::TempDir;
@@ -40,10 +40,15 @@ use k8s_openapi::api::core::v1::Pod;
 use kube::api::{ListParams, PostParams};
 use kube::client::ConfigExt;
 use crate::resource::address::ResourceKindParts;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
+use std::env::VarError;
 
 pub struct KubeCore {
     skel: StarSkel,
     client: kube::Client,
+    starlane_meta: ObjectMeta,
+    namespace: String,
+    api_version: String
 }
 
 impl KubeCore {
@@ -51,9 +56,39 @@ impl KubeCore {
 
         let client = kube::Client::try_default().await?;
 
+        let kubernetes_instance_name = match env::var("STARLANE_KUBERNETES_INSTANCE_NAME"){
+            Ok(kubernetes_instance_name) => {kubernetes_instance_name}
+            Err(err) => {
+                error!("FATAL: env variable 'STARLANE_KUBERNETES_INSTANCE_NAME' must be set to a valid Starlane Kubernetes resource");
+                return Err("FATAL: env variable 'STARLANE_KUBERNETES_INSTANCE_NAME' must be set to a valid Starlane Kubernetes resource".into());
+            }
+        };
+
+        let namespace = match env::var("NAMESPACE"){
+            Ok(namespace) => {namespace}
+            Err(err) => {
+                warn!("NAMESPACE environment variable is not set, defaulting to 'default'");
+                "default".to_string()
+            }
+        };
+
+        let starlane_api: Api<crate::core::kube::Starlane> = Api::namespaced(client.clone(), namespace.as_str() );
+        let starlane: crate::core::kube::Starlane =  match starlane_api.get(kubernetes_instance_name.as_str()).await {
+            Ok(starlane) => starlane,
+            Err(err) => {
+                let message = format!("FATAL: could not access Kubernetes starlane instance named '{}'", kubernetes_instance_name);
+                error!("{}",message);
+                return Err(message.into());
+            }
+        };
+        let starlane_meta: ObjectMeta = starlane.metadata.clone();
+
         let rtn = KubeCore {
             skel: skel,
             client: client,
+            namespace: namespace,
+            starlane_meta: starlane_meta,
+            api_version: starlane.api_version.clone()
         };
 
         Ok(rtn)
@@ -101,7 +136,16 @@ impl Host for KubeCore {
         starlane_resource_spec.createArgs = Option::None;
         starlane_resource_spec.provisioner = provisioner_name;
         starlane_resource_spec.snakeKey = assign.stub.key.clone().to_snake_case();
-        let starlane_resource: StarlaneResource = starlane_resource_api.create(&PostParams::default(), &starlane_resource ).await?;
+
+        let starlane_resource_meta: &mut ObjectMeta= & mut starlane_resource.metadata;
+        let mut owner_ref = OwnerReference::default();
+        owner_ref.kind = "Starlane".to_string();
+        owner_ref.name = self.starlane_meta.name.as_ref().ok_or("expected Starlane instance to have a Name")?.clone();
+        owner_ref.uid = self.starlane_meta.uid.as_ref().ok_or("expected Starlane instance to have a uid")?.clone();
+        owner_ref.api_version = self.api_version.clone();
+        starlane_resource_meta.owner_references.push(owner_ref);
+
+        starlane_resource_api.create( &PostParams::default(), &starlane_resource ).await?;
 
         println!("STARLANE RESOURCE CREATED!");
 

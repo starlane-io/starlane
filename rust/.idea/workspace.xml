@@ -4,7 +4,10 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="" />
+    <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/core/kube.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/kube.rs" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -103,6 +106,7 @@
       <option name="backtrace" value="SHORT" />
       <envs>
         <env name="STARLANE_PORT" value="7501" />
+        <env name="STARLANE_KUBERNETES_INSTANCE_NAME" value="starlane" />
       </envs>
       <option name="isRedirectInput" value="false" />
       <option name="redirectInputPath" value="" />
@@ -207,7 +211,7 @@
       <workItem from="1624567980551" duration="193344000" />
       <workItem from="1625052009343" duration="195350000" />
       <workItem from="1625759977203" duration="11299000" />
-      <workItem from="1625777595261" duration="8686000" />
+      <workItem from="1625777595261" duration="12326000" />
     </task>
     <servers />
   </component>
