@@ -1,9 +1,151 @@
-apiVersion: mysql.oracle.com/v2alpha1
-kind: InnoDBCluster
+apiVersion: mysql.presslabs.org/v1alpha1
+kind: MysqlCluster
 metadata:
-  name: mysql-cluster 
+  name: my-cluster
 spec:
-  secretName: mysql-passwd
-  instances: 2
-  router:
-    instances: 1
+  replicas: 1
+  secretName: my-secret
+
+  ## For setting custom docker image or specifying mysql version
+  ## the image field has priority over mysqlVersion.
+  # image: percona:5.7
+  # mysqlVersion: "5.7"
+
+  # initBucketURL: gs://bucket_name/backup.xtrabackup.gz
+  # initBucketSecretName:
+
+  ## PodDisruptionBudget
+  # minAvailable: 1
+
+  ## For recurrent backups set backupSchedule with a cronjob expression with seconds
+  # backupSchedule:
+  # backupURL: s3://bucket_name/
+  # backupSecretName:
+  # backupScheduleJobsHistoryLimit:
+  # backupRemoteDeletePolicy:
+
+  ## Custom Server ID Offset for replication
+  # serverIDOffset: 100
+
+  ## Configs that will be added to my.cnf for cluster
+  mysqlConf:
+  #   innodb-buffer-size: 128M
+
+
+  ## Specify additional pod specification
+  # podSpec:
+  #   imagePullSecrets: []
+  #   labels: {}
+  #   annotations: {}
+  #   affinity:
+  #     podAntiAffinity:
+  #       preferredDuringSchedulingIgnoredDuringExecution:
+  #         weight: 100
+  #         podAffinityTerm:
+  #           topologyKey: "kubernetes.io/hostname"
+  #           labelSelector:
+  #             matchlabels: <cluster-labels>
+  #   backupAffinity: {}
+  #   backupNodeSelector: {}
+  #   backupPriorityClassName:
+  #   backupTolerations: []
+  #   # Override the default preStop hook with a custom command/script
+  #   mysqlLifecycle:
+  #     preStop:
+  #       exec:
+  #         command:
+  #           - /scripts/demote-if-master
+  #   nodeSelector: {}
+  #   resources:
+  #     requests:
+  #       memory: 1G
+  #       cpu:    200m
+  #   tolerations: []
+  #   priorityClassName:
+  #   serviceAccountName: default
+  #   # Use a initContainer to fix the permissons of a hostPath volume.
+  #   initContainers:
+  #     - name: volume-permissions
+  #       image: busybox
+  #       securityContext:
+  #         runAsUser: 0
+  #       command:
+  #         - sh
+  #         - -c
+  #         - chmod 750 /data/mysql; chown 999:999 /data/mysql
+  #       volumeMounts:
+  #         - name: data
+  #           mountPath: /data/mysql
+
+  ## Specify additional volume specification
+  # volumeSpec:
+  #   # https://godoc.org/k8s.io/api/core/v1#EmptyDirVolumeSource
+  #   emptyDir: {}
+
+  #   # https://godoc.org/k8s.io/api/core/v1#HostPathVolumeSource
+  #   hostPath:
+  #     path:
+  #     type:
+
+  #   # https://godoc.org/k8s.io/api/core/v1#PersistentVolumeClaimSpec
+  #   persistentVolumeClaim:
+  #     accessModes: [ "ReadWriteOnce" ]
+  #     resources:
+  #       requests:
+  #         storage: 1Gi
+
+  ## Specify service objectives
+  ## If thoses SLO are not fulfilled by cluster node then that node is
+  ## removed from scheme
+  # targetSLO:
+  #   maxSlaveLatency: 10s
+
+  ## You can use custom volume for /tmp partition if needed.
+  ## Is disabled by default
+  # tmpfsSize: 1Gi
+
+  ## Set cluster in read only
+  # readOnly: false
+
+  ## Use `pigz` for parallel compression/decompression of backups
+  ## Or specify any arbitrary compress/decompress commands with args
+  # backupCompressCommand:
+  #   - pigz
+  #   - --stdout
+  #
+  # backupDecompressCommand:
+  #   - pigz
+  #   - --decompress
+
+  ## Add metrics exporter extra arguments
+  # metricsExporterExtraArgs:
+  #   - --collect.info_schema.userstats
+  #   - --collect.perf_schema.file_events
+
+  ## Add extra arguments to rclone
+  # rcloneExtraArgs:
+  #   - --buffer-size=1G
+  #   - --multi-thread-streams=8
+  #   - --retries-sleep=10s
+  #   - --retries=10
+  #   - --transfers=8
+  #   - --s3-force-path-style=false # when use Alibaba OSS
+
+  ## Add extra arguments to xbstream
+  # xbstreamExtraArgs:
+  #   - --parallel=8
+
+  ## Add extra arguments to xtrabackup
+  # xtrabackupExtraArgs:
+  #   - --parallel=8
+
+  ## Add extra arguments to xtrabackup during --prepare
+  # xtrabackupPrepareExtraArgs:
+  #   - --use-memory=5G
+
+  ## Set xtrabackup target directory (the directory needs to exist)
+  # xtrabackupTargetDir: /var/lib/mysql/.tmp/xtrabackup/
+
+  # Add additional SQL commands to run during init of mysql
+  # initFileExtraSQL:
+  #   - "CREATE USER test@localhost"

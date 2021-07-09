@@ -1,0 +1,20 @@
+# permissions for end users to view starlaneprovisioners.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: starlaneprovisioner-viewer-role
+rules:
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - starlaneprovisioners
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - starlaneprovisioners/status
+  verbs:
+  - get

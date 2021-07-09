@@ -1,0 +1,62 @@
+use std::str::FromStr;
+
+use crate::error::Error;
+use crate::resource::{ResourceSelector, ResourceType, FieldSelection};
+use nom::character::{is_alphanumeric, is_alphabetic};
+use nom::IResult;
+use nom::error::{VerboseError, context};
+use nom::bytes::complete::{tag, take_until, take_while, take_while1};
+use nom::sequence::delimited;
+use nom::multi::many1;
+use nom::character::complete::{alphanumeric0, alphanumeric1, alpha1};
+
+type Res<T, U> = IResult<T, U, VerboseError<T>>;
+
+pub struct MultiResourceSelector{
+  pub rt: ResourceType
+}
+
+impl Into<ResourceSelector> for MultiResourceSelector{
+    fn into(self) -> ResourceSelector {
+        let mut selector = ResourceSelector::new();
+        selector.add_field(FieldSelection::Type(self.rt));
+        selector
+    }
+}
+
+fn resource_type( input: &str ) -> Res<&str,Result<ResourceType,Error>> {
+    context( "resource_type",
+       delimited( tag("<"), alpha1, tag(">")  )
+    )(input).map( |(next_input, mut res )|{
+        (next_input,ResourceType::from_str(res))
+    })
+}
+
+
+impl FromStr for MultiResourceSelector {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let x = resource_type( s );
+        let (a,rtn) = x?;
+
+        Ok(MultiResourceSelector{
+            rt: rtn?
+        })
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    use crate::resource::selector::MultiResourceSelector;
+    use std::str::FromStr;
+    use crate::error::Error;
+
+    #[test]
+    pub fn test() -> Result<(),Error> {
+        MultiResourceSelector::from_str("<SubSpace>")?;
+
+        Ok(())
+    }
+}

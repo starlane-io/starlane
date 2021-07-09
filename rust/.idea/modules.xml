@@ -2,9 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/rust.iml" filepath="$PROJECT_DIR$/.idea/rust.iml" />
       <module fileurl="file://$PROJECT_DIR$/starlane/starlane.iml" filepath="$PROJECT_DIR$/starlane/starlane.iml" />
-      <module fileurl="file://$PROJECT_DIR$/starlane-fs.iml" filepath="$PROJECT_DIR$/starlane-fs.iml" />
-      <module fileurl="file://$PROJECT_DIR$/starlane_project.iml" filepath="$PROJECT_DIR$/starlane_project.iml" />
     </modules>
   </component>
 </project>
