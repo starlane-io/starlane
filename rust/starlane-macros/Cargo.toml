@@ -12,3 +12,4 @@ proc-macro = true
 [dependencies]
 syn = {version="1.0.57",features=["full","fold","parsing"]}
 quote = "1.0.8"
+nom = "6.2.1"
