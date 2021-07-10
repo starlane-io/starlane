@@ -9,12 +9,6 @@ fn main() {
 
 resources! {
 
-    #[resource(parents())]
-    #[resource(stars(Central))]
-    #[resource(prefix="root")]
-    pub struct Root{
-
-    }
 
     #[resource(parents(Root))]
     #[resource(stars(Space))]
@@ -35,12 +29,6 @@ resources! {
     #[resource(prefix="app")]
     pub struct App{
 
-    }
-
-    #[resource(parents(SubSpace,App))]
-    #[resource(stars(Space,App))]
-    #[resource(prefix="fs")]
-    pub struct FileSystem{
     }
 
     #[resource(parents(SubSpace,App))]

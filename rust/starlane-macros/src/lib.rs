@@ -17,6 +17,20 @@ struct ResourceParser {
    pub ident_to_resource: HashMap<String,Resource>
 }
 
+impl ResourceParser {
+    pub fn children_of(&self, parent: Resource ) -> Vec<Resource> {
+        let mut rtn = vec!();
+        for child in &self.resources {
+            for parent_ident in child.parents.clone() {
+                if parent.get_ident().to_string() == parent_ident.to_string() {
+                    rtn.push(child.clone())
+                }
+            }
+        }
+        rtn
+    }
+}
+
 #[derive(Clone)]
 struct Resource {
     item: Item,
@@ -118,10 +132,14 @@ impl Parse for ResourceParser {
             }
         }
 
+
+
         let mut ident_to_resource = HashMap::new();
         for resource in &resources {
             ident_to_resource.insert(resource.get_ident().to_string(), resource.clone() );
         }
+
+
 
         Ok(Self{
             items: items,
@@ -152,7 +170,8 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let resource_type_enum_def = quote!{
         pub enum ResourceType {
-        #(#rts),*
+          Root,
+          #(#rts),*
          }
     };
 
@@ -172,12 +191,14 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 impl ResourceType {
    pub fn parents(&self) -> Vec<Self> {
       match self {
+        Self::Root => vec!(),
         #(Self::#idents => vec![#(Self::#parents),*]),*
       }
    }
 
-   pub fn stars(&self) -> Vec<Self> {
+   pub fn stars(&self) -> Vec<StarKind> {
       match self {
+        Self::Root => vec![StarKind::Central],
         #(Self::#idents => vec![#(Self::#stars),*]),*
       }
    }
@@ -225,26 +246,19 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                     pub fn parent(&self) -> Option<ResourceKey> {
                         Option::None
                     }
-
-                    pub fn parent_string_bit(&self) -> Option<String> {
-                        Option::None
-                    }
-                }
+               }
             }
         } else {
             let parent = if resource.parents.len() > 1 {
                 let parent=Ident::new(format!("{}ParentKey", resource.get_ident().to_string()).as_str(), resource.get_ident().span());
                 let parents = resource.parents.clone();
+                let parents2 = resource.parents.clone();
                 let mut parent_keys = vec!();
                 let mut parent_x_parents = vec!();
-                //let mut prefixes = vec!();
                 for p in &resource.parents{
                     parent_keys.push( Ident::new( format!( "{}Key", p.to_string()).as_str(), p.span() ));
                     parent_x_parents.push( parent.clone() );
-//                    prefixes.push( &parsed.ident_to_resource.get(p.to_string().as_str()).unwrap().key_prefix );
                 }
-
-
 
                 key_stuff.push(quote! {
 
@@ -253,7 +267,9 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                         #(#parents(#parent_keys)),*
                     }
 
-                    impl for #parent {
+                    impl #parent {
+
+
                         pub fn string_bit(&self) -> String {
                              match self {
                                 #(#parents(key)=>key.string_bit()),*
@@ -275,6 +291,17 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                             }
                         }
                     }
+
+                    impl TryInto<#parent> for ResourceKey {
+                        type Error=Error;
+                        fn try_into(self)->Result<#parent,Self::Error> {
+                            match self {
+                              #(Self::#parents(key)=>Ok(#parent::#parents2(key)),)*
+                              _ => Err("no match".into())
+                            }
+                        }
+                    }
+
 
                     #(
                        impl Into<#parent_x_parents> for #parent_keys {
@@ -300,6 +327,16 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
 
                 impl #ident {
 
+                  fn from_keybit( parent: #parent, key_bit: KeyBit ) -> Result<Self,Error> {
+                       if key_bit.key_type.as_str() != strinify!(prefix) {
+                          return Err(format!("cannot create '{}' from keybit: '{}'",key_bit.key_type.as_str(),stringify!(prefix)).into())
+                       }
+                       Ok(Self {
+                         parent: parent,
+                         id: key_bit.id as id
+                       })
+                    }
+
                     pub fn new( parent: #parent, id: #id ) -> Self {
                         Self {
                             parent: parent,
@@ -311,11 +348,6 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                     pub fn parent(&self) -> Option<ResourceKey> {
                         Option::Some(parent.into())
                     }
-
-                    pub fn parent_string_bit(&self) -> Option<String> {
-                        Option::Some(self.parent.string_bit())
-                    }
-
                 }
             }
         };
@@ -327,7 +359,7 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
         key_stuff.push(quote!{
                  impl #ident {
                     pub fn string_bit(&self) -> String {
-                        self.id.to_string()
+                        format!("{}{}",stringify!(#prefix),self.id.to_string())
                     }
 
                     pub fn string_prefix(&self) -> String {
@@ -343,46 +375,71 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                         rtn.to_string()
                     }
                 }
+
+
+                    impl TryInto<#ident> for ResourceKey {
+                        type Error=Error;
+                        fn try_into(self)->Result<#ident,Self::Error> {
+                             if let Self::#ident(key) = self {
+                                  Ok(key)
+                             } else {
+                                  Err(format!("cannot convert to {}", stringify!(ident)).into())
+                             }
+                        }
+                    }
+
         });
 
     }
 
     let mut idents = vec!();
     let mut idents_keys = vec!();
+    let mut prefixes = vec![];
     for resource in &parsed.resources {
         idents.push( resource.get_ident() );
         idents_keys.push( Ident::new( format!("{}Key",resource.get_ident().to_string()).as_str(), resource.get_ident().span() ) );
+        prefixes.push(Ident::new(resource.key_prefix.as_ref().unwrap().clone().as_str(), resource.get_ident().span() ) );
     }
+
 
     quote!{
         #(#key_stuff)*
 
+        #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+        pub enum RootKey{
+
+        }
+
+        #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
         pub enum ResourceKey {
+            Root,
             #(#idents(#idents_keys)),*
         }
 
         impl ResourceKey {
+
+            pub fn root() -> Self {
+                Self::Root
+            }
+
             pub fn parent(&self)->Option<ResourceKey> {
                 match self {
-                    #(#idents(key) => key.parent()),*
+                    #(#idents(key) => key.parent(),)*
+                    Root => Option::None
                 }
             }
 
             pub fn string_bit(&self) -> String {
                  match self {
-                    #(#idents(key) => key.string_bit() ),*
-                }
-            }
-
-            pub fn parent_string_bit(&self) -> String {
-                 match self {
-                    #(#idents(parent) => format!("{}<{}>",parent.string_bit(),parent.string_prefix()) ),*
+                    #(#idents(key) => key.string_bit(), )*
+                    Root => ""
                 }
             }
 
             pub fn string_prefix(&self) -> String {
                  match self {
-                    #(#idents(key) => key.string_prefix() ),*
+                    #(#idents(key) => key.string_prefix(), )*
+                    Root => ""
                 }
             }
 
@@ -395,41 +452,60 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                 }
                 rtn
             }
+
+            pub fn ancestors_not_root(&self) -> Vec<ResourceKey> {
+                let mut rtn = vec![];
+                let mut ancestor = self;
+                while let Option::Some(parent) = ancestor.parent() {
+                   if parent.parent().is_some() {
+                      rtn.push( parent );
+                   }
+                   ancestor = parent;
+                }
+                rtn
+            }
+
+            fn from_keybit( parent: ResourceKey, key_bit: KeyBit ) -> Result<ResourceKey,Error> {
+                match key_bit.key_type.as_str() {
+
+                    #(stringify!(#prefixes) => {
+                        #idents::from_keybit(parent.try_into()?, key_bit )?.into()
+                    } ),*
+                }
+            }
         }
 
         impl ToString for ResourceKey {
             pub fn to_string(&self) -> String {
-               let mut bits = vec![];
-               bits.push(self.string_bit());
-               if self.parent().is_some()
-               {
-                 bits.push(self.parent_string_bit().expected("expected parent to have a string_bit"));
-                 let mut ancestor = self;
-                 while let Option::Some(ancestor) = ancestor.parent() {
-                   if let Option::Some(bit) = ancestor.parent_string_bit()
-                   {
-                      bits.push(bit);
-                   }
-                   ancestor = parent;
-                 }
-               }
+                let mut ancestors = self.ancestors_not_root();
+                ancestors.reverse();
+                ancestors.push(self.clone());
 
-               bits.reverse();
-
-               let mut rtn = String::new();
-               for i in 0..bits.len() {
-                    rtn.push_str(bit.as_str());
-                    if( i < bits.len()-1 ) {
-                        rtn.push_str('+');
-                    }
-               }
-               rtn.push_str( "<");
-               rtn.push_str( self.string_prefix() );
-               rtn.push_str( ">");
-               rtn
+                let mut rtn = String::new();
+                for ancestor in ancestors {
+                    rtn.push_str(ancestor.string_bit());
+                }
+                rtn
             }
         }
+
+
     }
+
+    /*
+impl FromStr for ResourceKey {
+    type Err=Error;
+    fn from_str( s: &str ) -> Result<Self,Self::Err> {
+        let key_bits = Self::parse_key_bits(s)?;
+        let mut key = Self::root();
+        for bit in key_bits {
+            key = Self::from_keybit( key, bit )?;
+        }
+        return Ok(key)
+    }
+}
+
+ */
 }
 
 
@@ -442,27 +518,31 @@ pub struct Error {
 }
 
 struct KeyBit{
-   key_type: Option<String>,
+   key_type: String,
    id: u64
 }
+
+struct KeyBits{
+  key_type: String,
+  bits: Vec<KeyBit>
+}
+
+
 impl ResourceKey {
 
-    pub fn parse_key_type(input: &str) -> Res<&str, &str> {
+
+     pub fn parse_key_bits(input: &str) -> Res<&str, Vec<KeyBit>> {
         context(
-            "key-type",
-            delimited(
-                tag("<"),
-                 alpha1,
-                tag(">"),
-            ),
+            "key-bits",
+             many1( parse_key_bit )
         )(input)
-    }
+     }
 
     pub fn parse_key_bit(input: &str) -> Res<&str, KeyBit> {
         context(
             "key-bit",
-            tuple( (digit1, parse_key_type) ),
-        )(input).map( |(input, (id,key_type))|{
+            tuple( (alpha1, digit1) ),
+        )(input).map( |(input, (key_type,id))|{
             (input,
             KeyBit{
                 key_type: key_type,
