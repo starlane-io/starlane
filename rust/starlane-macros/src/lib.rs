@@ -250,12 +250,22 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
   let mut kind_stuff = vec![];
 
 
+
+
   let mut resource_kind_enum = String::new();
     resource_kind_enum.push_str("pub enum ResourceKind {");
     resource_kind_enum.push_str("Root,");
+
+    let mut resource_kind_from_parts = String::new();
+    resource_kind_from_parts.push_str("impl ResourceKind {");
+    resource_kind_from_parts.push_str("pub fn from_parts( parts: &ResourceKindParts ) -> Result<ResourceKind,Error> { ");
+    resource_kind_from_parts.push_str("match parts.resource_type.as_str() { " );
+
+
     for resource in &parsed.resources {
       if let Option::Some(kind) = parsed.kind_for(resource) {
           resource_kind_enum.push_str(format!("{}({}),",resource.get_ident().to_string(),kind.ident.to_string()).as_str() );
+          resource_kind_from_parts.push_str( format!("\"{}\"=>Ok({}Kind::from_parts(parts)?.into()),",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str(), );
           let kind_cp = kind.clone();
           kind_stuff.push(quote!{#kind_cp});
 
@@ -349,11 +359,20 @@ println!("{}",from_parts);
 
       } else {
           resource_kind_enum.push_str(format!("{},",resource.get_ident().to_string()).as_str() );
+          resource_kind_from_parts.push_str( format!("\"{}\"=>Ok(Self::{}),",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str(), );
       }
   }
     resource_kind_enum.push_str("}");
+    resource_kind_from_parts.push_str("what => Err(format!(\"cannot identify ResourceType: '{}'\",what).into())" );
+    resource_kind_from_parts.push_str("}}}" );
+
     let resource_kind_emum = syn::parse_str::<Item>(resource_kind_enum.as_str()).unwrap();
     kind_stuff.push( quote!{#resource_kind_emum});
+
+println!("{}",resource_kind_from_parts);
+    let resource_kind_from_parts = syn::parse_str::<Item>(resource_kind_from_parts.as_str()).unwrap();
+    kind_stuff.push( quote!{#resource_kind_from_parts});
+
 
     let rtn = quote!{
         #(#kind_stuff)*
@@ -413,7 +432,7 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
 
                         pub fn string_prefix(&self) -> String {
                              match self {
-                                #(#parents(key)=>key.string_prefix()),*
+                                #(#parents(key)=>key.stringprefix()),*
                              }
                         }
 
