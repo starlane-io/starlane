@@ -12,8 +12,8 @@ use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, digit1};
 
 struct ResourceParser {
-   pub items: Vec<Item>,
    pub resources: Vec<Resource>,
+   pub kinds: Vec<ItemEnum>,
    pub ident_to_resource: HashMap<String,Resource>
 }
 
@@ -28,6 +28,16 @@ impl ResourceParser {
             }
         }
         rtn
+    }
+
+    pub fn kind_for(&self, resource: &Resource ) -> Option<ItemEnum> {
+        for kind in &self.kinds {
+               if kind.ident.to_string() == format!("{}Kind",resource.get_ident().to_string()) {
+println!("FOUND KIND MATCH");
+                   return Option::Some(kind.clone())
+               }
+        }
+        Option::None
     }
 }
 
@@ -82,7 +92,7 @@ impl Resource {
 
 impl Parse for ResourceParser {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut items: Vec<Item> = vec![];
+        let mut kinds: Vec<ItemEnum> = vec![];
         let mut resources:Vec<Resource> = vec![];
 
         while !input.is_empty() {
@@ -91,19 +101,16 @@ impl Parse for ResourceParser {
                 let mut resource = Resource::new(item.clone());
                 for attr in &e.attrs {
                     if let Option::Some(seg) = attr.path.segments.last() {
-
                         if seg.ident.to_string() == "resource".to_string() {
-                              let content: Meta = attr.parse_args()?;
+                            let content: Meta = attr.parse_args()?;
                             match content {
-                                Meta::Path(path) => {
-                                }
+                                Meta::Path(path) => {}
                                 Meta::List(list) => {
-
                                     match list.path.segments.last().unwrap().ident.to_string().as_str() {
-                                        "parents" =>  {
+                                        "parents" => {
                                             resource.parents = to_idents(&list);
                                         }
-                                        "stars" =>  {
+                                        "stars" => {
                                             resource.stars = to_idents(&list);
                                         }
                                         what => {
@@ -117,18 +124,21 @@ impl Parse for ResourceParser {
                                             resource.key_prefix = Option::Some(str.value());
                                         }
                                     }
-                               }
-
+                                }
                             }
-
                         }
                     }
                 }
 
                 resource.strip_resource_attributes();
                 resources.push(resource);
+            } else  if let Item::Enum(e) = &item {
+                if !e.ident.to_string().ends_with("Kind") {
+                    panic!("only ResourceKinds can be defined here");
+                }
+println!("ADDING KIND: {}",e.ident.to_string());
+                kinds.push(e.clone() );
             } else {
-                items.push(item );
             }
         }
 
@@ -142,7 +152,7 @@ impl Parse for ResourceParser {
 
 
         Ok(Self{
-            items: items,
+            kinds: kinds,
             resources: resources,
             ident_to_resource
         })
@@ -199,7 +209,7 @@ impl ResourceType {
    pub fn stars(&self) -> Vec<StarKind> {
       match self {
         Self::Root => vec![StarKind::Central],
-        #(Self::#idents => vec![#(Self::#stars),*]),*
+        #(Self::#idents => vec![#(StarKind::#stars),*]),*
       }
    }
 }
@@ -216,6 +226,10 @@ impl ResourceType {
 
     let extras = extras();
 
+    let kinds = kinds(&parsed);
+
+
+    /*
     proc_macro::TokenStream::from( quote!{
        #extras
        #resource_type_enum_def
@@ -223,7 +237,82 @@ impl ResourceType {
        #(#resources_def)*
        #keys
     })
+     */
 
+    proc_macro::TokenStream::from( quote!{
+       #resource_type_enum_def
+       #resource_impl_def
+       #kinds
+    })
+}
+
+fn kinds( parsed: &ResourceParser ) -> TokenStream {
+  let mut kind_stuff = vec![];
+
+
+  for resource in &parsed.resources {
+      if let Option::Some(kind) = parsed.kind_for(resource) {
+          let kind_cp = kind.clone();
+          kind_stuff.push(quote!{#kind_cp});
+
+          let kind_ident = kind.ident.clone();
+          let resource_ident = resource.get_ident();
+
+          let mut variants = vec![];
+          let mut get_specific = String::new();
+          get_specific.push_str(format!("impl {} {}", kind.ident.to_string(), "{").as_str() );
+          get_specific.push_str("pub fn get_specific(&self)->Option<Specific> {" );
+          get_specific.push_str("match self {");
+
+          let mut has_specific = String::new();
+          has_specific.push_str(format!("impl {} {}", kind.ident.to_string(), "{").as_str() );
+          has_specific.push_str("pub fn has_specific(&self)->bool {" );
+          has_specific.push_str("match self {");
+          for variant in &kind.variants {
+              variants.push( variant.ident.clone() );
+              has_specific.push_str(format!("Self::{}", variant.ident.to_string()).as_str());
+              if!variant.fields.is_empty()
+              {
+                  has_specific.push_str("(_)=>true,");
+              } else {
+                  has_specific.push_str("=>false,");
+              }
+
+              get_specific.push_str(format!("Self::{}", variant.ident.to_string()).as_str());
+              if!variant.fields.is_empty()
+              {
+                  get_specific.push_str("(specific)=>Option::Some(specific.clone()),");
+              } else {
+                  get_specific.push_str("=>Option::None,");
+              }
+          }
+          has_specific.push_str("}}}" );
+          get_specific.push_str("}}}" );
+
+          let has_specific= syn::parse_str::<Item>( has_specific.as_str() ).unwrap();
+          kind_stuff.push(quote!{#has_specific});
+
+          let get_specific= syn::parse_str::<Item>( get_specific.as_str() ).unwrap();
+          kind_stuff.push(quote!{#get_specific});
+
+
+          kind_stuff.push(quote!{
+
+
+            impl #kind_ident{
+                pub fn resource_type(&self) -> ResourceType {
+                    ResourceType::#resource_ident
+                }
+            }
+          });
+
+      }
+  }
+
+    let rtn = quote!{
+        #(#kind_stuff)*
+    };
+    rtn
 }
 
 fn keys( parsed: &ResourceParser) -> TokenStream {
@@ -402,7 +491,7 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
     }
 
 
-    quote!{
+    let rtn = quote!{
         #(#key_stuff)*
 
         #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
@@ -470,7 +559,8 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
 
                     #(stringify!(#prefixes) => {
                         #idents::from_keybit(parent.try_into()?, key_bit )?.into()
-                    } ),*
+                    } ,)*
+                    _ => Err("unrecognized keybit".into())
                 }
             }
         }
@@ -490,7 +580,8 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
         }
 
 
-    }
+    };
+    rtn
 
     /*
 impl FromStr for ResourceKey {

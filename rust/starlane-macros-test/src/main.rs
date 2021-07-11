@@ -5,6 +5,15 @@ fn main() {
     println!("Hello, world!");
 }
 
+pub enum StarKind{
+    Central,
+    Space,
+    App
+}
+
+pub struct Specific{
+
+}
 
 
 resources! {
@@ -39,7 +48,8 @@ resources! {
 
 
     pub enum DatabaseKind{
-        Relational(Specific)
+        Native,
+        External(Specific)
     }
 
 }
