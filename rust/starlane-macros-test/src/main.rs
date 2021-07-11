@@ -1,8 +1,14 @@
 use starlane_macros::resources;
-
+use std::convert::TryInto;
+use serde::{Serialize,Deserialize};
+use std::str::FromStr;
 
 fn main() {
     println!("Hello, world!");
+}
+
+pub struct Error{
+
 }
 
 pub enum StarKind{
@@ -13,6 +19,20 @@ pub enum StarKind{
 
 pub struct Specific{
 
+}
+
+impl FromStr for Specific {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        todo!()
+    }
+}
+
+pub struct ResourceKindParts{
+    pub resource_type: String,
+    pub kind: Option<String>,
+    pub specific: Option<Specific>
 }
 
 

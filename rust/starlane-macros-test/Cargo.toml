@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 starlane-macros = { path = "../starlane-macros" }
+serde = { version="1.0.69", features=['derive','rc'] }

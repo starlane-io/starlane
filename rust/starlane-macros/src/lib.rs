@@ -250,8 +250,12 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
   let mut kind_stuff = vec![];
 
 
-  for resource in &parsed.resources {
+  let mut resource_kind_enum = String::new();
+    resource_kind_enum.push_str("pub enum ResourceKind {");
+    resource_kind_enum.push_str("Root,");
+    for resource in &parsed.resources {
       if let Option::Some(kind) = parsed.kind_for(resource) {
+          resource_kind_enum.push_str(format!("{}({}),",resource.get_ident().to_string(),kind.ident.to_string()).as_str() );
           let kind_cp = kind.clone();
           kind_stuff.push(quote!{#kind_cp});
 
@@ -268,6 +272,14 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
           has_specific.push_str(format!("impl {} {}", kind.ident.to_string(), "{").as_str() );
           has_specific.push_str("pub fn has_specific(&self)->bool {" );
           has_specific.push_str("match self {");
+
+          let mut from_parts = String::new();
+          from_parts.push_str(format!("impl {} {}", kind.ident.to_string(), "{").as_str() );
+          from_parts.push_str("pub fn from_parts(parts: &ResourceKindParts)->Result<Self,Error>{" );
+          from_parts.push_str("match parts.kind.ok_or(\"expected kind\")?.as_str() {");
+
+
+
           for variant in &kind.variants {
               variants.push( variant.ident.clone() );
               has_specific.push_str(format!("Self::{}", variant.ident.to_string()).as_str());
@@ -285,9 +297,19 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
               } else {
                   get_specific.push_str("=>Option::None,");
               }
+
+              if!variant.fields.is_empty() {
+                  from_parts.push_str(format!("\"{}\" => Self::{}(Specific::from_str(parts.specific.ok_or(\"expected a specific\")?)),", variant.ident.to_string(), variant.ident.to_string()).as_str());
+              } else {
+                  from_parts.push_str(format!("\"{}\" => Self::{},", variant.ident.to_string(), variant.ident.to_string()).as_str());
+              }
+
           }
           has_specific.push_str("}}}" );
           get_specific.push_str("}}}" );
+          from_parts.push_str("}}}" );
+
+println!("{}",from_parts);
 
           let has_specific= syn::parse_str::<Item>( has_specific.as_str() ).unwrap();
           kind_stuff.push(quote!{#has_specific});
@@ -295,19 +317,43 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
           let get_specific= syn::parse_str::<Item>( get_specific.as_str() ).unwrap();
           kind_stuff.push(quote!{#get_specific});
 
+          let from_parts = syn::parse_str::<Item>( from_parts.as_str() ).unwrap();
+          kind_stuff.push(quote!{#from_parts});
 
           kind_stuff.push(quote!{
-
 
             impl #kind_ident{
                 pub fn resource_type(&self) -> ResourceType {
                     ResourceType::#resource_ident
                 }
             }
+
+            impl Into<ResourceKind> for #kind_ident {
+                  fn into(self) -> ResourceKind {
+                      ResourceKind::#resource_ident(self)
+                  }
+              }
+
+            impl TryInto<#kind_ident> for ResourceKind {
+                  type Error=Error;
+                  fn try_into(self) -> Result<#kind_ident,Self::Error>{
+                      if let Self::#resource_ident(rtn) = self {
+                          Ok(rtn)
+                      } else {
+                          Err("could not convert".into())
+                      }
+                  }
+              }
+
           });
 
+      } else {
+          resource_kind_enum.push_str(format!("{},",resource.get_ident().to_string()).as_str() );
       }
   }
+    resource_kind_enum.push_str("}");
+    let resource_kind_emum = syn::parse_str::<Item>(resource_kind_enum.as_str()).unwrap();
+    kind_stuff.push( quote!{#resource_kind_emum});
 
     let rtn = quote!{
         #(#kind_stuff)*
