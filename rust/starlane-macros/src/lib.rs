@@ -249,23 +249,26 @@ impl ResourceType {
 fn kinds( parsed: &ResourceParser ) -> TokenStream {
   let mut kind_stuff = vec![];
 
-
-
-
   let mut resource_kind_enum = String::new();
     resource_kind_enum.push_str("pub enum ResourceKind {");
     resource_kind_enum.push_str("Root,");
 
     let mut resource_kind_from_parts = String::new();
-    resource_kind_from_parts.push_str("impl ResourceKind {");
-    resource_kind_from_parts.push_str("pub fn from_parts( parts: &ResourceKindParts ) -> Result<ResourceKind,Error> { ");
+    resource_kind_from_parts.push_str("impl TryFrom<ResourceKindParts> for ResourceKind {");
+    resource_kind_from_parts.push_str("type Err = Error;");
+    resource_kind_from_parts.push_str("pub fn try_from( parts: ResourceKindParts ) -> Result<Self,Self::Err> { ");
     resource_kind_from_parts.push_str("match parts.resource_type.as_str() { " );
 
+    let mut into_resource_kind_parts = String::new();
+    into_resource_kind_parts.push_str( "impl Into<ResourceKindParts> for ResourceKind {");
+    into_resource_kind_parts.push_str( "fn into(self) -> ResourceKindParts {");
+    into_resource_kind_parts.push_str( "match self {");
 
     for resource in &parsed.resources {
       if let Option::Some(kind) = parsed.kind_for(resource) {
           resource_kind_enum.push_str(format!("{}({}),",resource.get_ident().to_string(),kind.ident.to_string()).as_str() );
           resource_kind_from_parts.push_str( format!("\"{}\"=>Ok({}Kind::from_parts(parts)?.into()),",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str(), );
+          into_resource_kind_parts.push_str(format!("Self::{}(kind)=>kind.into(),",resource.get_ident().to_string()).as_str() );
           let kind_cp = kind.clone();
           kind_stuff.push(quote!{#kind_cp});
 
@@ -284,11 +287,16 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
           has_specific.push_str("match self {");
 
           let mut from_parts = String::new();
-          from_parts.push_str(format!("impl {} {}", kind.ident.to_string(), "{").as_str() );
-          from_parts.push_str("pub fn from_parts(parts: &ResourceKindParts)->Result<Self,Error>{" );
+          from_parts.push_str(format!("impl TryFrom for {} {{", kind.ident.to_string()).as_str() );
+          from_parts.push_str("type Err=Error;");
+          from_parts.push_str("fn try_from(parts: ResourceKindParts)->Result<Self,Self::Err>{" );
           from_parts.push_str("match parts.kind.ok_or(\"expected kind\")?.as_str() {");
 
 
+          let mut into_parts= String::new();
+          into_parts.push_str(format!("impl Into<ResourceKindParts> for {} {{", kind.ident.to_string()).as_str() );
+          into_parts.push_str("fn into(self)->ResourceKindParts {" );
+          into_parts.push_str("match self {");
 
           for variant in &kind.variants {
               variants.push( variant.ident.clone() );
@@ -314,10 +322,17 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
                   from_parts.push_str(format!("\"{}\" => Self::{},", variant.ident.to_string(), variant.ident.to_string()).as_str());
               }
 
+              if!variant.fields.is_empty() {
+                  into_parts.push_str(format!("Self::{}(specific)=>ResourceKindParts{{resource_type:\"{}\",kind:Option::Some(\"{}\"),specific:Option::Some(specific.to_string())}},",variant.ident.to_string(),resource.get_ident().to_string(),variant.ident.to_string(),).as_str() );
+              } else {
+                  into_parts.push_str(format!("Self::{}=>ResourceKindParts{{resource_type:\"{}\",kind:Option::Some(\"{}\"),specific:Option::None}},",variant.ident.to_string(),resource.get_ident().to_string(),variant.ident.to_string(),).as_str() );
+              }
+
           }
           has_specific.push_str("}}}" );
           get_specific.push_str("}}}" );
           from_parts.push_str("}}}" );
+          into_parts.push_str("}}}" );
 
 println!("{}",from_parts);
 
@@ -329,6 +344,9 @@ println!("{}",from_parts);
 
           let from_parts = syn::parse_str::<Item>( from_parts.as_str() ).unwrap();
           kind_stuff.push(quote!{#from_parts});
+
+          let into_parts= syn::parse_str::<Item>( into_parts.as_str() ).unwrap();
+          kind_stuff.push(quote!{#into_parts});
 
           kind_stuff.push(quote!{
 
@@ -360,22 +378,44 @@ println!("{}",from_parts);
       } else {
           resource_kind_enum.push_str(format!("{},",resource.get_ident().to_string()).as_str() );
           resource_kind_from_parts.push_str( format!("\"{}\"=>Ok(Self::{}),",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str(), );
+          into_resource_kind_parts.push_str(format!("Self::{}(kind)=>ResourceKindParts{{resource_type:\"{}\",kind:Option::None,specific:Option::None}},",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str() );
       }
   }
     resource_kind_enum.push_str("}");
     resource_kind_from_parts.push_str("what => Err(format!(\"cannot identify ResourceType: '{}'\",what).into())" );
     resource_kind_from_parts.push_str("}}}" );
+    into_resource_kind_parts.push_str("}}}" );
 
     let resource_kind_emum = syn::parse_str::<Item>(resource_kind_enum.as_str()).unwrap();
     kind_stuff.push( quote!{#resource_kind_emum});
 
-println!("{}",resource_kind_from_parts);
     let resource_kind_from_parts = syn::parse_str::<Item>(resource_kind_from_parts.as_str()).unwrap();
     kind_stuff.push( quote!{#resource_kind_from_parts});
+
+    let into_resource_kind_parts= syn::parse_str::<Item>(into_resource_kind_parts.as_str()).unwrap();
+    kind_stuff.push( quote!{#into_resource_kind_parts});
+
 
 
     let rtn = quote!{
         #(#kind_stuff)*
+
+        impl ToString for ResourceKind {
+            fn to_string(&self) -> String {
+                let parts: ResourceKindParts = self.into();
+                parts.to_string()
+            }
+        }
+
+
+        impl FromStr for ResourceKind {
+            type Err=Error;
+
+            fn from_str(s: &str) -> Result<Self,Self::Err>{
+                let parts = ResourceKindParts::from_str(s)?;
+                Self::try_from(parts)
+            }
+        }
     };
     rtn
 }

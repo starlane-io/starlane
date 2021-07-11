@@ -29,10 +29,30 @@ impl FromStr for Specific {
     }
 }
 
+impl ToString for Specific{
+    fn to_string(&self) -> String {
+        todo!()
+    }
+}
+
 pub struct ResourceKindParts{
     pub resource_type: String,
     pub kind: Option<String>,
     pub specific: Option<Specific>
+}
+
+impl FromStr for ResourceKindParts{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        todo!()
+    }
+}
+
+impl ToString for ResourceKindParts{
+    fn to_string(&self) -> String {
+        todo!()
+    }
 }
 
 
