@@ -14,6 +14,7 @@ use std::time::Duration;
 
 use base64::DecodeError;
 use bincode::ErrorKind;
+use clap::{App, Arg};
 use rusqlite::{Connection, params, params_from_iter, Row, Rows, Statement, ToSql, Transaction};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 use serde::{Deserialize, Serialize};
@@ -24,10 +25,12 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::oneshot::Receiver;
 use url::Url;
 
-use crate::{logger, util, resource};
+use address::{ResourceAddressPart, SkewerCase};
+
+use crate::{logger, resource, util};
 use crate::actor::{ActorKey, ActorKind};
 use crate::app::ConfigSrc;
-use crate::artifact::{ArtifactKey, ArtifactKind, ArtifactAddress};
+use crate::artifact::{ArtifactAddress, ArtifactKey, ArtifactKind};
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::{
@@ -48,6 +51,7 @@ use crate::message::resource::{
 };
 use crate::names::{Name, Specific};
 use crate::permissions::User;
+use crate::resource::address::ResourceKindParts;
 use crate::resource::ResourceKind::UrlPathPattern;
 use crate::resource::space::{Space, SpaceState};
 use crate::resource::sub_space::SubSpaceState;
@@ -58,8 +62,6 @@ use crate::star::{
 use crate::star::pledge::{ResourceHostSelector, StarHandle};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
-use clap::{App, Arg};
-use crate::resource::address::ResourceKindParts;
 
 pub mod artifact;
 pub mod config;
@@ -3399,7 +3401,7 @@ impl ResourceAddressPartStruct {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq,Hash)]
 pub enum ResourceAddressPartKind {
     Domain,
     Url,
@@ -3412,6 +3414,7 @@ pub enum ResourceAddressPartKind {
     Path,
     Base64Encoded,
 }
+
 
 impl ToString for ResourceAddressPartKind {
     fn to_string(&self) -> String {
@@ -3502,44 +3505,6 @@ impl ResourceAddressPartKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub enum ResourceAddressPart {
-    Wildcard,
-    SkewerCase(SkewerCase),
-    Domain(DomainCase),
-    Base64Encoded(Base64Encoded),
-    Path(Path),
-    Version(Version),
-    Email(String),
-    Url(String),
-    UrlPathPattern(String),
-}
-
-impl ToString for ResourceAddressPart {
-    fn to_string(&self) -> String {
-        match self {
-            ResourceAddressPart::Wildcard => "*".to_string(),
-            ResourceAddressPart::SkewerCase(skewer) => skewer.to_string(),
-            ResourceAddressPart::Base64Encoded(base64) => base64.encoded.clone(),
-            ResourceAddressPart::Path(path) => path.to_string(),
-            ResourceAddressPart::Version(version) => version.to_string(),
-            ResourceAddressPart::Email(email) => email.to_string(),
-            ResourceAddressPart::Url(url) => url.to_string(),
-            ResourceAddressPart::UrlPathPattern(path) => path.to_string(),
-            ResourceAddressPart::Domain(domain) => domain.to_string(),
-        }
-    }
-}
-
-impl ResourceAddressPart {
-    pub fn is_wildcard(&self) -> bool {
-        match self {
-            ResourceAddressPart::Wildcard => true,
-            _ => false,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct Base64Encoded {
     encoded: String,
 }
@@ -3565,42 +3530,6 @@ impl Base64Encoded {
 impl ToString for Base64Encoded {
     fn to_string(&self) -> String {
         self.encoded.clone()
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub struct SkewerCase {
-    string: String,
-}
-
-impl SkewerCase {
-    pub fn new(string: &str) -> Result<Self, Error> {
-        if string.is_empty() {
-            return Err("cannot be empty".into());
-        }
-
-        for c in string.chars() {
-            if !((c.is_lowercase() && c.is_ascii_alphabetic()) || c.is_numeric() || c == '-') {
-                return Err(format!("must be lowercase, use only alphanumeric characters & dashes RECEIVED: '{}'", string).into());
-            }
-        }
-        Ok(SkewerCase {
-            string: string.to_string(),
-        })
-    }
-}
-
-impl ToString for SkewerCase {
-    fn to_string(&self) -> String {
-        self.string.clone()
-    }
-}
-
-impl FromStr for SkewerCase {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(SkewerCase::new(s)?)
     }
 }
 
@@ -3699,11 +3628,11 @@ mod test {
     use crate::permissions::Authentication;
     use crate::resource::{
         FieldSelection, Labels, LabelSelection, Names, Registry, ResourceAddress,
-        ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceKind, ResourceRecord,
+        ResourceArchetype, ResourceAssign, ResourceKind, ResourceRecord,
         ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand,
         ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector, ResourceStub, ResourceType,
-        SkewerCase,
     };
+    use crate::resource::address::{ResourceAddressPart, SkewerCase};
     use crate::resource::ResourceRegistryResult::Resources;
     use crate::space::CreateAppControllerFail;
     use crate::star::{StarController, StarInfo, StarKey, StarKind};

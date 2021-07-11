@@ -4,6 +4,9 @@ use std::convert::TryFrom;
 use serde::{Serialize,Deserialize};
 use std::str::FromStr;
 
+use starlane_core::resource::address::ResourceAddressPart;
+use starlane_core::resource::address::parse_address;
+
 fn main() {
     println!("Hello, world!");
 }
@@ -63,6 +66,7 @@ resources! {
     #[resource(parents(Root))]
     #[resource(stars(Space))]
     #[resource(prefix="spc")]
+    #[resource(ResourceAddressPartKind::SkewerCase)]
     pub struct Space{
 
     }
@@ -70,6 +74,7 @@ resources! {
     #[resource(parents(Space))]
     #[resource(stars(Space))]
     #[resource(prefix="sub")]
+    #[resource(ResourceAddressPartKind::SkewerCase)]
     pub struct SubSpace{
 
     }
@@ -77,6 +82,7 @@ resources! {
     #[resource(parents(SubSpace))]
     #[resource(stars(App))]
     #[resource(prefix="app")]
+    #[resource(ResourceAddressPartKind::SkewerCase)]
     pub struct App{
 
     }
@@ -84,6 +90,7 @@ resources! {
     #[resource(parents(SubSpace,App))]
     #[resource(stars(Space,App))]
     #[resource(prefix="db")]
+    #[resource(ResourceAddressPartKind::SkewerCase)]
     pub struct Database{
     }
 

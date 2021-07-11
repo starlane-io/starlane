@@ -1,18 +1,22 @@
-use crate::resource::{ResourceKind, ResourceType, ResourceAddress};
+use std::convert::TryFrom;
+use std::str::FromStr;
+
+use nom::{AsChar, InputTakeAtPosition, IResult};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take, take_until, take_while};
-use nom::character::complete::{alpha0, alpha1, digit0, digit1, one_of, anychar};
+use nom::character::complete::{alpha0, alpha1, anychar, digit0, digit1, one_of};
+use nom::character::is_digit;
 use nom::combinator::{not, opt};
-use nom::error::{context, ErrorKind, VerboseError, ParseError};
-use nom::multi::{many1, many_m_n, many0};
+use nom::error::{context, ErrorKind, ParseError, VerboseError};
+use nom::multi::{many0, many1, many_m_n};
 use nom::sequence::{delimited, preceded, terminated, tuple};
-use nom::{AsChar, IResult, InputTakeAtPosition};
 use serde::Deserialize;
 use serde::Serialize;
-use std::str::FromStr;
-use nom::character::is_digit;
+
 use crate::error::Error;
-use std::convert::TryFrom;
+use crate::resource::{Base64Encoded, DomainCase, Path, ResourceAddress, ResourceKind, ResourceType, Version, ResourceAddressPartKind};
+use std::collections::HashMap;
+
 
 pub type Domain = String;
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
@@ -280,9 +284,10 @@ impl Into<ResourceAddress> for ResourceAddressKind {
 
 #[cfg(test)]
 mod test {
-    use crate::resource::address::{domain, host, specific, version, version_major_minor_patch, Specific, parse_kind, ResourceKindParts, parse_address, ResourceAddressKind};
     use std::str::FromStr;
-    use crate::resource::{ResourceAddress, ResourceKind, ResourceType, DatabaseKind};
+
+    use crate::resource::{DatabaseKind, ResourceAddress, ResourceKind, ResourceType};
+    use crate::resource::address::{domain, host, parse_address, parse_kind, ResourceAddressKind, ResourceKindParts, specific, Specific, version, version_major_minor_patch};
 
     #[test]
     pub fn test_address_kind() {
@@ -403,5 +408,139 @@ mod test {
             domain("abc.hello.com:the-zozo:"),
             Ok((":the-zozo:", "abc.hello.com".to_string()))
         );
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub struct SkewerCase {
+    string: String,
+}
+
+impl SkewerCase {
+    pub fn new(string: &str) -> Result<Self, Error> {
+        if string.is_empty() {
+            return Err("cannot be empty".into());
+        }
+
+        for c in string.chars() {
+            if !((c.is_lowercase() && c.is_ascii_alphabetic()) || c.is_numeric() || c == '-') {
+                return Err(format!("must be lowercase, use only alphanumeric characters & dashes RECEIVED: '{}'", string).into());
+            }
+        }
+        Ok(SkewerCase {
+            string: string.to_string(),
+        })
+    }
+}
+
+impl ToString for SkewerCase {
+    fn to_string(&self) -> String {
+        self.string.clone()
+    }
+}
+
+impl FromStr for SkewerCase {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(SkewerCase::new(s)?)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub enum ResourceAddressPart {
+    Wildcard,
+    SkewerCase(SkewerCase),
+    Domain(DomainCase),
+    Base64Encoded(Base64Encoded),
+    Path(Path),
+    Version(Version),
+    Email(String),
+    Url(String),
+    UrlPathPattern(String),
+}
+
+impl ResourceAddressPart {
+    pub fn to_kind(self) -> ResourceAddressPartKind {
+        match self {
+            ResourceAddressPart::Wildcard => ResourceAddressPartKind::Wildcard,
+            ResourceAddressPart::SkewerCase(_) => ResourceAddressPartKind::SkewerCase,
+            ResourceAddressPart::Domain(_) => ResourceAddressPartKind::Domain,
+            ResourceAddressPart::Base64Encoded(_) => ResourceAddressPartKind::Base64Encoded,
+            ResourceAddressPart::Path(_) => ResourceAddressPartKind::Path,
+            ResourceAddressPart::Version(_) => ResourceAddressPartKind::Version,
+            ResourceAddressPart::Email(_) => ResourceAddressPartKind::Email,
+            ResourceAddressPart::Url(_) => ResourceAddressPartKind::Url,
+            ResourceAddressPart::UrlPathPattern(_) => ResourceAddressPartKind::UrlPathPattern
+        }
+    }
+}
+
+impl ToString for ResourceAddressPart {
+    fn to_string(&self) -> String {
+        match self {
+            ResourceAddressPart::Wildcard => "*".to_string(),
+            ResourceAddressPart::SkewerCase(skewer) => skewer.to_string(),
+            ResourceAddressPart::Base64Encoded(base64) => base64.encoded.clone(),
+            ResourceAddressPart::Path(path) => path.to_string(),
+            ResourceAddressPart::Version(version) => version.to_string(),
+            ResourceAddressPart::Email(email) => email.to_string(),
+            ResourceAddressPart::Url(url) => url.to_string(),
+            ResourceAddressPart::UrlPathPattern(path) => path.to_string(),
+            ResourceAddressPart::Domain(domain) => domain.to_string(),
+        }
+    }
+}
+
+impl ResourceAddressPart {
+    pub fn is_wildcard(&self) -> bool {
+        match self {
+            ResourceAddressPart::Wildcard => true,
+            _ => false,
+        }
+    }
+}
+
+
+pub struct ParentAddressPatternRecognizer {
+    patterns: HashMap<AddressPattern,ResourceType>,
+}
+
+impl Default for ParentAddressPatternRecognizer {
+    fn default() -> Self {
+        let mut pat = HashMap::new();
+        pat.insert( AddressPattern::from(vec![ResourceAddressPartKind::SkewerCase,ResourceAddressPartKind::SkewerCase]), ResourceType::SubSpace );
+        pat.insert( AddressPattern::from(vec![ResourceAddressPartKind::SkewerCase,ResourceAddressPartKind::SkewerCase,ResourceAddressPartKind::SkewerCase]), ResourceType::App );
+
+        Self {
+            patterns:pat
+        }
+    }
+}
+
+impl ParentAddressPatternRecognizer {
+    pub fn try_from( &self, pattern: &AddressPattern ) -> Result<ResourceType,Error>{
+        self.patterns.get(pattern ).cloned().ok_or(Error{error:"Could not find a match for ParentAddressPatternRecognizer".to_string()})
+    }
+}
+
+#[derive(Clone,Eq,PartialEq,Hash)]
+pub struct AddressPattern{
+    pattern: Vec<ResourceAddressPartKind>
+}
+
+impl From<Vec<ResourceAddressPart>> for AddressPattern{
+    fn from(parts: Vec<ResourceAddressPart>) -> Self {
+        Self {
+            pattern: parts.iter().map(|p| p.clone().to_kind()).collect()
+        }
+    }
+}
+
+impl From<Vec<ResourceAddressPartKind>> for AddressPattern{
+    fn from(parts: Vec<ResourceAddressPartKind>) -> Self {
+        Self {
+            pattern: parts
+        }
     }
 }

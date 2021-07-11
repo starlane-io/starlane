@@ -1,3 +1,7 @@
+use std::collections::HashSet;
+use std::convert::{TryFrom, TryInto};
+use std::fmt;
+use std::iter::FromIterator;
 use std::str::{FromStr, Split};
 
 use serde::{Deserialize, Serialize, Serializer};
@@ -11,13 +15,11 @@ use crate::message::Fail;
 use crate::message::Fail::ResourceAddressAlreadyInUse;
 use crate::names::{Name, Specific};
 use crate::resource::{
-    ArtifactBundleKind, Path, ResourceAddress, ResourceAddressPart, ResourceIdentifier,
+    ArtifactBundleKind, Path, ResourceAddress, ResourceIdentifier,
     ResourceType,
 };
-use std::collections::HashSet;
-use std::convert::{TryFrom, TryInto};
-use std::fmt;
-use std::iter::FromIterator;
+use crate::resource::address::ResourceAddressPart;
+
 /*
 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub struct Artifact

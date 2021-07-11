@@ -1,4 +1,6 @@
+use std::collections::HashSet;
 use std::fmt;
+use std::iter::FromIterator;
 use std::str::FromStr;
 
 use bincode::deserialize;
@@ -14,9 +16,8 @@ use crate::keys::ResourceId::UrlPathPattern;
 use crate::message::Fail;
 use crate::names::Name;
 use crate::permissions::{Priviledges, User, UserKind};
-use crate::resource::{Labels, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceIdentifier, ResourceKind, ResourceManagerKey, ResourceRecord, ResourceStub, ResourceType, SkewerCase, ResourceSelectorId};
-use std::collections::HashSet;
-use std::iter::FromIterator;
+use crate::resource::{Labels, ResourceArchetype, ResourceAssign, ResourceIdentifier, ResourceKind, ResourceManagerKey, ResourceRecord, ResourceSelectorId, ResourceStub, ResourceType};
+use crate::resource::address::{ResourceAddressPart, SkewerCase};
 
 pub type SpaceId = u32;
 

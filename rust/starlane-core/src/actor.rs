@@ -6,10 +6,10 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize, Serializer};
-use tokio::sync::broadcast::Sender;
+use serde::de::DeserializeOwned;
 use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::broadcast::Sender;
 
 use crate::app::ConfigSrc;
 use crate::error::Error;
@@ -18,12 +18,13 @@ use crate::id::Id;
 use crate::keys::{AppKey, ResourceId, ResourceKey, SubSpaceKey, UserKey};
 use crate::message::Fail;
 use crate::names::Name;
-use crate::resource::ResourceAddressPartKind::Base64Encoded;
 use crate::resource::{
-    Labels, Names, ResourceAddress, ResourceAddressPart, ResourceArchetype, ResourceAssign,
+    Labels, Names, ResourceAddress, ResourceArchetype, ResourceAssign,
     ResourceCreate, ResourceKind, ResourceRecord, ResourceRegistration, ResourceRegistryInfo,
-    ResourceSelector, ResourceStub, ResourceType, SkewerCase,
+    ResourceSelector, ResourceStub, ResourceType,
 };
+use crate::resource::address::{ResourceAddressPart, SkewerCase};
+use crate::resource::ResourceAddressPartKind::Base64Encoded;
 use crate::star::StarKey;
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Serialize, Deserialize)]

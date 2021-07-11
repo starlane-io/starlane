@@ -47,6 +47,7 @@ struct Resource {
     parents: Vec<Ident>,
     stars: Vec<Ident>,
     key_prefix: Option<String>,
+    address_part: Option<Ident>
 }
 
 impl Resource {
@@ -55,7 +56,8 @@ impl Resource {
             item: item,
             parents: vec![],
             stars: vec![],
-            key_prefix: Option::None
+            key_prefix: Option::None,
+            address_part: Option::None
         }
     }
 
@@ -104,7 +106,12 @@ impl Parse for ResourceParser {
                         if seg.ident.to_string() == "resource".to_string() {
                             let content: Meta = attr.parse_args()?;
                             match content {
-                                Meta::Path(path) => {}
+                                Meta::Path(path) => {
+                                    if( path.segments.first().is_some() && path.segments.first().unwrap().ident.to_string().as_str() == "ResourceAddressPartKind" )
+                                    {
+                                        resource.address_part = Option::Some( path.segments.last().unwrap().ident.clone() );
+                                    }
+                                }
                                 Meta::List(list) => {
                                     match list.path.segments.last().unwrap().ident.to_string().as_str() {
                                         "parents" => {
@@ -229,6 +236,7 @@ impl ResourceType {
     let kinds = kinds(&parsed);
 
 
+    let addresses= addresses(&parsed);
     /*
     proc_macro::TokenStream::from( quote!{
        #extras
@@ -242,8 +250,60 @@ impl ResourceType {
     proc_macro::TokenStream::from( quote!{
        #resource_type_enum_def
        #resource_impl_def
-       #kinds
+        #kinds
+       #addresses
     })
+}
+fn addresses( parsed: &ResourceParser ) -> TokenStream {
+
+    let idents: Vec<Ident> = parsed.resources.iter().map(|resource|{
+        resource.get_ident()
+    }).collect();
+
+    let address_idents: Vec<Ident> = parsed.resources.iter().map(|resource|{
+        Ident::new( format!("{}Address",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
+    }).collect();
+
+    let address_idents2 = address_idents.clone();
+
+    quote!{
+        #(struct #address_idents {
+            parts: Vec<ResourceAddressPart>,
+            parent_type: ResourceType
+        }
+
+        impl #address_idents2 {
+           pub fn resource_type(&self) -> ResourceType {
+               ResourceType::#idents
+           }
+        }
+
+
+        )*
+
+        pub enum ResourceAddress {
+            #(#idents(#address_idents)),*
+        }
+
+        impl FromStr for ResourceAddress {
+            type Err=Error;
+
+            fn from_str(s: &str) -> Result<Self,Self::Err>{
+                let (leftover,(address,kind)) = parse_address(s)?;
+                if leftover.len() > 0 {
+                    return Err(format!("cannot process: '{}' from address '{}'", leftover, s).into());
+                }
+                let kind:ResourceKind = kind.try_into()?;
+
+                match kind.resource_type() {
+                    #(ResourceType::#idents=>Ok(#address_idents::from_str(address)?)),*
+                }
+            }
+
+        }
+
+    }
+
 }
 
 fn kinds( parsed: &ResourceParser ) -> TokenStream {
@@ -256,7 +316,7 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
     let mut resource_kind_from_parts = String::new();
     resource_kind_from_parts.push_str("impl TryFrom<ResourceKindParts> for ResourceKind {");
     resource_kind_from_parts.push_str("type Error = Error;");
-    resource_kind_from_parts.push_str("fn try_from( parts: ResourceKindParts ) -> Result<Self,Self::Err> { ");
+    resource_kind_from_parts.push_str("fn try_from( parts: ResourceKindParts ) -> Result<Self,Self::Error> { ");
     resource_kind_from_parts.push_str("match parts.resource_type.as_str() { " );
 
     let mut into_resource_kind_parts = String::new();
@@ -267,7 +327,7 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
     for resource in &parsed.resources {
       if let Option::Some(kind) = parsed.kind_for(resource) {
           resource_kind_enum.push_str(format!("{}({}),",resource.get_ident().to_string(),kind.ident.to_string()).as_str() );
-          resource_kind_from_parts.push_str( format!("\"{}\"=>Ok({}Kind::from_parts(parts)?.into()),",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str(), );
+          resource_kind_from_parts.push_str( format!("\"{}\"=>Ok({}Kind::try_from(parts)?.into()),",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str(), );
           into_resource_kind_parts.push_str(format!("Self::{}(kind)=>kind.into(),",resource.get_ident().to_string()).as_str() );
           let kind_cp = kind.clone();
           kind_stuff.push(quote!{#kind_cp});
@@ -289,7 +349,7 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
           let mut from_parts = String::new();
           from_parts.push_str(format!("impl TryFrom for {} {{", kind.ident.to_string()).as_str() );
           from_parts.push_str("type Error=Error;");
-          from_parts.push_str("fn try_from(parts: ResourceKindParts)->Result<Self,Self::Err>{" );
+          from_parts.push_str("fn try_from(parts: ResourceKindParts)->Result<Self,Self::Error>{" );
           from_parts.push_str("match parts.kind.ok_or(\"expected kind\")?.as_str() {");
 
 
