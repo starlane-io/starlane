@@ -275,10 +275,24 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
             let parent_address= Ident::new(format!("{}Address",parent.to_string()).as_str(), parent.span());
             addresses.push( quote!{
                  impl #address_ident {
-                    pub fn parent(&self)->Option<ResourceAddress> {
+                    pub fn parent(&self)->Result<Option<ResourceAddress>,Error> {
                         let mut parts = self.parts;
                         parts.remove( parts.len() );
                         #parent_address::try_from(parts)?
+                    }
+                }
+            } );
+        }else  {
+            let parents = resource.parents.clone();
+            let parent_address: Vec<Ident>= resource.parents.iter().map( |parent|Ident::new(format!("{}Address",parent.to_string()).as_str(), parent.span())).collect();
+            addresses.push( quote!{
+                 impl #address_ident {
+                    pub fn parent(&self)->Result<Option<ResourceAddress>,Error> {
+                        let mut parts = self.parts;
+                        parts.remove( parts.len() );
+                        let matcher = ParentAddressPatternRecognizer::default();
+                        let parent_resource_type = matcher.try_from(parts)?;
+                        Ok(ResourceAddress::from_parts_and_type(parent_resource_type, parts )?)
                     }
                 }
             } );

@@ -5,6 +5,7 @@ use serde::{Serialize,Deserialize};
 use std::str::FromStr;
 
 use starlane_core::resource::address::ResourceAddressPart;
+use starlane_core::resource::address::ParentAddressPatternRecognizer;
 use starlane_core::resource::address::parse_address;
 
 fn main() {
