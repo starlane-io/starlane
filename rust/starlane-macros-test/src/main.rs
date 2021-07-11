@@ -1,5 +1,6 @@
 use starlane_macros::resources;
 use std::convert::TryInto;
+use std::convert::TryFrom;
 use serde::{Serialize,Deserialize};
 use std::str::FromStr;
 

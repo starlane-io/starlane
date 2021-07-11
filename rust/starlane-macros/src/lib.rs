@@ -255,8 +255,8 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
 
     let mut resource_kind_from_parts = String::new();
     resource_kind_from_parts.push_str("impl TryFrom<ResourceKindParts> for ResourceKind {");
-    resource_kind_from_parts.push_str("type Err = Error;");
-    resource_kind_from_parts.push_str("pub fn try_from( parts: ResourceKindParts ) -> Result<Self,Self::Err> { ");
+    resource_kind_from_parts.push_str("type Error = Error;");
+    resource_kind_from_parts.push_str("fn try_from( parts: ResourceKindParts ) -> Result<Self,Self::Err> { ");
     resource_kind_from_parts.push_str("match parts.resource_type.as_str() { " );
 
     let mut into_resource_kind_parts = String::new();
@@ -288,7 +288,7 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
 
           let mut from_parts = String::new();
           from_parts.push_str(format!("impl TryFrom for {} {{", kind.ident.to_string()).as_str() );
-          from_parts.push_str("type Err=Error;");
+          from_parts.push_str("type Error=Error;");
           from_parts.push_str("fn try_from(parts: ResourceKindParts)->Result<Self,Self::Err>{" );
           from_parts.push_str("match parts.kind.ok_or(\"expected kind\")?.as_str() {");
 
