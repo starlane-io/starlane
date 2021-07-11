@@ -256,20 +256,65 @@ impl ResourceType {
 }
 fn addresses( parsed: &ResourceParser ) -> TokenStream {
 
+
+
+    let mut addresses = vec![];
+    for resource in &parsed.resources{
+        let ident = Ident::new(resource.get_ident().to_string().as_str(), resource.get_ident().span());
+        let address_ident = Ident::new(format!("{}Address",resource.get_ident().to_string()).as_str(), resource.get_ident().span());
+        if resource.parents.is_empty() {
+            addresses.push(quote!{
+                impl #address_ident {
+                    pub fn parent(&self)->Result<Option<ResourceAddress>,Error> {
+                        Ok(Option::None)
+                    }
+                }
+            })
+        } else if resource.parents.len() == 1 {
+            let parent = resource.parents.first().unwrap().clone();
+            let parent_address= Ident::new(format!("{}Address",parent.to_string()).as_str(), parent.span());
+            addresses.push( quote!{
+                 impl #address_ident {
+                    pub fn parent(&self)->Option<ResourceAddress> {
+                        let mut parts = self.parts;
+                        parts.remove( parts.len() );
+                        #parent_address::try_from(parts)?
+                    }
+                }
+            } );
+        }
+    }
+
     let idents: Vec<Ident> = parsed.resources.iter().map(|resource|{
         resource.get_ident()
     }).collect();
+    let idents2 = idents.clone();
 
     let address_idents: Vec<Ident> = parsed.resources.iter().map(|resource|{
         Ident::new( format!("{}Address",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
     }).collect();
 
     let address_idents2 = address_idents.clone();
+    let address_idents3 = address_idents.clone();
+    let address_idents4= address_idents.clone();
+
+
+
 
     quote!{
+
+        struct RootAddress{
+
+        }
+
+        impl RootAddress {
+           pub fn parent(&self)->Result<Option<ResourceAddress>,Error> {
+             Ok(Option::None)
+           }
+        }
+
         #(struct #address_idents {
-            parts: Vec<ResourceAddressPart>,
-            parent_type: ResourceType
+            parts: Vec<ResourceAddressPart>
         }
 
         impl #address_idents2 {
@@ -278,7 +323,21 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
            }
         }
 
+          impl Into<ResourceAddress> for #address_idents3 {
+                fn into(self) -> ResourceAddress{
+                    ResourceAddress::#idents2(self)
+                }
+           }
 
+          impl TryFrom<Vec<ResourceAddressPart>> for #address_idents4 {
+               type Error=Error;
+
+               fn try_from(parts: Vec<ResourceAddressPart> )->Result<Self,Self::Error>{
+                    Ok(Self{
+                        parts: parts
+                    })
+               }
+            }
         )*
 
         pub enum ResourceAddress {
@@ -302,6 +361,17 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
 
         }
 
+
+        impl ResourceAddress {
+            pub fn from_parts_and_type( resource_type:ResourceType, parts: Vec<ResourceAddressPart> ) -> Result<ResourceAddress,Error> {
+               match  resource_type {
+                    #(ResourceType::#idents => Ok(#address_idents::try_from(parts)?) ),*
+               }
+
+            }
+        }
+
+        #(#addresses)*
     }
 
 }
