@@ -39,6 +39,21 @@ fn alphanumerichyphen1<T>(i: T) -> Res<T, T>
     )
 }
 
+fn pathchar<T>(i: T) -> Res<T, T>
+    where
+        T: InputTakeAtPosition,
+        <T as InputTakeAtPosition>::Item: AsChar,
+{
+    i.split_at_position1_complete(
+        |item| {
+            let char_item = item.as_char();
+            !(char_item == '/') && !(char_item == '.') && !(char_item == '_') && !(char_item == '-') && !(char_item.is_alpha() || char_item.is_dec_digit() )
+        },
+        ErrorKind::AlphaNumeric,
+    )
+}
+
+
 fn address<T>(i: T) -> Res<T, T>
     where
         T: InputTakeAtPosition,
@@ -67,6 +82,15 @@ fn loweralphanumerichyphen1<T>(i: T) -> Res<T, T>
     )
 }
 
+fn path( input: &str ) -> Res<&str,Path> {
+    context("path",
+      preceded(tag("/"),pathchar))(input).map( |(input,path)| {
+        let path = format!("/{}",path);
+        let path = Path::new( path.as_str() );
+        (input,path)
+    } )
+}
+
 
 fn host(input: &str) -> Res<&str, Domain> {
     context(
@@ -90,23 +114,10 @@ pub struct DomainCase {
 }
 
 impl DomainCase {
-    pub fn new(string: &str) -> Result<Self, Error> {
-        if string.is_empty() {
-            return Err("cannot be empty".into());
+    fn new(string: &str) -> Self {
+        Self{
+            string: string.to_string()
         }
-
-        if string.contains("..") {
-            return Err("cannot have two dots in a row".into());
-        }
-
-        for c in string.chars() {
-            if !((c.is_lowercase() && c.is_alphanumeric()) || c == '-' || c == '.') {
-                return Err("must be lowercase, use only alphanumeric characters & dashes".into());
-            }
-        }
-        Ok(DomainCase {
-            string: string.to_string(),
-        })
     }
 }
 
@@ -114,18 +125,23 @@ impl FromStr for DomainCase {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
+        let (remaining,domain) = domain(s)?;
+        if remaining.len() > 0 {
+            Err(format!("remainig text '{}' when parsing domain: '{}'",remaining,s).into())
+        } else {
+            Ok(domain)
+        }
     }
 }
 
 impl ToString for DomainCase {
     fn to_string(&self) -> String {
-        todo!()
+        self.string.clone()
     }
 }
 
 
-fn domain(input: &str) -> Res<&str, Domain> {
+fn domain(input: &str) -> Res<&str, DomainCase> {
     context(
         "domain",
         tuple((
@@ -137,7 +153,7 @@ fn domain(input: &str) -> Res<&str, Domain> {
             if !res.1.is_empty() {
                 res.0.push(res.1);
             }
-            (next_input, res.0.join("."))
+            (next_input, DomainCase::new(res.0.join(".").as_str()))
         })
 }
 
@@ -256,7 +272,7 @@ pub fn parse_kind(input: &str) -> Res<&str, ResourceKindParts> {
 pub fn parse_address_path(input: &str) -> Res<&str, (Vec<ResourceAddressPart>)> {
     context(
         "address-path",
-        separated_list1( nom::character::complete::char(':'), alt( (version_part,skewer_part) ) )
+        separated_list1( nom::character::complete::char(':'), alt( (path_part,version_part,domain_part,skewer_part) ) )
     )(input)
 }
 
@@ -295,11 +311,28 @@ fn version_part( input: &str ) -> Res<&str, ResourceAddressPart> {
     })
 }
 
+fn domain_part( input: &str ) -> Res<&str, ResourceAddressPart> {
+    context(
+        "domain-part",
+       domain
+    )(input).map( |(input, domain)|{
+        (input, ResourceAddressPart::Domain(domain))
+    })
+}
 
+
+fn path_part( input: &str ) -> Res<&str, ResourceAddressPart> {
+    context(
+        "path-part",
+         path
+    )(input).map( |(input, path)|{
+        (input, ResourceAddressPart::Path(path))
+    })
+}
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Specific {
-    pub vendor: Domain,
+    pub vendor: DomainCase,
     pub product: String,
     pub variant: String,
     pub version: Version
@@ -309,7 +342,7 @@ impl ToString for Specific {
     fn to_string(&self) -> String {
         format!(
             "{}:{}:{}:{}",
-            self.vendor, self.product, self.variant, self.version.to_string()
+            self.vendor.to_string(), self.product, self.variant, self.version.to_string()
         )
     }
 }
@@ -616,40 +649,10 @@ pub struct Path {
 }
 
 impl Path {
-    pub fn new(string: &str) -> Result<Self, Error> {
-        if string.trim().is_empty() {
-            return Err("path cannot be empty".into());
-        }
-
-        if string.contains("..") {
-            return Err(format!(
-                "path cannot contain directory traversal sequence [..] != '{}'",
-                string
-            )
-                .into());
-        }
-
-        for c in string.chars() {
-            if c == '*' || c == '?' || c == ':' {
-                return Err(format!(
-                    "path cannot contain wildcard characters [*,?] or [:] != '{}'",
-                    string
-                )
-                    .into());
-            }
-        }
-
-        if !string.starts_with("/") {
-            return Err(format!(
-                "Paths must be absolute (must start with a '/') != '{}'",
-                string
-            )
-                .into());
-        }
-
-        Ok(Path {
+    fn new(string: &str) -> Self {
+        Path {
             string: string.to_string(),
-        })
+        }
     }
 
     pub fn bin(&self) -> Result<Vec<u8>, Error> {
@@ -663,9 +666,9 @@ impl Path {
 
     pub fn cat(&self, path: &Path) -> Result<Self, Error> {
         if self.string.ends_with("/") {
-            Path::new(format!("{}{}", self.string.as_str(), path.string.as_str()).as_str())
+            Path::from_str(format!("{}{}", self.string.as_str(), path.string.as_str()).as_str())
         } else {
-            Path::new(format!("{}/{}", self.string.as_str(), path.string.as_str()).as_str())
+            Path::from_str(format!("{}/{}", self.string.as_str(), path.string.as_str()).as_str())
         }
     }
 
@@ -693,7 +696,7 @@ impl Path {
                     string.push_str("/");
                     string.push_str(segment);
                 }
-                Option::Some(Path::new(string.as_str()).unwrap())
+                Option::Some(Path::new(string.as_str()))
             }
         }
     }
@@ -731,7 +734,7 @@ impl TryFrom<&str> for Path {
     type Error = Error;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Ok(Path::new(value)?)
+        Ok(Path::from_str(value)?)
     }
 }
 
@@ -739,7 +742,7 @@ impl TryFrom<String> for Path {
     type Error = Error;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        Ok(Path::new(value.as_str())?)
+        Ok(Path::from_str(value.as_str())?)
     }
 }
 
@@ -753,7 +756,7 @@ impl FromStr for Path {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Path::new(s)?)
+        Ok(Path::from_str(s)?)
     }
 }
 
@@ -818,7 +821,7 @@ impl FromStr for Version {
 #[cfg(test)]
 mod tests {
     use crate::error::Error;
-    use crate::{parse_address_path, ResourceAddressPart, SkewerCase, version};
+    use crate::{parse_address_path, ResourceAddressPart, SkewerCase, version, path, domain, DomainCase};
 
 
     #[test]
@@ -834,14 +837,53 @@ mod tests {
         Ok(())
     }
     #[test]
-    fn skewer_case() -> Result<(),Error>{
-        let (leftover,address)= parse_address_path("some-skewer-case:1.3.4-beta")?;
+    fn test_path() -> Result<(),Error>{
+        let (leftover,path)= path("/end/of-the/World.xyz")?;
 
-        assert_eq!(address.get(0), Option::Some(&ResourceAddressPart::SkewerCase(SkewerCase::new("some-skewer-case"))));
-println!("leftover: {}",leftover);
         assert_eq!(leftover.len(),0);
+
+        assert_eq!("/end/of-the/World.xyz".to_string(), path.to_string() );
 
 
         Ok(())
+    }
+
+    #[test]
+    fn test_domain() -> Result<(),Error>{
+        let (leftover,domain)= domain("hello-kitty.com")?;
+
+        assert_eq!(leftover.len(),0);
+
+        assert_eq!("hello-kitty.com".to_string(), domain.to_string() );
+
+
+        Ok(())
+    }
+
+        #[test]
+    fn address_path() -> Result<(),Error>{
+        let (leftover,address)= parse_address_path("starlane.io:some-skewer-case:1.3.4-beta:/the/End/of/the.World")?;
+
+        assert_eq!(address.get(0), Option::Some(&ResourceAddressPart::Domain(DomainCase::new("starlane.io"))));
+        assert_eq!(address.get(1), Option::Some(&ResourceAddressPart::SkewerCase(SkewerCase::new("some-skewer-case"))));
+        assert_eq!(leftover.len(),0);
+
+        if let ResourceAddressPart::Version(version) = address.get(2).cloned().unwrap() {
+            assert_eq!(version.major, 1);
+            assert_eq!(version.minor, 3);
+            assert_eq!(version.patch, 4);
+            assert_eq!(version.release, Option::Some(SkewerCase::new("beta")));
+        } else {
+            assert!(false);
+        }
+
+
+            if let ResourceAddressPart::Path(path) = address.get(3).cloned().unwrap() {
+                assert_eq!("/the/End/of/the.World".to_string(), path.to_string() );
+            } else {
+                assert!(false);
+            }
+
+            Ok(())
     }
 }
