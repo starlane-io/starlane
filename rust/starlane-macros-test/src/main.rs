@@ -29,7 +29,6 @@ fn main() {
 
 
 
-/*
 resources! {
 
 
@@ -58,15 +57,17 @@ pub struct App();
 #[resource(ResourceAddressPartKind::SkewerCase)]
 pub struct Database();
 
+#[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub enum DatabaseKind{
     Native,
     External(Specific)
 }
 
 
+
 }
 
- */
+
 
 
 
@@ -74,8 +75,11 @@ pub enum DatabaseKind{
 
 #[cfg(test)]
 mod tests {
+
+    use crate::ResourceKey;
+
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn space_key() {
+
     }
 }

@@ -255,7 +255,6 @@ impl ResourceType {
        #(#resources_def)*
        #kinds
        #keys
-       #addresses
     })
 }
 fn addresses( parsed: &ResourceParser ) -> TokenStream {
@@ -398,6 +397,7 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
   let mut kind_stuff = vec![];
 
   let mut resource_kind_enum = String::new();
+    resource_kind_enum.push_str("#[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]");
     resource_kind_enum.push_str("pub enum ResourceKind {");
     resource_kind_enum.push_str("Root,");
 

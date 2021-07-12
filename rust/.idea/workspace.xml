@@ -6,8 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/resource/address.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource/address.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-macros-test/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-macros-test/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-macros-test/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-macros-test/src/main.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-macros/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-macros/src/lib.rs" afterDir="false" />
     </list>
@@ -72,7 +70,7 @@
       <recent name="$PROJECT_DIR$/starlane/src" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test tests::it_works">
+  <component name="RunManager" selected="Cargo.Test tests::space_key">
     <configuration default="true" type="ArquillianTestNG" factoryName="" nameIsGenerated="true">
       <option name="arquillianRunConfiguration">
         <value>
@@ -115,22 +113,6 @@
         <env name="STARLANE_PORT" value="7501" />
         <env name="STARLANE_KUBERNETES_INSTANCE_NAME" value="starlane" />
       </envs>
-      <option name="isRedirectInput" value="false" />
-      <option name="redirectInputPath" value="" />
-      <method v="2">
-        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
-      </method>
-    </configuration>
-    <configuration name="Test resource::address::test::test_kind" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib resource::address::test::test_kind -- --exact" />
-      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
-      <option name="channel" value="DEFAULT" />
-      <option name="requiredFeatures" value="true" />
-      <option name="allFeatures" value="false" />
-      <option name="emulateTerminal" value="false" />
-      <option name="withSudo" value="false" />
-      <option name="backtrace" value="SHORT" />
-      <envs />
       <option name="isRedirectInput" value="false" />
       <option name="redirectInputPath" value="" />
       <method v="2">
@@ -185,21 +167,37 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
+    <configuration name="Test tests::space_key" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-macros-test --bin starlane-macros-test tests::space_key -- --exact" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <envs />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Serve" />
-      <item itemvalue="Cargo.Test resource::address::test::test_kind" />
       <item itemvalue="Cargo.Test resource::address::test::test_specific" />
       <item itemvalue="Cargo.Test resource::address::test::test_version_major_minor_patch" />
       <item itemvalue="Cargo.Test tests::it_works" />
+      <item itemvalue="Cargo.Test tests::space_key" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Test tests::space_key" />
         <item itemvalue="Cargo.Test tests::it_works" />
         <item itemvalue="Cargo.Serve" />
         <item itemvalue="Cargo.Test resource::address::test::test_version_major_minor_patch" />
         <item itemvalue="Cargo.Test resource::address::test::test_specific" />
-        <item itemvalue="Cargo.Test resource::address::test::test_kind" />
       </list>
     </recent_temporary>
   </component>
@@ -220,7 +218,7 @@
       <workItem from="1625759977203" duration="11299000" />
       <workItem from="1625777595261" duration="13728000" />
       <workItem from="1625838663767" duration="61485000" />
-      <workItem from="1626011932512" duration="27077000" />
+      <workItem from="1626011932512" duration="30022000" />
     </task>
     <servers />
   </component>
