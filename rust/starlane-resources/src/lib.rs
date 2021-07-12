@@ -7,9 +7,9 @@ use nom::branch::alt;
 use nom::bytes::complete::{tag, take, take_until, take_while};
 use nom::character::complete::{alpha0, alpha1, anychar, digit0, digit1, one_of};
 use nom::character::is_digit;
-use nom::combinator::{not, opt};
+use nom::combinator::{not, opt, eof};
 use nom::error::{context, ErrorKind, ParseError, VerboseError};
-use nom::multi::{many0, many1, many_m_n};
+use nom::multi::{many0, many1, many_m_n, separated_list1};
 use nom::sequence::{delimited, preceded, terminated, tuple};
 use serde::Deserialize;
 use serde::Serialize;
@@ -174,16 +174,11 @@ fn version(input: &str) -> Res<&str, Version> {
         "version",
         tuple((
             version_major_minor_patch,
-            opt(preceded(tag("-"), loweralphanumerichyphen1)),
+            opt(preceded(tag("-"), skewer)),
         )),
     )(input)
         .map(|(next_input, ((major,minor,patch),release))| {
-            let release = match release {
-                None => Option::None,
-                Some(skewer) => {
-                    Option::Some(SkewerCase::new(skewer))
-                }
-            };
+
             (
                 next_input,
                 Version::new(
@@ -258,10 +253,17 @@ pub fn parse_kind(input: &str) -> Res<&str, ResourceKindParts> {
     } )
 }
 
-pub fn parse_address(input: &str) -> Res<&str, (&str,ResourceKindParts)> {
+pub fn parse_address_path(input: &str) -> Res<&str, (Vec<ResourceAddressPart>)> {
+    context(
+        "address-path",
+        separated_list1( nom::character::complete::char(':'), alt( (version_part,skewer_part) ) )
+    )(input)
+}
+
+pub fn parse_address(input: &str) -> Res<&str, (Vec<ResourceAddressPart>,ResourceKindParts)> {
     context(
         "address",
-        tuple( (take_while(|c| c != '<'),parse_kind)),
+        tuple( (parse_address_path,parse_kind) ),
     )(input)
 }
 
@@ -271,6 +273,25 @@ fn skewer( input: &str ) -> Res<&str, SkewerCase > {
         loweralphanumerichyphen1
     )(input).map( |(input, skewer)|{
         (input, SkewerCase::new(skewer))
+    })
+}
+
+
+fn skewer_part( input: &str ) -> Res<&str, ResourceAddressPart> {
+    context(
+        "skewer-case-part",
+        skewer
+    )(input).map( |(input, skewer)|{
+        (input, ResourceAddressPart::SkewerCase(skewer))
+    })
+}
+
+fn version_part( input: &str ) -> Res<&str, ResourceAddressPart> {
+    context(
+        "version-part",
+        version
+    )(input).map( |(input, version )|{
+        (input, ResourceAddressPart::Version(version))
     })
 }
 
@@ -796,8 +817,31 @@ impl FromStr for Version {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn skewer_case() {
+    use crate::error::Error;
+    use crate::{parse_address_path, ResourceAddressPart, SkewerCase, version};
 
+
+    #[test]
+    fn test_version() -> Result<(),Error>{
+        let (leftover,version)= version("1.3.4-beta")?;
+        assert_eq!(leftover.len(),0);
+
+        assert_eq!( version.major, 1 );
+        assert_eq!( version.minor, 3 );
+        assert_eq!( version.patch, 4 );
+        assert_eq!( version.release, Option::Some(SkewerCase::new("beta")) );
+
+        Ok(())
+    }
+    #[test]
+    fn skewer_case() -> Result<(),Error>{
+        let (leftover,address)= parse_address_path("some-skewer-case:1.3.4-beta")?;
+
+        assert_eq!(address.get(0), Option::Some(&ResourceAddressPart::SkewerCase(SkewerCase::new("some-skewer-case"))));
+println!("leftover: {}",leftover);
+        assert_eq!(leftover.len(),0);
+
+
+        Ok(())
     }
 }
