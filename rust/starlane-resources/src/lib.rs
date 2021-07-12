@@ -289,6 +289,14 @@ pub fn parse_kind(input: &str) -> Res<&str, ResourceKindParts> {
     } )
 }
 
+
+pub fn parse_key(input: &str) -> Res<&str, (Vec<ResourceAddressPart>)> {
+    context(
+        "key",
+        separated_list1( nom::character::complete::char(':'), alt( (path_part,version_part,domain_part,skewer_part) ) )
+    )(input)
+}
+
 pub fn parse_address_path(input: &str) -> Res<&str, (Vec<ResourceAddressPart>)> {
     context(
         "address-path",
@@ -644,8 +652,8 @@ impl KeyBits{
     pub fn parse_key_bits(input: &str) -> Res<&str, Vec<KeyBit>> {
         context(
             "key-bits",
-            many1( KeyBits::parse_key_bit )
-        )(input)
+
+            separated_list1( nom::character::complete::char(':'), Self::parse_key_bit ) )(input)
     }
 
     pub fn parse_key_bit(input: &str) -> Res<&str, KeyBit> {
@@ -841,13 +849,69 @@ impl FromStr for Version {
 #[cfg(test)]
 mod tests {
     use crate::error::Error;
-    use crate::{parse_address_path, ResourceAddressPart, SkewerCase, version, path, domain, DomainCase};
-    use crate::{SpaceKey,ResourceKey,RootKey};
+    use crate::{parse_address_path, ResourceAddressPart, SkewerCase, version, path, domain, DomainCase, KeyBits};
+    use crate::{SpaceKey,ResourceKey,RootKey,SubSpaceKey,AppKey,DatabaseKey};
+    use std::convert::TryInto;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_key_bit() -> Result<(),Error> {
+        let (leftover,bit) = KeyBits::parse_key_bit("ss0")?;
+
+        assert_eq!(leftover.len(),0);
+
+        assert_eq!(bit.key_type,"ss".to_string());
+        assert_eq!(bit.id,0);
+
+        Ok(())
+    }
+
+
+    #[test]
+    fn test_key_bits() -> Result<(),Error> {
+        let (leftover,bits) = KeyBits::parse_key_bits("ss0:e53:sub73")?;
+
+println!("leftover: {}",leftover );
+        assert_eq!(leftover.len(),0);
+
+        let bit = bits.get(0).unwrap();
+        assert_eq!(bit.key_type,"ss".to_string());
+        assert_eq!(bit.id,0);
+
+        let bit = bits.get(1).unwrap();
+        assert_eq!(bit.key_type,"e".to_string());
+        assert_eq!(bit.id,53);
+
+        let bit = bits.get(2).unwrap();
+        assert_eq!(bit.key_type,"sub".to_string());
+        assert_eq!(bit.id,73);
+
+
+        Ok(())
+    }
+
 
     #[test]
     fn test_key() -> Result<(),Error>{
         let space_key = SpaceKey::new(RootKey::new(),0);
         let space_key: ResourceKey = space_key.into();
+        println!("space_key.to_string() {}", space_key.to_string() );
+        let sub_space_key = SubSpaceKey::new(space_key.try_into()?, 0 );
+        let sub_space_key:ResourceKey  = sub_space_key.into();
+        println!("sub_space_key.to_string() {}", sub_space_key.to_string() );
+        let app_key = AppKey::new( sub_space_key.try_into()?, 1 );
+        let app_key: ResourceKey = app_key.into();
+        println!("app_key.to_string() {}", app_key.to_string() );
+        let db_key = DatabaseKey::new( app_key.try_into()?, 77 );
+        println!("db_key.to_string() {}", db_key.to_string() );
+        let db_key: ResourceKey = db_key.into();
+        println!("db_key.to_snake_case() {}", db_key.to_snake_case() );
+        println!("db_key.to_skewer_case() {}", db_key.to_skewer_case() );
+
+        let db_key2 = ResourceKey::from_str(db_key.to_string().as_str())?;
+
+        assert_eq!( db_key, db_key2 );
+
         Ok(())
     }
 
@@ -919,13 +983,13 @@ mod tests {
 resources! {
     #[resource(parents(Root))]
     #[resource(stars(SpaceHost))]
-    #[resource(prefix="spc")]
+    #[resource(prefix="s")]
     #[resource(ResourceAddressPartKind::SkewerCase)]
     pub struct Space();
 
     #[resource(parents(Space))]
     #[resource(stars(SpaceHost))]
-    #[resource(prefix="sub")]
+    #[resource(prefix="ss")]
     #[resource(ResourceAddressPartKind::SkewerCase)]
     pub struct SubSpace();
 

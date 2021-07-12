@@ -730,6 +730,8 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                 let parent = resource.parents.last().unwrap();
                 Ident::new(format!("{}Key", parent.to_string()).as_str(), parent.span())
             };
+
+            let prefix = Ident::new(resource.key_prefix.as_ref().unwrap().clone().as_str(), resource.get_ident().span() );
             quote! {
                 pub type #id= u64;
 
@@ -742,8 +744,8 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                 impl #ident {
 
                   fn from_keybit( parent: #parent, key_bit: KeyBit ) -> Result<Self,Error> {
-                       if key_bit.key_type.as_str() != stringify!(prefix) {
-                          return Err(format!("cannot create '{}' from keybit: '{}'",key_bit.key_type.as_str(),stringify!(prefix)).into())
+                       if key_bit.key_type.as_str() != stringify!(#prefix) {
+                          return Err(format!("cannot create '{}' from keybit: '{}'",key_bit.key_type.as_str(),stringify!(#prefix)).into())
                        }
                        Ok(Self {
                          parent: parent,
@@ -916,6 +918,14 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                     _ => Err("unrecognized keybit".into())
                 }
             }
+
+            pub fn to_snake_case(&self) -> String {
+                self.to_string().replace(":", "_")
+            }
+
+            pub fn to_skewer_case(&self) -> String {
+                self.to_string().replace(":", "-")
+            }
         }
 
         impl ToString for ResourceKey {
@@ -925,10 +935,30 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                 ancestors.push(self.clone());
 
                 let mut rtn = String::new();
-                for ancestor in ancestors {
+                for i in 0..ancestors.len() {
+                    let ancestor = ancestors.get(i).unwrap();
                     rtn.push_str(ancestor.string_bit().as_str());
+                    if i < ancestors.len()-1 {
+                      rtn.push_str(":");
+                    }
                 }
                 rtn
+            }
+        }
+
+        impl FromStr for ResourceKey {
+            type Err=Error;
+            fn from_str( s: &str ) -> Result<Self,Self::Err> {
+                let (leftover,keybits) = KeyBits::parse_key_bits(s)?;
+                if leftover.len() > 0 {
+                    Err(format!("leftover '{}' when trying to parse ResourceKey '{}'",leftover,s).into())
+                } else {
+                    let mut key = ResourceKey::Root;
+                    for bit in keybits {
+                        key = Self::from_keybit(key, bit)?;
+                    }
+                    Ok(key)
+                }
             }
         }
 
