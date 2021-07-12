@@ -45,7 +45,6 @@ println!("FOUND KIND MATCH");
 struct Resource {
     item: Item,
     parents: Vec<Ident>,
-    stars: Vec<Ident>,
     key_prefix: Option<String>,
     address_part: Option<Ident>
 }
@@ -55,7 +54,6 @@ impl Resource {
         Self {
             item: item,
             parents: vec![],
-            stars: vec![],
             key_prefix: Option::None,
             address_part: Option::None
         }
@@ -107,7 +105,7 @@ impl Parse for ResourceParser {
                             let content: Meta = attr.parse_args()?;
                             match content {
                                 Meta::Path(path) => {
-                                    if( path.segments.first().is_some() && path.segments.first().unwrap().ident.to_string().as_str() == "ResourceAddressPartKind" )
+                                    if( path.segments.first().is_some() && path.segments.first().unwrap().ident.to_string().as_str() == "ResourcePathSegmentKind" )
                                     {
                                         resource.address_part = Option::Some( path.segments.last().unwrap().ident.clone() );
                                     }
@@ -117,9 +115,7 @@ impl Parse for ResourceParser {
                                         "parents" => {
                                             resource.parents = to_idents(&list);
                                         }
-                                        "stars" => {
-                                            resource.stars = to_idents(&list);
-                                        }
+
                                         what => {
                                             panic!("unrecognized resource attribute '{}'", what);
                                         }
@@ -209,10 +205,6 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         resource.parents.clone()
     }).collect();
 
-    let stars: Vec<Vec<Ident>> = parsed.resources.iter().map(|resource|{
-        resource.stars.clone()
-    }).collect();
-
     let resource_impl_def = quote! {
 impl ResourceType {
    pub fn parents(&self) -> Vec<Self> {
@@ -222,12 +214,7 @@ impl ResourceType {
       }
    }
 
-   pub fn stars(&self) -> Vec<StarKind> {
-      match self {
-        Self::Root => vec![StarKind::Central],
-        #(Self::#idents => vec![#(StarKind::#stars),*]),*
-      }
-   }
+
 }
     };
 
@@ -278,7 +265,7 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
         if resource.parents.is_empty() {
             addresses.push(quote!{
                 impl #address_ident {
-                    pub fn parent(&self)->Result<Option<ResourceAddress>,Error> {
+                    pub fn parent(&self)->Result<Option<ResourcePath>,Error> {
                         Ok(Option::None)
                     }
                 }
@@ -288,7 +275,7 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
             let parent_address= Ident::new(format!("{}Address",parent.to_string()).as_str(), parent.span());
             addresses.push( quote!{
                  impl #address_ident {
-                    pub fn parent(&self)->Result<Option<ResourceAddress>,Error> {
+                    pub fn parent(&self)->Result<Option<ResourcePath>,Error> {
                         let mut parts = self.parts.clone();
                         parts.remove( parts.len() );
                         Ok(Option::Some(#parent_address::try_from(parts)?.into()))
@@ -300,13 +287,13 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
             let parent_address: Vec<Ident>= resource.parents.iter().map( |parent|Ident::new(format!("{}Address",parent.to_string()).as_str(), parent.span())).collect();
             addresses.push( quote!{
                  impl #address_ident {
-                    pub fn parent(&self)->Result<Option<ResourceAddress>,Error> {
+                    pub fn parent(&self)->Result<Option<ResourcePath>,Error> {
                         unimplemented!()
 /*                        let mut parts = self.parts.clone();
                         parts.remove( parts.len() );
                         let matcher = ParentAddressPatternRecognizer::default();
                         let parent_resource_type = matcher.try_from(parts.clone())?;
-                        Ok(Option::Some(ResourceAddress::from_parts_and_type(parent_resource_type, parts )?))
+                        Ok(Option::Some(ResourcePath::from_parts_and_type(parent_resource_type, parts )?))
 
  */
                     }
@@ -339,20 +326,20 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
         }
 
         impl RootAddress {
-           pub fn parent(&self)->Result<Option<ResourceAddress>,Error> {
+           pub fn parent(&self)->Result<Option<ResourcePath>,Error> {
              Ok(Option::None)
            }
         }
 
-        impl Into<ResourceAddress> for RootAddress{
-            fn into(self) -> ResourceAddress {
-                ResourceAddress::Root
+        impl Into<ResourcePath> for RootAddress{
+            fn into(self) -> ResourcePath {
+                ResourcePath::Root
             }
         }
 
-        impl TryFrom<Vec<ResourceAddressPart>> for RootAddress{
+        impl TryFrom<Vec<ResourcePathSegment>> for RootAddress{
             type Error=Error;
-            fn try_from( parts: Vec<ResourceAddressPart> ) -> Result<RootAddress,Self::Error> {
+            fn try_from( parts: Vec<ResourcePathSegment> ) -> Result<RootAddress,Self::Error> {
                 if parts.is_empty() {
                     Ok(RootAddress{})
                 } else {
@@ -362,7 +349,7 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
         }
 
         #(pub struct #address_idents {
-            parts: Vec<ResourceAddressPart>
+            parts: Vec<ResourcePathSegment>
         }
 
         impl #address_idents2 {
@@ -371,16 +358,16 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
            }
         }
 
-          impl Into<ResourceAddress> for #address_idents3 {
-                fn into(self) -> ResourceAddress{
-                    ResourceAddress::#idents2(self)
+          impl Into<ResourcePath> for #address_idents3 {
+                fn into(self) -> ResourcePath{
+                    ResourcePath::#idents2(self)
                 }
            }
 
-          impl TryFrom<Vec<ResourceAddressPart>> for #address_idents4 {
+          impl TryFrom<Vec<ResourcePathSegment>> for #address_idents4 {
                type Error=Error;
 
-               fn try_from(parts: Vec<ResourceAddressPart> )->Result<Self,Self::Error>{
+               fn try_from(parts: Vec<ResourcePathSegment> )->Result<Self,Self::Error>{
                     Ok(Self{
                         parts: parts
                     })
@@ -390,19 +377,19 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
          impl FromStr for #address_idents5 {
                type Err=Error;
                fn from_str( s: &str ) -> Result<Self,Self::Err> {
-                    let (leftover,parts):(&str,Vec<ResourceAddressPart>) = parse_address_path(s)?;
+                    let (leftover,parts):(&str,Vec<ResourcePathSegment>) = parse_address_path(s)?;
                     unimplemented!()
                }
          }
 
         )*
 
-        pub enum ResourceAddress {
+        pub enum ResourcePath {
             Root,
             #(#idents(#address_idents)),*
         }
 
-        impl FromStr for ResourceAddress {
+        impl FromStr for ResourcePath {
             type Err=Error;
 
             fn from_str(s: &str) -> Result<Self,Self::Err>{
@@ -417,7 +404,7 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
                         if !address.is_empty()  {
                             Err("root address must be empty".into())
                         } else {
-                            Ok(ResourceAddress::Root)
+                            Ok(ResourcePath::Root)
                         }
                     }
                     #(ResourceType::#idents=>Ok(#address_idents::try_from(address)?.into())),*
@@ -427,10 +414,10 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
         }
 
 
-        impl ResourceAddress {
-            pub fn from_parts_and_type( resource_type:ResourceType, parts: Vec<ResourceAddressPart> ) -> Result<ResourceAddress,Error> {
+        impl ResourcePath {
+            pub fn from_parts_and_type( resource_type:ResourceType, parts: Vec<ResourcePathSegment> ) -> Result<ResourcePath,Error> {
                match  resource_type {
-                    ResourceType::Root => Ok(ResourceAddress::Root),
+                    ResourceType::Root => Ok(ResourcePath::Root),
                     #(ResourceType::#idents => Ok(#address_idents::try_from(parts.clone())?.into()) ),*
                }
 
@@ -783,8 +770,6 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                 pub fn string_prefix(&self) -> String {
                    stringify!(#prefix).to_string()
                 }
-
-
             }
 
             impl ToString for #ident{
@@ -965,21 +950,6 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
 
     };
     rtn
-
-    /*
-impl FromStr for ResourceKey {
-    type Err=Error;
-    fn from_str( s: &str ) -> Result<Self,Self::Err> {
-        let key_bits = Self::parse_key_bits(s)?;
-        let mut key = Self::root();
-        for bit in key_bits {
-            key = Self::from_keybit( key, bit )?;
-        }
-        return Ok(key)
-    }
-}
-
- */
 }
 
 

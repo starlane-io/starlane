@@ -24,21 +24,6 @@ mod parse;
 
 
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize, Hash)]
-pub enum StarKind {
-    Central,
-    SpaceHost,
-    Mesh,
-    AppHost,
-    ActorHost,
-    FileStore,
-    ArtifactStore,
-    Gateway,
-    Link,
-    Client,
-    Web,
-    Kube,
-}
 
 pub type Domain = String;
 pub type Res<T, U> = IResult<T, U, VerboseError<T>>;
@@ -290,21 +275,21 @@ pub fn parse_kind(input: &str) -> Res<&str, ResourceKindParts> {
 }
 
 
-pub fn parse_key(input: &str) -> Res<&str, (Vec<ResourceAddressPart>)> {
+pub fn parse_key(input: &str) -> Res<&str, (Vec<ResourcePathSegment>)> {
     context(
         "key",
         separated_list1( nom::character::complete::char(':'), alt( (path_part,version_part,domain_part,skewer_part) ) )
     )(input)
 }
 
-pub fn parse_address_path(input: &str) -> Res<&str, (Vec<ResourceAddressPart>)> {
+pub fn parse_address_path(input: &str) -> Res<&str, (Vec<ResourcePathSegment>)> {
     context(
         "address-path",
         separated_list1( nom::character::complete::char(':'), alt( (path_part,version_part,domain_part,skewer_part) ) )
     )(input)
 }
 
-pub fn parse_address(input: &str) -> Res<&str, (Vec<ResourceAddressPart>,ResourceKindParts)> {
+pub fn parse_address(input: &str) -> Res<&str, (Vec<ResourcePathSegment>, ResourceKindParts)> {
     context(
         "address",
         tuple( (parse_address_path,parse_kind) ),
@@ -321,40 +306,40 @@ fn skewer( input: &str ) -> Res<&str, SkewerCase > {
 }
 
 
-fn skewer_part( input: &str ) -> Res<&str, ResourceAddressPart> {
+fn skewer_part( input: &str ) -> Res<&str, ResourcePathSegment> {
     context(
         "skewer-case-part",
         skewer
     )(input).map( |(input, skewer)|{
-        (input, ResourceAddressPart::SkewerCase(skewer))
+        (input, ResourcePathSegment::SkewerCase(skewer))
     })
 }
 
-fn version_part( input: &str ) -> Res<&str, ResourceAddressPart> {
+fn version_part( input: &str ) -> Res<&str, ResourcePathSegment> {
     context(
         "version-part",
         version
     )(input).map( |(input, version )|{
-        (input, ResourceAddressPart::Version(version))
+        (input, ResourcePathSegment::Version(version))
     })
 }
 
-fn domain_part( input: &str ) -> Res<&str, ResourceAddressPart> {
+fn domain_part( input: &str ) -> Res<&str, ResourcePathSegment> {
     context(
         "domain-part",
        domain
     )(input).map( |(input, domain)|{
-        (input, ResourceAddressPart::Domain(domain))
+        (input, ResourcePathSegment::Domain(domain))
     })
 }
 
 
-fn path_part( input: &str ) -> Res<&str, ResourceAddressPart> {
+fn path_part( input: &str ) -> Res<&str, ResourcePathSegment> {
     context(
         "path-part",
          path
     )(input).map( |(input, path)|{
-        (input, ResourceAddressPart::Path(path))
+        (input, ResourcePathSegment::Path(path))
     })
 }
 
@@ -476,9 +461,9 @@ impl SkewerCase {
 
 }
 
-impl Into<ResourceAddressPart> for SkewerCase {
-    fn into(self) -> ResourceAddressPart {
-        ResourceAddressPart::SkewerCase(self)
+impl Into<ResourcePathSegment> for SkewerCase {
+    fn into(self) -> ResourcePathSegment {
+        ResourcePathSegment::SkewerCase(self)
     }
 }
 
@@ -499,7 +484,7 @@ impl FromStr for SkewerCase {
 
 
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq,Hash)]
-pub enum ResourceAddressPartKind {
+pub enum ResourcePathSegmentKind {
     Domain,
     SkewerCase,
     Email,
@@ -508,32 +493,32 @@ pub enum ResourceAddressPartKind {
 }
 
 
-impl ToString for ResourceAddressPartKind {
+impl ToString for ResourcePathSegmentKind {
     fn to_string(&self) -> String {
         match self {
-            ResourceAddressPartKind::Domain => "Domain".to_string(),
-            ResourceAddressPartKind::SkewerCase => "Skewer".to_string(),
-            ResourceAddressPartKind::Version => "Version".to_string(),
-            ResourceAddressPartKind::Path => "Path".to_string(),
-            ResourceAddressPartKind::Email => "Email".to_string(),
+            ResourcePathSegmentKind::Domain => "Domain".to_string(),
+            ResourcePathSegmentKind::SkewerCase => "Skewer".to_string(),
+            ResourcePathSegmentKind::Version => "Version".to_string(),
+            ResourcePathSegmentKind::Path => "Path".to_string(),
+            ResourcePathSegmentKind::Email => "Email".to_string(),
         }
     }
 }
 
-impl ResourceAddressPartKind {
-    pub fn matches(&self, part: &ResourceAddressPart) -> bool {
+impl ResourcePathSegmentKind {
+    pub fn matches(&self, part: &ResourcePathSegment) -> bool {
         match part {
-            ResourceAddressPart::SkewerCase(_) => {
+            ResourcePathSegment::SkewerCase(_) => {
                 *self == Self::SkewerCase
             }
-            ResourceAddressPart::Path(_) => *self == Self::Path,
-            ResourceAddressPart::Version(_) => *self == Self::Version,
-            ResourceAddressPart::Email(_) => *self == Self::Email,
-            ResourceAddressPart::Domain(_) => *self == Self::Domain,
+            ResourcePathSegment::Path(_) => *self == Self::Path,
+            ResourcePathSegment::Version(_) => *self == Self::Version,
+            ResourcePathSegment::Email(_) => *self == Self::Email,
+            ResourcePathSegment::Domain(_) => *self == Self::Domain,
         }
     }
 
-    pub fn from_str(&self, s: &str) -> Result<ResourceAddressPart, Error> {
+    pub fn from_str(&self, s: &str) -> Result<ResourcePathSegment, Error> {
         if s.contains(RESOURCE_ADDRESS_DELIM) {
             return Err(format!(
                 "resource part cannot contain resource address delimeter '{}' as in '{}'",
@@ -543,22 +528,22 @@ impl ResourceAddressPartKind {
         }
         match self {
 
-            ResourceAddressPartKind::SkewerCase => {
-                Ok(ResourceAddressPart::SkewerCase(SkewerCase::from_str(s)?))
+            ResourcePathSegmentKind::SkewerCase => {
+                Ok(ResourcePathSegment::SkewerCase(SkewerCase::from_str(s)?))
             }
 
-            ResourceAddressPartKind::Path => Ok(ResourceAddressPart::Path(Path::from_str(s)?)),
-            ResourceAddressPartKind::Version => {
-                Ok(ResourceAddressPart::Version(Version::from_str(s)?))
+            ResourcePathSegmentKind::Path => Ok(ResourcePathSegment::Path(Path::from_str(s)?)),
+            ResourcePathSegmentKind::Version => {
+                Ok(ResourcePathSegment::Version(Version::from_str(s)?))
             }
 
-            ResourceAddressPartKind::Email => {
-                Ok(ResourceAddressPart::Email(
+            ResourcePathSegmentKind::Email => {
+                Ok(ResourcePathSegment::Email(
                     s.to_string().trim().to_lowercase(),
                 ))
             }
-           ResourceAddressPartKind::Domain => {
-                Ok(ResourceAddressPart::Domain(DomainCase::from_str(s)?))
+           ResourcePathSegmentKind::Domain => {
+                Ok(ResourcePathSegment::Domain(DomainCase::from_str(s)?))
             }
         }
     }
@@ -568,7 +553,7 @@ impl ResourceAddressPartKind {
 
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub enum ResourceAddressPart {
+pub enum ResourcePathSegment {
     SkewerCase(SkewerCase),
     Domain(DomainCase),
     Path(Path),
@@ -576,26 +561,26 @@ pub enum ResourceAddressPart {
     Email(String),
 }
 
-impl ResourceAddressPart {
-    pub fn to_kind(self) -> ResourceAddressPartKind {
+impl ResourcePathSegment {
+    pub fn to_kind(self) -> ResourcePathSegmentKind {
         match self {
-            ResourceAddressPart::SkewerCase(_) => ResourceAddressPartKind::SkewerCase,
-            ResourceAddressPart::Domain(_) => ResourceAddressPartKind::Domain,
-            ResourceAddressPart::Path(_) => ResourceAddressPartKind::Path,
-            ResourceAddressPart::Version(_) => ResourceAddressPartKind::Version,
-            ResourceAddressPart::Email(_) => ResourceAddressPartKind::Email,
+            ResourcePathSegment::SkewerCase(_) => ResourcePathSegmentKind::SkewerCase,
+            ResourcePathSegment::Domain(_) => ResourcePathSegmentKind::Domain,
+            ResourcePathSegment::Path(_) => ResourcePathSegmentKind::Path,
+            ResourcePathSegment::Version(_) => ResourcePathSegmentKind::Version,
+            ResourcePathSegment::Email(_) => ResourcePathSegmentKind::Email,
         }
     }
 }
 
-impl ToString for ResourceAddressPart {
+impl ToString for ResourcePathSegment {
     fn to_string(&self) -> String {
         match self {
-            ResourceAddressPart::SkewerCase(skewer) => skewer.to_string(),
-            ResourceAddressPart::Path(path) => path.to_string(),
-            ResourceAddressPart::Version(version) => version.to_string(),
-            ResourceAddressPart::Email(email) => email.to_string(),
-            ResourceAddressPart::Domain(domain) => domain.to_string(),
+            ResourcePathSegment::SkewerCase(skewer) => skewer.to_string(),
+            ResourcePathSegment::Path(path) => path.to_string(),
+            ResourcePathSegment::Version(version) => version.to_string(),
+            ResourcePathSegment::Email(email) => email.to_string(),
+            ResourcePathSegment::Domain(domain) => domain.to_string(),
         }
     }
 }
@@ -616,19 +601,19 @@ impl <T> ParentAddressPatternRecognizer<T> {
 
 #[derive(Clone,Eq,PartialEq,Hash)]
 pub struct AddressPattern{
-    pattern: Vec<ResourceAddressPartKind>
+    pattern: Vec<ResourcePathSegmentKind>
 }
 
-impl From<Vec<ResourceAddressPart>> for AddressPattern{
-    fn from(parts: Vec<ResourceAddressPart>) -> Self {
+impl From<Vec<ResourcePathSegment>> for AddressPattern{
+    fn from(parts: Vec<ResourcePathSegment>) -> Self {
         Self {
             pattern: parts.iter().map(|p| p.clone().to_kind()).collect()
         }
     }
 }
 
-impl From<Vec<ResourceAddressPartKind>> for AddressPattern{
-    fn from(parts: Vec<ResourceAddressPartKind>) -> Self {
+impl From<Vec<ResourcePathSegmentKind>> for AddressPattern{
+    fn from(parts: Vec<ResourcePathSegmentKind>) -> Self {
         Self {
             pattern: parts
         }
@@ -736,9 +721,9 @@ impl Path {
     }
 }
 
-impl Into<ResourceAddressPart> for Path {
-    fn into(self) -> ResourceAddressPart {
-        ResourceAddressPart::Path(self)
+impl Into<ResourcePathSegment> for Path {
+    fn into(self) -> ResourcePathSegment {
+        ResourcePathSegment::Path(self)
     }
 }
 
@@ -813,9 +798,9 @@ impl Version {
     }
 }
 
-impl Into<ResourceAddressPart> for Version {
-    fn into(self) -> ResourceAddressPart {
-        ResourceAddressPart::Version(self)
+impl Into<ResourcePathSegment> for Version {
+    fn into(self) -> ResourcePathSegment {
+        ResourcePathSegment::Version(self)
     }
 }
 
@@ -849,7 +834,7 @@ impl FromStr for Version {
 #[cfg(test)]
 mod tests {
     use crate::error::Error;
-    use crate::{parse_address_path, ResourceAddressPart, SkewerCase, version, path, domain, DomainCase, KeyBits};
+    use crate::{parse_address_path, ResourcePathSegment, SkewerCase, version, path, domain, DomainCase, KeyBits};
     use crate::{SpaceKey,ResourceKey,RootKey,SubSpaceKey,AppKey,DatabaseKey};
     use std::convert::TryInto;
     use std::str::FromStr;
@@ -871,7 +856,6 @@ mod tests {
     fn test_key_bits() -> Result<(),Error> {
         let (leftover,bits) = KeyBits::parse_key_bits("ss0:e53:sub73")?;
 
-println!("leftover: {}",leftover );
         assert_eq!(leftover.len(),0);
 
         let bit = bits.get(0).unwrap();
@@ -956,11 +940,11 @@ println!("leftover: {}",leftover );
     fn address_path() -> Result<(),Error>{
         let (leftover,address)= parse_address_path("starlane.io:some-skewer-case:1.3.4-beta:/the/End/of/the.World")?;
 
-        assert_eq!(address.get(0), Option::Some(&ResourceAddressPart::Domain(DomainCase::new("starlane.io"))));
-        assert_eq!(address.get(1), Option::Some(&ResourceAddressPart::SkewerCase(SkewerCase::new("some-skewer-case"))));
+        assert_eq!(address.get(0), Option::Some(&ResourcePathSegment::Domain(DomainCase::new("starlane.io"))));
+        assert_eq!(address.get(1), Option::Some(&ResourcePathSegment::SkewerCase(SkewerCase::new("some-skewer-case"))));
         assert_eq!(leftover.len(),0);
 
-        if let ResourceAddressPart::Version(version) = address.get(2).cloned().unwrap() {
+        if let ResourcePathSegment::Version(version) = address.get(2).cloned().unwrap() {
             assert_eq!(version.major, 1);
             assert_eq!(version.minor, 3);
             assert_eq!(version.patch, 4);
@@ -970,7 +954,7 @@ println!("leftover: {}",leftover );
         }
 
 
-            if let ResourceAddressPart::Path(path) = address.get(3).cloned().unwrap() {
+            if let ResourcePathSegment::Path(path) = address.get(3).cloned().unwrap() {
                 assert_eq!("/the/End/of/the.World".to_string(), path.to_string() );
             } else {
                 assert!(false);
@@ -982,28 +966,24 @@ println!("leftover: {}",leftover );
 
 resources! {
     #[resource(parents(Root))]
-    #[resource(stars(SpaceHost))]
     #[resource(prefix="s")]
-    #[resource(ResourceAddressPartKind::SkewerCase)]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
     pub struct Space();
 
     #[resource(parents(Space))]
-    #[resource(stars(SpaceHost))]
     #[resource(prefix="ss")]
-    #[resource(ResourceAddressPartKind::SkewerCase)]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
     pub struct SubSpace();
 
 
     #[resource(parents(SubSpace))]
-    #[resource(stars(AppHost))]
     #[resource(prefix="app")]
-    #[resource(ResourceAddressPartKind::SkewerCase)]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
     pub struct App();
 
     #[resource(parents(SubSpace,App))]
-    #[resource(stars(SpaceHost,AppHost))]
     #[resource(prefix="db")]
-    #[resource(ResourceAddressPartKind::SkewerCase)]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
     pub struct Database();
 
     #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
