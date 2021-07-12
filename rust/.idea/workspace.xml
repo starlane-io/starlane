@@ -6,7 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-macros-test/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-macros-test/src/main.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-macros/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-macros/src/lib.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-resources/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/lib.rs" afterDir="false" />
     </list>
@@ -72,7 +71,7 @@
       <recent name="$PROJECT_DIR$/starlane/src" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test tests::space_key">
+  <component name="RunManager" selected="Cargo.Test tests::test_key">
     <configuration default="true" type="ArquillianTestNG" factoryName="" nameIsGenerated="true">
       <option name="arquillianRunConfiguration">
         <value>
@@ -166,8 +165,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test tests::test_domain" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-resources --lib tests::test_domain -- --exact" />
+    <configuration name="Test tests::test_key" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib tests::test_key -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -185,18 +184,18 @@
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test tests::address_path" />
-      <item itemvalue="Cargo.Test tests::test_domain" />
       <item itemvalue="Cargo.Test lib::tests" />
       <item itemvalue="Cargo.Test tests::space_key" />
       <item itemvalue="Cargo.Run starlane-resources-test" />
+      <item itemvalue="Cargo.Test tests::test_key" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Test tests::test_key" />
         <item itemvalue="Cargo.Test tests::space_key" />
         <item itemvalue="Cargo.Run starlane-resources-test" />
         <item itemvalue="Cargo.Test tests::address_path" />
         <item itemvalue="Cargo.Test lib::tests" />
-        <item itemvalue="Cargo.Test tests::test_domain" />
       </list>
     </recent_temporary>
   </component>
@@ -217,7 +216,7 @@
       <workItem from="1625759977203" duration="11299000" />
       <workItem from="1625777595261" duration="13728000" />
       <workItem from="1625838663767" duration="61485000" />
-      <workItem from="1626011932512" duration="54159000" />
+      <workItem from="1626011932512" duration="59288000" />
     </task>
     <servers />
   </component>

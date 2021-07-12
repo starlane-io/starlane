@@ -390,7 +390,7 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
          impl FromStr for #address_idents5 {
                type Err=Error;
                fn from_str( s: &str ) -> Result<Self,Self::Err> {
-                    let (leftover,parts) = parse_address_part(s)?;
+                    let (leftover,parts):(&str,Vec<ResourceAddressPart>) = parse_address_path(s)?;
                     unimplemented!()
                }
          }
@@ -420,7 +420,7 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
                             Ok(ResourceAddress::Root)
                         }
                     }
-                    #(ResourceType::#idents=>Ok(#address_idents::from_str(address)?.into())),*
+                    #(ResourceType::#idents=>Ok(#address_idents::try_from(address)?.into())),*
                 }
             }
 
@@ -773,24 +773,24 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
         let ident = Ident::new(format!("{}Key", resource.get_ident().to_string()).as_str(), resource.get_ident().span());
         let resource = resource.get_ident();
         key_stuff.push(quote!{
-                 impl #ident {
-                    pub fn string_bit(&self) -> String {
-                        format!("{}{}",stringify!(#prefix),self.id.to_string())
-                    }
-
-                    pub fn string_prefix(&self) -> String {
-                       stringify!(#prefix).to_string()
-                    }
-
-
+            impl #ident {
+                pub fn string_bit(&self) -> String {
+                    format!("{}{}",stringify!(#prefix),self.id.to_string())
                 }
 
-                impl ToString for #ident{
-                    fn to_string(&self) -> String {
-                        let rtn:ResourceKey = self.clone().into();
-                        rtn.to_string()
-                    }
+                pub fn string_prefix(&self) -> String {
+                   stringify!(#prefix).to_string()
                 }
+
+
+            }
+
+            impl ToString for #ident{
+                fn to_string(&self) -> String {
+                    let rtn:ResourceKey = self.clone().into();
+                    rtn.to_string()
+                }
+            }
 
             impl Into<ResourceKey> for #ident {
                 fn into(self) -> ResourceKey {
@@ -798,16 +798,16 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                 }
             }
 
-                    impl TryInto<#ident> for ResourceKey {
-                        type Error=Error;
-                        fn try_into(self)->Result<#ident,Self::Error> {
-                             if let Self::#resource_ident(key) = self {
-                                  Ok(key)
-                             } else {
-                                  Err(format!("cannot convert to {}", stringify!(ident)).into())
-                             }
-                        }
-                    }
+            impl TryInto<#ident> for ResourceKey {
+                type Error=Error;
+                fn try_into(self)->Result<#ident,Self::Error> {
+                     if let Self::#resource_ident(key) = self {
+                          Ok(key)
+                     } else {
+                          Err(format!("cannot convert to {}", stringify!(ident)).into())
+                     }
+                }
+            }
 
         });
 
@@ -829,6 +829,11 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
         #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
         pub struct RootKey();
 
+        impl RootKey {
+            pub fn new()->Self {
+                Self()
+            }
+        }
 
         impl Into<ResourceKey> for RootKey {
             fn into(self) -> ResourceKey {

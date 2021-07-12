@@ -22,37 +22,7 @@ use std::sync::Arc;
 pub mod error;
 mod parse;
 
-resources! {
-    #[resource(parents(Root))]
-    #[resource(stars(SpaceHost))]
-    #[resource(prefix="spc")]
-    #[resource(ResourceAddressPartKind::SkewerCase)]
-    pub struct Space();
 
-    #[resource(parents(Space))]
-    #[resource(stars(SpaceHost))]
-    #[resource(prefix="sub")]
-    #[resource(ResourceAddressPartKind::SkewerCase)]
-    pub struct SubSpace();
-
-
-    #[resource(parents(SubSpace))]
-    #[resource(stars(AppHost))]
-    #[resource(prefix="app")]
-    #[resource(ResourceAddressPartKind::SkewerCase)]
-    pub struct App();
-
-    #[resource(parents(SubSpace,App))]
-    #[resource(stars(SpaceHost,AppHost))]
-    #[resource(prefix="db")]
-    #[resource(ResourceAddressPartKind::SkewerCase)]
-    pub struct Database();
-
-    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
-    pub enum DatabaseKind{
-        Relational(Specific)
-    }
-}
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum StarKind {
@@ -872,9 +842,17 @@ impl FromStr for Version {
 mod tests {
     use crate::error::Error;
     use crate::{parse_address_path, ResourceAddressPart, SkewerCase, version, path, domain, DomainCase};
-
+    use crate::{SpaceKey,ResourceKey,RootKey};
 
     #[test]
+    fn test_key() -> Result<(),Error>{
+        let space_key = SpaceKey::new(RootKey::new(),0);
+        let space_key: ResourceKey = space_key.into();
+        Ok(())
+    }
+
+
+        #[test]
     fn test_version() -> Result<(),Error>{
         let (leftover,version)= version("1.3.4-beta")?;
         assert_eq!(leftover.len(),0);
@@ -937,3 +915,41 @@ mod tests {
             Ok(())
     }
 }
+
+resources! {
+    #[resource(parents(Root))]
+    #[resource(stars(SpaceHost))]
+    #[resource(prefix="spc")]
+    #[resource(ResourceAddressPartKind::SkewerCase)]
+    pub struct Space();
+
+    #[resource(parents(Space))]
+    #[resource(stars(SpaceHost))]
+    #[resource(prefix="sub")]
+    #[resource(ResourceAddressPartKind::SkewerCase)]
+    pub struct SubSpace();
+
+
+    #[resource(parents(SubSpace))]
+    #[resource(stars(AppHost))]
+    #[resource(prefix="app")]
+    #[resource(ResourceAddressPartKind::SkewerCase)]
+    pub struct App();
+
+    #[resource(parents(SubSpace,App))]
+    #[resource(stars(SpaceHost,AppHost))]
+    #[resource(prefix="db")]
+    #[resource(ResourceAddressPartKind::SkewerCase)]
+    pub struct Database();
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum DatabaseKind{
+        Relational(Specific)
+    }
+}
+
+
+
+
+
+
