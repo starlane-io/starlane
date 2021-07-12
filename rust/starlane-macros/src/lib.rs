@@ -231,7 +231,6 @@ impl ResourceType {
 
     let keys= keys(&parsed);
 
-    let extras = extras();
 
     let kinds = kinds(&parsed);
 
@@ -244,13 +243,18 @@ impl ResourceType {
        #resource_impl_def
        #(#resources_def)*
        #keys
+
+       #addresses
+       #keys
     })
      */
 
     proc_macro::TokenStream::from( quote!{
        #resource_type_enum_def
        #resource_impl_def
-        #kinds
+       #(#resources_def)*
+       #kinds
+       #keys
        #addresses
     })
 }
@@ -278,7 +282,7 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
                     pub fn parent(&self)->Result<Option<ResourceAddress>,Error> {
                         let mut parts = self.parts;
                         parts.remove( parts.len() );
-                        #parent_address::try_from(parts)?
+                        Ok(Option::Some(#parent_address::try_from(parts)?))
                     }
                 }
             } );
@@ -292,7 +296,7 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
                         parts.remove( parts.len() );
                         let matcher = ParentAddressPatternRecognizer::default();
                         let parent_resource_type = matcher.try_from(parts)?;
-                        Ok(ResourceAddress::from_parts_and_type(parent_resource_type, parts )?)
+                        Ok(Option::Some(ResourceAddress::from_parts_and_type(parent_resource_type, parts )?))
                     }
                 }
             } );
@@ -407,6 +411,7 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
     into_resource_kind_parts.push_str( "impl Into<ResourceKindParts> for ResourceKind {");
     into_resource_kind_parts.push_str( "fn into(self) -> ResourceKindParts {");
     into_resource_kind_parts.push_str( "match self {");
+    into_resource_kind_parts.push_str( "Self::Root => ResourceKindParts{ resource_type: \"Root\".to_string(), kind:Option::None, specific:Option::None },");
 
     for resource in &parsed.resources {
       if let Option::Some(kind) = parsed.kind_for(resource) {
@@ -431,7 +436,7 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
           has_specific.push_str("match self {");
 
           let mut from_parts = String::new();
-          from_parts.push_str(format!("impl TryFrom for {} {{", kind.ident.to_string()).as_str() );
+          from_parts.push_str(format!("impl TryFrom<ResourceKindParts> for {} {{", kind.ident.to_string()).as_str() );
           from_parts.push_str("type Error=Error;");
           from_parts.push_str("fn try_from(parts: ResourceKindParts)->Result<Self,Self::Error>{" );
           from_parts.push_str("match parts.kind.ok_or(\"expected kind\")?.as_str() {");
@@ -461,20 +466,21 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
               }
 
               if!variant.fields.is_empty() {
-                  from_parts.push_str(format!("\"{}\" => Self::{}(Specific::from_str(parts.specific.ok_or(\"expected a specific\")?)),", variant.ident.to_string(), variant.ident.to_string()).as_str());
+                  from_parts.push_str(format!("\"{}\" => Ok(Self::{}(parts.specific.ok_or(\"expected a specific\")?)),", variant.ident.to_string(), variant.ident.to_string()).as_str());
               } else {
-                  from_parts.push_str(format!("\"{}\" => Self::{},", variant.ident.to_string(), variant.ident.to_string()).as_str());
+                  from_parts.push_str(format!("\"{}\" => Ok(Self::{}),", variant.ident.to_string(), variant.ident.to_string()).as_str());
               }
 
               if!variant.fields.is_empty() {
-                  into_parts.push_str(format!("Self::{}(specific)=>ResourceKindParts{{resource_type:\"{}\",kind:Option::Some(\"{}\"),specific:Option::Some(specific.to_string())}},",variant.ident.to_string(),resource.get_ident().to_string(),variant.ident.to_string(),).as_str() );
+                  into_parts.push_str(format!("Self::{}(specific)=>ResourceKindParts{{resource_type:\"{}\".to_string(),kind:Option::Some(\"{}\".to_string()),specific:Option::Some(specific)}},",variant.ident.to_string(),resource.get_ident().to_string(),variant.ident.to_string(),).as_str() );
               } else {
-                  into_parts.push_str(format!("Self::{}=>ResourceKindParts{{resource_type:\"{}\",kind:Option::Some(\"{}\"),specific:Option::None}},",variant.ident.to_string(),resource.get_ident().to_string(),variant.ident.to_string(),).as_str() );
+                  into_parts.push_str(format!("Self::{}=>ResourceKindParts{{resource_type:\"{}\".to_string(),kind:Option::Some(\"{}\".to_string()),specific:Option::None}},",variant.ident.to_string(),resource.get_ident().to_string(),variant.ident.to_string(),).as_str() );
               }
 
           }
           has_specific.push_str("}}}" );
           get_specific.push_str("}}}" );
+          from_parts.push_str("_ => Err(\"could not match kind\".into())");
           from_parts.push_str("}}}" );
           into_parts.push_str("}}}" );
 
@@ -522,7 +528,7 @@ println!("{}",from_parts);
       } else {
           resource_kind_enum.push_str(format!("{},",resource.get_ident().to_string()).as_str() );
           resource_kind_from_parts.push_str( format!("\"{}\"=>Ok(Self::{}),",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str(), );
-          into_resource_kind_parts.push_str(format!("Self::{}(kind)=>ResourceKindParts{{resource_type:\"{}\",kind:Option::None,specific:Option::None}},",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str() );
+          into_resource_kind_parts.push_str(format!("Self::{}=>ResourceKindParts{{resource_type:\"{}\".to_string(),kind:Option::None,specific:Option::None}},",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str() );
       }
   }
     resource_kind_enum.push_str("}");
@@ -546,7 +552,7 @@ println!("{}",from_parts);
 
         impl ToString for ResourceKind {
             fn to_string(&self) -> String {
-                let parts: ResourceKindParts = self.into();
+                let parts: ResourceKindParts = self.clone().into();
                 parts.to_string()
             }
         }
@@ -569,6 +575,7 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
     for resource in &parsed.resources {
         let ident = Ident::new(format!("{}Key", resource.get_ident().to_string()).as_str(), resource.get_ident().span());
         let id = Ident::new(format!("{}Id", resource.get_ident().to_string()).as_str(), resource.get_ident().span());
+        let resource_ident = resource.get_ident();
 
 
         let key = if resource.parents.is_empty() {
@@ -610,22 +617,22 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
 
                         pub fn string_bit(&self) -> String {
                              match self {
-                                #(#parents(key)=>key.string_bit()),*
+                                #(Self::#parents(key)=>key.string_bit()),*
                              }
                         }
 
                         pub fn string_prefix(&self) -> String {
                              match self {
-                                #(#parents(key)=>key.stringprefix()),*
+                                #(Self::#parents(key)=>key.string_prefix()),*
                              }
                         }
 
                     }
 
                     impl Into<ResourceKey> for #parent {
-                        pub fn into(self)->ResourceKey {
+                        fn into(self)->ResourceKey {
                             match self {
-                              #(#parents(key)=>key.into()),*
+                              #(Self::#parents(key)=>key.into()),*
                             }
                         }
                     }
@@ -658,20 +665,22 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
             };
             quote! {
                 pub type #id= u64;
+
+                #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
                 pub struct #ident {
-                    parent: #parent
+                    parent: #parent,
                     id: #id
                 }
 
                 impl #ident {
 
                   fn from_keybit( parent: #parent, key_bit: KeyBit ) -> Result<Self,Error> {
-                       if key_bit.key_type.as_str() != strinify!(prefix) {
+                       if key_bit.key_type.as_str() != stringify!(prefix) {
                           return Err(format!("cannot create '{}' from keybit: '{}'",key_bit.key_type.as_str(),stringify!(prefix)).into())
                        }
                        Ok(Self {
                          parent: parent,
-                         id: key_bit.id as id
+                         id: key_bit.id as u64
                        })
                     }
 
@@ -684,9 +693,10 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
 
 
                     pub fn parent(&self) -> Option<ResourceKey> {
-                        Option::Some(parent.into())
+                        Option::Some(self.parent.clone().into())
                     }
                 }
+
             }
         };
         key_stuff.push(key);
@@ -694,6 +704,7 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
         //COMMON KEY
         let prefix: TokenStream  = resource.key_prefix.as_ref().expect("expected key prefix").clone().parse().unwrap();
         let ident = Ident::new(format!("{}Key", resource.get_ident().to_string()).as_str(), resource.get_ident().span());
+        let resource = resource.get_ident();
         key_stuff.push(quote!{
                  impl #ident {
                     pub fn string_bit(&self) -> String {
@@ -701,24 +712,29 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                     }
 
                     pub fn string_prefix(&self) -> String {
-                       stringify!(#prefix)
+                       stringify!(#prefix).to_string()
                     }
 
 
                 }
 
                 impl ToString for #ident{
-                    pub fn to_string(&self) -> String {
+                    fn to_string(&self) -> String {
                         let rtn:ResourceKey = self.clone().into();
                         rtn.to_string()
                     }
                 }
 
+            impl Into<ResourceKey> for #ident {
+                fn into(self) -> ResourceKey {
+                    ResourceKey::#resource(self)
+                }
+            }
 
                     impl TryInto<#ident> for ResourceKey {
                         type Error=Error;
                         fn try_into(self)->Result<#ident,Self::Error> {
-                             if let Self::#ident(key) = self {
+                             if let Self::#resource_ident(key) = self {
                                   Ok(key)
                              } else {
                                   Err(format!("cannot convert to {}", stringify!(ident)).into())
@@ -741,11 +757,27 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
 
 
     let rtn = quote!{
-        #(#key_stuff)*
+    #(#key_stuff)*
 
         #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
-        pub enum RootKey{
+        pub struct RootKey();
 
+
+        impl Into<ResourceKey> for RootKey {
+            fn into(self) -> ResourceKey {
+                ResourceKey::Root
+            }
+        }
+
+        impl TryInto<RootKey> for ResourceKey {
+            type Error=Error;
+            fn try_into(self) -> Result<RootKey,Error> {
+                if let Self::Root=self {
+                    Ok(RootKey())
+                } else {
+                    Err("not an instance of a RootKey".into())
+                }
+            }
         }
 
         #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
@@ -762,43 +794,43 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
 
             pub fn parent(&self)->Option<ResourceKey> {
                 match self {
-                    #(#idents(key) => key.parent(),)*
+                    #(Self::#idents(key) => key.parent(),)*
                     Root => Option::None
                 }
             }
 
             pub fn string_bit(&self) -> String {
                  match self {
-                    #(#idents(key) => key.string_bit(), )*
-                    Root => ""
+                    #(Self::#idents(key) => key.string_bit(), )*
+                    Root => "".to_string()
                 }
             }
 
             pub fn string_prefix(&self) -> String {
                  match self {
-                    #(#idents(key) => key.string_prefix(), )*
-                    Root => ""
+                    #(Self::#idents(key) => key.string_prefix(), )*
+                    Root => "".to_string()
                 }
             }
 
             pub fn ancestors(&self) -> Vec<ResourceKey> {
                 let mut rtn = vec![];
-                let mut ancestor = self;
+                let mut ancestor = self.clone();
                 while let Option::Some(parent) = ancestor.parent() {
-                   rtn.push( parent );
-                   ancestor = parent;
+                   rtn.push( parent.clone() );
+                   ancestor = parent.clone();
                 }
                 rtn
             }
 
             pub fn ancestors_not_root(&self) -> Vec<ResourceKey> {
                 let mut rtn = vec![];
-                let mut ancestor = self;
+                let mut ancestor = self.clone();
                 while let Option::Some(parent) = ancestor.parent() {
                    if parent.parent().is_some() {
-                      rtn.push( parent );
+                      rtn.push( parent.clone() );
                    }
-                   ancestor = parent;
+                   ancestor = parent.clone();
                 }
                 rtn
             }
@@ -807,7 +839,7 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                 match key_bit.key_type.as_str() {
 
                     #(stringify!(#prefixes) => {
-                        #idents::from_keybit(parent.try_into()?, key_bit )?.into()
+                        Ok(#idents_keys::from_keybit(parent.try_into()?, key_bit )?.into())
                     } ,)*
                     _ => Err("unrecognized keybit".into())
                 }
@@ -815,14 +847,14 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
         }
 
         impl ToString for ResourceKey {
-            pub fn to_string(&self) -> String {
+            fn to_string(&self) -> String {
                 let mut ancestors = self.ancestors_not_root();
                 ancestors.reverse();
                 ancestors.push(self.clone());
 
                 let mut rtn = String::new();
                 for ancestor in ancestors {
-                    rtn.push_str(ancestor.string_bit());
+                    rtn.push_str(ancestor.string_bit().as_str());
                 }
                 rtn
             }
@@ -855,41 +887,6 @@ fn extras( )  -> TokenStream {
 
 pub struct Error {
     message: String
-}
-
-struct KeyBit{
-   key_type: String,
-   id: u64
-}
-
-struct KeyBits{
-  key_type: String,
-  bits: Vec<KeyBit>
-}
-
-
-impl ResourceKey {
-
-
-     pub fn parse_key_bits(input: &str) -> Res<&str, Vec<KeyBit>> {
-        context(
-            "key-bits",
-             many1( parse_key_bit )
-        )(input)
-     }
-
-    pub fn parse_key_bit(input: &str) -> Res<&str, KeyBit> {
-        context(
-            "key-bit",
-            tuple( (alpha1, digit1) ),
-        )(input).map( |(input, (key_type,id))|{
-            (input,
-            KeyBit{
-                key_type: key_type,
-                id: id.parse().unwrap() // should not have an error since we know it is a digit
-            })
-        })
-    }
 }
 
 

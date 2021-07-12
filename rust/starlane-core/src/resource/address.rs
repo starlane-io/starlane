@@ -19,7 +19,7 @@ use std::collections::HashMap;
 
 
 pub type Domain = String;
-type Res<T, U> = IResult<T, U, VerboseError<T>>;
+pub type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
 fn alphanumerichyphen1<T>(i: T) -> Res<T, T>
 where
@@ -231,11 +231,37 @@ impl ToString for Specific {
     }
 }
 
+impl FromStr for Specific {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (leftover, specific) = specific(s)?;
+        if leftover.len() != 0 {
+            Err(format!("could not process '{}' portion of specific '{}'", leftover, s).into())
+        } else {
+            Ok(specific)
+        }
+    }
+}
+
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ResourceKindParts{
     pub resource_type: String,
     pub kind: Option<String>,
     pub specific: Option<Specific>
+}
+
+
+impl ToString for ResourceKindParts {
+    fn to_string(&self) -> String {
+        if self.specific.is_some() && self.kind.is_some(){
+            format!("<{}<{}<{}>>>", self.resource_type, self.kind.as_ref().unwrap().to_string(), self.specific.as_ref().unwrap().to_string() )
+        } else if self.kind.is_some() {
+            format!("<{}<{}>>", self.resource_type, self.kind.as_ref().unwrap().to_string() )
+        } else {
+            format!("<{}>", self.resource_type)
+        }
+    }
 }
 
 impl FromStr for ResourceKindParts {
@@ -544,3 +570,39 @@ impl From<Vec<ResourceAddressPartKind>> for AddressPattern{
         }
     }
 }
+
+pub struct KeyBit{
+    pub key_type: String,
+    pub id: u64
+}
+
+pub struct KeyBits{
+    pub key_type: String,
+    pub bits: Vec<KeyBit>
+}
+
+
+impl KeyBits{
+
+
+    pub fn parse_key_bits(input: &str) -> Res<&str, Vec<KeyBit>> {
+        context(
+            "key-bits",
+            many1( KeyBits::parse_key_bit )
+        )(input)
+    }
+
+    pub fn parse_key_bit(input: &str) -> Res<&str, KeyBit> {
+        context(
+            "key-bit",
+            tuple( (alpha1, digit1) ),
+        )(input).map( |(input, (key_type,id))|{
+            (input,
+             KeyBit{
+                 key_type: key_type.to_string(),
+                 id: id.parse().unwrap() // should not have an error since we know it is a digit
+             })
+        })
+    }
+}
+
