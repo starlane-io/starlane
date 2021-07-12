@@ -23,9 +23,15 @@ use starlane_core::star::StarKind;
 use serde::de::Error as OtherError;
 
 
+pub fn parse_address_part(string: &str) -> Result<(&str, Vec<ResourceAddressPart>),Error>
+{
+    unimplemented!()
+}
+
 fn main() {
     println!("Hello, world!");
 }
+
 
 
 
@@ -65,7 +71,16 @@ pub enum DatabaseKind{
 
 
 
+
 }
+
+
+
+
+
+
+
+
 
 
 
@@ -93,3 +108,4 @@ use crate::ResourceKind;
         Ok(())
     }
 }
+

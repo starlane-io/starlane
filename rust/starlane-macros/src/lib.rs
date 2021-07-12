@@ -264,6 +264,7 @@ impl ResourceType {
        #(#resources_def)*
        #keys
        #kinds
+       #addresses
     })
 }
 fn addresses( parsed: &ResourceParser ) -> TokenStream {
@@ -288,9 +289,9 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
             addresses.push( quote!{
                  impl #address_ident {
                     pub fn parent(&self)->Result<Option<ResourceAddress>,Error> {
-                        let mut parts = self.parts;
+                        let mut parts = self.parts.clone();
                         parts.remove( parts.len() );
-                        Ok(Option::Some(#parent_address::try_from(parts)?))
+                        Ok(Option::Some(#parent_address::try_from(parts)?.into()))
                     }
                 }
             } );
@@ -300,11 +301,14 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
             addresses.push( quote!{
                  impl #address_ident {
                     pub fn parent(&self)->Result<Option<ResourceAddress>,Error> {
-                        let mut parts = self.parts;
+                        unimplemented!()
+/*                        let mut parts = self.parts.clone();
                         parts.remove( parts.len() );
                         let matcher = ParentAddressPatternRecognizer::default();
-                        let parent_resource_type = matcher.try_from(parts)?;
+                        let parent_resource_type = matcher.try_from(parts.clone())?;
                         Ok(Option::Some(ResourceAddress::from_parts_and_type(parent_resource_type, parts )?))
+
+ */
                     }
                 }
             } );
@@ -330,7 +334,7 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
 
     quote!{
 
-        struct RootAddress{
+        pub struct RootAddress{
 
         }
 
@@ -340,7 +344,24 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
            }
         }
 
-        #(struct #address_idents {
+        impl Into<ResourceAddress> for RootAddress{
+            fn into(self) -> ResourceAddress {
+                ResourceAddress::Root
+            }
+        }
+
+        impl TryFrom<Vec<ResourceAddressPart>> for RootAddress{
+            type Error=Error;
+            fn try_from( parts: Vec<ResourceAddressPart> ) -> Result<RootAddress,Self::Error> {
+                if parts.is_empty() {
+                    Ok(RootAddress{})
+                } else {
+                    Err("root address should not have remaining parts".into())
+                }
+            }
+        }
+
+        #(pub struct #address_idents {
             parts: Vec<ResourceAddressPart>
         }
 
@@ -367,15 +388,17 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
             }
 
          impl FromStr for #address_idents5 {
-               type Error=Err;
+               type Err=Error;
                fn from_str( s: &str ) -> Result<Self,Self::Err> {
-
+                    let (leftover,parts) = parse_address_part(s)?;
+                    unimplemented!()
                }
          }
 
         )*
 
         pub enum ResourceAddress {
+            Root,
             #(#idents(#address_idents)),*
         }
 
@@ -390,7 +413,14 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
                 let kind:ResourceKind = kind.try_into()?;
 
                 match kind.resource_type() {
-                    #(ResourceType::#idents=>Ok(#address_idents::from_str(address)?)),*
+                    ResourceType::Root => {
+                        if !address.is_empty()  {
+                            Err("root address must be empty".into())
+                        } else {
+                            Ok(ResourceAddress::Root)
+                        }
+                    }
+                    #(ResourceType::#idents=>Ok(#address_idents::from_str(address)?.into())),*
                 }
             }
 
@@ -400,7 +430,8 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
         impl ResourceAddress {
             pub fn from_parts_and_type( resource_type:ResourceType, parts: Vec<ResourceAddressPart> ) -> Result<ResourceAddress,Error> {
                match  resource_type {
-                    #(ResourceType::#idents => Ok(#address_idents::try_from(parts)?) ),*
+                    ResourceType::Root => Ok(ResourceAddress::Root),
+                    #(ResourceType::#idents => Ok(#address_idents::try_from(parts.clone())?.into()) ),*
                }
 
             }
@@ -431,11 +462,20 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
     into_resource_kind_parts.push_str( "match self {");
     into_resource_kind_parts.push_str( "Self::Root => ResourceKindParts{ resource_type: \"Root\".to_string(), kind:Option::None, specific:Option::None },");
 
+
+    let mut resource_type = String::new();
+    resource_type.push_str( "impl ResourceKind {");
+    resource_type.push_str( "pub fn resource_type(self) -> ResourceType {");
+    resource_type.push_str( "match self {");
+    resource_type.push_str( "Self::Root => ResourceType::Root,");
+
+
     for resource in &parsed.resources {
       if let Option::Some(kind) = parsed.kind_for(resource) {
           resource_kind_enum.push_str(format!("{}({}),",resource.get_ident().to_string(),kind.ident.to_string()).as_str() );
           resource_kind_from_parts.push_str( format!("\"{}\"=>Ok({}Kind::try_from(parts)?.into()),",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str(), );
           into_resource_kind_parts.push_str(format!("Self::{}(kind)=>kind.into(),",resource.get_ident().to_string()).as_str() );
+          resource_type.push_str(format!("Self::{}(_)=>ResourceType::{},",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str() );
           let kind_cp = kind.clone();
           kind_stuff.push(quote!{#kind_cp});
 
@@ -465,6 +505,7 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
           into_parts.push_str("fn into(self)->ResourceKindParts {" );
           into_parts.push_str("match self {");
 
+
           for variant in &kind.variants {
               variants.push( variant.ident.clone() );
               has_specific.push_str(format!("Self::{}", variant.ident.to_string()).as_str());
@@ -482,6 +523,7 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
               } else {
                   get_specific.push_str("=>Option::None,");
               }
+
 
               if!variant.fields.is_empty() {
                   from_parts.push_str(format!("\"{}\" => Ok(Self::{}(parts.specific.ok_or(\"expected a specific\")?)),", variant.ident.to_string(), variant.ident.to_string()).as_str());
@@ -502,7 +544,8 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
           from_parts.push_str("}}}" );
           into_parts.push_str("}}}" );
 
-println!("{}",from_parts);
+
+
 
           let has_specific= syn::parse_str::<Item>( has_specific.as_str() ).unwrap();
           kind_stuff.push(quote!{#has_specific});
@@ -516,6 +559,7 @@ println!("{}",from_parts);
           let into_parts= syn::parse_str::<Item>( into_parts.as_str() ).unwrap();
           kind_stuff.push(quote!{#into_parts});
 
+
           kind_stuff.push(quote!{
 
             impl #kind_ident{
@@ -523,6 +567,7 @@ println!("{}",from_parts);
                     ResourceType::#resource_ident
                 }
             }
+
 
             impl Into<ResourceKind> for #kind_ident {
                   fn into(self) -> ResourceKind {
@@ -547,12 +592,14 @@ println!("{}",from_parts);
           resource_kind_enum.push_str(format!("{},",resource.get_ident().to_string()).as_str() );
           resource_kind_from_parts.push_str( format!("\"{}\"=>Ok(Self::{}),",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str(), );
           into_resource_kind_parts.push_str(format!("Self::{}=>ResourceKindParts{{resource_type:\"{}\".to_string(),kind:Option::None,specific:Option::None}},",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str() );
+          resource_type.push_str(format!("Self::{}=>ResourceType::{},",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str() );
       }
   }
     resource_kind_enum.push_str("}");
     resource_kind_from_parts.push_str("what => Err(format!(\"cannot identify ResourceType: '{}'\",what).into())" );
     resource_kind_from_parts.push_str("}}}" );
     into_resource_kind_parts.push_str("}}}" );
+    resource_type.push_str("}}}");
 
     let resource_kind_emum = syn::parse_str::<Item>(resource_kind_enum.as_str()).unwrap();
     kind_stuff.push( quote!{#resource_kind_emum});
@@ -563,6 +610,8 @@ println!("{}",from_parts);
     let into_resource_kind_parts= syn::parse_str::<Item>(into_resource_kind_parts.as_str()).unwrap();
     kind_stuff.push( quote!{#into_resource_kind_parts});
 
+    let resource_type= syn::parse_str::<Item>(resource_type.as_str()).unwrap();
+    kind_stuff.push( quote!{#resource_type});
 
 
     let rtn = quote!{

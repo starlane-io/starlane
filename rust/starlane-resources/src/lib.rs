@@ -50,10 +50,10 @@ resources! {
 
     #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
     pub enum DatabaseKind{
-        Native,
-        External(Specific)
+        Relational(Specific)
     }
 }
+
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum StarKind {
     Central,
@@ -69,6 +69,7 @@ pub enum StarKind {
     Web,
     Kube,
 }
+
 pub type Domain = String;
 pub type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
