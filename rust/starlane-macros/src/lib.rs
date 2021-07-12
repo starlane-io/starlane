@@ -190,6 +190,15 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
           Root,
           #(#rts),*
          }
+
+        impl ToString for ResourceType {
+            fn to_string(&self) -> String {
+                match self {
+                    Self::Root => "Root".to_string(),
+                    #(Self::#rts => stringify!(#rts).to_string() ),*
+                }
+            }
+        }
     };
 
     let idents : Vec<Ident> = parsed.resources.iter().map(|resource|{
@@ -253,7 +262,8 @@ impl ResourceType {
        #resource_type_enum_def
        #resource_impl_def
        #(#resources_def)*
-       #addresses
+       #keys
+       #kinds
     })
 }
 fn addresses( parsed: &ResourceParser ) -> TokenStream {

@@ -14,12 +14,61 @@ use nom::sequence::{delimited, preceded, terminated, tuple};
 use serde::Deserialize;
 use serde::Serialize;
 
+use starlane_macros::resources;
+
 use crate::error::Error;
 use std::sync::Arc;
 
 pub mod error;
 mod parse;
 
+resources! {
+    #[resource(parents(Root))]
+    #[resource(stars(SpaceHost))]
+    #[resource(prefix="spc")]
+    #[resource(ResourceAddressPartKind::SkewerCase)]
+    pub struct Space();
+
+    #[resource(parents(Space))]
+    #[resource(stars(SpaceHost))]
+    #[resource(prefix="sub")]
+    #[resource(ResourceAddressPartKind::SkewerCase)]
+    pub struct SubSpace();
+
+
+    #[resource(parents(SubSpace))]
+    #[resource(stars(AppHost))]
+    #[resource(prefix="app")]
+    #[resource(ResourceAddressPartKind::SkewerCase)]
+    pub struct App();
+
+    #[resource(parents(SubSpace,App))]
+    #[resource(stars(SpaceHost,AppHost))]
+    #[resource(prefix="db")]
+    #[resource(ResourceAddressPartKind::SkewerCase)]
+    pub struct Database();
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum DatabaseKind{
+        Native,
+        External(Specific)
+    }
+}
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize, Hash)]
+pub enum StarKind {
+    Central,
+    SpaceHost,
+    Mesh,
+    AppHost,
+    ActorHost,
+    FileStore,
+    ArtifactStore,
+    Gateway,
+    Link,
+    Client,
+    Web,
+    Kube,
+}
 pub type Domain = String;
 pub type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
