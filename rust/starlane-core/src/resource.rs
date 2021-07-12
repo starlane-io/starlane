@@ -4230,6 +4230,12 @@ impl Path {
     }
 }
 
+impl Into<ResourceAddressPart> for Path {
+    fn into(self) -> ResourceAddressPart {
+        ResourceAddressPart::Path(self)
+    }
+}
+
 impl TryInto<Arc<Vec<u8>>> for Path {
     type Error = Error;
 
@@ -4299,6 +4305,12 @@ impl Version {
 impl Version {
     pub fn as_semver(&self) -> Result<semver::Version, Error> {
         Ok(semver::Version::parse(self.string.as_str())?)
+    }
+}
+
+impl Into<ResourceAddressPart> for Version {
+    fn into(self) -> ResourceAddressPart {
+        ResourceAddressPart::Version(self)
     }
 }
 

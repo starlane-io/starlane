@@ -459,6 +459,12 @@ impl SkewerCase {
     }
 }
 
+impl Into<ResourceAddressPart> for SkewerCase {
+    fn into(self) -> ResourceAddressPart {
+        ResourceAddressPart::SkewerCase(self)
+    }
+}
+
 impl ToString for SkewerCase {
     fn to_string(&self) -> String {
         self.string.clone()

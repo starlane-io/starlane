@@ -253,8 +253,7 @@ impl ResourceType {
        #resource_type_enum_def
        #resource_impl_def
        #(#resources_def)*
-       #kinds
-       #keys
+       #addresses
     })
 }
 fn addresses( parsed: &ResourceParser ) -> TokenStream {
@@ -314,6 +313,7 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
     let address_idents2 = address_idents.clone();
     let address_idents3 = address_idents.clone();
     let address_idents4= address_idents.clone();
+    let address_idents5= address_idents.clone();
 
 
 
@@ -355,6 +355,14 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
                     })
                }
             }
+
+         impl FromStr for #address_idents5 {
+               type Error=Err;
+               fn from_str( s: &str ) -> Result<Self,Self::Err> {
+
+               }
+         }
+
         )*
 
         pub enum ResourceAddress {

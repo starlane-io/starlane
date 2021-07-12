@@ -1,13 +1,13 @@
 [package]
-name = "starlane-macros-test"
+name = "starlane-resources"
 version = "0.1.0"
-authors = ["Scott Williams <scott@mightydevco.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 starlane-macros = { path = "../starlane-macros" }
-starlane-core = { path = "../starlane-core" }
 serde = { version="1.0.69", features=['derive','rc'] }
 nom = "6.2.1"
+bincode = "1.3.3"
+semver = "0.11.0"

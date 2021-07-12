@@ -76,10 +76,20 @@ pub enum DatabaseKind{
 #[cfg(test)]
 mod tests {
 
-    use crate::ResourceKey;
+use crate::DatabaseKind;
+use crate::ResourceKind;
+    use starlane_core::resource::address::Specific;
+    use starlane_core::error::Error;
+    use std::str::FromStr;
 
     #[test]
-    fn space_key() {
-
+    fn space_key() -> Result<(),Error>{
+        let kind = DatabaseKind::Native;
+        let kind2 = DatabaseKind::External(Specific::from_str("mysql.org:mysql:innodb:1.0.0")?);
+        let kind:ResourceKind = kind.into();
+        let kind2:ResourceKind = kind2.into();
+        println!("{}",kind.to_string());
+        println!("{}",kind2.to_string());
+        Ok(())
     }
 }

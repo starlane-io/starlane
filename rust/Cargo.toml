@@ -4,4 +4,6 @@ members = [
   "starlane-core",
   "starlane-macros",
   "starlane-macros-test",
+  "starlane-resources",
+  "starlane-resources-test",
   ]

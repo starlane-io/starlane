@@ -5,7 +5,13 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/starlane-resources/src/error.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/rust.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/rust.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/resource/address.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource/address.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-macros-test/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-macros-test/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-macros-test/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-macros-test/src/main.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-macros/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-macros/src/lib.rs" afterDir="false" />
     </list>
@@ -42,9 +48,6 @@
   <component name="MacroExpansionManager">
     <option name="directoryName" value="h1ju9bq2" />
   </component>
-  <component name="ProblemsViewState">
-    <option name="selectedIndex" value="1" />
-  </component>
   <component name="ProjectId" id="1uPX0kefh0HiYYBSxVlBJRcrzs4" />
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
@@ -56,21 +59,25 @@
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
     <property name="aspect.path.notification.shown" value="true" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/starlane-core/src/star/variant" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/starlane-resources/src" />
     <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
     <property name="org.rust.disableDetachedFileInspection/Users/scott/projects/starlane/rust/starlane-macros-test/src/main.rs" value="true" />
+    <property name="org.rust.disableDetachedFileInspection/Users/scott/projects/starlane/rust/starlane-resources/src/address.rs" value="true" />
+    <property name="org.rust.disableDetachedFileInspection/Users/scott/projects/starlane/rust/starlane-resources/src/lib.rs" value="true" />
     <property name="settings.editor.selected.configurable" value="preferences.pluginManager" />
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/starlane-resources/src" />
       <recent name="$PROJECT_DIR$/starlane-core/src/star/variant" />
       <recent name="$PROJECT_DIR$/starlane-core/src/core" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/starlane-resources/src" />
       <recent name="$PROJECT_DIR$/starlane/src" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test tests::space_key">
+  <component name="RunManager" selected="Cargo.Test tests::it_works (1)">
     <configuration default="true" type="ArquillianTestNG" factoryName="" nameIsGenerated="true">
       <option name="arquillianRunConfiguration">
         <value>
@@ -119,8 +126,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test resource::address::test::test_specific" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib resource::address::test::test_specific -- --exact" />
+    <configuration name="Test resource::address::test::test_version_major_minor_patch" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib resource::address::test::test_version_major_minor_patch -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -135,8 +142,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test resource::address::test::test_version_major_minor_patch" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib resource::address::test::test_version_major_minor_patch -- --exact" />
+    <configuration name="Test tests::it_works (1)" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib tests::it_works -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -186,18 +193,18 @@
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Serve" />
-      <item itemvalue="Cargo.Test resource::address::test::test_specific" />
       <item itemvalue="Cargo.Test resource::address::test::test_version_major_minor_patch" />
       <item itemvalue="Cargo.Test tests::it_works" />
       <item itemvalue="Cargo.Test tests::space_key" />
+      <item itemvalue="Cargo.Test tests::it_works (1)" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Test tests::it_works (1)" />
         <item itemvalue="Cargo.Test tests::space_key" />
         <item itemvalue="Cargo.Test tests::it_works" />
         <item itemvalue="Cargo.Serve" />
         <item itemvalue="Cargo.Test resource::address::test::test_version_major_minor_patch" />
-        <item itemvalue="Cargo.Test resource::address::test::test_specific" />
       </list>
     </recent_temporary>
   </component>
@@ -218,7 +225,7 @@
       <workItem from="1625759977203" duration="11299000" />
       <workItem from="1625777595261" duration="13728000" />
       <workItem from="1625838663767" duration="61485000" />
-      <workItem from="1626011932512" duration="30022000" />
+      <workItem from="1626011932512" duration="39952000" />
     </task>
     <servers />
   </component>
