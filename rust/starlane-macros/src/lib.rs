@@ -235,6 +235,7 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
 
     let resource_type_enum_def = quote!{
+        #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
         pub enum ResourceType {
           Root,
           #(#rts),*
@@ -576,12 +577,21 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
                     ResourceType::Root => Ok(ResourcePath::Root),
                     #(ResourceType::#idents => Ok(#path_idents::try_from(parts.clone())?.into()) ),*
                }
-
             }
+
+            pub fn parent(&self)->Result<Option<ResourcePath>,Error>{
+                match self {
+                     Self::Root => Ok(Option::None),
+                     #(Self::#idents(path) => Ok(Option::Some(path.parent()?.unwrap().into())) ),*
+                 }
+            }
+
+
         }
 
         #(#paths)*
     }
+    //#(ResourceType::#idents => Ok(Option::Some(#path_idents::parent()?.unwrap().into())) ),*
 
 }
 

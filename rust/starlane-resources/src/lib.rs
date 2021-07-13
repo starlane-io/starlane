@@ -851,7 +851,7 @@ impl FromStr for Version {
 mod tests {
     use crate::error::Error;
     use crate::{parse_resource_path, ResourcePathSegment, SkewerCase, version, path, domain, DomainCase, KeyBits, Specific};
-    use crate::{SpaceKey,ResourceKey,RootKey,SubSpaceKey,AppKey,DatabaseKey,DatabaseKind,ResourceKind, DatabasePath, ResourcePath};
+    use crate::{SpaceKey,ResourceKey,RootKey,SubSpaceKey,AppKey,DatabaseKey,DatabaseKind,ResourceKind, DatabasePath, ResourcePath, ResourceType};
     use std::convert::TryInto;
     use std::str::FromStr;
 
@@ -1001,7 +1001,18 @@ mod tests {
 
     #[test]
     fn test_address_parent_resolution( ) -> Result<(),Error>{
-        let path = ResourcePath::from_str( "space:sub-space:database<Database<Relational>>")?;
+
+        let path = ResourcePath::from_str( "space:sub-space:some-app:database<Database<Relational<mysql.org:mysql:innodb:1.0.0>>>")?;
+        let parent = path.parent()?.unwrap();
+        assert_eq!( parent.resource_type(), ResourceType::App );
+
+/*        let path = ResourcePath::from_str( "space:sub-space:database<Database<Relational>>")?;
+        let parent = path.parent()?.unwrap();
+
+        assert_eq!( parent.resource_type(), ResourceType::SubSpace );
+
+ */
+
 
         Ok(())
     }
