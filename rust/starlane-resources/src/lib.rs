@@ -22,7 +22,6 @@ use std::sync::Arc;
 pub mod error;
 mod parse;
 
-
 pub struct ResourceAddress {
     path: ResourcePath
 }
@@ -1028,3 +1027,5 @@ resources! {
         Relational(Specific)
     }
 }
+
+

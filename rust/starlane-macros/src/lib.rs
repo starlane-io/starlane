@@ -30,6 +30,53 @@ impl ResourceParser {
         rtn
     }
 
+    pub fn parents_of(&self, resource: Resource ) -> Vec<Resource> {
+        let mut rtn = vec!();
+        for parent in &self.resources {
+            for parent_ident in resource.parents.clone() {
+                if parent.get_ident().to_string() == parent_ident.to_string() {
+                    rtn.push(parent.clone())
+                }
+            }
+        }
+        rtn
+    }
+
+
+
+    pub fn build_paths( &self, resource: Resource )  -> HashMap<String,Vec<String>>{
+        let mut parts = vec![];
+        parts.push( resource.path_part.as_ref().unwrap().to_string() );
+        let mut rtn = HashMap::new();
+
+        for parent in self.parents_of(resource.clone())
+        {
+            for path in self.paths(parent.clone(), parts.clone() ){
+                rtn.insert( parent.get_ident().to_string(), path.clone() );
+            }
+        }
+
+        return rtn
+    }
+
+    pub fn paths( &self, resource: Resource,mut parts: Vec<String> )  -> HashSet<Vec<String>>{
+        let mut rtn = HashSet::new();
+        parts.push( resource.path_part.as_ref().unwrap().to_string() );
+        for parent in self.parents_of(resource.clone())
+        {
+            for path in self.paths(parent, parts.clone() ){
+                rtn.insert(path);
+            }
+        }
+
+        if self.parents_of(resource).is_empty() {
+            parts.reverse();
+            rtn.insert( parts );
+        }
+
+        rtn
+    }
+
     pub fn kind_for(&self, resource: &Resource ) -> Option<ItemEnum> {
         for kind in &self.kinds {
                if kind.ident.to_string() == format!("{}Kind",resource.get_ident().to_string()) {
@@ -39,6 +86,12 @@ println!("FOUND KIND MATCH");
         }
         Option::None
     }
+}
+
+#[derive(Clone,Hash,Eq,PartialEq)]
+struct PathIdent{
+   pub resource: String,
+   pub parts: Vec<String>
 }
 
 #[derive(Clone)]
@@ -197,7 +250,51 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         }
     };
 
-    let idents : Vec<Ident> = parsed.resources.iter().map(|resource|{
+    let mut pathways  = String::new();
+    pathways.push_str("impl ResourceType {");
+    pathways.push_str("pub fn parent_pathway_match( &self, path: Vec<ResourcePathSegmentKind> ) -> Result<ResourceType,Error> {");
+    pathways.push_str("match self { ");
+    pathways.push_str("Self::Root => Err(\"Root does not have a parent to match\".into()),");
+
+    for resource in &parsed.resources {
+        let ident = resource.get_ident();
+        pathways.push_str( format!("Self::{} => {{", resource.get_ident().to_string() ).as_str());
+
+
+        for (parent,path) in parsed.build_paths(resource.clone()).iter() {
+            pathways.push_str( format!("let {} = vec![", parent.to_lowercase()).as_str());
+            for part in path {
+                pathways.push_str( "ResourcePathSegmentKind::");
+                pathways.push_str(part);
+                pathways.push_str(",");
+            }
+            pathways.push_str( "];");
+
+
+        }
+        pathways.push_str( "match path {");
+        for (parent,path) in parsed.build_paths(resource.clone()).iter() {
+            pathways.push_str( format!("{} => {{", parent.to_lowercase()).as_str() );
+            pathways.push_str(format!("Ok(Self::{})",parent).as_str());
+            pathways.push_str( "}");
+        }
+
+        pathways.push_str( "_ => Err(\"could not find parent match for resource pathway\".into())");
+
+        pathways.push_str( "}");
+
+        pathways.push_str( "},");
+    }
+
+
+
+    pathways.push_str("}}}");
+println!("{}",pathways);
+    let pathways = syn::parse_str::<Item>( pathways.as_str() ).unwrap();
+    let pathways = quote!{#pathways};
+
+
+    let idents : Vec<Ident> = parsed.resources.clone().iter().map(|resource|{
         resource.get_ident()
     }).collect();
 
@@ -213,9 +310,8 @@ impl ResourceType {
         #(Self::#idents => vec![#(Self::#parents),*]),*
       }
    }
-
-
 }
+#pathways
     };
 
 
@@ -246,12 +342,12 @@ impl ResourceType {
      */
 
     proc_macro::TokenStream::from( quote!{
-       #resource_type_enum_def
-       #resource_impl_def
-       #(#resources_def)*
        #keys
        #kinds
        #paths
+       #resource_type_enum_def
+       #resource_impl_def
+       #(#resources_def)*
     })
 }
 fn paths( parsed: &ResourceParser ) -> TokenStream {
@@ -302,7 +398,7 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
         }
     }
 
-    let idents: Vec<Ident> = parsed.resources.iter().map(|resource|{
+    let idents: Vec<Ident> = parsed.resources.clone().iter().map(|resource|{
         resource.get_ident()
     }).collect();
     let idents2 = idents.clone();
