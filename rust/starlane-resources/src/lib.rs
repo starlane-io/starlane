@@ -520,7 +520,7 @@ impl FromStr for SkewerCase {
 }
 
 
-#[derive(Clone, Serialize, Deserialize, Eq, PartialEq,Hash)]
+#[derive(Debug,Clone, Serialize, Deserialize, Eq, PartialEq,Hash)]
 pub enum ResourcePathSegmentKind {
     Domain,
     SkewerCase,
@@ -1006,12 +1006,10 @@ mod tests {
         let parent = path.parent()?.unwrap();
         assert_eq!( parent.resource_type(), ResourceType::App );
 
-/*        let path = ResourcePath::from_str( "space:sub-space:database<Database<Relational>>")?;
+        let path = ResourcePath::from_str( "space:sub-space:database<Database<Relational>>")?;
         let parent = path.parent()?.unwrap();
 
         assert_eq!( parent.resource_type(), ResourceType::SubSpace );
-
- */
 
 
         Ok(())

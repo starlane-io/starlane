@@ -269,6 +269,9 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         }
     };
 
+
+    // the pathway method is kinda hacked using the number of segments to determine parent,
+    // vector matchin doesn't actually seem to work as expected
     let mut pathways  = String::new();
     pathways.push_str("impl ResourceType {");
     pathways.push_str("pub fn parent_path_matcher( &self, path: Vec<ResourcePathSegmentKind> ) -> Result<ResourceType,Error> {");
@@ -278,6 +281,7 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     for resource in &parsed.resources {
         let ident = resource.get_ident();
         pathways.push_str( format!("Self::{} => {{", resource.get_ident().to_string() ).as_str());
+
 
 
         for (parent,path) in parsed.build_paths(resource.clone()).iter() {
@@ -291,14 +295,14 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
 
         }
-        pathways.push_str( "match path {");
+        pathways.push_str( "match (path.len(), path) {");
         for (parent,path) in parsed.build_paths(resource.clone()).iter() {
-            pathways.push_str( format!("{} => {{", parent.to_lowercase()).as_str() );
+            pathways.push_str( format!("({}, {}) => {{", path.len(),parent.to_lowercase()).as_str(), );
             pathways.push_str(format!("Ok(Self::{})",parent).as_str());
             pathways.push_str( "}");
         }
 
-        pathways.push_str( "_ => Err(\"could not find parent match for resource pathway\".into())");
+        pathways.push_str( "(_,_) => Err(\"could not find parent match for resource pathway\".into())");
 
         pathways.push_str( "}");
 
