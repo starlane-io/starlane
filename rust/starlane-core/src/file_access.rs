@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{mpsc, Arc, Mutex};
 
 use crate::error::Error;
-use crate::resource::{FileKind, Path};
+use crate::resource::{Path};
 use crate::star::Star;
 use crate::util;
 use notify::{raw_watcher, Op, RawEvent, RecursiveMode, Watcher};
@@ -16,6 +16,7 @@ use std::{fs, thread};
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::time::Duration;
 use walkdir::{DirEntry, WalkDir};
+use crate::resource::FileKind;
 
 pub enum FileCommand {
     Read {

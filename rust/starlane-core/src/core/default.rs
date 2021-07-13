@@ -4,34 +4,35 @@ use std::iter::FromIterator;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use clap::App;
+use rusqlite::{Connection, params, Transaction};
 use rusqlite::types::ValueRef;
-use rusqlite::{params, Connection, Transaction};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
+
+use starlane_resources::ResourceStatePersistenceManager;
 
 use crate::app::ConfigSrc;
 use crate::core::Host;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::ResourceHostAction;
-use crate::keys::ResourceKey;
+use crate::resource::ResourceKey;
 use crate::message::Fail;
-use crate::names::{Name, Specific};
+use crate::names::{Name};
 use crate::resource;
+use crate::resource::{
+    AssignResourceStateSrc, DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer,
+    Names, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign,
+    ResourceIdentifier, ResourceKind, ResourceStateSrc,ArtifactKind
+};
 use crate::resource::store::{
     ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult,
     ResourceStoreSqlLite,
 };
 use crate::resource::user::UserState;
-use crate::resource::{
-    AssignResourceStateSrc, DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer,
-    Names, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign,
-    ResourceIdentifier, ResourceKind, ResourceStatePersistenceManager, ResourceStateSrc,
-    ResourceType,
-};
 use crate::star::StarSkel;
-use crate::artifact::{ArtifactRef, ArtifactKind};
-use clap::App;
+use crate::artifact::ArtifactRef;
 
 #[derive(Debug)]
 pub struct DefaultHost {

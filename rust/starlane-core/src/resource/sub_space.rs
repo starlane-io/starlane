@@ -1,6 +1,5 @@
 use crate::error::Error;
-use crate::keys::{ResourceKey, SubSpaceKey};
-use crate::resource::{Resource, ResourceAddress, ResourceType};
+use crate::resource::{Resource, ResourceAddress, ResourceType, SubSpaceKey};
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;

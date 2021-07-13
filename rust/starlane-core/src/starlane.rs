@@ -18,7 +18,6 @@ use crate::core::CoreRunner;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::{ChildManagerResourceAction, Frame, Reply, SimpleReply, StarMessagePayload};
-use crate::keys::ResourceKey;
 use crate::lane::{ConnectionInfo, ConnectionKind, LaneEndpoint, LocalTunnelConnector, ServerSideTunnelConnector, ClientSideTunnelConnector, ConnectorController, ProtoLaneEndpoint, FrameCodex};
 use crate::logger::{Flags, Logger};
 use crate::message::{Fail, ProtoStarMessage};
@@ -785,9 +784,8 @@ mod test {
     use tokio::time::timeout;
     use tokio::time::Duration;
 
-    use crate::artifact::{ArtifactAddress, ArtifactKind, ArtifactLocation, ArtifactBundleAddress};
+    use crate::artifact::{ArtifactLocation, ArtifactBundleAddress};
     use crate::error::Error;
-    use crate::keys::{SpaceKey, SubSpaceKey, UserKey};
     use crate::logger::{
         Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog,
         StarLogPayload,

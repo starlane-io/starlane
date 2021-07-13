@@ -1,8 +1,5 @@
 use crate::error::Error;
-use crate::keys::{FileSystemKey, ResourceKey};
-use crate::resource::{
-    AssignResourceStateSrc, LocalDataSrc, Resource, ResourceAddress, ResourceType, SrcTransfer,
-};
+use crate::resource::{AssignResourceStateSrc, LocalDataSrc, Resource, ResourceAddress, ResourceType, SrcTransfer, FileSystemKey};
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;

@@ -11,7 +11,6 @@ use tokio::sync::{mpsc, Mutex};
 use crate::core::Host;
 use crate::error::Error;
 use crate::file_access::{FileAccess, FileEvent};
-use crate::keys::{FileSystemKey, ResourceKey};
 use crate::message::Fail;
 use crate::resource::store::{
     ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult,
@@ -19,11 +18,10 @@ use crate::resource::store::{
 
 
 use crate::resource::{
-    AddressCreationSrc, ArtifactBundleKind, AssignResourceStateSrc, DataTransfer, FileKind,
+    AddressCreationSrc, AssignResourceStateSrc, DataTransfer,
     KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress,
     ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy,
     ResourceCreationChamber, ResourceIdentifier, ResourceKind, ResourceStateSrc, ResourceStub,
-    ResourceType,
 };
 use crate::star::StarSkel;
 
@@ -39,9 +37,9 @@ use kube::{Api, Client, Config};
 use k8s_openapi::api::core::v1::Pod;
 use kube::api::{ListParams, PostParams};
 use kube::client::ConfigExt;
-use crate::resource::address::ResourceKindParts;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use std::env::VarError;
+use starlane_resources::ResourceKindParts;
 
 pub struct KubeCore {
     skel: StarSkel,
@@ -112,10 +110,10 @@ impl Host for KubeCore {
             list_params = list_params.labels(format!("kind={}", kind).as_str());
         }
         if let Option::Some(specific) = parts.specific {
-            list_params = list_params.labels(format!("vendor={}", specific.vendor).as_str());
+            list_params = list_params.labels(format!("vendor={}", specific.vendor.to_string()).as_str());
             list_params = list_params.labels(format!("product={}", specific.product).as_str());
             list_params = list_params.labels(format!("variant={}", specific.variant).as_str());
-            list_params = list_params.labels(format!("version={}", specific.version).as_str());
+            list_params = list_params.labels(format!("version={}", specific.version.to_string()).as_str());
         }
 
         let mut provisioners = provisioners.list(&list_params ).await?;

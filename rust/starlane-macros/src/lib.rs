@@ -3,7 +3,7 @@ use syn::parse::{Parse, ParseStream};
 use std::collections::{HashSet, HashMap};
 use proc_macro::{Literal};
 use quote::{quote, quote_spanned, ToTokens};
-use syn::{parse_macro_input, Expr, Ident, Token, Type, Visibility, Item, PathArguments, Meta, NestedMeta, MetaList, MetaNameValue, Lit, ItemEnum};
+use syn::{parse_macro_input, Expr, Ident, Token, Type, Visibility, Item, PathArguments, Meta, NestedMeta, MetaList, MetaNameValue, Lit, ItemEnum, Path};
 use std::convert::TryInto;
 use quote::__private::{TokenTree, TokenStream};
 use nom::error::context;
@@ -99,7 +99,8 @@ struct Resource {
     item: Item,
     parents: Vec<Ident>,
     key_prefix: Option<String>,
-    path_part: Option<Ident>
+    path_part: Option<Ident>,
+    state_persistence: Option<Path>
 }
 
 impl Resource {
@@ -108,7 +109,8 @@ impl Resource {
             item: item,
             parents: vec![],
             key_prefix: Option::None,
-            path_part: Option::None
+            path_part: Option::None,
+            state_persistence: Option::None
         }
     }
 
@@ -161,6 +163,10 @@ impl Parse for ResourceParser {
                                     if( path.segments.first().is_some() && path.segments.first().unwrap().ident.to_string().as_str() == "ResourcePathSegmentKind" )
                                     {
                                         resource.path_part = Option::Some( path.segments.last().unwrap().ident.clone() );
+                                    }
+                                    else if( path.segments.first().is_some() && path.segments.first().unwrap().ident.to_string().as_str() == "ResourceStatePersistenceManager" )
+                                    {
+                                        resource.state_persistence= Option::Some( path );
                                     }
                                 }
                                 Meta::List(list) => {
@@ -312,9 +318,13 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
 
     pathways.push_str("}}}");
-println!("{}",pathways);
+//println!("{}",pathways);
     let pathways = syn::parse_str::<Item>( pathways.as_str() ).unwrap();
     let pathways = quote!{#pathways};
+
+    let state_persistences: Vec<Path> = parsed.resources.clone().iter().map(|resource|{
+        resource.state_persistence.as_ref().expect("expected ResourceStatePersistenceManager to be set").clone()
+    }).collect();
 
 
     let idents : Vec<Ident> = parsed.resources.clone().iter().map(|resource|{
@@ -332,6 +342,13 @@ impl ResourceType {
         Self::Root => vec!(),
         #(Self::#idents => vec![#(Self::#parents),*]),*
       }
+   }
+
+  pub fn state_persistence(&self) -> ResourceStatePersistenceManager {
+      match self {
+                    Self::Root => ResourceStatePersistenceManager::None,
+                    #(Self::#idents => #state_persistences),*
+     }
    }
 }
 #pathways

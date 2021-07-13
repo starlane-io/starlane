@@ -10,3 +10,9 @@ impl <T:Display> From<T> for Error{
         Error{message:format!("{}",t)}
     }
 }
+
+impl ToString for Error {
+    fn to_string(&self) -> String {
+        self.message.clone()
+    }
+}

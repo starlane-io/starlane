@@ -17,16 +17,9 @@ use crate::error::Error;
 use crate::filesystem::File;
 use crate::frame::{ChildManagerResourceAction, Reply, StarMessagePayload};
 use crate::id::{Id, IdSeq};
-use crate::keys::{AppKey, ResourceKey, SubSpaceKey, UserKey};
 use crate::message::{Fail, ProtoStarMessage};
 use crate::message::resource::{ActorMessage, Message, MessageFrom, MessageTo, RawPayload};
-use crate::names::{Name, Specific};
-use crate::resource::{
-    AssignResourceStateSrc, Labels, Names, ResourceAddress, ResourceArchetype,
-    ResourceAssign, ResourceCreate, ResourceKind, ResourceRecord, ResourceRegistration,
-    ResourceStub, ResourceType,
-};
-use crate::resource::address::{ResourceAddressPart, SkewerCase};
+use crate::resource::{AssignResourceStateSrc, Labels, Names, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceKind, ResourceRecord, ResourceRegistration, ResourceStub, Specific};
 use crate::space::CreateAppControllerFail;
 use crate::star::{
     ActorCreate, CoreAppSequenceRequest, CoreRequest, Empty, LocalResourceLocation, Query, Request,

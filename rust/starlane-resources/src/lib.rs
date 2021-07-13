@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
+use std::sync::Arc;
 
 use nom::{AsChar, InputTakeAtPosition, IResult};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take, take_until, take_while};
 use nom::character::complete::{alpha0, alpha1, anychar, digit0, digit1, one_of};
 use nom::character::is_digit;
-use nom::combinator::{not, opt, eof};
+use nom::combinator::{eof, not, opt};
 use nom::error::{context, ErrorKind, ParseError, VerboseError};
 use nom::multi::{many0, many1, many_m_n, separated_list1};
 use nom::sequence::{delimited, preceded, terminated, tuple};
@@ -17,7 +18,6 @@ use serde::Serialize;
 use starlane_macros::resources;
 
 use crate::error::Error;
-use std::sync::Arc;
 
 pub mod error;
 mod parse;
@@ -27,62 +27,82 @@ resources! {
     #[resource(parents(Root))]
     #[resource(prefix="s")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Store)]
     pub struct Space();
 
     #[resource(parents(Space))]
     #[resource(prefix="ss")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Store)]
     pub struct SubSpace();
 
     #[resource(parents(SubSpace))]
     #[resource(prefix="app")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::None)]
     pub struct App();
 
     #[resource(parents(App))]
     #[resource(prefix="act")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::None)]
     pub struct Actor();
 
     #[resource(parents(SubSpace,App))]
     #[resource(prefix="fs")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Host)]
     pub struct FileSystem();
 
     #[resource(parents(FileSystem))]
     #[resource(prefix="f")]
     #[resource(ResourcePathSegmentKind::Path)]
+    #[resource(ResourceStatePersistenceManager::Host)]
     pub struct File();
 
     #[resource(parents(SubSpace,App))]
     #[resource(prefix="db")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Host)]
     pub struct Database();
 
     #[resource(parents(Space))]
     #[resource(prefix="d")]
     #[resource(ResourcePathSegmentKind::Domain)]
+    #[resource(ResourceStatePersistenceManager::None)]
     pub struct Domain();
 
     #[resource(parents(SubSpace))]
     #[resource(prefix="p")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::None)]
     pub struct Proxy();
 
     #[resource(parents(SubSpace))]
     #[resource(prefix="abv")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::None)]
     pub struct ArtifactBundleVersions();
 
     #[resource(parents(ArtifactBundleVersions))]
     #[resource(prefix="ab")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Host)]
     pub struct ArtifactBundle();
 
     #[resource(parents(ArtifactBundle))]
     #[resource(prefix="a")]
     #[resource(ResourcePathSegmentKind::Path)]
+    #[resource(ResourceStatePersistenceManager::Host)]
     pub struct Artifact();
+
+    #[resource(parents(Space))]
+    #[resource(prefix="u")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    pub struct User();
+
+
 
     #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
     pub enum DatabaseKind{
@@ -91,10 +111,22 @@ resources! {
 
     #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
     pub enum FileKind{
-        Dir,
+        Directory,
         File
     }
 
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum ArtifactKind{
+        Raw,
+        DomainConfig
+    }
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum ArtifactBundleKind{
+        Final,
+        Volatile
+    }
 }
 
 
@@ -109,6 +141,15 @@ impl ResourceAddress {
             path: path
         }
     }
+
+    pub fn append( &self, string: String, resource_type: ResourceType ) -> Result<Self,Error> {
+        let address = format!("{}:{}<{}>",self.path.to_string(), string, resource_type.to_string() );
+        let path = ResourcePath::from_str(address.as_str())?;
+        Ok(Self{
+            path: path
+        })
+    }
+
 }
 
 impl ToString for ResourceAddress {
@@ -953,11 +994,12 @@ impl FromStr for Version {
 
 #[cfg(test)]
 mod tests {
-    use crate::error::Error;
-    use crate::{parse_resource_path, ResourcePathSegment, SkewerCase, version, path, domain, DomainCase, KeyBits, Specific, ResourceAddressKind, ResourceAddress};
-    use crate::{SpaceKey,ResourceKey,RootKey,SubSpaceKey,AppKey,DatabaseKey,DatabaseKind,ResourceKind, DatabasePath, ResourcePath, ResourceType};
     use std::convert::TryInto;
     use std::str::FromStr;
+
+    use crate::{domain, DomainCase, KeyBits, parse_resource_path, path, ResourceAddress, ResourceAddressKind, ResourcePathSegment, SkewerCase, Specific, version};
+    use crate::{AppKey, DatabaseKey, DatabaseKind, DatabasePath, ResourceKey, ResourceKind, ResourcePath, ResourceType, RootKey, SpaceKey, SubSpaceKey};
+    use crate::error::Error;
 
     #[test]
     fn test_kind() -> Result<(),Error> {
@@ -1137,5 +1179,11 @@ mod tests {
 
         Ok(())
     }
+}
+
+pub enum ResourceStatePersistenceManager {
+    None,
+    Store,
+    Host,
 }
 

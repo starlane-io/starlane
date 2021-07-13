@@ -14,14 +14,15 @@ use crate::frame::{
     Frame, MessageAck, MessagePayload, SimpleReply, StarMessage, StarMessagePayload,
 };
 use crate::id::Id;
-use crate::keys::{MessageId, ResourceId, ResourceKey, SubSpaceKey, UserKey};
 use crate::lane::LaneMeta;
-use crate::names::Specific;
-use crate::resource::{ResourceAddress, ResourceIdentifier, ResourceType, ResourceKind};
+use crate::resource::{ResourceAddress, ResourceIdentifier, ResourceKind, ResourceType, Specific};
 use crate::star::{StarCommand, StarKey, StarSearchTransaction, Transaction, TransactionResult};
 use std::string::FromUtf8Error;
+use uuid::Uuid;
 
 pub mod resource;
+
+pub type MessageId = Uuid;
 
 #[derive(Clone)]
 pub enum ProtoStarMessageTo {
@@ -495,5 +496,15 @@ impl From<kube::Error> for Fail {
         Fail::Error(e.to_string())
     }
 }
+
+
+impl From<starlane_resources::error::Error> for Fail {
+
+    fn from(e: starlane_resources::error::Error) -> Self {
+        Fail::Error(e.to_string())
+    }
+}
+
+
 
 

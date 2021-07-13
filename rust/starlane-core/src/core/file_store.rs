@@ -12,18 +12,19 @@ use tokio::sync::{mpsc, Mutex};
 use crate::core::Host;
 use crate::error::Error;
 use crate::file_access::{FileAccess, FileEvent};
-use crate::keys::{FileSystemKey, ResourceKey};
 use crate::message::Fail;
 use crate::resource::store::{
     ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult,
 };
 use crate::resource::{
-    AddressCreationSrc, AssignResourceStateSrc, DataTransfer, FileKind, KeyCreationSrc,
+    AddressCreationSrc, AssignResourceStateSrc, DataTransfer, KeyCreationSrc,
     MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype,
     ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber,
-    ResourceIdentifier, ResourceKind, ResourceStateSrc, ResourceStub, ResourceType,
+    ResourceIdentifier, ResourceKind, ResourceStateSrc, ResourceStub, ResourceType, FileKind,
+    FileSystemKey
 };
 use crate::star::StarSkel;
+use crate::resource::ResourceKey;
 
 use crate::util;
 use std::fs;
@@ -219,7 +220,7 @@ impl Host for FileStoreHost {
                 // here we just ensure that a directory exists for the filesystem
                 if let ResourceKey::FileSystem(filesystem_key) = &assign.stub.key {
                     let path =
-                        Path::new(format!("/{}", filesystem_key.to_string().as_str()).as_str())?;
+                        Path::from_Str(format!("/{}", filesystem_key.to_string().as_str()).as_str())?;
                     self.file_access.mkdir(&path).await?;
                 }
             }
@@ -232,7 +233,7 @@ impl Host for FileStoreHost {
                             .parent()
                             .ok_or("Wheres the filesystem key?")?
                             .as_filesystem()?;
-                        let filesystem_path = Path::new(
+                        let filesystem_path = Path::from_str(
                             format!("/{}", filesystem_key.to_string().as_str()).as_str(),
                         )?;
                         let path = format!(
@@ -295,7 +296,7 @@ impl Host for FileStoreHost {
                         .ok_or("Wheres the filesystem key?")?
                         .as_filesystem()?;
                     let filesystem_path =
-                        Path::new(format!("/{}", filesystem_key.to_string().as_str()).as_str())?;
+                        Path::from_str(format!("/{}", filesystem_key.to_string().as_str()).as_str())?;
                     let path = format!(
                         "{}{}",
                         filesystem_path.to_string(),

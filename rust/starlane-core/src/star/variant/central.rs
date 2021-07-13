@@ -1,5 +1,4 @@
 use crate::error::Error;
-use crate::keys::ResourceKey;
 use crate::resource::{
     ResourceAddress, ResourceArchetype, ResourceCreateStrategy, ResourceKind, ResourceLocation,
     ResourceRecord, ResourceRegistration, ResourceStub, create_args
@@ -13,6 +12,7 @@ use tokio::sync::oneshot;
 use std::thread;
 use tokio::runtime::{Runtime, Handle};
 use crate::message::resource;
+use crate::resource::ResourceKey;
 use std::sync::Arc;
 
 pub struct CentralVariant {

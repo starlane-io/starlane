@@ -1,5 +1,4 @@
 use crate::error::Error;
-use crate::keys::ResourceKey;
 use crate::resource::{
     ResourceAddress, ResourceArchetype, ResourceCreateStrategy, ResourceKind, ResourceLocation,
     ResourceRecord, ResourceRegistration, ResourceStub,

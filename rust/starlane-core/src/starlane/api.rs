@@ -5,7 +5,6 @@ use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
 use crate::frame::ChildManagerResourceAction::Register;
 use crate::frame::{ChildManagerResourceAction, Reply, SimpleReply, StarMessagePayload, StarPattern, WindAction};
-use crate::keys::ResourceKey;
 use crate::message::resource::{
     MessageFrom, MessageReply, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage,
 };
@@ -16,7 +15,7 @@ use crate::resource::file_system::FileSystemState;
 use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
-use crate::resource::{AddressCreationSrc, ArtifactBundleKind, AssignResourceStateSrc, DataTransfer, FileKind, KeyCreationSrc, LocalDataSrc, Path, RemoteDataSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceIdentifier, ResourceKind, ResourceRecord, ResourceRegistryInfo, ResourceStateSrc, ResourceStub, ResourceType, ResourceSelector, FieldSelection};
+use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, DataTransfer, KeyCreationSrc, LocalDataSrc, Path, RemoteDataSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceIdentifier, ResourceKind, ResourceRecord, ResourceRegistryInfo, ResourceStateSrc, ResourceStub, ResourceType, ResourceSelector, FieldSelection};
 use crate::star::StarCommand::ResourceRecordRequest;
 use crate::star::{Request, StarCommand, StarKey, Wind, StarKind};
 use futures::channel::oneshot;
@@ -32,6 +31,8 @@ use tokio::runtime::{Handle, Runtime};
 use tokio::sync::mpsc;
 use crate::artifact::ArtifactBundleAddress;
 use crate::starlane::StarlaneCommand;
+use crate::resource::ResourceKey;
+use crate::resource::FileKind;
 
 #[derive(Clone)]
 pub struct StarlaneApi {

@@ -7,13 +7,9 @@ use serde::{Deserialize, Serialize, Serializer};
 use crate::error::Error;
 use crate::frame::{MessagePayload, Reply, SimpleReply, StarMessage, StarMessagePayload};
 use crate::id::Id;
-use crate::keys::{MessageId, ResourceId, ResourceKey, UserKey};
 use crate::logger::Log::ProtoStar;
-use crate::message::{Fail, ProtoStarMessage};
-use crate::resource::{
-    RemoteDataSrc, ResourceCreate, ResourceIdentifier, ResourceRecord, ResourceSelector,
-    ResourceType,
-};
+use crate::message::{Fail, ProtoStarMessage, MessageId};
+use crate::resource::{RemoteDataSrc, ResourceCreate, ResourceIdentifier, ResourceRecord, ResourceSelector, ResourceType, ResourceId};
 use crate::star::{StarCommand, StarKey, StarSkel};
 use crate::util;
 use std::collections::HashSet;

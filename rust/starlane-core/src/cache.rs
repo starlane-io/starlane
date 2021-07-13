@@ -7,22 +7,14 @@ use tokio::runtime::{Handle, Runtime};
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::{broadcast, mpsc, oneshot};
 
-use crate::artifact::{
-    ArtifactAddress, ArtifactBundleAddress, ArtifactBundleId, ArtifactBundleIdentifier,
-    ArtifactBundleKey, ArtifactIdentifier, ArtifactKey, ArtifactKind, ArtifactRef,
-};
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use crate::keys::{ResourceId, ResourceKey, SpaceKey, SubSpaceKey};
 use crate::logger::{elog, LogInfo, StaticLogInfo};
 use crate::message::Fail;
 use crate::resource::artifact::ArtifactBundle;
 use crate::resource::config::Parser;
 use crate::resource::domain::{DomainConfig, DomainConfigParser};
-use crate::resource::{
-    ArtifactBundleKind, Path, ResourceAddress, ResourceArchetype, ResourceIdentifier, ResourceKind,
-    ResourceLocation, ResourceRecord, ResourceStub,
-};
+use crate::resource::{Path, ResourceAddress, ResourceArchetype, ResourceIdentifier, ResourceKind, ResourceLocation, ResourceRecord, ResourceStub, ArtifactBundleAddress};
 use crate::star::{StarCommand, StarKey};
 use crate::starlane::api::StarlaneApi;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
@@ -37,6 +29,15 @@ use std::ops::Deref;
 use std::str::FromStr;
 use tokio::fs;
 use tokio::sync::oneshot::error::RecvError;
+use crate::resource::SpaceKey;
+use crate::resource::SubSpaceKey;
+use crate::resource::ArtifactKind;
+use crate::resource::ArtifactBundleKind;
+use crate::resource::ArtifactBundleKey;
+use crate::resource::ResourceKey;
+use crate::resource::ArtifactAddress;
+use crate::resource::RootKey;
+use crate::artifact::{ArtifactRef, ArtifactBundleIdentifier};
 
 pub type Data = Arc<Vec<u8>>;
 pub type ZipFile = Path;
@@ -376,7 +377,7 @@ println!("fetchED resource record.");
     async fn has(&self, bundle: ArtifactBundleAddress) -> Result<(), Error> {
         let file_access =
             ArtifactBundleCache::with_bundle_path(self.file_access.clone(), bundle.clone())?;
-        file_access.read(&Path::new("/.ready")?).await?;
+        file_access.read(&Path::from_str("/.ready")?).await?;
         Ok(())
     }
 
@@ -399,8 +400,8 @@ println!("download&extract src.fetch_resource_record DONE");
 
         let mut file_access =
             ArtifactBundleCache::with_bundle_path(file_access, record.stub.address.try_into()?)?;
-        let bundle_zip = Path::new("/bundle.zip")?;
-        let key_file = Path::new("/key.ser")?;
+        let bundle_zip = Path::from_str("/bundle.zip")?;
+        let key_file = Path::from_str("/key.ser")?;
         file_access.write(
             &key_file,
             Arc::new(record.stub.key.to_string().as_bytes().to_vec()),
@@ -411,7 +412,7 @@ println!("download&extract src.fetch_resource_record DONE");
             .unzip("bundle.zip".to_string(), "files".to_string())
             .await?;
 
-        let ready_file = Path::new("/.ready")?;
+        let ready_file = Path::from_str("/.ready")?;
         file_access
             .write(
                 &ready_file,
@@ -522,7 +523,7 @@ impl MockArtifactBundleSrc {
     pub fn new() -> Result<Self, Error> {
         let key = ResourceKey::ArtifactBundle(ArtifactBundleKey {
             sub_space: SubSpaceKey {
-                space: SpaceKey::HyperSpace,
+                space: SpaceKey::new(RootKey{},0),
                 id: 0,
             },
             id: 0,
@@ -1033,14 +1034,16 @@ impl AuditLogCollectorProc {
 
 #[cfg(test)]
 mod test {
-    use crate::artifact::ArtifactBundleAddress;
-    use crate::artifact::{ArtifactAddress, ArtifactKind, ArtifactRef};
+    use crate::artifact::{ArtifactBundleAddress, ArtifactRef};
     use crate::cache::{
         ArtifactBundleCache, ArtifactBundleSrc, AuditLogger, MockArtifactBundleSrc,
         ProtoArtifactCachesFactory, RootArtifactCaches, RootItemCache,
     };
     use crate::error::Error;
     use crate::file_access::FileAccess;
+    use crate::resource::ArtifactKind;
+    use crate::resource::RootKey;
+    use crate::resource::ArtifactAddress;
     use std::fs;
     use std::str::FromStr;
     use tokio::runtime::Runtime;

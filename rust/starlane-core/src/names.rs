@@ -4,32 +4,10 @@ use std::str::{FromStr, Split};
 use crate::actor::ActorKind;
 use crate::actor::ActorSpecific;
 use crate::app::AppSpecific;
-use crate::artifact::ArtifactKind;
 use crate::artifact::{ArtifactLocation, SubSpaceName};
 use crate::error::Error;
 
 use serde::{Deserialize, Serialize, Serializer};
-
-lazy_static! {
-    pub static ref TEST_APP_SPEC: AppSpecific = AppSpecific::from("starlane-core.io:starlane-core:core:/test/test_app").unwrap();
-    pub static ref TEST_ACTOR_SPEC: ActorSpecific = ActorSpecific::from("starlane-core.io:starlane-core:core:/test/test_actor").unwrap();
-
-    /*
-    pub static ref TEST_APP_CONFIG_ARTIFACT: Artifact = Artifact
-    {
-                    location: ArtifactLocation::from_str("starlane-core.io:starlane-core:core:test:1.0.0:/test/test_app.yaml").unwrap(),
-                    kind: ArtifactKind::AppConfig,
-                    specific: Option::Some(AppSpecific::from_str("starlane-core.io:starlane-core:core:test:/test/test_app").unwrap())
-    };
-
-    pub static ref TEST_ACTOR_CONFIG_ARTIFACT: Artifact = Artifact
-    {
-                    location: ArtifactLocation::from_str("starlane-core.io:starlane-core:core:test:1.0.0:/test/test_actor.yaml").unwrap(),
-                    kind: ArtifactKind::ActorConfig,
-                    specific:Option::Some(ActorSpecific::from_str("starlane-core.io:starlane-core:core:test:/test/test_actor").unwrap())
-    };
-     */
-}
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct Name {
@@ -83,4 +61,3 @@ impl FromStr for Name {
     }
 }
 
-pub type Specific = Name;

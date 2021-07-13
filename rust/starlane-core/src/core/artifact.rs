@@ -11,12 +11,11 @@ use tokio::sync::{mpsc, Mutex};
 use crate::core::{Host, StarCoreAction, StarCoreCommand};
 use crate::error::Error;
 use crate::file_access::{FileAccess, FileEvent};
-use crate::keys::{FileSystemKey, ResourceKey};
 use crate::message::Fail;
 use crate::resource::store::{
     ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult,
 };
-use crate::resource::{AddressCreationSrc, ArtifactBundleKind, AssignResourceStateSrc, DataTransfer, FileKind, KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceIdentifier, ResourceKind, ResourceStateSrc, ResourceStub, ResourceType, ResourceRegistryInfo, ResourceRegistration, ResourceRecord};
+use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, DataTransfer, KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceIdentifier, ResourceKind, ResourceStateSrc, ResourceStub, ResourceRegistryInfo, ResourceRegistration, ResourceRecord, ResourceType, ResourceKey, ArtifactBundleKind};
 use crate::star::StarSkel;
 
 use crate::artifact::ArtifactBundleKey;
@@ -68,14 +67,14 @@ impl ArtifactHost {
 
     fn bundle_path(key: ResourceKey) -> Result<Path, Fail> {
         let bundle_key = Self::bundle_key(key)?;
-        Ok(Path::new(
+        Ok(Path::from_str(
             format!("/{}", bundle_key.to_string().as_str()).as_str(),
         )?)
     }
 
     fn zip_bundle_path(key: ResourceKey) -> Result<Path, Fail> {
         let bundle_path = Self::bundle_path(key)?;
-        Ok(bundle_path.cat(&Path::new("bundle.zip")?)?)
+        Ok(bundle_path.cat(&Path::from_str("bundle.zip")?)?)
     }
 
     async fn ensure_bundle_dir(&mut self, key: ResourceKey) -> Result<(), Fail> {
@@ -299,3 +298,4 @@ fn get_artifacts(data: Arc<Vec<u8>>) -> Result<Vec<String>, Fail> {
         )),
     }
 }
+

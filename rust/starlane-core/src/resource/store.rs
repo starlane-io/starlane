@@ -2,21 +2,17 @@ use std::convert::TryInto;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use rusqlite::{Connection, params, Row, Transaction};
 use rusqlite::types::ValueRef;
-use rusqlite::{params, Connection, Row, Transaction};
 use tokio::sync::{mpsc, oneshot};
+
+use starlane_resources::ResourceStatePersistenceManager;
 
 use crate::app::ConfigSrc;
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use crate::keys::ResourceKey;
 use crate::message::Fail;
-use crate::names::Specific;
-use crate::resource::{
-    DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Resource, ResourceAddress,
-    ResourceArchetype, ResourceAssign, ResourceCreate, ResourceIdentifier, ResourceKind,
-    ResourceStatePersistenceManager,
-};
+use crate::resource::{DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceIdentifier, ResourceKind, Specific,ResourceKey};
 
 #[derive(Clone,Debug)]
 pub struct ResourceStore {
@@ -216,7 +212,12 @@ impl ResourceStoreSqlLite {
                     let key = ResourceKey::from_bin(key)?;
 
                     let address: String = row.get(1)?;
-                    let address = ResourceAddress::from_str(address.as_str())?;
+                    let address = match ResourceAddress::from_str(address.as_str()) {
+                        Ok(address) => address,
+                        Err(error) => {
+                            return Err(Fail::Error(error.to_string()));
+                        }
+                    };
 
                     let state = if let ValueRef::Null = row.get_ref(2)? {
                         Option::None
@@ -258,7 +259,7 @@ impl ResourceStoreSqlLite {
                     Ok(Resource::new(key, address, archetype, state))
                 };
 
-                let resource = match identifier.clone() {
+                let resource:rusqlite::Result<Resource> = match identifier.clone() {
                     ResourceIdentifier::Key(key) => {
                         let key = key.bin()?;
                         self.conn.query_row(statement, params![key], func)
@@ -275,7 +276,7 @@ impl ResourceStoreSqlLite {
                         rusqlite::Error::QueryReturnedNoRows => {
                             Ok(ResourceStoreResult::Resource(Option::None))
                         }
-                        _ => Err(err.into()),
+                        _ => Err(err.to_string().into()),
                     },
                 }
             }

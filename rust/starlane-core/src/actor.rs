@@ -15,55 +15,12 @@ use crate::app::ConfigSrc;
 use crate::error::Error;
 use crate::frame::Event;
 use crate::id::Id;
-use crate::keys::{AppKey, ResourceId, ResourceKey, SubSpaceKey, UserKey};
 use crate::message::Fail;
 use crate::names::Name;
-use crate::resource::{
-    Labels, Names, ResourceAddress, ResourceArchetype, ResourceAssign,
-    ResourceCreate, ResourceKind, ResourceRecord, ResourceRegistration, ResourceRegistryInfo,
-    ResourceSelector, ResourceStub, ResourceType,
-};
-use crate::resource::address::{ResourceAddressPart, SkewerCase};
-use crate::resource::ResourceAddressPartKind::Base64Encoded;
+use crate::resource::{Labels, Names, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceKind, ResourceRecord, ResourceRegistration, ResourceRegistryInfo, ResourceSelector, ResourceStub, ResourceAddressPart, AppKey};
 use crate::star::StarKey;
 
-#[derive(Debug, Eq, PartialEq, Hash, Clone, Serialize, Deserialize)]
-pub struct ActorKey {
-    pub app: AppKey,
-    pub id: Id,
-}
 
-impl ActorKey {
-    pub fn address_part(&self) -> Result<ResourceAddressPart, Error> {
-        Ok(ResourceAddressPart::SkewerCase(SkewerCase::new(
-            self.id.to_string().as_str(),
-        )?))
-    }
-}
-
-impl ActorKey {
-    pub fn new(app: AppKey, id: Id) -> Self {
-        ActorKey { app: app, id: id }
-    }
-}
-
-impl ToString for ActorKey {
-    fn to_string(&self) -> String {
-        format!("{}-{}", self.app.to_string(), self.id.to_string())
-    }
-}
-
-impl FromStr for ActorKey {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let pos = s.rfind('-').ok_or("expected '-' between parent and id")?;
-        let (parent, id) = s.split_at(pos);
-        let app = AppKey::from_str(parent)?;
-        let id = Id::from_str(id)?;
-        Ok(ActorKey { app: app, id: id })
-    }
-}
 
 pub type ActorSpecific = Name;
 pub type GatheringSpecific = Name;

@@ -28,7 +28,6 @@ use url::Url;
 
 use variant::StarVariant;
 
-use crate::actor::{ActorKey, ActorKind};
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::core::{StarCoreAction, StarCoreCommand, StarCoreResult};
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
@@ -41,9 +40,6 @@ use crate::frame::{
     StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp,
 };
 use crate::id::{Id, IdSeq};
-use crate::keys::{
-    AppKey, GatheringKey, MessageId, ResourceId, ResourceKey, SpaceKey, Unique, UniqueSrc, UserKey,
-};
 use crate::lane::{ConnectionInfo, ConnectorController, LaneEndpoint, LaneCommand, LaneMeta, OutgoingSide, TunnelConnector, TunnelConnectorFactory, ProtoLaneEndpoint, LaneIndex, LaneWrapper};
 use crate::logger::{
     Flag, Flags, Log, LogInfo, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag, StaticLogInfo,
@@ -60,17 +56,7 @@ use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
 use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
-use crate::resource::{
-    AddressCreationSrc, AssignResourceStateSrc, FieldSelection, HostedResourceStore,
-    KeyCreationSrc, Labels, LocalDataSrc, LocalHostedResource, LocalResourceHost,
-    MemoryDataTransfer, Parent, ParentCore, Registry, RegistryReservation, RegistryUniqueSrc,
-    RemoteResourceManager, Resource, ResourceAddress, ResourceArchetype, ResourceAssign,
-    ResourceBinding, ResourceCreate, ResourceHost, ResourceIdentifier, ResourceKind,
-    ResourceLocation, ResourceManager, ResourceManagerKey, ResourceNamesReservationRequest,
-    ResourceParent, ResourceRecord, ResourceRegistration, ResourceRegistryAction,
-    ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector,
-    ResourceStateSrc, ResourceStub, ResourceType,
-};
+use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, FieldSelection, HostedResourceStore, KeyCreationSrc, Labels, LocalDataSrc, LocalHostedResource, LocalResourceHost, MemoryDataTransfer, Parent, ParentCore, Registry, RegistryReservation, RegistryUniqueSrc, RemoteResourceManager, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceBinding, ResourceCreate, ResourceHost, ResourceIdentifier, ResourceKind, ResourceLocation, ResourceManager, ResourceManagerKey, ResourceNamesReservationRequest, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector, ResourceStateSrc, ResourceStub, ResourceType, ResourceKey};
 use crate::star::pledge::{ResourceHostSelector, Satisfaction, StarHandle, StarHandleBacking};
 use crate::star::variant::web::WebVariant;
 use crate::util;
@@ -100,6 +86,8 @@ pub enum StarKind {
     Web,
     Kube,
 }
+
+
 
 impl StarKind {
     pub fn is_resource_manager(&self) -> bool {

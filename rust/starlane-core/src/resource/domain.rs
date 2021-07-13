@@ -1,9 +1,8 @@
-use crate::artifact::{ArtifactAddress, ArtifactKind, ArtifactRef};
+use crate::artifact::{ArtifactRef};
 use crate::cache::{Cacheable, Data};
 use crate::error::Error;
-use crate::keys::DomainKey;
 use crate::resource::config::{Parser, ResourceConfig};
-use crate::resource::{ResourceAddress, ResourceKind};
+use crate::resource::{ResourceAddress, ResourceKind, DomainKey, ArtifactAddress};
 use nom::branch::alt;
 use nom::character::streaming::{alpha1, alphanumeric1};
 use nom::combinator::recognize;
@@ -14,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
+use crate::resource::ArtifactKind;
 
 pub struct Domain {
     key: DomainKey,

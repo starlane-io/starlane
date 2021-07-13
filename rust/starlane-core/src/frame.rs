@@ -8,23 +8,17 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::error::Elapsed;
 use tokio::time::Instant;
 
-use crate::actor::ActorKey;
 use crate::crypt::{Encrypted, HashEncrypted, HashId};
 use crate::error::Error;
 use crate::id::Id;
-use crate::keys::{AppKey, MessageId, ResourceId, ResourceKey, SubSpaceKey, UserKey};
 use crate::logger::Flags;
 use crate::message::resource::{
     ActorMessage, Message, MessageReply, RawState, ResourceRequestMessage, ResourceResponseMessage,
 };
-use crate::message::{Fail, MessageExpect, MessageResult, MessageUpdate, ProtoStarMessage};
+use crate::message::{Fail, MessageExpect, MessageResult, MessageUpdate, ProtoStarMessage, MessageId};
 use crate::names::Name;
 use crate::permissions::{AuthToken, Authentication};
-use crate::resource::{
-    AssignResourceStateSrc, Labels, ResourceAddress, ResourceAssign, ResourceBinding,
-    ResourceCreate, ResourceIdentifier, ResourceRecord, ResourceRegistration, ResourceSelector,
-    ResourceSliceAssign, ResourceSliceStatus, ResourceStatus, ResourceStub, ResourceType,
-};
+use crate::resource::{AssignResourceStateSrc, Labels, ResourceAddress, ResourceAssign, ResourceBinding, ResourceCreate, ResourceIdentifier, ResourceRecord, ResourceRegistration, ResourceSelector, ResourceSliceAssign, ResourceSliceStatus, ResourceStatus, ResourceStub, ResourceType, ActorKey, ResourceKey, SubSpaceKey, UserKey, AppKey, ResourceId};
 use crate::star::{
     LocalResourceLocation, Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify,
     StarSubGraphKey, StarWatchInfo,
@@ -683,7 +677,7 @@ impl fmt::Display for StarPattern {
             StarPattern::Any => "Any".to_string(),
             StarPattern::None => "None".to_string(),
             StarPattern::StarKey(key) => format!("{}", key.to_string()).to_string(),
-            StarPattern::StarKind(kind) => format!("{}", kind).to_string(),
+            StarPattern::StarKind(kind) => format!("{}", kind.to_string()).to_string(),
         };
         write!(f, "{}", r)
     }

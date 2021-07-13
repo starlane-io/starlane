@@ -1,5 +1,4 @@
 use crate::error::Error;
-use crate::keys::ResourceKey;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
