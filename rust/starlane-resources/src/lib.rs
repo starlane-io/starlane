@@ -22,6 +22,83 @@ use std::sync::Arc;
 pub mod error;
 mod parse;
 
+
+resources! {
+    #[resource(parents(Root))]
+    #[resource(prefix="s")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    pub struct Space();
+
+    #[resource(parents(Space))]
+    #[resource(prefix="ss")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    pub struct SubSpace();
+
+    #[resource(parents(SubSpace))]
+    #[resource(prefix="app")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    pub struct App();
+
+    #[resource(parents(App))]
+    #[resource(prefix="act")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    pub struct Actor();
+
+    #[resource(parents(SubSpace,App))]
+    #[resource(prefix="fs")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    pub struct FileSystem();
+
+    #[resource(parents(FileSystem))]
+    #[resource(prefix="f")]
+    #[resource(ResourcePathSegmentKind::Path)]
+    pub struct File();
+
+    #[resource(parents(SubSpace,App))]
+    #[resource(prefix="db")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    pub struct Database();
+
+    #[resource(parents(Space))]
+    #[resource(prefix="d")]
+    #[resource(ResourcePathSegmentKind::Domain)]
+    pub struct Domain();
+
+    #[resource(parents(SubSpace))]
+    #[resource(prefix="p")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    pub struct Proxy();
+
+    #[resource(parents(SubSpace))]
+    #[resource(prefix="abv")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    pub struct ArtifactBundleVersions();
+
+    #[resource(parents(ArtifactBundleVersions))]
+    #[resource(prefix="ab")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    pub struct ArtifactBundle();
+
+    #[resource(parents(ArtifactBundle))]
+    #[resource(prefix="a")]
+    #[resource(ResourcePathSegmentKind::Path)]
+    pub struct Artifact();
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum DatabaseKind{
+        Relational(Specific)
+    }
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum FileKind{
+        Dir,
+        File
+    }
+
+}
+
+
+
 pub struct ResourceAddress {
     path: ResourcePath
 }
@@ -90,7 +167,6 @@ impl FromStr for ResourceAddressKind{
 }
 
 
-pub type Domain = String;
 pub type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
 static RESOURCE_ADDRESS_DELIM : &str  = ":";
@@ -162,7 +238,7 @@ fn path( input: &str ) -> Res<&str,Path> {
 }
 
 
-fn host(input: &str) -> Res<&str, Domain> {
+fn host(input: &str) -> Res<&str, String> {
     context(
         "host",
         alt((
@@ -1060,34 +1136,6 @@ mod tests {
         assert_eq!("space:sub-space:some-app:database<Database>".to_string(), address.to_string() );
 
         Ok(())
-    }
-}
-
-resources! {
-    #[resource(parents(Root))]
-    #[resource(prefix="s")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    pub struct Space();
-
-    #[resource(parents(Space))]
-    #[resource(prefix="ss")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    pub struct SubSpace();
-
-
-    #[resource(parents(SubSpace))]
-    #[resource(prefix="app")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    pub struct App();
-
-    #[resource(parents(SubSpace,App))]
-    #[resource(prefix="db")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    pub struct Database();
-
-    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
-    pub enum DatabaseKind{
-        Relational(Specific)
     }
 }
 
