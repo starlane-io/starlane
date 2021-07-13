@@ -23,6 +23,44 @@ pub mod error;
 mod parse;
 
 
+pub struct ResourceAddress {
+    path: ResourcePath
+}
+
+impl ResourceAddress {
+    pub fn new( path: ResourcePath ) -> Self {
+        Self {
+            path: path
+        }
+    }
+}
+
+impl ToString for ResourceAddress {
+    fn to_string(&self) -> String {
+        format!("{}<{}>", self.path.to_string(), self.path.resource_type().to_string())
+    }
+}
+
+pub struct ResourceAddressKind {
+    path: ResourcePath,
+    kind: ResourceKind
+}
+
+impl ResourceAddressKind {
+    pub fn new( path: ResourcePath, kind: ResourceKind ) -> Self {
+        Self {
+            path: path,
+            kind: kind
+        }
+    }
+}
+
+impl ToString for ResourceAddressKind {
+    fn to_string(&self) -> String {
+        format!("{}{}", self.path.to_string(), self.kind.to_string())
+    }
+}
+
 
 
 pub type Domain = String;
@@ -282,17 +320,17 @@ pub fn parse_key(input: &str) -> Res<&str, (Vec<ResourcePathSegment>)> {
     )(input)
 }
 
-pub fn parse_address_path(input: &str) -> Res<&str, (Vec<ResourcePathSegment>)> {
+pub fn parse_resource_path(input: &str) -> Res<&str, (Vec<ResourcePathSegment>)> {
     context(
         "address-path",
         separated_list1( nom::character::complete::char(':'), alt( (path_part,version_part,domain_part,skewer_part) ) )
     )(input)
 }
 
-pub fn parse_address(input: &str) -> Res<&str, (Vec<ResourcePathSegment>, ResourceKindParts)> {
+pub fn parse_path(input: &str) -> Res<&str, (Vec<ResourcePathSegment>, ResourceKindParts)> {
     context(
         "address",
-        tuple( (parse_address_path,parse_kind) ),
+        tuple( (parse_resource_path, parse_kind) ),
     )(input)
 }
 
@@ -519,32 +557,11 @@ impl ResourcePathSegmentKind {
     }
 
     pub fn from_str(&self, s: &str) -> Result<ResourcePathSegment, Error> {
-        if s.contains(RESOURCE_ADDRESS_DELIM) {
-            return Err(format!(
-                "resource part cannot contain resource address delimeter '{}' as in '{}'",
-                RESOURCE_ADDRESS_DELIM, s
-            )
-                .into());
-        }
-        match self {
-
-            ResourcePathSegmentKind::SkewerCase => {
-                Ok(ResourcePathSegment::SkewerCase(SkewerCase::from_str(s)?))
-            }
-
-            ResourcePathSegmentKind::Path => Ok(ResourcePathSegment::Path(Path::from_str(s)?)),
-            ResourcePathSegmentKind::Version => {
-                Ok(ResourcePathSegment::Version(Version::from_str(s)?))
-            }
-
-            ResourcePathSegmentKind::Email => {
-                Ok(ResourcePathSegment::Email(
-                    s.to_string().trim().to_lowercase(),
-                ))
-            }
-           ResourcePathSegmentKind::Domain => {
-                Ok(ResourcePathSegment::Domain(DomainCase::from_str(s)?))
-            }
+        let (leftover,part) = path_part(s)?;
+        if leftover.len() > 0 {
+            Err(format!("could not parse entire path string: leftover: '{}' from '{}'",leftover,s).into())
+        } else {
+            Ok(part)
         }
     }
 }
@@ -834,12 +851,26 @@ impl FromStr for Version {
 #[cfg(test)]
 mod tests {
     use crate::error::Error;
-    use crate::{parse_address_path, ResourcePathSegment, SkewerCase, version, path, domain, DomainCase, KeyBits};
-    use crate::{SpaceKey,ResourceKey,RootKey,SubSpaceKey,AppKey,DatabaseKey};
+    use crate::{parse_resource_path, ResourcePathSegment, SkewerCase, version, path, domain, DomainCase, KeyBits, Specific};
+    use crate::{SpaceKey,ResourceKey,RootKey,SubSpaceKey,AppKey,DatabaseKey,DatabaseKind,ResourceKind};
     use std::convert::TryInto;
     use std::str::FromStr;
 
     #[test]
+    fn test_kind() -> Result<(),Error> {
+        let specific = Specific::from_str( "mysql.org:mysql:innodb:1.0.1")?;
+        let kind = DatabaseKind::Relational(specific);
+        println!("kind: {}", kind.to_string() );
+
+        let parsed_kind = ResourceKind::from_str(kind.to_string().as_str())?;
+        let parsed_kind:DatabaseKind = parsed_kind.try_into()?;
+        assert_eq!(kind,parsed_kind);
+        Ok(())
+    }
+
+
+
+        #[test]
     fn test_key_bit() -> Result<(),Error> {
         let (leftover,bit) = KeyBits::parse_key_bit("ss0")?;
 
@@ -884,6 +915,7 @@ mod tests {
         let sub_space_key:ResourceKey  = sub_space_key.into();
         println!("sub_space_key.to_string() {}", sub_space_key.to_string() );
         let app_key = AppKey::new( sub_space_key.try_into()?, 1 );
+        let app_key_cp = app_key.clone();
         let app_key: ResourceKey = app_key.into();
         println!("app_key.to_string() {}", app_key.to_string() );
         let db_key = DatabaseKey::new( app_key.try_into()?, 77 );
@@ -895,6 +927,11 @@ mod tests {
         let db_key2 = ResourceKey::from_str(db_key.to_string().as_str())?;
 
         assert_eq!( db_key, db_key2 );
+
+        let app_key: AppKey = db_key.parent().unwrap().try_into()?;
+        println!("parent {}", app_key.to_string() );
+
+        assert_eq!( app_key_cp, app_key );
 
         Ok(())
     }
@@ -938,7 +975,7 @@ mod tests {
 
         #[test]
     fn address_path() -> Result<(),Error>{
-        let (leftover,address)= parse_address_path("starlane.io:some-skewer-case:1.3.4-beta:/the/End/of/the.World")?;
+        let (leftover,address)= parse_resource_path("starlane.io:some-skewer-case:1.3.4-beta:/the/End/of/the.World")?;
 
         assert_eq!(address.get(0), Option::Some(&ResourcePathSegment::Domain(DomainCase::new("starlane.io"))));
         assert_eq!(address.get(1), Option::Some(&ResourcePathSegment::SkewerCase(SkewerCase::new("some-skewer-case"))));
@@ -991,9 +1028,3 @@ resources! {
         Relational(Specific)
     }
 }
-
-
-
-
-
-

@@ -46,7 +46,7 @@ struct Resource {
     item: Item,
     parents: Vec<Ident>,
     key_prefix: Option<String>,
-    address_part: Option<Ident>
+    path_part: Option<Ident>
 }
 
 impl Resource {
@@ -55,7 +55,7 @@ impl Resource {
             item: item,
             parents: vec![],
             key_prefix: Option::None,
-            address_part: Option::None
+            path_part: Option::None
         }
     }
 
@@ -107,7 +107,7 @@ impl Parse for ResourceParser {
                                 Meta::Path(path) => {
                                     if( path.segments.first().is_some() && path.segments.first().unwrap().ident.to_string().as_str() == "ResourcePathSegmentKind" )
                                     {
-                                        resource.address_part = Option::Some( path.segments.last().unwrap().ident.clone() );
+                                        resource.path_part = Option::Some( path.segments.last().unwrap().ident.clone() );
                                     }
                                 }
                                 Meta::List(list) => {
@@ -231,7 +231,7 @@ impl ResourceType {
     let kinds = kinds(&parsed);
 
 
-    let addresses= addresses(&parsed);
+    let paths= paths(&parsed);
     /*
     proc_macro::TokenStream::from( quote!{
        #extras
@@ -240,7 +240,7 @@ impl ResourceType {
        #(#resources_def)*
        #keys
 
-       #addresses
+       #paths
        #keys
     })
      */
@@ -251,20 +251,20 @@ impl ResourceType {
        #(#resources_def)*
        #keys
        #kinds
-       #addresses
+       #paths
     })
 }
-fn addresses( parsed: &ResourceParser ) -> TokenStream {
+fn paths( parsed: &ResourceParser ) -> TokenStream {
 
 
 
-    let mut addresses = vec![];
+    let mut paths = vec![];
     for resource in &parsed.resources{
         let ident = Ident::new(resource.get_ident().to_string().as_str(), resource.get_ident().span());
-        let address_ident = Ident::new(format!("{}Address",resource.get_ident().to_string()).as_str(), resource.get_ident().span());
+        let path_ident = Ident::new(format!("{}Path",resource.get_ident().to_string()).as_str(), resource.get_ident().span());
         if resource.parents.is_empty() {
-            addresses.push(quote!{
-                impl #address_ident {
+            paths.push(quote!{
+                impl #path_ident {
                     pub fn parent(&self)->Result<Option<ResourcePath>,Error> {
                         Ok(Option::None)
                     }
@@ -272,26 +272,26 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
             })
         } else if resource.parents.len() == 1 {
             let parent = resource.parents.first().unwrap().clone();
-            let parent_address= Ident::new(format!("{}Address",parent.to_string()).as_str(), parent.span());
-            addresses.push( quote!{
-                 impl #address_ident {
+            let parent_path= Ident::new(format!("{}Path",parent.to_string()).as_str(), parent.span());
+            paths.push( quote!{
+                 impl #path_ident {
                     pub fn parent(&self)->Result<Option<ResourcePath>,Error> {
                         let mut parts = self.parts.clone();
                         parts.remove( parts.len() );
-                        Ok(Option::Some(#parent_address::try_from(parts)?.into()))
+                        Ok(Option::Some(#parent_path::try_from(parts)?.into()))
                     }
                 }
             } );
         }else  {
             let parents = resource.parents.clone();
-            let parent_address: Vec<Ident>= resource.parents.iter().map( |parent|Ident::new(format!("{}Address",parent.to_string()).as_str(), parent.span())).collect();
-            addresses.push( quote!{
-                 impl #address_ident {
+            let parent_path: Vec<Ident>= resource.parents.iter().map( |parent|Ident::new(format!("{}Path",parent.to_string()).as_str(), parent.span())).collect();
+            paths.push( quote!{
+                 impl #path_ident {
                     pub fn parent(&self)->Result<Option<ResourcePath>,Error> {
                         unimplemented!()
 /*                        let mut parts = self.parts.clone();
                         parts.remove( parts.len() );
-                        let matcher = ParentAddressPatternRecognizer::default();
+                        let matcher = ParentPathPatternRecognizer::default();
                         let parent_resource_type = matcher.try_from(parts.clone())?;
                         Ok(Option::Some(ResourcePath::from_parts_and_type(parent_resource_type, parts )?))
 
@@ -307,64 +307,74 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
     }).collect();
     let idents2 = idents.clone();
 
-    let address_idents: Vec<Ident> = parsed.resources.iter().map(|resource|{
-        Ident::new( format!("{}Address",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
+    let path_idents: Vec<Ident> = parsed.resources.iter().map(|resource|{
+        Ident::new( format!("{}Path",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
     }).collect();
 
-    let address_idents2 = address_idents.clone();
-    let address_idents3 = address_idents.clone();
-    let address_idents4= address_idents.clone();
-    let address_idents5= address_idents.clone();
+    let path_idents2 = path_idents.clone();
+    let path_idents3 = path_idents.clone();
+    let path_idents4= path_idents.clone();
+    let path_idents5= path_idents.clone();
 
 
 
 
     quote!{
 
-        pub struct RootAddress{
+        #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+        pub struct RootPath{
 
         }
 
-        impl RootAddress {
+        impl RootPath {
            pub fn parent(&self)->Result<Option<ResourcePath>,Error> {
              Ok(Option::None)
            }
         }
 
-        impl Into<ResourcePath> for RootAddress{
+        impl Into<ResourcePath> for RootPath{
             fn into(self) -> ResourcePath {
                 ResourcePath::Root
             }
         }
 
-        impl TryFrom<Vec<ResourcePathSegment>> for RootAddress{
+        impl TryFrom<Vec<ResourcePathSegment>> for RootPath{
             type Error=Error;
-            fn try_from( parts: Vec<ResourcePathSegment> ) -> Result<RootAddress,Self::Error> {
+            fn try_from( parts: Vec<ResourcePathSegment> ) -> Result<RootPath,Self::Error> {
                 if parts.is_empty() {
-                    Ok(RootAddress{})
+                    Ok(RootPath{})
                 } else {
-                    Err("root address should not have remaining parts".into())
+                    Err("root path should not have remaining parts".into())
                 }
             }
         }
 
-        #(pub struct #address_idents {
+        #(
+            #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+            pub struct #path_idents {
             parts: Vec<ResourcePathSegment>
         }
 
-        impl #address_idents2 {
+        impl #path_idents2 {
            pub fn resource_type(&self) -> ResourceType {
                ResourceType::#idents
            }
         }
 
-          impl Into<ResourcePath> for #address_idents3 {
+          impl Into<ResourcePath> for #path_idents3 {
                 fn into(self) -> ResourcePath{
                     ResourcePath::#idents2(self)
                 }
            }
 
-          impl TryFrom<Vec<ResourcePathSegment>> for #address_idents4 {
+          impl Into<Vec<ResourcePathSegment>> for #path_idents3 {
+                fn into(self) -> Vec<ResourcePathSegment> {
+                  self.parts
+                }
+          }
+
+
+          impl TryFrom<Vec<ResourcePathSegment>> for #path_idents4 {
                type Error=Error;
 
                fn try_from(parts: Vec<ResourcePathSegment> )->Result<Self,Self::Error>{
@@ -374,40 +384,77 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
                }
             }
 
-         impl FromStr for #address_idents5 {
+         impl FromStr for #path_idents5 {
                type Err=Error;
                fn from_str( s: &str ) -> Result<Self,Self::Err> {
-                    let (leftover,parts):(&str,Vec<ResourcePathSegment>) = parse_address_path(s)?;
+                    let (leftover,parts):(&str,Vec<ResourcePathSegment>) = parse_resource_path(s)?;
                     unimplemented!()
                }
          }
 
         )*
 
+        #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
         pub enum ResourcePath {
             Root,
-            #(#idents(#address_idents)),*
+            #(#idents(#path_idents)),*
         }
+
+        impl ResourcePath {
+            pub fn resource_type(&self) -> ResourceType {
+                match self {
+                 Self::Root => ResourceType::Root,
+                 #(Self::#idents(_)=>ResourceType::#idents2),*
+                }
+            }
+        }
+
+
+        impl ToString for ResourcePath {
+
+            fn to_string(&self)->String {
+                let segments:Vec<ResourcePathSegment> = self.clone().into();
+                let mut rtn = String::new();
+                for i in 0..segments.len() {
+                    let segment = segments.get(i).unwrap();
+                    rtn.push_str( segment.to_string().as_str() );
+                    if i < segments.len()-1 {
+                        rtn.push_str(":");
+                    }
+                }
+                rtn
+            }
+        }
+
+        impl Into<Vec<ResourcePathSegment>> for ResourcePath {
+            fn into(self) -> Vec<ResourcePathSegment> {
+                match self {
+                    Self::Root => vec![],
+                    #(Self::#idents(path)=>path.into()),*
+                }
+            }
+        }
+
 
         impl FromStr for ResourcePath {
             type Err=Error;
 
             fn from_str(s: &str) -> Result<Self,Self::Err>{
-                let (leftover,(address,kind)) = parse_address(s)?;
+                let (leftover,(path,kind)) = parse_path(s)?;
                 if leftover.len() > 0 {
-                    return Err(format!("cannot process: '{}' from address '{}'", leftover, s).into());
+                    return Err(format!("cannot process: '{}' from path '{}'", leftover, s).into());
                 }
                 let kind:ResourceKind = kind.try_into()?;
 
                 match kind.resource_type() {
                     ResourceType::Root => {
-                        if !address.is_empty()  {
-                            Err("root address must be empty".into())
+                        if !path.is_empty()  {
+                            Err("root path must be empty".into())
                         } else {
                             Ok(ResourcePath::Root)
                         }
                     }
-                    #(ResourceType::#idents=>Ok(#address_idents::try_from(address)?.into())),*
+                    #(ResourceType::#idents=>Ok(#path_idents::try_from(path)?.into())),*
                 }
             }
 
@@ -418,13 +465,13 @@ fn addresses( parsed: &ResourceParser ) -> TokenStream {
             pub fn from_parts_and_type( resource_type:ResourceType, parts: Vec<ResourcePathSegment> ) -> Result<ResourcePath,Error> {
                match  resource_type {
                     ResourceType::Root => Ok(ResourcePath::Root),
-                    #(ResourceType::#idents => Ok(#address_idents::try_from(parts.clone())?.into()) ),*
+                    #(ResourceType::#idents => Ok(#path_idents::try_from(parts.clone())?.into()) ),*
                }
 
             }
         }
 
-        #(#addresses)*
+        #(#paths)*
     }
 
 }
@@ -459,6 +506,21 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
 
     for resource in &parsed.resources {
       if let Option::Some(kind) = parsed.kind_for(resource) {
+
+
+          let ident = resource.get_ident();
+          let ident_kind = Ident::new(format!("{}Kind",resource.get_ident().to_string()).as_str(), resource.get_ident().span() );
+          kind_stuff.push( quote! {
+              impl ToString for #ident_kind {
+                  fn to_string(&self) -> String {
+                      let kind: ResourceKind = self.clone().into();
+                      kind.to_string()
+                  }
+              }
+          } );
+
+
+
           resource_kind_enum.push_str(format!("{}({}),",resource.get_ident().to_string(),kind.ident.to_string()).as_str() );
           resource_kind_from_parts.push_str( format!("\"{}\"=>Ok({}Kind::try_from(parts)?.into()),",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str(), );
           into_resource_kind_parts.push_str(format!("Self::{}(kind)=>kind.into(),",resource.get_ident().to_string()).as_str() );
