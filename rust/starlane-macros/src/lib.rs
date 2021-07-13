@@ -248,6 +248,24 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 }
             }
         }
+
+        impl FromStr for ResourceType {
+            type Err=Error;
+            fn from_str( s: &str ) -> Result<Self,Error> {
+                match s {
+                    "Root" => Ok(Self::Root),
+                    #(stringify!(#rts) => Ok(Self::#rts),)*
+                    what => Err(format!("could not match ResourceType '{}'", what ).into())
+                }
+            }
+        }
+
+        impl TryFrom<ResourceKindParts> for ResourceType {
+            type Error = Error;
+            fn try_from(parts:ResourceKindParts) -> Result<Self,Self::Error> {
+                Ok(ResourceType::from_str(parts.resource_type.as_str())?)
+            }
+        }
     };
 
     let mut pathways  = String::new();
@@ -632,6 +650,7 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
           has_specific.push_str(format!("impl {} {}", kind.ident.to_string(), "{").as_str() );
           has_specific.push_str("pub fn has_specific(&self)->bool {" );
           has_specific.push_str("match self {");
+
 
           let mut from_parts = String::new();
           from_parts.push_str(format!("impl TryFrom<ResourceKindParts> for {} {{", kind.ident.to_string()).as_str() );
