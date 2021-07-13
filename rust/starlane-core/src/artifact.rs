@@ -201,21 +201,7 @@ impl SubSpaceName {
 
 
 
-impl Into<ResourceIdentifier> for ArtifactBundleIdentifier {
-    fn into(self) -> ResourceIdentifier {
-        match self {
-            ArtifactBundleIdentifier::Key(key) => ResourceIdentifier::Key(key.into()),
-            ArtifactBundleIdentifier::Address(address) => {
-                ResourceIdentifier::Address(address.into())
-            }
-        }
-    }
-}
 
-pub enum ArtifactBundleIdentifier {
-    Key(ArtifactBundleKey),
-    Address(ArtifactBundleAddress),
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct ArtifactRef {

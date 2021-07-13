@@ -49,12 +49,8 @@ impl ResourceAddress {
 
     pub fn parent(&self) -> Option<ResourceAddress> {
         match self.path.parent() {
-            Ok(Option::None) => Option::None,
-            Ok(Option::Some(parent)) => Option::Some(parent.into()),
-            Err(err)=>{
-                eprintln!("CRITICAL : error when getting parent: {}", err.to_string() );
-                Option::None
-            }
+            Option::None => Option::None,
+            Option::Some(parent) => Option::Some(parent.into())
         }
     }
 
@@ -1104,111 +1100,7 @@ pub enum ResourceStatePersistenceManager {
 
 
 
-resources! {
-    #[resource(parents(Root))]
-    #[resource(prefix="s")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::Store)]
-    pub struct Space();
 
-    #[resource(parents(Space))]
-    #[resource(prefix="ss")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::Store)]
-    pub struct SubSpace();
-
-    #[resource(parents(SubSpace))]
-    #[resource(prefix="app")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::None)]
-    pub struct App();
-
-    #[resource(parents(App))]
-    #[resource(prefix="act")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::None)]
-    pub struct Actor();
-
-    #[resource(parents(SubSpace,App))]
-    #[resource(prefix="fs")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::Host)]
-    pub struct FileSystem();
-
-    #[resource(parents(FileSystem))]
-    #[resource(prefix="f")]
-    #[resource(ResourcePathSegmentKind::Path)]
-    #[resource(ResourceStatePersistenceManager::Host)]
-    pub struct File();
-
-    #[resource(parents(SubSpace,App))]
-    #[resource(prefix="db")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::Host)]
-    pub struct Database();
-
-    #[resource(parents(Space))]
-    #[resource(prefix="d")]
-    #[resource(ResourcePathSegmentKind::Domain)]
-    #[resource(ResourceStatePersistenceManager::None)]
-    pub struct Domain();
-
-    #[resource(parents(SubSpace))]
-    #[resource(prefix="p")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::None)]
-    pub struct Proxy();
-
-    #[resource(parents(SubSpace))]
-    #[resource(prefix="abv")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::None)]
-    pub struct ArtifactBundleVersions();
-
-    #[resource(parents(ArtifactBundleVersions))]
-    #[resource(prefix="ab")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::Host)]
-    pub struct ArtifactBundle();
-
-    #[resource(parents(ArtifactBundle))]
-    #[resource(prefix="a")]
-    #[resource(ResourcePathSegmentKind::Path)]
-    #[resource(ResourceStatePersistenceManager::Host)]
-    pub struct Artifact();
-
-    #[resource(parents(Space))]
-    #[resource(prefix="u")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::Host)]
-    pub struct User();
-
-
-
-    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
-    pub enum DatabaseKind{
-        Relational(Specific)
-    }
-
-    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
-    pub enum FileKind{
-        Directory,
-        File
-    }
-
-
-    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
-    pub enum ArtifactKind{
-        Raw,
-        DomainConfig
-    }
-
-    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
-    pub enum ArtifactBundleKind{
-        Final,
-        Volatile
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
 pub enum ResourceIdentifier {
@@ -1327,3 +1219,122 @@ impl ToString for ResourceIdentifier {
         }
     }
 }
+
+
+resources! {
+    #[resource(parents(Root))]
+    #[resource(prefix="s")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Store)]
+    pub struct Space();
+    #[resource(parents(Space))]
+    #[resource(prefix="ss")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Store)]
+    pub struct SubSpace();
+
+    #[resource(parents(SubSpace))]
+    #[resource(prefix="app")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::None)]
+    pub struct App();
+
+    #[resource(parents(App))]
+    #[resource(prefix="act")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::None)]
+    pub struct Actor();
+
+    #[resource(parents(SubSpace,App))]
+    #[resource(prefix="fs")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    pub struct FileSystem();
+
+    #[resource(parents(FileSystem))]
+    #[resource(prefix="f")]
+    #[resource(ResourcePathSegmentKind::Path)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    pub struct File();
+
+    #[resource(parents(SubSpace,App))]
+    #[resource(prefix="db")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    pub struct Database();
+
+    #[resource(parents(Space))]
+    #[resource(prefix="d")]
+    #[resource(ResourcePathSegmentKind::Domain)]
+    #[resource(ResourceStatePersistenceManager::None)]
+    pub struct Domain();
+
+    #[resource(parents(SubSpace))]
+    #[resource(prefix="p")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::None)]
+    pub struct Proxy();
+
+    #[resource(parents(SubSpace))]
+    #[resource(prefix="abv")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::None)]
+    pub struct ArtifactBundleVersions();
+
+    #[resource(parents(ArtifactBundleVersions))]
+    #[resource(prefix="ab")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    pub struct ArtifactBundle();
+
+    #[resource(parents(ArtifactBundle))]
+    #[resource(prefix="a")]
+    #[resource(ResourcePathSegmentKind::Path)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    pub struct Artifact();
+
+    #[resource(parents(Space))]
+    #[resource(prefix="u")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    pub struct User();
+
+
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum DatabaseKind{
+        Relational(Specific)
+    }
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum FileKind{
+        Directory,
+        File
+    }
+
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum ArtifactKind{
+        Raw,
+        DomainConfig
+    }
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum ArtifactBundleKind{
+        Final,
+        Volatile
+    }
+
+
+}
+
+impl ArtifactPath{
+    pub fn path(&self)->Path {
+        if let ResourcePathSegment::Path( path ) = self.parts.last().unwrap() {
+            path.clone()
+        } else {
+            panic!("expected last segment to be a path")
+        }
+    }
+}
+

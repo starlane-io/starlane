@@ -166,7 +166,7 @@ impl ResourceStoreSqlLite {
                 let address = assign.stub.address.to_string();
                 let specific = match &assign.stub.archetype.specific {
                     None => Option::None,
-                    Some(specific) => Option::Some(specific.to()),
+                    Some(specific) => Option::Some(specific.to_string()),
                 };
                 let config_src = match &assign.stub.archetype.config {
                     None => Option::None,

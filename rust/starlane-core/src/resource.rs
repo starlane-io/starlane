@@ -110,6 +110,8 @@ pub type ArtifactAddress=starlane_resources::ArtifactPath;
 pub type ArtifactBundleKey=starlane_resources::ArtifactBundleKey;
 pub type ArtifactBundleAddress=starlane_resources::ArtifactBundlePath;
 
+pub type ArtifactBundleIdentifier=starlane_resources::ArtifactBundleIdentifier;
+
 pub type Specific=starlane_resources::Specific;
 
 

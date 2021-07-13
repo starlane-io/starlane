@@ -20,12 +20,12 @@ use tokio::sync::oneshot::Receiver;
 
 use starlane_resources::ResourceIdentifier;
 
-use crate::artifact::{ArtifactBundleIdentifier, ArtifactRef};
+use crate::artifact::{ArtifactRef};
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::logger::{elog, LogInfo, StaticLogInfo};
 use crate::message::Fail;
-use crate::resource::{ArtifactBundleAddress, Path, ResourceAddress, ResourceArchetype, ResourceKind, ResourceLocation, ResourceRecord, ResourceStub};
+use crate::resource::{ArtifactBundleAddress, Path, ResourceAddress, ResourceArchetype, ResourceKind, ResourceLocation, ResourceRecord, ResourceStub, ArtifactBundleIdentifier};
 use crate::resource::artifact::ArtifactBundle;
 use crate::resource::ArtifactAddress;
 use crate::resource::ArtifactBundleKey;
@@ -547,7 +547,6 @@ impl MockArtifactBundleSrc {
                 },
                 location: ResourceLocation {
                     host: StarKey::central(),
-                    gathering: None,
                 },
             },
         })
@@ -899,16 +898,18 @@ impl<C: Cacheable> RootItemCacheProc<C> {
         bundle_cache: ArtifactBundleCache,
     ) -> Result<Arc<X>, Error> {
 println!("root: cache_artifact: {}", artifact.address.to_string());
+        let address: ResourceAddress  = artifact.address.parent().into();
+        let address: ResourceIdentifier = address.into();
         bundle_cache
-            .download(artifact.address.parent().into())
+            .download(address.try_into()?)
             .await?;
 println!("bundle cached : parsing: {}", artifact.address.to_string());
         let file_access = ArtifactBundleCache::with_bundle_files_path(
             bundle_cache.file_access(),
-            artifact.address.parent(),
+            artifact.address.parent().try_into()?,
         )?;
 println!("file acces scached : parsing: {}", artifact.address.to_string());
-        let data = file_access.read(&artifact.address.path()?).await?;
+        let data = file_access.read(&artifact.address.path()).await?;
 println!("root: parsing: {}", artifact.address.to_string());
         parser.parse(artifact, data)
     }
@@ -1090,7 +1091,8 @@ mod test {
 
         let mut proto_caches = factory.create();
         let artifact = ArtifactAddress::from_str("hyperspace:default:whiz:1.0.0:/routes.txt")?;
-        let artifact = artifact.as_ref(ArtifactKind::DomainConfig);
+
+        let artifact = ArtifactRef::new(artifact, ArtifactKind::DomainConfig );
 
         proto_caches.cache(vec![artifact.clone()]).await?;
 

@@ -362,6 +362,7 @@ impl ResourceType {
     println!("resources_def.len() {}",resources_def.len());
 
     let keys= keys(&parsed);
+    let ids = ids(&parsed);
 
 
     let kinds = kinds(&parsed);
@@ -388,6 +389,7 @@ impl ResourceType {
        #resource_type_enum_def
        #resource_impl_def
        #(#resources_def)*
+       #ids
     })
 }
 fn paths( parsed: &ResourceParser ) -> TokenStream {
@@ -398,23 +400,16 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
     for resource in &parsed.resources{
         let ident = Ident::new(resource.get_ident().to_string().as_str(), resource.get_ident().span());
         let path_ident = Ident::new(format!("{}Path",resource.get_ident().to_string()).as_str(), resource.get_ident().span());
-        if resource.parents.is_empty() {
-            paths.push(quote!{
-                impl #path_ident {
-                    pub fn parent(&self)->Result<Option<ResourcePath>,Error> {
-                        Ok(Option::None)
-                    }
-                }
-            })
-        } else if resource.parents.len() == 1 {
+
+        if resource.parents.len() == 1 {
             let parent = resource.parents.first().unwrap().clone();
             let parent_path= Ident::new(format!("{}Path",parent.to_string()).as_str(), parent.span());
             paths.push( quote!{
                  impl #path_ident {
-                    pub fn parent(&self)->Result<Option<ResourcePath>,Error> {
+                    pub fn parent(&self)->ResourcePath {
                         let mut parts = self.parts.clone();
                         parts.remove( parts.len() );
-                        Ok(Option::Some(#parent_path::try_from(parts)?.into()))
+                        #parent_path::try_from(parts).expect("expected it to parse sence it had already parsed once").into()
                     }
                 }
             } );
@@ -423,9 +418,9 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
             let parent_path: Vec<Ident>= resource.parents.iter().map( |parent|Ident::new(format!("{}Path",parent.to_string()).as_str(), parent.span())).collect();
             paths.push( quote!{
                  impl #path_ident {
-                    pub fn parent(&self)->Result<Option<ResourcePath>,Error> {
-                        let parent_resource_type = self.resource_type().parent_path_matcher(self.parts.iter().map(|p|p.clone().to_kind()).collect())?;
-                        Ok(Option::Some(ResourcePath::from_parts_and_type(parent_resource_type, self.parts.clone() )?))
+                    pub fn parent(&self)->ResourcePath {
+                        let parent_resource_type = self.resource_type().parent_path_matcher(self.parts.iter().map(|p|p.clone().to_kind()).collect()).expect("expected to find a parent match");
+                        ResourcePath::from_parts_and_type(parent_resource_type, self.parts.clone() ).unwrap()
                     }
                 }
             } );
@@ -455,12 +450,6 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
         #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
         pub struct RootPath{
 
-        }
-
-        impl RootPath {
-           pub fn parent(&self)->Result<Option<ResourcePath>,Error> {
-             Ok(Option::None)
-           }
         }
 
         impl Into<ResourcePath> for RootPath{
@@ -574,7 +563,11 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
                type Err=Error;
                fn from_str( s: &str ) -> Result<Self,Self::Err> {
                     let (leftover,parts):(&str,Vec<ResourcePathSegment>) = parse_resource_path(s)?;
-                    unimplemented!()
+                    if leftover.len() > 0 {
+                        Err(format!("tried to parse #path_idents5 for '{}' but ran into leftover '{}'", s, leftover).into() )
+                    } else {
+                        Ok(parts.try_into()?)
+                    }
                }
          }
 
@@ -663,10 +656,10 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
                }
             }
 
-            pub fn parent(&self)->Result<Option<ResourcePath>,Error>{
+            pub fn parent(&self)->Option<ResourcePath>{
                 match self {
-                     Self::Root => Ok(Option::None),
-                     #(Self::#idents(path) => Ok(Option::Some(path.parent()?.unwrap().into())) ),*
+                     Self::Root => Option::None,
+                     #(Self::#idents(path) => Option::Some(path.parent().into()) ),*
                  }
             }
 
@@ -907,6 +900,18 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                     id: #id
                 }
 
+                impl #ident{
+                    pub fn bin(&self) -> Result<Vec<u8>, Error> {
+                        let mut bin = bincode::serialize(self)?;
+                        Ok(bin)
+                    }
+
+                    pub fn from_bin(mut bin: Vec<u8>) -> Result<Self, Error> {
+                        let mut key = bincode::deserialize::<Self>(bin.as_slice())?;
+                        Ok(key)
+                    }
+                }
+
                 impl #ident {
                     pub fn parent(&self) -> Option<ResourceKey> {
                         Option::None
@@ -1111,6 +1116,19 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
             #(#idents(#idents_keys)),*
         }
 
+         impl ResourceKey{
+            pub fn bin(&self) -> Result<Vec<u8>, Error> {
+                let mut bin = bincode::serialize(self)?;
+                Ok(bin)
+            }
+
+            pub fn from_bin(mut bin: Vec<u8>) -> Result<Self, Error> {
+                let mut key = bincode::deserialize::<Self>(bin.as_slice())?;
+                Ok(key)
+            }
+         }
+
+
         impl ResourceKey {
 
             pub fn root() -> Self {
@@ -1244,6 +1262,70 @@ pub struct Error {
 
 
 
+fn ids( parsed: &ResourceParser ) -> TokenStream {
+
+
+    let idents: Vec<Ident> = parsed.resources.clone().iter().map(|resource|{
+        resource.get_ident()
+    }).collect();
+    let identifier_idents : Vec<Ident> = parsed.resources.iter().map(|resource|{
+        Ident::new( format!("{}Identifier",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
+    }).collect();
+
+    let key_idents : Vec<Ident> = parsed.resources.iter().map(|resource|{
+        Ident::new( format!("{}Key",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
+    }).collect();
+
+    let path_idents : Vec<Ident> = parsed.resources.iter().map(|resource|{
+        Ident::new( format!("{}Path",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
+    }).collect();
+
+
+    quote! {
+        #(
+            pub enum #identifier_idents {
+                Address(#path_idents),
+                Key(#key_idents)
+            }
+
+
+            impl Into<ResourceIdentifier> for #identifier_idents {
+                fn into(self) -> ResourceIdentifier {
+                    match self {
+                        Self::Address(address) => ResourceIdentifier::Address( ResourceAddress{path:address.into()}),
+                        Self::Key(key) => ResourceIdentifier::Key( key.into() ),
+                    }
+                }
+            }
+
+            impl From<#path_idents> for #identifier_idents {
+                fn from(path: #path_idents) -> #identifier_idents{
+                        Self::Address(path)
+                }
+            }
+
+            impl From<#key_idents> for #identifier_idents {
+                fn from(key: #key_idents) -> #identifier_idents{
+                        Self::Key(key)
+                }
+            }
+
+            impl TryFrom<ResourceIdentifier> for #identifier_idents {
+                type Error=Error;
+                fn try_from(id:ResourceIdentifier) -> Result<Self,Self::Error>{
+                    match id{
+                        ResourceIdentifier::Address(address) => Ok(Self::Address( address.try_into()? )),
+                        ResourceIdentifier::Key(key) => Ok(Self::Key( key.try_into()? )),
+                    }
+                }
+            }
+
+
+        )*
+
+    }
+
+}
 
 
 
