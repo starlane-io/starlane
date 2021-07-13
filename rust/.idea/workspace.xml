@@ -5,9 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-macros/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-macros/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-resources/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/lib.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -216,7 +214,7 @@
       <workItem from="1625759977203" duration="11299000" />
       <workItem from="1625777595261" duration="13728000" />
       <workItem from="1625838663767" duration="61485000" />
-      <workItem from="1626011932512" duration="82700000" />
+      <workItem from="1626011932512" duration="83263000" />
     </task>
     <servers />
   </component>

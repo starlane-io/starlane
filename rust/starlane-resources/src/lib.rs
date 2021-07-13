@@ -1001,7 +1001,7 @@ mod tests {
 
     #[test]
     fn test_address_parent_resolution( ) -> Result<(),Error>{
-        let path = ResourcePath::from_str( "space:sub-space:database<Database>")?;
+        let path = ResourcePath::from_str( "space:sub-space:database<Database<Relational>>")?;
 
         Ok(())
     }

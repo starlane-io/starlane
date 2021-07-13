@@ -553,9 +553,9 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
                 if leftover.len() > 0 {
                     return Err(format!("cannot process: '{}' from path '{}'", leftover, s).into());
                 }
-                let kind:ResourceKind = kind.try_into()?;
+                let resource_type:ResourceType= kind.try_into()?;
 
-                match kind.resource_type() {
+                match resource_type {
                     ResourceType::Root => {
                         if !path.is_empty()  {
                             Err("root path must be empty".into())
