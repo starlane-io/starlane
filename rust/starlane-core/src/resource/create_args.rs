@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::artifact::ArtifactBundleAddress;
+use crate::resource::ArtifactBundleAddress;
 
 use std::str::FromStr;
 use zip::{ZipWriter, CompressionMethod};

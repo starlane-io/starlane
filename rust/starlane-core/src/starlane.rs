@@ -784,7 +784,8 @@ mod test {
     use tokio::time::timeout;
     use tokio::time::Duration;
 
-    use crate::artifact::{ArtifactLocation, ArtifactBundleAddress};
+    use crate::artifact::ArtifactLocation;
+    use crate::resource::ArtifactBundleAddress;
     use crate::error::Error;
     use crate::logger::{
         Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog,

@@ -6,13 +6,13 @@ use rusqlite::{Connection, params, Row, Transaction};
 use rusqlite::types::ValueRef;
 use tokio::sync::{mpsc, oneshot};
 
-use starlane_resources::ResourceStatePersistenceManager;
+use starlane_resources::{ResourceIdentifier, ResourceStatePersistenceManager};
 
 use crate::app::ConfigSrc;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::message::Fail;
-use crate::resource::{DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceIdentifier, ResourceKind, Specific,ResourceKey};
+use crate::resource::{DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceKey, ResourceKind, Specific};
 
 #[derive(Clone,Debug)]
 pub struct ResourceStore {

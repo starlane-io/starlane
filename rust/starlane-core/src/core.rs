@@ -1,39 +1,41 @@
+use std::{io, thread};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
+use std::io::Write;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::pin::Pin;
-use std::sync::mpsc::Receiver;
 use std::sync::Arc;
-use std::{thread, io};
+use std::sync::mpsc::Receiver;
 
 use futures::future::BoxFuture;
 use futures::FutureExt;
-use tokio::runtime::{Runtime, Builder};
-use tokio::sync::mpsc::Sender;
+use tokio::runtime::{Builder, Runtime};
 use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc::Sender;
 use tokio::time::Duration;
+
+use starlane_resources::ResourceIdentifier;
 
 use crate::core::artifact::ArtifactHost;
 use crate::core::default::DefaultHost;
 use crate::core::file_store::FileStoreHost;
+use crate::core::kube::KubeCore;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::MessagePayload;
 use crate::id::{Id, IdSeq};
 use crate::message::Fail;
-use crate::resource::store::ResourceStoreSqlLite;
 use crate::resource::{
     AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource,
-    RemoteDataSrc, Resource, ResourceAssign, ResourceIdentifier, ResourceSliceAssign,
+    RemoteDataSrc, Resource, ResourceAssign, ResourceSliceAssign,
 };
-use crate::star::variant::StarVariantCommand;
+use crate::resource::store::ResourceStoreSqlLite;
 use crate::star::{
     ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel,
 };
-use crate::core::kube::KubeCore;
-use std::io::Write;
+use crate::star::variant::StarVariantCommand;
 
 pub mod artifact;
 pub mod default;

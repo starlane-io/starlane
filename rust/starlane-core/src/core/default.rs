@@ -10,29 +10,29 @@ use rusqlite::types::ValueRef;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
 
-use starlane_resources::ResourceStatePersistenceManager;
+use starlane_resources::{ResourceIdentifier, ResourceStatePersistenceManager};
 
 use crate::app::ConfigSrc;
+use crate::artifact::ArtifactRef;
 use crate::core::Host;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::ResourceHostAction;
-use crate::resource::ResourceKey;
 use crate::message::Fail;
-use crate::names::{Name};
+use crate::names::Name;
 use crate::resource;
 use crate::resource::{
-    AssignResourceStateSrc, DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer,
-    Names, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign,
-    ResourceIdentifier, ResourceKind, ResourceStateSrc,ArtifactKind
+    ArtifactKind, AssignResourceStateSrc, DataTransfer, FileDataTransfer, LocalDataSrc,
+    MemoryDataTransfer, Names, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype,
+    ResourceAssign, ResourceKind, ResourceStateSrc
 };
+use crate::resource::ResourceKey;
 use crate::resource::store::{
     ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult,
     ResourceStoreSqlLite,
 };
 use crate::resource::user::UserState;
 use crate::star::StarSkel;
-use crate::artifact::ArtifactRef;
 
 #[derive(Debug)]
 pub struct DefaultHost {

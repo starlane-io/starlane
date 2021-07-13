@@ -2,19 +2,36 @@ use core::cell::Cell;
 use core::option::Option;
 use core::result::Result;
 use core::result::Result::{Err, Ok};
+use std::collections::HashSet;
+use std::iter::FromIterator;
+
 use serde::{Deserialize, Serialize, Serializer};
+use tokio::sync::{mpsc, oneshot};
+
+use starlane_resources::ResourceIdentifier;
 
 use crate::error::Error;
 use crate::frame::{MessagePayload, Reply, SimpleReply, StarMessage, StarMessagePayload};
 use crate::id::Id;
 use crate::logger::Log::ProtoStar;
-use crate::message::{Fail, ProtoStarMessage, MessageId};
-use crate::resource::{RemoteDataSrc, ResourceCreate, ResourceIdentifier, ResourceRecord, ResourceSelector, ResourceType, ResourceId};
+use crate::message::{Fail, MessageId, ProtoStarMessage};
+use crate::resource::{RemoteDataSrc, ResourceCreate, ResourceId, ResourceRecord, ResourceSelector, ResourceType};
 use crate::star::{StarCommand, StarKey, StarSkel};
 use crate::util;
-use std::collections::HashSet;
-use std::iter::FromIterator;
-use tokio::sync::{mpsc, oneshot};
+
+
+pub struct MessageTo {
+    id: ResourceIdentifier
+}
+
+impl MessageTo {
+    pub fn new( id: ResourceIdentifier ) {
+        Self{id};
+    }
+    pub fn reverse(&self) -> MessageFrom {
+        MessageFrom::Resource(self.id.clone())
+    }
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum MessageFrom {
@@ -22,13 +39,7 @@ pub enum MessageFrom {
     Resource(ResourceIdentifier),
 }
 
-pub type MessageTo = ResourceIdentifier;
 
-impl MessageTo {
-    pub fn reverse(&self) -> MessageFrom {
-        MessageFrom::Resource(self.clone())
-    }
-}
 
 pub struct ProtoMessage<P, R> {
     pub id: MessageId,

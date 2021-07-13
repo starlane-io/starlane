@@ -486,6 +486,15 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
             parts: Vec<ResourcePathSegment>
         }
 
+        impl ToString for #path_idents2 {
+           fn to_string(&self) -> String {
+               let path: ResourcePath = self.clone().into();
+               path.to_string()
+           }
+        }
+
+
+
         impl #path_idents2 {
            pub fn resource_type(&self) -> ResourceType {
                ResourceType::#idents
@@ -504,6 +513,52 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
                 }
           }
 
+          impl TryFrom<ResourcePath> for #path_idents3 {
+                type Error=Error;
+                fn try_from( path: ResourcePath ) -> Result<Self,Self::Error> {
+                    if let ResourcePath::#idents( rtn ) = path {
+                        Ok(rtn)
+                    } else {
+                        Err("could not convert ResourcePath to #ident".into())
+                    }
+                }
+            }
+
+            impl Into<ResourceIdentifier> for #path_idents{
+                fn into(self) -> ResourceIdentifier {
+                    let path: ResourcePath = self.into();
+                    path.into()
+                }
+            }
+
+
+            impl TryFrom<ResourceIdentifier> for #path_idents {
+                type Error=Error;
+                fn try_from( identifier: ResourceIdentifier) -> Result<Self,Self::Error> {
+                    if let ResourceIdentifier::Address( address ) = identifier {
+                        address.try_into()
+                    } else {
+                        Err("cannot convert a key into an address".into())
+                    }
+                }
+            }
+
+
+           impl Into<ResourceAddress> for #path_idents {
+                fn into(self) -> ResourceAddress{
+                    ResourceAddress {
+                        path: ResourcePath::#idents(self)
+                    }
+                }
+            }
+
+          impl TryFrom<ResourceAddress> for #path_idents3 {
+                type Error=Error;
+                fn try_from( path: ResourceAddress ) -> Result<Self,Self::Error> {
+                    let ResourceAddress { path } = path;
+                    path.try_into()
+                }
+            }
 
           impl TryFrom<Vec<ResourcePathSegment>> for #path_idents4 {
                type Error=Error;
@@ -554,6 +609,14 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
                     }
                 }
                 rtn
+            }
+        }
+
+        impl Into<ResourceIdentifier> for ResourcePath {
+           fn into(self) -> ResourceIdentifier{
+                ResourceAddress{
+                    path: self
+                }.into()
             }
         }
 
@@ -1052,6 +1115,13 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
 
             pub fn root() -> Self {
                 Self::Root
+            }
+
+            pub fn resource_type(&self)  -> ResourceType {
+                match self {
+                    Self::Root => ResourceType::Root,
+                    #(Self::#idents(_)=>ResourceType::#idents),*
+                }
             }
 
             pub fn parent(&self)->Option<ResourceKey> {

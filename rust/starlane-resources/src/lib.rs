@@ -23,114 +23,11 @@ pub mod error;
 mod parse;
 
 
-resources! {
-    #[resource(parents(Root))]
-    #[resource(prefix="s")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::Store)]
-    pub struct Space();
-
-    #[resource(parents(Space))]
-    #[resource(prefix="ss")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::Store)]
-    pub struct SubSpace();
-
-    #[resource(parents(SubSpace))]
-    #[resource(prefix="app")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::None)]
-    pub struct App();
-
-    #[resource(parents(App))]
-    #[resource(prefix="act")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::None)]
-    pub struct Actor();
-
-    #[resource(parents(SubSpace,App))]
-    #[resource(prefix="fs")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::Host)]
-    pub struct FileSystem();
-
-    #[resource(parents(FileSystem))]
-    #[resource(prefix="f")]
-    #[resource(ResourcePathSegmentKind::Path)]
-    #[resource(ResourceStatePersistenceManager::Host)]
-    pub struct File();
-
-    #[resource(parents(SubSpace,App))]
-    #[resource(prefix="db")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::Host)]
-    pub struct Database();
-
-    #[resource(parents(Space))]
-    #[resource(prefix="d")]
-    #[resource(ResourcePathSegmentKind::Domain)]
-    #[resource(ResourceStatePersistenceManager::None)]
-    pub struct Domain();
-
-    #[resource(parents(SubSpace))]
-    #[resource(prefix="p")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::None)]
-    pub struct Proxy();
-
-    #[resource(parents(SubSpace))]
-    #[resource(prefix="abv")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::None)]
-    pub struct ArtifactBundleVersions();
-
-    #[resource(parents(ArtifactBundleVersions))]
-    #[resource(prefix="ab")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::Host)]
-    pub struct ArtifactBundle();
-
-    #[resource(parents(ArtifactBundle))]
-    #[resource(prefix="a")]
-    #[resource(ResourcePathSegmentKind::Path)]
-    #[resource(ResourceStatePersistenceManager::Host)]
-    pub struct Artifact();
-
-    #[resource(parents(Space))]
-    #[resource(prefix="u")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::Host)]
-    pub struct User();
 
 
 
-    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
-    pub enum DatabaseKind{
-        Relational(Specific)
-    }
 
-    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
-    pub enum FileKind{
-        Directory,
-        File
-    }
-
-
-    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
-    pub enum ArtifactKind{
-        Raw,
-        DomainConfig
-    }
-
-    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
-    pub enum ArtifactBundleKind{
-        Final,
-        Volatile
-    }
-}
-
-
-
+#[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
 pub struct ResourceAddress {
     path: ResourcePath
 }
@@ -148,6 +45,21 @@ impl ResourceAddress {
         Ok(Self{
             path: path
         })
+    }
+
+    pub fn parent(&self) -> Option<ResourceAddress> {
+        match self.path.parent() {
+            Ok(Option::None) => Option::None,
+            Ok(Option::Some(parent)) => Option::Some(parent.into()),
+            Err(err)=>{
+                eprintln!("CRITICAL : error when getting parent: {}", err.to_string() );
+                Option::None
+            }
+        }
+    }
+
+    pub fn resource_type(&self) -> ResourceType {
+        self.path.resource_type()
     }
 
 }
@@ -173,6 +85,9 @@ impl From<ResourcePath> for ResourceAddress {
         }
     }
 }
+
+
+
 
 pub struct ResourceAddressKind {
     path: ResourcePath,
@@ -1187,3 +1102,228 @@ pub enum ResourceStatePersistenceManager {
     Host,
 }
 
+
+
+resources! {
+    #[resource(parents(Root))]
+    #[resource(prefix="s")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Store)]
+    pub struct Space();
+
+    #[resource(parents(Space))]
+    #[resource(prefix="ss")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Store)]
+    pub struct SubSpace();
+
+    #[resource(parents(SubSpace))]
+    #[resource(prefix="app")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::None)]
+    pub struct App();
+
+    #[resource(parents(App))]
+    #[resource(prefix="act")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::None)]
+    pub struct Actor();
+
+    #[resource(parents(SubSpace,App))]
+    #[resource(prefix="fs")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    pub struct FileSystem();
+
+    #[resource(parents(FileSystem))]
+    #[resource(prefix="f")]
+    #[resource(ResourcePathSegmentKind::Path)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    pub struct File();
+
+    #[resource(parents(SubSpace,App))]
+    #[resource(prefix="db")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    pub struct Database();
+
+    #[resource(parents(Space))]
+    #[resource(prefix="d")]
+    #[resource(ResourcePathSegmentKind::Domain)]
+    #[resource(ResourceStatePersistenceManager::None)]
+    pub struct Domain();
+
+    #[resource(parents(SubSpace))]
+    #[resource(prefix="p")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::None)]
+    pub struct Proxy();
+
+    #[resource(parents(SubSpace))]
+    #[resource(prefix="abv")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::None)]
+    pub struct ArtifactBundleVersions();
+
+    #[resource(parents(ArtifactBundleVersions))]
+    #[resource(prefix="ab")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    pub struct ArtifactBundle();
+
+    #[resource(parents(ArtifactBundle))]
+    #[resource(prefix="a")]
+    #[resource(ResourcePathSegmentKind::Path)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    pub struct Artifact();
+
+    #[resource(parents(Space))]
+    #[resource(prefix="u")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    pub struct User();
+
+
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum DatabaseKind{
+        Relational(Specific)
+    }
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum FileKind{
+        Directory,
+        File
+    }
+
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum ArtifactKind{
+        Raw,
+        DomainConfig
+    }
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum ArtifactBundleKind{
+        Final,
+        Volatile
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
+pub enum ResourceIdentifier {
+    Key(ResourceKey),
+    Address(ResourceAddress),
+}
+
+impl ResourceIdentifier{
+
+    pub fn is_key(&self) -> bool {
+        match self {
+            ResourceIdentifier::Key(_) => {
+                true
+            }
+            ResourceIdentifier::Address(_) => {
+                false
+            }
+        }
+    }
+
+    pub fn is_address(&self) -> bool {
+        match self {
+            ResourceIdentifier::Key(_) => {
+                false
+            }
+            ResourceIdentifier::Address(_) => {
+                true
+            }
+        }
+    }
+
+
+    pub fn key_or(self,error_message: &str ) -> Result<ResourceKey,Error> {
+        match self {
+            ResourceIdentifier::Key(key) => {
+                Ok(key)
+            }
+            ResourceIdentifier::Address(_) => {
+                Err(error_message.into())
+            }
+        }
+    }
+
+    pub fn address_or(self,error_message: &str ) -> Result<ResourceAddress,Error> {
+        match self {
+            ResourceIdentifier::Key(_) => {
+                Err(error_message.into())
+            }
+            ResourceIdentifier::Address(address) => {
+                Ok(address)
+            }
+        }
+    }
+
+    /*
+    pub async fn to_key(mut self, starlane_api: &StarlaneApi ) -> Result<ResourceKey,Error> {
+        match self{
+            ResourceIdentifier::Key(key) => {Ok(key)}
+            ResourceIdentifier::Address(address) => {
+                Ok(starlane_api.fetch_resource_key(address).await?)
+            }
+        }
+    }
+
+    pub async fn to_address(mut self, starlane_api: &StarlaneApi ) -> Result<ResourceAddress,Error> {
+        match self{
+            ResourceIdentifier::Address(address) => {Ok(address)}
+            ResourceIdentifier::Key(key) => {
+                Ok(starlane_api.fetch_resource_address(key).await?)
+            }
+        }
+    }
+
+     */
+}
+
+impl ResourceIdentifier {
+    pub fn parent(&self) -> Option<ResourceIdentifier> {
+        match self {
+            ResourceIdentifier::Key(key) => match key.parent() {
+                None => Option::None,
+                Some(parent) => Option::Some(parent.into()),
+            },
+            ResourceIdentifier::Address(address) => match address.parent() {
+                None => Option::None,
+                Some(parent) => Option::Some(parent.into()),
+            },
+        }
+    }
+
+    pub fn resource_type(&self) -> ResourceType {
+        match self {
+            ResourceIdentifier::Key(key) => key.resource_type(),
+            ResourceIdentifier::Address(address) => address.resource_type(),
+        }
+    }
+}
+
+impl From<ResourceAddress> for ResourceIdentifier {
+    fn from(address: ResourceAddress) -> Self {
+        ResourceIdentifier::Address(address)
+    }
+}
+
+impl From<ResourceKey> for ResourceIdentifier {
+    fn from(key: ResourceKey) -> Self {
+        ResourceIdentifier::Key(key)
+    }
+}
+
+impl ToString for ResourceIdentifier {
+    fn to_string(&self) -> String {
+        match self {
+            ResourceIdentifier::Key(key) => key.to_string(),
+            ResourceIdentifier::Address(address) => address.to_string(),
+        }
+    }
+}

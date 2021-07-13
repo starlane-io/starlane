@@ -1,4 +1,5 @@
-use crate::artifact::{ArtifactAddress, ArtifactRef};
+use crate::artifact::ArtifactRef;
+use crate::resource::ArtifactAddress;
 use crate::cache::{Cacheable, Data};
 use crate::error::Error;
 use crate::resource::{ResourceKind, ResourceType};

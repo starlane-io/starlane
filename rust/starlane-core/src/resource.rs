@@ -25,9 +25,10 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::oneshot::Receiver;
 use url::Url;
 
+use starlane_resources::ResourceIdentifier;
 
 use crate::{logger, resource, util};
-use crate::actor::{ActorKind};
+use crate::actor::ActorKind;
 use crate::app::ConfigSrc;
 use crate::error::Error;
 use crate::file_access::FileAccess;
@@ -42,7 +43,7 @@ use crate::message::resource::{
     Message, MessageFrom, MessageReply, MessageTo, ProtoMessage, ResourceRequestMessage,
     ResourceResponseMessage,
 };
-use crate::names::{Name};
+use crate::names::Name;
 use crate::permissions::User;
 use crate::resource::space::{Space, SpaceState};
 use crate::resource::sub_space::SubSpaceState;
@@ -1868,21 +1869,18 @@ impl From<ResourceRecord> for ResourceAddress {
 #[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct ResourceLocation {
     pub host: StarKey,
-    pub gathering: Option<GatheringKey>,
 }
 
 impl ResourceLocation {
     pub fn new(host: StarKey) -> Self {
         ResourceLocation {
             host: host,
-            gathering: Option::None,
         }
     }
 
     pub fn root() -> Self {
         Self{
             host: StarKey::central(),
-            gathering: Option::None
         }
     }
 }
@@ -2323,11 +2321,6 @@ pub struct ResourceBinding {
     pub address: ResourceAddress,
 }
 
-#[derive(Clone)]
-pub struct ResourceAddressStructure {
-    parts: Vec<ResourceAddressPartStruct>,
-    resource_type: ResourceType,
-}
 
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
@@ -2883,124 +2876,6 @@ impl DataTransfer for FileDataTransfer {
 
 pub trait ResourceSelectorId: Debug+Clone+Serialize+for <'de> Deserialize<'de>+Eq+PartialEq+Hash+Into<ResourceIdentifier>+Sized{}
 
-#[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
-pub enum ResourceIdentifier {
-    Key(ResourceKey),
-    Address(ResourceAddress),
-}
-
-impl ResourceSelectorId for ResourceIdentifier {}
-
-
-impl ResourceIdentifier{
-
-    pub fn is_key(&self) -> bool {
-        match self {
-            ResourceIdentifier::Key(_) => {
-                true
-            }
-            ResourceIdentifier::Address(_) => {
-                false
-            }
-        }
-    }
-
-    pub fn is_address(&self) -> bool {
-        match self {
-            ResourceIdentifier::Key(_) => {
-                false
-            }
-            ResourceIdentifier::Address(_) => {
-                true
-            }
-        }
-    }
-
-
-    pub fn key_or(self,error_message: &str ) -> Result<ResourceKey,Error> {
-        match self {
-            ResourceIdentifier::Key(key) => {
-                Ok(key)
-            }
-            ResourceIdentifier::Address(_) => {
-                Err(error_message.into())
-            }
-        }
-    }
-
-    pub fn address_or(self,error_message: &str ) -> Result<ResourceAddress,Error> {
-        match self {
-            ResourceIdentifier::Key(_) => {
-                Err(error_message.into())
-            }
-            ResourceIdentifier::Address(address) => {
-                Ok(address)
-            }
-        }
-    }
-
-    pub async fn to_key(mut self, starlane_api: &StarlaneApi ) -> Result<ResourceKey,Error> {
-        match self{
-            ResourceIdentifier::Key(key) => {Ok(key)}
-            ResourceIdentifier::Address(address) => {
-                Ok(starlane_api.fetch_resource_key(address).await?)
-            }
-        }
-    }
-
-    pub async fn to_address(mut self, starlane_api: &StarlaneApi ) -> Result<ResourceAddress,Error> {
-        match self{
-            ResourceIdentifier::Address(address) => {Ok(address)}
-            ResourceIdentifier::Key(key) => {
-                Ok(starlane_api.fetch_resource_address(key).await?)
-            }
-        }
-    }
-}
-
-impl ResourceIdentifier {
-    pub fn parent(&self) -> Option<ResourceIdentifier> {
-        match self {
-            ResourceIdentifier::Key(key) => match key.parent() {
-                None => Option::None,
-                Some(parent) => Option::Some(parent.into()),
-            },
-            ResourceIdentifier::Address(address) => match address.parent() {
-                None => Option::None,
-                Some(parent) => Option::Some(parent.into()),
-            },
-        }
-    }
-
-    pub fn resource_type(&self) -> ResourceType {
-        match self {
-            ResourceIdentifier::Key(key) => key.resource_type(),
-            ResourceIdentifier::Address(address) => address.resource_type(),
-        }
-    }
-}
-
-impl From<ResourceAddress> for ResourceIdentifier {
-    fn from(address: ResourceAddress) -> Self {
-        ResourceIdentifier::Address(address)
-    }
-}
-
-impl From<ResourceKey> for ResourceIdentifier {
-    fn from(key: ResourceKey) -> Self {
-        ResourceIdentifier::Key(key)
-    }
-}
-
-impl ToString for ResourceIdentifier {
-    fn to_string(&self) -> String {
-        match self {
-            ResourceIdentifier::Key(key) => key.to_string(),
-            ResourceIdentifier::Address(address) => address.to_string(),
-        }
-    }
-}
-
 pub enum ResourceCreateStrategy{
    Create,
    Ensure
@@ -3009,4 +2884,9 @@ pub enum ResourceCreateStrategy{
 pub enum Unique {
     Sequence,
     Index
+}
+
+#[async_trait]
+pub trait UniqueSrc: Send + Sync {
+    async fn next(&self, resource_type: &ResourceType) -> Result<ResourceId, Fail>;
 }

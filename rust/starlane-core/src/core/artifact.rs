@@ -1,30 +1,31 @@
 use std::collections::HashSet;
 use std::convert::{TryFrom, TryInto};
+use std::fs;
+use std::fs::File;
+use std::io::Write;
 use std::iter::FromIterator;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use rusqlite::Connection;
+use tempdir::TempDir;
 use tokio::sync::{mpsc, Mutex};
+use tracing_futures::WithSubscriber;
+
+use starlane_resources::ResourceIdentifier;
 
 use crate::core::{Host, StarCoreAction, StarCoreCommand};
 use crate::error::Error;
 use crate::file_access::{FileAccess, FileEvent};
 use crate::message::Fail;
+use crate::resource::{AddressCreationSrc, ArtifactBundleKind, AssignResourceStateSrc, DataTransfer, KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceKey, ResourceKind, ResourceRecord, ResourceRegistration, ResourceRegistryInfo, ResourceStateSrc, ResourceStub, ResourceType};
+use crate::resource::ArtifactBundleKey;
 use crate::resource::store::{
     ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult,
 };
-use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, DataTransfer, KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceIdentifier, ResourceKind, ResourceStateSrc, ResourceStub, ResourceRegistryInfo, ResourceRegistration, ResourceRecord, ResourceType, ResourceKey, ArtifactBundleKind};
 use crate::star::StarSkel;
-
-use crate::artifact::ArtifactBundleKey;
 use crate::util;
-use std::fs;
-use std::fs::File;
-use std::io::Write;
-use tempdir::TempDir;
-use tracing_futures::WithSubscriber;
 
 pub struct ArtifactHost {
     skel: StarSkel,

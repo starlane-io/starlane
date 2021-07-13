@@ -1,4 +1,4 @@
-use crate::artifact::ArtifactBundleKey;
+use crate::resource::ArtifactBundleKey;
 use crate::error::Error;
 use crate::resource::{ResourceAddress, SrcTransfer};
 use serde::{Deserialize, Serialize};

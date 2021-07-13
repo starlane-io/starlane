@@ -47,6 +47,14 @@ impl From<ZipError> for Error {
     }
 }
 
+
+impl From<starlane_resources::error::Error> for Error {
+    fn from(e: starlane_resources::error::Error) -> Self {
+        e.to_string().into()
+    }
+}
+
+
 impl From<kube::Error> for Error {
     fn from(e: kube::Error) -> Self {
         e.to_string().into()

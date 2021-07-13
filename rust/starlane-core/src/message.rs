@@ -2,12 +2,16 @@ use std::cell::Cell;
 use std::collections::HashSet;
 use std::fmt;
 use std::fmt::{Display, Formatter};
+use std::string::FromUtf8Error;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot::Receiver;
+use uuid::Uuid;
+
+use starlane_resources::ResourceIdentifier;
 
 use crate::error::Error;
 use crate::frame::{
@@ -15,10 +19,8 @@ use crate::frame::{
 };
 use crate::id::Id;
 use crate::lane::LaneMeta;
-use crate::resource::{ResourceAddress, ResourceIdentifier, ResourceKind, ResourceType, Specific};
+use crate::resource::{ResourceAddress, ResourceKind, ResourceType, Specific};
 use crate::star::{StarCommand, StarKey, StarSearchTransaction, Transaction, TransactionResult};
-use std::string::FromUtf8Error;
-use uuid::Uuid;
 
 pub mod resource;
 

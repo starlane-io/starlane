@@ -1,34 +1,35 @@
 use std::collections::HashSet;
 use std::convert::{TryFrom, TryInto};
+use std::fmt;
+use std::fmt::{Debug, Formatter};
+use std::fs;
 use std::iter::FromIterator;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::fmt;
 
 use rusqlite::Connection;
 use tokio::sync::{mpsc, Mutex};
+
+use starlane_resources::ResourceIdentifier;
 
 use crate::core::Host;
 use crate::error::Error;
 use crate::file_access::{FileAccess, FileEvent};
 use crate::message::Fail;
+use crate::resource::{
+    AddressCreationSrc, AssignResourceStateSrc, DataTransfer, FileKind,
+    FileSystemKey, KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource,
+    ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate,
+    ResourceCreateStrategy, ResourceCreationChamber, ResourceKind, ResourceStateSrc, ResourceStub,
+    ResourceType
+};
+use crate::resource::ResourceKey;
 use crate::resource::store::{
     ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult,
 };
-use crate::resource::{
-    AddressCreationSrc, AssignResourceStateSrc, DataTransfer, KeyCreationSrc,
-    MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype,
-    ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber,
-    ResourceIdentifier, ResourceKind, ResourceStateSrc, ResourceStub, ResourceType, FileKind,
-    FileSystemKey
-};
 use crate::star::StarSkel;
-use crate::resource::ResourceKey;
-
 use crate::util;
-use std::fs;
-use std::fmt::{Debug, Formatter};
 
 pub struct FileStoreHost {
     skel: StarSkel,

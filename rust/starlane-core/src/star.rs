@@ -1,71 +1,70 @@
+use std::{cmp, fmt};
 use std::borrow::Borrow;
 use std::cell::Cell;
 use std::cmp::{min, Ordering};
-use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::RandomState;
 use std::convert::TryInto;
+use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::iter::FromIterator;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU64};
 use std::sync::Arc;
-use std::{cmp, fmt};
+use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU64};
 
+use futures::future::{BoxFuture, join_all, Map};
 use futures::future::select_all;
-use futures::future::{join_all, BoxFuture, Map};
-use futures::prelude::future::FusedFuture;
 use futures::FutureExt;
+use futures::prelude::future::FusedFuture;
 use lru::LruCache;
-use serde::de::Unexpected;
 use serde::{Deserialize, Serialize};
+use serde::de::Unexpected;
+use tokio::sync::{broadcast, oneshot};
 use tokio::sync::broadcast::error::{RecvError, SendError};
 use tokio::sync::mpsc;
 use tokio::sync::oneshot::Sender;
-use tokio::sync::{broadcast, oneshot};
+use tokio::time::{Duration, Instant, timeout};
 use tokio::time::error::Elapsed;
-use tokio::time::{timeout, Duration, Instant};
+use tracing::field::{Field, Visit};
 use url::Url;
 
+use starlane_resources::ResourceIdentifier;
 use variant::StarVariant;
 
+use crate::actor::ActorKind;
 use crate::cache::ProtoArtifactCachesFactory;
+use crate::constellation::ConstellationStatus;
 use crate::core::{StarCoreAction, StarCoreCommand, StarCoreResult};
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use crate::frame::WindAction::SearchHits;
 use crate::frame::{
     ActorLookup, ChildManagerResourceAction, Event, Frame, FromReply, MessagePayload, ProtoFrame,
     Reply, ResourceHostAction, SimpleReply, SpaceMessage, StarMessage, StarMessagePayload,
     StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp,
 };
+use crate::frame::WindAction::SearchHits;
 use crate::id::{Id, IdSeq};
-use crate::lane::{ConnectionInfo, ConnectorController, LaneEndpoint, LaneCommand, LaneMeta, OutgoingSide, TunnelConnector, TunnelConnectorFactory, ProtoLaneEndpoint, LaneIndex, LaneWrapper};
+use crate::lane::{ConnectionInfo, ConnectorController, LaneCommand, LaneEndpoint, LaneIndex, LaneMeta, LaneWrapper, OutgoingSide, ProtoLaneEndpoint, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{
-    Flag, Flags, Log, LogInfo, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag, StaticLogInfo,
+    Flag, Flags, Log, Logger, LogInfo, ProtoStarLog, ProtoStarLogPayload, StarFlag, StaticLogInfo,
 };
+use crate::message::{Fail, MessageExpect, MessageExpectWait, MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage, ProtoStarMessageTo, StarMessageDeliveryInsurance, TrackerJob};
 use crate::message::resource::{
     Delivery, Message, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage,
 };
-use crate::message::{
-    Fail, MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate,
-    ProtoStarMessage, ProtoStarMessageTo, StarMessageDeliveryInsurance, TrackerJob,
-};
-use crate::permissions::{AuthToken, AuthTokenSource, Authentication, Credentials};
+use crate::permissions::{Authentication, AuthToken, AuthTokenSource, Credentials};
 use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
+use crate::resource::{ActorKey, AddressCreationSrc, AppKey, AssignResourceStateSrc, FieldSelection, HostedResourceStore, KeyCreationSrc, Labels, LocalDataSrc, LocalHostedResource, LocalResourceHost, MemoryDataTransfer, Parent, ParentCore, Registry, RegistryReservation, RegistryUniqueSrc, RemoteResourceManager, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceBinding, ResourceCreate, ResourceHost, ResourceKey, ResourceKind, ResourceLocation, ResourceManager, ResourceManagerKey, ResourceNamesReservationRequest, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector, ResourceStateSrc, ResourceStub, ResourceType, UniqueSrc, UserKey};
 use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
-use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, FieldSelection, HostedResourceStore, KeyCreationSrc, Labels, LocalDataSrc, LocalHostedResource, LocalResourceHost, MemoryDataTransfer, Parent, ParentCore, Registry, RegistryReservation, RegistryUniqueSrc, RemoteResourceManager, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceBinding, ResourceCreate, ResourceHost, ResourceIdentifier, ResourceKind, ResourceLocation, ResourceManager, ResourceManagerKey, ResourceNamesReservationRequest, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector, ResourceStateSrc, ResourceStub, ResourceType, ResourceKey};
 use crate::star::pledge::{ResourceHostSelector, Satisfaction, StarHandle, StarHandleBacking};
+use crate::star::variant::StarShellInstructions;
 use crate::star::variant::web::WebVariant;
+use crate::template::StarTemplateHandle;
 use crate::util;
 use crate::util::AsyncHashMap;
-use crate::template::StarTemplateHandle;
-use std::fmt::{Debug, Formatter};
-use tracing::field::{Field, Visit};
-use crate::constellation::ConstellationStatus;
-use crate::star::variant::StarShellInstructions;
 
 pub mod filestore;
 pub mod pledge;
@@ -912,13 +911,13 @@ if self.skel.core_tx.is_closed() {
                     Err(error) => {
                         error!(
                             "error encountered when attempting to get a handle for: {} TIMEOUT: {}",
-                            kind, error.to_string()
+                            kind.to_string(), error.to_string()
                         );
                     }
                     Ok(Err(error)) => {
                             error!(
                                 "error encountered when attempting to get a handle for: {} ERROR: {}",
-                                kind, error.to_string()
+                                kind.to_string(), error.to_string()
                             );
                     }
 
@@ -2584,14 +2583,12 @@ pub enum ServerCommand {
 
 pub struct LocalResourceLocation {
     pub resource: ResourceKey,
-    pub gathering: Option<GatheringKey>,
 }
 
 impl LocalResourceLocation {
-    pub fn new(resource: ResourceKey, gathering: Option<GatheringKey>) -> Self {
+    pub fn new(resource: ResourceKey) -> Self {
         LocalResourceLocation {
             resource: resource,
-            gathering: gathering,
         }
     }
 }

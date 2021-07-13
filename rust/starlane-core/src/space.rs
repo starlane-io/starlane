@@ -3,7 +3,7 @@ use crate::error::Error;
 use crate::message::Fail;
 use crate::names::Name;
 use crate::permissions::Authentication;
-use crate::resource::{Labels, ResourceSelector};
+use crate::resource::{Labels, ResourceSelector, AppKey};
 use serde::{Deserialize, Serialize, Serializer};
 use std::fmt;
 use std::sync::Arc;
