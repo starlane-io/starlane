@@ -252,7 +252,7 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let mut pathways  = String::new();
     pathways.push_str("impl ResourceType {");
-    pathways.push_str("pub fn parent_pathway_match( &self, path: Vec<ResourcePathSegmentKind> ) -> Result<ResourceType,Error> {");
+    pathways.push_str("pub fn parent_path_matcher( &self, path: Vec<ResourcePathSegmentKind> ) -> Result<ResourceType,Error> {");
     pathways.push_str("match self { ");
     pathways.push_str("Self::Root => Err(\"Root does not have a parent to match\".into()),");
 
@@ -384,17 +384,12 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
             paths.push( quote!{
                  impl #path_ident {
                     pub fn parent(&self)->Result<Option<ResourcePath>,Error> {
-                        unimplemented!()
-/*                        let mut parts = self.parts.clone();
-                        parts.remove( parts.len() );
-                        let matcher = ParentPathPatternRecognizer::default();
-                        let parent_resource_type = matcher.try_from(parts.clone())?;
-                        Ok(Option::Some(ResourcePath::from_parts_and_type(parent_resource_type, parts )?))
-
- */
+                        let parent_resource_type = self.resource_type().parent_path_matcher(self.parts.iter().map(|p|p.clone().to_kind()).collect())?;
+                        Ok(Option::Some(ResourcePath::from_parts_and_type(parent_resource_type, self.parts.clone() )?))
                     }
                 }
             } );
+
         }
     }
 

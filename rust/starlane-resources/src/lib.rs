@@ -1027,5 +1027,3 @@ resources! {
         Relational(Specific)
     }
 }
-
-
