@@ -40,6 +40,22 @@ impl ToString for ResourceAddress {
     }
 }
 
+impl FromStr for ResourceAddress{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(ResourcePath::from_str(s)?.into())
+    }
+}
+
+impl From<ResourcePath> for ResourceAddress {
+    fn from(path: ResourcePath) -> Self {
+        Self{
+            path: path
+        }
+    }
+}
+
 pub struct ResourceAddressKind {
     path: ResourcePath,
     kind: ResourceKind
@@ -60,6 +76,18 @@ impl ToString for ResourceAddressKind {
     }
 }
 
+impl FromStr for ResourceAddressKind{
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let path = ResourcePath::from_str(s)?;
+        let (leftover,(_,kind)) = parse_path(s)?;
+        Ok(Self{
+            path: path,
+            kind: kind.try_into()?
+        })
+    }
+}
 
 
 pub type Domain = String;
@@ -850,7 +878,7 @@ impl FromStr for Version {
 #[cfg(test)]
 mod tests {
     use crate::error::Error;
-    use crate::{parse_resource_path, ResourcePathSegment, SkewerCase, version, path, domain, DomainCase, KeyBits, Specific};
+    use crate::{parse_resource_path, ResourcePathSegment, SkewerCase, version, path, domain, DomainCase, KeyBits, Specific, ResourceAddressKind, ResourceAddress};
     use crate::{SpaceKey,ResourceKey,RootKey,SubSpaceKey,AppKey,DatabaseKey,DatabaseKind,ResourceKind, DatabasePath, ResourcePath, ResourceType};
     use std::convert::TryInto;
     use std::str::FromStr;
@@ -1011,6 +1039,25 @@ mod tests {
 
         assert_eq!( parent.resource_type(), ResourceType::SubSpace );
 
+        Ok(())
+    }
+
+
+    #[test]
+    fn test_address_kind( ) -> Result<(),Error>{
+
+        let address = ResourceAddressKind::from_str( "space:sub-space:some-app:database<Database<Relational<mysql.org:mysql:innodb:1.0.0>>>")?;
+        assert_eq!("space:sub-space:some-app:database<Database<Relational<mysql.org:mysql:innodb:1.0.0>>>".to_string(), address.to_string() );
+
+        Ok(())
+    }
+
+
+    #[test]
+    fn test_resource_address( ) -> Result<(),Error>{
+
+        let address = ResourceAddress::from_str( "space:sub-space:some-app:database<Database<Relational<mysql.org:mysql:innodb:1.0.0>>>")?;
+        assert_eq!("space:sub-space:some-app:database<Database>".to_string(), address.to_string() );
 
         Ok(())
     }
