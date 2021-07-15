@@ -6,10 +6,14 @@ use quote::{quote, quote_spanned, ToTokens};
 use syn::{parse_macro_input, Expr, Ident, Token, Type, Visibility, Item, PathArguments, Meta, NestedMeta, MetaList, MetaNameValue, Lit, ItemEnum, Path};
 use std::convert::TryInto;
 use quote::__private::{TokenTree, TokenStream};
-use nom::error::context;
+use nom::error::{context, VerboseError};
 use nom::sequence::{delimited, tuple};
-use nom::bytes::complete::tag;
-use nom::character::complete::{alpha1, digit1};
+use nom::bytes::complete::{tag, take_until, take_till1};
+use nom::character::complete::{alpha1, digit1, anychar};
+use nom::IResult;
+use nom::multi::many1;
+
+pub type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
 struct ResourceParser {
    pub resources: Vec<Resource>,
@@ -1423,10 +1427,44 @@ fn ids(parsed: &ResourceParser ) -> TokenStream {
 
 }
 
+fn is_uppercase(a: char) -> bool { (a as char).is_uppercase() }
+
+
+pub fn parse_camel(input: &str) -> Res<&str, Vec<String>> {
+    context(
+        "camel",
+        many1( tuple( (anychar, take_till1(is_uppercase) ) )
+    ))(input).map( |(input,vec)| {
+        let vec: Vec<String> = vec.iter().map( |(c,s):&(char,&str)| { format!("{}{}",c,s) } ).collect();
+        (input,vec)
+    })
+
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::parse_camel;
+    use nom::error::VerboseError;
+
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn camel() {
+        let (leftover,rtn) = parse_camel("RomulanVarool").unwrap();
+
+        assert!(leftover.is_empty());
+        if let Option::Some(romulan) = rtn.get(0).cloned() {
+            assert_eq!("Romulan".to_string(), romulan );
+        } else {
+            assert!(false)
+        }
+
+
+        assert!(leftover.is_empty());
+        if let Option::Some(romulan) = rtn.get(1).cloned() {
+            assert_eq!("Varool".to_string(), romulan );
+        } else {
+            assert!(false)
+        }
+
     }
+
 }
