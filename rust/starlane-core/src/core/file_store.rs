@@ -180,7 +180,7 @@ impl FileStoreHost {
             .await?
             .ok_or(format!(
                 "expected filesystem to be present in hosted environment: {}",
-                filesystem_key.as_filesystem()?.to_string()
+                filesystem_key.to_string()
             ))?;
         let filesystem: ResourceStub = filesystem.into();
 

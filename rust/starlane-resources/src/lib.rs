@@ -20,7 +20,7 @@ use starlane_macros::resources;
 use crate::error::Error;
 
 pub mod error;
-mod parse;
+pub mod parse;
 
 
 
@@ -33,6 +33,12 @@ pub struct ResourceAddress {
 }
 
 impl ResourceAddress {
+
+    pub fn root() -> Self {
+       ResourcePath::Root.into()
+    }
+
+
     pub fn new( path: ResourcePath ) -> Self {
         Self {
             path: path
@@ -56,6 +62,10 @@ impl ResourceAddress {
 
     pub fn resource_type(&self) -> ResourceType {
         self.path.resource_type()
+    }
+
+    pub fn to_parts_string(&self) -> String {
+        self.path.to_string()
     }
 
 }

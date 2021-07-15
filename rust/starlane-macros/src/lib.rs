@@ -247,6 +247,15 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
           #(#rts),*
          }
 
+        impl ResourceType {
+            pub fn to_resource_id( &self, id: u64 ) -> ResourceId {
+                match self {
+                    Root => ResourceId::Root,
+                    #(Self::#rts => ResourceId::#rts(id as _)),*
+                }
+            }
+        }
+
         impl ToString for ResourceType {
             fn to_string(&self) -> String {
                 match self {
@@ -362,6 +371,7 @@ impl ResourceType {
     println!("resources_def.len() {}",resources_def.len());
 
     let keys= keys(&parsed);
+    let identifiers = identifiers(&parsed);
     let ids = ids(&parsed);
 
 
@@ -384,12 +394,14 @@ impl ResourceType {
 
     proc_macro::TokenStream::from( quote!{
        #keys
-       #kinds
        #paths
        #resource_type_enum_def
        #resource_impl_def
        #(#resources_def)*
+       #identifiers
        #ids
+       #kinds
+
     })
 }
 fn paths( parsed: &ResourceParser ) -> TokenStream {
@@ -695,7 +707,7 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
 
     let mut resource_type = String::new();
     resource_type.push_str( "impl ResourceKind {");
-    resource_type.push_str( "pub fn resource_type(self) -> ResourceType {");
+    resource_type.push_str( "pub fn resource_type(&self) -> ResourceType {");
     resource_type.push_str( "match self {");
     resource_type.push_str( "Self::Root => ResourceType::Root,");
 
@@ -893,7 +905,6 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
 
         let key = if resource.parents.is_empty() {
             quote! {
-                pub type #id= u64;
 
                 #[derive(Clone,Eq,PartialEq,Hash,Serialize,Deserialize,Debug)]
                 pub struct #ident {
@@ -991,7 +1002,6 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
 
             let prefix = Ident::new(resource.key_prefix.as_ref().unwrap().clone().as_str(), resource.get_ident().span() );
             quote! {
-                pub type #id= u64;
 
                 #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
                 pub struct #ident {
@@ -1018,10 +1028,11 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                         }
                     }
 
-
                     pub fn parent(&self) -> Option<ResourceKey> {
                         Option::Some(self.parent.clone().into())
                     }
+
+
                 }
 
             }
@@ -1031,8 +1042,18 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
         //COMMON KEY
         let prefix: TokenStream  = resource.key_prefix.as_ref().expect("expected key prefix").clone().parse().unwrap();
         let ident = Ident::new(format!("{}Key", resource.get_ident().to_string()).as_str(), resource.get_ident().span());
+        let ident_lower = Ident::new(resource.get_ident().to_string().to_lowercase().as_str(), resource.get_ident().span());
         let resource = resource.get_ident();
         key_stuff.push(quote!{
+
+            impl FromStr for #ident {
+                type Err=Error;
+                fn from_str( s: &str ) -> Result<Self,Self::Err> {
+                    Ok(ResourceKey::from_str(s)?.try_into()?)
+                }
+            }
+
+
             impl #ident {
                 pub fn string_bit(&self) -> String {
                     format!("{}{}",stringify!(#prefix),self.id.to_string())
@@ -1040,6 +1061,10 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
 
                 pub fn string_prefix(&self) -> String {
                    stringify!(#prefix).to_string()
+                }
+
+                pub fn generate_address_tail(&self) -> String {
+                   format!( "{}-{}", stringify!(#ident_lower), self.id )
                 }
             }
 
@@ -1117,6 +1142,15 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
         }
 
          impl ResourceKey{
+
+            pub fn new( parent: ResourceKey, id: ResourceId ) -> Result<Self,Error>{
+                match id {
+                    ResourceId::Root => Err("root cannot have a parent".into()),
+                    #(ResourceId::#idents(id) => Ok( #idents_keys{ parent: parent.try_into()?, id: id  }.into()) ),*
+                }
+            }
+
+
             pub fn bin(&self) -> Result<Vec<u8>, Error> {
                 let mut bin = bincode::serialize(self)?;
                 Ok(bin)
@@ -1146,6 +1180,13 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                 match self {
                     #(Self::#idents(key) => key.parent(),)*
                     Root => Option::None
+                }
+            }
+
+            pub fn generate_address_tail( &self ) -> String {
+                  match self {
+                    #(Self::#idents(key) => key.generate_address_tail(), )*
+                    Root => "root".to_string()
                 }
             }
 
@@ -1262,7 +1303,7 @@ pub struct Error {
 
 
 
-fn ids( parsed: &ResourceParser ) -> TokenStream {
+fn identifiers(parsed: &ResourceParser ) -> TokenStream {
 
 
     let idents: Vec<Ident> = parsed.resources.clone().iter().map(|resource|{
@@ -1328,7 +1369,59 @@ fn ids( parsed: &ResourceParser ) -> TokenStream {
 }
 
 
+fn ids(parsed: &ResourceParser ) -> TokenStream {
 
+
+    let idents: Vec<Ident> = parsed.resources.clone().iter().map(|resource|{
+        resource.get_ident()
+    }).collect();
+    let ids: Vec<Ident> = parsed.resources.iter().map(|resource|{
+        Ident::new( format!("{}Id",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
+    }).collect();
+
+    let key_idents : Vec<Ident> = parsed.resources.iter().map(|resource|{
+        Ident::new( format!("{}Key",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
+    }).collect();
+
+    let path_idents : Vec<Ident> = parsed.resources.iter().map(|resource|{
+        Ident::new( format!("{}Path",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
+    }).collect();
+
+
+    quote! {
+        #(
+            pub type #ids = u64;
+        )*
+
+
+
+        impl ResourceId {
+            pub fn resource_type(&self) -> ResourceType {
+                match self {
+                    Self::Root => ResourceType::Root,
+                    #(Self::#idents(_) => ResourceType::#idents),*
+                }
+            }
+        }
+
+        #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+        pub enum ResourceId {
+            Root,
+            #(#idents(#ids)),*
+        }
+
+        impl ToString for ResourceId {
+            fn to_string(&self) -> String {
+                 match self {
+                    Self::Root => "root".to_string(),
+                    #(Self::#idents(id) => id.to_string()),*
+                }
+            }
+        }
+
+    }
+
+}
 
 #[cfg(test)]
 mod tests {

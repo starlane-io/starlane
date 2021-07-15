@@ -89,6 +89,9 @@ pub enum StarKind {
 
 
 impl StarKind {
+
+
+
     pub fn is_resource_manager(&self) -> bool {
         match self {
             StarKind::Central => true,
@@ -176,6 +179,56 @@ impl StarKind {
             .cloned(),
         )
     }
+    pub fn hosted_by(rt: &ResourceType) -> StarKind {
+        match rt {
+
+            ResourceType::Root =>{
+                Self::Central
+            }
+            ResourceType::Space => {
+                Self::SpaceHost
+            }
+            ResourceType::SubSpace => {
+                Self::SpaceHost
+            }
+            ResourceType::User=> {
+                Self::SpaceHost
+            }
+            ResourceType::App=> {
+                Self::AppHost
+            }
+            ResourceType::Actor=> {
+                Self::ActorHost
+            }
+            ResourceType::FileSystem => {
+                Self::FileStore
+            }
+            ResourceType::File=> {
+                Self::FileStore
+            }
+            ResourceType::Database=> {
+                Self::Kube
+            }
+            ResourceType::ArtifactBundleVersions=> {
+                Self::ArtifactStore
+            }
+            ResourceType::ArtifactBundle=> {
+                Self::ArtifactStore
+            }
+            ResourceType::Artifact=> {
+                Self::ArtifactStore
+            }
+            ResourceType::Proxy=> {
+                Self::SpaceHost
+            }
+            ResourceType::Domain=> {
+                Self::SpaceHost
+            }
+        }
+    }
+
+
+
 
     pub fn hosts(&self) -> HashSet<ResourceType> {
         HashSet::from_iter(
@@ -186,7 +239,6 @@ impl StarKind {
                     ResourceType::SubSpace,
                     ResourceType::User,
                     ResourceType::Domain,
-                    ResourceType::UrlPathPattern,
                     ResourceType::Proxy,
                 ],
                 StarKind::Mesh => vec![],
@@ -198,7 +250,7 @@ impl StarKind {
                 StarKind::Web => vec![],
                 StarKind::FileStore => vec![ResourceType::FileSystem, ResourceType::File],
                 StarKind::ArtifactStore => {
-                    vec![ResourceType::ArtifactBundle, ResourceType::Artifact]
+                    vec![ResourceType::ArtifactBundleVersions,ResourceType::ArtifactBundle, ResourceType::Artifact]
                 }
                 StarKind::Kube => vec![ResourceType::Database],
             }
@@ -1003,11 +1055,10 @@ if self.skel.core_tx.is_closed() {
                 .tx
                 .send(Ok(self.get_resource_record(&request.payload).unwrap()));
             return;
-        } else if request
+        } else if StarKind::hosted_by(&request
             .payload
-            .resource_type()
-            .star_manager()
-            .contains(&self.skel.info.kind)
+            .resource_type()) ==
+            self.skel.info.kind
         {
             if request.log {
                 self.log(
@@ -2063,7 +2114,7 @@ if self.skel.core_tx.is_closed() {
                 let parent_key = match create.parent.clone().key_or("expected parent to be a ResourceKey"){
                     Ok(key) => {key}
                     Err(error) => {
-                        return Err(error);
+                        return Err(error.to_string().into());
                     }
                 };
                 let child_manager = self

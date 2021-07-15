@@ -15,23 +15,17 @@ use crate::frame::{MessagePayload, Reply, SimpleReply, StarMessage, StarMessageP
 use crate::id::Id;
 use crate::logger::Log::ProtoStar;
 use crate::message::{Fail, MessageId, ProtoStarMessage};
-use crate::resource::{RemoteDataSrc, ResourceCreate, ResourceId, ResourceRecord, ResourceSelector, ResourceType};
+use crate::resource::{RemoteDataSrc, ResourceCreate, ResourceId, ResourceRecord, ResourceSelector, ResourceType, ResourceKey};
 use crate::star::{StarCommand, StarKey, StarSkel};
 use crate::util;
 
 
-pub struct MessageTo {
-    id: ResourceIdentifier
-}
+pub type MessageTo = ResourceIdentifier;
 
-impl MessageTo {
-    pub fn new( id: ResourceIdentifier ) {
-        Self{id};
+pub fn reverse(to: MessageTo) -> MessageFrom {
+        MessageFrom::Resource(to)
     }
-    pub fn reverse(&self) -> MessageFrom {
-        MessageFrom::Resource(self.id.clone())
-    }
-}
+
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum MessageFrom {

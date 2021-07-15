@@ -290,14 +290,14 @@ impl FieldSelection {
     pub async fn to_keyed(mut self, starlane_api: &StarlaneApi ) -> Result<FieldSelection,Error> {
         match self{
             FieldSelection::Identifier(id) => {
-                Ok(FieldSelection::Identifier(id.to_key(starlane_api).await?.into()))
+                Ok(FieldSelection::Identifier(starlane_api.to_key(id).await?.into()))
             }
             FieldSelection::Type(resource_type) => Ok(FieldSelection::Type(resource_type)),
             FieldSelection::Kind(kind) => Ok(FieldSelection::Kind(kind)),
             FieldSelection::Specific(specific) => Ok(FieldSelection::Specific(specific)),
             FieldSelection::Owner(owner) => Ok(FieldSelection::Owner(owner)),
             FieldSelection::Parent(id) => {
-                Ok(FieldSelection::Parent(id.to_key(starlane_api).await?.into()))
+                Ok(FieldSelection::Parent(starlane_api.to_key(id).await?.into()))
             }
         }
     }
@@ -1538,7 +1538,7 @@ impl ResourceCreationChamber {
             let key = match &self.create.key {
                 KeyCreationSrc::None => {
                     let mut proto = ProtoMessage::new();
-                    proto.to(self.parent.key.clone().into());
+                    proto.to(MessageTo::from(self.parent.key.clone()));
                     proto.from(MessageFrom::Resource(self.parent.key.clone().into()));
                     proto.payload = Option::Some(ResourceRequestMessage::Unique(
                         self.create.archetype.kind.resource_type(),
@@ -1573,6 +1573,7 @@ impl ResourceCreationChamber {
                             log,
                         })) = util::wait_for_it_whatever(rx).await
                         {
+                            let id = self.create.archetype.kind.resource_type().to_resource_id(id);
                             match ResourceKey::new(self.parent.key.clone(), id.clone()) {
                                 Ok(key) => {
                                     let final_create = self.finalize_create(key.clone()).await;
@@ -1616,30 +1617,13 @@ impl ResourceCreationChamber {
                 let address = format!(
                     "{}:{}",
                     self.parent.address.to_parts_string(),
-                    key.generate_address_tail()?
+                    key.generate_address_tail()
                 );
                 ResourceAddress::from_str(address.as_str() )?
-/*                self.create
-                    .archetype
-                    .kind
-                    .resource_type()
-                    .address_structure()
-                    .from_str(address.as_str())?
-
- */
             }
-            AddressCreationSrc::Append(tail) => self
-                .create
-                .archetype
-                .kind
-                .resource_type()
-                .append_address(self.parent.address.clone(), tail.clone())?,
-
-
-
-
-
-
+            AddressCreationSrc::Append(tail) => {
+                ResourceAddress::from_str(format!("{}:{}",self.parent.address.to_parts_string(),tail ).as_str())?
+            }
             AddressCreationSrc::Appends(tails) => {
                 let mut address = self.parent.address.to_parts_string();
                 for tail in tails {
@@ -1647,7 +1631,7 @@ impl ResourceCreationChamber {
                     address.push_str(tail.as_str());
                 }
 
-                address.push_str("::<");
+                address.push_str("<");
                 address.push_str(key.resource_type().to_string().as_str());
                 address.push_str(">");
 
@@ -1661,7 +1645,7 @@ impl ResourceCreationChamber {
                     )
                     .into());
                 }
-                ResourceAddress::for_space(space_name.as_str())?
+                ResourceAddress::from_str(space_name.as_str())?
             }
 
             AddressCreationSrc::Exact(address) => {
@@ -1760,7 +1744,7 @@ impl RegistryUniqueSrc {
 
 #[async_trait]
 impl UniqueSrc for RegistryUniqueSrc {
-    async fn next<ID>(&self, resource_type: &ResourceType) -> Result<ID, Fail> {
+    async fn next(&self, resource_type: &ResourceType) -> Result<ResourceId, Fail> {
         if !resource_type
             .parent()
             .matches(Option::Some(&self.parent_key.resource_type()))
@@ -1805,7 +1789,7 @@ impl UniqueSrc for RegistryUniqueSrc {
 
         match rx.await? {
            ResourceRegistryResult::Unique(index) => {
-               Ok(index as _)
+               Ok(resource_type.to_resource_id(index as _))
            }
            what => {
                Err(Fail::Unexpected{ expected:"ResourceRegistryResult::Unique".to_string(), received: what.to_string() })
@@ -2418,7 +2402,7 @@ impl ResourceCreate {
 
     pub async fn to_keyed(self, starlane_api: StarlaneApi )->Result<Self,Error>{
         Ok(Self{
-            parent: self.parent.to_key(&starlane_api).await?.into(),
+            parent: starlane_api.to_key(self.parent).await?.into(),
             key: self.key,
             address: self.address,
             archetype: self.archetype,

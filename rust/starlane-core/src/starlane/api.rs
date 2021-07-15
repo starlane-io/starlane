@@ -58,6 +58,14 @@ impl StarlaneApi {
         }
     }
 
+    pub async fn to_key( &self, identifier: ResourceIdentifier ) -> Result<ResourceKey,Fail> {
+        match identifier {
+            ResourceIdentifier::Key(key) => Ok(key),
+            ResourceIdentifier::Address(address) => {
+                self.fetch_resource_key(address).await
+            }
+        }
+    }
 
     pub fn shutdown(&self) -> Result<(),Error>{
         self.starlane_tx.as_ref().ok_or("this api does not have access to the StarlaneMachine and therefore cannot do a shutdown")?.try_send(StarlaneCommand::Shutdown);
@@ -324,7 +332,6 @@ impl StarlaneApi {
     ) -> Result<Creation<ArtifactBundleApi>, Fail> {
 
         let sub_space = self.get_sub_space(address.sub_space().into() ).await?;
-        sub_space.create_artifact_bundle( address.name().as_str(), &address.version(), data )
     }
 
 }

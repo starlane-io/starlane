@@ -209,13 +209,19 @@ impl ResourceStoreSqlLite {
 
                 let func = |row: &Row| {
                     let key: Vec<u8> = row.get(0)?;
-                    let key = ResourceKey::from_bin(key)?;
+                    let key = match ResourceKey::from_bin(key) {
+                        Ok(key) => key,
+                        Err(err) => {
+                            return Err(rusqlite::Error::InvalidParameterName(err.to_string()));
+                        }
+
+                    };
 
                     let address: String = row.get(1)?;
                     let address = match ResourceAddress::from_str(address.as_str()) {
                         Ok(address) => address,
                         Err(error) => {
-                            return Err(Fail::Error(error.to_string()));
+                            return Err(rusqlite::Error::InvalidParameterName(error.to_string()));
                         }
                     };
 
@@ -227,14 +233,26 @@ impl ResourceStoreSqlLite {
                     };
 
                     let kind: String = row.get(3)?;
-                    let kind = ResourceKind::from_str(kind.as_str())?;
+                    let kind = match ResourceKind::from_str(kind.as_str()) {
+                        Ok(kind) => kind,
+                        Err(err) => {
+                            return Err(rusqlite::Error::InvalidParameterName(err.to_string()));
+                        }
+
+                    };
 
                     let specific = if let ValueRef::Null = row.get_ref(4)? {
                         Option::None
                     } else {
                         let specific: String = row.get(4)?;
-                        let specific = Specific::from_str(specific.as_str())?;
-                        Option::Some(specific)
+                        match Specific::from_str(specific.as_str()){
+                            Ok(specific) => {
+                                Option::Some(specific)
+                            }
+                            Err(err) => {
+                                return Err(rusqlite::Error::InvalidParameterName(err.to_string()));
+                            }
+                        }
                     };
 
                     let config_src = if let ValueRef::Null = row.get_ref(5)? {
