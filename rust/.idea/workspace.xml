@@ -7,6 +7,7 @@
     <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-macros/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-macros/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/lib.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -70,7 +71,7 @@
       <recent name="$PROJECT_DIR$/starlane/src" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test tests::camel">
+  <component name="RunManager" selected="Cargo.Test lib::tests">
     <configuration default="true" type="ArquillianTestNG" factoryName="" nameIsGenerated="true">
       <option name="arquillianRunConfiguration">
         <value>
@@ -86,6 +87,22 @@
     </configuration>
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
       <option name="command" value="run --package rust --bin rust" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <envs />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test lib::tests" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib tests" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -132,8 +149,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test tests::test_address_parent_resolution" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-resources --lib tests::test_address_parent_resolution -- --exact" />
+    <configuration name="Test tests::test_address_kind" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib tests::test_address_kind -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -164,37 +181,21 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test tests::test_resource_address" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-resources --lib tests::test_resource_address -- --exact" />
-      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
-      <option name="channel" value="DEFAULT" />
-      <option name="requiredFeatures" value="true" />
-      <option name="allFeatures" value="false" />
-      <option name="emulateTerminal" value="false" />
-      <option name="withSudo" value="false" />
-      <option name="backtrace" value="SHORT" />
-      <envs />
-      <option name="isRedirectInput" value="false" />
-      <option name="redirectInputPath" value="" />
-      <method v="2">
-        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
-      </method>
-    </configuration>
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test tests::test_kind" />
-      <item itemvalue="Cargo.Test tests::test_address_parent_resolution" />
-      <item itemvalue="Cargo.Test tests::test_resource_address" />
       <item itemvalue="Cargo.Test resource::test::test10" />
       <item itemvalue="Cargo.Test tests::camel" />
+      <item itemvalue="Cargo.Test tests::test_address_kind" />
+      <item itemvalue="Cargo.Test lib::tests" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Test lib::tests" />
+        <item itemvalue="Cargo.Test tests::test_address_kind" />
+        <item itemvalue="Cargo.Test tests::test_kind" />
         <item itemvalue="Cargo.Test tests::camel" />
         <item itemvalue="Cargo.Test resource::test::test10" />
-        <item itemvalue="Cargo.Test tests::test_resource_address" />
-        <item itemvalue="Cargo.Test tests::test_address_parent_resolution" />
-        <item itemvalue="Cargo.Test tests::test_kind" />
       </list>
     </recent_temporary>
   </component>
@@ -215,7 +216,7 @@
       <workItem from="1625759977203" duration="11299000" />
       <workItem from="1625777595261" duration="13728000" />
       <workItem from="1625838663767" duration="61485000" />
-      <workItem from="1626011932512" duration="113396000" />
+      <workItem from="1626011932512" duration="117412000" />
     </task>
     <servers />
   </component>

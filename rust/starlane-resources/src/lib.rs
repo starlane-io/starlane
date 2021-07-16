@@ -68,6 +68,10 @@ impl ResourceAddress {
         self.path.to_string()
     }
 
+    pub fn name(&self) -> String {
+        self.path.name()
+    }
+
 }
 
 impl ToString for ResourceAddress {
@@ -1070,11 +1074,11 @@ mod tests {
     fn test_address_parent_resolution( ) -> Result<(),Error>{
 
         let path = ResourcePath::from_str( "space:sub-space:some-app:database<Database<Relational<mysql.org:mysql:innodb:1.0.0>>>")?;
-        let parent = path.parent()?.unwrap();
+        let parent = path.parent().unwrap();
         assert_eq!( parent.resource_type(), ResourceType::App );
 
         let path = ResourcePath::from_str( "space:sub-space:database<Database<Relational>>")?;
-        let parent = path.parent()?.unwrap();
+        let parent = path.parent().unwrap();
 
         assert_eq!( parent.resource_type(), ResourceType::SubSpace );
 

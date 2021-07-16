@@ -13,7 +13,7 @@ use nom::character::complete::{alpha1, digit1, anychar};
 use nom::IResult;
 use nom::multi::many1;
 
-pub type Res<T, U> = IResult<T, U, VerboseError<T>>;
+type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
 struct ResourceParser {
    pub resources: Vec<Resource>,
@@ -504,6 +504,10 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
            pub fn resource_type(&self) -> ResourceType {
                ResourceType::#idents
            }
+
+           pub fn name(&self) -> String {
+                self.parts.last().expect("expected last()").to_string()
+           }
         }
 
           impl Into<ResourcePath> for #path_idents3 {
@@ -679,6 +683,12 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
                  }
             }
 
+            pub fn name(&self)->String{
+                match self {
+                     Self::Root => "".to_string(),
+                     #(Self::#idents(path) => path.name() ),*
+                 }
+            }
 
         }
 
@@ -1430,7 +1440,7 @@ fn ids(parsed: &ResourceParser ) -> TokenStream {
 fn is_uppercase(a: char) -> bool { (a as char).is_uppercase() }
 
 
-pub fn parse_camel(input: &str) -> Res<&str, Vec<String>> {
+fn parse_camel(input: &str) -> Res<&str, Vec<String>> {
     context(
         "camel",
         many1( tuple( (anychar, take_till1(is_uppercase) ) )
