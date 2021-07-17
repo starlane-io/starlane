@@ -36,6 +36,7 @@ use crate::resource::user::UserState;
 use crate::star::{Request, StarCommand, StarKey, StarKind, Wind};
 use crate::star::StarCommand::ResourceRecordRequest;
 use crate::starlane::StarlaneCommand;
+use std::str::FromStr;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -331,7 +332,12 @@ impl StarlaneApi {
         data: Arc<Vec<u8>>,
     ) -> Result<Creation<ArtifactBundleApi>, Fail> {
 
-        let sub_space = self.get_sub_space(address.sub_space().into() ).await?;
+        let address: ResourceAddress = address.clone().into();
+        let identifier: ResourceIdentifier =address.clone().sub_space()?.into();
+        let sub_space = self.get_sub_space(identifier).await?;
+
+        let bundle_name = address.ancestor_of_type(ResourceType::ArtifactBundleVersions )?.name();
+        sub_space.create_artifact_bundle(bundle_name.as_str(), &semver::Version::from_str(address.name().as_str())?, data )
     }
 
 }

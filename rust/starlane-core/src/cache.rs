@@ -479,7 +479,6 @@ impl ArtifactBundleCache {
 #[derive(Clone)]
 pub enum ArtifactBundleSrc {
     STARLANE_API(StarlaneApi),
-    MOCK(MockArtifactBundleSrc),
 }
 
 impl ArtifactBundleSrc {
@@ -489,7 +488,7 @@ impl ArtifactBundleSrc {
     ) -> Result<Option<Arc<Vec<u8>>>, Fail> {
         match self {
             ArtifactBundleSrc::STARLANE_API(api) => api.get_resource_state(identifier),
-            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(identifier).await,
+//            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(identifier).await,
         }
     }
 
@@ -499,7 +498,8 @@ impl ArtifactBundleSrc {
     ) -> Result<ResourceRecord, Fail> {
         match self {
             ArtifactBundleSrc::STARLANE_API(api) => api.fetch_resource_record(identifier).await,
-            ArtifactBundleSrc::MOCK(mock) => mock.fetch_resource_record(identifier).await,
+
+//            ArtifactBundleSrc::MOCK(mock) => mock.fetch_resource_record(identifier).await,
         }
     }
 }
@@ -510,6 +510,7 @@ impl From<StarlaneApi> for ArtifactBundleSrc {
     }
 }
 
+/*
 impl From<MockArtifactBundleSrc> for ArtifactBundleSrc {
     fn from(mock: MockArtifactBundleSrc) -> Self {
         ArtifactBundleSrc::MOCK(mock)
@@ -571,6 +572,8 @@ impl MockArtifactBundleSrc {
         Ok(self.resource.clone())
     }
 }
+
+ */
 
 pub struct RefCount<C: Cacheable> {
     pub count: usize,

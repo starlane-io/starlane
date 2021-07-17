@@ -5,7 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/cache.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/cache.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-macros/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-macros/src/lib.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-resources/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/lib.rs" afterDir="false" />
     </list>
@@ -71,7 +72,7 @@
       <recent name="$PROJECT_DIR$/starlane/src" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test lib::tests">
+  <component name="RunManager" selected="Cargo.Run starlane">
     <configuration default="true" type="ArquillianTestNG" factoryName="" nameIsGenerated="true">
       <option name="arquillianRunConfiguration">
         <value>
@@ -83,6 +84,22 @@
       <listeners />
       <method v="2">
         <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Run starlane" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="run --package starlane --bin starlane" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <envs />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
@@ -103,22 +120,6 @@
     </configuration>
     <configuration name="Test lib::tests" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
       <option name="command" value="test --package starlane-resources --lib tests" />
-      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
-      <option name="channel" value="DEFAULT" />
-      <option name="requiredFeatures" value="true" />
-      <option name="allFeatures" value="false" />
-      <option name="emulateTerminal" value="false" />
-      <option name="withSudo" value="false" />
-      <option name="backtrace" value="SHORT" />
-      <envs />
-      <option name="isRedirectInput" value="false" />
-      <option name="redirectInputPath" value="" />
-      <method v="2">
-        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
-      </method>
-    </configuration>
-    <configuration name="Test resource::test::test10" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib resource::test::test10 -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -184,18 +185,18 @@
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test tests::test_kind" />
-      <item itemvalue="Cargo.Test resource::test::test10" />
       <item itemvalue="Cargo.Test tests::camel" />
       <item itemvalue="Cargo.Test tests::test_address_kind" />
       <item itemvalue="Cargo.Test lib::tests" />
+      <item itemvalue="Cargo.Run starlane" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Run starlane" />
         <item itemvalue="Cargo.Test lib::tests" />
         <item itemvalue="Cargo.Test tests::test_address_kind" />
         <item itemvalue="Cargo.Test tests::test_kind" />
         <item itemvalue="Cargo.Test tests::camel" />
-        <item itemvalue="Cargo.Test resource::test::test10" />
       </list>
     </recent_temporary>
   </component>

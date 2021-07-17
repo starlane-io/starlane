@@ -60,6 +60,25 @@ impl ResourceAddress {
         }
     }
 
+    pub fn ancestor_of_type(&self, resource_type: ResourceType ) -> Result<ResourceAddress,Error> {
+        if self.resource_type() == resource_type {
+            return Ok(self.clone())
+        } else if let Option::Some(parent) = self.parent() {
+            parent.ancestor_of_type(resource_type)
+        } else {
+            Err(format!("does not have ancestor of type {}",resource_type.to_string()).into())
+        }
+    }
+
+    pub fn sub_space(&self) -> Result<ResourceAddress,Error> {
+        self.ancestor_of_type(ResourceType::SubSpace)
+    }
+
+    pub fn space(&self) -> Result<ResourceAddress,Error> {
+        self.ancestor_of_type(ResourceType::Space)
+    }
+
+
     pub fn resource_type(&self) -> ResourceType {
         self.path.resource_type()
     }

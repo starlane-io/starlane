@@ -459,8 +459,6 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
     let path_idents5= path_idents.clone();
 
 
-
-
     quote!{
 
         #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
