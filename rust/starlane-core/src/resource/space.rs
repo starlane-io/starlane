@@ -17,7 +17,7 @@ impl Space {
         address: ResourceAddress,
         state_src: SrcTransfer<SpaceState>,
     ) -> Result<Self, Error> {
-        if address.resource_type != ResourceType::Space {
+        if address.resource_type() != ResourceType::Space {
             Err("expected space address".into())
         } else {
             Ok(Space {

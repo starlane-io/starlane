@@ -397,14 +397,14 @@ impl ResourceType {
      */
 
     proc_macro::TokenStream::from( quote!{
-       #keys
-       #paths
        #resource_type_enum_def
        #resource_impl_def
        #(#resources_def)*
        #identifiers
        #ids
        #kinds
+       #keys
+       #paths
 
     })
 }
@@ -960,6 +960,9 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                         #(#parents(#parent_keys)),*
                     }
 
+
+
+
                     impl #parent {
 
 
@@ -1022,6 +1025,15 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                 }
 
                 impl #ident {
+                    pub fn bin(&self) -> Result<Vec<u8>, Error> {
+                        let mut bin = bincode::serialize(self)?;
+                        Ok(bin)
+                    }
+
+                    pub fn from_bin(mut bin: Vec<u8>) -> Result<Self, Error> {
+                        let mut key = bincode::deserialize::<Self>(bin.as_slice())?;
+                        Ok(key)
+                    }
 
                   fn from_keybit( parent: #parent, key_bit: KeyBit ) -> Result<Self,Error> {
                        if key_bit.key_type.as_str() != stringify!(#prefix) {

@@ -596,25 +596,6 @@ pub enum ActorLookup {
     Key(ActorKey),
 }
 
-impl ActorLookup {
-    pub fn app(&self) -> AppKey {
-        match self {
-            ActorLookup::Key(key) => key.app.clone(),
-        }
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ActorNameLookup {
-    pub app_id: Id,
-    pub name: String,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ActorBind {
-    pub key: ResourceKey,
-    pub star: StarKey,
-}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Rejection {

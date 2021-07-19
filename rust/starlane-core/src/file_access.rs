@@ -17,6 +17,7 @@ use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::time::Duration;
 use walkdir::{DirEntry, WalkDir};
 use crate::resource::FileKind;
+use std::str::FromStr;
 
 pub enum FileCommand {
     Read {
@@ -274,7 +275,7 @@ impl LocalFileAccess {
         for i in 0..archive.len() {
             let mut zip_file = archive.by_index(i)?;
             if zip_file.is_dir() {
-                let path = Path::new(format!("/{}/{}", target, zip_file.name()).as_str())?;
+                let path = Path::from_str(format!("/{}/{}", target, zip_file.name()).as_str())?;
                 self.mkdir(&path)?;
             } else {
                 let path = format!("{}/{}/{}", self.base_dir, target, zip_file.name());

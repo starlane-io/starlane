@@ -91,6 +91,10 @@ impl ResourceAddress {
         self.path.name()
     }
 
+    pub fn last_to_string(&self) -> String {
+        self.name()
+    }
+
 }
 
 impl ToString for ResourceAddress {
@@ -116,7 +120,25 @@ impl From<ResourcePath> for ResourceAddress {
 }
 
 
+impl ResourceKey {
 
+    pub fn ancestor_of_type(&self, resource_type: ResourceType ) -> Result<ResourceKey,Error> {
+        if self.resource_type() == resource_type {
+            return Ok(self.clone())
+        } else if let Option::Some(parent) = self.parent() {
+            parent.ancestor_of_type(resource_type)
+        } else {
+            Err(format!("does not have ancestor of type {}",resource_type.to_string()).into())
+        }
+    }
+
+}
+
+impl ResourceKind{
+    pub fn init_clap_config(&self) -> Option<ArtifactPath> {
+        Option::None
+    }
+}
 
 pub struct ResourceAddressKind {
     path: ResourcePath,
@@ -129,6 +151,10 @@ impl ResourceAddressKind {
             path: path,
             kind: kind
         }
+    }
+
+    pub fn kind(&self) -> ResourceKind {
+        self.kind.clone()
     }
 }
 
@@ -400,7 +426,6 @@ pub fn parse_kind(input: &str) -> Res<&str, ResourceKindParts> {
     } )
 }
 
-
 pub fn parse_key(input: &str) -> Res<&str, (Vec<ResourcePathSegment>)> {
     context(
         "key",
@@ -528,6 +553,12 @@ impl FromStr for ResourceKindParts {
             return Err(format!("ResourceKindParts ERROR: could not parse extra: '{}' in string '{}'", leftover, s ).into());
         }
         Ok(rtn)
+    }
+}
+
+impl Into<ResourceAddress> for ResourceAddressKind {
+    fn into(self) -> ResourceAddress {
+        self.path.into()
     }
 }
 
@@ -767,7 +798,7 @@ pub struct Path {
 }
 
 impl Path {
-    fn new(string: &str) -> Self {
+    pub fn new(string: &str) -> Self {
         Path {
             string: string.to_string(),
         }

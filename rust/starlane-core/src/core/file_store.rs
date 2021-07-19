@@ -221,26 +221,24 @@ impl Host for FileStoreHost {
                 // here we just ensure that a directory exists for the filesystem
                 if let ResourceKey::FileSystem(filesystem_key) = &assign.stub.key {
                     let path =
-                        Path::from_Str(format!("/{}", filesystem_key.to_string().as_str()).as_str())?;
+                        Path::from_str(format!("/{}", filesystem_key.to_string().as_str()).as_str())?;
                     self.file_access.mkdir(&path).await?;
                 }
             }
             ResourceType::File => {
                 match assign.state_src {
                     AssignResourceStateSrc::Direct(data) => {
-                        let filesystem_key = assign
+                        let filesystem_key= assign
                             .stub
                             .key
-                            .parent()
-                            .ok_or("Wheres the filesystem key?")?
-                            .as_filesystem()?;
+                            .ancestor_of_type(ResourceType::FileSystem)?;
                         let filesystem_path = Path::from_str(
                             format!("/{}", filesystem_key.to_string().as_str()).as_str(),
                         )?;
                         let path = format!(
                             "{}{}",
                             filesystem_path.to_string(),
-                            assign.stub.address.last_to_string()?
+                            assign.stub.address.last_to_string()
                         );
 
                         let lock = self.mutex.lock().await;
@@ -293,15 +291,13 @@ impl Host for FileStoreHost {
                 ResourceType::File => {
                     let filesystem_key = resource
                         .key()
-                        .parent()
-                        .ok_or("Wheres the filesystem key?")?
-                        .as_filesystem()?;
+                        .ancestor_of_type(ResourceType::FileSystem)?;
                     let filesystem_path =
                         Path::from_str(format!("/{}", filesystem_key.to_string().as_str()).as_str())?;
                     let path = format!(
                         "{}{}",
                         filesystem_path.to_string(),
-                        resource.address().last_to_string()?
+                        resource.address().last_to_string()
                     );
                     let data = self
                         .file_access

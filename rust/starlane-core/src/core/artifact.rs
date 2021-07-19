@@ -19,7 +19,7 @@ use crate::core::{Host, StarCoreAction, StarCoreCommand};
 use crate::error::Error;
 use crate::file_access::{FileAccess, FileEvent};
 use crate::message::Fail;
-use crate::resource::{AddressCreationSrc, ArtifactBundleKind, AssignResourceStateSrc, DataTransfer, KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceKey, ArtifactKind,ResourceKind, ResourceRecord, ResourceRegistration, ResourceRegistryInfo, ResourceStateSrc, ResourceStub, ResourceType};
+use crate::resource::{AddressCreationSrc, ArtifactBundleKind, AssignResourceStateSrc, DataTransfer, KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceKey, ArtifactKind, ResourceKind, ResourceRecord, ResourceRegistration, ResourceRegistryInfo, ResourceStateSrc, ResourceStub, ResourceType, FileSystemKey};
 use crate::resource::ArtifactBundleKey;
 use crate::resource::store::{
     ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult,
@@ -48,10 +48,11 @@ impl ArtifactHost {
     }
 
 
+
     fn bundle_key(key: ResourceKey) -> Result<ArtifactBundleKey, Fail> {
         let bundle_key = match key {
             ResourceKey::ArtifactBundle(key) => key,
-            ResourceKey::Artifact(artifact) => artifact.bundle,
+            ResourceKey::Artifact(artifact) => artifact.parent().unwrap().try_into()?,
             key => {
                 return Err(Fail::WrongResourceType {
                     expected: HashSet::from_iter(vec![
@@ -140,20 +141,6 @@ impl Host for ArtifactHost {
         // if there is Initialization to do for assignment THIS is where we do it
         self.ensure_bundle_dir(assign.stub.key.clone()).await?;
 
-        //check for Final state violation
-        if let Option::Some(resource) = self.store.get(assign.stub.address.clone().into()).await? {
-            let kind: ArtifactBundleKind = assign.stub.address.clone().try_into()?;
-            match kind {
-                ArtifactBundleKind::Final => {
-                    return Err(Fail::ResourceStateFinal(assign.stub.address.into()));
-                }
-                ArtifactBundleKind::Volatile => {
-                    // delete old ArtifactBundle
-                    self.delete(assign.stub.address.clone().into()).await?;
-                }
-            }
-        }
-
         let artifacts = match assign.stub.key.resource_type() {
             ResourceType::ArtifactBundle => {
                 match &assign.state_src {
@@ -162,7 +149,7 @@ impl Host for ArtifactHost {
                        let path = Self::bundle_path(assign.key())?;
                         let mut file_access = self.file_access.with_path(path.to_relative())?;
                         file_access
-                            .write(&Path::new("/bundle.zip")?, data.clone())
+                            .write(&Path::from_str("/bundle.zip")?, data.clone())
                             .await?;
 
                         artifacts
@@ -236,17 +223,16 @@ impl Host for ArtifactHost {
         if let Ok(Option::Some(resource)) = self.store.get(identifier.clone()).await {
             match identifier.resource_type() {
                 ResourceType::File => {
-                    let filesystem_key = resource
+                    let filesystem_key: FileSystemKey = resource
                         .key()
-                        .parent()
-                        .ok_or("Wheres the filesystem key?")?
-                        .as_filesystem()?;
+                        .ancestor_of_type(ResourceType::FileSystem)?
+                        .try_into()?;
                     let filesystem_path =
-                        Path::new(format!("/{}", filesystem_key.to_string().as_str()).as_str())?;
+                        Path::from_str(format!("/{}", filesystem_key.to_string().as_str()).as_str())?;
                     let path = format!(
                         "{}{}",
                         filesystem_path.to_string(),
-                        resource.address().last_to_string()?
+                        resource.address().last_to_string()
                     );
                     let data = self
                         .file_access

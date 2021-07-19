@@ -27,7 +27,7 @@ use url::Url;
 
 use starlane_resources::ResourceIdentifier;
 
-use crate::{logger, resource, util};
+use crate::{logger, resource, util, error};
 use crate::actor::ActorKind;
 use crate::app::ConfigSrc;
 use crate::error::Error;
@@ -69,6 +69,7 @@ pub mod create_args;
 
 pub type ResourceType = starlane_resources::ResourceType;
 pub type ResourceAddress = starlane_resources::ResourceAddress;
+pub type ResourceAddressKind = starlane_resources::ResourceAddressKind;
 pub type Path = starlane_resources::Path;
 pub type DomainCase = starlane_resources::DomainCase;
 pub type SkwerCase = starlane_resources::SkewerCase;
@@ -101,8 +102,10 @@ pub type ArtifactKey=starlane_resources::ArtifactKey;
 pub type FileSystemKey=starlane_resources::FileSystemKey;
 pub type FileKey=starlane_resources::FileKey;
 
-pub type ResourceId=u64;
+pub type ResourceId=starlane_resources::ResourceId;
 
+
+pub type ArtifactBundlePath=starlane_resources::ArtifactBundlePath;
 
 
 
@@ -374,6 +377,18 @@ impl  FieldSelection {
 
 impl ToSql for FieldSelection {
     fn to_sql(&self) -> Result<ToSqlOutput<'_>, rusqlite::Error> {
+        match self.to_sql_error() {
+            Ok(ok) => {Ok(ok)}
+            Err(err) => {
+                error!("{}",err.to_string());
+                Err(rusqlite::Error::InvalidQuery)
+            }
+        }
+    }
+}
+
+impl FieldSelection{
+    fn to_sql_error(&self) -> Result<ToSqlOutput<'_>, error::Error> {
         match self {
             FieldSelection::Identifier(id) => Ok(ToSqlOutput::Owned(Value::Blob(id.clone().key_or("(Identifier) selection fields must be turned into ResourceKeys before they can be used by the ResourceRegistry")?.bin()?))),
             FieldSelection::Type(resource_type) => {
@@ -801,14 +816,10 @@ impl Registry {
             ResourceRegistryCommand::SetLocation(location_record) => {
                 let key = location_record.stub.key.bin()?;
                 let host = location_record.location.host.bin()?;
-                let gathering = match location_record.location.gathering {
-                    None => Option::None,
-                    Some(key) => Option::Some(key.bin()?),
-                };
-                let mut trans = self.conn.transaction()?;
+               let mut trans = self.conn.transaction()?;
                 trans.execute(
-                    "UPDATE resources SET host=?1, gathering=?2 WHERE key=?3",
-                    params![host, gathering, key],
+                    "UPDATE resources SET host=?1 WHERE key=?3",
+                    params![host, key],
                 )?;
                 trans.commit()?;
                 Ok(ResourceRegistryResult::Ok)
@@ -1027,7 +1038,6 @@ impl Registry {
             stub: stub,
             location: ResourceLocation {
                 host: host,
-                gathering: Option::None,
             },
         };
 
@@ -1573,7 +1583,6 @@ impl ResourceCreationChamber {
                             log,
                         })) = util::wait_for_it_whatever(rx).await
                         {
-                            let id = self.create.archetype.kind.resource_type().to_resource_id(id);
                             match ResourceKey::new(self.parent.key.clone(), id.clone()) {
                                 Ok(key) => {
                                     let final_create = self.finalize_create(key.clone()).await;
@@ -1674,12 +1683,6 @@ pub trait ResourceHost: Send + Sync {
     async fn assign(&self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<(), Fail>;
 }
 
-impl From<ActorKind> for ResourceKind {
-    fn from(e: ActorKind) -> Self {
-        ResourceKind::Actor(e)
-    }
-}
-
 #[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct ResourceRegistryInfo {
     pub names: Names,
@@ -1746,12 +1749,13 @@ impl RegistryUniqueSrc {
 impl UniqueSrc for RegistryUniqueSrc {
     async fn next(&self, resource_type: &ResourceType) -> Result<ResourceId, Fail> {
         if !resource_type
-            .parent()
-            .matches(Option::Some(&self.parent_key.resource_type()))
+            .parents()
+            .contains(&self.parent_key.resource_type())
         {
             eprintln!("WRONG RESOURCE TYPE IN UNIQUE SRC");
             return Err(Fail::WrongResourceType {
-                expected: HashSet::from_iter(self.parent_key.resource_type().children()),
+//                expected: HashSet::from_iter(self.parent_key.resource_type().children()),
+                expected: HashSet::new(),
                 received: resource_type.clone(),
             });
         }
@@ -2387,10 +2391,6 @@ impl ResourceCreate {
 
         self.archetype.valid()?;
 
-        if resource_type.requires_owner() && self.owner.is_none() {
-            return Err(Fail::ResourceTypeRequiresOwner);
-        };
-
         if let KeyCreationSrc::Key(key) = &self.key {
             if key.resource_type() != resource_type {
                 return Err(Fail::ResourceTypeMismatch("ResourceCreate: key: KeyCreationSrc::Key(key) resource type != init.archetype.kind.resource_type()".into()));
@@ -2602,7 +2602,7 @@ impl From<Resource> for ResourceStub {
 impl ResourceStub {
     pub fn validate(&self, resource_type: ResourceType) -> bool {
         self.key.resource_type() == resource_type
-            && self.address.resource_type == resource_type
+            && self.address.resource_type() == resource_type
             && self.archetype.kind.resource_type() == resource_type
     }
 }
@@ -2862,11 +2862,13 @@ impl DataTransfer for FileDataTransfer {
 
 pub trait ResourceSelectorId: Debug+Clone+Serialize+for <'de> Deserialize<'de>+Eq+PartialEq+Hash+Into<ResourceIdentifier>+Sized{}
 
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum ResourceCreateStrategy{
    Create,
    Ensure
 }
 
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum Unique {
     Sequence,
     Index

@@ -21,6 +21,7 @@ use crate::id::Id;
 use crate::lane::LaneMeta;
 use crate::resource::{ResourceAddress, ResourceKind, ResourceType, Specific};
 use crate::star::{StarCommand, StarKey, StarSearchTransaction, Transaction, TransactionResult};
+use std::convert::Infallible;
 
 pub mod resource;
 
@@ -401,7 +402,7 @@ impl ToString for Fail {
                 received: received,
             } => format!(
                 "WrongResourceType(expected:[{}],received:{})",
-                ResourceType::hash_to_string(expected),
+                hash_to_string(expected),
                 received.to_string()
             ),
             Fail::ChannelRecvErr => "ChannelRecvErr".to_string(),
@@ -409,7 +410,7 @@ impl ToString for Fail {
             Fail::CannotSelectResourceHost => "CannotSelectResourceHost".to_string(),
             Fail::WrongParentResourceType { expected, received } => format!(
                 "WrongParentResourceType(expected:[{}],received:{})",
-                ResourceType::hash_to_string(expected),
+                hash_to_string(expected),
                 match received {
                     None => "None".to_string(),
                     Some(expected) => expected.to_string(),
@@ -509,4 +510,20 @@ impl From<starlane_resources::error::Error> for Fail {
 
 
 
+impl From<Infallible> for Fail{
+    fn from(e: Infallible) -> Self {
+        Fail::Error(
+            format!("{}", e.to_string()),
+        )
+    }
+}
 
+
+fn hash_to_string( hash: &HashSet<ResourceType> ) -> String {
+    let mut rtn = String::new();
+    for i in hash.iter() {
+        rtn.push_str( i.to_string().as_str() );
+        rtn.push_str( ", " );
+    }
+    rtn
+}

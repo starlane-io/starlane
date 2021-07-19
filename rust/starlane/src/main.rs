@@ -6,13 +6,12 @@ use starlane_core::error::Error;
 use starlane_core::starlane::{ConstellationCreate, StarlaneMachine, StarlaneCommand, StarlaneMachineRunner};
 use starlane_core::template::{ConstellationData, ConstellationTemplate, ConstellationLayout};
 use tokio::sync::oneshot;
-use starlane_core::resource::{ResourceAddress, Version, ResourceSelector, FieldSelection, ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceArchetype, ResourceCreateStrategy, AssignResourceStateSrc};
+use starlane_core::resource::{ResourceAddress, ResourceSelector, FieldSelection, ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceArchetype, ResourceCreateStrategy, AssignResourceStateSrc,ArtifactBundlePath};
 use std::str::FromStr;
 use std::{fs, thread};
 use std::path::Path;
 use std::fs::File;
 use std::sync::Arc;
-use starlane_core::artifact::ArtifactBundleAddress;
 use std::io::Read;
 use tracing_subscriber::FmtSubscriber;
 use tracing::dispatcher::set_global_default;
@@ -22,7 +21,7 @@ use starlane_core::util::shutdown;
 use starlane_core::resource::selector::MultiResourceSelector;
 use std::ffi::OsString;
 use starlane_core::util;
-use starlane_core::resource::address::ResourceAddressKind;
+use starlane_core::resource::ResourceAddressKind;
 use starlane_core::star::StarKind;
 
 mod cli;
@@ -111,7 +110,7 @@ fn main() -> Result<(), Error> {
 
 async fn publish(args: ArgMatches<'_> ) -> Result<(),Error> {
 
-    let bundle = ArtifactBundleAddress::from_str( args.value_of("address").ok_or("expected address")? )?;
+    let bundle = ArtifactBundlePath::from_str( args.value_of("address").ok_or("expected address")? )?;
 
     let input = Path::new(args.value_of("dir").ok_or("expected directory")?);
 
@@ -163,9 +162,8 @@ async fn list(args: ArgMatches<'_> ) -> Result<(),Error> {
 async fn create(args: ArgMatches<'_> ) -> Result<(),Error> {
 
     let address = ResourceAddressKind::from_str( args.value_of("address").ok_or("expected resource address")? )?;
-    let kind = address.kind.clone();
+    let kind = address.kind().clone();
     let address:ResourceAddress = address.into();
-println!("HOST StarKind: {}", kind.resource_type().star_host().to_string());
 
     let init_args = match args.values_of("init-args") {
         None => {"".to_string()}

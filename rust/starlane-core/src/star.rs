@@ -170,7 +170,7 @@ impl StarKind {
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
                 StarKind::Client => vec![],
-                StarKind::Web => vec![ResourceType::Domain, ResourceType::UrlPathPattern],
+                StarKind::Web => vec![ResourceType::Domain],
                 StarKind::FileStore => vec![ResourceType::File],
                 StarKind::ArtifactStore => vec![ResourceType::Artifact],
                 StarKind::Kube => vec![ResourceType::Database],

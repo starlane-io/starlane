@@ -41,7 +41,6 @@ impl StarVariant for CentralVariant {
             },
             location: ResourceLocation {
                 host: StarKey::central(),
-                gathering: None,
             },
         };
 

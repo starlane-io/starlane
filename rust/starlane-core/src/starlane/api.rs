@@ -512,7 +512,8 @@ impl SubSpaceApi {
         data: Arc<Vec<u8>>,
     ) -> Result<Creation<ArtifactBundleApi>, Fail> {
         let resource_src = AssignResourceStateSrc::Direct(data);
-        let kind: ArtifactBundleKind = version.clone().into();
+        // hacked to FINAL
+        let kind: ArtifactBundleKind = ArtifactBundleKind::Final;
 
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),

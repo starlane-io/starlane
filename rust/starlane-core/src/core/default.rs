@@ -65,14 +65,16 @@ impl Host for DefaultHost {
             AssignResourceStateSrc::Hosted => Arc::new(MemoryDataTransfer::none()),
             AssignResourceStateSrc::None => Arc::new(MemoryDataTransfer::none()),
             AssignResourceStateSrc::InitArgs(ref args) =>  {
-                Arc::new(if args.trim().is_empty() && assign.stub.archetype.kind.init_clap_config()?.is_none() {
+                Arc::new(if args.trim().is_empty() && assign.stub.archetype.kind.init_clap_config().is_none() {
                     MemoryDataTransfer::none()
-                } else if assign.stub.archetype.kind.init_clap_config()?.is_none(){
+                } else if assign.stub.archetype.kind.init_clap_config().is_none(){
                     return Err(format!("resource {} does not take init args",assign.archetype().kind.to_string()).into());
                 }
                 else {
+                    /*
 info!("enter");
-                    let artifact = assign.archetype().kind.init_clap_config()?.expect("expected init clap config");
+                    let artifact = assign.archetype().kind.init_clap_config().expect("expected init clap config");
+                    let artifact: ResourceAddress =  artifact.into();
 info!("got init clapConfig");
                     let mut cache = self.skel.caches.create();
 println!("artifact is::: {}",artifact.to_string());
@@ -102,6 +104,8 @@ info!("App::from(&yaml)" );
                     // now not sure what to do with matches
 println!("seems to have worked....");
                     MemoryDataTransfer::none()
+                     */
+                    unimplemented!()
                 })
             }
 
