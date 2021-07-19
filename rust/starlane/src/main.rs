@@ -1,25 +1,25 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::{fs, thread};
+
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use clap::{App, Arg, ArgMatches, SubCommand, Values};
+use clap::{App, Arg, ArgMatches, SubCommand};
 use tokio::runtime::Runtime;
-use tokio::sync::oneshot;
-use tokio::time::Duration;
+
+
 use tracing::dispatcher::set_global_default;
 use tracing_subscriber::FmtSubscriber;
 
 use starlane_core::error::Error;
-use starlane_core::resource::{AddressCreationSrc, ArtifactBundlePath, AssignResourceStateSrc, FieldSelection, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceSelector};
+use starlane_core::resource::{AddressCreationSrc, ArtifactBundlePath, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceSelector};
 use starlane_core::resource::ResourceAddressKind;
 use starlane_core::resource::selector::MultiResourceSelector;
-use starlane_core::star::StarKind;
+
 use starlane_core::starlane::{ConstellationCreate, StarlaneCommand, StarlaneMachine, StarlaneMachineRunner};
 use starlane_core::starlane::api::StarlaneApi;
 use starlane_core::template::{ConstellationData, ConstellationLayout, ConstellationTemplate};
@@ -55,7 +55,7 @@ fn main() -> Result<(), Error> {
     if let Option::Some(serve) = matches.subcommand_matches("serve") {
         let rt = Runtime::new().unwrap();
         rt.block_on(async move {
-            let mut starlane = StarlaneMachine::new("server".to_string() ).unwrap();
+            let starlane = StarlaneMachine::new("server".to_string() ).unwrap();
             let layout = match serve.is_present("with-external"){
                 false  => {
                     ConstellationLayout::standalone().unwrap()}
@@ -114,7 +114,7 @@ async fn publish(args: ArgMatches<'_> ) -> Result<(),Error> {
     let input = Path::new(args.value_of("dir").ok_or("expected directory")?);
 
     let mut zipfile = if input.is_dir() {
-        let mut zipfile = tempfile::NamedTempFile::new()?;
+        let zipfile = tempfile::NamedTempFile::new()?;
         util::zip( args.value_of("dir").expect("expected directory").to_string().as_str(),
                            &zipfile.reopen()?,
                     zip::CompressionMethod::Deflated )?;
@@ -138,7 +138,7 @@ async fn list(args: ArgMatches<'_> ) -> Result<(),Error> {
     let address = ResourceAddress::from_str( args.value_of("address").ok_or("expected resource address")? )?;
     let starlane_api = starlane_api().await?;
 
-    let mut selector = if args.value_of("child-pattern" ).is_some(){
+    let selector = if args.value_of("child-pattern" ).is_some(){
         let selector = MultiResourceSelector::from_str( args.value_of("child-pattern").unwrap() )?;
         selector.into()
     } else {
@@ -197,7 +197,7 @@ async fn create(args: ArgMatches<'_> ) -> Result<(),Error> {
 }
 
 pub async fn starlane_api() -> Result<StarlaneApi,Error>{
-    let mut starlane = StarlaneMachine::new("client".to_string() ).unwrap();
+    let starlane = StarlaneMachine::new("client".to_string() ).unwrap();
     let mut  layout = ConstellationLayout::client("host".to_string())?;
     let host = {
         let config = crate::cli::CLI_CONFIG.lock()?;

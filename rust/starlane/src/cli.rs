@@ -29,7 +29,7 @@ impl CliConfig{
             Ok(cli_config) => {
                 cli_config
             }
-            Err(err) => {
+            Err(_err) => {
                 Self::default()
             }
         }
