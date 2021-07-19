@@ -1,13 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
-use nom::bytes::complete::{tag, take_till1, take_until};
-use nom::character::complete::{alpha1, anychar, digit1};
+use nom::bytes::complete::{take_till1};
+use nom::character::complete::{anychar};
 use nom::error::{context, VerboseError};
 use nom::IResult;
 use nom::multi::many1;
-use nom::sequence::{delimited, tuple};
-use quote::{quote, quote_spanned, ToTokens};
-use quote::__private::{TokenStream, TokenTree};
+use nom::sequence::{tuple};
+use quote::{quote};
+use quote::__private::{TokenStream};
 use syn::{Expr, Ident, Item, ItemEnum, Lit, Meta, MetaList, MetaNameValue, NestedMeta, parse_macro_input, Path, PathArguments, Token, Type, Visibility};
 use syn::parse::{Parse, ParseStream};
 
@@ -162,11 +162,11 @@ impl Parse for ResourceParser {
                             let content: Meta = attr.parse_args()?;
                             match content {
                                 Meta::Path(path) => {
-                                    if( path.segments.first().is_some() && path.segments.first().unwrap().ident.to_string().as_str() == "ResourcePathSegmentKind" )
+                                    if path.segments.first().is_some() && path.segments.first().unwrap().ident.to_string().as_str() == "ResourcePathSegmentKind"
                                     {
                                         resource.path_part = Option::Some( path.segments.last().unwrap().ident.clone() );
                                     }
-                                    else if( path.segments.first().is_some() && path.segments.first().unwrap().ident.to_string().as_str() == "ResourceStatePersistenceManager" )
+                                    else if path.segments.first().is_some() && path.segments.first().unwrap().ident.to_string().as_str() == "ResourceStatePersistenceManager"
                                     {
                                         resource.state_persistence= Option::Some( path );
                                     }
@@ -296,7 +296,7 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     pathways.push_str("Self::Root => Err(\"Root does not have a parent to match\".into()),");
 
     for resource in &parsed.resources {
-        let ident = resource.get_ident();
+        let _ident = resource.get_ident();
         pathways.push_str( format!("Self::{} => {{", resource.get_ident().to_string() ).as_str());
 
 
@@ -412,7 +412,7 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
 
     let mut paths = vec![];
     for resource in &parsed.resources{
-        let ident = Ident::new(resource.get_ident().to_string().as_str(), resource.get_ident().span());
+        let _ident = Ident::new(resource.get_ident().to_string().as_str(), resource.get_ident().span());
         let path_ident = Ident::new(format!("{}Path",resource.get_ident().to_string()).as_str(), resource.get_ident().span());
 
         if resource.parents.len() == 1 {
@@ -428,8 +428,8 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
                 }
             } );
         }else  {
-            let parents = resource.parents.clone();
-            let parent_path: Vec<Ident>= resource.parents.iter().map( |parent|Ident::new(format!("{}Path",parent.to_string()).as_str(), parent.span())).collect();
+            let _parents = resource.parents.clone();
+            let _parent_path: Vec<Ident>= resource.parents.iter().map( |parent|Ident::new(format!("{}Path",parent.to_string()).as_str(), parent.span())).collect();
             paths.push( quote!{
                  impl #path_ident {
                     pub fn parent(&self)->ResourcePath {
@@ -726,7 +726,7 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
       if let Option::Some(kind) = parsed.kind_for(resource) {
 
 
-          let ident = resource.get_ident();
+          let _ident = resource.get_ident();
           let ident_kind = Ident::new(format!("{}Kind",resource.get_ident().to_string()).as_str(), resource.get_ident().span() );
           kind_stuff.push( quote! {
               impl ToString for #ident_kind {
@@ -1328,7 +1328,7 @@ pub struct Error {
 fn identifiers(parsed: &ResourceParser ) -> TokenStream {
 
 
-    let idents: Vec<Ident> = parsed.resources.clone().iter().map(|resource|{
+    let _idents: Vec<Ident> = parsed.resources.clone().iter().map(|resource|{
         resource.get_ident()
     }).collect();
     let identifier_idents : Vec<Ident> = parsed.resources.iter().map(|resource|{
@@ -1401,11 +1401,11 @@ fn ids(parsed: &ResourceParser ) -> TokenStream {
         Ident::new( format!("{}Id",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
     }).collect();
 
-    let key_idents : Vec<Ident> = parsed.resources.iter().map(|resource|{
+    let _key_idents : Vec<Ident> = parsed.resources.iter().map(|resource|{
         Ident::new( format!("{}Key",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
     }).collect();
 
-    let path_idents : Vec<Ident> = parsed.resources.iter().map(|resource|{
+    let _path_idents : Vec<Ident> = parsed.resources.iter().map(|resource|{
         Ident::new( format!("{}Path",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
     }).collect();
 
@@ -1461,7 +1461,7 @@ fn parse_camel(input: &str) -> Res<&str, Vec<String>> {
 
 #[cfg(test)]
 mod tests {
-    use nom::error::VerboseError;
+    
 
     use crate::parse_camel;
 
