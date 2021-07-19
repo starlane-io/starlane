@@ -1,6 +1,7 @@
 use std::{sync, thread};
 use std::convert::{TryFrom, TryInto};
 use std::marker::PhantomData;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -36,7 +37,6 @@ use crate::resource::user::UserState;
 use crate::star::{Request, StarCommand, StarKey, StarKind, Wind};
 use crate::star::StarCommand::ResourceRecordRequest;
 use crate::starlane::StarlaneCommand;
-use std::str::FromStr;
 
 #[derive(Clone)]
 pub struct StarlaneApi {

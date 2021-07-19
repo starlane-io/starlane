@@ -1,13 +1,15 @@
 use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::str::FromStr;
+use std::sync::Arc;
 
+use futures::TryFutureExt;
+use rusqlite::{Connection, params, params_from_iter, ToSql};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
-use rusqlite::{params, params_from_iter, Connection, ToSql};
-use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{mpsc, oneshot};
-use tokio::time::error::Elapsed;
+use tokio::sync::oneshot::error::RecvError;
 use tokio::time::Duration;
+use tokio::time::error::Elapsed;
 
 use crate::error::Error;
 use crate::frame::{Reply, ResourceHostAction, SimpleReply, StarMessagePayload};
@@ -18,8 +20,6 @@ use crate::resource::{
 use crate::star::{
     LocalResourceLocation, StarComm, StarCommand, StarInfo, StarKey, StarKind, StarSkel,
 };
-use futures::TryFutureExt;
-use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct StarHandleBacking {

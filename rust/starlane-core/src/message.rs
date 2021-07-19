@@ -1,5 +1,6 @@
 use std::cell::Cell;
 use std::collections::HashSet;
+use std::convert::Infallible;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::string::FromUtf8Error;
@@ -21,7 +22,6 @@ use crate::id::Id;
 use crate::lane::LaneMeta;
 use crate::resource::{ResourceAddress, ResourceKind, ResourceType, Specific};
 use crate::star::{StarCommand, StarKey, StarSearchTransaction, Transaction, TransactionResult};
-use std::convert::Infallible;
 
 pub mod resource;
 

@@ -1,50 +1,50 @@
+use std::cell::Cell;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::RandomState;
 use std::convert::TryInto;
-use std::sync::mpsc::{Receiver, Sender};
+use std::future::Future;
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
+use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
-use futures::future::{join_all, BoxFuture};
-use tokio::sync::{mpsc, broadcast};
+use futures::{FutureExt, StreamExt, TryFutureExt};
+use futures::future::{BoxFuture, join_all};
+use futures::stream::{SplitSink, SplitStream};
+use serde::{Deserialize, Serialize};
+use tokio::net::{TcpListener, TcpSocket, TcpStream};
+use tokio::sync::{broadcast, mpsc};
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
+use tokio::time::sleep;
 
 use api::SpaceApi;
-use serde::{Serialize,Deserialize};
 
 use crate::cache::ProtoArtifactCachesFactory;
+use crate::constellation::{Constellation, ConstellationStatus};
 use crate::core::CoreRunner;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::{ChildManagerResourceAction, Frame, Reply, SimpleReply, StarMessagePayload};
-use crate::lane::{ConnectionInfo, ConnectionKind, LaneEndpoint, LocalTunnelConnector, ServerSideTunnelConnector, ClientSideTunnelConnector, ConnectorController, ProtoLaneEndpoint, FrameCodex};
+use crate::lane::{ClientSideTunnelConnector, ConnectionInfo, ConnectionKind, ConnectorController, FrameCodex, LaneEndpoint, LocalTunnelConnector, ProtoLaneEndpoint, ServerSideTunnelConnector};
 use crate::logger::{Flags, Logger};
 use crate::message::{Fail, ProtoStarMessage};
-use crate::star::{ConstellationBroadcast, StarKind, StarStatus};
 use crate::proto::{
     local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoTunnel,
 };
-use crate::resource::space::SpaceState;
 use crate::resource::{
     AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype,
     ResourceCreate, ResourceKind, ResourceRecord,
 };
+use crate::resource::space::SpaceState;
+use crate::star::{ConstellationBroadcast, StarKind, StarStatus};
+use crate::star::{Request, Star, StarCommand, StarController, StarInfo, StarKey, StarTemplateId};
 use crate::star::variant::{StarVariantFactory, StarVariantFactoryDefault};
-use crate::star::{Request, Star, StarCommand, StarController, StarKey, StarTemplateId, StarInfo};
 use crate::starlane::api::StarlaneApi;
-use crate::template::{ConstellationData, ConstellationTemplate, StarKeyConstellationIndexTemplate, StarKeySubgraphTemplate, StarKeyTemplate, MachineName, ConstellationLayout, StarSelector, ConstellationSelector, StarTemplate, StarInConstellationTemplateHandle, StarTemplateHandle, StarInConstellationTemplateSelector, ConstellationTemplateHandle};
-use tokio::net::{TcpListener, TcpStream, TcpSocket};
+use crate::template::{ConstellationData, ConstellationLayout, ConstellationSelector, ConstellationTemplate, ConstellationTemplateHandle, MachineName, StarInConstellationTemplateHandle, StarInConstellationTemplateSelector, StarKeyConstellationIndexTemplate, StarKeySubgraphTemplate, StarKeyTemplate, StarSelector, StarTemplate, StarTemplateHandle};
 use crate::util::AsyncHashMap;
-use futures::{TryFutureExt, StreamExt, FutureExt};
-use futures::stream::{SplitStream, SplitSink};
-use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
-use std::str::FromStr;
-use crate::constellation::{Constellation, ConstellationStatus};
-use tokio::time::sleep;
-use std::collections::hash_map::RandomState;
-use std::cell::Cell;
-use std::future::Future;
 
 pub mod api;
 
@@ -776,16 +776,22 @@ impl StarlaneInnerFlags{
 
 #[cfg(test)]
 mod test {
+    use std::convert::TryInto;
+    use std::fs;
+    use std::fs::File;
+    use std::io::Read;
     use std::str::FromStr;
     use std::sync::Arc;
 
     use tokio::runtime::Runtime;
+    use tokio::sync::oneshot;
     use tokio::sync::oneshot::error::RecvError;
-    use tokio::time::timeout;
     use tokio::time::Duration;
+    use tokio::time::timeout;
+    use tracing::dispatcher::set_global_default;
+    use tracing_subscriber::FmtSubscriber;
 
     use crate::artifact::ArtifactLocation;
-    use crate::resource::ArtifactBundleAddress;
     use crate::error::Error;
     use crate::logger::{
         Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog,
@@ -795,18 +801,12 @@ mod test {
     use crate::names::Name;
     use crate::permissions::Authentication;
     use crate::resource::{Labels, ResourceAddress};
+    use crate::resource::ArtifactBundleAddress;
     use crate::space::CreateAppControllerFail;
     use crate::star::{StarController, StarInfo, StarKey, StarKind};
+    use crate::starlane::{ConstellationCreate, StarlaneApiRequest, StarlaneCommand, StarlaneMachine, StarlaneMachineRunner};
     use crate::starlane::api::SubSpaceApi;
-    use crate::starlane::{ConstellationCreate, StarlaneMachineRunner, StarlaneApiRequest, StarlaneCommand, StarlaneMachine};
     use crate::template::{ConstellationLayout, ConstellationTemplate};
-    use std::convert::TryInto;
-    use std::fs;
-    use std::fs::File;
-    use std::io::Read;
-    use tokio::sync::oneshot;
-    use tracing::dispatcher::set_global_default;
-    use tracing_subscriber::FmtSubscriber;
 
     #[test]
     #[instrument]

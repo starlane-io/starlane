@@ -19,7 +19,7 @@ use crate::core::{Host, StarCoreAction, StarCoreCommand};
 use crate::error::Error;
 use crate::file_access::{FileAccess, FileEvent};
 use crate::message::Fail;
-use crate::resource::{AddressCreationSrc, ArtifactBundleKind, AssignResourceStateSrc, DataTransfer, KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceKey, ArtifactKind, ResourceKind, ResourceRecord, ResourceRegistration, ResourceRegistryInfo, ResourceStateSrc, ResourceStub, ResourceType, FileSystemKey};
+use crate::resource::{AddressCreationSrc, ArtifactBundleKind, ArtifactKind, AssignResourceStateSrc, DataTransfer, FileSystemKey, KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceKey, ResourceKind, ResourceRecord, ResourceRegistration, ResourceRegistryInfo, ResourceStateSrc, ResourceStub, ResourceType};
 use crate::resource::ArtifactBundleKey;
 use crate::resource::store::{
     ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult,

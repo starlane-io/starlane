@@ -1,13 +1,13 @@
 use std::fmt;
 use std::str::{FromStr, Split};
 
+use serde::{Deserialize, Serialize, Serializer};
+
 use crate::actor::ActorKind;
 use crate::actor::ActorSpecific;
 use crate::app::AppSpecific;
 use crate::artifact::{ArtifactLocation, SubSpaceName};
 use crate::error::Error;
-
-use serde::{Deserialize, Serialize, Serializer};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct Name {

@@ -27,7 +27,7 @@ use url::Url;
 
 use starlane_resources::ResourceIdentifier;
 
-use crate::{logger, resource, util, error};
+use crate::{error, logger, resource, util};
 use crate::actor::ActorKind;
 use crate::app::ConfigSrc;
 use crate::error::Error;

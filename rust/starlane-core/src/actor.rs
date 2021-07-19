@@ -17,10 +17,8 @@ use crate::frame::Event;
 use crate::id::Id;
 use crate::message::Fail;
 use crate::names::Name;
-use crate::resource::{Labels, Names, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceKind, ResourceRecord, ResourceRegistration, ResourceRegistryInfo, ResourceSelector, ResourceStub, ResourceAddressPart, AppKey};
+use crate::resource::{AppKey, Labels, Names, ResourceAddress, ResourceAddressPart, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceKind, ResourceRecord, ResourceRegistration, ResourceRegistryInfo, ResourceSelector, ResourceStub};
 use crate::star::StarKey;
-
-
 
 pub type ActorSpecific = Name;
 pub type GatheringSpecific = Name;

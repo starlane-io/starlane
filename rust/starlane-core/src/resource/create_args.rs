@@ -1,13 +1,14 @@
+use std::fs;
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::Path;
+use std::str::FromStr;
+
+use zip::{CompressionMethod, ZipWriter};
+use zip::write::FileOptions;
+
 use crate::error::Error;
 use crate::resource::ArtifactBundleAddress;
-
-use std::str::FromStr;
-use zip::{ZipWriter, CompressionMethod};
-use zip::write::FileOptions;
-use std::io::{Write, Read};
-use std::fs::File;
-use std::path::Path;
-use std::fs;
 
 lazy_static!{
 

@@ -1,24 +1,22 @@
+use std::collections::{HashMap, HashSet};
 
-use syn::parse::{Parse, ParseStream};
-use std::collections::{HashSet, HashMap};
-use proc_macro::{Literal};
-use quote::{quote, quote_spanned, ToTokens};
-use syn::{parse_macro_input, Expr, Ident, Token, Type, Visibility, Item, PathArguments, Meta, NestedMeta, MetaList, MetaNameValue, Lit, ItemEnum, Path};
-use std::convert::TryInto;
-use quote::__private::{TokenTree, TokenStream};
+use nom::bytes::complete::{tag, take_till1, take_until};
+use nom::character::complete::{alpha1, anychar, digit1};
 use nom::error::{context, VerboseError};
-use nom::sequence::{delimited, tuple};
-use nom::bytes::complete::{tag, take_until, take_till1};
-use nom::character::complete::{alpha1, digit1, anychar};
 use nom::IResult;
 use nom::multi::many1;
+use nom::sequence::{delimited, tuple};
+use quote::{quote, quote_spanned, ToTokens};
+use quote::__private::{TokenStream, TokenTree};
+use syn::{Expr, Ident, Item, ItemEnum, Lit, Meta, MetaList, MetaNameValue, NestedMeta, parse_macro_input, Path, PathArguments, Token, Type, Visibility};
+use syn::parse::{Parse, ParseStream};
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
 struct ResourceParser {
-   pub resources: Vec<Resource>,
-   pub kinds: Vec<ItemEnum>,
-   pub ident_to_resource: HashMap<String,Resource>
+    pub resources: Vec<Resource>,
+    pub kinds: Vec<ItemEnum>,
+    pub ident_to_resource: HashMap<String, Resource>,
 }
 
 impl ResourceParser {
@@ -1463,16 +1461,17 @@ fn parse_camel(input: &str) -> Res<&str, Vec<String>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parse_camel;
     use nom::error::VerboseError;
+
+    use crate::parse_camel;
 
     #[test]
     fn camel() {
-        let (leftover,rtn) = parse_camel("RomulanVarool").unwrap();
+        let (leftover, rtn) = parse_camel("RomulanVarool").unwrap();
 
         assert!(leftover.is_empty());
         if let Option::Some(romulan) = rtn.get(0).cloned() {
-            assert_eq!("Romulan".to_string(), romulan );
+            assert_eq!("Romulan".to_string(), romulan);
         } else {
             assert!(false)
         }

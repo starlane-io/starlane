@@ -1,9 +1,10 @@
+use std::marker::PhantomData;
+
+use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
 
 use crate::error::Error;
 use crate::permissions::{AuthToken, User};
-use serde::{Deserialize, Serialize, Serializer};
-use std::marker::PhantomData;
 
 pub type CryptKeyId = Uuid;
 pub type HashId = Uuid;

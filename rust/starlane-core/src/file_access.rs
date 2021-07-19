@@ -1,23 +1,24 @@
+use std::{fs, thread};
 use std::collections::HashMap;
-use std::sync::{mpsc, Arc, Mutex};
-
-use crate::error::Error;
-use crate::resource::{Path};
-use crate::star::Star;
-use crate::util;
-use notify::{raw_watcher, Op, RawEvent, RecursiveMode, Watcher};
 use std::convert::TryFrom;
 use std::fs::{DirBuilder, File};
 use std::future::Future;
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::{Arc, mpsc, Mutex};
 use std::sync::mpsc::{Receiver, RecvError};
-use std::{fs, thread};
+
+use notify::{Op, raw_watcher, RawEvent, RecursiveMode, Watcher};
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::time::Duration;
 use walkdir::{DirEntry, WalkDir};
+
+use crate::error::Error;
+use crate::resource::Path;
 use crate::resource::FileKind;
-use std::str::FromStr;
+use crate::star::Star;
+use crate::util;
 
 pub enum FileCommand {
     Read {

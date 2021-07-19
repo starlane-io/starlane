@@ -1,33 +1,32 @@
-use clap::{App, SubCommand, Arg, ArgMatches, Values};
-
-use tokio::runtime::Runtime;
-
-use starlane_core::error::Error;
-use starlane_core::starlane::{ConstellationCreate, StarlaneMachine, StarlaneCommand, StarlaneMachineRunner};
-use starlane_core::template::{ConstellationData, ConstellationTemplate, ConstellationLayout};
-use tokio::sync::oneshot;
-use starlane_core::resource::{ResourceAddress, ResourceSelector, FieldSelection, ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceArchetype, ResourceCreateStrategy, AssignResourceStateSrc,ArtifactBundlePath};
-use std::str::FromStr;
-use std::{fs, thread};
-use std::path::Path;
-use std::fs::File;
-use std::sync::Arc;
-use std::io::Read;
-use tracing_subscriber::FmtSubscriber;
-use tracing::dispatcher::set_global_default;
-use tokio::time::Duration;
-use starlane_core::starlane::api::StarlaneApi;
-use starlane_core::util::shutdown;
-use starlane_core::resource::selector::MultiResourceSelector;
-use std::ffi::OsString;
-use starlane_core::util;
-use starlane_core::resource::ResourceAddressKind;
-use starlane_core::star::StarKind;
-
-mod cli;
-
 #[macro_use]
 extern crate lazy_static;
+
+use std::{fs, thread};
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+use std::str::FromStr;
+use std::sync::Arc;
+
+use clap::{App, Arg, ArgMatches, SubCommand, Values};
+use tokio::runtime::Runtime;
+use tokio::sync::oneshot;
+use tokio::time::Duration;
+use tracing::dispatcher::set_global_default;
+use tracing_subscriber::FmtSubscriber;
+
+use starlane_core::error::Error;
+use starlane_core::resource::{AddressCreationSrc, ArtifactBundlePath, AssignResourceStateSrc, FieldSelection, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceSelector};
+use starlane_core::resource::ResourceAddressKind;
+use starlane_core::resource::selector::MultiResourceSelector;
+use starlane_core::star::StarKind;
+use starlane_core::starlane::{ConstellationCreate, StarlaneCommand, StarlaneMachine, StarlaneMachineRunner};
+use starlane_core::starlane::api::StarlaneApi;
+use starlane_core::template::{ConstellationData, ConstellationLayout, ConstellationTemplate};
+use starlane_core::util;
+use starlane_core::util::shutdown;
+
+mod cli;
 
 fn main() -> Result<(), Error> {
 

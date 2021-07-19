@@ -1,21 +1,23 @@
-use crate::frame::ProtoFrame;
-use crate::message::Fail;
-use base64::DecodeError;
-use futures::channel::oneshot::Canceled;
-use semver::SemVerError;
-use std::convert::{TryFrom, Infallible};
+use std::convert::{Infallible, TryFrom};
 use std::env::VarError;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::num::ParseIntError;
 use std::string::FromUtf8Error;
 use std::sync::Arc;
+
+use base64::DecodeError;
+use futures::channel::oneshot::Canceled;
+use nom::error::VerboseError;
+use semver::SemVerError;
 use tokio::sync::broadcast;
+use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::mpsc::error::{SendError, TrySendError};
 use tokio::time::error::Elapsed;
 use zip::result::ZipError;
-use tokio::sync::broadcast::error::RecvError;
-use nom::error::VerboseError;
+
+use crate::frame::ProtoFrame;
+use crate::message::Fail;
 
 #[derive(Debug, Clone,Eq,PartialEq)]
 pub struct Error {

@@ -20,12 +20,12 @@ use tokio::sync::oneshot::Receiver;
 
 use starlane_resources::ResourceIdentifier;
 
-use crate::artifact::{ArtifactRef};
+use crate::artifact::ArtifactRef;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::logger::{elog, LogInfo, StaticLogInfo};
 use crate::message::Fail;
-use crate::resource::{ArtifactBundleAddress, Path, ResourceAddress, ResourceArchetype, ResourceKind, ResourceLocation, ResourceRecord, ResourceStub, ArtifactBundleIdentifier};
+use crate::resource::{ArtifactBundleAddress, ArtifactBundleIdentifier, Path, ResourceAddress, ResourceArchetype, ResourceKind, ResourceLocation, ResourceRecord, ResourceStub};
 use crate::resource::artifact::ArtifactBundle;
 use crate::resource::ArtifactAddress;
 use crate::resource::ArtifactBundleKey;

@@ -1,25 +1,25 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::fs::File;
 use std::future::Future;
 use std::hash::Hash;
+use std::io::{Read, Seek, Write};
+use std::path::Path;
+use std::thread;
+use std::thread::sleep;
 
 use tokio::sync::{mpsc, oneshot};
+use tokio::sync::broadcast;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::broadcast;
 use tokio::time::Duration;
 use tokio::time::error::Elapsed;
+use walkdir::{DirEntry, WalkDir};
+use zip::result::ZipError;
+use zip::write::FileOptions;
 
 use crate::error::Error;
 use crate::message::Fail;
-use std::thread;
-use std::thread::sleep;
-use walkdir::{DirEntry, WalkDir};
-use std::io::{Seek, Write, Read};
-use zip::write::FileOptions;
-use std::path::Path;
-use std::fs::File;
-use zip::result::ZipError;
 
 lazy_static!{
     pub static ref SHUTDOWN_TX: broadcast::Sender<()> = {

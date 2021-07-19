@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize, Serializer};
 
 use crate::crypt::{JwtDecoder, PrivateKey};
 use crate::error::Error;
-use crate::resource::{Labels, UserKey, ResourceKey};
+use crate::resource::{Labels, ResourceKey, UserKey};
 
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct AuthToken {

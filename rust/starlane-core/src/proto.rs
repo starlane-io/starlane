@@ -1,5 +1,6 @@
-use std::cell::{RefCell, Cell};
+use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
+use std::convert::TryInto;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU64, Ordering};
@@ -27,16 +28,15 @@ use crate::frame::{
     WindHit, WindUp,
 };
 use crate::id::{Id, IdSeq};
-use crate::lane::{ConnectorController, LaneEndpoint, LaneCommand, LaneMeta, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelIn, TunnelOut, TunnelOutState, ProtoLaneEndpoint, LaneIndex, LaneWrapper};
+use crate::lane::{ConnectorController, LaneCommand, LaneEndpoint, LaneIndex, LaneMeta, LaneWrapper, ProtoLaneEndpoint, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelIn, TunnelOut, TunnelOutState};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::permissions::AuthTokenSource;
 use crate::resource::HostedResourceStore;
-use crate::star::{FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBacking, ResourceRegistryBackingSqLite, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarSearchTransaction, StarSkel, Transaction, ConstellationBroadcast};
+use crate::star::{ConstellationBroadcast, FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBacking, ResourceRegistryBackingSqLite, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarSearchTransaction, StarSkel, Transaction};
 use crate::star::pledge::StarHandleBacking;
 use crate::star::variant::{StarVariantCommand, StarVariantFactory};
 use crate::starlane::StarlaneCommand;
 use crate::template::{ConstellationTemplate, StarKeyConstellationIndex};
-use std::convert::TryInto;
 
 pub static MAX_HOPS: i32 = 32;
 

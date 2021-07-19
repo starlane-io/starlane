@@ -1,6 +1,10 @@
+use std::cell::Cell;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+use std::convert::TryInto;
 use std::fmt;
+use std::fmt::{Debug, Formatter};
+use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
 use std::task::Poll;
 
@@ -10,6 +14,7 @@ use futures::task;
 use futures::task::Context;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf, WriteHalf};
 use tokio::net::TcpStream;
@@ -26,12 +31,7 @@ use crate::id::Id;
 use crate::proto::{local_tunnels, ProtoStar, ProtoTunnel};
 use crate::star::{Star, StarCommand, StarKey};
 use crate::starlane::{StarlaneCommand, VersionFrame};
-use std::cell::Cell;
-use serde::de::DeserializeOwned;
 use crate::template::{ConstellationSelector, StarInConstellationTemplateHandle, StarInConstellationTemplateSelector};
-use std::convert::TryInto;
-use std::fmt::{Debug, Formatter};
-use std::ops::{Deref, DerefMut};
 
 pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
 pub static LANE_QUEUE_SIZE: usize = 32;
@@ -815,24 +815,25 @@ impl LaneIndex {
 
 #[cfg(test)]
 mod test {
+    use std::net::{SocketAddr, ToSocketAddrs};
+    use std::str::FromStr;
+
     use futures::FutureExt;
+    use tokio::net::{TcpListener, TcpStream};
     use tokio::runtime::Runtime;
+    use tokio::sync::oneshot;
     use tokio::time::Duration;
 
     use crate::error::Error;
     use crate::frame::{Diagnose, ProtoFrame};
     use crate::id::Id;
-    use crate::lane::{LaneEndpoint, LaneCommand, FrameCodex, ProtoLaneEndpoint};
+    use crate::lane::{FrameCodex, LaneCommand, LaneEndpoint, ProtoLaneEndpoint};
     use crate::lane::ConnectorCommand;
     use crate::lane::Frame;
     use crate::lane::LocalTunnelConnector;
     use crate::lane::TunnelConnector;
     use crate::proto::local_tunnels;
     use crate::star::{StarCommand, StarKey};
-    use tokio::net::{TcpListener, TcpStream};
-    use std::net::{ToSocketAddrs, SocketAddr};
-    use std::str::FromStr;
-    use tokio::sync::oneshot;
 
     #[test]
     fn frame_codex()

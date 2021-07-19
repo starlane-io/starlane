@@ -1,9 +1,10 @@
+use std::sync::Arc;
+
 use crate::artifact::ArtifactRef;
-use crate::resource::ArtifactAddress;
 use crate::cache::{Cacheable, Data};
 use crate::error::Error;
 use crate::resource::{ResourceKind, ResourceType};
-use std::sync::Arc;
+use crate::resource::ArtifactAddress;
 
 pub trait ResourceConfig {
     fn kind(&self) -> ResourceKind;

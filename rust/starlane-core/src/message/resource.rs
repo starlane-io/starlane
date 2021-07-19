@@ -15,10 +15,9 @@ use crate::frame::{MessagePayload, Reply, SimpleReply, StarMessage, StarMessageP
 use crate::id::Id;
 use crate::logger::Log::ProtoStar;
 use crate::message::{Fail, MessageId, ProtoStarMessage};
-use crate::resource::{RemoteDataSrc, ResourceCreate, ResourceId, ResourceRecord, ResourceSelector, ResourceType, ResourceKey};
+use crate::resource::{RemoteDataSrc, ResourceCreate, ResourceId, ResourceKey, ResourceRecord, ResourceSelector, ResourceType};
 use crate::star::{StarCommand, StarKey, StarSkel};
 use crate::util;
-
 
 pub type MessageTo = ResourceIdentifier;
 

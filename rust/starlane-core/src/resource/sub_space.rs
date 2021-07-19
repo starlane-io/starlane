@@ -1,8 +1,10 @@
-use crate::error::Error;
-use crate::resource::{Resource, ResourceAddress, ResourceType, SubSpaceKey};
-use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
+
+use serde::{Deserialize, Serialize};
+
+use crate::error::Error;
+use crate::resource::{Resource, ResourceAddress, ResourceType, SubSpaceKey};
 
 pub struct SubSpace {
     key: SubSpaceKey,

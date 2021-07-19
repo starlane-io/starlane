@@ -1,18 +1,20 @@
+use std::convert::TryInto;
+use std::str::FromStr;
+use std::sync::atomic::Ordering;
+
+use tokio::sync::oneshot;
+use tokio::time::Duration;
+
 use crate::error::Error;
+use crate::frame::{Frame, ProtoFrame};
+use crate::lane::{LaneCommand, LaneWrapper};
 use crate::resource::{
     ResourceAddress, ResourceArchetype, ResourceCreateStrategy, ResourceKind, ResourceLocation,
     ResourceRecord, ResourceRegistration, ResourceStub,
 };
-use crate::star::variant::{StarVariant, StarVariantCommand, StarShellInstructions};
-use crate::star::{PublicKeySource, StarKey, StarSkel, StarCommand, StarSubGraphKey};
+use crate::star::{PublicKeySource, StarCommand, StarKey, StarSkel, StarSubGraphKey};
+use crate::star::variant::{StarShellInstructions, StarVariant, StarVariantCommand};
 use crate::starlane::api::{SpaceApi, StarlaneApi};
-use std::convert::TryInto;
-use std::str::FromStr;
-use tokio::sync::oneshot;
-use crate::frame::{Frame, ProtoFrame};
-use crate::lane::{LaneWrapper, LaneCommand};
-use std::sync::atomic::Ordering;
-use tokio::time::Duration;
 
 pub struct GatewayVariant {
     skel: StarSkel,

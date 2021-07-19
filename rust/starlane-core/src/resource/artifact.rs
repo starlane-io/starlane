@@ -1,9 +1,11 @@
-use crate::resource::ArtifactBundleKey;
-use crate::error::Error;
-use crate::resource::{ResourceAddress, SrcTransfer};
-use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
+
+use serde::{Deserialize, Serialize};
+
+use crate::error::Error;
+use crate::resource::{ResourceAddress, SrcTransfer};
+use crate::resource::ArtifactBundleKey;
 
 #[derive(Clone)]
 pub struct ArtifactBundle {
