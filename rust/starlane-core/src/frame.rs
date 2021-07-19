@@ -1,27 +1,27 @@
-use std::collections::{HashMap, HashSet};
+
 use std::fmt;
 use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
+
 
 use semver::SemVerError;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
-use tokio::sync::oneshot::error::RecvError;
+
 use tokio::time::error::Elapsed;
-use tokio::time::Instant;
+
 
 use starlane_resources::ResourceIdentifier;
 
-use crate::crypt::{Encrypted, HashEncrypted, HashId};
+
 use crate::error::Error;
 use crate::id::Id;
 use crate::logger::Flags;
-use crate::message::{Fail, MessageExpect, MessageId, MessageResult, MessageUpdate, ProtoStarMessage};
+use crate::message::{Fail, MessageExpect, MessageId, MessageUpdate, ProtoStarMessage};
 use crate::message::resource::{
     ActorMessage, Message, MessageReply, RawState, ResourceRequestMessage, ResourceResponseMessage,
 };
-use crate::names::Name;
-use crate::permissions::{Authentication, AuthToken};
+
+
 use crate::resource::{ActorKey, AppKey, AssignResourceStateSrc, Labels, ResourceAddress, ResourceAssign, ResourceBinding, ResourceCreate, ResourceId, ResourceKey, ResourceRecord, ResourceRegistration, ResourceSelector, ResourceSliceAssign, ResourceSliceStatus, ResourceStatus, ResourceStub, ResourceType, SubSpaceKey, UserKey};
 use crate::star::{
     LocalResourceLocation, Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify,
@@ -136,7 +136,7 @@ impl WindAction {
                     )
                 }
             }
-            WindAction::Flags(flags) => Ok(WindResults::None),
+            WindAction::Flags(_flags) => Ok(WindResults::None),
         }
     }
 }
@@ -240,7 +240,7 @@ impl StarMessage {
         }
     }
 
-    pub fn forward(&self, to: &StarKey) -> ProtoStarMessage {
+    pub fn forward(&self, _to: &StarKey) -> ProtoStarMessage {
         let mut proto = ProtoStarMessage::new();
         proto.to = self.to.clone().into();
         proto.payload = self.payload.clone();
@@ -259,7 +259,7 @@ impl StarMessage {
                     let proto = message.reply(payload);
                     star_tx.send(StarCommand::SendProtoMessage(proto));
                 }
-                Err(error) => {
+                Err(_error) => {
                     let proto = message.reply_err("no reply".to_string());
                     star_tx.send(StarCommand::SendProtoMessage(proto));
                 }
@@ -412,7 +412,7 @@ impl ToString for SimpleReply {
         match self {
             SimpleReply::Ok(ok) => format!("Ok({})", ok.to_string()),
             SimpleReply::Fail(fail) => format!("Fail({})", fail.to_string()),
-            SimpleReply::Ack(ack) => "Ack".to_string(),
+            SimpleReply::Ack(_ack) => "Ack".to_string(),
         }
     }
 }
@@ -691,7 +691,7 @@ impl From<Error> for Fail {
 }
 
 impl From<Elapsed> for Fail {
-    fn from(e: Elapsed) -> Self {
+    fn from(_e: Elapsed) -> Self {
         Fail::Timeout
     }
 }
@@ -703,7 +703,7 @@ pub trait FromReply<T, E>: Sized {
 impl FromReply<(), Fail> for Reply {
     fn from_result(t: Result<(), Fail>) -> Result<Self, Fail> {
         match t {
-            Ok(ok) => Ok(Reply::Empty),
+            Ok(_ok) => Ok(Reply::Empty),
             Err(e) => Err(e),
         }
     }
@@ -736,7 +736,7 @@ impl From<rusqlite::Error> for Fail {
 }
 
 impl From<()> for Fail {
-    fn from(error: ()) -> Self {
+    fn from(_error: ()) -> Self {
         Fail::Error("() From Error".to_string())
 
     }

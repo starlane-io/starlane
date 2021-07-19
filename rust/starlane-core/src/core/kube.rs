@@ -1,30 +1,30 @@
-use std::{env, fs};
-use std::collections::HashSet;
-use std::convert::{TryFrom, TryInto};
-use std::env::VarError;
-use std::fs::File;
-use std::io::Write;
-use std::iter::FromIterator;
-use std::path::PathBuf;
-use std::str::FromStr;
+use std::{env};
+
+
+
+
+
+
+
+
 use std::sync::Arc;
 
-use k8s_openapi::api::core::v1::Pod;
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+
+
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
-use kube::{Api, Client, Config};
+use kube::{Api};
 use kube::api::{ListParams, PostParams};
-use kube::client::ConfigExt;
-use rusqlite::Connection;
+
+
 use serde::{Deserialize, Serialize};
-use tempdir::TempDir;
-use tokio::sync::{mpsc, Mutex};
+
+
 
 use starlane_resources::{ResourceIdentifier, ResourceKindParts};
 
 use crate::core::Host;
 use crate::error::Error;
-use crate::file_access::{FileAccess, FileEvent};
+
 use crate::message::Fail;
 use crate::resource::{
     AddressCreationSrc, AssignResourceStateSrc, DataTransfer,
@@ -32,12 +32,10 @@ use crate::resource::{
     ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy,
     ResourceCreationChamber, ResourceKind, ResourceStateSrc, ResourceStub,
 };
-use crate::resource::ArtifactBundleKey;
-use crate::resource::store::{
-    ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult,
-};
+
+
 use crate::star::StarSkel;
-use crate::util;
+
 
 pub struct KubeCore {
     skel: StarSkel,
@@ -54,7 +52,7 @@ impl KubeCore {
 
         let kubernetes_instance_name = match env::var("STARLANE_KUBERNETES_INSTANCE_NAME"){
             Ok(kubernetes_instance_name) => {kubernetes_instance_name}
-            Err(err) => {
+            Err(_err) => {
                 error!("FATAL: env variable 'STARLANE_KUBERNETES_INSTANCE_NAME' must be set to a valid Starlane Kubernetes resource");
                 return Err("FATAL: env variable 'STARLANE_KUBERNETES_INSTANCE_NAME' must be set to a valid Starlane Kubernetes resource".into());
             }
@@ -62,7 +60,7 @@ impl KubeCore {
 
         let namespace = match env::var("NAMESPACE"){
             Ok(namespace) => {namespace}
-            Err(err) => {
+            Err(_err) => {
                 warn!("NAMESPACE environment variable is not set, defaulting to 'default'");
                 "default".to_string()
             }
@@ -71,7 +69,7 @@ impl KubeCore {
         let starlane_api: Api<crate::core::kube::Starlane> = Api::namespaced(client.clone(), namespace.as_str() );
         let starlane: crate::core::kube::Starlane =  match starlane_api.get(kubernetes_instance_name.as_str()).await {
             Ok(starlane) => starlane,
-            Err(err) => {
+            Err(_err) => {
                 let message = format!("FATAL: could not access Kubernetes starlane instance named '{}'", kubernetes_instance_name);
                 error!("{}",message);
                 return Err(message.into());
@@ -122,7 +120,7 @@ impl Host for KubeCore {
            return Err(Fail::NoProvisioner(assign.stub.archetype.kind.clone()));
         }
 
-        let mut provisioner:StarlaneProvisioner  = provisioners.items.remove(0);
+        let provisioner:StarlaneProvisioner  = provisioners.items.remove(0);
         let provisioner_name = provisioner.metadata.name.ok_or("expected provisioner to have a name")?;
 
         let starlane_resource_api: Api<StarlaneResource> = Api::default_namespaced(self.client.clone());
@@ -157,12 +155,12 @@ impl Host for KubeCore {
         Ok(resource)
     }
 
-    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail> {
+    async fn get(&self, _identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail> {
         unimplemented!()
 //        self.store.get(identifier).await
     }
 
-    async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {
+    async fn state(&self, _identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {
         unimplemented!()
 /*        if let Ok(Option::Some(resource)) = self.store.get(identifier.clone()).await {
             Ok(RemoteDataSrc::None)
@@ -172,7 +170,7 @@ impl Host for KubeCore {
  */
     }
 
-    async fn delete(&self, identifier: ResourceIdentifier) -> Result<(), Fail> {
+    async fn delete(&self, _identifier: ResourceIdentifier) -> Result<(), Fail> {
         unimplemented!("I don't know how to DELETE yet.");
         Ok(())
     }

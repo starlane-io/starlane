@@ -1,41 +1,41 @@
-use std::{sync, thread};
+use std::{thread};
 use std::convert::{TryFrom, TryInto};
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use futures::channel::oneshot;
-use futures::io::Cursor;
+
+
 use semver::Version;
-use tempdir::TempDir;
-use tokio::fs::File;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::runtime::{Handle, Runtime};
+
+
+
+use tokio::runtime::{Handle};
 use tokio::sync::mpsc;
 
 use starlane_resources::ResourceIdentifier;
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
-use crate::frame::{ChildManagerResourceAction, Reply, SimpleReply, StarMessagePayload, StarPattern, WindAction};
-use crate::frame::ChildManagerResourceAction::Register;
-use crate::message::{Fail, ProtoStarMessage};
+use crate::frame::{StarPattern, WindAction};
+
+use crate::message::{Fail};
 use crate::message::resource::{
-    MessageFrom, MessageReply, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage,
+    MessageFrom, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage,
 };
 use crate::resource::{AddressCreationSrc, ArtifactBundleKind, AssignResourceStateSrc, DataTransfer, FieldSelection, KeyCreationSrc, LocalDataSrc, Path, RemoteDataSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceKind, ResourceRecord, ResourceRegistryInfo, ResourceSelector, ResourceStateSrc, ResourceStub, ResourceType};
-use crate::resource::artifact::ArtifactBundleState;
+
 use crate::resource::ArtifactBundleAddress;
-use crate::resource::domain::DomainState;
+
 use crate::resource::file_system::FileSystemState;
 use crate::resource::FileKind;
 use crate::resource::ResourceKey;
 use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
-use crate::star::{Request, StarCommand, StarKey, StarKind, Wind};
-use crate::star::StarCommand::ResourceRecordRequest;
+use crate::star::{Request, StarCommand, StarKind, Wind};
+
 use crate::starlane::StarlaneCommand;
 
 #[derive(Clone)]
@@ -79,7 +79,7 @@ impl StarlaneApi {
         match tokio::time::timeout(Duration::from_secs(15), rx).await {
             Ok(result) => match result {
                 Ok(result) => result,
-                Err(err) => Err(Fail::ChannelRecvErr),
+                Err(_err) => Err(Fail::ChannelRecvErr),
             },
             Err(err) => {
                 println!("elapsed error: {}", err);
@@ -116,7 +116,7 @@ impl StarlaneApi {
         &self,
         identifier: ResourceIdentifier,
     ) -> Result<ResourceRecord, Fail> {
-        let (mut request, rx) = Request::new(identifier);
+        let (request, rx) = Request::new(identifier);
         self.star_tx.send(StarCommand::ResourceRecordRequest(request)).await;
         Self::timeout(rx).await
     }
@@ -184,7 +184,7 @@ impl StarlaneApi {
     }
 
     pub async fn list( &self, identifier: &ResourceIdentifier ) -> Result<Vec<ResourceRecord>,Fail> {
-        let mut selector = ResourceSelector::new();
+        let selector = ResourceSelector::new();
         self.select(identifier, selector).await
     }
 
@@ -236,7 +236,7 @@ impl StarlaneApi {
 
         match api {
             Ok(api) => Ok(api),
-            Err(error) => Err(Fail::Error("catastrophic converstion error".into())),
+            Err(_error) => Err(Fail::Error("catastrophic converstion error".into())),
         }
     }
 
@@ -283,7 +283,7 @@ impl StarlaneApi {
             proto.to = Option::Some(identifier);
             proto.from = Option::Some(MessageFrom::Inject);
             let reply = proto.reply();
-            let mut proto = proto.to_proto_star_message().await?;
+            let proto = proto.to_proto_star_message().await?;
             star_tx.send(StarCommand::SendProtoMessage(proto)).await?;
 
             let result = Self::timeout(reply).await?;
@@ -840,7 +840,7 @@ pub struct StarlaneApiRunner {
 
 impl StarlaneApiRunner {
     pub fn new(api: StarlaneApi) -> tokio::sync::mpsc::Sender<StarlaneAction> {
-        let (tx, mut rx) = tokio::sync::mpsc::channel(16);
+        let (tx, rx) = tokio::sync::mpsc::channel(16);
 
         let runner = StarlaneApiRunner { api: api, rx: rx };
 
@@ -882,7 +882,7 @@ impl StarlaneApiRelay {
         &self,
         identifier: ResourceIdentifier,
     ) -> Result<Option<Arc<Vec<u8>>>, Fail> {
-        let (tx, mut rx) = tokio::sync::oneshot::channel();
+        let (tx, rx) = tokio::sync::oneshot::channel();
         self.tx
             .send(StarlaneAction::GetState {
                 identifier: identifier,

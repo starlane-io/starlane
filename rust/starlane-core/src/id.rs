@@ -1,4 +1,4 @@
-use std::fmt;
+
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
 

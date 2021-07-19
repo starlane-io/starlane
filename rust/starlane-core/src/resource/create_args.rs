@@ -1,7 +1,7 @@
-use std::fs;
+
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::Path;
+
 use std::str::FromStr;
 
 use zip::{CompressionMethod, ZipWriter};
@@ -41,7 +41,7 @@ pub fn artifact_bundle_address() -> ArtifactBundleAddress{
 }
 
 pub fn create_init_args_artifact_bundle() -> Result<Vec<u8>,Error> {
-   let mut zipfile = tempfile::NamedTempFile::new()?;
+   let zipfile = tempfile::NamedTempFile::new()?;
    let mut zip = ZipWriter::new(zipfile.reopen() ? );
 
    write_file_to_zip(&mut zip, "init-args/space.yaml", &SPACE )?;

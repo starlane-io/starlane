@@ -1,28 +1,28 @@
 use std::collections::HashSet;
-use std::convert::{TryFrom, TryInto};
-use std::fs;
+use std::convert::{TryInto};
+
 use std::fs::File;
 use std::io::Write;
 use std::iter::FromIterator;
-use std::path::PathBuf;
+
 use std::str::FromStr;
 use std::sync::Arc;
 
-use rusqlite::Connection;
+
 use tempdir::TempDir;
-use tokio::sync::{mpsc, Mutex};
-use tracing_futures::WithSubscriber;
+use tokio::sync::{Mutex};
+
 
 use starlane_resources::ResourceIdentifier;
 
 use crate::core::{Host, StarCoreAction, StarCoreCommand};
 use crate::error::Error;
-use crate::file_access::{FileAccess, FileEvent};
+use crate::file_access::{FileAccess};
 use crate::message::Fail;
 use crate::resource::{AddressCreationSrc, ArtifactBundleKind, ArtifactKind, AssignResourceStateSrc, DataTransfer, FileSystemKey, KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceKey, ResourceKind, ResourceRecord, ResourceRegistration, ResourceRegistryInfo, ResourceStateSrc, ResourceStub, ResourceType};
 use crate::resource::ArtifactBundleKey;
 use crate::resource::store::{
-    ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult,
+    ResourceStore,
 };
 use crate::star::StarSkel;
 use crate::util;
@@ -36,7 +36,7 @@ pub struct ArtifactHost {
 
 impl ArtifactHost {
     pub async fn new(skel: StarSkel, file_access: FileAccess) -> Result<Self, Error> {
-        let mut file_access = file_access.with_path("bundles".to_string())?;
+        let file_access = file_access.with_path("bundles".to_string())?;
         let rtn = ArtifactHost {
             skel: skel,
             file_access: file_access,
@@ -116,7 +116,7 @@ impl ArtifactHost {
 
         let assign = util::wait_for_it_whatever(rx).await??;
         let stub = assign.stub.clone();
-        let (action,mut rx) = StarCoreAction::new(StarCoreCommand::Assign(assign));
+        let (action,rx) = StarCoreAction::new(StarCoreCommand::Assign(assign));
         skel.core_tx.send( action ).await;
 
         util::wait_for_it_whatever(rx).await??;
@@ -247,7 +247,7 @@ impl Host for ArtifactHost {
         }
     }
 
-    async fn delete(&self, identifier: ResourceIdentifier) -> Result<(), Fail> {
+    async fn delete(&self, _identifier: ResourceIdentifier) -> Result<(), Fail> {
         unimplemented!("I don't know how to DELETE yet.");
         Ok(())
     }
@@ -268,19 +268,19 @@ fn get_artifacts(data: Arc<Vec<u8>>) -> Result<Vec<String>, Fail> {
     file.write_all(data.as_slice())?;
 
     let file = File::open(file_path.as_path())?;
-    let mut archive = zip::ZipArchive::new(file);
+    let archive = zip::ZipArchive::new(file);
     match archive {
         Ok(mut archive) => {
             let mut artifacts = vec![];
             for i in 0..archive.len() {
-                let mut file = archive.by_index(i).unwrap();
+                let file = archive.by_index(i).unwrap();
                 if !file.name().ends_with("/") {
                     artifacts.push(file.name().to_string())
                 }
             }
             Ok(artifacts)
         }
-        Err(error) => Err(Fail::InvalidResourceState(
+        Err(_error) => Err(Fail::InvalidResourceState(
             "ArtifactBundle must be a properly formatted Zip file.".to_string(),
         )),
     }

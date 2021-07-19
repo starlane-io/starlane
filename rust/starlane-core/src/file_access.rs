@@ -1,23 +1,23 @@
 use std::{fs, thread};
 use std::collections::HashMap;
-use std::convert::TryFrom;
+
 use std::fs::{DirBuilder, File};
-use std::future::Future;
+
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::{Arc, mpsc, Mutex};
-use std::sync::mpsc::{Receiver, RecvError};
+use std::sync::{Arc, mpsc};
+
 
 use notify::{Op, raw_watcher, RawEvent, RecursiveMode, Watcher};
-use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio::io::{AsyncReadExt};
 use tokio::time::Duration;
-use walkdir::{DirEntry, WalkDir};
+use walkdir::{WalkDir};
 
 use crate::error::Error;
 use crate::resource::Path;
 use crate::resource::FileKind;
-use crate::star::Star;
+
 use crate::util;
 
 pub enum FileCommand {
@@ -81,7 +81,7 @@ impl FileAccess {
     }
 
     pub async fn write(&mut self, path: &Path, data: Arc<Vec<u8>>) -> Result<(), Error> {
-        let (tx, mut rx) = tokio::sync::oneshot::channel();
+        let (tx, rx) = tokio::sync::oneshot::channel();
         self.tx
             .send(FileCommand::Write {
                 path: path.clone(),
@@ -107,7 +107,7 @@ impl FileAccess {
     }
 
     pub async fn unzip(&self, source: String, target: String) -> Result<(), Error> {
-        let (tx, mut rx) = tokio::sync::oneshot::channel();
+        let (tx, rx) = tokio::sync::oneshot::channel();
         self.tx
             .send(FileCommand::UnZip { source, target, tx })
             .await?;
@@ -220,7 +220,7 @@ impl LocalFileAccess {
                 tx.send(self.read(&path));
             }
             FileCommand::Write {
-                path: path,
+                path,
                 data,
                 tx,
             } => {
@@ -388,14 +388,14 @@ impl LocalFileAccess {
                     Ok(RawEvent {
                         path: Some(path),
                         op: Ok(op),
-                        cookie,
+                        cookie: _,
                     }) => {
                         let event_kind = match op {
                             Op::CREATE => FileEventKind::Create,
-                            CREATE_WRITE => FileEventKind::Create,
+                            _CREATE_WRITE => FileEventKind::Create,
                             Op::REMOVE => FileEventKind::Delete,
                             Op::WRITE => FileEventKind::Update,
-                            x => {
+                            _x => {
                                 continue;
                             }
                         };

@@ -1,37 +1,36 @@
-use std::collections::HashSet;
-use std::convert::{TryFrom, TryInto};
-use std::iter::FromIterator;
-use std::str::FromStr;
+
+
+
+
 use std::sync::Arc;
 
-use clap::App;
-use rusqlite::{Connection, params, Transaction};
-use rusqlite::types::ValueRef;
-use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, oneshot};
 
-use starlane_resources::{ResourceIdentifier, ResourceStatePersistenceManager};
 
-use crate::app::ConfigSrc;
-use crate::artifact::ArtifactRef;
+
+
+
+
+use starlane_resources::{ResourceIdentifier};
+
+
+
 use crate::core::Host;
-use crate::error::Error;
-use crate::file_access::FileAccess;
-use crate::frame::ResourceHostAction;
+
+
+
 use crate::message::Fail;
-use crate::names::Name;
-use crate::resource;
+
+
 use crate::resource::{
     ArtifactKind, AssignResourceStateSrc, DataTransfer, FileDataTransfer, LocalDataSrc,
     MemoryDataTransfer, Names, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype,
     ResourceAssign, ResourceKind, ResourceStateSrc
 };
-use crate::resource::ResourceKey;
+
 use crate::resource::store::{
-    ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult,
-    ResourceStoreSqlLite,
+    ResourceStore,
 };
-use crate::resource::user::UserState;
+
 use crate::star::StarSkel;
 
 #[derive(Debug)]
@@ -132,7 +131,7 @@ println!("seems to have worked....");
         }
     }
 
-    async fn delete(&self, identifier: ResourceIdentifier) -> Result<(), Fail> {
+    async fn delete(&self, _identifier: ResourceIdentifier) -> Result<(), Fail> {
         unimplemented!()
     }
 }

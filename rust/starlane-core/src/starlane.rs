@@ -1,44 +1,41 @@
 use std::cell::Cell;
-use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
-use std::collections::hash_map::RandomState;
-use std::convert::TryInto;
-use std::future::Future;
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
-use std::str::FromStr;
+
+use std::collections::{HashMap};
+
+
+
+
+
 use std::sync::{Arc, Mutex};
-use std::sync::mpsc::{Receiver, Sender};
+
 use std::time::Duration;
 
-use futures::{FutureExt, StreamExt, TryFutureExt};
-use futures::future::{BoxFuture, join_all};
-use futures::stream::{SplitSink, SplitStream};
+use futures::{FutureExt, StreamExt};
+use futures::future::{join_all};
+
 use serde::{Deserialize, Serialize};
-use tokio::net::{TcpListener, TcpSocket, TcpStream};
+use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, mpsc};
 use tokio::sync::oneshot;
-use tokio::sync::oneshot::error::RecvError;
-use tokio::time::sleep;
 
-use api::SpaceApi;
+
+
+
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::constellation::{Constellation, ConstellationStatus};
 use crate::core::CoreRunner;
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use crate::frame::{ChildManagerResourceAction, Frame, Reply, SimpleReply, StarMessagePayload};
-use crate::lane::{ClientSideTunnelConnector, ConnectionInfo, ConnectionKind, ConnectorController, FrameCodex, LaneEndpoint, LocalTunnelConnector, ProtoLaneEndpoint, ServerSideTunnelConnector};
+
+use crate::lane::{ClientSideTunnelConnector, LocalTunnelConnector, ProtoLaneEndpoint, ServerSideTunnelConnector};
 use crate::logger::{Flags, Logger};
-use crate::message::{Fail, ProtoStarMessage};
+
 use crate::proto::{
     local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoTunnel,
 };
-use crate::resource::{
-    AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype,
-    ResourceCreate, ResourceKind, ResourceRecord,
-};
-use crate::resource::space::SpaceState;
+
+
 use crate::star::{ConstellationBroadcast, StarKind, StarStatus};
 use crate::star::{Request, Star, StarCommand, StarController, StarInfo, StarKey, StarTemplateId};
 use crate::star::variant::{StarVariantFactory, StarVariantFactoryDefault};
@@ -50,7 +47,7 @@ pub mod api;
 
 lazy_static! {
 //    pub static ref DATA_DIR: Mutex<String> = Mutex::new("data".to_string());
-    pub static ref DEFAULT_PORT: usize = { std::env::var("STARLANE_PORT").unwrap_or("4343".to_string()).parse::<usize>().unwrap_or(4343) };
+    pub static ref DEFAULT_PORT: usize = std::env::var("STARLANE_PORT").unwrap_or("4343".to_string()).parse::<usize>().unwrap_or(4343);
 
     pub static ref VERSION: VersionFrame = VersionFrame{ product: "Starlane".to_string(), version: "1.0.0".to_string() };
 }
@@ -67,7 +64,7 @@ impl StarlaneMachine {
     }
 
     pub fn new_with_artifact_caches(name: MachineName, artifact_caches: Option<Arc<ProtoArtifactCachesFactory>>) -> Result<Self,Error> {
-        let mut runner = StarlaneMachineRunner::new_with_artifact_caches(name, artifact_caches )?;
+        let runner = StarlaneMachineRunner::new_with_artifact_caches(name, artifact_caches )?;
         let tx = runner.command_tx.clone();
         let run_complete_signal_tx= runner.run();
         let starlane = Self {
@@ -200,7 +197,7 @@ impl StarlaneMachineRunner {
                         command.tx.send(result);
                     }
                     StarlaneCommand::StarlaneApiSelectBest(tx) => {
-                        let mut map = match self.star_controllers.clone().into_map().await {
+                        let map = match self.star_controllers.clone().into_map().await {
                             Ok(map) => { map }
                             Err(err) => {
                                 tx.send(Err(err));
@@ -211,7 +208,7 @@ impl StarlaneMachineRunner {
                             tx.send(Err("ERROR: cannot create StarlaneApi: no StarControllers available.".into()));
                             continue;
                         }
-                        let values: Vec<StarController> = map.into_iter().map(|(k, v)| v).collect();
+                        let values: Vec<StarController> = map.into_iter().map(|(_k, v)| v).collect();
 
                         let mut best = Option::None;
 
@@ -235,7 +232,7 @@ impl StarlaneMachineRunner {
                             }
                         }
 
-                        let (info, star_ctrl) = best.unwrap();
+                        let (_info, star_ctrl) = best.unwrap();
 
                         tx.send(Ok(StarlaneApi::with_starlane_ctrl(star_ctrl.star_tx, self.command_tx.clone())));
                     }
@@ -267,7 +264,7 @@ impl StarlaneMachineRunner {
                         match self.select_star_kind(&StarKind::Gateway).await {
                             Ok(Option::Some(star_ctrl)) => {
                                 match self.add_server_side_lane_ctrl(star_ctrl, stream).await {
-                                    Ok(result) => {}
+                                    Ok(_result) => {}
                                     Err(error) => {
                                         error!("{}", error);
                                     }
@@ -300,7 +297,7 @@ impl StarlaneMachineRunner {
 
     async fn select_star_kind( &self, kind: &StarKind ) -> Result<Option<StarController>,Error> {
         let map = self.star_controllers.clone().into_map().await?;
-        let values: Vec<StarController> = map.into_iter().map( |(k,v)| v ).collect();
+        let values: Vec<StarController> = map.into_iter().map( |(_k,v)| v ).collect();
 
         for star_ctrl in values {
             let info = star_ctrl.get_star_info().await?.ok_or("expected StarInfo")?;
@@ -324,7 +321,7 @@ impl StarlaneMachineRunner {
 
         let mut constellation = Constellation::new(name.clone());
         let mut evolve_rxs = vec![];
-        let (mut constellation_broadcaster,_) = broadcast::channel(16);
+        let (constellation_broadcaster,_) = broadcast::channel(16);
 
         for star_template in layout.template.stars.clone() {
             constellation.stars.push(star_template.clone());
@@ -335,7 +332,7 @@ impl StarlaneMachineRunner {
             if self.name == *machine {
                 let star_key = star_template.key.create();
 
-                let (mut evolve_tx, mut evolve_rx) = oneshot::channel();
+                let (evolve_tx, evolve_rx) = oneshot::channel();
                 evolve_rxs.push(evolve_rx);
 
                 let (star_tx, star_rx) = mpsc::channel(32);
@@ -354,7 +351,7 @@ impl StarlaneMachineRunner {
                     self.artifact_caches = Option::Some(caches);
                 }
 
-                let (proto_star, star_ctrl) = ProtoStar::new(
+                let (proto_star, _star_ctrl) = ProtoStar::new(
                     star_key.clone(),
                     star_template.kind.clone(),
                     star_tx.clone(),
@@ -501,8 +498,8 @@ impl StarlaneMachineRunner {
 
 
         {
-            let port = self.port.clone();
-            let inner_flags = self.inner_flags.clone();
+            let _port = self.port.clone();
+            let _inner_flags = self.inner_flags.clone();
 
 /*            ctrlc::set_handler( move || {
                 Self::unlisten(inner_flags.clone(), port.clone());
@@ -519,7 +516,7 @@ impl StarlaneMachineRunner {
                 Ok(std_listener) => {
                     let listener = TcpListener::from_std(std_listener).unwrap();
                     result_tx.send(Ok(()) );
-                    while let Ok((mut stream,_)) = listener.accept().await {
+                    while let Ok((stream,_)) = listener.accept().await {
                         {
                             let mut flags = flags.lock().unwrap();
                             let flags = flags.get_mut();
@@ -528,7 +525,7 @@ impl StarlaneMachineRunner {
                                 return;
                             }
                         }
-                        let ok = command_tx.send( StarlaneCommand::AddStream(stream) ).await.is_ok();
+                        let _ok = command_tx.send( StarlaneCommand::AddStream(stream) ).await.is_ok();
                         tokio::time::sleep(Duration::from_secs(0)).await;
                     }
                 }

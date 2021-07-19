@@ -1,15 +1,15 @@
-use std::cell::Cell;
+
 use std::collections::HashSet;
 use std::convert::Infallible;
-use std::fmt;
-use std::fmt::{Display, Formatter};
+
+
 use std::string::FromUtf8Error;
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast, mpsc, oneshot};
-use tokio::sync::broadcast::error::RecvError;
-use tokio::sync::mpsc::Sender;
-use tokio::sync::oneshot::Receiver;
+use tokio::sync::{broadcast, oneshot};
+
+
+
 use uuid::Uuid;
 
 use starlane_resources::ResourceIdentifier;
@@ -18,8 +18,8 @@ use crate::error::Error;
 use crate::frame::{
     Frame, MessageAck, MessagePayload, SimpleReply, StarMessage, StarMessagePayload,
 };
-use crate::id::Id;
-use crate::lane::LaneMeta;
+
+
 use crate::resource::{ResourceAddress, ResourceKind, ResourceType, Specific};
 use crate::star::{StarCommand, StarKey, StarSearchTransaction, Transaction, TransactionResult};
 
@@ -143,7 +143,7 @@ impl MessageReplyTracker {
     pub fn on_message(&self, message: &StarMessage) -> TrackerJob {
         match &message.payload {
             StarMessagePayload::Reply(reply) => match reply {
-                SimpleReply::Ok(reply) => {
+                SimpleReply::Ok(_reply) => {
                     self.tx.send(MessageUpdate::Result(MessageResult::Ok(
                         message.payload.clone(),
                     )));
@@ -398,8 +398,8 @@ impl ToString for Fail {
             Fail::DoNotKnowSpecific(_) => "DoNotKnowSpecific".to_string(),
             Fail::ResourceNotFound(id) => format!("ResourceNotFound({})",id.to_string()).to_string(),
             Fail::WrongResourceType {
-                expected: expected,
-                received: received,
+                expected,
+                received,
             } => format!(
                 "WrongResourceType(expected:[{}],received:{})",
                 hash_to_string(expected),

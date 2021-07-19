@@ -1,12 +1,12 @@
 use std::str::FromStr;
 
-use nom::bytes::complete::{tag, take_until, take_while, take_while1};
-use nom::character::{is_alphabetic, is_alphanumeric};
-use nom::character::complete::{alpha1, alphanumeric0, alphanumeric1};
-use nom::error::{context, VerboseError};
+
+
+
+use nom::error::{VerboseError};
 use nom::IResult;
-use nom::multi::many1;
-use nom::sequence::delimited;
+
+
 
 use starlane_resources::parse_kind;
 

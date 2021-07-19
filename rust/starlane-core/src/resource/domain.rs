@@ -2,12 +2,12 @@ use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
-use nom::branch::alt;
-use nom::character::streaming::{alpha1, alphanumeric1};
-use nom::combinator::recognize;
-use nom::IResult;
-use nom::multi::many0;
-use nom::sequence::pair;
+
+
+
+
+
+
 use serde::{Deserialize, Serialize};
 
 use crate::artifact::ArtifactRef;
@@ -98,7 +98,7 @@ impl DomainConfigParser {
 }
 
 impl Parser<DomainConfig> for DomainConfigParser {
-    fn parse(&self, artifact: ArtifactRef, data: Data) -> Result<Arc<DomainConfig>, Error> {
+    fn parse(&self, artifact: ArtifactRef, _data: Data) -> Result<Arc<DomainConfig>, Error> {
         Ok(Arc::new(DomainConfig {
             artifact: artifact.address,
             routes: HashMap::new(),

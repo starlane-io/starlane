@@ -1,43 +1,43 @@
-use std::collections::{HashMap, HashSet};
-use std::collections::hash_map::RandomState;
-use std::collections::hash_set::Difference;
+use std::collections::{HashMap};
+
+
 use std::convert::TryInto;
-use std::future::Future;
-use std::hash::{Hash, Hasher};
-use std::iter::FromIterator;
+
+use std::hash::{Hasher};
+
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 
 use futures::FutureExt;
-use tokio::fs;
-use tokio::io::{AsyncRead, AsyncReadExt};
-use tokio::runtime::{Handle, Runtime};
+
+use tokio::io::{AsyncReadExt};
+use tokio::runtime::{Handle};
 use tokio::sync::{broadcast, mpsc, oneshot};
-use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::oneshot::Receiver;
+
+
 
 use starlane_resources::ResourceIdentifier;
 
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use crate::logger::{elog, LogInfo, StaticLogInfo};
+
 use crate::message::Fail;
 use crate::resource::{ArtifactBundleAddress, ArtifactBundleIdentifier, Path, ResourceAddress, ResourceArchetype, ResourceKind, ResourceLocation, ResourceRecord, ResourceStub};
-use crate::resource::artifact::ArtifactBundle;
+
 use crate::resource::ArtifactAddress;
-use crate::resource::ArtifactBundleKey;
-use crate::resource::ArtifactBundleKind;
+
+
 use crate::resource::ArtifactKind;
 use crate::resource::config::Parser;
 use crate::resource::domain::{DomainConfig, DomainConfigParser};
-use crate::resource::ResourceKey;
-use crate::resource::RootKey;
-use crate::resource::SpaceKey;
-use crate::resource::SubSpaceKey;
-use crate::star::{StarCommand, StarKey};
+
+
+
+
+
 use crate::starlane::api::StarlaneApi;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
 
@@ -142,7 +142,7 @@ impl ProtoArtifactCaches {
         let mut caches = ArtifactCaches::new();
         let claims = self.claims.into_map().await?;
 
-        for (artifact, claim) in claims {
+        for (artifact, _claim) in claims {
             match artifact.kind {
                 ArtifactKind::DomainConfig => {
                     caches
@@ -385,7 +385,7 @@ println!("fetchED resource record.");
 
     async fn download_and_extract(
         src: ArtifactBundleSrc,
-        mut file_access: FileAccess,
+        file_access: FileAccess,
         bundle: ArtifactBundleAddress,
         logger: AuditLogger,
     ) -> Result<(), Error> {
@@ -824,7 +824,7 @@ impl<C: Cacheable> AsyncProcessor<RootItemCacheCall<C>> for RootItemCacheProc<C>
                     None => {}
                     Some(ref_count) => {
                         ref_count.dec();
-                        if (ref_count.count <= 0) {
+                        if ref_count.count <= 0 {
                             self.map.remove(&artifact);
                         }
                     }
@@ -1009,7 +1009,7 @@ impl AuditLogCollectorProc {
         tx
     }
 
-    pub fn run(mut self) {
+    pub fn run(self) {
         let handle = Handle::current();
 
         let tx = self.tx;

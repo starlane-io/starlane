@@ -1,32 +1,32 @@
 use std::{cmp, fmt};
-use std::borrow::Borrow;
-use std::cell::Cell;
+
+
 use std::cmp::{min, Ordering};
 use std::collections::{HashMap, HashSet};
-use std::collections::hash_map::RandomState;
+
 use std::convert::TryInto;
 use std::fmt::{Debug, Formatter};
-use std::future::Future;
-use std::iter::FromIterator;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU64};
 
-use futures::future::{BoxFuture, join_all, Map};
+use std::iter::FromIterator;
+
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64};
+
+
 use futures::future::select_all;
 use futures::FutureExt;
-use futures::prelude::future::FusedFuture;
+
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
-use serde::de::Unexpected;
+
 use tokio::sync::{broadcast, oneshot};
-use tokio::sync::broadcast::error::{RecvError, SendError};
+
 use tokio::sync::mpsc;
 use tokio::sync::oneshot::Sender;
 use tokio::time::{Duration, Instant, timeout};
-use tokio::time::error::Elapsed;
-use tracing::field::{Field, Visit};
-use url::Url;
+
+
+
 
 use starlane_resources::ResourceIdentifier;
 use variant::StarVariant;
@@ -39,32 +39,32 @@ use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::{
-    ActorLookup, ChildManagerResourceAction, Event, Frame, FromReply, MessagePayload, ProtoFrame,
+    ActorLookup, ChildManagerResourceAction, Event, Frame, MessagePayload, ProtoFrame,
     Reply, ResourceHostAction, SimpleReply, SpaceMessage, StarMessage, StarMessagePayload,
     StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp,
 };
-use crate::frame::WindAction::SearchHits;
-use crate::id::{Id, IdSeq};
+
+use crate::id::{Id};
 use crate::lane::{ConnectionInfo, ConnectorController, LaneCommand, LaneEndpoint, LaneIndex, LaneMeta, LaneWrapper, OutgoingSide, ProtoLaneEndpoint, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{
     Flag, Flags, Log, Logger, LogInfo, ProtoStarLog, ProtoStarLogPayload, StarFlag, StaticLogInfo,
 };
-use crate::message::{Fail, MessageExpect, MessageExpectWait, MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage, ProtoStarMessageTo, StarMessageDeliveryInsurance, TrackerJob};
+use crate::message::{Fail, MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage, ProtoStarMessageTo, StarMessageDeliveryInsurance, TrackerJob};
 use crate::message::resource::{
-    Delivery, Message, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage,
+    Delivery, Message, ResourceRequestMessage, ResourceResponseMessage,
 };
-use crate::permissions::{Authentication, AuthToken, AuthTokenSource, Credentials};
-use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
+use crate::permissions::{AuthToken, AuthTokenSource, Credentials};
+
 use crate::resource::{ActorKey, AddressCreationSrc, AppKey, AssignResourceStateSrc, FieldSelection, HostedResourceStore, KeyCreationSrc, Labels, LocalDataSrc, LocalHostedResource, LocalResourceHost, MemoryDataTransfer, Parent, ParentCore, Registry, RegistryReservation, RegistryUniqueSrc, RemoteResourceManager, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceBinding, ResourceCreate, ResourceHost, ResourceKey, ResourceKind, ResourceLocation, ResourceManager, ResourceManagerKey, ResourceNamesReservationRequest, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector, ResourceStateSrc, ResourceStub, ResourceType, UniqueSrc, UserKey};
-use crate::resource::space::SpaceState;
-use crate::resource::sub_space::SubSpaceState;
-use crate::resource::user::UserState;
+
+
+
 use crate::star::pledge::{ResourceHostSelector, Satisfaction, StarHandle, StarHandleBacking};
 use crate::star::variant::StarShellInstructions;
-use crate::star::variant::web::WebVariant;
+
 use crate::template::StarTemplateHandle;
-use crate::util;
-use crate::util::AsyncHashMap;
+
+
 
 pub mod filestore;
 pub mod pledge;
@@ -702,7 +702,7 @@ if self.skel.core_tx.is_closed() {
         loop {
             let mut futures = vec![];
             let mut lanes = vec![];
-            for (key, mut lane) in &mut self.lanes {
+            for (key, lane) in &mut self.lanes {
                 futures.push(lane.incoming().recv().boxed());
                 lanes.push(key.clone())
             }
@@ -750,7 +750,7 @@ if self.skel.core_tx.is_closed() {
                             set_flags.tx.send(());
                         }
                         StarCommand::AddProtoLaneEndpoint(lane) => {
-                            let result = lane.outgoing.out_tx.try_send( LaneCommand::Frame(Frame::Proto(ProtoFrame::ReportStarKey(self.skel.info.key.clone()))));
+                            let _result = lane.outgoing.out_tx.try_send( LaneCommand::Frame(Frame::Proto(ProtoFrame::ReportStarKey(self.skel.info.key.clone()))));
                             self.proto_lanes.push(LaneWrapper::Proto(LaneMeta::new(lane)));
                         }
                         StarCommand::AddLaneEndpoint(lane) => {
@@ -775,10 +775,10 @@ if self.skel.core_tx.is_closed() {
                             }
                         }
 
-                        StarCommand::AddLogger(tx) => {
+                        StarCommand::AddLogger(_tx) => {
                             //                        self.logger.tx.push(tx);
                         }
-                        StarCommand::Test(test) => {
+                        StarCommand::Test(_test) => {
                             /*                        match test
                                                {
                                                    StarTest::StarSearchForStarKey(star) => {
@@ -1022,7 +1022,7 @@ if self.skel.core_tx.is_closed() {
         match tokio::time::timeout(Duration::from_secs(15), rx).await {
             Ok(result) => match result {
                 Ok(result) => result,
-                Err(err) => Err(Fail::ChannelRecvErr),
+                Err(_err) => Err(Fail::ChannelRecvErr),
             },
             Err(_) => Err(Fail::Timeout),
         }
@@ -1445,7 +1445,7 @@ if self.skel.core_tx.is_closed() {
             .await;
     }
 
-    async fn on_wind_up_hop(&mut self, mut wind_up: WindUp, lane_key: StarKey) {
+    async fn on_wind_up_hop(&mut self, wind_up: WindUp, lane_key: StarKey) {
         if wind_up.pattern.is_match(&self.skel.info) {
             if wind_up.pattern.is_single_match() {
                 let hit = WindHit {
@@ -1554,7 +1554,7 @@ if self.skel.core_tx.is_closed() {
                         .collect();
                     match wind_up.action.update(hits, WindResults::None) {
                         Ok(result) => {
-                            let mut wind_down = WindDown {
+                            let wind_down = WindDown {
                                 missed: None,
                                 hops: wind_up.hops.clone(),
                                 wind_up: wind_up.clone(),
@@ -1642,7 +1642,7 @@ if self.skel.core_tx.is_closed() {
                                 }
                             }
                         }
-                        Err(elapsed) => {
+                        Err(_elapsed) => {
                             delivery.retries = delivery.retries - 1;
                             if delivery.retries == 0 {
                                 if delivery.expect.retry_forever() {
@@ -1709,7 +1709,7 @@ if self.skel.core_tx.is_closed() {
     }
 
     fn lane_with_shortest_path_to_star(&mut self, star: &StarKey) -> Option<&mut LaneWrapper> {
-        let mut min_hops = usize::MAX;
+        let min_hops = usize::MAX;
         let mut rtn = Option::None;
 
         for (_, lane) in &mut self.lanes {
@@ -1787,7 +1787,7 @@ if self.skel.core_tx.is_closed() {
         }
     }*/
 
-    async fn on_wind_down(&mut self, mut search_result: WindDown, lane_key: StarKey) {
+    async fn on_wind_down(&mut self, _search_result: WindDown, _lane_key: StarKey) {
         //        println!("ON STAR SEARCH RESULTS");
     }
     /*
@@ -1923,7 +1923,7 @@ if self.skel.core_tx.is_closed() {
                 }
             },
             Frame::StarMessage(message) => match self.on_message(message).await {
-                Ok(messages) => {}
+                Ok(_messages) => {}
                 Err(error) => {
                     error!("X error: {}", error)
                 }
@@ -1934,7 +1934,7 @@ if self.skel.core_tx.is_closed() {
         }
     }
 
-    async fn on_event(&mut self, event: Event, lane_key: StarKey) {
+    async fn on_event(&mut self, _event: Event, _lane_key: StarKey) {
         unimplemented!()
         /*
         let watches = self.watches.get(&event.actor );
@@ -1984,13 +1984,13 @@ if self.skel.core_tx.is_closed() {
                 watches.insert(watch_info.id.clone(), star_watch);
                 self.watches.insert(watch_info.actor.clone(), watches);
             }
-            Some(mut watches) => {
+            Some(watches) => {
                 watches.insert(watch_info.id.clone(), star_watch);
             }
         }
     }
 
-    async fn forward_watch(&mut self, watch: Watch) {
+    async fn forward_watch(&mut self, _watch: Watch) {
         unimplemented!()
         /*
         let has_entity = match &watch
@@ -2043,7 +2043,7 @@ if self.skel.core_tx.is_closed() {
          */
     }
 
-    async fn on_message(&mut self, mut message: StarMessage) -> Result<(), Error> {
+    async fn on_message(&mut self, message: StarMessage) -> Result<(), Error> {
         if message.log {
 /*            info!(
                 "{} => {} : {}",
@@ -2074,7 +2074,7 @@ if self.skel.core_tx.is_closed() {
 
     async fn process_resource_message(
         &mut self,
-        mut star_message: StarMessage,
+        star_message: StarMessage,
     ) -> Result<(), Error> {
         //println!("process_message---> {}", message.payload.to_string() );
         match &star_message.payload {
@@ -2162,7 +2162,7 @@ if self.skel.core_tx.is_closed() {
                     .await?;
             }
             ResourceRequestMessage::State => {
-                let (action, mut rx) =
+                let (action, rx) =
                     StarCoreAction::new(StarCoreCommand::State(delivery.message.to.clone()));
                 self.skel.core_tx.send(action).await?;
                 tokio::spawn(async move {
@@ -2238,11 +2238,11 @@ if self.skel.core_tx.is_closed() {
                         }
                     }
                 }
-                ChildManagerResourceAction::Status(report) => {
+                ChildManagerResourceAction::Status(_report) => {
                     unimplemented!()
                 }
 
-                ChildManagerResourceAction::Create(create) => {
+                ChildManagerResourceAction::Create(_create) => {
                     unimplemented!();
 /*                    let child_manager = self
                         .get_child_resource_manager(parent )
@@ -2840,9 +2840,9 @@ impl ResourceLocationRequestTransaction {
 impl Transaction for ResourceLocationRequestTransaction {
     async fn on_frame(
         &mut self,
-        frame: &Frame,
-        lane: Option<&mut LaneWrapper>,
-        command_tx: &mut mpsc::Sender<StarCommand>,
+        _frame: &Frame,
+        _lane: Option<&mut LaneWrapper>,
+        _command_tx: &mut mpsc::Sender<StarCommand>,
     ) -> TransactionResult {
         /*
 
@@ -2893,7 +2893,7 @@ impl StarSearchTransaction {
 
     fn collapse(&self) -> HashMap<StarKey, usize> {
         let mut rtn = HashMap::new();
-        for (lane, map) in &self.hits {
+        for (_lane, map) in &self.hits {
             for (star, hops) in map {
                 if rtn.contains_key(star) {
                     if let Some(old) = rtn.get(star) {
@@ -2950,7 +2950,7 @@ impl Transaction for StarSearchTransaction {
         &mut self,
         frame: &Frame,
         lane: Option<&mut LaneWrapper>,
-        command_tx: &mut mpsc::Sender<StarCommand>,
+        _command_tx: &mut mpsc::Sender<StarCommand>,
     ) -> TransactionResult {
         if let Option::None = lane {
             eprintln!("lane is not set for StarSearchTransaction");
@@ -3032,7 +3032,7 @@ pub enum TransactionResult {
 
 #[async_trait]
 pub trait Transaction: Send + Sync {
-    async fn on_lane_closed( &mut self, key: &StarKey ) -> TransactionResult  {
+    async fn on_lane_closed( &mut self, _key: &StarKey ) -> TransactionResult  {
             TransactionResult::Continue
     }
 
@@ -3111,12 +3111,12 @@ impl StarKey {
 
 impl StarKey {
     pub fn bin(&self) -> Result<Vec<u8>, Error> {
-        let mut bin = bincode::serialize(self)?;
+        let bin = bincode::serialize(self)?;
         Ok(bin)
     }
 
-    pub fn from_bin(mut bin: Vec<u8>) -> Result<StarKey, Error> {
-        let mut key = bincode::deserialize::<StarKey>(bin.as_slice())?;
+    pub fn from_bin(bin: Vec<u8>) -> Result<StarKey, Error> {
+        let key = bincode::deserialize::<StarKey>(bin.as_slice())?;
         Ok(key)
     }
 }
@@ -3310,7 +3310,7 @@ impl PublicKeySource {
         PublicKeySource {}
     }
 
-    pub async fn get_public_key_and_hash(&self, star: &StarKey) -> (PublicKey, UniqueHash) {
+    pub async fn get_public_key_and_hash(&self, _star: &StarKey) -> (PublicKey, UniqueHash) {
         (
             PublicKey {
                 id: Default::default(),
@@ -3325,9 +3325,9 @@ impl PublicKeySource {
 
     pub async fn create_encrypted_payloads(
         &self,
-        creds: &Credentials,
-        star: &StarKey,
-        payload: SpaceMessage,
+        _creds: &Credentials,
+        _star: &StarKey,
+        _payload: SpaceMessage,
     ) -> Result<(HashEncrypted<AuthToken>, Encrypted<SpaceMessage>), Error> {
         unimplemented!();
         /*
@@ -3398,10 +3398,10 @@ impl StarComm {
         tokio::spawn(async move {
             let reply = match rx.await {
                 Ok(result) => match result {
-                    Ok(ok) => SimpleReply::Ok(Reply::Empty),
+                    Ok(_ok) => SimpleReply::Ok(Reply::Empty),
                     Err(fail) => SimpleReply::Fail(fail),
                 },
-                Err(err) => SimpleReply::Fail(Fail::ChannelRecvErr),
+                Err(_err) => SimpleReply::Fail(Fail::ChannelRecvErr),
             };
             let proto = message.reply(StarMessagePayload::Reply(reply));
             star_tx.send(StarCommand::SendProtoMessage(proto)).await;
@@ -3418,7 +3418,7 @@ impl StarComm {
                 Ok(result) => match result {
                     Ok(payload) => match payload {
                         StarMessagePayload::Reply(reply) => match reply {
-                            SimpleReply::Ok(reply) => {
+                            SimpleReply::Ok(_reply) => {
                                 tx.send(Result::Ok(()));
                             }
                             SimpleReply::Fail(fail) => {
@@ -3432,11 +3432,11 @@ impl StarComm {
                             tx.send(Result::Err(Fail::expected("StarMessagePayload::Reply(_)")));
                         }
                     },
-                    Err(error) => {
+                    Err(_error) => {
                         tx.send(Result::Err(Fail::expected("Result::Ok(_)")) );
                     }
                 },
-                Err(elapsed) => {
+                Err(_elapsed) => {
                     tx.send(Result::Err(Fail::Timeout));
                 }
             };
@@ -3475,7 +3475,7 @@ impl StarComm {
                         tx.send(Result::Err(Fail::Error(error.to_string())));
                     }
                 },
-                Err(elapsed) => {
+                Err(_elapsed) => {
                     tx.send(Result::Err(Fail::Timeout));
                 }
             };
@@ -3511,7 +3511,7 @@ impl StarComm {
                         star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                     }
                 },
-                Err(err) => {
+                Err(_err) => {
                     let proto =
                         message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Timeout)));
                     star_tx.send(StarCommand::SendProtoMessage(proto)).await;
@@ -3545,7 +3545,7 @@ impl StarComm {
                         star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                     }
                 },
-                Err(fail) => {
+                Err(_fail) => {
                     let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(
                         Fail::expected("Ok(result)"),
                     )));
@@ -3557,7 +3557,7 @@ impl StarComm {
 
     pub async fn reply_result_empty(&self, message: StarMessage, result: Result<(), Fail>) {
         match result {
-            Ok(reply) => {
+            Ok(_reply) => {
                 let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
                 self.star_tx
                     .send(StarCommand::SendProtoMessage(proto))

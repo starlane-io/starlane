@@ -1,10 +1,10 @@
-use std::convert::{Infallible, TryFrom};
+use std::convert::{Infallible};
 use std::env::VarError;
 use std::fmt;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Formatter};
 use std::num::ParseIntError;
 use std::string::FromUtf8Error;
-use std::sync::Arc;
+
 
 use base64::DecodeError;
 use futures::channel::oneshot::Canceled;
@@ -16,7 +16,7 @@ use tokio::sync::mpsc::error::{SendError, TrySendError};
 use tokio::time::error::Elapsed;
 use zip::result::ZipError;
 
-use crate::frame::ProtoFrame;
+
 use crate::message::Fail;
 
 #[derive(Debug, Clone,Eq,PartialEq)]
@@ -187,7 +187,7 @@ impl From<Fail> for Error {
 }
 
 impl From<()> for Error {
-    fn from(e: ()) -> Self {
+    fn from(_e: ()) -> Self {
         Error {
             error: "() Error".to_string(),
         }
@@ -227,7 +227,7 @@ impl From<SemVerError> for Error {
 }
 
 impl From<Error> for rusqlite::Error {
-    fn from(e: Error) -> Self {
+    fn from(_e: Error) -> Self {
         rusqlite::Error::InvalidQuery
     }
 }

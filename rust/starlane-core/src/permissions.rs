@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
-use crate::crypt::{JwtDecoder, PrivateKey};
+use crate::crypt::{JwtDecoder};
 use crate::error::Error;
 use crate::resource::{Labels, ResourceKey, UserKey};
 
@@ -12,7 +12,7 @@ pub struct AuthToken {
 }
 
 impl AuthToken {
-    pub fn decode(&self, decoder: JwtDecoder) -> Authentication {
+    pub fn decode(&self, _decoder: JwtDecoder) -> Authentication {
         unimplemented!();
     }
 }
@@ -136,7 +136,7 @@ impl Priviledges {
     }
 
     pub fn all() -> Self {
-        let mut rtn = Self::new();
+        let rtn = Self::new();
         rtn.hyper
             .union(&HyperSpaceAccess::all().into_iter().collect());
         rtn.space.union(&SpaceAccess::all().into_iter().collect());
@@ -357,7 +357,7 @@ impl AuthTokenSource {
         AuthTokenSource {}
     }
 
-    pub async fn auth(&self, creds: &Credentials) -> Result<AuthToken, Error> {
+    pub async fn auth(&self, _creds: &Credentials) -> Result<AuthToken, Error> {
         unimplemented!()
         /*        Ok(AuthToken{
                    user: User{

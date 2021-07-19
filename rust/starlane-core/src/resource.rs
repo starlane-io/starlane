@@ -3,53 +3,53 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::fs::DirBuilder;
-use std::future::Future;
+
 use std::hash::Hash;
 use std::iter::FromIterator;
-use std::path::PathBuf;
+
 use std::str::FromStr;
-use std::string::FromUtf8Error;
+
 use std::sync::Arc;
 use std::time::Duration;
 
-use base64::DecodeError;
-use bincode::ErrorKind;
-use clap::{App, Arg};
-use rusqlite::{Connection, params, params_from_iter, Row, Rows, Statement, ToSql, Transaction};
+
+
+
+use rusqlite::{Connection, params, params_from_iter, Row, ToSql, Transaction};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 use serde::{Deserialize, Serialize};
-use serde::de::DeserializeOwned;
-use serde_json::to_string;
+
+
 use tokio::sync::{mpsc, oneshot};
-use tokio::sync::oneshot::error::RecvError;
+
 use tokio::sync::oneshot::Receiver;
-use url::Url;
+
 
 use starlane_resources::ResourceIdentifier;
 
-use crate::{error, logger, resource, util};
-use crate::actor::ActorKind;
+use crate::{error, logger, util};
+
 use crate::app::ConfigSrc;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::{
-    ChildManagerResourceAction, MessagePayload, Reply, ResourceHostAction, SimpleReply,
+    ResourceHostAction, SimpleReply,
     StarMessagePayload,
 };
-use crate::id::{Id, IdSeq};
+
 use crate::logger::{elog, LogInfo, StaticLogInfo};
 use crate::message::{Fail, ProtoStarMessage};
 use crate::message::resource::{
-    Message, MessageFrom, MessageReply, MessageTo, ProtoMessage, ResourceRequestMessage,
+    MessageFrom, MessageReply, MessageTo, ProtoMessage, ResourceRequestMessage,
     ResourceResponseMessage,
 };
 use crate::names::Name;
-use crate::permissions::User;
-use crate::resource::space::{Space, SpaceState};
-use crate::resource::sub_space::SubSpaceState;
-use crate::resource::user::UserState;
+
+
+
+
 use crate::star::{
-    ResourceRegistryBacking, StarComm, StarCommand, StarInfo, StarKey, StarKind, StarSkel,
+    ResourceRegistryBacking, StarComm, StarCommand, StarInfo, StarKey, StarSkel,
 };
 use crate::star::pledge::{ResourceHostSelector, StarHandle};
 use crate::starlane::api::StarlaneApi;
@@ -187,7 +187,7 @@ pub struct LabelSelector {
 
 impl ResourceSelector{
     pub fn new() -> Self{
-        let mut fields = HashSet::new();
+        let fields = HashSet::new();
         ResourceSelector {
             meta: MetaSelector::None,
             fields: fields
@@ -237,7 +237,7 @@ impl ResourceSelector{
                 self.meta = MetaSelector::Name(name.clone());
                 Ok(())
             }
-            MetaSelector::Label(selector) => {
+            MetaSelector::Label(_selector) => {
                 Err("Selector is already set to a LABEL meta selector".into())
             }
         }
@@ -290,7 +290,7 @@ pub enum FieldSelection {
 }
 
 impl FieldSelection {
-    pub async fn to_keyed(mut self, starlane_api: &StarlaneApi ) -> Result<FieldSelection,Error> {
+    pub async fn to_keyed(self, starlane_api: &StarlaneApi ) -> Result<FieldSelection,Error> {
         match self{
             FieldSelection::Identifier(id) => {
                 Ok(FieldSelection::Identifier(starlane_api.to_key(id).await?.into()))
@@ -764,7 +764,7 @@ impl Registry {
                     }
                     MetaSelector::Label(label_selector) => {
                         let mut labels = String::new();
-                        for (index, label_selection) in
+                        for (_index, label_selection) in
                             Vec::from_iter(label_selector.labels.clone())
                                 .iter()
                                 .map(|x| x.clone())
@@ -816,7 +816,7 @@ impl Registry {
             ResourceRegistryCommand::SetLocation(location_record) => {
                 let key = location_record.stub.key.bin()?;
                 let host = location_record.location.host.bin()?;
-               let mut trans = self.conn.transaction()?;
+               let trans = self.conn.transaction()?;
                 trans.execute(
                     "UPDATE resources SET host=?1 WHERE key=?3",
                     params![host, key],
@@ -826,7 +826,7 @@ impl Registry {
             }
             ResourceRegistryCommand::Get(identifier) => {
 
-                if( identifier.resource_type() == ResourceType::Root ) {
+                if identifier.resource_type() == ResourceType::Root {
                     return Ok(ResourceRegistryResult::Resource(Option::Some(ResourceRecord::root())));
                 }
 
@@ -946,7 +946,7 @@ impl Registry {
             }
 
             ResourceRegistryCommand::Next { key, unique } => {
-                let mut trans = self.conn.transaction()?;
+                let trans = self.conn.transaction()?;
                 let key = key.bin()?;
                 let column = match unique {
                     Unique::Sequence => "sequence",
@@ -1257,7 +1257,7 @@ impl RemoteResourceManager {
 
 #[async_trait]
 impl ResourceManager for RemoteResourceManager {
-    async fn create(&self, create: ResourceCreate) -> Receiver<Result<ResourceRecord, Fail>> {
+    async fn create(&self, _create: ResourceCreate) -> Receiver<Result<ResourceRecord, Fail>> {
         unimplemented!();
     }
 }
@@ -1305,7 +1305,7 @@ impl Parent {
             })
             .await
         {
-            let mut rx =
+            let rx =
                 ResourceCreationChamber::new(core.stub.clone(), create.clone(), core.skel.clone())
                     .await;
 
@@ -1338,13 +1338,13 @@ impl Parent {
         rx: oneshot::Receiver<Result<ResourceAssign<AssignResourceStateSrc>, Fail>>,
     ) -> Result<ResourceRecord, Fail> {
         let assign = rx.await??;
-        let mut host = core
+        let host = core
             .selector
             .select(create.archetype.kind.resource_type())
             .await?;
         let record = ResourceRecord::new(assign.stub.clone(), host.star_key());
         host.assign(assign).await?;
-        let (commit_tx, commit_rx) = oneshot::channel();
+        let (commit_tx, _commit_rx) = oneshot::channel();
         reservation.commit(record.clone(), commit_tx)?;
         Ok(record)
     }
@@ -1545,7 +1545,7 @@ impl ResourceCreationChamber {
                 }
             }
 
-            let key = match &self.create.key {
+            let _key = match &self.create.key {
                 KeyCreationSrc::None => {
                     let mut proto = ProtoMessage::new();
                     proto.to(MessageTo::from(self.parent.key.clone()));
@@ -1554,7 +1554,7 @@ impl ResourceCreationChamber {
                         self.create.archetype.kind.resource_type(),
                     ));
 
-                    let mut rx: Receiver<Result<MessageReply<ResourceResponseMessage>, Fail>> =
+                    let rx: Receiver<Result<MessageReply<ResourceResponseMessage>, Fail>> =
                         proto.reply();
 
                     let proto_star_message = match proto.to_proto_star_message().await {
@@ -1579,8 +1579,8 @@ impl ResourceCreationChamber {
                             from: _,
                             reply_to: _,
                             payload: ResourceResponseMessage::Unique(id),
-                            trace,
-                            log,
+                            trace: _,
+                            log: _,
                         })) = util::wait_for_it_whatever(rx).await
                         {
                             match ResourceKey::new(self.parent.key.clone(), id.clone()) {
@@ -1589,7 +1589,7 @@ impl ResourceCreationChamber {
                                     self.tx.send(final_create);
                                     return;
                                 }
-                                Err(error) => {
+                                Err(_error) => {
                                     self.tx.send(Err(format!(
                                         "error when trying to create resource key with id {}",
                                         id.to_string()
@@ -2646,7 +2646,7 @@ impl ResourceHost for LocalResourceHost {
         self.skel.info.key.clone()
     }
 
-    async fn assign(&self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<(), Fail> {
+    async fn assign(&self, _assign: ResourceAssign<AssignResourceStateSrc>) -> Result<(), Fail> {
         unimplemented!()
     }
 }
@@ -2690,16 +2690,16 @@ impl ResourceHost for RemoteResourceHost {
                     Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(_))) => {
                         Ok(())
                     }
-                    Result::Ok(what) => {
+                    Result::Ok(_what) => {
                         Err(Fail::expected("Ok(StarMessagePayload::Reply(SimpleReply::Ok(_)))"))
                     }
-                    Result::Err(err) => {
+                    Result::Err(_err) => {
                         Err(Fail::expected("Ok(StarMessagePayload::Reply(SimpleReply::Ok(_)))"))
                     }
                 }
 
             }
-            Err(err) => Err(Fail::Timeout)
+            Err(_err) => Err(Fail::Timeout)
         }
     }
 }
@@ -2788,7 +2788,7 @@ where
                 let data = self.data_transfer.as_ref().unwrap().get().await?;
                 let s = match S::try_from(data) {
                     Ok(s) => s,
-                    Err(err) => return Err("could not convert to data".into()),
+                    Err(_err) => return Err("could not convert to data".into()),
                 };
                 let s = Arc::new(s);
                 self.data = Option::Some(s.clone());

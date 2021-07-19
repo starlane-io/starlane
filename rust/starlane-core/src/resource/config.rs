@@ -3,8 +3,8 @@ use std::sync::Arc;
 use crate::artifact::ArtifactRef;
 use crate::cache::{Cacheable, Data};
 use crate::error::Error;
-use crate::resource::{ResourceKind, ResourceType};
-use crate::resource::ArtifactAddress;
+use crate::resource::{ResourceKind};
+
 
 pub trait ResourceConfig {
     fn kind(&self) -> ResourceKind;

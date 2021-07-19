@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::convert::{TryFrom, TryInto};
+
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::fs;
@@ -8,8 +8,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use rusqlite::Connection;
-use tokio::sync::{mpsc, Mutex};
+
+use tokio::sync::{Mutex};
 
 use starlane_resources::ResourceIdentifier;
 
@@ -26,7 +26,7 @@ use crate::resource::{
 };
 use crate::resource::ResourceKey;
 use crate::resource::store::{
-    ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult,
+    ResourceStore,
 };
 use crate::star::StarSkel;
 use crate::util;
@@ -46,7 +46,7 @@ impl Debug for FileStoreHost {
 
 impl FileStoreHost {
     pub async fn new(skel: StarSkel, file_access: FileAccess) -> Result<Self, Error> {
-        let mut file_access = file_access.with_path("filesystems".to_string())?;
+        let file_access = file_access.with_path("filesystems".to_string())?;
         let rtn = FileStoreHost {
             skel: skel,
             file_access: file_access,
@@ -107,7 +107,7 @@ impl FileStoreHost {
         let mutex = self.mutex.clone();
         tokio::spawn(async move {
             while let Option::Some(event) = event_rx.recv().await {
-                let lock = mutex.lock().await;
+                let _lock = mutex.lock().await;
                 match Self::handle_event(
                     root_path.clone(),
                     event.clone(),
@@ -203,7 +203,7 @@ impl FileStoreHost {
 
         let rx = ResourceCreationChamber::new(filesystem, create, skel.clone()).await;
 
-        let x = util::wait_for_it_whatever(rx).await??;
+        let _x = util::wait_for_it_whatever(rx).await??;
         Ok(())
     }
 }
@@ -241,7 +241,7 @@ impl Host for FileStoreHost {
                             assign.stub.address.last_to_string()
                         );
 
-                        let lock = self.mutex.lock().await;
+                        let _lock = self.mutex.lock().await;
                         self.file_access
                             .write(&Path::from_str(path.as_str())?, data)
                             .await?;
@@ -312,7 +312,7 @@ impl Host for FileStoreHost {
         }
     }
 
-    async fn delete(&self, identifier: ResourceIdentifier) -> Result<(), Fail> {
+    async fn delete(&self, _identifier: ResourceIdentifier) -> Result<(), Fail> {
         unimplemented!()
     }
 }

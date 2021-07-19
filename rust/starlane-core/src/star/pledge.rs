@@ -7,13 +7,13 @@ use futures::TryFutureExt;
 use rusqlite::{Connection, params, params_from_iter, ToSql};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 use tokio::sync::{mpsc, oneshot};
-use tokio::sync::oneshot::error::RecvError;
+
 use tokio::time::Duration;
-use tokio::time::error::Elapsed;
+
 
 use crate::error::Error;
-use crate::frame::{Reply, ResourceHostAction, SimpleReply, StarMessagePayload};
-use crate::message::{Fail, ProtoStarMessage};
+
+use crate::message::{Fail};
 use crate::resource::{
     RemoteResourceHost, ResourceAssign, ResourceHost, ResourceLocationAffinity, ResourceType,
 };
@@ -51,7 +51,7 @@ impl StarHandleBacking {
             StarHandleResult::StarHandles(handles) => {
                 Ok(handles)
             }
-            what => {
+            _what => {
                 Err(Fail::expected("StarHandleResult::StarHandles(handles)"))
             }
         }
@@ -65,7 +65,7 @@ impl StarHandleBacking {
             StarHandleResult::StarHandle(handle) => {
                 Ok(handle)
             }
-            what => {
+            _what => {
                 Err(Fail::expected("StarHandleResult::StarHandle(handle)"))
             }
         }
@@ -80,7 +80,7 @@ impl StarHandleBacking {
             StarHandleResult::Satisfaction(satisfaction) => {
                 Ok(satisfaction)
             }
-            what => {
+            _what => {
                 Err(Fail::expected("StarHandleResult::Satisfaction(_)"))
             }
         }
@@ -298,7 +298,7 @@ impl StarHandleDb {
                 let key = handle.key.bin()?;
                 let kind = handle.kind.to_string();
 
-                let mut trans = self.conn.transaction()?;
+                let trans = self.conn.transaction()?;
                 if handle.hops.is_some() {
                     trans.execute(
                         "REPLACE INTO stars (key,kind,hops) VALUES (?1,?2,?3)",
@@ -329,7 +329,7 @@ impl StarHandleDb {
                     }
 
                     let f = match &field {
-                        StarFieldSelection::Kind(kind) => {
+                        StarFieldSelection::Kind(_kind) => {
                             format!("kind=?{}", index + 1)
                         }
                         StarFieldSelection::MinHops => {
@@ -397,7 +397,7 @@ impl StarHandleDb {
                     }
 
                     let f = match &field {
-                        StarFieldSelection::Kind(kind) => {
+                        StarFieldSelection::Kind(_kind) => {
                             format!("kind=?{}", index + 1)
                         }
                         StarFieldSelection::MinHops => {

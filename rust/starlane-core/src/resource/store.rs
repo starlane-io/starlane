@@ -1,8 +1,8 @@
-use std::convert::TryInto;
+
 use std::str::FromStr;
 use std::sync::Arc;
 
-use rusqlite::{Connection, params, Row, Transaction};
+use rusqlite::{Connection, params, Row};
 use rusqlite::types::ValueRef;
 use tokio::sync::{mpsc, oneshot};
 
@@ -10,7 +10,7 @@ use starlane_resources::{ResourceIdentifier, ResourceStatePersistenceManager};
 
 use crate::app::ConfigSrc;
 use crate::error::Error;
-use crate::file_access::FileAccess;
+
 use crate::message::Fail;
 use crate::resource::{DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceKey, ResourceKind, Specific};
 
@@ -199,7 +199,7 @@ impl ResourceStoreSqlLite {
             }
             ResourceStoreCommand::Get(identifier) => {
                 let statement = match &identifier {
-                    ResourceIdentifier::Key(key) => {
+                    ResourceIdentifier::Key(_key) => {
                         "SELECT key,address,state_src,kind,specific,config_src FROM resources WHERE key=?1"
                     }
                     ResourceIdentifier::Address(_) => {
