@@ -5,12 +5,12 @@ use std::sync::Arc;
 
 use nom::{AsChar, InputTakeAtPosition, IResult};
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take, take_until, take_while};
+use nom::bytes::complete::{tag, take};
 use nom::character::complete::{alpha0, alpha1, anychar, digit0, digit1, one_of};
-use nom::character::is_digit;
-use nom::combinator::{eof, not, opt};
-use nom::error::{context, ErrorKind, ParseError, VerboseError};
-use nom::multi::{many0, many1, many_m_n, separated_list1};
+
+use nom::combinator::{not, opt};
+use nom::error::{context, ErrorKind, VerboseError};
+use nom::multi::{many1, many_m_n, separated_list1};
 use nom::sequence::{delimited, preceded, terminated, tuple};
 use serde::Deserialize;
 use serde::Serialize;
@@ -169,7 +169,7 @@ impl FromStr for ResourceAddressKind{
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let path = ResourcePath::from_str(s)?;
-        let (leftover,(_,kind)) = parse_path(s)?;
+        let (_leftover,(_,kind)) = parse_path(s)?;
         Ok(Self{
             path: path,
             kind: kind.try_into()?
@@ -339,7 +339,7 @@ fn version_major_minor_patch(input: &str) -> Res<&str, (usize,usize,usize)> {
             terminated(digit1, not(digit1)),
         )),
     )(input)
-        .map(|(next_input, mut res)| (next_input, (res.0.parse().unwrap(), res.1.parse().unwrap(), res.2.parse().unwrap())))
+        .map(|(next_input, res)| (next_input, (res.0.parse().unwrap(), res.1.parse().unwrap(), res.2.parse().unwrap())))
 }
 
 fn version(input: &str) -> Res<&str, Version> {
@@ -426,14 +426,14 @@ pub fn parse_kind(input: &str) -> Res<&str, ResourceKindParts> {
     } )
 }
 
-pub fn parse_key(input: &str) -> Res<&str, (Vec<ResourcePathSegment>)> {
+pub fn parse_key(input: &str) -> Res<&str, Vec<ResourcePathSegment>> {
     context(
         "key",
         separated_list1( nom::character::complete::char(':'), alt( (path_part,version_part,domain_part,skewer_part) ) )
     )(input)
 }
 
-pub fn parse_resource_path(input: &str) -> Res<&str, (Vec<ResourcePathSegment>)> {
+pub fn parse_resource_path(input: &str) -> Res<&str, Vec<ResourcePathSegment>> {
     context(
         "address-path",
         separated_list1( nom::character::complete::char(':'), alt( (path_part,version_part,domain_part,skewer_part) ) )
@@ -729,7 +729,7 @@ pub struct ParentAddressPatternRecognizer<T> {
 
 
 impl <T> ParentAddressPatternRecognizer<T> {
-    pub fn try_from( &self, pattern: &AddressPattern ) -> Result<T,Error>{
+    pub fn try_from( &self, _pattern: &AddressPattern ) -> Result<T,Error>{
         unimplemented!()
 //        self.patterns.get(pattern ).cloned().ok_or(Error{message:"Could not find a match for ParentAddressPatternRecognizer".to_string()})
     }
@@ -805,7 +805,7 @@ impl Path {
     }
 
     pub fn bin(&self) -> Result<Vec<u8>, Error> {
-        let mut bin = bincode::serialize(self)?;
+        let bin = bincode::serialize(self)?;
         Ok(bin)
     }
 
@@ -973,7 +973,7 @@ mod tests {
     use std::str::FromStr;
 
     use crate::{domain, DomainCase, KeyBits, parse_resource_path, path, ResourceAddress, ResourceAddressKind, ResourcePathSegment, SkewerCase, Specific, version};
-    use crate::{AppKey, DatabaseKey, DatabaseKind, DatabasePath, ResourceKey, ResourceKind, ResourcePath, ResourceType, RootKey, SpaceKey, SubSpaceKey};
+    use crate::{AppKey, DatabaseKey, DatabaseKind, ResourceKey, ResourceKind, ResourcePath, ResourceType, RootKey, SpaceKey, SubSpaceKey};
     use crate::error::Error;
 
     #[test]
