@@ -126,7 +126,7 @@ impl StarKind {
         }
     }
 
-    pub fn handles(&self) -> HashSet<StarKind> {
+    pub fn distributes_to(&self) -> HashSet<StarKind> {
         HashSet::from_iter(
             match self {
                 StarKind::Central => vec![StarKind::SpaceHost],
@@ -179,7 +179,55 @@ impl StarKind {
             .cloned(),
         )
     }
-    pub fn hosted_by(rt: &ResourceType) -> StarKind {
+
+    pub fn provisions(rt: &ResourceType) -> StarKind {
+        match rt {
+            ResourceType::Root => {
+                Self::Central
+            }
+            ResourceType::Space => {
+                Self::Central
+            }
+            ResourceType::SubSpace => {
+                Self::SpaceHost
+            }
+            ResourceType::User => {
+                Self::SpaceHost
+            }
+            ResourceType::App => {
+                Self::SpaceHost
+            }
+            ResourceType::Actor => {
+                Self::AppHost
+            }
+            ResourceType::FileSystem => {
+                Self::SpaceHost
+            }
+            ResourceType::File => {
+                Self::SpaceHost
+            }
+            ResourceType::Database => {
+                Self::Kube
+            }
+            ResourceType::ArtifactBundleVersions => {
+                Self::ArtifactStore
+            }
+            ResourceType::ArtifactBundle => {
+                Self::ArtifactStore
+            }
+            ResourceType::Artifact => {
+                Self::ArtifactStore
+            }
+            ResourceType::Proxy => {
+                Self::SpaceHost
+            }
+            ResourceType::Domain => {
+                Self::SpaceHost
+            }
+        }
+    }
+
+    pub fn hosts(rt: &ResourceType) -> StarKind {
         match rt {
 
             ResourceType::Root =>{
@@ -230,7 +278,7 @@ impl StarKind {
 
 
 
-    pub fn hosts(&self) -> HashSet<ResourceType> {
+    pub fn hosted(&self) -> HashSet<ResourceType> {
         HashSet::from_iter(
             match self {
                 StarKind::Central => vec![ResourceType::Root],
@@ -929,7 +977,7 @@ if self.skel.core_tx.is_closed() {
         }
 
         if let Option::Some(star_handler) = &self.skel.star_handler {
-            for kind in self.skel.info.kind.handles() {
+            for kind in self.skel.info.kind.distributes_to() {
                 let (search, rx) =
                     Wind::new(StarPattern::StarKind(kind.clone()), WindAction::SearchHits);
                 self.skel.star_tx.send(StarCommand::WindInit(search)).await;
@@ -982,7 +1030,7 @@ if self.skel.core_tx.is_closed() {
     async fn check_status(&mut self) {
         if self.status == StarStatus::Pending {
             if let Option::Some(star_handler) = &self.skel.star_handler {
-                let satisfied = star_handler.satisfied(self.skel.info.kind.handles()).await;
+                let satisfied = star_handler.satisfied(self.skel.info.kind.distributes_to()).await;
                 if let Result::Ok(Satisfaction::Ok) = satisfied {
                     self.set_status(StarStatus::Initializing);
                     let (tx, rx) = oneshot::channel();
@@ -1034,6 +1082,7 @@ if self.skel.core_tx.is_closed() {
         &mut self,
         request: Request<ResourceIdentifier, ResourceRecord>,
     ) {
+println!("locate_resource_record request for : {}", self.skel.info.kind.to_string() );
         if request.log {
             self.log(
                 LogId(request.payload.to_string()),
@@ -1055,7 +1104,7 @@ if self.skel.core_tx.is_closed() {
                 .tx
                 .send(Ok(self.get_resource_record(&request.payload).unwrap()));
             return;
-        } else if StarKind::hosted_by(&request
+        } else if StarKind::provisions(&request
             .payload
             .resource_type()) ==
             self.skel.info.kind
@@ -2476,7 +2525,7 @@ if self.skel.core_tx.is_closed() {
             Diagnose::HandlersSatisfied(satisfied) => {
                 if let Option::Some(star_handler) = &self.skel.star_handler {
                     if let Result::Ok(satisfaction) =
-                        star_handler.satisfied(self.skel.info.kind.handles()).await
+                        star_handler.satisfied(self.skel.info.kind.distributes_to()).await
                     {
                         satisfied.tx.send(satisfaction);
                     } else {
@@ -3718,11 +3767,15 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
     }
 
     async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<ResourceRecord>, Fail> {
+println!("getting : {}",identifier.to_string()  );
         let (request, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Get(identifier));
         self.registry.send(request).await;
         //match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
         match Self::timeout( rx).await? {
-            ResourceRegistryResult::Resource(resource) => Ok(resource),
+            ResourceRegistryResult::Resource(resource) => {
+println!("returning resource...{}",resource.is_some());
+                Ok(resource)
+            },
             _ => Err(Fail::expected("ResourceRegistryResult::Resource(_)")),
         }
     }

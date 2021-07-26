@@ -204,7 +204,7 @@ impl ProtoStar {
                             };
 
                         let star_handler: Option<StarHandleBacking> =
-                            if !info.kind.handles().is_empty() {
+                            if !info.kind.distributes_to().is_empty() {
                                 Option::Some(StarHandleBacking::new(self.star_tx.clone()).await)
                             } else {
                                 Option::None

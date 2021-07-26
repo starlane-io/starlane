@@ -71,13 +71,16 @@ println!("ensuring hyperspace.");
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         let space_api = creation.submit().await?;
 println!("hyperspace ensured.");
-        let mut creation = space_api.create_user("hyperuser@starlane.io")?;
-        creation.set_strategy(ResourceCreateStrategy::Ensure);
-        creation.submit().await?;
 
         let mut creation = space_api.create_sub_space("starlane")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
+println!("subspace ensured.");
+
+        let mut creation = space_api.create_user("hyperuser@starlane.io")?;
+        creation.set_strategy(ResourceCreateStrategy::Ensure);
+        creation.submit().await?;
+println!("hyperuser ensured.");
 
         let mut creation = space_api.create_domain("localhost")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);

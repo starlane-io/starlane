@@ -98,7 +98,7 @@ impl ResourceHostSelector {
     }
 
     pub async fn select(&self, resource_type: ResourceType) -> Result<Arc<dyn ResourceHost>, Fail> {
-        if StarKind::hosted_by(&resource_type) == self.skel.info.kind {
+        if StarKind::hosts(&resource_type) == self.skel.info.kind {
             let handle = StarHandle {
                 key: self.skel.info.key.clone(),
                 kind: self.skel.info.kind.clone(),
@@ -115,7 +115,7 @@ impl ResourceHostSelector {
                 self.skel.info.kind.to_string()
             ))?;
             let mut selector = StarSelector::new();
-            selector.add(StarFieldSelection::Kind(StarKind::hosted_by(&resource_type)));
+            selector.add(StarFieldSelection::Kind(StarKind::hosts(&resource_type)));
             let handle = handler.next(selector).await?;
 
             let host = RemoteResourceHost {

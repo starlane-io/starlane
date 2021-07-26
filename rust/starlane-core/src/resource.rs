@@ -682,6 +682,8 @@ impl Registry {
 
             ResourceRegistryCommand::Commit(registration) => {
                 let params = RegistryParams::from_registration(registration.clone())?;
+println!("COMMIT address: {} ",params.address.clone().unwrap().to_string());
+println!("and key : {} ",ResourceKey::from_bin(params.key.clone().unwrap())?.to_string());
 
                 let trans = self.conn.transaction()?;
 
@@ -1623,17 +1625,24 @@ impl ResourceCreationChamber {
     ) -> Result<ResourceAssign<AssignResourceStateSrc>, Fail> {
         let address = match &self.create.address {
             AddressCreationSrc::None => {
-                let address = format!(
+                let mut address = format!(
                     "{}:{}",
                     self.parent.address.to_parts_string(),
                     key.generate_address_tail()
                 );
-println!("A: {}", address );
+                address.push_str("<");
+                address.push_str(key.resource_type().to_string().as_str());
+                address.push_str(">");
+
+println!("1 Address: {}", address );
                 ResourceAddress::from_str(address.as_str() )?
             }
             AddressCreationSrc::Append(tail) => {
-                let address = format!("{}:{}",self.parent.address.to_parts_string(),tail );
-println!("A: {}", address );
+                let mut address = format!("{}:{}",self.parent.address.to_parts_string(),tail );
+                address.push_str("<");
+                address.push_str(key.resource_type().to_string().as_str());
+                address.push_str(">");
+println!("2 Address: {}", address );
                 ResourceAddress::from_str(address.as_str())?
             }
             AddressCreationSrc::Appends(tails) => {
@@ -1646,16 +1655,14 @@ println!("A: {}", address );
                 address.push_str("<");
                 address.push_str(key.resource_type().to_string().as_str());
                 address.push_str(">");
-println!("A: {}", address );
+println!("Address: {}", address );
 
                 ResourceAddress::from_str(address.as_str())?
             }
             AddressCreationSrc::Space(space_name) => {
-println!("SPACE: {}", space_name);
-
                 if self.parent.key.resource_type() != ResourceType::Root {
                     return Err(format!(
-                        "Space creation can only be used at top level (Nothing) not by {}",
+                        "Space creation can only be used at top level (Root) not by {}",
                         self.parent.key.resource_type().to_string()
                     )
                     .into());
@@ -2673,11 +2680,11 @@ impl ResourceHost for RemoteResourceHost {
         if !self
             .handle
             .kind
-            .hosts()
+            .hosted()
             .contains(&assign.stub.key.resource_type())
         {
             return Err(Fail::WrongResourceType {
-                expected: self.handle.kind.hosts().clone(),
+                expected: self.handle.kind.hosted().clone(),
                 received: assign.stub.key.resource_type().clone(),
             });
         }
