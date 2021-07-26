@@ -1589,9 +1589,9 @@ impl ResourceCreationChamber {
                                     self.tx.send(final_create);
                                     return;
                                 }
-                                Err(_error) => {
+                                Err(error) => {
                                     self.tx.send(Err(format!(
-                                        "error when trying to create resource key with id {}",
+                                        "error '{}' when trying to create resource key with id {}", error.to_string(),
                                         id.to_string()
                                     )
                                     .into()));
@@ -1628,10 +1628,13 @@ impl ResourceCreationChamber {
                     self.parent.address.to_parts_string(),
                     key.generate_address_tail()
                 );
+println!("A: {}", address );
                 ResourceAddress::from_str(address.as_str() )?
             }
             AddressCreationSrc::Append(tail) => {
-                ResourceAddress::from_str(format!("{}:{}",self.parent.address.to_parts_string(),tail ).as_str())?
+                let address = format!("{}:{}",self.parent.address.to_parts_string(),tail );
+println!("A: {}", address );
+                ResourceAddress::from_str(address.as_str())?
             }
             AddressCreationSrc::Appends(tails) => {
                 let mut address = self.parent.address.to_parts_string();
@@ -1643,10 +1646,13 @@ impl ResourceCreationChamber {
                 address.push_str("<");
                 address.push_str(key.resource_type().to_string().as_str());
                 address.push_str(">");
+println!("A: {}", address );
 
                 ResourceAddress::from_str(address.as_str())?
             }
             AddressCreationSrc::Space(space_name) => {
+println!("SPACE: {}", space_name);
+
                 if self.parent.key.resource_type() != ResourceType::Root {
                     return Err(format!(
                         "Space creation can only be used at top level (Nothing) not by {}",
@@ -1654,7 +1660,8 @@ impl ResourceCreationChamber {
                     )
                     .into());
                 }
-                ResourceAddress::from_str(space_name.as_str())?
+                let address = format!("{}<Space>",space_name );
+                ResourceAddress::from_str(address.as_str())?
             }
 
             AddressCreationSrc::Exact(address) => {

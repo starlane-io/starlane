@@ -107,6 +107,7 @@ impl FromStr for ResourceAddress{
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+println!("ADDRESS: {}",s);
         Ok(ResourcePath::from_str(s)?.into())
     }
 }

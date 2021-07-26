@@ -8,10 +8,7 @@ use tokio::sync::oneshot;
 
 use crate::error::Error;
 
-use crate::resource::{
-    create_args, ResourceAddress, ResourceArchetype, ResourceCreateStrategy, ResourceKind,
-    ResourceLocation, ResourceRecord, ResourceRegistration, ResourceStub
-};
+use crate::resource::{create_args, ResourceAddress, ResourceArchetype, ResourceCreateStrategy, ResourceKind, ResourceLocation, ResourceRecord, ResourceRegistration, ResourceStub, ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceStateSrc, AssignResourceStateSrc};
 use crate::resource::ResourceKey;
 use crate::star::{StarKey, StarSkel};
 use crate::star::variant::{StarVariant};
@@ -51,7 +48,6 @@ impl StarVariant for CentralVariant {
             info: None,
         };
 
-
         let skel = self.skel.clone();
 
          tokio::spawn( async move {
@@ -69,10 +65,12 @@ impl StarVariant for CentralVariant {
 
 impl CentralVariant {
     async fn ensure(starlane_api: StarlaneApi) -> Result<(), Error> {
+
+println!("ensuring hyperspace.");
         let mut creation = starlane_api.create_space("hyperspace", "Hyper Space")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         let space_api = creation.submit().await?;
-
+println!("hyperspace ensured.");
         let mut creation = space_api.create_user("hyperuser@starlane.io")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;

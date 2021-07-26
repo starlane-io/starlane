@@ -250,7 +250,7 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         impl ResourceType {
             pub fn to_resource_id( &self, id: u64 ) -> ResourceId {
                 match self {
-                    Root => ResourceId::Root,
+                    Self::Root => ResourceId::Root,
                     #(Self::#rts => ResourceId::#rts(id as _)),*
                 }
             }
