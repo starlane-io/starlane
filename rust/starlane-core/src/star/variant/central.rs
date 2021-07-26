@@ -77,14 +77,18 @@ println!("hyperspace ensured.");
         creation.submit().await?;
 println!("subspace ensured.");
 
+        /*
         let mut creation = space_api.create_user("hyperuser@starlane.io")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
 println!("hyperuser ensured.");
 
+         */
+
         let mut creation = space_api.create_domain("localhost")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
+println!("localhost ensured.");
 
         let init_args = Arc::new(create_args::create_init_args_artifact_bundle()?);
         let creation = starlane_api.create_artifact_bundle(&create_args::artifact_bundle_address(), init_args ).await?;
