@@ -10,7 +10,7 @@ use nom::character::complete::{alpha0, alpha1, anychar, digit0, digit1, one_of};
 
 use nom::combinator::{not, opt};
 use nom::error::{context, ErrorKind, VerboseError};
-use nom::multi::{many1, many_m_n, separated_list1};
+use nom::multi::{many1, many_m_n, separated_list1, separated_list0};
 use nom::sequence::{delimited, preceded, terminated, tuple};
 use serde::Deserialize;
 use serde::Serialize;
@@ -436,7 +436,7 @@ pub fn parse_key(input: &str) -> Res<&str, Vec<ResourcePathSegment>> {
 pub fn parse_resource_path(input: &str) -> Res<&str, Vec<ResourcePathSegment>> {
     context(
         "address-path",
-        separated_list1( nom::character::complete::char(':'), alt( (path_part,version_part,domain_part,skewer_part) ) )
+        separated_list0( nom::character::complete::char(':'), alt( (path_part,version_part,domain_part,skewer_part) ) )
     )(input)
 }
 

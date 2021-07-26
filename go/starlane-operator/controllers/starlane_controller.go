@@ -189,7 +189,7 @@ func (r *StarlaneReconciler) deploymentForStarlane(m *starlanev1alpha1.Starlane)
 						Args:  []string{"serve", "--with-external"},
 						Env: []corev1.EnvVar{
 							{Name: "STARLANE_KUBERNETES_INSTANCE_NAME", Value: m.Name},
-							{Name: "NAMESPACE", Value: m.Namespace },
+							{Name: "NAMESPACE", Value: m.Namespace},
 						},
 						Ports: []corev1.ContainerPort{{
 							ContainerPort: 4343,

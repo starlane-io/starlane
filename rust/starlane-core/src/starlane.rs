@@ -91,6 +91,7 @@ impl StarlaneMachine {
 
 
     pub async fn create_constellation(&self, name: &str, layout: ConstellationLayout ) -> Result<(),Error> {
+
         let name = name.to_string();
         let (tx,rx) = oneshot::channel();
         let create = ConstellationCreate{
@@ -98,6 +99,7 @@ impl StarlaneMachine {
             layout,
             tx
         };
+
         self.tx.send( StarlaneCommand::ConstellationCreate(create)).await?;
         rx.await?
     }
@@ -315,6 +317,7 @@ impl StarlaneMachineRunner {
         layout : ConstellationLayout,
         name: String,
     ) -> Result<(), Error> {
+
         if self.constellations.contains_key(&name) {
             return Err(format!("constellation named '{}' already exists in this StarlaneMachine.",name).into());
         }
@@ -434,8 +437,6 @@ impl StarlaneMachineRunner {
                 }
             }
         }
-
-
 
         let proto_lane_evolutions = join_all(proto_lane_evolution_rxs.iter_mut().map( |x| x.recv())).await;
 
@@ -827,13 +828,25 @@ mod test {
         std::env::set_var("STARLANE_DATA", data_dir);
         std::env::set_var("STARLANE_CACHE", cache_dir);
 
+println!("Hello");
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
 
             let mut starlane = StarlaneMachine::new("server".to_string() ).unwrap();
             starlane.listen().await.unwrap();
 
+tokio::spawn ( async {
+println!("PRE CREATE CONSTELLATION");
+});
+
             starlane.create_constellation("standalone", ConstellationLayout::standalone().unwrap() ).await.unwrap();
+
+            tokio::spawn ( async {
+                println!("POST CREATE CONSTELLATION");
+            });
+if true {
+return;
+}
 
             let mut client = StarlaneMachine::new_with_artifact_caches("client".to_string(), starlane.get_proto_artifact_caches_factory().await.unwrap() ).unwrap();
             let mut client_layout = ConstellationLayout::client("gateway".to_string() ).unwrap();
@@ -841,6 +854,10 @@ mod test {
             client.create_constellation("client", client_layout  ).await.unwrap();
 
             tokio::time::sleep(Duration::from_secs(1)).await;
+tokio::spawn ( async {
+    println!("GOT TO FIRST SLEEP");
+});
+
 
             let starlane_api = client.get_starlane_api().await.unwrap();
 
@@ -850,6 +867,9 @@ mod test {
                 starlane.shutdown();
                 return;
             }
+tokio::spawn ( async {
+println!("PING GATEWAY");
+});
 
             let sub_space_api = match starlane_api
                 .get_sub_space(
@@ -890,6 +910,10 @@ mod test {
                 .submit()
                 .await
                 .unwrap();
+
+tokio::spawn ( async {
+println!("FILE API");
+});
 
             /*
             // upload an artifact bundle
@@ -935,7 +959,7 @@ mod test {
                      ok
                 }
                 Err(error) => {
-                    error!("error: {}",error);
+                    error!("error: {}",error.to_string());
                     panic!("cannot continue")
                 }
             };

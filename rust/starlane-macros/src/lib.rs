@@ -1,13 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
-use nom::bytes::complete::{take_till1};
-use nom::character::complete::{anychar};
+use nom::bytes::complete::take_till1;
+use nom::character::complete::anychar;
 use nom::error::{context, VerboseError};
 use nom::IResult;
 use nom::multi::many1;
-use nom::sequence::{tuple};
-use quote::{quote};
-use quote::__private::{TokenStream};
+use nom::sequence::tuple;
+use quote::quote;
+use quote::__private::TokenStream;
 use syn::{Expr, Ident, Item, ItemEnum, Lit, Meta, MetaList, MetaNameValue, NestedMeta, parse_macro_input, Path, PathArguments, Token, Type, Visibility};
 use syn::parse::{Parse, ParseStream};
 
@@ -44,8 +44,6 @@ impl ResourceParser {
         rtn
     }
 
-
-
     pub fn build_paths( &self, resource: Resource )  -> HashMap<String,Vec<String>>{
         let mut parts = vec![];
         parts.push( resource.path_part.as_ref().unwrap().to_string() );
@@ -58,7 +56,7 @@ impl ResourceParser {
             }
         }
 
-        return rtn
+        rtn
     }
 
     pub fn paths( &self, resource: Resource,mut parts: Vec<String> )  -> HashSet<Vec<String>>{
@@ -1461,8 +1459,6 @@ fn parse_camel(input: &str) -> Res<&str, Vec<String>> {
 
 #[cfg(test)]
 mod tests {
-    
-
     use crate::parse_camel;
 
     #[test]

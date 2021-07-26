@@ -1038,6 +1038,7 @@ impl AuditLogCollectorProc {
     }
 }
 
+/*
 #[cfg(test)]
 mod test {
     use std::fs;
@@ -1170,6 +1171,8 @@ mod test {
         Ok(())
     }
 }
+
+ */
 
 pub struct Raw{
     data: Data,
