@@ -421,7 +421,7 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
                     pub fn parent(&self)->ResourcePath {
                         let mut parts = self.parts.clone();
                         parts.remove( parts.len()-1 );
-                        #parent_path::try_from(parts).expect("expected it to parse sence it had already parsed once").into()
+                        #parent_path::try_from(parts).expect("expected it to parse since it had already parsed once").into()
                     }
                 }
             } );
