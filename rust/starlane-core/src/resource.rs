@@ -1643,7 +1643,6 @@ println!("1 Address: {}", address );
                 address.push_str("<");
                 address.push_str(key.resource_type().to_string().as_str());
                 address.push_str(">");
-println!("2 Address: {}", address );
                 ResourceAddress::from_str(address.as_str())?
             }
             AddressCreationSrc::Appends(tails) => {
@@ -1688,6 +1687,7 @@ println!("Address: {}", address );
             stub: stub,
             state_src: self.create.src.clone(),
         };
+println!("return create...");
         Ok(assign)
     }
 }

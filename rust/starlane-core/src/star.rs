@@ -210,7 +210,7 @@ impl StarKind {
                 Self::Kube
             }
             ResourceType::ArtifactBundleVersions => {
-                Self::ArtifactStore
+                Self::SpaceHost
             }
             ResourceType::ArtifactBundle => {
                 Self::ArtifactStore
@@ -1082,7 +1082,7 @@ if self.skel.core_tx.is_closed() {
         &mut self,
         request: Request<ResourceIdentifier, ResourceRecord>,
     ) {
-println!("locate_resource_record request for : {}", self.skel.info.kind.to_string() );
+println!("locate_resource_record request star: {} identifier: {}", self.skel.info.kind.to_string(), request.payload.to_string() );
         if request.log {
             self.log(
                 LogId(request.payload.to_string()),

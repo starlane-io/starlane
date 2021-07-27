@@ -905,7 +905,11 @@ impl FromStr for Path {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Path::from_str(s)?)
+        let (leftover,path) = path(s)?;
+        if !leftover.is_empty() {
+            return Err(format!("could not parse '{}' from path {}", leftover,s ).into() );
+        }
+        Ok(path)
     }
 }
 

@@ -68,9 +68,8 @@ impl ArtifactHost {
     }
 
     fn bundle_path(key: ResourceKey) -> Result<Path, Fail> {
-        let bundle_key = Self::bundle_key(key)?;
         Ok(Path::from_str(
-            format!("/{}", bundle_key.to_string().as_str()).as_str(),
+            format!("/{}", key.to_snake_case().as_str()).as_str(),
         )?)
     }
 
