@@ -1531,9 +1531,10 @@ impl ResourceCreationChamber {
                 .parents()
                 .contains(&self.parent.key.resource_type())
             {
-                println!("!!! -> Throwing Fail::WrongParentResourceType <- !!!");
+                println!("!!! -> Throwing Fail::WrongParentResourceType for kind {} & ResourceType {} <- !!!", self.create.archetype.kind.to_string(), self.create.archetype.kind.resource_type().to_string() );
+
                 self.tx.send(Err(Fail::WrongParentResourceType {
-                    expected: HashSet::from_iter(self.parent.key.resource_type().parents()),
+                    expected: HashSet::from_iter(self.create.archetype.kind.resource_type().parents()),
                     received: Option::Some(self.create.parent.resource_type()),
                 }));
                 return;

@@ -128,8 +128,7 @@ async fn publish(args: ArgMatches<'_> ) -> Result<(),Error> {
     let data = Arc::new(data);
 
     let starlane_api = starlane_api().await?;
-    let create_artifact_bundle = starlane_api.create_artifact_bundle(&bundle,data).await?;
-    create_artifact_bundle.submit().await?;
+    starlane_api.create_artifact_bundle(&bundle,data).await?;
 
     Ok(())
 }

@@ -394,7 +394,6 @@ impl ResourceType {
 
     proc_macro::TokenStream::from( quote!{
        #resource_type_enum_def
-       #resource_impl_def
        #(#resources_def)*
        #identifiers
        #ids
@@ -402,6 +401,7 @@ impl ResourceType {
        #keys
        #paths
 
+       #resource_impl_def
     })
 }
 fn paths( parsed: &ResourceParser ) -> TokenStream {
@@ -425,7 +425,7 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
                     }
                 }
             } );
-        }else  {
+        } else {
             let _parents = resource.parents.clone();
             let _parent_path: Vec<Ident>= resource.parents.iter().map( |parent|Ident::new(format!("{}Path",parent.to_string()).as_str(), parent.span())).collect();
             paths.push( quote!{
@@ -492,8 +492,6 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
            }
         }
 
-
-
         impl #path_idents2 {
            pub fn resource_type(&self) -> ResourceType {
                ResourceType::#idents
@@ -534,7 +532,6 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
                 }
             }
 
-
             impl TryFrom<ResourceIdentifier> for #path_idents {
                 type Error=Error;
                 fn try_from( identifier: ResourceIdentifier) -> Result<Self,Self::Error> {
@@ -545,7 +542,6 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
                     }
                 }
             }
-
 
            impl Into<ResourceAddress> for #path_idents {
                 fn into(self) -> ResourceAddress{

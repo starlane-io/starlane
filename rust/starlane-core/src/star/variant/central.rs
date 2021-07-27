@@ -74,7 +74,7 @@ println!("hyperspace ensured.");
 
         let mut creation = space_api.create_sub_space("starlane")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
-        creation.submit().await?;
+        let subspace_api= creation.submit().await?;
 println!("subspace ensured.");
 
         /*
@@ -90,9 +90,18 @@ println!("hyperuser ensured.");
         creation.submit().await?;
 println!("localhost ensured.");
 
-        let init_args = Arc::new(create_args::create_init_args_artifact_bundle()?);
-        let creation = starlane_api.create_artifact_bundle(&create_args::artifact_bundle_address(), init_args ).await?;
-        creation.submit().await?;
+        {
+            let address: ResourceAddress = create_args::artifact_bundle_address().into();
+            let mut creation = subspace_api.create_artifact_bundle_versions(address.parent().unwrap().name().as_str())?;
+            creation.set_strategy(ResourceCreateStrategy::Ensure);
+            let artifact_bundle_versions_api = creation.submit().await?;
+
+            let version = semver::Version::from_str( address.name().as_str() )?;
+            let mut creation = artifact_bundle_versions_api.create_artifact_bundle(version, Arc::new(create_args::create_init_args_artifact_bundle()?) )?;
+            creation.set_strategy(ResourceCreateStrategy::Ensure);
+            creation.submit().await?;
+        }
+println!("created artifact bundle.");
 
         Ok(())
     }
