@@ -788,6 +788,7 @@ mod test {
     use tokio::time::timeout;
     use tracing::dispatcher::set_global_default;
     use tracing_subscriber::FmtSubscriber;
+    use starlane_resources::ArtifactBundlePath;
 
     use crate::artifact::ArtifactLocation;
     use crate::error::Error;
@@ -844,9 +845,6 @@ println!("PRE CREATE CONSTELLATION");
             tokio::spawn ( async {
                 println!("POST CREATE CONSTELLATION");
             });
-if true {
-return;
-}
 
             let mut client = StarlaneMachine::new_with_artifact_caches("client".to_string(), starlane.get_proto_artifact_caches_factory().await.unwrap() ).unwrap();
             let mut client_layout = ConstellationLayout::client("gateway".to_string() ).unwrap();
@@ -915,6 +913,7 @@ tokio::spawn ( async {
 println!("FILE API");
 });
 
+
             /*
             // upload an artifact bundle
             {
@@ -942,17 +941,17 @@ println!("FILE API");
                 let mut data = vec![];
                 file.read_to_end(&mut data).unwrap();
                 let data = Arc::new(data);
-                let artifact_bundle_api = sub_space_api
+                //let artifact_bundle_path = "hyperspace:starlane:filo:1.0.0<ArtifactBundle>";
+                let artifact_bundle_path = "hyperspace:starlane:filo:1.0.0<ArtifactBundle>";
+                let artifact_bundle_path = ArtifactBundlePath::from_str(artifact_bundle_path).unwrap();
+                let artifact_bundle_api = starlane_api
                     .create_artifact_bundle(
-                        "filo",
-                        &semver::Version::from_str("1.0.0").unwrap(),
+                        &artifact_bundle_path,
                         data,
-                    )
-                    .unwrap()
-                    .submit()
-                    .await
-                    .unwrap();
+                    ).
+                    await.unwrap();
             }
+
 
             let bundle: ResourceAddress = match ResourceAddress::from_str("hyperspace::<Space>"){
                 Ok(ok) => {
@@ -980,6 +979,7 @@ println!("FILE API");
             starlane.shutdown();
 
             std::thread::sleep(std::time::Duration::from_secs(1) );
+
         });
     }
 }

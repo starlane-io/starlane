@@ -5,12 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/starlane-core/src/data.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/core/artifact.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/artifact.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant/central.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/central.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-resources/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -74,7 +72,7 @@
       <recent name="$PROJECT_DIR$/starlane/src" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Run starlane">
+  <component name="RunManager" selected="Cargo.Expand starlane_core::data">
     <configuration default="true" type="ArquillianJUnit" factoryName="" nameIsGenerated="true">
       <option name="arquillianRunConfiguration">
         <value>
@@ -84,6 +82,22 @@
       <option name="TEST_OBJECT" value="class" />
       <method v="2">
         <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Expand starlane_core::data" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="expand --lib --color=always --theme=GitHub --tests data" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$/starlane-core" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <envs />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
     <configuration name="Run starlane" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
@@ -150,22 +164,6 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test tests::test_address_kind" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-resources --lib tests::test_address_kind -- --exact" />
-      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
-      <option name="channel" value="DEFAULT" />
-      <option name="requiredFeatures" value="true" />
-      <option name="allFeatures" value="false" />
-      <option name="emulateTerminal" value="false" />
-      <option name="withSudo" value="false" />
-      <option name="backtrace" value="SHORT" />
-      <envs />
-      <option name="isRedirectInput" value="false" />
-      <option name="redirectInputPath" value="" />
-      <method v="2">
-        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
-      </method>
-    </configuration>
     <configuration name="Test tests::test_kind" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
       <option name="command" value="test --package starlane-resources --lib tests::test_kind -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -185,18 +183,18 @@
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test tests::camel" />
-      <item itemvalue="Cargo.Test tests::test_address_kind" />
       <item itemvalue="Cargo.Test tests::test_kind" />
       <item itemvalue="Cargo.Test starlane::test::starlane" />
       <item itemvalue="Cargo.Run starlane" />
+      <item itemvalue="Cargo.Expand starlane_core::data" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Cargo.Run starlane" />
+        <item itemvalue="Cargo.Expand starlane_core::data" />
         <item itemvalue="Cargo.Test starlane::test::starlane" />
+        <item itemvalue="Cargo.Run starlane" />
         <item itemvalue="Cargo.Test tests::camel" />
         <item itemvalue="Cargo.Test tests::test_kind" />
-        <item itemvalue="Cargo.Test tests::test_address_kind" />
       </list>
     </recent_temporary>
   </component>
@@ -223,7 +221,7 @@
       <workItem from="1626783803555" duration="485000" />
       <workItem from="1626890844132" duration="433000" />
       <workItem from="1626964242980" duration="688000" />
-      <workItem from="1627279190622" duration="28891000" />
+      <workItem from="1627279190622" duration="33609000" />
     </task>
     <servers />
   </component>
