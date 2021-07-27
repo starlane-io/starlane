@@ -100,7 +100,8 @@ struct Resource {
     parents: Vec<Ident>,
     key_prefix: Option<String>,
     path_part: Option<Ident>,
-    state_persistence: Option<Path>
+    state_persistence: Option<Path>,
+    state_aspects: HashMap<String,String>
 }
 
 impl Resource {
@@ -110,7 +111,8 @@ impl Resource {
             parents: vec![],
             key_prefix: Option::None,
             path_part: Option::None,
-            state_persistence: Option::None
+            state_persistence: Option::None,
+            state_aspects: HashMap::new()
         }
     }
 
@@ -173,6 +175,17 @@ impl Parse for ResourceParser {
                                     match list.path.segments.last().unwrap().ident.to_string().as_str() {
                                         "parents" => {
                                             resource.parents = to_idents(&list);
+                                        }
+                                        "state" => {
+                                            for  aspect in list.nested {
+                                                if let NestedMeta::Meta(aspect ) = aspect {
+                                                    let name = aspect.path().segments.first().expect("expected a first").ident.to_string();
+                                                    let kind = aspect.path().segments.last().expect("expected a last").ident.to_string();
+println!("name & kind : {}: {} ",name, kind );
+                                                    resource.state_aspects.insert( name, kind );
+                                                }
+                                            }
+//                                            resource.parents = to_idents(&list);
                                         }
 
                                         what => {
@@ -293,11 +306,16 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     pathways.push_str("match self { ");
     pathways.push_str("Self::Root => Err(\"Root does not have a parent to match\".into()),");
 
+    let mut state_schema= String::new();
+    state_schema.push_str("impl ResourceType {");
+    state_schema.push_str("pub fn state_schema( &self ) -> StateSchema {");
+    state_schema.push_str("match self { ");
+    state_schema.push_str("Self::Root => StateSchema::new(),");
+
+
     for resource in &parsed.resources {
         let _ident = resource.get_ident();
         pathways.push_str( format!("Self::{} => {{", resource.get_ident().to_string() ).as_str());
-
-
 
         for (parent,path) in parsed.build_paths(resource.clone()).iter() {
             pathways.push_str( format!("let {} = vec![", parent.to_lowercase()).as_str());
@@ -322,14 +340,26 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         pathways.push_str( "}");
 
         pathways.push_str( "},");
+
+        state_schema.push_str( format!("Self::{}=>{{", resource.get_ident().to_string()).as_str() );
+        state_schema.push_str( "let mut state_schema = StateSchema::new();" );
+        for (key,value) in &resource.state_aspects {
+            state_schema.push_str( format!("state_schema.insert( \"{}\".to_string(), DataAspectType::{} );", key, value).as_str() );
+        }
+        state_schema.push_str( "state_schema" );
+        state_schema.push_str( "}");
     }
 
 
 
     pathways.push_str("}}}");
+    state_schema.push_str( "}}}");
 //println!("{}",pathways);
     let pathways = syn::parse_str::<Item>( pathways.as_str() ).unwrap();
     let pathways = quote!{#pathways};
+
+    let state_schema = syn::parse_str::<Item>( state_schema.as_str() ).unwrap();
+    let state_schema = quote!{#state_schema};
 
     let state_persistences: Vec<Path> = parsed.resources.clone().iter().map(|resource|{
         resource.state_persistence.as_ref().expect("expected ResourceStatePersistenceManager to be set").clone()
@@ -361,6 +391,7 @@ impl ResourceType {
    }
 }
 #pathways
+#state_schema
     };
 
 

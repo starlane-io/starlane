@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -7,10 +7,9 @@ use nom::{AsChar, InputTakeAtPosition, IResult};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
 use nom::character::complete::{alpha0, alpha1, anychar, digit0, digit1, one_of};
-
 use nom::combinator::{not, opt};
 use nom::error::{context, ErrorKind, VerboseError};
-use nom::multi::{many1, many_m_n, separated_list1, separated_list0};
+use nom::multi::{many1, many_m_n, separated_list0, separated_list1};
 use nom::sequence::{delimited, preceded, terminated, tuple};
 use serde::Deserialize;
 use serde::Serialize;
@@ -18,13 +17,12 @@ use serde::Serialize;
 use starlane_macros::resources;
 
 use crate::error::Error;
+use crate::data::DataSchema;
+use crate::data::DataAspectType;
 
 pub mod error;
 pub mod parse;
-
-
-
-
+pub mod data;
 
 
 #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
@@ -1167,6 +1165,8 @@ pub enum ResourceStatePersistenceManager {
 }
 
 
+pub type StateSchema=HashMap<String,DataSchema>;
+
 
 
 
@@ -1294,11 +1294,14 @@ resources! {
     #[resource(prefix="s")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
     #[resource(ResourceStatePersistenceManager::Store)]
+    #[resource(state(meta::Meta))]
     pub struct Space();
+
     #[resource(parents(Space))]
     #[resource(prefix="ss")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
     #[resource(ResourceStatePersistenceManager::Store)]
+    #[resource(state(meta::Meta))]
     pub struct SubSpace();
 
     #[resource(parents(SubSpace))]
@@ -1323,6 +1326,8 @@ resources! {
     #[resource(prefix="f")]
     #[resource(ResourcePathSegmentKind::Path)]
     #[resource(ResourceStatePersistenceManager::Host)]
+    #[resource(state(meta::Meta))]
+    #[resource(state(content::Binary))]
     pub struct File();
 
     #[resource(parents(SubSpace,App))]
@@ -1347,18 +1352,21 @@ resources! {
     #[resource(prefix="abv")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
     #[resource(ResourceStatePersistenceManager::None)]
+    #[resource(state(content::Binary))]
     pub struct ArtifactBundleVersions();
 
     #[resource(parents(ArtifactBundleVersions))]
     #[resource(prefix="ab")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
     #[resource(ResourceStatePersistenceManager::Host)]
+    #[resource(state(content::Binary))]
     pub struct ArtifactBundle();
 
     #[resource(parents(ArtifactBundle))]
     #[resource(prefix="a")]
     #[resource(ResourcePathSegmentKind::Path)]
     #[resource(ResourceStatePersistenceManager::Host)]
+    #[resource(state(content::Binary))]
     pub struct Artifact();
 
     #[resource(parents(Space))]
@@ -1405,4 +1413,3 @@ impl ArtifactPath{
         }
     }
 }
-
