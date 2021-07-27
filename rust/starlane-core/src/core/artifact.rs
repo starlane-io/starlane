@@ -80,14 +80,31 @@ impl ArtifactHost {
     }
 
     async fn ensure_bundle_dir(&mut self, key: ResourceKey) -> Result<(), Fail> {
+        if key.resource_type() == ResourceType::ArtifactBundleVersions {
+            return Ok(());
+        }
+
         let path = Self::bundle_path(key)?;
         self.file_access.mkdir(&path).await?;
         Ok(())
     }
 
     fn validate(assign: &ResourceAssign<AssignResourceStateSrc>) -> Result<(), Fail> {
-        Self::bundle_key(assign.key())?;
-        Ok(())
+        match &assign.stub.key {
+            ResourceKey::ArtifactBundle(_) => Ok(()),
+            ResourceKey::Artifact(_) => Ok(()),
+            ResourceKey::ArtifactBundleVersions(_) => Ok(()),
+            key => {
+                Err(Fail::WrongResourceType {
+                    expected: HashSet::from_iter(vec![
+                        ResourceType::ArtifactBundle,
+                        ResourceType::Artifact,
+                    ]),
+                    received: key.resource_type(),
+                })
+            }
+        }
+
     }
 
     async fn ensure_artifact(
@@ -172,6 +189,9 @@ impl Host for ArtifactHost {
                 }
             }
             ResourceType::Artifact => {
+                vec![]
+            }
+            ResourceType::ArtifactBundleVersions=> {
                 vec![]
             }
             rt => {
