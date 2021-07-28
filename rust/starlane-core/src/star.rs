@@ -55,7 +55,7 @@ use crate::message::resource::{
 };
 use crate::permissions::{AuthToken, AuthTokenSource, Credentials};
 
-use crate::resource::{ActorKey, AddressCreationSrc, AppKey, AssignResourceStateSrc, FieldSelection, HostedResourceStore, KeyCreationSrc, Labels, LocalDataSrc, LocalHostedResource, LocalResourceHost, MemoryDataTransfer, Parent, ParentCore, Registry, RegistryReservation, RegistryUniqueSrc, RemoteResourceManager, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceBinding, ResourceCreate, ResourceHost, ResourceKey, ResourceKind, ResourceLocation, ResourceManager, ResourceManagerKey, ResourceNamesReservationRequest, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector, ResourceStateSrc, ResourceStub, ResourceType, UniqueSrc, UserKey};
+use crate::resource::{ActorKey, AddressCreationSrc, AppKey, AssignResourceStateSrc, FieldSelection, HostedResourceStore, KeyCreationSrc, Labels, LocalStateSetSrc, LocalHostedResource, LocalResourceHost, MemoryDataTransfer, Parent, ParentCore, Registry, RegistryReservation, RegistryUniqueSrc, RemoteResourceManager, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceBinding, ResourceCreate, ResourceHost, ResourceKey, ResourceKind, ResourceLocation, ResourceManager, ResourceManagerKey, ResourceNamesReservationRequest, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector,  ResourceStub, ResourceType, UniqueSrc, UserKey};
 
 
 
@@ -63,7 +63,7 @@ use crate::star::pledge::{ResourceHostSelector, Satisfaction, StarHandle, StarHa
 use crate::star::variant::StarShellInstructions;
 
 use crate::template::StarTemplateHandle;
-
+use crate::data::DataSetSrc;
 
 
 pub mod filestore;
@@ -2429,7 +2429,7 @@ println!("locate_resource_record request star: {} identifier: {}", self.skel.inf
                         specific: None,
                         config: None,
                     },
-                    Arc::new(MemoryDataTransfer::none()),
+                    DataSetSrc::new()
                 ))
             }
             _ => self.get_resource(&key).await?,

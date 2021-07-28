@@ -4,7 +4,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
-use crate::resource::{AssignResourceStateSrc, LocalDataSrc, Resource, ResourceAddress, ResourceKind, ResourceType, SpaceKey, SrcTransfer};
+use crate::resource::{AssignResourceStateSrc, LocalStateSetSrc, Resource, ResourceAddress, ResourceKind, ResourceType, SpaceKey, SrcTransfer};
 
 #[derive(Clone)]
 pub struct Space {

@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 
 
-use starlane_resources::{ResourceIdentifier};
+use starlane_resources::{ResourceIdentifier, StateSchema};
 
 
 
@@ -22,9 +22,9 @@ use crate::message::Fail;
 
 
 use crate::resource::{
-    ArtifactKind, AssignResourceStateSrc, DataTransfer, FileDataTransfer, LocalDataSrc,
+    ArtifactKind, AssignResourceStateSrc, DataTransfer, FileDataTransfer, LocalStateSetSrc,
     MemoryDataTransfer, Names, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype,
-    ResourceAssign, ResourceKind, ResourceStateSrc
+    ResourceAssign, ResourceKind
 };
 
 use crate::resource::store::{
@@ -32,6 +32,7 @@ use crate::resource::store::{
 };
 
 use crate::star::StarSkel;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct DefaultHost {
@@ -58,14 +59,18 @@ impl Host for DefaultHost {
         // if there is Initialization to do for assignment THIS is where we do it
         let data_transfer = match assign.state_src {
             AssignResourceStateSrc::Direct(data) => {
-                let data_transfer: Arc<dyn DataTransfer> = Arc::new(MemoryDataTransfer::new(data));
-                data_transfer
+                let state_schema: StateSchema = assign.stub.archetype.kind.resource_type().state_schema();
+                let mut transfer_map:HashMap<String,Arc<dyn DataTransfer>> = HashMap::new();
+                for (key,kind) in state_schema {
+                    transfer_map.insert( key, MemoryDataTransfer::new(data.map.get(&key).ok_or(format!("expected state aspect {} ", key))?.get()?) )
+                }
+               transfer_map
             }
-            AssignResourceStateSrc::Hosted => Arc::new(MemoryDataTransfer::none()),
+            AssignResourceStateSrc::AlreadyHosted => Arc::new(MemoryDataTransfer::none()),
             AssignResourceStateSrc::None => Arc::new(MemoryDataTransfer::none()),
-            AssignResourceStateSrc::InitArgs(ref args) =>  {
+            AssignResourceStateSrc::CreateArgs(ref args) =>  {
                 Arc::new(if args.trim().is_empty() && assign.stub.archetype.kind.init_clap_config().is_none() {
-                    MemoryDataTransfer::none()
+                    HashMap::new()
                 } else if assign.stub.archetype.kind.init_clap_config().is_none(){
                     return Err(format!("resource {} does not take init args",assign.archetype().kind.to_string()).into());
                 }

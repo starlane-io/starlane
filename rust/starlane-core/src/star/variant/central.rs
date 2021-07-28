@@ -8,7 +8,7 @@ use tokio::sync::oneshot;
 
 use crate::error::Error;
 
-use crate::resource::{create_args, ResourceAddress, ResourceArchetype, ResourceCreateStrategy, ResourceKind, ResourceLocation, ResourceRecord, ResourceRegistration, ResourceStub, ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceStateSrc, AssignResourceStateSrc};
+use crate::resource::{create_args, ResourceAddress, ResourceArchetype, ResourceCreateStrategy, ResourceKind, ResourceLocation, ResourceRecord, ResourceRegistration, ResourceStub, ResourceCreate, KeyCreationSrc, AddressCreationSrc, AssignResourceStateSrc};
 use crate::resource::ResourceKey;
 use crate::star::{StarKey, StarSkel};
 use crate::star::variant::{StarVariant};

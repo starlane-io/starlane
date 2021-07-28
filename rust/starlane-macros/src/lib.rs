@@ -344,7 +344,7 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         state_schema.push_str( format!("Self::{}=>{{", resource.get_ident().to_string()).as_str() );
         state_schema.push_str( "let mut state_schema = StateSchema::new();" );
         for (key,value) in &resource.state_aspects {
-            state_schema.push_str( format!("state_schema.insert( \"{}\".to_string(), DataAspectType::{} );", key, value).as_str() );
+            state_schema.push_str( format!("state_schema.insert( \"{}\".to_string(), DataAspectKind::{} );", key, value).as_str() );
         }
         state_schema.push_str( "state_schema" );
         state_schema.push_str( "}");

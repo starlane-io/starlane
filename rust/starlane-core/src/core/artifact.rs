@@ -19,7 +19,7 @@ use crate::core::{Host, StarCoreAction, StarCoreCommand};
 use crate::error::Error;
 use crate::file_access::{FileAccess};
 use crate::message::Fail;
-use crate::resource::{AddressCreationSrc, ArtifactBundleKind, ArtifactKind, AssignResourceStateSrc, DataTransfer, FileSystemKey, KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceKey, ResourceKind, ResourceRecord, ResourceRegistration, ResourceRegistryInfo, ResourceStateSrc, ResourceStub, ResourceType};
+use crate::resource::{AddressCreationSrc, ArtifactBundleKind, ArtifactKind, AssignResourceStateSrc, DataTransfer, FileSystemKey, KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceKey, ResourceKind, ResourceRecord, ResourceRegistration, ResourceRegistryInfo, ResourceStub, ResourceType};
 use crate::resource::ArtifactBundleKey;
 use crate::resource::store::{
     ResourceStore,
@@ -122,7 +122,7 @@ impl ArtifactHost {
             parent: parent.key.clone().into(),
             archetype: archetype,
             address: AddressCreationSrc::Append(artifact_path),
-            src: AssignResourceStateSrc::Hosted,
+            src: AssignResourceStateSrc::AlreadyHosted,
             registry_info: Option::None,
             owner: Option::None,
             strategy: ResourceCreateStrategy::Ensure,
@@ -161,16 +161,18 @@ impl Host for ArtifactHost {
             ResourceType::ArtifactBundle => {
                 match &assign.state_src {
                     AssignResourceStateSrc::Direct(data) => {
-                        let artifacts = get_artifacts(data.clone())?;
-                       let path = Self::bundle_path(assign.key())?;
+                        let src = data.map.get(&"content".to_string() ).cloned().ok_or("expected content state aspect for ArtifactBundle")?;
+                        let content = src.get()?;
+                        let artifacts = get_artifacts(content.clone().bin()? )?;
+                        let path = Self::bundle_path(assign.key())?;
                         let mut file_access = self.file_access.with_path(path.to_relative())?;
                         file_access
-                            .write(&Path::from_str("/bundle.zip")?, data.clone())
+                            .write(&Path::from_str("/bundle.zip")?, content.bin()?)
                             .await?;
 
                         artifacts
                     }
-                    AssignResourceStateSrc::Hosted => {
+                    AssignResourceStateSrc::AlreadyHosted => {
                         // do nothing, the file should already be present in the filesystem detected by the watcher and
                         // this call to assign is just making sure the database registry is updated
                         vec![]
@@ -180,9 +182,9 @@ impl Host for ArtifactHost {
                             "ArtifactBundle state should never be None".to_string(),
                         ));
                     }
-                    AssignResourceStateSrc::InitArgs(_) => {
+                    AssignResourceStateSrc::CreateArgs(_) => {
                         return Err(Fail::Error(
-                            "ArtifactBundle cannot be created from InitArgs".to_string(),
+                            "ArtifactBundle cannot be created from CreateArgs".to_string(),
                         ));
                     }
                 }

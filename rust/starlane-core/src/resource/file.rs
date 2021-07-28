@@ -4,7 +4,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
-use crate::resource::{AssignResourceStateSrc, FileKey, LocalDataSrc, Resource, ResourceAddress, ResourceType, SrcTransfer};
+use crate::resource::{AssignResourceStateSrc, FileKey, LocalStateSetSrc, Resource, ResourceAddress, ResourceType, SrcTransfer};
 
 #[derive(Clone)]
 pub struct File {

@@ -12,7 +12,9 @@ use crate::app::ConfigSrc;
 use crate::error::Error;
 
 use crate::message::Fail;
-use crate::resource::{DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceKey, ResourceKind, Specific};
+use crate::resource::{DataTransfer, FileDataTransfer, LocalStateSetSrc, MemoryDataTransfer, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceKey, ResourceKind, Specific};
+use crate::data::{DataSetBlob, DataSetSrc, LocalBinSrc};
+use std::convert::TryInto;
 
 #[derive(Clone,Debug)]
 pub struct ResourceStore {
@@ -28,7 +30,7 @@ impl ResourceStore {
 
     pub async fn put(
         &self,
-        assign: ResourceAssign<Arc<dyn DataTransfer>>,
+        assign: ResourceAssign<DataSetSrc<LocalBinSrc>>,
     ) -> Result<Resource, Fail> {
         let (tx, rx) = oneshot::channel();
 
@@ -86,7 +88,7 @@ pub struct ResourceStoreAction {
 #[derive(strum_macros::Display)]
 pub enum ResourceStoreCommand {
     Close,
-    Put(ResourceAssign<Arc<dyn DataTransfer>>),
+    Put(ResourceAssign<DataSetSrc<LocalBinSrc>>),
     Get(ResourceIdentifier),
 }
 
@@ -181,9 +183,12 @@ impl ResourceStoreSqlLite {
                     .state_persistence()
                 {
                     ResourceStatePersistenceManager::Store => {
-                        Option::Some(assign.state_src.get().await?)
+                        let state_src: DataSetBlob = assign.state_src.clone().try_into()?;
+                        state_src.bin()?
                     }
-                    _ => Option::None,
+                    _ => {
+                        DataSetBlob::new().bin()?
+                    }
                 };
 
                 self.conn.execute("INSERT INTO resources (key,address,state_src,kind,specific,config_src) VALUES (?1,?2,?3,?4,?5,?6)", params![key,address,state,assign.stub.archetype.kind.to_string(),specific,config_src])?;
@@ -192,7 +197,7 @@ impl ResourceStoreSqlLite {
                     assign.stub.key,
                     assign.stub.address,
                     assign.stub.archetype,
-                    assign.state_src,
+                    assign.state_src
                 );
 
                 Ok(ResourceStoreResult::Resource(Option::Some(resource)))
@@ -263,9 +268,21 @@ impl ResourceStoreSqlLite {
                         Option::Some(config_src)
                     };
 
-                    let state: Arc<dyn DataTransfer> = match state {
-                        None => Arc::new(MemoryDataTransfer::none()),
-                        Some(state) => Arc::new(MemoryDataTransfer::new(Arc::new(state))),
+                    let state: DataSetSrc<LocalBinSrc> = match state {
+                        None => {
+                            DataSetSrc::new()
+                        }
+                        Some(state) => {
+                            let bin = Arc::new(state);
+                            let blob = DataSetBlob::from_bin(bin)?;
+                            match blob.try_into() {
+                                Ok(data_set) => data_set,
+                                Err(err) => {
+                                    error!("ERROR: {}",err.to_string());
+                                    return Err(rusqlite::Error::InvalidQuery);
+                                }
+                            }
+                        },
                     };
 
                     let archetype = ResourceArchetype {

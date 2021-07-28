@@ -30,7 +30,7 @@ use crate::resource::{
     AddressCreationSrc, AssignResourceStateSrc, DataTransfer,
     KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress,
     ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy,
-    ResourceCreationChamber, ResourceKind, ResourceStateSrc, ResourceStub,
+    ResourceCreationChamber, ResourceKind, ResourceStub,
 };
 
 

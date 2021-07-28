@@ -21,7 +21,7 @@ use crate::resource::{
     AddressCreationSrc, AssignResourceStateSrc, DataTransfer, FileKind,
     FileSystemKey, KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource,
     ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate,
-    ResourceCreateStrategy, ResourceCreationChamber, ResourceKind, ResourceStateSrc, ResourceStub,
+    ResourceCreateStrategy, ResourceCreationChamber, ResourceKind, ResourceStub,
     ResourceType
 };
 use crate::resource::ResourceKey;
@@ -195,7 +195,7 @@ impl FileStoreHost {
             parent: filesystem.key.clone().into(),
             archetype: archetype,
             address: AddressCreationSrc::Append(file_path),
-            src: AssignResourceStateSrc::Hosted,
+            src: AssignResourceStateSrc::AlreadyHosted,
             registry_info: Option::None,
             owner: Option::None,
             strategy: ResourceCreateStrategy::Ensure,
@@ -246,14 +246,14 @@ impl Host for FileStoreHost {
                             .write(&Path::from_str(path.as_str())?, data)
                             .await?;
                     }
-                    AssignResourceStateSrc::Hosted => {
+                    AssignResourceStateSrc::AlreadyHosted => {
                         // do nothing, the file should already be present in the filesystem detected by the watcher and
                         // this call to assign is just making sure the database registry is updated
                     }
                     AssignResourceStateSrc::None => {
                         // do nothing, there is no data (this should never happen of course in a file)
                     }
-                    AssignResourceStateSrc::InitArgs(_) => {
+                    AssignResourceStateSrc::CreateArgs(_) => {
                         return Err("File cannot be created with InitArgs".into());
                         // cannot create with init_args
                     }

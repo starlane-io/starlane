@@ -18,7 +18,7 @@ use starlane_macros::resources;
 
 use crate::error::Error;
 use crate::data::DataSchema;
-use crate::data::DataAspectType;
+use crate::data::DataAspectKind;
 
 pub mod error;
 pub mod parse;

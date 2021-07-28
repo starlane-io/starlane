@@ -54,6 +54,7 @@ use crate::star::{
 use crate::star::pledge::{ResourceHostSelector, StarHandle};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
+use crate::data::{DataSetSrc, LocalBinSrc, DataSetBlob};
 
 pub mod artifact;
 pub mod config;
@@ -2508,19 +2509,19 @@ pub enum KeySrc {
 #[derive(Debug,Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum AssignResourceStateSrc {
     None,
-    Direct(Arc<Vec<u8>>),
-    InitArgs(String),
-    Hosted,
+    Direct(DataSetBlob),
+    CreateArgs(String),
+    AlreadyHosted,
 }
 
-impl TryInto<ResourceStateSrc> for AssignResourceStateSrc {
+impl TryInto<LocalStateSetSrc> for AssignResourceStateSrc {
     type Error = Error;
 
-    fn try_into(self) -> Result<ResourceStateSrc, Self::Error> {
+    fn try_into(self) -> Result<LocalStateSetSrc, Self::Error> {
         match self {
-            AssignResourceStateSrc::Direct(state) => Ok(ResourceStateSrc::Memory(state)),
-            AssignResourceStateSrc::Hosted => Ok(ResourceStateSrc::Hosted),
-            AssignResourceStateSrc::None => Ok(ResourceStateSrc::None),
+            AssignResourceStateSrc::Direct(state) => Ok(LocalStateSetSrc::Some(state.try_into()?)),
+            AssignResourceStateSrc::AlreadyHosted => Ok(LocalStateSetSrc::AlreadyHosted),
+            AssignResourceStateSrc::None => Ok(LocalStateSetSrc::None),
             _ => {
                 Err(format!("cannot turn {}", self.to_string() ).into())
             }
@@ -2638,10 +2639,10 @@ impl<S> ResourceAssign<S> {
     }
 }
 
-impl TryInto<ResourceAssign<ResourceStateSrc>> for ResourceAssign<AssignResourceStateSrc> {
+impl TryInto<ResourceAssign<LocalStateSetSrc>> for ResourceAssign<AssignResourceStateSrc> {
     type Error = Error;
 
-    fn try_into(self) -> Result<ResourceAssign<ResourceStateSrc>, Self::Error> {
+    fn try_into(self) -> Result<ResourceAssign<LocalStateSetSrc>, Self::Error> {
         let state_src = self.state_src.try_into()?;
         Ok(ResourceAssign {
             stub: self.stub,
@@ -2724,7 +2725,7 @@ pub struct Resource {
     key: ResourceKey,
     address: ResourceAddress,
     archetype: ResourceArchetype,
-    state_src: Arc<dyn DataTransfer>,
+    state_src: DataSetSrc<LocalBinSrc>,
     owner: Option<UserKey>,
 }
 
@@ -2733,7 +2734,7 @@ impl Resource {
         key: ResourceKey,
         address: ResourceAddress,
         archetype: ResourceArchetype,
-        state_src: Arc<dyn DataTransfer>,
+        state_src: DataSetSrc<LocalBinSrc>
     ) -> Resource {
         Resource {
             key: key,
@@ -2756,19 +2757,22 @@ impl Resource {
         self.key.resource_type()
     }
 
-    pub fn state_src(&self) -> Arc<dyn DataTransfer> {
+    pub fn state_src(&self) -> DataSetSrc<LocalStateSetSrc> {
         self.state_src.clone()
     }
 }
 
-pub type ResourceStateSrc = LocalDataSrc;
+impl From<DataSetSrc<LocalBinSrc>> for LocalStateSetSrc {
+    fn from(src: DataSetSrc<LocalBinSrc>) -> Self {
+        LocalStateSetSrc::Some(src)
+    }
+}
 
 #[derive(Clone)]
-pub enum LocalDataSrc {
+pub enum LocalStateSetSrc {
     None,
-    Memory(Arc<Vec<u8>>),
-    File(Path),
-    Hosted,
+    Some(DataSetSrc<LocalBinSrc>),
+    AlreadyHosted,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -2818,7 +2822,7 @@ where
 #[async_trait]
 pub trait DataTransfer: Send + Sync {
     async fn get(&self) -> Result<Arc<Vec<u8>>, Error>;
-    fn src(&self) -> LocalDataSrc;
+    fn src(&self) -> LocalStateSetSrc;
 }
 
 #[derive(Clone)]
@@ -2844,8 +2848,8 @@ impl DataTransfer for MemoryDataTransfer {
         Ok(self.data.clone())
     }
 
-    fn src(&self) -> LocalDataSrc {
-        LocalDataSrc::Memory(self.data.clone())
+    fn src(&self) -> LocalStateSetSrc {
+        LocalStateSetSrc::Memory(self.data.clone())
     }
 }
 
@@ -2869,8 +2873,8 @@ impl DataTransfer for FileDataTransfer {
         self.file_access.read(&self.path).await
     }
 
-    fn src(&self) -> LocalDataSrc {
-        LocalDataSrc::File(self.path.clone())
+    fn src(&self) -> LocalStateSetSrc {
+        LocalStateSetSrc::File(self.path.clone())
     }
 }
 
