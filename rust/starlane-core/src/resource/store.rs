@@ -12,7 +12,7 @@ use crate::app::ConfigSrc;
 use crate::error::Error;
 
 use crate::message::Fail;
-use crate::resource::{DataTransfer, FileDataTransfer, LocalStateSetSrc, MemoryDataTransfer, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceKey, ResourceKind, Specific};
+use crate::resource::{LocalStateSetSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceKey, ResourceKind, Specific};
 use crate::data::{DataSetBlob, DataSetSrc, LocalBinSrc};
 use std::convert::TryInto;
 

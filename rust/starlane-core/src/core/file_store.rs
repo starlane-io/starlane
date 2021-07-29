@@ -18,8 +18,8 @@ use crate::error::Error;
 use crate::file_access::{FileAccess, FileEvent};
 use crate::message::Fail;
 use crate::resource::{
-    AddressCreationSrc, AssignResourceStateSrc, DataTransfer, FileKind,
-    FileSystemKey, KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource,
+    AddressCreationSrc, AssignResourceStateSrc, FileKind,
+    FileSystemKey, KeyCreationSrc, Path, RemoteDataSrc, Resource,
     ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate,
     ResourceCreateStrategy, ResourceCreationChamber, ResourceKind, ResourceStub,
     ResourceType
@@ -30,6 +30,9 @@ use crate::resource::store::{
 };
 use crate::star::StarSkel;
 use crate::util;
+use crate::data::{LocalBinSrc, DataSetSrc};
+use std::convert::TryInto;
+use starlane_resources::data::DataAspectKind;
 
 pub struct FileStoreHost {
     skel: StarSkel,
@@ -195,7 +198,7 @@ impl FileStoreHost {
             parent: filesystem.key.clone().into(),
             archetype: archetype,
             address: AddressCreationSrc::Append(file_path),
-            src: AssignResourceStateSrc::AlreadyHosted,
+            state_src: AssignResourceStateSrc::AlreadyHosted,
             registry_info: Option::None,
             owner: Option::None,
             strategy: ResourceCreateStrategy::Ensure,
@@ -212,7 +215,7 @@ impl FileStoreHost {
 impl Host for FileStoreHost {
     async fn assign(
         &mut self,
-        assign: ResourceAssign<AssignResourceStateSrc>,
+        assign: ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>,
     ) -> Result<Resource, Fail> {
         // if there is Initialization to do for assignment THIS is where we do it
 
@@ -242,8 +245,9 @@ impl Host for FileStoreHost {
                         );
 
                         let _lock = self.mutex.lock().await;
+                        let content = data.map.get("content").cloned().ok_or("expected file content")?.try_into()?;
                         self.file_access
-                            .write(&Path::from_str(path.as_str())?, data)
+                            .write(&Path::from_str(path.as_str())?, content)
                             .await?;
                     }
                     AssignResourceStateSrc::AlreadyHosted => {
@@ -254,7 +258,7 @@ impl Host for FileStoreHost {
                         // do nothing, there is no data (this should never happen of course in a file)
                     }
                     AssignResourceStateSrc::CreateArgs(_) => {
-                        return Err("File cannot be created with InitArgs".into());
+                        return Err("File cannot be created with CreateArgs".into());
                         // cannot create with init_args
                     }
 
@@ -271,11 +275,11 @@ impl Host for FileStoreHost {
             }
         }
 
-        let data_transfer: Arc<dyn DataTransfer> = Arc::new(MemoryDataTransfer::none());
+        let state = DataSetSrc::new();
 
         let assign = ResourceAssign {
             stub: assign.stub,
-            state_src: data_transfer,
+            state_src: state,
         };
 
         Ok(self.store.put(assign).await?)
@@ -285,7 +289,7 @@ impl Host for FileStoreHost {
         self.store.get(identifier).await
     }
 
-    async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {
+    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSetSrc<LocalBinSrc>, Fail> {
         if let Ok(Option::Some(resource)) = self.store.get(identifier.clone()).await {
             match identifier.resource_type() {
                 ResourceType::File => {
@@ -303,9 +307,11 @@ impl Host for FileStoreHost {
                         .file_access
                         .read(&Path::from_str(path.as_str())?)
                         .await?;
-                    Ok(RemoteDataSrc::Memory(data))
+                    let mut state = DataSetSrc::new();
+                    state.map.insert("content".to_string(), LocalBinSrc::InMemory(data));
+                    Ok(state)
                 }
-                _ => Ok(RemoteDataSrc::None),
+                _ => Ok(DataSetSrc::new()),
             }
         } else {
             Err(Fail::ResourceNotFound(identifier))

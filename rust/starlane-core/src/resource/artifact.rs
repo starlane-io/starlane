@@ -4,14 +4,16 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
-use crate::resource::{ResourceAddress, SrcTransfer};
+use crate::resource::{ResourceAddress};
 use crate::resource::ArtifactBundleKey;
+use crate::data::DataSet;
+use crate::data::{LocalBinSrc, DataSetSrc};
 
 #[derive(Clone)]
 pub struct ArtifactBundle {
     key: ArtifactBundleKey,
     address: ResourceAddress,
-    state_src: SrcTransfer<ArtifactBundleState>,
+    state_src: DataSetSrc<LocalBinSrc>
 }
 
 #[derive(Clone, Serialize, Deserialize)]

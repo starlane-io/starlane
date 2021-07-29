@@ -18,6 +18,7 @@ use crate::message::{Fail, MessageId, ProtoStarMessage};
 use crate::resource::{RemoteDataSrc, ResourceCreate, ResourceId, ResourceRecord, ResourceSelector, ResourceType};
 use crate::star::{StarCommand, StarSkel};
 use crate::util;
+use crate::data::{DataSetSrc, NetworkBinSrc, NetworkDataSetSrc};
 
 pub type MessageTo = ResourceIdentifier;
 
@@ -292,7 +293,7 @@ pub enum ResourceResponseMessage {
     Resource(Option<ResourceRecord>),
     Resources(Vec<ResourceRecord>),
     Unique(ResourceId),
-    State(RemoteDataSrc),
+    State(NetworkDataSetSrc),
     Fail(Fail),
 }
 

@@ -54,7 +54,7 @@ use crate::star::{
 use crate::star::pledge::{ResourceHostSelector, StarHandle};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
-use crate::data::{DataSetSrc, LocalBinSrc, DataSetBlob};
+use crate::data::{DataSetSrc, LocalBinSrc, DataSetBlob, NetworkBinSrc, NetworkDataSetSrc};
 
 pub mod artifact;
 pub mod config;
@@ -1338,7 +1338,7 @@ impl Parent {
         core: ParentCore,
         create: ResourceCreate,
         reservation: RegistryReservation,
-        rx: oneshot::Receiver<Result<ResourceAssign<AssignResourceStateSrc>, Fail>>,
+        rx: oneshot::Receiver<Result<ResourceAssign<AssignResourceStateSrc<NetworkDataSetSrc>>, Fail>>,
     ) -> Result<ResourceRecord, Fail> {
         let assign = rx.await??;
         let host = core
@@ -1346,7 +1346,7 @@ impl Parent {
             .select(create.archetype.kind.resource_type())
             .await?;
         let record = ResourceRecord::new(assign.stub.clone(), host.star_key());
-        host.assign(assign).await?;
+        host.assign(assign.try_into()?).await?;
         let (commit_tx, _commit_rx) = oneshot::channel();
         reservation.commit(record.clone(), commit_tx)?;
         Ok(record)
@@ -1494,7 +1494,7 @@ pub struct ResourceCreationChamber {
     parent: ResourceStub,
     create: ResourceCreate,
     skel: StarSkel,
-    tx: oneshot::Sender<Result<ResourceAssign<AssignResourceStateSrc>, Fail>>,
+    tx: oneshot::Sender<Result<ResourceAssign<AssignResourceStateSrc<NetworkDataSetSrc>>, Fail>>,
 }
 
 impl ResourceCreationChamber {
@@ -1502,7 +1502,7 @@ impl ResourceCreationChamber {
         parent: ResourceStub,
         create: ResourceCreate,
         skel: StarSkel,
-    ) -> oneshot::Receiver<Result<ResourceAssign<AssignResourceStateSrc>, Fail>> {
+    ) -> oneshot::Receiver<Result<ResourceAssign<AssignResourceStateSrc<NetworkDataSetSrc>>, Fail>> {
 
 
         let (tx, rx) = oneshot::channel();
@@ -1624,7 +1624,7 @@ impl ResourceCreationChamber {
     async fn finalize_create(
         &self,
         key: ResourceKey,
-    ) -> Result<ResourceAssign<AssignResourceStateSrc>, Fail> {
+    ) -> Result<ResourceAssign<AssignResourceStateSrc<NetworkDataSetSrc>>, Fail> {
         let address = match &self.create.address {
             AddressCreationSrc::None => {
                 let mut address = format!(
@@ -1686,7 +1686,7 @@ println!("Address: {}", address );
 
         let assign = ResourceAssign {
             stub: stub,
-            state_src: self.create.src.clone(),
+            state_src: self.create.state_src.clone(),
         };
 println!("return create...");
         Ok(assign)
@@ -1696,7 +1696,7 @@ println!("return create...");
 #[async_trait]
 pub trait ResourceHost: Send + Sync {
     fn star_key(&self) -> StarKey;
-    async fn assign(&self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<(), Fail>;
+    async fn assign(&self, assign: ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>) -> Result<(), Fail>;
 }
 
 #[derive(Debug,Clone, Serialize, Deserialize)]
@@ -2369,33 +2369,33 @@ pub struct ResourceCreate {
     pub key: KeyCreationSrc,
     pub address: AddressCreationSrc,
     pub archetype: ResourceArchetype,
-    pub src: AssignResourceStateSrc,
+    pub state_src: AssignResourceStateSrc<NetworkDataSetSrc>,
     pub registry_info: Option<ResourceRegistryInfo>,
     pub owner: Option<UserKey>,
     pub strategy: ResourceCreateStrategy,
 }
 
 impl ResourceCreate {
-    pub fn create(archetype: ResourceArchetype, src: AssignResourceStateSrc) -> Self {
+    pub fn create(archetype: ResourceArchetype, state_src: AssignResourceStateSrc<NetworkDataSetSrc>) -> Self {
         ResourceCreate {
             parent: ResourceKey::Root.into(),
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::None,
             archetype: archetype,
-            src: src,
+            state_src: state_src,
             registry_info: Option::None,
             owner: Option::None,
             strategy: ResourceCreateStrategy::Create,
         }
     }
 
-    pub fn ensure_address(archetype: ResourceArchetype, src: AssignResourceStateSrc) -> Self {
+    pub fn ensure_address(archetype: ResourceArchetype, src: AssignResourceStateSrc<NetworkDataSetSrc>) -> Self {
         ResourceCreate {
             parent: ResourceKey::Root.into(),
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::None,
             archetype: archetype,
-            src: src,
+            state_src: src,
             registry_info: Option::None,
             owner: Option::None,
             strategy: ResourceCreateStrategy::Ensure,
@@ -2422,7 +2422,7 @@ impl ResourceCreate {
             key: self.key,
             address: self.address,
             archetype: self.archetype,
-            src: self.src,
+            state_src: self.state_src,
             registry_info: self.registry_info,
             owner: self.owner,
             strategy: self.strategy
@@ -2507,14 +2507,14 @@ pub enum KeySrc {
 
 /// can have other options like to Initialize the state data
 #[derive(Debug,Clone, Serialize, Deserialize,strum_macros::Display)]
-pub enum AssignResourceStateSrc {
+pub enum AssignResourceStateSrc<DATASET> {
     None,
-    Direct(DataSetBlob),
+    Direct(DATASET),
     CreateArgs(String),
     AlreadyHosted,
 }
 
-impl TryInto<LocalStateSetSrc> for AssignResourceStateSrc {
+impl TryInto<LocalStateSetSrc> for AssignResourceStateSrc<NetworkDataSetSrc> {
     type Error = Error;
 
     fn try_into(self) -> Result<LocalStateSetSrc, Self::Error> {
@@ -2529,7 +2529,36 @@ impl TryInto<LocalStateSetSrc> for AssignResourceStateSrc {
     }
 }
 
+impl TryInto<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>> for AssignResourceStateSrc<NetworkDataSetSrc> {
+    type Error = Error;
 
+    fn try_into(self) -> Result<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>, Self::Error> {
+        match self {
+            AssignResourceStateSrc::Direct(state) => Ok(AssignResourceStateSrc::Direct(state.try_into()?)),
+            AssignResourceStateSrc::AlreadyHosted => Ok(AssignResourceStateSrc::AlreadyHosted),
+            AssignResourceStateSrc::None => Ok(AssignResourceStateSrc::None),
+            _ => {
+                Err(format!("cannot turn {}", self.to_string() ).into())
+            }
+        }
+    }
+}
+
+
+impl TryInto<AssignResourceStateSrc<NetworkDataSetSrc>> for AssignResourceStateSrc<DataSetSrc<LocalBinSrc>> {
+    type Error = Error;
+
+    fn try_into(self) -> Result<AssignResourceStateSrc<NetworkDataSetSrc>, Self::Error> {
+        match self {
+            AssignResourceStateSrc::Direct(state) => Ok(AssignResourceStateSrc::Direct(state.try_into()?)),
+            AssignResourceStateSrc::AlreadyHosted => Ok(AssignResourceStateSrc::AlreadyHosted),
+            AssignResourceStateSrc::None => Ok(AssignResourceStateSrc::None),
+            _ => {
+                Err(format!("cannot turn {}", self.to_string() ).into())
+            }
+        }
+    }
+}
 
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum ResourceSliceStatus {
@@ -2639,17 +2668,48 @@ impl<S> ResourceAssign<S> {
     }
 }
 
-impl TryInto<ResourceAssign<LocalStateSetSrc>> for ResourceAssign<AssignResourceStateSrc> {
+impl TryInto<ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>> for ResourceAssign<AssignResourceStateSrc<NetworkDataSetSrc>>
+{
     type Error = Error;
 
-    fn try_into(self) -> Result<ResourceAssign<LocalStateSetSrc>, Self::Error> {
-        let state_src = self.state_src.try_into()?;
-        Ok(ResourceAssign {
+    fn try_into(self) -> Result<ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>, Self::Error> {
+        let state_src: AssignResourceStateSrc<DataSetSrc<LocalBinSrc>> = self.state_src.try_into()?;
+        Ok(ResourceAssign{
             stub: self.stub,
-            state_src: state_src,
+            state_src: state_src
         })
     }
 }
+
+impl TryInto<ResourceAssign<AssignResourceStateSrc<NetworkDataSetSrc>>> for ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>
+{
+    type Error = Error;
+
+    fn try_into(self) -> Result<ResourceAssign<AssignResourceStateSrc<NetworkDataSetSrc>>, Self::Error> {
+        let state_src: AssignResourceStateSrc<NetworkDataSetSrc> = self.state_src.try_into()?;
+        Ok(ResourceAssign{
+            stub: self.stub,
+            state_src: state_src
+        })
+    }
+}
+
+
+/*j
+impl TryInto<ResourceAssign<DataSetSrc<LocalBinSrc>>> for ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>> {
+    type Error = Error;
+
+    fn try_into(self) -> Result<ResourceAssign<DataSetSrc<LocalBinSrc>>, Self::Error> {
+        Ok(ResourceAssign {
+            stub: self.stub,
+            state_src: self.state_src.try_into()?,
+        })
+    }
+}
+
+ */
+
+
 
 pub struct LocalResourceHost {
     skel: StarSkel,
@@ -2662,7 +2722,7 @@ impl ResourceHost for LocalResourceHost {
         self.skel.info.key.clone()
     }
 
-    async fn assign(&self, _assign: ResourceAssign<AssignResourceStateSrc>) -> Result<(), Fail> {
+    async fn assign(&self, _assign: ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>) -> Result<(), Fail> {
         unimplemented!()
     }
 }
@@ -2678,7 +2738,7 @@ impl ResourceHost for RemoteResourceHost {
         self.handle.key.clone()
     }
 
-    async fn assign(&self, assign: ResourceAssign<AssignResourceStateSrc>) -> Result<(), Fail> {
+    async fn assign(&self, assign: ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>) -> Result<(), Fail> {
         if !self
             .handle
             .kind
@@ -2693,7 +2753,7 @@ impl ResourceHost for RemoteResourceHost {
 
         let mut proto = ProtoStarMessage::new();
         proto.to = self.handle.key.clone().into();
-        proto.payload = StarMessagePayload::ResourceHost(ResourceHostAction::Assign(assign));
+        proto.payload = StarMessagePayload::ResourceHost(ResourceHostAction::Assign(assign.try_into()?));
         let reply = proto.get_ok_result().await;
         self.comm
             .star_tx
@@ -2719,6 +2779,7 @@ impl ResourceHost for RemoteResourceHost {
         }
     }
 }
+
 
 #[derive(Clone)]
 pub struct Resource {
@@ -2757,7 +2818,7 @@ impl Resource {
         self.key.resource_type()
     }
 
-    pub fn state_src(&self) -> DataSetSrc<LocalStateSetSrc> {
+    pub fn state_src(&self) -> DataSetSrc<LocalBinSrc> {
         self.state_src.clone()
     }
 }
@@ -2779,103 +2840,6 @@ pub enum LocalStateSetSrc {
 pub enum RemoteDataSrc {
     None,
     Memory(Arc<Vec<u8>>),
-}
-
-#[derive(Clone)]
-pub struct SrcTransfer<S>
-where
-    S: TryInto<Arc<Vec<u8>>> + TryFrom<Arc<Vec<u8>>>,
-{
-    data_transfer: Option<Arc<dyn DataTransfer>>,
-    data: Option<Arc<S>>,
-}
-
-impl<S> SrcTransfer<S>
-where
-    S: TryInto<Arc<Vec<u8>>> + TryFrom<Arc<Vec<u8>>>,
-{
-    pub fn new(data_transfer: Arc<dyn DataTransfer>) -> Self {
-        SrcTransfer {
-            data_transfer: Option::Some(data_transfer),
-            data: Option::None,
-        }
-    }
-
-    pub async fn get(&mut self) -> Result<Arc<S>, Error> {
-        match &self.data {
-            None => {
-                let data = self.data_transfer.as_ref().unwrap().get().await?;
-                let s = match S::try_from(data) {
-                    Ok(s) => s,
-                    Err(_err) => return Err("could not convert to data".into()),
-                };
-                let s = Arc::new(s);
-                self.data = Option::Some(s.clone());
-                self.data_transfer = Option::None;
-                Ok(s)
-            }
-            Some(s) => Ok(s.clone()),
-        }
-    }
-}
-
-#[async_trait]
-pub trait DataTransfer: Send + Sync {
-    async fn get(&self) -> Result<Arc<Vec<u8>>, Error>;
-    fn src(&self) -> LocalStateSetSrc;
-}
-
-#[derive(Clone)]
-pub struct MemoryDataTransfer {
-    data: Arc<Vec<u8>>,
-}
-
-impl MemoryDataTransfer {
-    pub fn none() -> Self {
-        MemoryDataTransfer {
-            data: Arc::new(vec![]),
-        }
-    }
-
-    pub fn new(data: Arc<Vec<u8>>) -> Self {
-        MemoryDataTransfer { data: data }
-    }
-}
-
-#[async_trait]
-impl DataTransfer for MemoryDataTransfer {
-    async fn get(&self) -> Result<Arc<Vec<u8>>, Error> {
-        Ok(self.data.clone())
-    }
-
-    fn src(&self) -> LocalStateSetSrc {
-        LocalStateSetSrc::Memory(self.data.clone())
-    }
-}
-
-pub struct FileDataTransfer {
-    file_access: FileAccess,
-    path: Path,
-}
-
-impl FileDataTransfer {
-    pub fn new(file_access: FileAccess, path: Path) -> Self {
-        FileDataTransfer {
-            file_access: file_access,
-            path: path,
-        }
-    }
-}
-
-#[async_trait]
-impl DataTransfer for FileDataTransfer {
-    async fn get(&self) -> Result<Arc<Vec<u8>>, Error> {
-        self.file_access.read(&self.path).await
-    }
-
-    fn src(&self) -> LocalStateSetSrc {
-        LocalStateSetSrc::File(self.path.clone())
-    }
 }
 
 

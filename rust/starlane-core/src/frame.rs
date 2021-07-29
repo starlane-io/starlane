@@ -27,6 +27,7 @@ use crate::star::{
     LocalResourceLocation, Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify,
     StarSubGraphKey, StarWatchInfo,
 };
+use crate::data::{LocalBinSrc, DataSetSrc, NetworkBinSrc, NetworkDataSetSrc};
 
 #[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum Frame {
@@ -352,7 +353,7 @@ pub enum MessagePayload {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum ResourceHostAction {
     IsHosting(ResourceKey),
-    Assign(ResourceAssign<AssignResourceStateSrc>),
+    Assign(ResourceAssign<AssignResourceStateSrc<NetworkDataSetSrc>>),
 }
 
 pub enum ResourceHostResult {

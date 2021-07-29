@@ -24,7 +24,7 @@ use crate::message::{Fail};
 use crate::message::resource::{
     MessageFrom, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage,
 };
-use crate::resource::{AddressCreationSrc, ArtifactBundleKind, AssignResourceStateSrc, DataTransfer, FieldSelection, KeyCreationSrc, LocalStateSetSrc, Path, RemoteDataSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceKind, ResourceRecord, ResourceRegistryInfo, ResourceSelector, ResourceStub, ResourceType, ArtifactBundlePath};
+use crate::resource::{AddressCreationSrc, ArtifactBundleKind, AssignResourceStateSrc, FieldSelection, KeyCreationSrc, LocalStateSetSrc, Path, RemoteDataSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceKind, ResourceRecord, ResourceRegistryInfo, ResourceSelector, ResourceStub, ResourceType, ArtifactBundlePath};
 
 use crate::resource::ArtifactBundleAddress;
 
@@ -326,7 +326,7 @@ impl StarlaneApi {
                 specific: None,
                 config: None,
             },
-            src: resource_src,
+            state_src: resource_src,
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
@@ -398,7 +398,7 @@ impl SpaceApi {
                 specific: None,
                 config: None,
             },
-            src: resource_src,
+            state_src: resource_src,
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
@@ -419,7 +419,7 @@ impl SpaceApi {
                 specific: None,
                 config: None,
             },
-            src: resource_src,
+            state_src: resource_src,
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
@@ -438,7 +438,7 @@ impl SpaceApi {
                 specific: None,
                 config: None,
             },
-            src: resource_src,
+            state_src: resource_src,
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
@@ -500,7 +500,7 @@ impl SubSpaceApi {
                 specific: None,
                 config: None,
             },
-            src: resource_src,
+            state_src: resource_src,
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
@@ -523,7 +523,7 @@ impl SubSpaceApi {
                 specific: None,
                 config: None,
             },
-            src: resource_src,
+            state_src: resource_src,
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
@@ -594,7 +594,7 @@ impl FileSystemApi {
                 specific: None,
                 config: None,
             },
-            src: resource_src,
+            state_src: resource_src,
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
@@ -678,7 +678,7 @@ impl ArtifactBundleVersionsApi {
                 specific: None,
                 config: None,
             },
-            src: resource_src,
+            state_src: resource_src,
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,

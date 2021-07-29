@@ -14,11 +14,11 @@ use nom::sequence::{delimited, preceded, terminated, tuple};
 use serde::Deserialize;
 use serde::Serialize;
 
+use starlane_core::data::DataSchema;
 use starlane_macros::resources;
 
-use crate::error::Error;
-use crate::data::DataSchema;
 use crate::data::DataAspectKind;
+use crate::error::Error;
 
 pub mod error;
 pub mod parse;

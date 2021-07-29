@@ -35,6 +35,8 @@ use crate::resource::{
 use crate::star::{
     ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel,
 };
+use crate::data::{NetworkBinSrc, DataSetSrc, LocalBinSrc};
+use crate::data::DataSet;
 
 
 pub mod artifact;
@@ -75,7 +77,7 @@ impl StarCoreAction {
 pub enum StarCoreCommand {
     Get(ResourceIdentifier),
     State(ResourceIdentifier),
-    Assign(ResourceAssign<AssignResourceStateSrc>),
+    Assign(ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>),
     Shutdown
 }
 
@@ -84,7 +86,7 @@ pub enum StarCoreResult {
     Resource(Option<Resource>),
     LocalLocation(LocalResourceLocation),
     MessageReply(MessagePayload),
-    State(RemoteDataSrc),
+    State(DataSetSrc<LocalBinSrc>),
 }
 
 impl ToString for StarCoreResult {
@@ -203,7 +205,7 @@ impl InertHost {
 impl Host for InertHost {
     async fn assign(
         &mut self,
-        _assign: ResourceAssign<AssignResourceStateSrc>,
+        _assign: ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>,
     ) -> Result<Resource, Fail> {
         Err(Fail::Error(
             "This is an InertHost which cannot actually host anything".into(),
@@ -216,11 +218,12 @@ impl Host for InertHost {
         ))
     }
 
-    async fn state(&self, _identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {
+    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSetSrc<LocalBinSrc>, Fail> {
         Err(Fail::Error(
             "This is an InertHost which cannot actually host anything".into(),
         ))
     }
+
 
     async fn delete(&self, _identifier: ResourceIdentifier) -> Result<(), Fail> {
         Err(Fail::Error(
@@ -260,10 +263,10 @@ pub trait StarCoreExtFactory: Send+Sync
 pub trait Host: Send + Sync {
     async fn assign(
         &mut self,
-        assign: ResourceAssign<AssignResourceStateSrc>,
+        assign: ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>,
     ) -> Result<Resource, Fail>;
     async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail>;
-    async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail>;
+    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSetSrc<LocalBinSrc>, Fail>;
     async fn delete(&self, identifier: ResourceIdentifier) -> Result<(), Fail>;
     fn shutdown(&self) {}
 }

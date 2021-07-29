@@ -55,7 +55,7 @@ use crate::message::resource::{
 };
 use crate::permissions::{AuthToken, AuthTokenSource, Credentials};
 
-use crate::resource::{ActorKey, AddressCreationSrc, AppKey, AssignResourceStateSrc, FieldSelection, HostedResourceStore, KeyCreationSrc, Labels, LocalStateSetSrc, LocalHostedResource, LocalResourceHost, MemoryDataTransfer, Parent, ParentCore, Registry, RegistryReservation, RegistryUniqueSrc, RemoteResourceManager, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceBinding, ResourceCreate, ResourceHost, ResourceKey, ResourceKind, ResourceLocation, ResourceManager, ResourceManagerKey, ResourceNamesReservationRequest, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector,  ResourceStub, ResourceType, UniqueSrc, UserKey};
+use crate::resource::{ActorKey, AddressCreationSrc, AppKey, AssignResourceStateSrc, FieldSelection, HostedResourceStore, KeyCreationSrc, Labels, LocalStateSetSrc, LocalHostedResource, LocalResourceHost, Parent, ParentCore, Registry, RegistryReservation, RegistryUniqueSrc, RemoteResourceManager, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceBinding, ResourceCreate, ResourceHost, ResourceKey, ResourceKind, ResourceLocation, ResourceManager, ResourceManagerKey, ResourceNamesReservationRequest, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector,  ResourceStub, ResourceType, UniqueSrc, UserKey};
 
 
 
@@ -2217,6 +2217,19 @@ println!("locate_resource_record request star: {} identifier: {}", self.skel.inf
                 tokio::spawn(async move {
                     let result = rx.await;
                     if let Ok(Ok(StarCoreResult::State(state))) = result {
+
+                        let state  = match state.try_into(){
+                            Ok(state) => state,
+                            Err(_)=>{
+                                error!("error when try_into from LocalBinSrc to NetworkBinSrc");
+                                delivery
+                                    .reply(ResourceResponseMessage::Fail(Fail::expected("Ok(Ok(StarCoreResult::State(state)))")))
+                                    .await
+                                    .unwrap_or_default();
+                                return;
+                            }
+                        };
+
                         delivery
                             .reply(ResourceResponseMessage::State(state))
                             .await
@@ -2395,7 +2408,10 @@ println!("locate_resource_record request star: {} identifier: {}", self.skel.inf
                 }
             }
             ResourceHostAction::Assign(assign) => {
-                let (action, rx) = StarCoreAction::new(StarCoreCommand::Assign(assign.clone()));
+
+
+
+                let (action, rx) = StarCoreAction::new(StarCoreCommand::Assign(assign.try_into()?));
                 self.skel.core_tx.send(action).await;
                 let result = rx.await??;
                 if let StarCoreResult::Resource(Option::Some(resource)) = result {

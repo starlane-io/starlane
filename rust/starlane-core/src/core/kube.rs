@@ -27,14 +27,15 @@ use crate::error::Error;
 
 use crate::message::Fail;
 use crate::resource::{
-    AddressCreationSrc, AssignResourceStateSrc, DataTransfer,
-    KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress,
+    AddressCreationSrc, AssignResourceStateSrc,
+    KeyCreationSrc, Path, RemoteDataSrc, Resource, ResourceAddress,
     ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy,
     ResourceCreationChamber, ResourceKind, ResourceStub,
 };
 
 
 use crate::star::StarSkel;
+use crate::data::{DataSetSrc, LocalBinSrc};
 
 
 pub struct KubeCore {
@@ -94,7 +95,7 @@ impl KubeCore {
 impl Host for KubeCore {
     async fn assign(
         &mut self,
-        assign: ResourceAssign<AssignResourceStateSrc>,
+        assign: ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>,
     ) -> Result<Resource, Fail> {
 
 
@@ -143,13 +144,12 @@ impl Host for KubeCore {
 
         println!("STARLANE RESOURCE CREATED!");
 
-        let data_transfer: Arc<dyn DataTransfer> = Arc::new(MemoryDataTransfer::none());
 
         let resource = Resource::new(
             assign.stub.key,
             assign.stub.address,
             assign.stub.archetype,
-            data_transfer
+            DataSetSrc::new()
         );
 
         Ok(resource)
@@ -160,15 +160,10 @@ impl Host for KubeCore {
 //        self.store.get(identifier).await
     }
 
-    async fn state(&self, _identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {
-        unimplemented!()
-/*        if let Ok(Option::Some(resource)) = self.store.get(identifier.clone()).await {
-            Ok(RemoteDataSrc::None)
-        } else {
-            Err(Fail::ResourceNotFound(identifier))
-        }
- */
+    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSetSrc<LocalBinSrc>, Fail> {
+        todo!()
     }
+
 
     async fn delete(&self, _identifier: ResourceIdentifier) -> Result<(), Fail> {
         unimplemented!("I don't know how to DELETE yet.");

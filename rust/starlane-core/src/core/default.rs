@@ -22,8 +22,8 @@ use crate::message::Fail;
 
 
 use crate::resource::{
-    ArtifactKind, AssignResourceStateSrc, DataTransfer, FileDataTransfer, LocalStateSetSrc,
-    MemoryDataTransfer, Names, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype,
+    ArtifactKind, AssignResourceStateSrc, LocalStateSetSrc,
+    Names, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype,
     ResourceAssign, ResourceKind
 };
 
@@ -33,6 +33,7 @@ use crate::resource::store::{
 
 use crate::star::StarSkel;
 use std::collections::HashMap;
+use crate::data::{DataSetSrc, LocalBinSrc};
 
 #[derive(Debug)]
 pub struct DefaultHost {
@@ -51,26 +52,20 @@ impl DefaultHost {
 
 #[async_trait]
 impl Host for DefaultHost {
-    #[instrument]
     async fn assign(
         &mut self,
-        assign: ResourceAssign<AssignResourceStateSrc>,
+        assign: ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>,
     ) -> Result<Resource, Fail> {
         // if there is Initialization to do for assignment THIS is where we do it
-        let data_transfer = match assign.state_src {
+        let state = match assign.state_src {
             AssignResourceStateSrc::Direct(data) => {
-                let state_schema: StateSchema = assign.stub.archetype.kind.resource_type().state_schema();
-                let mut transfer_map:HashMap<String,Arc<dyn DataTransfer>> = HashMap::new();
-                for (key,kind) in state_schema {
-                    transfer_map.insert( key, MemoryDataTransfer::new(data.map.get(&key).ok_or(format!("expected state aspect {} ", key))?.get()?) )
-                }
-               transfer_map
+                data
             }
-            AssignResourceStateSrc::AlreadyHosted => Arc::new(MemoryDataTransfer::none()),
-            AssignResourceStateSrc::None => Arc::new(MemoryDataTransfer::none()),
+            AssignResourceStateSrc::AlreadyHosted => DataSetSrc::new(),
+            AssignResourceStateSrc::None => DataSetSrc::new(),
             AssignResourceStateSrc::CreateArgs(ref args) =>  {
-                Arc::new(if args.trim().is_empty() && assign.stub.archetype.kind.init_clap_config().is_none() {
-                    HashMap::new()
+                if args.trim().is_empty() && assign.stub.archetype.kind.init_clap_config().is_none() {
+                    DataSetSrc::new()
                 } else if assign.stub.archetype.kind.init_clap_config().is_none(){
                     return Err(format!("resource {} does not take init args",assign.archetype().kind.to_string()).into());
                 }
@@ -110,7 +105,7 @@ println!("seems to have worked....");
                     MemoryDataTransfer::none()
                      */
                     unimplemented!()
-                })
+                }
             }
 
 
@@ -118,7 +113,7 @@ println!("seems to have worked....");
 
         let assign = ResourceAssign {
             stub: assign.stub,
-            state_src: data_transfer,
+            state_src: state,
         };
 
         Ok(self.store.put(assign).await?)
@@ -128,6 +123,16 @@ println!("seems to have worked....");
         self.store.get(identifier).await
     }
 
+    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSetSrc<LocalBinSrc>, Fail> {
+        if let Option::Some(resource) = self.store.get(identifier.clone()).await? {
+            Ok(resource.state_src())
+        } else {
+            Err(Fail::ResourceNotFound(identifier))
+        }
+
+    }
+
+    /*jjjj
     async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {
         if let Option::Some(resource) = self.store.get(identifier.clone()).await? {
             Ok(RemoteDataSrc::Memory(resource.state_src().get().await?))
@@ -135,6 +140,7 @@ println!("seems to have worked....");
             Err(Fail::ResourceNotFound(identifier))
         }
     }
+     */
 
     async fn delete(&self, _identifier: ResourceIdentifier) -> Result<(), Fail> {
         unimplemented!()

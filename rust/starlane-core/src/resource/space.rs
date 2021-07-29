@@ -4,20 +4,21 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
-use crate::resource::{AssignResourceStateSrc, LocalStateSetSrc, Resource, ResourceAddress, ResourceKind, ResourceType, SpaceKey, SrcTransfer};
+use crate::resource::{AssignResourceStateSrc, LocalStateSetSrc, Resource, ResourceAddress, ResourceKind, ResourceType, SpaceKey };
+use crate::data::{DataSetSrc, LocalBinSrc};
 
 #[derive(Clone)]
 pub struct Space {
     key: SpaceKey,
     address: ResourceAddress,
-    state_src: SrcTransfer<SpaceState>,
+    state_src: DataSetSrc<LocalBinSrc>
 }
 
 impl Space {
     pub fn new(
         key: SpaceKey,
         address: ResourceAddress,
-        state_src: SrcTransfer<SpaceState>,
+        state_src: DataSetSrc<LocalBinSrc>
     ) -> Result<Self, Error> {
         if address.resource_type() != ResourceType::Space {
             Err("expected space address".into())
