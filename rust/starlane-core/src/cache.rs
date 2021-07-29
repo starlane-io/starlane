@@ -487,7 +487,11 @@ impl ArtifactBundleSrc {
         identifier: ResourceIdentifier,
     ) -> Result<Option<Arc<Vec<u8>>>, Fail> {
         match self {
-            ArtifactBundleSrc::STARLANE_API(api) => api.get_resource_state(identifier),
+            ArtifactBundleSrc::STARLANE_API(api) => {
+
+//                api.get_resource_state(identifier)
+unimplemented!()
+            },
 //            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(identifier).await,
         }
     }

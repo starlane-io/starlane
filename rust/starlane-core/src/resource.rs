@@ -61,7 +61,6 @@ pub mod config;
 pub mod domain;
 pub mod file;
 pub mod file_system;
-pub mod space;
 pub mod store;
 pub mod sub_space;
 pub mod user;

@@ -72,7 +72,7 @@ println!("ensuring hyperspace.");
         let space_api = creation.submit().await?;
 println!("hyperspace ensured.");
 
-        let mut creation = space_api.create_sub_space("starlane")?;
+        let mut creation = space_api.create_sub_space("starlane", "Starlane")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         let subspace_api= creation.submit().await?;
 println!("subspace ensured.");

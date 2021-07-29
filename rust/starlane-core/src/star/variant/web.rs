@@ -51,14 +51,18 @@ async fn forward(
         format!("hyperspace:default:*:website:{}::<File>", req.path()).as_str(),
     )
     .unwrap();
-    let responder = match api.get_resource_state(address.into()).await {
+
+unimplemented!("switched to BinSrc");
+/*    let responder = match api.get_resource_state(address.into()).await {
         Ok(state) => match state {
             None => "404".to_string(),
             Some(state) => String::from_utf8((*state).clone()).unwrap(),
         },
         Err(_err) => "500".to_string(),
     };
+
     Ok(responder.into())
+ */
 }
 
 async fn proxy(

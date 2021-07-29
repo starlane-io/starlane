@@ -7,9 +7,11 @@ use crate::error::Error;
 use starlane_resources::Path;
 
 use std::future::Future;
+use std::convert::TryFrom;
 use crate::star::StarKey;
 use crate::file_access::FileAccess;
 use actix_web::rt::Runtime;
+use starlane_resources::data::Meta;
 
 
 pub type Binary = Arc<Vec<u8>>;
@@ -47,7 +49,7 @@ pub enum BinSrc {
 }
 
 impl BinSrc{
-    pub fn new(bin: Binary) {
+    pub fn new(bin: Binary) -> Self {
         Self::Memory(bin)
     }
 }
@@ -89,7 +91,7 @@ impl BinSrc{
     pub fn to_bin(&self, ctx: Arc<dyn BinContext>) -> Result<Binary,Error> {
         match self {
             BinSrc::Memory(bin) => {
-                bin.clone()
+                Ok(bin.clone())
             }
             BinSrc::Network { .. } => {
                 unimplemented!()
@@ -105,7 +107,7 @@ impl BinSrc{
                 }
                 transfer.index = bin.len() as _;
                 transfer.complete = true;
-                Ok(Option::Some((*bin).clone()))
+                Ok(Option::Some(bin.to_vec()))
             }
             BinSrc::Network { .. } => {
                 unimplemented!()
@@ -166,3 +168,10 @@ impl BinSrc{
     }
 }
 
+impl TryFrom<Meta> for BinSrc{
+    type Error = Error;
+
+    fn try_from(meta: Meta) -> Result<Self,Self::Error> {
+        Ok(BinSrc::Memory(Arc::new(bincode::serialize(&meta)?)))
+    }
+}

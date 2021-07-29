@@ -32,13 +32,13 @@ use crate::resource::ArtifactBundleAddress;
 use crate::resource::file_system::FileSystemState;
 use crate::resource::FileKind;
 use crate::resource::ResourceKey;
-use crate::resource::space::SpaceState;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
 use crate::star::{Request, StarCommand, StarKind, Wind};
 
 use crate::starlane::StarlaneCommand;
 use crate::data::{BinSrc, DataSet};
+use starlane_resources::data::Meta;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -312,10 +312,12 @@ impl StarlaneApi {
         })
     }
 
-    pub fn create_space(&self, name: &str, display: &str) -> Result<Creation<SpaceApi>, Fail> {
-        let state = SpaceState::new(display);
-        let state_data = state.try_into()?;
-        let resource_src = AssignResourceStateSrc::Direct(state_data);
+    pub fn create_space(&self, name: &str, display_name: &str) -> Result<Creation<SpaceApi>, Fail> {
+        let mut meta = Meta::single("display-name", display_name);
+        let mut state:DataSet<BinSrc> = DataSet::new();
+        state.insert("meta".to_string(), meta.try_into()? );
+
+        let state = AssignResourceStateSrc::Direct(state);
         let create = ResourceCreate {
             parent: ResourceKey::Root.into(),
             key: KeyCreationSrc::None,
@@ -325,7 +327,7 @@ impl StarlaneApi {
                 specific: None,
                 config: None,
             },
-            state_src: resource_src,
+            state_src: state,
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
@@ -385,8 +387,9 @@ impl SpaceApi {
     }
 
     pub fn create_user(&self, email: &str) -> Result<Creation<UserApi>, Fail> {
-        let state = UserState::new(email.to_string());
-        let state_data = state.try_into()?;
+        let mut meta = Meta::single("email", email);
+        let mut state_data:DataSet<BinSrc> = DataSet::new();
+        state_data.insert("meta".to_string(), meta.try_into()? );
         let resource_src = AssignResourceStateSrc::Direct(state_data);
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
@@ -405,10 +408,12 @@ impl SpaceApi {
         Ok(Creation::new(self.starlane_api(), create))
     }
 
-    pub fn create_sub_space(&self, sub_space: &str) -> Result<Creation<SubSpaceApi>, Fail> {
-        let state = SubSpaceState::new(sub_space);
-        let state_data = state.try_into()?;
+    pub fn create_sub_space(&self, sub_space: &str, display_name: &str) -> Result<Creation<SubSpaceApi>, Fail> {
+        let mut meta = Meta::single("display-name", display_name);
+        let mut state_data:DataSet<BinSrc> = DataSet::new();
+        state_data.insert("meta".to_string(), meta.try_into()? );
         let resource_src = AssignResourceStateSrc::Direct(state_data);
+
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
             key: KeyCreationSrc::None,
@@ -487,9 +492,7 @@ impl SubSpaceApi {
     }
 
     pub fn create_file_system(&self, name: &str) -> Result<Creation<FileSystemApi>, Fail> {
-        let state = FileSystemState::new();
-        let state_data = state.try_into()?;
-        let resource_src = AssignResourceStateSrc::Direct(state_data);
+        let resource_src = AssignResourceStateSrc::None;
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
             key: KeyCreationSrc::None,
@@ -579,11 +582,16 @@ impl FileSystemApi {
         self.create_file(path, Arc::new(string.into_bytes()))
     }
 
-    pub fn create_file(&self, path: &Path, data: Arc<Vec<u8>>) -> Result<Creation<FileApi>, Fail> {
+    pub fn create_file(&self, path: &Path, data: Binary ) -> Result<Creation<FileApi>, Fail> {
+
+        let content = BinSrc::Memory(data);
+        let mut state:  DataSet<BinSrc> = DataSet::new();
+        state.insert( "content".to_string(), content );
+
         // at this time the only way to 'create' a file state is to load the entire thing into memory
         // in the future we want options like "Stream" which will allow us to stream the state contents, etc.
         //        let resource_src = AssignResourceStateSrc::Direct(data.get()?);
-        let resource_src = AssignResourceStateSrc::Direct(data);
+        let resource_src = AssignResourceStateSrc::Direct(state);
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
             key: KeyCreationSrc::None,
@@ -664,7 +672,12 @@ impl ArtifactBundleVersionsApi {
         version: Version,
         data: Arc<Vec<u8>>,
     ) -> Result<Creation<ArtifactBundleApi>, Fail> {
-        let resource_src = AssignResourceStateSrc::Direct(data);
+
+        let content = BinSrc::Memory(data);
+        let mut state:  DataSet<BinSrc> = DataSet::new();
+        state.insert( "content".to_string(), content );
+
+        let resource_src = AssignResourceStateSrc::Direct(state);
         // hacked to FINAL
         let kind: ArtifactBundleKind = ArtifactBundleKind::Final;
 
@@ -896,7 +909,7 @@ impl TryFrom<ResourceApi> for DomainApi {
 pub enum StarlaneAction {
     GetState {
         identifier: ResourceIdentifier,
-        tx: tokio::sync::oneshot::Sender<Result<Option<Arc<Vec<u8>>>, Fail>>,
+        tx: tokio::sync::oneshot::Sender<Result<DataSet<BinSrc>, Fail>>,
     },
 }
 
@@ -948,7 +961,7 @@ impl StarlaneApiRelay {
     pub async fn get_resource_state(
         &self,
         identifier: ResourceIdentifier,
-    ) -> Result<Option<Arc<Vec<u8>>>, Fail> {
+    ) -> Result<DataSet<BinSrc>, Fail> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.tx
             .send(StarlaneAction::GetState {

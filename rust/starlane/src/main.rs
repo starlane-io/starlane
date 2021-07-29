@@ -183,7 +183,7 @@ async fn create(args: ArgMatches<'_> ) -> Result<(),Error> {
                 specific: None,
                 config: None
             },
-            src: AssignResourceStateSrc::InitArgs(init_args),
+            state_src: AssignResourceStateSrc::CreateArgs(init_args),
             registry_info: Option::None,
             owner: Option::None,
             strategy: ResourceCreateStrategy::Create

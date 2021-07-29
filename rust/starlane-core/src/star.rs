@@ -3308,7 +3308,7 @@ impl StarSkel {
     }
 }
 
-struct SkelBinContext {
+pub struct SkelBinContext {
   star: StarKey
 }
 
