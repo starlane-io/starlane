@@ -5,20 +5,20 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 use crate::resource::{AssignResourceStateSrc, LocalStateSetSrc, Resource, ResourceAddress, ResourceKind, ResourceType, SpaceKey };
-use crate::data::{DataSetSrc, LocalBinSrc};
+use crate::data::{BinSrc, DataSet};
 
 #[derive(Clone)]
 pub struct Space {
     key: SpaceKey,
     address: ResourceAddress,
-    state_src: DataSetSrc<LocalBinSrc>
+    state_src: DataSet<BinSrc>
 }
 
 impl Space {
     pub fn new(
         key: SpaceKey,
         address: ResourceAddress,
-        state_src: DataSetSrc<LocalBinSrc>
+        state_src: DataSet<BinSrc>
     ) -> Result<Self, Error> {
         if address.resource_type() != ResourceType::Space {
             Err("expected space address".into())

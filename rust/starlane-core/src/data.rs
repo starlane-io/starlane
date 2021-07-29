@@ -1,3 +1,4 @@
+use serde::{Serialize,Deserialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
@@ -8,36 +9,38 @@ use starlane_resources::Path;
 use std::future::Future;
 use crate::star::StarKey;
 use crate::file_access::FileAccess;
-use std::alloc::Global;
+use actix_web::rt::Runtime;
 
 
 pub type Binary = Arc<Vec<u8>>;
 pub type DataSet<B> = HashMap<String,B>;
 
-#[Debug,Clone,Serialize,Deserialize]
+#[derive(Debug,Clone,Serialize,Deserialize)]
 pub enum BinSize{
     Unknown,
     Size(i32)
 }
 
+#[derive(Debug,Clone,Serialize,Deserialize)]
 pub enum BinSizeCategory{
     Small,
     Large
 }
 
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub enum FileSpace{
     Perm,
     Temp
 }
 
-#[Debug,Clone,Serialize,Deserialize]
+#[derive(Debug,Clone,Serialize,Deserialize)]
 pub struct BinNetworkAddress {
     pub star: StarKey,
     pub filepath: String,
     pub filespace: FileSpace
 }
 
-#[Debug,Clone,Serialize,Deserialize]
+#[derive(Debug,Clone,Serialize,Deserialize)]
 pub enum BinSrc {
   Memory(Binary),
   Network{address:BinNetworkAddress, size: BinSize}
@@ -51,12 +54,8 @@ impl BinSrc{
 
 pub trait BinContext {
   fn file_access(&self) -> FileAccess;
-  fn spawn<T>(&self, task: T) -> JoinHandle<T::Output>
-        where
-            T: Future + Send + 'static,
-            T::Output: Send + 'static;
-
-  fn is_local_star( star: StarKey ) -> bool;
+  fn bin_runtime(&self) -> Runtime;
+  fn is_local_star( &self, star: StarKey ) -> bool;
 }
 
 pub struct BinTransfer{
@@ -118,7 +117,7 @@ impl BinSrc{
     pub async fn mv(&self, ctx: Arc<dyn BinContext>, path: Path, tx: tokio::sync::oneshot::Sender<Result<(),Error>> ) {
         match self {
             BinSrc::Memory(bin) => {
-                tx.send(ctx.file_access().write( &path, bin ).await).unwrap_or_default();
+                tx.send(ctx.file_access().write( &path, bin.clone() ).await).unwrap_or_default();
             }
             BinSrc::Network { address,size: _ } => {
                 if address.filespace == FileSpace::Temp && ctx.is_local_star(address.star.clone())
@@ -129,7 +128,7 @@ impl BinSrc{
                 else
                 {
                     let clone = self.clone();
-                    ctx.spawn_bin_transfer(async move {
+                    ctx.bin_runtime().spawn(async move {
                         let mut transfer = BinTransfer::new(ctx.clone());
                         // output stream does not exist yet in filesysstem
                         // let output = ctx.file_access().output( path );
@@ -160,7 +159,7 @@ impl BinSrc{
                             }
                         }
                         tx.send(Result::Ok(()));
-                    })
+                    });
                 }
             }
         }

@@ -306,11 +306,13 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     pathways.push_str("match self { ");
     pathways.push_str("Self::Root => Err(\"Root does not have a parent to match\".into()),");
 
+    /*
     let mut state_schema= String::new();
     state_schema.push_str("impl ResourceType {");
     state_schema.push_str("pub fn state_schema( &self ) -> StateSchema {");
     state_schema.push_str("match self { ");
     state_schema.push_str("Self::Root => StateSchema::new(),");
+     */
 
 
     for resource in &parsed.resources {
@@ -341,6 +343,7 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
         pathways.push_str( "},");
 
+        /*
         state_schema.push_str( format!("Self::{}=>{{", resource.get_ident().to_string()).as_str() );
         state_schema.push_str( "let mut state_schema = StateSchema::new();" );
         for (key,value) in &resource.state_aspects {
@@ -348,18 +351,22 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         }
         state_schema.push_str( "state_schema" );
         state_schema.push_str( "}");
+
+         */
     }
 
 
 
     pathways.push_str("}}}");
-    state_schema.push_str( "}}}");
+    //state_schema.push_str( "}}}");
 //println!("{}",pathways);
     let pathways = syn::parse_str::<Item>( pathways.as_str() ).unwrap();
     let pathways = quote!{#pathways};
 
+    /*
     let state_schema = syn::parse_str::<Item>( state_schema.as_str() ).unwrap();
     let state_schema = quote!{#state_schema};
+     */
 
     let state_persistences: Vec<Path> = parsed.resources.clone().iter().map(|resource|{
         resource.state_persistence.as_ref().expect("expected ResourceStatePersistenceManager to be set").clone()
@@ -391,7 +398,6 @@ impl ResourceType {
    }
 }
 #pathways
-#state_schema
     };
 
 

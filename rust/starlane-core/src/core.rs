@@ -27,16 +27,12 @@ use crate::error::Error;
 use crate::frame::MessagePayload;
 
 use crate::message::Fail;
-use crate::resource::{
-    AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource,
-    RemoteDataSrc, Resource, ResourceAssign, ResourceSliceAssign,
-};
+use crate::resource::{AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource, RemoteDataSrc, Resource, ResourceAssign, ResourceSliceAssign, ResourceKey};
 
 use crate::star::{
     ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel,
 };
-use crate::data::{NetworkBinSrc, DataSetSrc, LocalBinSrc};
-use crate::data::DataSet;
+use crate::data::{DataSet, BinSrc};
 
 
 pub mod artifact;
@@ -77,7 +73,7 @@ impl StarCoreAction {
 pub enum StarCoreCommand {
     Get(ResourceIdentifier),
     State(ResourceIdentifier),
-    Assign(ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>),
+    Assign(ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>),
     Shutdown
 }
 
@@ -86,7 +82,7 @@ pub enum StarCoreResult {
     Resource(Option<Resource>),
     LocalLocation(LocalResourceLocation),
     MessageReply(MessagePayload),
-    State(DataSetSrc<LocalBinSrc>),
+    State(DataSet<BinSrc>),
 }
 
 impl ToString for StarCoreResult {
@@ -205,7 +201,7 @@ impl InertHost {
 impl Host for InertHost {
     async fn assign(
         &mut self,
-        _assign: ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>,
+        _assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<Resource, Fail> {
         Err(Fail::Error(
             "This is an InertHost which cannot actually host anything".into(),
@@ -218,7 +214,7 @@ impl Host for InertHost {
         ))
     }
 
-    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSetSrc<LocalBinSrc>, Fail> {
+    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSet<BinSrc>, Fail> {
         Err(Fail::Error(
             "This is an InertHost which cannot actually host anything".into(),
         ))
@@ -260,14 +256,14 @@ pub trait StarCoreExtFactory: Send+Sync
  */
 
 #[async_trait]
-pub trait Host: Send + Sync {
+    pub trait Host: Send + Sync {
     async fn assign(
-        &mut self,
-        assign: ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>,
+    &mut self,
+    assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<Resource, Fail>;
-    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail>;
-    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSetSrc<LocalBinSrc>, Fail>;
-    async fn delete(&self, identifier: ResourceIdentifier) -> Result<(), Fail>;
+    async fn get(&self, key: ResourceKey) -> Result<Option<Resource>, Fail>;
+    async fn state(&self, key: ResourceKey) -> Result<DataSet<BinSrc>, Fail>;
+    async fn delete(&self, key: ResourceKey) -> Result<(), Fail>;
     fn shutdown(&self) {}
 }
 

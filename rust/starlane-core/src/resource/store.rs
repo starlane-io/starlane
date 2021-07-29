@@ -13,8 +13,8 @@ use crate::error::Error;
 
 use crate::message::Fail;
 use crate::resource::{LocalStateSetSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceKey, ResourceKind, Specific};
-use crate::data::{DataSetBlob, DataSetSrc, LocalBinSrc};
 use std::convert::TryInto;
+use crate::data::{DataSet, BinSrc};
 
 #[derive(Clone,Debug)]
 pub struct ResourceStore {
@@ -24,13 +24,13 @@ pub struct ResourceStore {
 impl ResourceStore {
     pub async fn new() -> Self {
         ResourceStore {
-            tx: ResourceStoreSqlLite::new().await,
+            tx: ResourceStoreFS::new().await,
         }
     }
 
     pub async fn put(
         &self,
-        assign: ResourceAssign<DataSetSrc<LocalBinSrc>>,
+        assign: ResourceAssign<DataSet<BinSrc>>,
     ) -> Result<Resource, Fail> {
         let (tx, rx) = oneshot::channel();
 
@@ -51,11 +51,11 @@ impl ResourceStore {
         }
     }
 
-    pub async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail> {
+    pub async fn get(&self, key: ResourceKey ) -> Result<Option<Resource>, Fail> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(ResourceStoreAction {
-                command: ResourceStoreCommand::Get(identifier.clone()),
+                command: ResourceStoreCommand::Get(key.clone()),
                 tx: tx,
             })
             .await?;
@@ -88,8 +88,8 @@ pub struct ResourceStoreAction {
 #[derive(strum_macros::Display)]
 pub enum ResourceStoreCommand {
     Close,
-    Put(ResourceAssign<DataSetSrc<LocalBinSrc>>),
-    Get(ResourceIdentifier),
+    Put(ResourceAssign<DataSet<BinSrc>>),
+    Get(ResourceKey),
 }
 
 pub enum ResourceStoreResult {
@@ -106,13 +106,13 @@ impl ToString for ResourceStoreResult{
     }
 }
 
-pub struct ResourceStoreSqlLite {
+pub struct ResourceStoreFS {
     pub conn: Connection,
     pub tx: mpsc::Sender<ResourceStoreAction>,
     pub rx: mpsc::Receiver<ResourceStoreAction>,
 }
 
-impl ResourceStoreSqlLite {
+impl ResourceStoreFS {
     pub async fn new() -> mpsc::Sender<ResourceStoreAction> {
         let (tx, rx) = mpsc::channel(1024);
 
@@ -120,7 +120,7 @@ impl ResourceStoreSqlLite {
         tokio::spawn(async move {
             let conn = Connection::open_in_memory();
             if conn.is_ok() {
-                let mut db = ResourceStoreSqlLite {
+                let mut db = ResourceStoreFS {
                     conn: conn.unwrap(),
                     tx: tx_clone,
                     rx: rx,
@@ -175,6 +175,8 @@ impl ResourceStoreSqlLite {
                     Some(config_src) => Option::Some(config_src.to_string()),
                 };
 
+                unimplemented!();
+                /*
                 let state = match assign
                     .stub
                     .archetype
@@ -191,7 +193,9 @@ impl ResourceStoreSqlLite {
                     }
                 };
 
-                self.conn.execute("INSERT INTO resources (key,address,state_src,kind,specific,config_src) VALUES (?1,?2,?3,?4,?5,?6)", params![key,address,state,assign.stub.archetype.kind.to_string(),specific,config_src])?;
+//                self.conn.execute("INSERT INTO resources (key,address,state_src,kind,specific,config_src) VALUES (?1,?2,?3,?4,?5,?6)", params![key,address,state,assign.stub.archetype.kind.to_string(),specific,config_src])?;
+
+                 */
 
                 let resource = Resource::new(
                     assign.stub.key,
@@ -203,136 +207,12 @@ impl ResourceStoreSqlLite {
                 Ok(ResourceStoreResult::Resource(Option::Some(resource)))
             }
             ResourceStoreCommand::Get(identifier) => {
-                let statement = match &identifier {
-                    ResourceIdentifier::Key(_key) => {
-                        "SELECT key,address,state_src,kind,specific,config_src FROM resources WHERE key=?1"
-                    }
-                    ResourceIdentifier::Address(_) => {
-                        "SELECT key,address,state_src,kind,specific,config_src FROM resources WHERE address=?1"
-                    }
-                };
-
-                let func = |row: &Row| {
-                    let key: Vec<u8> = row.get(0)?;
-                    let key = match ResourceKey::from_bin(key) {
-                        Ok(key) => key,
-                        Err(err) => {
-                            return Err(rusqlite::Error::InvalidParameterName(err.to_string()));
-                        }
-
-                    };
-
-                    let address: String = row.get(1)?;
-                    let address = match ResourceAddress::from_str(address.as_str()) {
-                        Ok(address) => address,
-                        Err(error) => {
-                            return Err(rusqlite::Error::InvalidParameterName(error.to_string()));
-                        }
-                    };
-
-                    let state = if let ValueRef::Null = row.get_ref(2)? {
-                        Option::None
-                    } else {
-                        let state: Vec<u8> = row.get(2)?;
-                        Option::Some(state)
-                    };
-
-                    let kind: String = row.get(3)?;
-                    let kind = match ResourceKind::from_str(kind.as_str()) {
-                        Ok(kind) => kind,
-                        Err(err) => {
-                            return Err(rusqlite::Error::InvalidParameterName(err.to_string()));
-                        }
-
-                    };
-
-                    let specific = if let ValueRef::Null = row.get_ref(4)? {
-                        Option::None
-                    } else {
-                        let specific: String = row.get(4)?;
-                        match Specific::from_str(specific.as_str()){
-                            Ok(specific) => {
-                                Option::Some(specific)
-                            }
-                            Err(err) => {
-                                return Err(rusqlite::Error::InvalidParameterName(err.to_string()));
-                            }
-                        }
-                    };
-
-                    let config_src = if let ValueRef::Null = row.get_ref(5)? {
-                        Option::None
-                    } else {
-                        let config_src: String = row.get(5)?;
-                        let config_src = ConfigSrc::from_str(config_src.as_str())?;
-                        Option::Some(config_src)
-                    };
-
-                    let state: DataSetSrc<LocalBinSrc> = match state {
-                        None => {
-                            DataSetSrc::new()
-                        }
-                        Some(state) => {
-                            let bin = Arc::new(state);
-                            let blob = DataSetBlob::from_bin(bin)?;
-                            match blob.try_into() {
-                                Ok(data_set) => data_set,
-                                Err(err) => {
-                                    error!("ERROR: {}",err.to_string());
-                                    return Err(rusqlite::Error::InvalidQuery);
-                                }
-                            }
-                        },
-                    };
-
-                    let archetype = ResourceArchetype {
-                        kind: kind,
-                        specific: specific,
-                        config: config_src,
-                    };
-
-                    Ok(Resource::new(key, address, archetype, state))
-                };
-
-                let resource:rusqlite::Result<Resource> = match identifier.clone() {
-                    ResourceIdentifier::Key(key) => {
-                        let key = key.bin()?;
-                        self.conn.query_row(statement, params![key], func)
-                    }
-                    ResourceIdentifier::Address(address) => {
-                        self.conn
-                            .query_row(statement, params![address.to_string()], func)
-                    }
-                };
-
-                match resource {
-                    Ok(resource) => Ok(ResourceStoreResult::Resource(Option::Some(resource))),
-                    Err(err) => match err {
-                        rusqlite::Error::QueryReturnedNoRows => {
-                            Ok(ResourceStoreResult::Resource(Option::None))
-                        }
-                        _ => Err(err.to_string().into()),
-                    },
-                }
+                unimplemented!()
             }
         }
     }
 
     pub fn setup(&mut self) -> Result<(), Error> {
-        let resources = r#"
-       CREATE TABLE IF NOT EXISTS resources(
-	      key BLOB PRIMARY KEY,
-	      address TEXT NOT NULL,
-	      state_src BLOB,
-	      kind TEXT NOT NULL,
-	      specific TEXT,
-	      config_src TEXT,
-	      UNIQUE(address)
-        )"#;
-
-        let transaction = self.conn.transaction()?;
-        transaction.execute(resources, [])?;
-        transaction.commit()?;
 
         Ok(())
     }

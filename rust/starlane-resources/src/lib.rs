@@ -14,10 +14,8 @@ use nom::sequence::{delimited, preceded, terminated, tuple};
 use serde::Deserialize;
 use serde::Serialize;
 
-use starlane_core::data::DataSchema;
 use starlane_macros::resources;
 
-use crate::data::DataAspectKind;
 use crate::error::Error;
 
 pub mod error;
@@ -1165,7 +1163,6 @@ pub enum ResourceStatePersistenceManager {
 }
 
 
-pub type StateSchema=HashMap<String,DataSchema>;
 
 
 

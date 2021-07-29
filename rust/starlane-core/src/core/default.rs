@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 
 
-use starlane_resources::{ResourceIdentifier, StateSchema};
+use starlane_resources::{ResourceIdentifier};
 
 
 
@@ -33,7 +33,7 @@ use crate::resource::store::{
 
 use crate::star::StarSkel;
 use std::collections::HashMap;
-use crate::data::{DataSetSrc, LocalBinSrc};
+use crate::data::{DataSet, BinSrc};
 
 #[derive(Debug)]
 pub struct DefaultHost {
@@ -54,18 +54,18 @@ impl DefaultHost {
 impl Host for DefaultHost {
     async fn assign(
         &mut self,
-        assign: ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>,
+        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<Resource, Fail> {
         // if there is Initialization to do for assignment THIS is where we do it
         let state = match assign.state_src {
             AssignResourceStateSrc::Direct(data) => {
                 data
             }
-            AssignResourceStateSrc::AlreadyHosted => DataSetSrc::new(),
-            AssignResourceStateSrc::None => DataSetSrc::new(),
+            AssignResourceStateSrc::AlreadyHosted => DataSet::new(),
+            AssignResourceStateSrc::None => DataSet::new(),
             AssignResourceStateSrc::CreateArgs(ref args) =>  {
                 if args.trim().is_empty() && assign.stub.archetype.kind.init_clap_config().is_none() {
-                    DataSetSrc::new()
+                    DataSet::new()
                 } else if assign.stub.archetype.kind.init_clap_config().is_none(){
                     return Err(format!("resource {} does not take init args",assign.archetype().kind.to_string()).into());
                 }
@@ -123,7 +123,7 @@ println!("seems to have worked....");
         self.store.get(identifier).await
     }
 
-    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSetSrc<LocalBinSrc>, Fail> {
+    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSet<BinSrc>, Fail> {
         if let Option::Some(resource) = self.store.get(identifier.clone()).await? {
             Ok(resource.state_src())
         } else {

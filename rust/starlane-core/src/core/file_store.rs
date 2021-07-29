@@ -30,9 +30,8 @@ use crate::resource::store::{
 };
 use crate::star::StarSkel;
 use crate::util;
-use crate::data::{LocalBinSrc, DataSetSrc};
 use std::convert::TryInto;
-use starlane_resources::data::DataAspectKind;
+use crate::data::{DataSet, BinSrc};
 
 pub struct FileStoreHost {
     skel: StarSkel,
@@ -215,7 +214,7 @@ impl FileStoreHost {
 impl Host for FileStoreHost {
     async fn assign(
         &mut self,
-        assign: ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>,
+        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<Resource, Fail> {
         // if there is Initialization to do for assignment THIS is where we do it
 
@@ -275,7 +274,7 @@ impl Host for FileStoreHost {
             }
         }
 
-        let state = DataSetSrc::new();
+        let state = DataSet::new();
 
         let assign = ResourceAssign {
             stub: assign.stub,
@@ -289,7 +288,7 @@ impl Host for FileStoreHost {
         self.store.get(identifier).await
     }
 
-    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSetSrc<LocalBinSrc>, Fail> {
+    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSet<BinSrc>, Fail> {
         if let Ok(Option::Some(resource)) = self.store.get(identifier.clone()).await {
             match identifier.resource_type() {
                 ResourceType::File => {
@@ -307,11 +306,11 @@ impl Host for FileStoreHost {
                         .file_access
                         .read(&Path::from_str(path.as_str())?)
                         .await?;
-                    let mut state = DataSetSrc::new();
-                    state.map.insert("content".to_string(), LocalBinSrc::InMemory(data));
+                    let mut state = DataSet::new();
+                    state.map.insert("content".to_string(), BinSrc::Memory(data));
                     Ok(state)
                 }
-                _ => Ok(DataSetSrc::new()),
+                _ => Ok(DataSet::new()),
             }
         } else {
             Err(Fail::ResourceNotFound(identifier))

@@ -35,7 +35,7 @@ use crate::resource::{
 
 
 use crate::star::StarSkel;
-use crate::data::{DataSetSrc, LocalBinSrc};
+use crate::data::{DataSet, BinSrc};
 
 
 pub struct KubeCore {
@@ -95,7 +95,7 @@ impl KubeCore {
 impl Host for KubeCore {
     async fn assign(
         &mut self,
-        assign: ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>,
+        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<Resource, Fail> {
 
 
@@ -149,7 +149,7 @@ impl Host for KubeCore {
             assign.stub.key,
             assign.stub.address,
             assign.stub.archetype,
-            DataSetSrc::new()
+            DataSet::new()
         );
 
         Ok(resource)
@@ -160,7 +160,7 @@ impl Host for KubeCore {
 //        self.store.get(identifier).await
     }
 
-    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSetSrc<LocalBinSrc>, Fail> {
+    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSet<BinSrc>, Fail> {
         todo!()
     }
 

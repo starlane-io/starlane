@@ -1,6 +1,7 @@
 use std::{cmp, fmt};
 
 
+use tokio::task::JoinHandle;
 use std::cmp::{min, Ordering};
 use std::collections::{HashMap, HashSet};
 
@@ -63,7 +64,9 @@ use crate::star::pledge::{ResourceHostSelector, Satisfaction, StarHandle, StarHa
 use crate::star::variant::StarShellInstructions;
 
 use crate::template::StarTemplateHandle;
-use crate::data::DataSetSrc;
+use std::future::Future;
+use crate::data::{DataSet, BinContext};
+use actix_web::rt::Runtime;
 
 
 pub mod filestore;
@@ -2221,7 +2224,7 @@ println!("locate_resource_record request star: {} identifier: {}", self.skel.inf
                         let state  = match state.try_into(){
                             Ok(state) => state,
                             Err(_)=>{
-                                error!("error when try_into from LocalBinSrc to NetworkBinSrc");
+                                error!("error when try_into from BinSrc to NetworkBinSrc");
                                 delivery
                                     .reply(ResourceResponseMessage::Fail(Fail::expected("Ok(Ok(StarCoreResult::State(state)))")))
                                     .await
@@ -2445,7 +2448,7 @@ println!("locate_resource_record request star: {} identifier: {}", self.skel.inf
                         specific: None,
                         config: None,
                     },
-                    DataSetSrc::new()
+                    DataSet::new()
                 ))
             }
             _ => self.get_resource(&key).await?,
@@ -3288,6 +3291,31 @@ pub struct StarSkel {
     pub persistence: Persistence,
     pub data_access: FileAccess,
     pub caches: Arc<ProtoArtifactCachesFactory>,
+}
+
+impl StarSkel {
+    pub fn bin_context(&self)-> Arc<SkelBinContext>{
+        SkelBinContext{}
+    }
+}
+
+struct SkelBinContext {
+
+}
+
+impl BinContext for SkelBinContext{
+    fn file_access(&self) -> FileAccess {
+        todo!()
+    }
+
+    fn bin_runtime(&self) -> Runtime {
+        todo!()
+    }
+
+
+    fn is_local_star(&self,star: StarKey) -> bool {
+        self.info.key == star
+    }
 }
 
 impl Debug for StarSkel{

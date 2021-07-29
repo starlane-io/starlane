@@ -6,14 +6,13 @@ use serde::{Deserialize, Serialize};
 use crate::error::Error;
 use crate::resource::{ResourceAddress};
 use crate::resource::ArtifactBundleKey;
-use crate::data::DataSet;
-use crate::data::{LocalBinSrc, DataSetSrc};
+use crate::data::{DataSet, BinSrc};
 
 #[derive(Clone)]
 pub struct ArtifactBundle {
     key: ArtifactBundleKey,
     address: ResourceAddress,
-    state_src: DataSetSrc<LocalBinSrc>
+    state_src: DataSet<BinSrc>
 }
 
 #[derive(Clone, Serialize, Deserialize)]

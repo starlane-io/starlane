@@ -5,13 +5,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 use crate::resource::{AssignResourceStateSrc, FileKey, LocalStateSetSrc, Resource, ResourceAddress, ResourceType };
-use crate::data::{LocalBinSrc, DataSetSrc};
+use crate::data::{BinSrc, DataSet};
 
 #[derive(Clone)]
 pub struct File {
     key: FileKey,
     address: ResourceAddress,
-    state_src: DataSetSrc<LocalBinSrc>,
+    state_src: DataSet<BinSrc>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

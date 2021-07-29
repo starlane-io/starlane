@@ -9,11 +9,9 @@ use std::sync::Arc;
 use tempdir::TempDir;
 use tokio::sync::Mutex;
 
-use starlane_resources::data::DataAspectKind;
 use starlane_resources::ResourceIdentifier;
 
 use crate::core::{Host, StarCoreAction, StarCoreCommand};
-use crate::data::{Binary, DataSetSrc, LocalBinSrc};
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::message::Fail;
@@ -22,6 +20,7 @@ use crate::resource::ArtifactBundleKey;
 use crate::resource::store::ResourceStore;
 use crate::star::StarSkel;
 use crate::util;
+use crate::data::{DataSet, BinSrc};
 
 pub struct ArtifactHost {
     skel: StarSkel,
@@ -84,7 +83,7 @@ impl ArtifactHost {
         Ok(())
     }
 
-    fn validate(assign: &ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>) -> Result<(), Fail> {
+    fn validate(assign: &ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>) -> Result<(), Fail> {
         match &assign.stub.key {
             ResourceKey::ArtifactBundle(_) => Ok(()),
             ResourceKey::Artifact(_) => Ok(()),
@@ -145,7 +144,7 @@ impl ArtifactHost {
 impl Host for ArtifactHost {
     async fn assign(
         &mut self,
-        assign: ResourceAssign<AssignResourceStateSrc<DataSetSrc<LocalBinSrc>>>,
+        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<Resource, Fail> {
 
         Self::validate(&assign)?;
@@ -158,8 +157,8 @@ impl Host for ArtifactHost {
                 match &assign.state_src {
                     AssignResourceStateSrc::Direct(state_set_src) => {
 
-                        let src = state_set_src.map.get(&"content".to_string() ).cloned().ok_or("expected content state aspect for ArtifactBundle")?;
-                        let content:Binary = src.try_into()?;
+                        let src = state_set_src.get(&"content".to_string() ).cloned().ok_or("expected content state aspect for ArtifactBundle")?;
+                        let content= src.to_bin(self.skel.bin_context() )?;
                         let artifacts = get_artifacts(content.clone() )?;
                         let path = Self::bundle_path(assign.key())?;
                         let mut file_access = self.file_access.with_path(path.to_relative())?;
@@ -206,7 +205,7 @@ impl Host for ArtifactHost {
 
         let assign = ResourceAssign {
             stub: assign.stub.clone(),
-            state_src: DataSetSrc::new(),
+            state_src: DataSet::new(),
         };
 
         let resource = self.store.put(assign).await?;
@@ -232,11 +231,11 @@ impl Host for ArtifactHost {
         Ok(resource)
     }
 
-    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail> {
-        self.store.get(identifier).await
+    async fn get(&self, key: ResourceKey) -> Result<Option<Resource>, Fail> {
+        self.store.get(key).await
     }
 
-    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSetSrc<LocalBinSrc>, Fail> {
+    async fn state(&self, key: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
         if let Ok(Option::Some(resource)) = self.store.get(identifier.clone()).await {
             match identifier.resource_type() {
                 ResourceType::File => {
@@ -255,11 +254,11 @@ impl Host for ArtifactHost {
                         .file_access
                         .read(&Path::from_str(path.as_str())?)
                         .await?;
-                    let mut state = DataSetSrc::new();
-                    state.map.insert("content".to_string(), LocalBinSrc::InMemory(data) );
+                    let mut state = DataSet::new();
+                    state.map.insert("content".to_string(), BinSrc::Memory(data) );
                     Ok(state)
                 }
-                _ => Ok(DataSetSrc::new()),
+                _ => Ok(DataSet::new()),
             }
         } else {
             Err(Fail::ResourceNotFound(identifier))
