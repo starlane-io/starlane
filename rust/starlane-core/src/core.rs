@@ -71,8 +71,8 @@ impl StarCoreAction {
 
 #[derive(strum_macros::Display)]
 pub enum StarCoreCommand {
-    Get(ResourceIdentifier),
-    State(ResourceIdentifier),
+    Get(ResourceKey),
+    State(ResourceKey),
     Assign(ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>),
     Shutdown
 }
@@ -208,20 +208,20 @@ impl Host for InertHost {
         ))
     }
 
-    async fn get(&self, _identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail> {
+    async fn get(&self, _identifier: ResourceKey) -> Result<Option<Resource>, Fail> {
         Err(Fail::Error(
             "This is an InertHost which cannot actually host anything".into(),
         ))
     }
 
-    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSet<BinSrc>, Fail> {
+    async fn state(&self, identifier: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
         Err(Fail::Error(
             "This is an InertHost which cannot actually host anything".into(),
         ))
     }
 
 
-    async fn delete(&self, _identifier: ResourceIdentifier) -> Result<(), Fail> {
+    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Fail> {
         Err(Fail::Error(
             "This is an InertHost which cannot actually host anything".into(),
         ))
@@ -326,12 +326,12 @@ impl StarCore2 {
             StarCoreCommand::Assign(assign) => Ok(StarCoreResult::Resource(Option::Some(
                 self.host.assign(assign).await?,
             ))),
-            StarCoreCommand::Get(identifier) => {
-                let resource = self.host.get(identifier).await?;
+            StarCoreCommand::Get(key) => {
+                let resource = self.host.get(key).await?;
                 Ok(StarCoreResult::Resource(resource))
             }
-            StarCoreCommand::State(identifier) => {
-                let state_src = self.host.state(identifier).await?;
+            StarCoreCommand::State(key) => {
+                let state_src = self.host.state(key).await?;
                 Ok(StarCoreResult::State(state_src))
             }
             StarCoreCommand::Shutdown => {

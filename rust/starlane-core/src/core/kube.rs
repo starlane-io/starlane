@@ -26,12 +26,7 @@ use crate::core::Host;
 use crate::error::Error;
 
 use crate::message::Fail;
-use crate::resource::{
-    AddressCreationSrc, AssignResourceStateSrc,
-    KeyCreationSrc, Path, RemoteDataSrc, Resource, ResourceAddress,
-    ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy,
-    ResourceCreationChamber, ResourceKind, ResourceStub,
-};
+use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceKind, ResourceStub, ResourceKey};
 
 
 use crate::star::StarSkel;
@@ -155,17 +150,17 @@ impl Host for KubeCore {
         Ok(resource)
     }
 
-    async fn get(&self, _identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail> {
+    async fn get(&self, _identifier: ResourceKey ) -> Result<Option<Resource>, Fail> {
         unimplemented!()
 //        self.store.get(identifier).await
     }
 
-    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSet<BinSrc>, Fail> {
+    async fn state(&self, identifier: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
         todo!()
     }
 
 
-    async fn delete(&self, _identifier: ResourceIdentifier) -> Result<(), Fail> {
+    async fn delete(&self, _identifier: ResourceKey ) -> Result<(), Fail> {
         unimplemented!("I don't know how to DELETE yet.");
         Ok(())
     }

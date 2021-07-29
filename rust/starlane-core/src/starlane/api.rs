@@ -16,6 +16,7 @@ use tokio::sync::mpsc;
 
 use starlane_resources::ResourceIdentifier;
 
+use crate::data::Binary;
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
 use crate::frame::{StarPattern, WindAction};
@@ -37,6 +38,7 @@ use crate::resource::user::UserState;
 use crate::star::{Request, StarCommand, StarKind, Wind};
 
 use crate::starlane::StarlaneCommand;
+use crate::data::{BinSrc, DataSet};
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -279,19 +281,16 @@ impl StarlaneApi {
     pub fn get_resource_state(
         &self,
         identifier: ResourceIdentifier,
-    ) -> Result<Option<Arc<Vec<u8>>>, Fail> {
+    ) -> Result<DataSet<BinSrc>, Fail> {
         println!("get_resource_state block_on");
         let state_src = self.get_resource_state_src(identifier)?;
-        match state_src {
-            RemoteDataSrc::None => Ok(Option::None),
-            RemoteDataSrc::Memory(data) => Ok(Option::Some(data)),
-        }
+        Ok(state_src)
     }
 
     pub fn get_resource_state_src(
         &self,
         identifier: ResourceIdentifier,
-    ) -> Result<RemoteDataSrc, Fail> {
+    ) -> Result<DataSet<BinSrc>, Fail> {
         let star_tx = self.star_tx.clone();
 
         let handle = Handle::current();

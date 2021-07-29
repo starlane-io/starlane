@@ -236,8 +236,8 @@ impl Host for ArtifactHost {
     }
 
     async fn state(&self, key: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
-        if let Ok(Option::Some(resource)) = self.store.get(identifier.clone()).await {
-            match identifier.resource_type() {
+        if let Ok(Option::Some(resource)) = self.store.get(key.clone()).await {
+            match key.resource_type() {
                 ResourceType::File => {
                     let filesystem_key: FileSystemKey = resource
                         .key()
@@ -255,17 +255,17 @@ impl Host for ArtifactHost {
                         .read(&Path::from_str(path.as_str())?)
                         .await?;
                     let mut state = DataSet::new();
-                    state.map.insert("content".to_string(), BinSrc::Memory(data) );
+                    state.insert("content".to_string(), BinSrc::Memory(data) );
                     Ok(state)
                 }
                 _ => Ok(DataSet::new()),
             }
         } else {
-            Err(Fail::ResourceNotFound(identifier))
+            Err(Fail::ResourceNotFound(key.into()))
         }
     }
 
-    async fn delete(&self, _identifier: ResourceIdentifier) -> Result<(), Fail> {
+    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Fail> {
         unimplemented!("I don't know how to DELETE yet.");
         Ok(())
     }

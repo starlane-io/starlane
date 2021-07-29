@@ -1276,6 +1276,28 @@ impl From<ResourceKey> for ResourceIdentifier {
     }
 }
 
+impl TryInto<ResourceKey> for ResourceIdentifier {
+    type Error = Error;
+
+    fn try_into(self) -> Result<ResourceKey, Self::Error> {
+        match self {
+            ResourceIdentifier::Key(key) => Ok(key),
+            ResourceIdentifier::Address(_) => Err("resource identifier is not a key".into())
+        }
+    }
+}
+
+impl TryInto<ResourceAddress> for ResourceIdentifier {
+    type Error = Error;
+
+    fn try_into(self) -> Result<ResourceAddress, Self::Error> {
+        match self {
+            ResourceIdentifier::Key(_) =>Err("resource identifier is not an address".into()),
+            ResourceIdentifier::Address(address) => Ok(address)
+        }
+    }
+}
+
 impl ToString for ResourceIdentifier {
     fn to_string(&self) -> String {
         match self {

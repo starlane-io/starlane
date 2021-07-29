@@ -244,7 +244,8 @@ impl Host for FileStoreHost {
                         );
 
                         let _lock = self.mutex.lock().await;
-                        let content = data.map.get("content").cloned().ok_or("expected file content")?.try_into()?;
+                        let content = data.get("content").cloned().ok_or("expected file content")?;
+                        let content = content.to_bin(self.skel.bin_context())?;
                         self.file_access
                             .write(&Path::from_str(path.as_str())?, content)
                             .await?;
@@ -284,13 +285,13 @@ impl Host for FileStoreHost {
         Ok(self.store.put(assign).await?)
     }
 
-    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail> {
-        self.store.get(identifier).await
+    async fn get(&self, key: ResourceKey ) -> Result<Option<Resource>, Fail> {
+        self.store.get(key).await
     }
 
-    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSet<BinSrc>, Fail> {
-        if let Ok(Option::Some(resource)) = self.store.get(identifier.clone()).await {
-            match identifier.resource_type() {
+    async fn state(&self, key: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
+        if let Ok(Option::Some(resource)) = self.store.get(key.clone()).await {
+            match key.resource_type() {
                 ResourceType::File => {
                     let filesystem_key = resource
                         .key()
@@ -307,17 +308,17 @@ impl Host for FileStoreHost {
                         .read(&Path::from_str(path.as_str())?)
                         .await?;
                     let mut state = DataSet::new();
-                    state.map.insert("content".to_string(), BinSrc::Memory(data));
+                    state.insert("content".to_string(), BinSrc::Memory(data));
                     Ok(state)
                 }
                 _ => Ok(DataSet::new()),
             }
         } else {
-            Err(Fail::ResourceNotFound(identifier))
+            Err(Fail::ResourceNotFound(key.into()))
         }
     }
 
-    async fn delete(&self, _identifier: ResourceIdentifier) -> Result<(), Fail> {
+    async fn delete(&self, _identifier: ResourceKey ) -> Result<(), Fail> {
         unimplemented!()
     }
 }

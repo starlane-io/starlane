@@ -2214,8 +2214,17 @@ println!("locate_resource_record request star: {} identifier: {}", self.skel.inf
                     .await?;
             }
             ResourceRequestMessage::State => {
+
+                let key: ResourceKey = if delivery.message.to.is_key() {
+                    delivery.message.to.clone().try_into()?
+                } else {
+                    let resource_record = self.skel.registry.as_ref().expect("Expected resource registry").get(delivery.message.to.clone()).await?;
+                    resource_record.ok_or(format!("expected resource record for identifier {}", delivery.message.to.to_string()) )?.stub.key
+                };
+
+
                 let (action, rx) =
-                    StarCoreAction::new(StarCoreCommand::State(delivery.message.to.clone()));
+                    StarCoreAction::new(StarCoreCommand::State(key));
                 self.skel.core_tx.send(action).await?;
                 tokio::spawn(async move {
                     let result = rx.await;
@@ -3295,12 +3304,12 @@ pub struct StarSkel {
 
 impl StarSkel {
     pub fn bin_context(&self)-> Arc<SkelBinContext>{
-        SkelBinContext{}
+        Arc::new(SkelBinContext{star:self.info.key.clone()})
     }
 }
 
 struct SkelBinContext {
-
+  star: StarKey
 }
 
 impl BinContext for SkelBinContext{
@@ -3314,7 +3323,7 @@ impl BinContext for SkelBinContext{
 
 
     fn is_local_star(&self,star: StarKey) -> bool {
-        self.info.key == star
+        self.star == star
     }
 }
 

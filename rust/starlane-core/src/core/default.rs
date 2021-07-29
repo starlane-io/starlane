@@ -21,11 +21,7 @@ use crate::core::Host;
 use crate::message::Fail;
 
 
-use crate::resource::{
-    ArtifactKind, AssignResourceStateSrc, LocalStateSetSrc,
-    Names, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype,
-    ResourceAssign, ResourceKind
-};
+use crate::resource::{ArtifactKind, AssignResourceStateSrc, LocalStateSetSrc, Names, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceKey};
 
 use crate::resource::store::{
     ResourceStore,
@@ -119,15 +115,15 @@ println!("seems to have worked....");
         Ok(self.store.put(assign).await?)
     }
 
-    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail> {
+    async fn get(&self, identifier: ResourceKey) -> Result<Option<Resource>, Fail> {
         self.store.get(identifier).await
     }
 
-    async fn state(&self, identifier: ResourceIdentifier) -> Result<DataSet<BinSrc>, Fail> {
+    async fn state(&self, identifier: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
         if let Option::Some(resource) = self.store.get(identifier.clone()).await? {
             Ok(resource.state_src())
         } else {
-            Err(Fail::ResourceNotFound(identifier))
+            Err(Fail::ResourceNotFound(identifier.into()))
         }
 
     }
@@ -142,7 +138,7 @@ println!("seems to have worked....");
     }
      */
 
-    async fn delete(&self, _identifier: ResourceIdentifier) -> Result<(), Fail> {
+    async fn delete(&self, _identifier: ResourceKey ) -> Result<(), Fail> {
         unimplemented!()
     }
 }
