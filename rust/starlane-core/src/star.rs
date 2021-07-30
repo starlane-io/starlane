@@ -73,6 +73,7 @@ use crate::starlane::StarlaneMachine;
 pub mod filestore;
 pub mod pledge;
 pub mod variant;
+pub mod core;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize, Hash, strum_macros::EnumString, strum_macros::Display )]
 pub enum StarKind {
@@ -569,7 +570,7 @@ impl Star {
     }
 
     pub async fn get_resource(&self, key: &ResourceKey) -> Result<Option<Resource>, Fail> {
-        let (action, rx) = StarCoreAction::new(StarCoreCommand::Get(key.clone().into()));
+        let (action, rx) = StarCoreAction::new(StarCoreCommand::GetState(key.clone().into()));
 if self.skel.core_tx.is_closed() {
     error!("core_tx CLOSED");
 }

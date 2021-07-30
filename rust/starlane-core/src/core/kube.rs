@@ -150,13 +150,9 @@ impl Host for KubeCore {
         Ok(resource)
     }
 
-    async fn get(&self, _identifier: ResourceKey ) -> Result<Option<Resource>, Fail> {
+    async fn get(&self, _identifier: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
         unimplemented!()
 //        self.store.get(identifier).await
-    }
-
-    async fn state(&self, identifier: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
-        todo!()
     }
 
 

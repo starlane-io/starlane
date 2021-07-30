@@ -71,15 +71,13 @@ impl StarCoreAction {
 
 #[derive(strum_macros::Display)]
 pub enum StarCoreCommand {
-    Get(ResourceKey),
-    State(ResourceKey),
+    GetState(ResourceKey),
     Assign(ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>),
     Shutdown
 }
 
 pub enum StarCoreResult {
     Ok,
-    Resource(Option<Resource>),
     LocalLocation(LocalResourceLocation),
     MessageReply(MessagePayload),
     State(DataSet<BinSrc>),
@@ -208,17 +206,12 @@ impl Host for InertHost {
         ))
     }
 
-    async fn get(&self, _identifier: ResourceKey) -> Result<Option<Resource>, Fail> {
+    async fn get(&self, _identifier: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
         Err(Fail::Error(
             "This is an InertHost which cannot actually host anything".into(),
         ))
     }
 
-    async fn state(&self, identifier: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
-        Err(Fail::Error(
-            "This is an InertHost which cannot actually host anything".into(),
-        ))
-    }
 
 
     async fn delete(&self, _identifier: ResourceKey) -> Result<(), Fail> {
@@ -325,13 +318,9 @@ impl StarCore2 {
             StarCoreCommand::Assign(assign) => Ok(StarCoreResult::Resource(Option::Some(
                 self.host.assign(assign).await?,
             ))),
-            StarCoreCommand::Get(key) => {
-                let resource = self.host.get(key).await?;
-                Ok(StarCoreResult::Resource(resource))
-            }
-            StarCoreCommand::State(key) => {
-                let state_src = self.host.state(key).await?;
-                Ok(StarCoreResult::State(state_src))
+            StarCoreCommand::GetState(key) => {
+                let state= self.host.get(key).await?;
+                Ok(StarCoreResult::State(state))
             }
             StarCoreCommand::Shutdown => {
                 self.host.shutdown();

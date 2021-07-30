@@ -292,10 +292,11 @@ impl Host for FileStoreHost {
         Ok(self.store.put(assign).await?)
     }
 
-    async fn get(&self, key: ResourceKey ) -> Result<Option<Resource>, Fail> {
+    async fn get(&self, key: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
         self.store.get(key).await
     }
 
+    /*
     async fn state(&self, key: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
         if let Ok(Option::Some(resource)) = self.store.get(key.clone()).await {
             match key.resource_type() {
@@ -324,6 +325,8 @@ impl Host for FileStoreHost {
             Err(Fail::ResourceNotFound(key.into()))
         }
     }
+
+     */
 
     async fn delete(&self, _identifier: ResourceKey ) -> Result<(), Fail> {
         unimplemented!()
