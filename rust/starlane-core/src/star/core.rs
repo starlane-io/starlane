@@ -1,3 +1,5 @@
+pub mod component;
+
 use crate::util::{AsyncProcessor, AsyncRunner};
 use crate::frame::StarMessage;
 use crate::star::StarSkel;
