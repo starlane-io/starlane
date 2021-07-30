@@ -12,208 +12,154 @@ use crate::app::ConfigSrc;
 use crate::error::Error;
 
 use crate::message::Fail;
-use crate::resource::{LocalStateSetSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceKey, ResourceKind, Specific};
+use crate::resource::{LocalStateSetSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceKey, ResourceKind, Specific, Path};
 use std::convert::TryInto;
 use crate::data::{DataSet, BinSrc};
+use crate::file_access::FileAccess;
+use crate::starlane::files::MachineFileSystem;
+use crate::star::StarSkel;
 
 #[derive(Clone,Debug)]
-pub struct ResourceStore {
-    tx: mpsc::Sender<ResourceStoreAction>,
+pub struct StateStore {
+    tx: mpsc::Sender<ResourceStoreCommand>,
 }
 
-impl ResourceStore {
-    pub async fn new() -> Self {
-        ResourceStore {
-            tx: ResourceStoreFS::new().await,
+impl StateStore {
+    pub async fn new(skel: StarSkel) -> Self {
+        StateStore {
+            tx: StateStoreFS::new(skel).await,
         }
     }
 
     pub async fn put(
         &self,
         assign: ResourceAssign<DataSet<BinSrc>>,
-    ) -> Result<Resource, Fail> {
+    ) -> Result<(), Fail> {
         let (tx, rx) = oneshot::channel();
 
         self.tx
-            .send(ResourceStoreAction {
-                command: ResourceStoreCommand::Put(assign),
-                tx: tx,
-            })
+            .send( ResourceStoreCommand::Save{assign,tx} )
             .await?;
 
-        match rx.await?? {
-            ResourceStoreResult::Resource(resource) => {
-                resource.ok_or(Fail::Error("option returned None".into()))
-            }
-            _ => Err(Fail::Error(
-                "unexpected response from host registry sql".into(),
-            )),
-        }
+        Ok(rx.await??)
     }
 
-    pub async fn get(&self, key: ResourceKey ) -> Result<Option<Resource>, Fail> {
+    pub async fn get(&self, key: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
         let (tx, rx) = oneshot::channel();
         self.tx
-            .send(ResourceStoreAction {
-                command: ResourceStoreCommand::Get(key.clone()),
-                tx: tx,
-            })
+            .send( ResourceStoreCommand::Get{key: key.clone(), tx } )
             .await?;
-        let result = rx.await??;
-        match result {
-            ResourceStoreResult::Resource(resource) => Ok(resource),
-            what => Err(Fail::Unexpected{ expected: "Resource()".to_string(), received: what.to_string()}),
-        }
+        Ok(rx.await??)
     }
 
     pub fn close(&self) {
         let tx = self.tx.clone();
         tokio::spawn( async move {
             tx
-                .send(ResourceStoreAction {
-                    command: ResourceStoreCommand::Close,
-                    tx: oneshot::channel().0
-                })
+                .send(ResourceStoreCommand::Close)
                 .await;
         });
 
     }
 }
 
-pub struct ResourceStoreAction {
-    pub command: ResourceStoreCommand,
-    pub tx: oneshot::Sender<Result<ResourceStoreResult, Fail>>,
-}
-
 #[derive(strum_macros::Display)]
 pub enum ResourceStoreCommand {
     Close,
-    Put(ResourceAssign<DataSet<BinSrc>>),
-    Get(ResourceKey),
+    Save{assign: ResourceAssign<DataSet<BinSrc>>, tx: oneshot::Sender<Result<(),Error>>},
+    Get{key:ResourceKey, tx: oneshot::Sender<Result<DataSet<BinSrc>,Error>>},
 }
 
-pub enum ResourceStoreResult {
-    Ok,
-    Resource(Option<Resource>),
+pub struct StateStoreFS {
+    pub tx: mpsc::Sender<ResourceStoreCommand>,
+    pub rx: mpsc::Receiver<ResourceStoreCommand>,
+    pub skel: StarSkel
 }
 
-impl ToString for ResourceStoreResult{
-    fn to_string(&self) -> String {
-        match self {
-            ResourceStoreResult::Ok => "ResourceStoreResult::Ok".to_string(),
-            ResourceStoreResult::Resource(_) => "ResourceStoreResult::Resource(_)".to_string()
-        }
-    }
-}
-
-pub struct ResourceStoreFS {
-    pub conn: Connection,
-    pub tx: mpsc::Sender<ResourceStoreAction>,
-    pub rx: mpsc::Receiver<ResourceStoreAction>,
-}
-
-impl ResourceStoreFS {
-    pub async fn new() -> mpsc::Sender<ResourceStoreAction> {
+impl StateStoreFS {
+    pub async fn new(skel: StarSkel) -> mpsc::Sender<ResourceStoreCommand> {
         let (tx, rx) = mpsc::channel(1024);
-
         let tx_clone = tx.clone();
-        tokio::spawn(async move {
-            let conn = Connection::open_in_memory();
-            if conn.is_ok() {
-                let mut db = ResourceStoreFS {
-                    conn: conn.unwrap(),
-                    tx: tx_clone,
-                    rx: rx,
-                };
-                match db.run().await {
-                    Ok(_) => {}
-                    Err(err) => {
-                        eprintln!("experienced fatal error in sql db: {}", err);
-                    }
-                }
-            }
+
+        tokio::spawn( async move {
+            Self{
+                tx:  tx_clone,
+                rx: rx,
+                skel
+            }.run().await;
         });
+
         tx
     }
 
-    async fn run(&mut self) -> Result<(), Error> {
-        match self.setup() {
-            Ok(_) => {}
-            Err(err) => {
-                eprintln!("error setting up db: {}", err);
-                return Err(err);
-            }
-        };
+    async fn run(mut self) -> Result<(), Error> {
 
         while let Option::Some(request) = self.rx.recv().await {
-            if let ResourceStoreCommand::Close = request.command {
-                request.tx.send(Ok(ResourceStoreResult::Ok));
+            if let ResourceStoreCommand::Close = request {
                 break;
             } else {
-                request.tx.send(self.process(request.command).await);
+                self.process(request).await;
             }
         }
 
         Ok(())
+    }
+
+    async fn save( &mut self, assign: ResourceAssign<DataSet<BinSrc>> ) -> Result<(),Error>{
+        let key = assign.stub.key.to_string();
+
+        let state_path= Path::from_str(format!("/stars/{}/states/{}",self.skel.info.key.to_string(), key).as_str())?;
+        let machine_filesystem = self.skel.machine.machine_filesystem();
+        let mut data_access = machine_filesystem.data_access();
+        data_access.mkdir(&state_path).await?;
+
+        let mut rxs = vec![];
+        for (aspect, data) in assign.state_src {
+            let state_aspect_file = Path::from_str(format!("/stars/{}/states/{}/{}",self.skel.info.key.to_string(),key.to_string(),aspect).as_str())?;
+            let (tx,rx) = oneshot::channel();
+            let bin_context = self.skel.machine.bin_context();
+            data.mv( bin_context, state_aspect_file, tx ).await;
+            rxs.push(rx);
+        }
+
+        for rx in rxs {
+            rx.await?;
+        }
+
+        Ok(())
+    }
+
+    async fn get( &self, key: ResourceKey ) -> Result<DataSet<BinSrc>,Error>{
+        let key = key.to_string();
+        let machine_filesystem = self.skel.machine.machine_filesystem();
+        let mut data_access = machine_filesystem.data_access();
+
+        let state_path= Path::from_str(format!("/stars/{}/states/{}",self.skel.info.key.to_string(), key).as_str())?;
+        let mut dataset = DataSet::new();
+        for aspect in data_access.list(&state_path).await? {
+            let state_aspect_file = Path::from_str(format!("/stars/{}/states/{}/{}",self.skel.info.key.to_string(),key.to_string(),aspect.last_segment().ok_or("expected final segment from list")?).as_str())?;
+
+            let bin= data_access.read(&state_aspect_file).await?;
+            let bin_src = BinSrc::Memory(bin);
+            dataset.insert( aspect.last_segment().ok_or("expected final segment from list")?, bin_src );
+        }
+        Ok(dataset)
     }
 
     async fn process(
         &mut self,
         command: ResourceStoreCommand,
-    ) -> Result<ResourceStoreResult, Fail> {
+    ) {
         match command {
-            ResourceStoreCommand::Close => Ok(ResourceStoreResult::Ok),
-            ResourceStoreCommand::Put(assign) => {
-                let key = assign.stub.key.bin()?;
-                let address = assign.stub.address.to_string();
-                let specific = match &assign.stub.archetype.specific {
-                    None => Option::None,
-                    Some(specific) => Option::Some(specific.to_string()),
-                };
-                let config_src = match &assign.stub.archetype.config {
-                    None => Option::None,
-                    Some(config_src) => Option::Some(config_src.to_string()),
-                };
-
-                unimplemented!();
-                /*
-                let state = match assign
-                    .stub
-                    .archetype
-                    .kind
-                    .resource_type()
-                    .state_persistence()
-                {
-                    ResourceStatePersistenceManager::Store => {
-                        let state_src: DataSetBlob = assign.state_src.clone().try_into()?;
-                        state_src.bin()?
-                    }
-                    _ => {
-                        DataSetBlob::new().bin()?
-                    }
-                };
-
-//                self.conn.execute("INSERT INTO resources (key,address,state_src,kind,specific,config_src) VALUES (?1,?2,?3,?4,?5,?6)", params![key,address,state,assign.stub.archetype.kind.to_string(),specific,config_src])?;
-
-                 */
-
-                let resource = Resource::new(
-                    assign.stub.key,
-                    assign.stub.address,
-                    assign.stub.archetype,
-                    assign.state_src
-                );
-
-                Ok(ResourceStoreResult::Resource(Option::Some(resource)))
+            ResourceStoreCommand::Save{ assign, tx } => {
+                tx.send(self.save(assign).await ).unwrap_or_default();
             }
-            ResourceStoreCommand::Get(identifier) => {
-                unimplemented!()
+            ResourceStoreCommand::Get { key, tx } => {
+                tx.send(self.get(key).await ).unwrap_or_default();
             }
+            ResourceStoreCommand::Close => {}
         }
     }
 
-    pub fn setup(&mut self) -> Result<(), Error> {
 
-        Ok(())
-    }
 }

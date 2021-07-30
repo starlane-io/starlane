@@ -24,7 +24,7 @@ use crate::message::Fail;
 use crate::resource::{ArtifactKind, AssignResourceStateSrc, LocalStateSetSrc, Names, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceKey};
 
 use crate::resource::store::{
-    ResourceStore,
+    StateStore,
 };
 
 use crate::star::StarSkel;
@@ -34,14 +34,14 @@ use crate::data::{DataSet, BinSrc};
 #[derive(Debug)]
 pub struct DefaultHost {
     skel: StarSkel,
-    store: ResourceStore,
+    store: StateStore,
 }
 
 impl DefaultHost {
     pub async fn new(skel: StarSkel) -> Self {
         DefaultHost {
             skel: skel,
-            store: ResourceStore::new().await,
+            store: StateStore::new().await,
         }
     }
 }

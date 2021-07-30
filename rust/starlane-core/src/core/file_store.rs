@@ -26,7 +26,7 @@ use crate::resource::{
 };
 use crate::resource::ResourceKey;
 use crate::resource::store::{
-    ResourceStore,
+    StateStore,
 };
 use crate::star::StarSkel;
 use crate::util;
@@ -36,7 +36,7 @@ use crate::data::{DataSet, BinSrc};
 pub struct FileStoreHost {
     skel: StarSkel,
     file_access: FileAccess,
-    store: ResourceStore,
+    store: StateStore,
     mutex: Arc<Mutex<u8>>,
 }
 
@@ -50,9 +50,9 @@ impl FileStoreHost {
     pub async fn new(skel: StarSkel, file_access: FileAccess) -> Result<Self, Error> {
         let file_access = file_access.with_path("filesystems".to_string())?;
         let rtn = FileStoreHost {
-            skel: skel,
+            skel: skel.clone(),
             file_access: file_access,
-            store: ResourceStore::new().await,
+            store: StateStore::new(skel).await,
             mutex: Arc::new(Mutex::new(0)),
         };
 
@@ -135,7 +135,7 @@ impl FileStoreHost {
     async fn handle_event(
         root_path: String,
         event: FileEvent,
-        store: ResourceStore,
+        store: StateStore,
         skel: StarSkel,
     ) -> Result<(), Error> {
         let mut path = event.path.clone();
@@ -174,16 +174,12 @@ impl FileStoreHost {
         filesystem_key: ResourceKey,
         file_path: String,
         kind: FileKind,
-        store: ResourceStore,
+        store: StateStore,
         skel: StarSkel,
     ) -> Result<(), Error> {
         let filesystem = store
             .get(filesystem_key.clone().into())
-            .await?
-            .ok_or(format!(
-                "expected filesystem to be present in hosted environment: {}",
-                filesystem_key.to_string()
-            ))?;
+            .await?;
         let filesystem: ResourceStub = filesystem.into();
 
         let archetype = ResourceArchetype {
@@ -245,7 +241,7 @@ impl Host for FileStoreHost {
 
                         let _lock = self.mutex.lock().await;
                         let content = data.get("content").cloned().ok_or("expected file content")?;
-                        let content = content.to_bin(self.skel.bin_context())?;
+                        let content = content.to_bin(self.skel.machine.bin_context())?;
                         self.file_access
                             .write(&Path::from_str(path.as_str())?, content)
                             .await?;

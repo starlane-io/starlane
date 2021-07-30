@@ -19,8 +19,15 @@ use crate::resource::Path;
 use crate::resource::FileKind;
 
 use crate::util;
+use tokio::fs::ReadDir;
+use std::convert::TryInto;
+use std::convert::TryFrom;
 
 pub enum FileCommand {
+    List {
+        path: Path,
+        tx: tokio::sync::oneshot::Sender<Result<Vec<Path>, Error>>,
+    },
     Read {
         path: Path,
         tx: tokio::sync::oneshot::Sender<Result<Arc<Vec<u8>>, Error>>,
@@ -46,6 +53,8 @@ pub enum FileCommand {
         target: String,
         tx: tokio::sync::oneshot::Sender<Result<(), Error>>,
     },
+    HighestNumber{path: Path, tx: tokio::sync::oneshot::Sender<usize>},
+    DeleteLower{path: Path, number: usize, tx: tokio::sync::oneshot::Sender<()>},
     Shutdown
 }
 
@@ -67,6 +76,17 @@ impl FileAccess {
             .ok_or("turning path to string")?
             .to_string();
         Ok(FileAccess { path: path, tx: tx })
+    }
+
+    pub async fn list(&self, path: &Path) -> Result<Vec<Path>, Error> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(FileCommand::List{
+                path: path.clone(),
+                tx: tx,
+            })
+            .await?;
+        Ok(util::wait_for_it(rx).await?)
     }
 
     pub async fn read(&self, path: &Path) -> Result<Arc<Vec<u8>>, Error> {
@@ -91,6 +111,32 @@ impl FileAccess {
             .await?;
         Ok(util::wait_for_it(rx).await?)
     }
+
+    /// if this path is a directory return the highest number listed,
+    /// or else return 0
+    pub async fn highest_number(&self, path: &Path ) -> usize {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(FileCommand::HighestNumber{
+                path: path.clone(),
+                tx,
+            })
+            .await?;
+        Ok(util::wait_for_it(rx).await?)
+    }
+
+    pub async fn delete_lower(&self, path: &Path, number: usize ) {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(FileCommand::DeleteLower{
+                path: path.clone(),
+                number: number,
+                tx,
+            })
+            .await?;
+        Ok(util::wait_for_it(rx).await?)
+    }
+
 
     /*
     pub async fn write_stream( &mut self, path: &Path, stream: Box<dyn AsyncReadExt> )->Result<(),Error> {
@@ -216,36 +262,108 @@ impl LocalFileAccess {
 
     async fn process(&mut self, command: FileCommand) -> Result<(), Error> {
         match command {
+            FileCommand::List { path, tx } => {
+                tx.send( self.list(path).await ).unwrap_or_default();
+            }
             FileCommand::Read { path, tx } => {
-                tx.send(self.read(&path));
+                tx.send(self.read(&path)).unwrap_or_default();
             }
             FileCommand::Write {
                 path,
                 data,
                 tx,
             } => {
-                tx.send(self.write(&path, data));
+                tx.send(self.write(&path, data)).unwrap_or_default();
             }
             /*            FileCommand::WriteStream { path: path, stream, tx } => {
                 tx.send(self.write_sream(&path,stream).await);
             }*/
             FileCommand::MkDir { path, tx } => {
-                tx.send(self.mkdir(&path));
+                tx.send(self.mkdir(&path)).unwrap_or_default();
             }
             FileCommand::Watch { tx } => {
-                tx.send(self.watch());
+                tx.send(self.watch()).unwrap_or_default();
             }
             FileCommand::Walk { tx } => {
-                tx.send(self.walk());
+                tx.send(self.walk()).unwrap_or_default();
             }
             FileCommand::UnZip { source, target, tx } => {
-                tx.send(self.unzip(source, target));
+                tx.send(self.unzip(source, target)).unwrap_or_default();
             }
             FileCommand::Shutdown => {
                 // do nothing
             }
+            FileCommand::HighestNumber{ path, tx } => {
+                tx.send( self.highest_number(path).await ).unwrap_or_default();
+            }
+            FileCommand::DeleteLower { path, number, tx } => {
+                self.delete_lower( path, number ).await;
+                tx.send(()).unwrap_or_default();
+            }
         }
         Ok(())
+    }
+
+    async fn list(&self, dir_path: Path) -> usize {
+        let path = self.cat_path(dir_path.to_relative().as_str()).unwrap_or("/");
+        let mut read_dir = match tokio::fs::read_dir(path).await{
+            Ok(ok) => {ok}
+            Err(_) => {
+                return 0;
+            }
+        };
+
+        let mut rtn = vec!();
+        while let Result::Ok(Option::Some(entry)) = read_dir.next_entry().await {
+            let entry = Path::make_absolute(entry.file_name().to_str().ok_or("expected os str to be able to change to str")?)?;
+            let entry = dir_path.cat(&entry)?;
+            rtn.push(entry );
+        }
+        Ok(rtn)
+    }
+
+
+    async fn delete_lower(&self, path: Path, number: usize ) -> usize {
+        let path = self.cat_path(path.to_relative().as_str()).unwrap_or("/");
+        let mut read_dir = match tokio::fs::read_dir(path).await{
+            Ok(ok) => {ok}
+            Err(_) => {
+                return 0;
+            }
+        };
+
+        while let Result::Ok(Option::Some(entry)) = read_dir.next_entry().await {
+            if let Result::Ok(n) = usize::try_from(entry.file_name()) {
+               if n < number {
+error!("delete_lower() NOT IMPLEMENTED!");
+// somehow delete the file
+//                   self.delete()
+               }
+            }
+        }
+    }
+
+    async fn highest_number(&self, path: Path ) -> usize {
+        let path = self.cat_path(path.to_relative().as_str()).unwrap_or("/");
+        let mut read_dir = match tokio::fs::read_dir(path).await{
+            Ok(ok) => {ok}
+            Err(_) => {
+                return 0;
+            }
+        };
+
+        let mut highest = 0;
+        while let Result::Ok(Option::Some(entry)) = read_dir.next_entry().await {
+            let number = match entry.file_name().try_into() {
+                Ok(number) => number,
+                Err(_) => 0
+            } as _;
+            if number > highest {
+                highest = number;
+            }
+        }
+
+        highest
     }
 
     pub fn cat_path(&self, path: &str) -> Result<String, Error> {

@@ -794,10 +794,18 @@ pub struct Path {
 }
 
 impl Path {
-    pub fn new(string: &str) -> Self {
+    fn new(string: &str) -> Self {
         Path {
             string: string.to_string(),
         }
+    }
+
+    pub fn make_absolute( string: &str ) -> Result<Self,Error> {
+       if string.starts_with("/") {
+           Path::from_str(string)
+       } else {
+           Path::from_str(format!("/{}",string).as_str() )
+       }
     }
 
     pub fn bin(&self) -> Result<Vec<u8>, Error> {
@@ -843,6 +851,14 @@ impl Path {
                 }
                 Option::Some(Path::new(string.as_str()))
             }
+        }
+    }
+
+    pub fn last_segment(&self) -> Option<String> {
+        let split = self.string.split("/");
+        match split.last() {
+            None => Option::None,
+            Some(last) => Option::Some(last.to_string())
         }
     }
 

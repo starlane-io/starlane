@@ -10,8 +10,8 @@ use std::future::Future;
 use std::convert::TryFrom;
 use crate::star::StarKey;
 use crate::file_access::FileAccess;
-use actix_web::rt::Runtime;
 use starlane_resources::data::Meta;
+use tokio::runtime::Handle;
 
 
 pub type Binary = Arc<Vec<u8>>;
@@ -54,10 +54,14 @@ impl BinSrc{
     }
 }
 
-pub trait BinContext {
+#[async_trait]
+pub trait BinContext : Sync+Send {
+//  fn open(&self) -> OutputStream;
+//  fn mv(&self, tmp_file: &Path, new_file: &Path )->Result<(),Error>;
+
   fn file_access(&self) -> FileAccess;
-  fn bin_runtime(&self) -> Runtime;
-  fn is_local_star( &self, star: StarKey ) -> bool;
+  fn runtime_handle(&self) -> &Handle;
+  async fn is_local_star( &self, star: &StarKey ) -> Result<bool,Error>;
 }
 
 pub struct BinTransfer{
@@ -122,15 +126,16 @@ impl BinSrc{
                 tx.send(ctx.file_access().write( &path, bin.clone() ).await).unwrap_or_default();
             }
             BinSrc::Network { address,size: _ } => {
-                if address.filespace == FileSpace::Temp && ctx.is_local_star(address.star.clone())
+                unimplemented!()
+                /*
+                if address.filespace == FileSpace::Temp && ctx.is_local_star(&address.star).await
                 {
                     // find some way to move a file from TMP FileAccess to Perm FileAccess
-                    unimplemented!()
                 }
                 else
                 {
                     let clone = self.clone();
-                    ctx.bin_runtime().spawn(async move {
+                    ctx.runtime_handle().spawn(async move {
                         let mut transfer = BinTransfer::new(ctx.clone());
                         // output stream does not exist yet in filesysstem
                         // let output = ctx.file_access().output( path );
@@ -163,6 +168,8 @@ impl BinSrc{
                         tx.send(Result::Ok(()));
                     });
                 }
+
+                 */
             }
         }
     }

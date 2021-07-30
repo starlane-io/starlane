@@ -42,8 +42,11 @@ use crate::star::variant::{StarVariantFactory, StarVariantFactoryDefault};
 use crate::starlane::api::StarlaneApi;
 use crate::template::{ConstellationData, ConstellationLayout, ConstellationSelector, ConstellationTemplate, ConstellationTemplateHandle, MachineName, StarInConstellationTemplateHandle, StarInConstellationTemplateSelector, StarKeyConstellationIndexTemplate, StarKeySubgraphTemplate, StarKeyTemplate, StarSelector, StarTemplate, StarTemplateHandle};
 use crate::util::AsyncHashMap;
+use crate::starlane::files::MachineFileSystem;
+use crate::data::BinContext;
 
 pub mod api;
+pub mod files;
 
 lazy_static! {
 //    pub static ref DATA_DIR: Mutex<String> = Mutex::new("data".to_string());
@@ -55,7 +58,8 @@ lazy_static! {
 #[derive(Clone)]
 pub struct StarlaneMachine {
     tx: mpsc::Sender<StarlaneCommand>,
-    run_complete_signal_tx: broadcast::Sender<()>
+    run_complete_signal_tx: broadcast::Sender<()>,
+    machine_filesystem: Arc<MachineFileSystem>
 }
 
 impl StarlaneMachine {
@@ -69,7 +73,8 @@ impl StarlaneMachine {
         let run_complete_signal_tx= runner.run();
         let starlane = Self {
             tx: tx,
-            run_complete_signal_tx: run_complete_signal_tx
+            run_complete_signal_tx: run_complete_signal_tx,
+            machine_filesystem: Arc::new(MachineFileSystem::new() )
         };
 
         Ok(starlane)
@@ -81,6 +86,15 @@ impl StarlaneMachine {
         self.tx.send( StarlaneCommand::GetProtoArtifactCachesFactory(tx)).await?;
         Ok(rx.await?)
     }
+
+    pub fn bin_context(&self) -> Arc<dyn BinContext> {
+        self.machine_filesystem.clone()
+    }
+
+    pub fn machine_filesystem(&self) -> Arc<MachineFileSystem> {
+        self.machine_filesystem.clone()
+    }
+
 
     pub fn shutdown(&self) {
         let tx = self.tx.clone();

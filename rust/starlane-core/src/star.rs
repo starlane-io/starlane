@@ -67,6 +67,7 @@ use crate::template::StarTemplateHandle;
 use std::future::Future;
 use crate::data::{DataSet, BinContext};
 use actix_web::rt::Runtime;
+use crate::starlane::StarlaneMachine;
 
 
 pub mod filestore;
@@ -3300,32 +3301,9 @@ pub struct StarSkel {
     pub persistence: Persistence,
     pub data_access: FileAccess,
     pub caches: Arc<ProtoArtifactCachesFactory>,
+    pub machine: StarlaneMachine
 }
 
-impl StarSkel {
-    pub fn bin_context(&self)-> Arc<SkelBinContext>{
-        Arc::new(SkelBinContext{star:self.info.key.clone()})
-    }
-}
-
-pub struct SkelBinContext {
-  star: StarKey
-}
-
-impl BinContext for SkelBinContext{
-    fn file_access(&self) -> FileAccess {
-        todo!()
-    }
-
-    fn bin_runtime(&self) -> Runtime {
-        todo!()
-    }
-
-
-    fn is_local_star(&self,star: StarKey) -> bool {
-        self.star == star
-    }
-}
 
 impl Debug for StarSkel{
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

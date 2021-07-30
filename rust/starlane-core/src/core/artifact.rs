@@ -17,7 +17,7 @@ use crate::file_access::FileAccess;
 use crate::message::Fail;
 use crate::resource::{AddressCreationSrc, ArtifactBundleKind, ArtifactKind, AssignResourceStateSrc, FileSystemKey, KeyCreationSrc, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceKey, ResourceKind, ResourceRecord, ResourceRegistration, ResourceRegistryInfo, ResourceStub, ResourceType};
 use crate::resource::ArtifactBundleKey;
-use crate::resource::store::ResourceStore;
+use crate::resource::store::StateStore;
 use crate::star::StarSkel;
 use crate::util;
 use crate::data::{DataSet, BinSrc};
@@ -25,7 +25,7 @@ use crate::data::{DataSet, BinSrc};
 pub struct ArtifactHost {
     skel: StarSkel,
     file_access: FileAccess,
-    store: ResourceStore,
+    store: StateStore,
     mutex: Arc<Mutex<u8>>,
 }
 
@@ -35,7 +35,7 @@ impl ArtifactHost {
         let rtn = ArtifactHost {
             skel: skel,
             file_access: file_access,
-            store: ResourceStore::new().await,
+            store: StateStore::new().await,
             mutex: Arc::new(Mutex::new(0)),
         };
 
