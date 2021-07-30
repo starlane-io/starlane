@@ -111,7 +111,8 @@ impl StarlaneMachine {
         let create = ConstellationCreate{
             name,
             layout,
-            tx
+            tx,
+            machine: self.clone()
         };
 
         self.tx.send( StarlaneCommand::ConstellationCreate(create)).await?;
@@ -203,7 +204,7 @@ impl StarlaneMachineRunner {
 
                     StarlaneCommand::ConstellationCreate(command) => {
                         let result = self
-                            .constellation_create(command.layout, command.name)
+                            .constellation_create(command.layout, command.name, command.machine )
                             .await;
 
 //sleep(Duration::from_secs(10)).await;
@@ -330,6 +331,7 @@ impl StarlaneMachineRunner {
         &mut self,
         layout : ConstellationLayout,
         name: String,
+        starlane_machine: StarlaneMachine
     ) -> Result<(), Error> {
 
         if self.constellations.contains_key(&name) {
@@ -383,6 +385,7 @@ impl StarlaneMachineRunner {
                     constellation_broadcaster.subscribe(),
                     self.flags.clone(),
                     self.logger.clone(),
+                    starlane_machine.clone()
                 );
 
 
@@ -747,6 +750,7 @@ pub struct ConstellationCreate {
     name: String,
     layout: ConstellationLayout,
     tx: oneshot::Sender<Result<(), Error>>,
+    machine: StarlaneMachine
 }
 
 
@@ -754,6 +758,7 @@ impl ConstellationCreate {
     pub fn new(
         layout: ConstellationLayout,
         name: String,
+        machine: StarlaneMachine
     ) -> (Self, oneshot::Receiver<Result<(), Error>>) {
         let (tx, rx) = oneshot::channel();
         (
@@ -761,6 +766,7 @@ impl ConstellationCreate {
                 name: name,
                 layout: layout,
                 tx: tx,
+                machine: machine
             },
             rx,
         )

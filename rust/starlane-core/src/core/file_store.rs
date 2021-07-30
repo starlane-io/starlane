@@ -25,7 +25,7 @@ use crate::resource::{
     ResourceType
 };
 use crate::resource::ResourceKey;
-use crate::resource::store::{
+use crate::resource::state_store::{
     StateStore,
 };
 use crate::star::StarSkel;
@@ -64,6 +64,9 @@ impl FileStoreHost {
     }
 
     async fn walk(&self) -> Result<(), Error> {
+        unimplemented!()
+        /*
+
         let mut event_rx = self.file_access.walk().await?;
         let dir = PathBuf::from(self.file_access.path());
         let root_path = fs::canonicalize(&dir)?
@@ -94,10 +97,13 @@ impl FileStoreHost {
             }
         });
         Ok(())
+         */
     }
 
     #[instrument]
     async fn watch(&self) -> Result<(), Error> {
+        unimplemented!()
+        /*
         let mut event_rx = self.file_access.watch().await?;
         let dir = PathBuf::from(self.file_access.path());
         let root_path = fs::canonicalize(&dir)?
@@ -130,8 +136,11 @@ impl FileStoreHost {
             }
         });
         Ok(())
+
+         */
     }
 
+    /*
     async fn handle_event(
         root_path: String,
         event: FileEvent,
@@ -204,7 +213,9 @@ impl FileStoreHost {
         let _x = util::wait_for_it_whatever(rx).await??;
         Ok(())
     }
+     */
 }
+
 
 #[async_trait]
 impl Host for FileStoreHost {

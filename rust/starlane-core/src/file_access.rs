@@ -53,8 +53,6 @@ pub enum FileCommand {
         target: String,
         tx: tokio::sync::oneshot::Sender<Result<(), Error>>,
     },
-    HighestNumber{path: Path, tx: tokio::sync::oneshot::Sender<usize>},
-    DeleteLower{path: Path, number: usize, tx: tokio::sync::oneshot::Sender<()>},
     Shutdown
 }
 
@@ -112,30 +110,6 @@ impl FileAccess {
         Ok(util::wait_for_it(rx).await?)
     }
 
-    /// if this path is a directory return the highest number listed,
-    /// or else return 0
-    pub async fn highest_number(&self, path: &Path ) -> usize {
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        self.tx
-            .send(FileCommand::HighestNumber{
-                path: path.clone(),
-                tx,
-            })
-            .await?;
-        Ok(util::wait_for_it(rx).await?)
-    }
-
-    pub async fn delete_lower(&self, path: &Path, number: usize ) {
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        self.tx
-            .send(FileCommand::DeleteLower{
-                path: path.clone(),
-                number: number,
-                tx,
-            })
-            .await?;
-        Ok(util::wait_for_it(rx).await?)
-    }
 
 
     /*
@@ -293,25 +267,13 @@ impl LocalFileAccess {
             FileCommand::Shutdown => {
                 // do nothing
             }
-            FileCommand::HighestNumber{ path, tx } => {
-                tx.send( self.highest_number(path).await ).unwrap_or_default();
-            }
-            FileCommand::DeleteLower { path, number, tx } => {
-                self.delete_lower( path, number ).await;
-                tx.send(()).unwrap_or_default();
-            }
         }
         Ok(())
     }
 
-    async fn list(&self, dir_path: Path) -> usize {
-        let path = self.cat_path(dir_path.to_relative().as_str()).unwrap_or("/");
-        let mut read_dir = match tokio::fs::read_dir(path).await{
-            Ok(ok) => {ok}
-            Err(_) => {
-                return 0;
-            }
-        };
+    async fn list(&self, dir_path: Path) -> Result<Vec<Path>,Error>{
+        let path = self.cat_path(dir_path.to_relative().as_str())?;
+        let mut read_dir = tokio::fs::read_dir(path).await?;
 
         let mut rtn = vec!();
         while let Result::Ok(Option::Some(entry)) = read_dir.next_entry().await {
@@ -323,48 +285,6 @@ impl LocalFileAccess {
     }
 
 
-    async fn delete_lower(&self, path: Path, number: usize ) -> usize {
-        let path = self.cat_path(path.to_relative().as_str()).unwrap_or("/");
-        let mut read_dir = match tokio::fs::read_dir(path).await{
-            Ok(ok) => {ok}
-            Err(_) => {
-                return 0;
-            }
-        };
-
-        while let Result::Ok(Option::Some(entry)) = read_dir.next_entry().await {
-            if let Result::Ok(n) = usize::try_from(entry.file_name()) {
-               if n < number {
-error!("delete_lower() NOT IMPLEMENTED!");
-// somehow delete the file
-//                   self.delete()
-               }
-            }
-        }
-    }
-
-    async fn highest_number(&self, path: Path ) -> usize {
-        let path = self.cat_path(path.to_relative().as_str()).unwrap_or("/");
-        let mut read_dir = match tokio::fs::read_dir(path).await{
-            Ok(ok) => {ok}
-            Err(_) => {
-                return 0;
-            }
-        };
-
-        let mut highest = 0;
-        while let Result::Ok(Option::Some(entry)) = read_dir.next_entry().await {
-            let number = match entry.file_name().try_into() {
-                Ok(number) => number,
-                Err(_) => 0
-            } as _;
-            if number > highest {
-                highest = number;
-            }
-        }
-
-        highest
-    }
 
     pub fn cat_path(&self, path: &str) -> Result<String, Error> {
         if path.len() < 1 {

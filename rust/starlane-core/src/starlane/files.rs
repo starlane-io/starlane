@@ -26,7 +26,7 @@ impl MachineFileSystem{
 
   pub async fn add_local_star( &self, star: StarKey ) {
       let mut lock = self.local_stars.write().await;
-      lock.insert(star)
+      lock.insert(star);
   }
 
   pub fn data_access(&self) -> FileAccess{
@@ -37,6 +37,9 @@ impl MachineFileSystem{
 
 #[async_trait]
 impl BinContext for MachineFileSystem {
+    fn file_access(&self) -> FileAccess {
+        self.data_access.clone()
+    }
 
     fn runtime_handle(&self) -> &Handle {
         self.runtime.handle()

@@ -23,7 +23,7 @@ use crate::message::Fail;
 
 use crate::resource::{ArtifactKind, AssignResourceStateSrc, LocalStateSetSrc, Names, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceKey};
 
-use crate::resource::store::{
+use crate::resource::state_store::{
     StateStore,
 };
 
@@ -40,8 +40,8 @@ pub struct DefaultHost {
 impl DefaultHost {
     pub async fn new(skel: StarSkel) -> Self {
         DefaultHost {
-            skel: skel,
-            store: StateStore::new().await,
+            skel: skel.clone(),
+            store: StateStore::new(skel).await,
         }
     }
 }
@@ -115,10 +115,11 @@ println!("seems to have worked....");
         Ok(self.store.put(assign).await?)
     }
 
-    async fn get(&self, identifier: ResourceKey) -> Result<Option<Resource>, Fail> {
-        self.store.get(identifier).await
+    async fn get(&self, key: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
+        self.store.get(key).await
     }
 
+    /*
     async fn state(&self, identifier: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
         if let Option::Some(resource) = self.store.get(identifier.clone()).await? {
             Ok(resource.state_src())
@@ -127,6 +128,8 @@ println!("seems to have worked....");
         }
 
     }
+
+     */
 
     /*jjjj
     async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {

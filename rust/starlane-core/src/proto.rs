@@ -37,6 +37,7 @@ use crate::star::pledge::StarHandleBacking;
 use crate::star::variant::{StarVariantFactory};
 
 use crate::template::{StarKeyConstellationIndex};
+use crate::starlane::StarlaneMachine;
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -60,6 +61,7 @@ pub struct ProtoStar {
     constellation_status: ConstellationStatus,
     flags: Flags,
     tracker: ProtoTracker,
+    machine: StarlaneMachine
 }
 
 impl ProtoStar {
@@ -75,6 +77,7 @@ impl ProtoStar {
         proto_constellation_broadcast: broadcast::Receiver<ConstellationBroadcast>,
         flags: Flags,
         logger: Logger,
+        machine: StarlaneMachine
     ) -> (Self, StarController) {
         //        let (star_tx, star_rx) = mpsc::channel(32);
         (
@@ -96,7 +99,8 @@ impl ProtoStar {
                 proto_constellation_broadcast: Cell::new(Option::Some(proto_constellation_broadcast)),
                 tracker: ProtoTracker::new(),
                 flags: flags,
-                constellation_status: ConstellationStatus::Unknown
+                constellation_status: ConstellationStatus::Unknown,
+                machine: machine
             },
             StarController { star_tx },
         )
@@ -224,6 +228,7 @@ impl ProtoStar {
                             persistence: Persistence::Memory,
                             data_access: data_access,
                             caches: self.caches.clone(),
+                            machine: self.machine.clone()
                         };
 
                         let variant = self.star_manager_factory.create(skel.clone()).await;
@@ -308,7 +313,7 @@ impl ProtoStar {
                                 }
                             }
                             _ => {
-                                println!("{} frame unsupported by ProtoStar: {}", self.kind, frame);
+                                println!("{} frame unsupported by ProtoStar: {}", self.kind.to_string(), frame);
                             }
                         }
                     }

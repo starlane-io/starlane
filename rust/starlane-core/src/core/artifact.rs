@@ -17,7 +17,7 @@ use crate::file_access::FileAccess;
 use crate::message::Fail;
 use crate::resource::{AddressCreationSrc, ArtifactBundleKind, ArtifactKind, AssignResourceStateSrc, FileSystemKey, KeyCreationSrc, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceKey, ResourceKind, ResourceRecord, ResourceRegistration, ResourceRegistryInfo, ResourceStub, ResourceType};
 use crate::resource::ArtifactBundleKey;
-use crate::resource::store::StateStore;
+use crate::resource::state_store::StateStore;
 use crate::star::StarSkel;
 use crate::util;
 use crate::data::{DataSet, BinSrc};
@@ -33,9 +33,9 @@ impl ArtifactHost {
     pub async fn new(skel: StarSkel, file_access: FileAccess) -> Result<Self, Error> {
         let file_access = file_access.with_path("bundles".to_string())?;
         let rtn = ArtifactHost {
-            skel: skel,
+            skel: skel.clone(),
             file_access: file_access,
-            store: StateStore::new().await,
+            store: StateStore::new(skel).await,
             mutex: Arc::new(Mutex::new(0)),
         };
 
@@ -158,7 +158,7 @@ impl Host for ArtifactHost {
                     AssignResourceStateSrc::Direct(state_set_src) => {
 
                         let src = state_set_src.get(&"content".to_string() ).cloned().ok_or("expected content state aspect for ArtifactBundle")?;
-                        let content= src.to_bin(self.skel.bin_context() )?;
+                        let content= src.to_bin(self.skel.machine.bin_context() )?;
                         let artifacts = get_artifacts(content.clone() )?;
                         let path = Self::bundle_path(assign.key())?;
                         let mut file_access = self.file_access.with_path(path.to_relative())?;
@@ -208,8 +208,9 @@ impl Host for ArtifactHost {
             state_src: DataSet::new(),
         };
 
-        let resource = self.store.put(assign).await?;
-        {
+
+        self.store.put(assign.clone()).await?;
+/*        {
             // at some point we need to ensure all of the artifacts but it must be AFTER
             // the registration for Bundle is fully commited...
 
@@ -228,13 +229,22 @@ impl Host for ArtifactHost {
             });
         }
 
+ */
+
+        let resource = Resource::new(
+             assign.stub.key,
+            assign.stub.address,
+            assign.stub.archetype,
+            assign.state_src);
+
         Ok(resource)
     }
 
-    async fn get(&self, key: ResourceKey) -> Result<Option<Resource>, Fail> {
+    async fn get(&self, key: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
         self.store.get(key).await
     }
 
+    /*
     async fn state(&self, key: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
         if let Ok(Option::Some(resource)) = self.store.get(key.clone()).await {
             match key.resource_type() {
@@ -264,6 +274,8 @@ impl Host for ArtifactHost {
             Err(Fail::ResourceNotFound(key.into()))
         }
     }
+
+     */
 
     async fn delete(&self, _identifier: ResourceKey) -> Result<(), Fail> {
         unimplemented!("I don't know how to DELETE yet.");

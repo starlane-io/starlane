@@ -261,8 +261,7 @@ pub trait StarCoreExtFactory: Send+Sync
     &mut self,
     assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<Resource, Fail>;
-    async fn get(&self, key: ResourceKey) -> Result<Option<Resource>, Fail>;
-    async fn state(&self, key: ResourceKey) -> Result<DataSet<BinSrc>, Fail>;
+    async fn get(&self, key: ResourceKey) -> Result<DataSet<BinSrc>, Fail>;
     async fn delete(&self, key: ResourceKey) -> Result<(), Fail>;
     fn shutdown(&self) {}
 }

@@ -61,7 +61,7 @@ pub trait BinContext : Sync+Send {
 
   fn file_access(&self) -> FileAccess;
   fn runtime_handle(&self) -> &Handle;
-  async fn is_local_star( &self, star: &StarKey ) -> Result<bool,Error>;
+  async fn is_local_star( &self, star: &StarKey ) -> bool;
 }
 
 pub struct BinTransfer{
