@@ -1,15 +1,15 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
+use std::sync::Arc;
 
 use nom::{AsChar, InputTakeAtPosition, IResult};
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take, take_until, take_while};
+use nom::bytes::complete::{tag, take};
 use nom::character::complete::{alpha0, alpha1, anychar, digit0, digit1, one_of};
-use nom::character::is_digit;
-use nom::combinator::{not, opt, eof};
-use nom::error::{context, ErrorKind, ParseError, VerboseError};
-use nom::multi::{many0, many1, many_m_n, separated_list1};
+use nom::combinator::{not, opt};
+use nom::error::{context, ErrorKind, VerboseError};
+use nom::multi::{many1, many_m_n, separated_list0, separated_list1};
 use nom::sequence::{delimited, preceded, terminated, tuple};
 use serde::Deserialize;
 use serde::Serialize;
@@ -17,98 +17,80 @@ use serde::Serialize;
 use starlane_macros::resources;
 
 use crate::error::Error;
-use std::sync::Arc;
 
 pub mod error;
-mod parse;
+pub mod parse;
+pub mod data;
 
 
-resources! {
-    #[resource(parents(Root))]
-    #[resource(prefix="s")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    pub struct Space();
-
-    #[resource(parents(Space))]
-    #[resource(prefix="ss")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    pub struct SubSpace();
-
-    #[resource(parents(SubSpace))]
-    #[resource(prefix="app")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    pub struct App();
-
-    #[resource(parents(App))]
-    #[resource(prefix="act")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    pub struct Actor();
-
-    #[resource(parents(SubSpace,App))]
-    #[resource(prefix="fs")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    pub struct FileSystem();
-
-    #[resource(parents(FileSystem))]
-    #[resource(prefix="f")]
-    #[resource(ResourcePathSegmentKind::Path)]
-    pub struct File();
-
-    #[resource(parents(SubSpace,App))]
-    #[resource(prefix="db")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    pub struct Database();
-
-    #[resource(parents(Space))]
-    #[resource(prefix="d")]
-    #[resource(ResourcePathSegmentKind::Domain)]
-    pub struct Domain();
-
-    #[resource(parents(SubSpace))]
-    #[resource(prefix="p")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    pub struct Proxy();
-
-    #[resource(parents(SubSpace))]
-    #[resource(prefix="abv")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    pub struct ArtifactBundleVersions();
-
-    #[resource(parents(ArtifactBundleVersions))]
-    #[resource(prefix="ab")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    pub struct ArtifactBundle();
-
-    #[resource(parents(ArtifactBundle))]
-    #[resource(prefix="a")]
-    #[resource(ResourcePathSegmentKind::Path)]
-    pub struct Artifact();
-
-    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
-    pub enum DatabaseKind{
-        Relational(Specific)
-    }
-
-    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
-    pub enum FileKind{
-        Dir,
-        File
-    }
-
-}
-
-
-
+#[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
 pub struct ResourceAddress {
     path: ResourcePath
 }
 
 impl ResourceAddress {
+
+    pub fn root() -> Self {
+       ResourcePath::Root.into()
+    }
+
+
     pub fn new( path: ResourcePath ) -> Self {
         Self {
             path: path
         }
     }
+
+    pub fn append( &self, string: String, resource_type: ResourceType ) -> Result<Self,Error> {
+        let address = format!("{}:{}<{}>",self.path.to_string(), string, resource_type.to_string() );
+        let path = ResourcePath::from_str(address.as_str())?;
+        Ok(Self{
+            path: path
+        })
+    }
+
+    pub fn parent(&self) -> Option<ResourceAddress> {
+        match self.path.parent() {
+            Option::None => Option::None,
+            Option::Some(parent) => Option::Some(parent.into())
+        }
+    }
+
+    pub fn ancestor_of_type(&self, resource_type: ResourceType ) -> Result<ResourceAddress,Error> {
+        if self.resource_type() == resource_type {
+            return Ok(self.clone())
+        } else if let Option::Some(parent) = self.parent() {
+            parent.ancestor_of_type(resource_type)
+        } else {
+            Err(format!("does not have ancestor of type {}",resource_type.to_string()).into())
+        }
+    }
+
+    pub fn sub_space(&self) -> Result<ResourceAddress,Error> {
+        self.ancestor_of_type(ResourceType::SubSpace)
+    }
+
+    pub fn space(&self) -> Result<ResourceAddress,Error> {
+        self.ancestor_of_type(ResourceType::Space)
+    }
+
+
+    pub fn resource_type(&self) -> ResourceType {
+        self.path.resource_type()
+    }
+
+    pub fn to_parts_string(&self) -> String {
+        self.path.to_string()
+    }
+
+    pub fn name(&self) -> String {
+        self.path.name()
+    }
+
+    pub fn last_to_string(&self) -> String {
+        self.name()
+    }
+
 }
 
 impl ToString for ResourceAddress {
@@ -133,6 +115,27 @@ impl From<ResourcePath> for ResourceAddress {
     }
 }
 
+
+impl ResourceKey {
+
+    pub fn ancestor_of_type(&self, resource_type: ResourceType ) -> Result<ResourceKey,Error> {
+        if self.resource_type() == resource_type {
+            return Ok(self.clone())
+        } else if let Option::Some(parent) = self.parent() {
+            parent.ancestor_of_type(resource_type)
+        } else {
+            Err(format!("does not have ancestor of type {}",resource_type.to_string()).into())
+        }
+    }
+
+}
+
+impl ResourceKind{
+    pub fn init_clap_config(&self) -> Option<ArtifactPath> {
+        Option::None
+    }
+}
+
 pub struct ResourceAddressKind {
     path: ResourcePath,
     kind: ResourceKind
@@ -144,6 +147,10 @@ impl ResourceAddressKind {
             path: path,
             kind: kind
         }
+    }
+
+    pub fn kind(&self) -> ResourceKind {
+        self.kind.clone()
     }
 }
 
@@ -158,7 +165,7 @@ impl FromStr for ResourceAddressKind{
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let path = ResourcePath::from_str(s)?;
-        let (leftover,(_,kind)) = parse_path(s)?;
+        let (_leftover,(_,kind)) = parse_path(s)?;
         Ok(Self{
             path: path,
             kind: kind.try_into()?
@@ -328,7 +335,7 @@ fn version_major_minor_patch(input: &str) -> Res<&str, (usize,usize,usize)> {
             terminated(digit1, not(digit1)),
         )),
     )(input)
-        .map(|(next_input, mut res)| (next_input, (res.0.parse().unwrap(), res.1.parse().unwrap(), res.2.parse().unwrap())))
+        .map(|(next_input, res)| (next_input, (res.0.parse().unwrap(), res.1.parse().unwrap(), res.2.parse().unwrap())))
 }
 
 fn version(input: &str) -> Res<&str, Version> {
@@ -415,18 +422,17 @@ pub fn parse_kind(input: &str) -> Res<&str, ResourceKindParts> {
     } )
 }
 
-
-pub fn parse_key(input: &str) -> Res<&str, (Vec<ResourcePathSegment>)> {
+pub fn parse_key(input: &str) -> Res<&str, Vec<ResourcePathSegment>> {
     context(
         "key",
         separated_list1( nom::character::complete::char(':'), alt( (path_part,version_part,domain_part,skewer_part) ) )
     )(input)
 }
 
-pub fn parse_resource_path(input: &str) -> Res<&str, (Vec<ResourcePathSegment>)> {
+pub fn parse_resource_path(input: &str) -> Res<&str, Vec<ResourcePathSegment>> {
     context(
         "address-path",
-        separated_list1( nom::character::complete::char(':'), alt( (path_part,version_part,domain_part,skewer_part) ) )
+        separated_list0( nom::character::complete::char(':'), alt( (path_part,version_part,domain_part,skewer_part) ) )
     )(input)
 }
 
@@ -543,6 +549,12 @@ impl FromStr for ResourceKindParts {
             return Err(format!("ResourceKindParts ERROR: could not parse extra: '{}' in string '{}'", leftover, s ).into());
         }
         Ok(rtn)
+    }
+}
+
+impl Into<ResourceAddress> for ResourceAddressKind {
+    fn into(self) -> ResourceAddress {
+        self.path.into()
     }
 }
 
@@ -713,7 +725,7 @@ pub struct ParentAddressPatternRecognizer<T> {
 
 
 impl <T> ParentAddressPatternRecognizer<T> {
-    pub fn try_from( &self, pattern: &AddressPattern ) -> Result<T,Error>{
+    pub fn try_from( &self, _pattern: &AddressPattern ) -> Result<T,Error>{
         unimplemented!()
 //        self.patterns.get(pattern ).cloned().ok_or(Error{message:"Could not find a match for ParentAddressPatternRecognizer".to_string()})
     }
@@ -788,8 +800,16 @@ impl Path {
         }
     }
 
+    pub fn make_absolute( string: &str ) -> Result<Self,Error> {
+       if string.starts_with("/") {
+           Path::from_str(string)
+       } else {
+           Path::from_str(format!("/{}",string).as_str() )
+       }
+    }
+
     pub fn bin(&self) -> Result<Vec<u8>, Error> {
-        let mut bin = bincode::serialize(self)?;
+        let bin = bincode::serialize(self)?;
         Ok(bin)
     }
 
@@ -831,6 +851,14 @@ impl Path {
                 }
                 Option::Some(Path::new(string.as_str()))
             }
+        }
+    }
+
+    pub fn last_segment(&self) -> Option<String> {
+        let split = self.string.split("/");
+        match split.last() {
+            None => Option::None,
+            Some(last) => Option::Some(last.to_string())
         }
     }
 
@@ -889,7 +917,11 @@ impl FromStr for Path {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Path::from_str(s)?)
+        let (leftover,path) = path(s)?;
+        if !leftover.is_empty() {
+            return Err(format!("could not parse '{}' from path {}", leftover,s ).into() );
+        }
+        Ok(path)
     }
 }
 
@@ -953,11 +985,12 @@ impl FromStr for Version {
 
 #[cfg(test)]
 mod tests {
-    use crate::error::Error;
-    use crate::{parse_resource_path, ResourcePathSegment, SkewerCase, version, path, domain, DomainCase, KeyBits, Specific, ResourceAddressKind, ResourceAddress};
-    use crate::{SpaceKey,ResourceKey,RootKey,SubSpaceKey,AppKey,DatabaseKey,DatabaseKind,ResourceKind, DatabasePath, ResourcePath, ResourceType};
     use std::convert::TryInto;
     use std::str::FromStr;
+
+    use crate::{domain, DomainCase, KeyBits, parse_resource_path, path, ResourceAddress, ResourceAddressKind, ResourcePathSegment, SkewerCase, Specific, version};
+    use crate::{AppKey, DatabaseKey, DatabaseKind, ResourceKey, ResourceKind, ResourcePath, ResourceType, RootKey, SpaceKey, SubSpaceKey};
+    use crate::error::Error;
 
     #[test]
     fn test_kind() -> Result<(),Error> {
@@ -1107,11 +1140,11 @@ mod tests {
     fn test_address_parent_resolution( ) -> Result<(),Error>{
 
         let path = ResourcePath::from_str( "space:sub-space:some-app:database<Database<Relational<mysql.org:mysql:innodb:1.0.0>>>")?;
-        let parent = path.parent()?.unwrap();
+        let parent = path.parent().unwrap();
         assert_eq!( parent.resource_type(), ResourceType::App );
 
         let path = ResourcePath::from_str( "space:sub-space:database<Database<Relational>>")?;
-        let parent = path.parent()?.unwrap();
+        let parent = path.parent().unwrap();
 
         assert_eq!( parent.resource_type(), ResourceType::SubSpace );
 
@@ -1139,3 +1172,279 @@ mod tests {
     }
 }
 
+pub enum ResourceStatePersistenceManager {
+    None,
+    Store,
+    Host,
+}
+
+
+
+
+
+
+#[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
+pub enum ResourceIdentifier {
+    Key(ResourceKey),
+    Address(ResourceAddress),
+}
+
+impl ResourceIdentifier{
+
+    pub fn is_key(&self) -> bool {
+        match self {
+            ResourceIdentifier::Key(_) => {
+                true
+            }
+            ResourceIdentifier::Address(_) => {
+                false
+            }
+        }
+    }
+
+    pub fn is_address(&self) -> bool {
+        match self {
+            ResourceIdentifier::Key(_) => {
+                false
+            }
+            ResourceIdentifier::Address(_) => {
+                true
+            }
+        }
+    }
+
+
+    pub fn key_or(self,error_message: &str ) -> Result<ResourceKey,Error> {
+        match self {
+            ResourceIdentifier::Key(key) => {
+                Ok(key)
+            }
+            ResourceIdentifier::Address(_) => {
+                Err(error_message.into())
+            }
+        }
+    }
+
+    pub fn address_or(self,error_message: &str ) -> Result<ResourceAddress,Error> {
+        match self {
+            ResourceIdentifier::Key(_) => {
+                Err(error_message.into())
+            }
+            ResourceIdentifier::Address(address) => {
+                Ok(address)
+            }
+        }
+    }
+
+    /*
+    pub async fn to_key(mut self, starlane_api: &StarlaneApi ) -> Result<ResourceKey,Error> {
+        match self{
+            ResourceIdentifier::Key(key) => {Ok(key)}
+            ResourceIdentifier::Address(address) => {
+                Ok(starlane_api.fetch_resource_key(address).await?)
+            }
+        }
+    }
+
+    pub async fn to_address(mut self, starlane_api: &StarlaneApi ) -> Result<ResourceAddress,Error> {
+        match self{
+            ResourceIdentifier::Address(address) => {Ok(address)}
+            ResourceIdentifier::Key(key) => {
+                Ok(starlane_api.fetch_resource_address(key).await?)
+            }
+        }
+    }
+
+     */
+}
+
+impl ResourceIdentifier {
+    pub fn parent(&self) -> Option<ResourceIdentifier> {
+        match self {
+            ResourceIdentifier::Key(key) => match key.parent() {
+                None => Option::None,
+                Some(parent) => Option::Some(parent.into()),
+            },
+            ResourceIdentifier::Address(address) => match address.parent() {
+                None => Option::None,
+                Some(parent) => Option::Some(parent.into()),
+            },
+        }
+    }
+
+    pub fn resource_type(&self) -> ResourceType {
+        match self {
+            ResourceIdentifier::Key(key) => key.resource_type(),
+            ResourceIdentifier::Address(address) => address.resource_type(),
+        }
+    }
+}
+
+impl From<ResourceAddress> for ResourceIdentifier {
+    fn from(address: ResourceAddress) -> Self {
+        ResourceIdentifier::Address(address)
+    }
+}
+
+impl From<ResourceKey> for ResourceIdentifier {
+    fn from(key: ResourceKey) -> Self {
+        ResourceIdentifier::Key(key)
+    }
+}
+
+impl TryInto<ResourceKey> for ResourceIdentifier {
+    type Error = Error;
+
+    fn try_into(self) -> Result<ResourceKey, Self::Error> {
+        match self {
+            ResourceIdentifier::Key(key) => Ok(key),
+            ResourceIdentifier::Address(_) => Err("resource identifier is not a key".into())
+        }
+    }
+}
+
+impl TryInto<ResourceAddress> for ResourceIdentifier {
+    type Error = Error;
+
+    fn try_into(self) -> Result<ResourceAddress, Self::Error> {
+        match self {
+            ResourceIdentifier::Key(_) =>Err("resource identifier is not an address".into()),
+            ResourceIdentifier::Address(address) => Ok(address)
+        }
+    }
+}
+
+impl ToString for ResourceIdentifier {
+    fn to_string(&self) -> String {
+        match self {
+            ResourceIdentifier::Key(key) => key.to_string(),
+            ResourceIdentifier::Address(address) => address.to_string(),
+        }
+    }
+}
+
+
+resources! {
+    #[resource(parents(Root))]
+    #[resource(prefix="s")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Store)]
+    #[resource(state(meta::Meta))]
+    pub struct Space();
+
+    #[resource(parents(Space))]
+    #[resource(prefix="ss")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Store)]
+    #[resource(state(meta::Meta))]
+    pub struct SubSpace();
+
+    #[resource(parents(SubSpace))]
+    #[resource(prefix="app")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::None)]
+    pub struct App();
+
+    #[resource(parents(App))]
+    #[resource(prefix="act")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::None)]
+    pub struct Actor();
+
+    #[resource(parents(SubSpace,App))]
+    #[resource(prefix="fs")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    pub struct FileSystem();
+
+    #[resource(parents(FileSystem))]
+    #[resource(prefix="f")]
+    #[resource(ResourcePathSegmentKind::Path)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    #[resource(state(meta::Meta))]
+    #[resource(state(content::Binary))]
+    pub struct File();
+
+    #[resource(parents(SubSpace,App))]
+    #[resource(prefix="db")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    pub struct Database();
+
+    #[resource(parents(Space))]
+    #[resource(prefix="d")]
+    #[resource(ResourcePathSegmentKind::Domain)]
+    #[resource(ResourceStatePersistenceManager::None)]
+    pub struct Domain();
+
+    #[resource(parents(SubSpace))]
+    #[resource(prefix="p")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::None)]
+    pub struct Proxy();
+
+    #[resource(parents(SubSpace))]
+    #[resource(prefix="abv")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::None)]
+    #[resource(state(content::Binary))]
+    pub struct ArtifactBundleVersions();
+
+    #[resource(parents(ArtifactBundleVersions))]
+    #[resource(prefix="ab")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    #[resource(state(content::Binary))]
+    pub struct ArtifactBundle();
+
+    #[resource(parents(ArtifactBundle))]
+    #[resource(prefix="a")]
+    #[resource(ResourcePathSegmentKind::Path)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    #[resource(state(content::Binary))]
+    pub struct Artifact();
+
+    #[resource(parents(Space))]
+    #[resource(prefix="u")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    pub struct User();
+
+
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum DatabaseKind{
+        Relational(Specific)
+    }
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum FileKind{
+        Directory,
+        File
+    }
+
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum ArtifactKind{
+        Raw,
+        DomainConfig
+    }
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum ArtifactBundleKind{
+        Final,
+        Volatile
+    }
+
+
+}
+
+impl ArtifactPath{
+    pub fn path(&self)->Path {
+        if let ResourcePathSegment::Path( path ) = self.parts.last().unwrap() {
+            path.clone()
+        } else {
+            panic!("expected last segment to be a path")
+        }
+    }
+}

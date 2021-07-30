@@ -1,25 +1,23 @@
 use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::str::FromStr;
+use std::sync::Arc;
 
+use futures::TryFutureExt;
+use rusqlite::{Connection, params, params_from_iter, ToSql};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
-use rusqlite::{params, params_from_iter, Connection, ToSql};
-use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{mpsc, oneshot};
-use tokio::time::error::Elapsed;
+
 use tokio::time::Duration;
 
+
 use crate::error::Error;
-use crate::frame::{Reply, ResourceHostAction, SimpleReply, StarMessagePayload};
-use crate::message::{Fail, ProtoStarMessage};
-use crate::resource::{
-    RemoteResourceHost, ResourceAssign, ResourceHost, ResourceLocationAffinity, ResourceType,
-};
+
+use crate::message::{Fail};
+use crate::resource::{ResourceAssign, ResourceHost, ResourceLocationAffinity, ResourceType, RemoteResourceHost};
 use crate::star::{
     LocalResourceLocation, StarComm, StarCommand, StarInfo, StarKey, StarKind, StarSkel,
 };
-use futures::TryFutureExt;
-use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct StarHandleBacking {
@@ -51,7 +49,7 @@ impl StarHandleBacking {
             StarHandleResult::StarHandles(handles) => {
                 Ok(handles)
             }
-            what => {
+            _what => {
                 Err(Fail::expected("StarHandleResult::StarHandles(handles)"))
             }
         }
@@ -65,7 +63,7 @@ impl StarHandleBacking {
             StarHandleResult::StarHandle(handle) => {
                 Ok(handle)
             }
-            what => {
+            _what => {
                 Err(Fail::expected("StarHandleResult::StarHandle(handle)"))
             }
         }
@@ -80,7 +78,7 @@ impl StarHandleBacking {
             StarHandleResult::Satisfaction(satisfaction) => {
                 Ok(satisfaction)
             }
-            what => {
+            _what => {
                 Err(Fail::expected("StarHandleResult::Satisfaction(_)"))
             }
         }
@@ -98,7 +96,7 @@ impl ResourceHostSelector {
     }
 
     pub async fn select(&self, resource_type: ResourceType) -> Result<Arc<dyn ResourceHost>, Fail> {
-        if resource_type.star_host() == self.skel.info.kind {
+        if StarKind::hosts(&resource_type) == self.skel.info.kind {
             let handle = StarHandle {
                 key: self.skel.info.key.clone(),
                 kind: self.skel.info.kind.clone(),
@@ -115,7 +113,7 @@ impl ResourceHostSelector {
                 self.skel.info.kind.to_string()
             ))?;
             let mut selector = StarSelector::new();
-            selector.add(StarFieldSelection::Kind(resource_type.star_host()));
+            selector.add(StarFieldSelection::Kind(StarKind::hosts(&resource_type)));
             let handle = handler.next(selector).await?;
 
             let host = RemoteResourceHost {
@@ -298,7 +296,7 @@ impl StarHandleDb {
                 let key = handle.key.bin()?;
                 let kind = handle.kind.to_string();
 
-                let mut trans = self.conn.transaction()?;
+                let trans = self.conn.transaction()?;
                 if handle.hops.is_some() {
                     trans.execute(
                         "REPLACE INTO stars (key,kind,hops) VALUES (?1,?2,?3)",
@@ -329,7 +327,7 @@ impl StarHandleDb {
                     }
 
                     let f = match &field {
-                        StarFieldSelection::Kind(kind) => {
+                        StarFieldSelection::Kind(_kind) => {
                             format!("kind=?{}", index + 1)
                         }
                         StarFieldSelection::MinHops => {
@@ -397,7 +395,7 @@ impl StarHandleDb {
                     }
 
                     let f = match &field {
-                        StarFieldSelection::Kind(kind) => {
+                        StarFieldSelection::Kind(_kind) => {
                             format!("kind=?{}", index + 1)
                         }
                         StarFieldSelection::MinHops => {

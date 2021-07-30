@@ -1,34 +1,32 @@
-use clap::{App, SubCommand, Arg, ArgMatches, Values};
-
-use tokio::runtime::Runtime;
-
-use starlane_core::error::Error;
-use starlane_core::starlane::{ConstellationCreate, StarlaneMachine, StarlaneCommand, StarlaneMachineRunner};
-use starlane_core::template::{ConstellationData, ConstellationTemplate, ConstellationLayout};
-use tokio::sync::oneshot;
-use starlane_core::resource::{ResourceAddress, Version, ResourceSelector, FieldSelection, ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceArchetype, ResourceCreateStrategy, AssignResourceStateSrc};
-use std::str::FromStr;
-use std::{fs, thread};
-use std::path::Path;
-use std::fs::File;
-use std::sync::Arc;
-use starlane_core::artifact::ArtifactBundleAddress;
-use std::io::Read;
-use tracing_subscriber::FmtSubscriber;
-use tracing::dispatcher::set_global_default;
-use tokio::time::Duration;
-use starlane_core::starlane::api::StarlaneApi;
-use starlane_core::util::shutdown;
-use starlane_core::resource::selector::MultiResourceSelector;
-use std::ffi::OsString;
-use starlane_core::util;
-use starlane_core::resource::address::ResourceAddressKind;
-use starlane_core::star::StarKind;
-
-mod cli;
-
 #[macro_use]
 extern crate lazy_static;
+
+
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+use std::str::FromStr;
+use std::sync::Arc;
+
+use clap::{App, Arg, ArgMatches, SubCommand};
+use tokio::runtime::Runtime;
+
+
+use tracing::dispatcher::set_global_default;
+use tracing_subscriber::FmtSubscriber;
+
+use starlane_core::error::Error;
+use starlane_core::resource::{AddressCreationSrc, ArtifactBundlePath, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceSelector};
+use starlane_core::resource::ResourceAddressKind;
+use starlane_core::resource::selector::MultiResourceSelector;
+
+use starlane_core::starlane::{ConstellationCreate, StarlaneCommand, StarlaneMachine, StarlaneMachineRunner};
+use starlane_core::starlane::api::StarlaneApi;
+use starlane_core::template::{ConstellationData, ConstellationLayout, ConstellationTemplate};
+use starlane_core::util;
+use starlane_core::util::shutdown;
+
+mod cli;
 
 fn main() -> Result<(), Error> {
 
@@ -57,7 +55,7 @@ fn main() -> Result<(), Error> {
     if let Option::Some(serve) = matches.subcommand_matches("serve") {
         let rt = Runtime::new().unwrap();
         rt.block_on(async move {
-            let mut starlane = StarlaneMachine::new("server".to_string() ).unwrap();
+            let starlane = StarlaneMachine::new("server".to_string() ).unwrap();
             let layout = match serve.is_present("with-external"){
                 false  => {
                     ConstellationLayout::standalone().unwrap()}
@@ -111,12 +109,12 @@ fn main() -> Result<(), Error> {
 
 async fn publish(args: ArgMatches<'_> ) -> Result<(),Error> {
 
-    let bundle = ArtifactBundleAddress::from_str( args.value_of("address").ok_or("expected address")? )?;
+    let bundle = ArtifactBundlePath::from_str( args.value_of("address").ok_or("expected address")? )?;
 
     let input = Path::new(args.value_of("dir").ok_or("expected directory")?);
 
     let mut zipfile = if input.is_dir() {
-        let mut zipfile = tempfile::NamedTempFile::new()?;
+        let zipfile = tempfile::NamedTempFile::new()?;
         util::zip( args.value_of("dir").expect("expected directory").to_string().as_str(),
                            &zipfile.reopen()?,
                     zip::CompressionMethod::Deflated )?;
@@ -130,8 +128,7 @@ async fn publish(args: ArgMatches<'_> ) -> Result<(),Error> {
     let data = Arc::new(data);
 
     let starlane_api = starlane_api().await?;
-    let create_artifact_bundle = starlane_api.create_artifact_bundle(&bundle,data).await?;
-    create_artifact_bundle.submit().await?;
+    starlane_api.create_artifact_bundle(&bundle,data).await?;
 
     Ok(())
 }
@@ -140,7 +137,7 @@ async fn list(args: ArgMatches<'_> ) -> Result<(),Error> {
     let address = ResourceAddress::from_str( args.value_of("address").ok_or("expected resource address")? )?;
     let starlane_api = starlane_api().await?;
 
-    let mut selector = if args.value_of("child-pattern" ).is_some(){
+    let selector = if args.value_of("child-pattern" ).is_some(){
         let selector = MultiResourceSelector::from_str( args.value_of("child-pattern").unwrap() )?;
         selector.into()
     } else {
@@ -163,9 +160,8 @@ async fn list(args: ArgMatches<'_> ) -> Result<(),Error> {
 async fn create(args: ArgMatches<'_> ) -> Result<(),Error> {
 
     let address = ResourceAddressKind::from_str( args.value_of("address").ok_or("expected resource address")? )?;
-    let kind = address.kind.clone();
+    let kind = address.kind().clone();
     let address:ResourceAddress = address.into();
-println!("HOST StarKind: {}", kind.resource_type().star_host().to_string());
 
     let init_args = match args.values_of("init-args") {
         None => {"".to_string()}
@@ -187,7 +183,7 @@ println!("HOST StarKind: {}", kind.resource_type().star_host().to_string());
                 specific: None,
                 config: None
             },
-            src: AssignResourceStateSrc::InitArgs(init_args),
+            state_src: AssignResourceStateSrc::CreateArgs(init_args),
             registry_info: Option::None,
             owner: Option::None,
             strategy: ResourceCreateStrategy::Create
@@ -200,7 +196,7 @@ println!("HOST StarKind: {}", kind.resource_type().star_host().to_string());
 }
 
 pub async fn starlane_api() -> Result<StarlaneApi,Error>{
-    let mut starlane = StarlaneMachine::new("client".to_string() ).unwrap();
+    let starlane = StarlaneMachine::new("client".to_string() ).unwrap();
     let mut  layout = ConstellationLayout::client("host".to_string())?;
     let host = {
         let config = crate::cli::CLI_CONFIG.lock()?;

@@ -1,23 +1,33 @@
+use std::{fs, thread};
 use std::collections::HashMap;
-use std::sync::{mpsc, Arc, Mutex};
 
-use crate::error::Error;
-use crate::resource::{FileKind, Path};
-use crate::star::Star;
-use crate::util;
-use notify::{raw_watcher, Op, RawEvent, RecursiveMode, Watcher};
-use std::convert::TryFrom;
 use std::fs::{DirBuilder, File};
-use std::future::Future;
+
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use std::sync::mpsc::{Receiver, RecvError};
-use std::{fs, thread};
-use tokio::io::{AsyncRead, AsyncReadExt};
+use std::str::FromStr;
+use std::sync::{Arc, mpsc};
+
+
+use notify::{Op, raw_watcher, RawEvent, RecursiveMode, Watcher};
+use tokio::io::{AsyncReadExt};
 use tokio::time::Duration;
-use walkdir::{DirEntry, WalkDir};
+use walkdir::{WalkDir};
+
+use crate::error::Error;
+use crate::resource::Path;
+use crate::resource::FileKind;
+
+use crate::util;
+use tokio::fs::ReadDir;
+use std::convert::TryInto;
+use std::convert::TryFrom;
 
 pub enum FileCommand {
+    List {
+        path: Path,
+        tx: tokio::sync::oneshot::Sender<Result<Vec<Path>, Error>>,
+    },
     Read {
         path: Path,
         tx: tokio::sync::oneshot::Sender<Result<Arc<Vec<u8>>, Error>>,
@@ -66,6 +76,17 @@ impl FileAccess {
         Ok(FileAccess { path: path, tx: tx })
     }
 
+    pub async fn list(&self, path: &Path) -> Result<Vec<Path>, Error> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(FileCommand::List{
+                path: path.clone(),
+                tx: tx,
+            })
+            .await?;
+        Ok(util::wait_for_it(rx).await?)
+    }
+
     pub async fn read(&self, path: &Path) -> Result<Arc<Vec<u8>>, Error> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.tx
@@ -78,7 +99,7 @@ impl FileAccess {
     }
 
     pub async fn write(&mut self, path: &Path, data: Arc<Vec<u8>>) -> Result<(), Error> {
-        let (tx, mut rx) = tokio::sync::oneshot::channel();
+        let (tx, rx) = tokio::sync::oneshot::channel();
         self.tx
             .send(FileCommand::Write {
                 path: path.clone(),
@@ -88,6 +109,8 @@ impl FileAccess {
             .await?;
         Ok(util::wait_for_it(rx).await?)
     }
+
+
 
     /*
     pub async fn write_stream( &mut self, path: &Path, stream: Box<dyn AsyncReadExt> )->Result<(),Error> {
@@ -104,7 +127,7 @@ impl FileAccess {
     }
 
     pub async fn unzip(&self, source: String, target: String) -> Result<(), Error> {
-        let (tx, mut rx) = tokio::sync::oneshot::channel();
+        let (tx, rx) = tokio::sync::oneshot::channel();
         self.tx
             .send(FileCommand::UnZip { source, target, tx })
             .await?;
@@ -213,30 +236,33 @@ impl LocalFileAccess {
 
     async fn process(&mut self, command: FileCommand) -> Result<(), Error> {
         match command {
+            FileCommand::List { path, tx } => {
+                tx.send( self.list(path).await ).unwrap_or_default();
+            }
             FileCommand::Read { path, tx } => {
-                tx.send(self.read(&path));
+                tx.send(self.read(&path)).unwrap_or_default();
             }
             FileCommand::Write {
-                path: path,
+                path,
                 data,
                 tx,
             } => {
-                tx.send(self.write(&path, data));
+                tx.send(self.write(&path, data)).unwrap_or_default();
             }
             /*            FileCommand::WriteStream { path: path, stream, tx } => {
                 tx.send(self.write_sream(&path,stream).await);
             }*/
             FileCommand::MkDir { path, tx } => {
-                tx.send(self.mkdir(&path));
+                tx.send(self.mkdir(&path)).unwrap_or_default();
             }
             FileCommand::Watch { tx } => {
-                tx.send(self.watch());
+                tx.send(self.watch()).unwrap_or_default();
             }
             FileCommand::Walk { tx } => {
-                tx.send(self.walk());
+                tx.send(self.walk()).unwrap_or_default();
             }
             FileCommand::UnZip { source, target, tx } => {
-                tx.send(self.unzip(source, target));
+                tx.send(self.unzip(source, target)).unwrap_or_default();
             }
             FileCommand::Shutdown => {
                 // do nothing
@@ -244,6 +270,21 @@ impl LocalFileAccess {
         }
         Ok(())
     }
+
+    async fn list(&self, dir_path: Path) -> Result<Vec<Path>,Error>{
+        let path = self.cat_path(dir_path.to_relative().as_str())?;
+        let mut read_dir = tokio::fs::read_dir(path).await?;
+
+        let mut rtn = vec!();
+        while let Result::Ok(Option::Some(entry)) = read_dir.next_entry().await {
+            let entry = Path::make_absolute(entry.file_name().to_str().ok_or("expected os str to be able to change to str")?)?;
+            let entry = dir_path.cat(&entry)?;
+            rtn.push(entry );
+        }
+        Ok(rtn)
+    }
+
+
 
     pub fn cat_path(&self, path: &str) -> Result<String, Error> {
         if path.len() < 1 {
@@ -273,7 +314,7 @@ impl LocalFileAccess {
         for i in 0..archive.len() {
             let mut zip_file = archive.by_index(i)?;
             if zip_file.is_dir() {
-                let path = Path::new(format!("/{}/{}", target, zip_file.name()).as_str())?;
+                let path = Path::from_str(format!("/{}/{}", target, zip_file.name()).as_str())?;
                 self.mkdir(&path)?;
             } else {
                 let path = format!("{}/{}/{}", self.base_dir, target, zip_file.name());
@@ -385,14 +426,14 @@ impl LocalFileAccess {
                     Ok(RawEvent {
                         path: Some(path),
                         op: Ok(op),
-                        cookie,
+                        cookie: _,
                     }) => {
                         let event_kind = match op {
                             Op::CREATE => FileEventKind::Create,
-                            CREATE_WRITE => FileEventKind::Create,
+                            _CREATE_WRITE => FileEventKind::Create,
                             Op::REMOVE => FileEventKind::Delete,
                             Op::WRITE => FileEventKind::Update,
-                            x => {
+                            _x => {
                                 continue;
                             }
                         };

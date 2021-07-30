@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	starlanev1alpha1 "github.com/mechtronium/starlane/api/v1alpha1"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -36,6 +37,7 @@ type StarlaneProvisionerReconciler struct {
 //+kubebuilder:rbac:groups=starlane.starlane.io,resources=starlaneprovisioners,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=starlane.starlane.io,resources=starlaneprovisioners/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=starlane.starlane.io,resources=starlaneprovisioners/finalizers,verbs=update
+//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -94,6 +96,7 @@ func (r *StarlaneProvisionerReconciler) Reconcile(ctx context.Context, req ctrl.
 func (r *StarlaneProvisionerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&starlanev1alpha1.StarlaneProvisioner{}).
+		Owns(&batchv1.Job{}).
 		Complete(r)
 }
 

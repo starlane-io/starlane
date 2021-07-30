@@ -1,19 +1,18 @@
-use crate::error::Error;
-use crate::keys::ResourceKey;
-use crate::resource::{
-    ResourceAddress, ResourceArchetype, ResourceCreateStrategy, ResourceKind, ResourceLocation,
-    ResourceRecord, ResourceRegistration, ResourceStub, create_args
-};
-use crate::star::variant::{StarVariant, StarVariantCommand};
-use crate::star::{PublicKeySource, StarKey, StarSkel};
-use crate::starlane::api::{SpaceApi, StarlaneApi};
-use std::convert::TryInto;
+
 use std::str::FromStr;
-use tokio::sync::oneshot;
-use std::thread;
-use tokio::runtime::{Runtime, Handle};
-use crate::message::resource;
 use std::sync::Arc;
+
+
+
+use tokio::sync::oneshot;
+
+use crate::error::Error;
+
+use crate::resource::{create_args, ResourceAddress, ResourceArchetype, ResourceCreateStrategy, ResourceKind, ResourceLocation, ResourceRecord, ResourceRegistration, ResourceStub, ResourceCreate, KeyCreationSrc, AddressCreationSrc, AssignResourceStateSrc};
+use crate::resource::ResourceKey;
+use crate::star::{StarKey, StarSkel};
+use crate::star::variant::{StarVariant};
+use crate::starlane::api::{StarlaneApi};
 
 pub struct CentralVariant {
     skel: StarSkel,
@@ -41,7 +40,6 @@ impl StarVariant for CentralVariant {
             },
             location: ResourceLocation {
                 host: StarKey::central(),
-                gathering: None,
             },
         };
 
@@ -49,7 +47,6 @@ impl StarVariant for CentralVariant {
             resource: root_resource,
             info: None,
         };
-
 
         let skel = self.skel.clone();
 
@@ -68,25 +65,44 @@ impl StarVariant for CentralVariant {
 
 impl CentralVariant {
     async fn ensure(starlane_api: StarlaneApi) -> Result<(), Error> {
+
+println!("ensuring hyperspace.");
         let mut creation = starlane_api.create_space("hyperspace", "Hyper Space")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         let space_api = creation.submit().await?;
+println!("hyperspace ensured.");
 
+        let mut creation = space_api.create_sub_space("starlane", "Starlane")?;
+        creation.set_strategy(ResourceCreateStrategy::Ensure);
+        let subspace_api= creation.submit().await?;
+println!("subspace ensured.");
+
+        /*
         let mut creation = space_api.create_user("hyperuser@starlane.io")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
+println!("hyperuser ensured.");
 
-        let mut creation = space_api.create_sub_space("starlane")?;
-        creation.set_strategy(ResourceCreateStrategy::Ensure);
-        creation.submit().await?;
+         */
 
         let mut creation = space_api.create_domain("localhost")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
+println!("localhost ensured.");
 
-        let init_args = Arc::new(create_args::create_init_args_artifact_bundle()?);
-        let creation = starlane_api.create_artifact_bundle(&create_args::artifact_bundle_address(), init_args ).await?;
-        creation.submit().await?;
+        {
+            let address: ResourceAddress = create_args::artifact_bundle_address().into();
+            let mut creation = subspace_api.create_artifact_bundle_versions(address.parent().unwrap().name().as_str())?;
+            creation.set_strategy(ResourceCreateStrategy::Ensure);
+            let artifact_bundle_versions_api = creation.submit().await?;
+println!("created artifact bundle VERSIONS.");
+
+            let version = semver::Version::from_str( address.name().as_str() )?;
+            let mut creation = artifact_bundle_versions_api.create_artifact_bundle(version, Arc::new(create_args::create_init_args_artifact_bundle()?) )?;
+            creation.set_strategy(ResourceCreateStrategy::Ensure);
+            creation.submit().await?;
+        }
+println!("created artifact bundle.");
 
         Ok(())
     }

@@ -1,42 +1,67 @@
+use std::{thread};
 use std::convert::{TryFrom, TryInto};
+use std::marker::PhantomData;
+use std::str::FromStr;
+use std::sync::Arc;
 use std::time::Duration;
 
+
+
+use semver::Version;
+
+
+
+use tokio::runtime::{Handle};
+use tokio::sync::mpsc;
+
+use starlane_resources::ResourceIdentifier;
+
+use crate::data::Binary;
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
-use crate::frame::ChildManagerResourceAction::Register;
-use crate::frame::{ChildManagerResourceAction, Reply, SimpleReply, StarMessagePayload, StarPattern, WindAction};
-use crate::keys::ResourceKey;
+use crate::frame::{StarPattern, WindAction};
+
+use crate::message::{Fail};
 use crate::message::resource::{
-    MessageFrom, MessageReply, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage,
+    MessageFrom, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage,
 };
-use crate::message::{Fail, ProtoStarMessage};
-use crate::resource::artifact::ArtifactBundleState;
-use crate::resource::domain::DomainState;
+use crate::resource::{AddressCreationSrc, ArtifactBundleKind, AssignResourceStateSrc, FieldSelection, KeyCreationSrc, LocalStateSetSrc, Path, RemoteDataSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceKind, ResourceRecord, ResourceRegistryInfo, ResourceSelector, ResourceStub, ResourceType, ArtifactBundlePath};
+
+use crate::resource::ArtifactBundleAddress;
+
 use crate::resource::file_system::FileSystemState;
-use crate::resource::space::SpaceState;
+use crate::resource::FileKind;
+use crate::resource::ResourceKey;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
-use crate::resource::{AddressCreationSrc, ArtifactBundleKind, AssignResourceStateSrc, DataTransfer, FileKind, KeyCreationSrc, LocalDataSrc, Path, RemoteDataSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceIdentifier, ResourceKind, ResourceRecord, ResourceRegistryInfo, ResourceStateSrc, ResourceStub, ResourceType, ResourceSelector, FieldSelection};
-use crate::star::StarCommand::ResourceRecordRequest;
-use crate::star::{Request, StarCommand, StarKey, Wind, StarKind};
-use futures::channel::oneshot;
-use futures::io::Cursor;
-use semver::Version;
-use std::marker::PhantomData;
-use std::sync::Arc;
-use std::{sync, thread};
-use tempdir::TempDir;
-use tokio::fs::File;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::runtime::{Handle, Runtime};
-use tokio::sync::mpsc;
-use crate::artifact::ArtifactBundleAddress;
+use crate::star::{Request, StarCommand, StarKind, Wind};
+
 use crate::starlane::StarlaneCommand;
+use crate::data::{BinSrc, DataSet};
+use starlane_resources::data::Meta;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
     star_tx: mpsc::Sender<StarCommand>,
     starlane_tx: Option<mpsc::Sender<StarlaneCommand>>
+}
+
+impl StarlaneApi {
+    pub async fn create_artifact_bundle(&self, path: &ArtifactBundlePath, data: Arc<Vec<u8>>) -> Result<ArtifactBundleApi,Fail> {
+        let address: ResourceAddress = path.clone().into();
+
+        let subspace_address = address.parent().ok_or("expected parent")?.parent().ok_or("expected parent")?;
+        let subspace_api= self.get_sub_space(subspace_address.into()).await?;
+
+        let mut creation = subspace_api.create_artifact_bundle_versions(address.parent().unwrap().name().as_str())?;
+        creation.set_strategy(ResourceCreateStrategy::Ensure);
+        let artifact_bundle_versions_api = creation.submit().await?;
+
+        let version = semver::Version::from_str( address.name().as_str() )?;
+        let mut creation = artifact_bundle_versions_api.create_artifact_bundle(version, data )?;
+        creation.set_strategy(ResourceCreateStrategy::Ensure);
+        creation.submit().await
+    }
 }
 
 impl StarlaneApi {
@@ -54,6 +79,14 @@ impl StarlaneApi {
         }
     }
 
+    pub async fn to_key( &self, identifier: ResourceIdentifier ) -> Result<ResourceKey,Fail> {
+        match identifier {
+            ResourceIdentifier::Key(key) => Ok(key),
+            ResourceIdentifier::Address(address) => {
+                self.fetch_resource_key(address).await
+            }
+        }
+    }
 
     pub fn shutdown(&self) -> Result<(),Error>{
         self.starlane_tx.as_ref().ok_or("this api does not have access to the StarlaneMachine and therefore cannot do a shutdown")?.try_send(StarlaneCommand::Shutdown);
@@ -66,7 +99,7 @@ impl StarlaneApi {
         match tokio::time::timeout(Duration::from_secs(15), rx).await {
             Ok(result) => match result {
                 Ok(result) => result,
-                Err(err) => Err(Fail::ChannelRecvErr),
+                Err(_err) => Err(Fail::ChannelRecvErr),
             },
             Err(err) => {
                 println!("elapsed error: {}", err);
@@ -103,7 +136,7 @@ impl StarlaneApi {
         &self,
         identifier: ResourceIdentifier,
     ) -> Result<ResourceRecord, Fail> {
-        let (mut request, rx) = Request::new(identifier);
+        let (request, rx) = Request::new(identifier);
         self.star_tx.send(StarCommand::ResourceRecordRequest(request)).await;
         Self::timeout(rx).await
     }
@@ -171,7 +204,7 @@ impl StarlaneApi {
     }
 
     pub async fn list( &self, identifier: &ResourceIdentifier ) -> Result<Vec<ResourceRecord>,Fail> {
-        let mut selector = ResourceSelector::new();
+        let selector = ResourceSelector::new();
         self.select(identifier, selector).await
     }
 
@@ -223,7 +256,7 @@ impl StarlaneApi {
 
         match api {
             Ok(api) => Ok(api),
-            Err(error) => Err(Fail::Error("catastrophic converstion error".into())),
+            Err(_error) => Err(Fail::Error("catastrophic converstion error".into())),
         }
     }
 
@@ -248,19 +281,16 @@ impl StarlaneApi {
     pub fn get_resource_state(
         &self,
         identifier: ResourceIdentifier,
-    ) -> Result<Option<Arc<Vec<u8>>>, Fail> {
+    ) -> Result<DataSet<BinSrc>, Fail> {
         println!("get_resource_state block_on");
         let state_src = self.get_resource_state_src(identifier)?;
-        match state_src {
-            RemoteDataSrc::None => Ok(Option::None),
-            RemoteDataSrc::Memory(data) => Ok(Option::Some(data)),
-        }
+        Ok(state_src)
     }
 
     pub fn get_resource_state_src(
         &self,
         identifier: ResourceIdentifier,
-    ) -> Result<RemoteDataSrc, Fail> {
+    ) -> Result<DataSet<BinSrc>, Fail> {
         let star_tx = self.star_tx.clone();
 
         let handle = Handle::current();
@@ -270,7 +300,7 @@ impl StarlaneApi {
             proto.to = Option::Some(identifier);
             proto.from = Option::Some(MessageFrom::Inject);
             let reply = proto.reply();
-            let mut proto = proto.to_proto_star_message().await?;
+            let proto = proto.to_proto_star_message().await?;
             star_tx.send(StarCommand::SendProtoMessage(proto)).await?;
 
             let result = Self::timeout(reply).await?;
@@ -282,10 +312,12 @@ impl StarlaneApi {
         })
     }
 
-    pub fn create_space(&self, name: &str, display: &str) -> Result<Creation<SpaceApi>, Fail> {
-        let state = SpaceState::new(display);
-        let state_data = state.try_into()?;
-        let resource_src = AssignResourceStateSrc::Direct(state_data);
+    pub fn create_space(&self, name: &str, display_name: &str) -> Result<Creation<SpaceApi>, Fail> {
+        let mut meta = Meta::single("display-name", display_name);
+        let mut state:DataSet<BinSrc> = DataSet::new();
+        state.insert("meta".to_string(), meta.try_into()? );
+
+        let state = AssignResourceStateSrc::Direct(state);
         let create = ResourceCreate {
             parent: ResourceKey::Root.into(),
             key: KeyCreationSrc::None,
@@ -295,7 +327,7 @@ impl StarlaneApi {
                 specific: None,
                 config: None,
             },
-            src: resource_src,
+            state_src: state,
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
@@ -312,17 +344,6 @@ impl StarlaneApi {
         let record = self.fetch_resource_record(identifier).await?;
         Ok(SubSpaceApi::new(self.star_tx.clone(), record.stub)?)
     }
-
-    pub async fn create_artifact_bundle(
-        &self,
-        address: &ArtifactBundleAddress,
-        data: Arc<Vec<u8>>,
-    ) -> Result<Creation<ArtifactBundleApi>, Fail> {
-
-        let sub_space = self.get_sub_space(address.sub_space().into() ).await?;
-        sub_space.create_artifact_bundle( address.name().as_str(), &address.version(), data )
-    }
-
 }
 
 pub struct SpaceApi {
@@ -366,8 +387,9 @@ impl SpaceApi {
     }
 
     pub fn create_user(&self, email: &str) -> Result<Creation<UserApi>, Fail> {
-        let state = UserState::new(email.to_string());
-        let state_data = state.try_into()?;
+        let mut meta = Meta::single("email", email);
+        let mut state_data:DataSet<BinSrc> = DataSet::new();
+        state_data.insert("meta".to_string(), meta.try_into()? );
         let resource_src = AssignResourceStateSrc::Direct(state_data);
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
@@ -378,7 +400,7 @@ impl SpaceApi {
                 specific: None,
                 config: None,
             },
-            src: resource_src,
+            state_src: resource_src,
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
@@ -386,10 +408,12 @@ impl SpaceApi {
         Ok(Creation::new(self.starlane_api(), create))
     }
 
-    pub fn create_sub_space(&self, sub_space: &str) -> Result<Creation<SubSpaceApi>, Fail> {
-        let state = SubSpaceState::new(sub_space);
-        let state_data = state.try_into()?;
+    pub fn create_sub_space(&self, sub_space: &str, display_name: &str) -> Result<Creation<SubSpaceApi>, Fail> {
+        let mut meta = Meta::single("display-name", display_name);
+        let mut state_data:DataSet<BinSrc> = DataSet::new();
+        state_data.insert("meta".to_string(), meta.try_into()? );
         let resource_src = AssignResourceStateSrc::Direct(state_data);
+
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
             key: KeyCreationSrc::None,
@@ -399,7 +423,7 @@ impl SpaceApi {
                 specific: None,
                 config: None,
             },
-            src: resource_src,
+            state_src: resource_src,
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
@@ -418,7 +442,7 @@ impl SpaceApi {
                 specific: None,
                 config: None,
             },
-            src: resource_src,
+            state_src: resource_src,
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
@@ -468,9 +492,7 @@ impl SubSpaceApi {
     }
 
     pub fn create_file_system(&self, name: &str) -> Result<Creation<FileSystemApi>, Fail> {
-        let state = FileSystemState::new();
-        let state_data = state.try_into()?;
-        let resource_src = AssignResourceStateSrc::Direct(state_data);
+        let resource_src = AssignResourceStateSrc::None;
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
             key: KeyCreationSrc::None,
@@ -480,7 +502,7 @@ impl SubSpaceApi {
                 specific: None,
                 config: None,
             },
-            src: resource_src,
+            state_src: resource_src,
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
@@ -488,25 +510,22 @@ impl SubSpaceApi {
         Ok(Creation::new(self.starlane_api(), create))
     }
 
-    pub fn create_artifact_bundle(
+    pub fn create_artifact_bundle_versions(
         &self,
         name: &str,
-        version: &Version,
-        data: Arc<Vec<u8>>,
-    ) -> Result<Creation<ArtifactBundleApi>, Fail> {
-        let resource_src = AssignResourceStateSrc::Direct(data);
-        let kind: ArtifactBundleKind = version.clone().into();
+    ) -> Result<Creation<ArtifactBundleVersionsApi>, Fail> {
+        let resource_src = AssignResourceStateSrc::None;
 
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
             key: KeyCreationSrc::None,
-            address: AddressCreationSrc::Appends(vec![name.to_string(), version.to_string()]),
+            address: AddressCreationSrc::Append(name.to_string()),
             archetype: ResourceArchetype {
-                kind: ResourceKind::ArtifactBundle(kind),
+                kind: ResourceKind::ArtifactBundleVersions,
                 specific: None,
                 config: None,
             },
-            src: resource_src,
+            state_src: resource_src,
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
@@ -563,11 +582,16 @@ impl FileSystemApi {
         self.create_file(path, Arc::new(string.into_bytes()))
     }
 
-    pub fn create_file(&self, path: &Path, data: Arc<Vec<u8>>) -> Result<Creation<FileApi>, Fail> {
+    pub fn create_file(&self, path: &Path, data: Binary ) -> Result<Creation<FileApi>, Fail> {
+
+        let content = BinSrc::Memory(data);
+        let mut state:  DataSet<BinSrc> = DataSet::new();
+        state.insert( "content".to_string(), content );
+
         // at this time the only way to 'create' a file state is to load the entire thing into memory
         // in the future we want options like "Stream" which will allow us to stream the state contents, etc.
         //        let resource_src = AssignResourceStateSrc::Direct(data.get()?);
-        let resource_src = AssignResourceStateSrc::Direct(data);
+        let resource_src = AssignResourceStateSrc::Direct(state);
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
             key: KeyCreationSrc::None,
@@ -577,7 +601,7 @@ impl FileSystemApi {
                 specific: None,
                 config: None,
             },
-            src: resource_src,
+            state_src: resource_src,
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
@@ -613,6 +637,71 @@ impl FileApi {
             stub: stub,
         })
     }
+}
+
+pub struct ArtifactBundleVersionsApi {
+    stub: ResourceStub,
+    star_tx: mpsc::Sender<StarCommand>,
+}
+
+impl ArtifactBundleVersionsApi {
+    pub fn new(star_tx: mpsc::Sender<StarCommand>, stub: ResourceStub) -> Result<Self, Error> {
+        if stub.key.resource_type() != ResourceType::ArtifactBundleVersions{
+            return Err(format!(
+                "wrong key resource type for ArtifactVersionsBundleApi: {}",
+                stub.key.resource_type().to_string()
+            )
+                .into());
+        }
+        if stub.address.resource_type() != ResourceType::ArtifactBundleVersions{
+            return Err(format!(
+                "wrong address resource type for ArtifactBundleVersionsApi: {}",
+                stub.address.resource_type().to_string()
+            )
+                .into());
+        }
+
+        Ok(Self{
+            star_tx: star_tx,
+            stub: stub,
+        })
+    }
+
+    pub fn create_artifact_bundle(
+        &self,
+        version: Version,
+        data: Arc<Vec<u8>>,
+    ) -> Result<Creation<ArtifactBundleApi>, Fail> {
+
+        let content = BinSrc::Memory(data);
+        let mut state:  DataSet<BinSrc> = DataSet::new();
+        state.insert( "content".to_string(), content );
+
+        let resource_src = AssignResourceStateSrc::Direct(state);
+        // hacked to FINAL
+        let kind: ArtifactBundleKind = ArtifactBundleKind::Final;
+
+        let create = ResourceCreate {
+            parent: self.stub.key.clone().into(),
+            key: KeyCreationSrc::None,
+            address: AddressCreationSrc::Append(version.to_string()),
+            archetype: ResourceArchetype {
+                kind: ResourceKind::ArtifactBundle(kind),
+                specific: None,
+                config: None,
+            },
+            state_src: resource_src,
+            registry_info: None,
+            owner: None,
+            strategy: ResourceCreateStrategy::Create,
+        };
+        Ok(Creation::new(self.starlane_api(), create))
+    }
+
+    pub fn starlane_api(&self) -> StarlaneApi {
+        StarlaneApi::new(self.star_tx.clone() )
+    }
+
 }
 
 pub struct ArtifactBundleApi {
@@ -775,6 +864,15 @@ impl TryFrom<ResourceApi> for ArtifactBundleApi {
     }
 }
 
+impl TryFrom<ResourceApi> for ArtifactBundleVersionsApi {
+    type Error = Fail;
+
+    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
+        Ok(Self::new(value.star_tx, value.stub)?)
+    }
+}
+
+
 impl TryFrom<ResourceApi> for SubSpaceApi {
     type Error = Fail;
 
@@ -811,7 +909,7 @@ impl TryFrom<ResourceApi> for DomainApi {
 pub enum StarlaneAction {
     GetState {
         identifier: ResourceIdentifier,
-        tx: tokio::sync::oneshot::Sender<Result<Option<Arc<Vec<u8>>>, Fail>>,
+        tx: tokio::sync::oneshot::Sender<Result<DataSet<BinSrc>, Fail>>,
     },
 }
 
@@ -822,7 +920,7 @@ pub struct StarlaneApiRunner {
 
 impl StarlaneApiRunner {
     pub fn new(api: StarlaneApi) -> tokio::sync::mpsc::Sender<StarlaneAction> {
-        let (tx, mut rx) = tokio::sync::mpsc::channel(16);
+        let (tx, rx) = tokio::sync::mpsc::channel(16);
 
         let runner = StarlaneApiRunner { api: api, rx: rx };
 
@@ -863,8 +961,8 @@ impl StarlaneApiRelay {
     pub async fn get_resource_state(
         &self,
         identifier: ResourceIdentifier,
-    ) -> Result<Option<Arc<Vec<u8>>>, Fail> {
-        let (tx, mut rx) = tokio::sync::oneshot::channel();
+    ) -> Result<DataSet<BinSrc>, Fail> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
         self.tx
             .send(StarlaneAction::GetState {
                 identifier: identifier,

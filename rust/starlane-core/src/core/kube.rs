@@ -1,47 +1,37 @@
-use std::collections::HashSet;
-use std::convert::{TryFrom, TryInto};
-use std::iter::FromIterator;
-use std::path::PathBuf;
-use std::str::FromStr;
+use std::{env};
+
+
+
+
+
+
+
+
 use std::sync::Arc;
 
-use rusqlite::Connection;
-use tokio::sync::{mpsc, Mutex};
+
+
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
+use kube::{Api};
+use kube::api::{ListParams, PostParams};
+
+
+use serde::{Deserialize, Serialize};
+
+
+
+use starlane_resources::{ResourceIdentifier, ResourceKindParts};
 
 use crate::core::Host;
 use crate::error::Error;
-use crate::file_access::{FileAccess, FileEvent};
-use crate::keys::{FileSystemKey, ResourceKey};
+
 use crate::message::Fail;
-use crate::resource::store::{
-    ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult,
-};
+use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceKind, ResourceStub, ResourceKey};
 
 
-use crate::resource::{
-    AddressCreationSrc, ArtifactBundleKind, AssignResourceStateSrc, DataTransfer, FileKind,
-    KeyCreationSrc, MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress,
-    ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy,
-    ResourceCreationChamber, ResourceIdentifier, ResourceKind, ResourceStateSrc, ResourceStub,
-    ResourceType,
-};
 use crate::star::StarSkel;
+use crate::data::{DataSet, BinSrc};
 
-use crate::artifact::ArtifactBundleKey;
-use crate::util;
-use std::{fs, env};
-use std::fs::File;
-use std::io::Write;
-use tempdir::TempDir;
-use serde::{Serialize,Deserialize};
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
-use kube::{Api, Client, Config};
-use k8s_openapi::api::core::v1::Pod;
-use kube::api::{ListParams, PostParams};
-use kube::client::ConfigExt;
-use crate::resource::address::ResourceKindParts;
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
-use std::env::VarError;
 
 pub struct KubeCore {
     skel: StarSkel,
@@ -58,7 +48,7 @@ impl KubeCore {
 
         let kubernetes_instance_name = match env::var("STARLANE_KUBERNETES_INSTANCE_NAME"){
             Ok(kubernetes_instance_name) => {kubernetes_instance_name}
-            Err(err) => {
+            Err(_err) => {
                 error!("FATAL: env variable 'STARLANE_KUBERNETES_INSTANCE_NAME' must be set to a valid Starlane Kubernetes resource");
                 return Err("FATAL: env variable 'STARLANE_KUBERNETES_INSTANCE_NAME' must be set to a valid Starlane Kubernetes resource".into());
             }
@@ -66,7 +56,7 @@ impl KubeCore {
 
         let namespace = match env::var("NAMESPACE"){
             Ok(namespace) => {namespace}
-            Err(err) => {
+            Err(_err) => {
                 warn!("NAMESPACE environment variable is not set, defaulting to 'default'");
                 "default".to_string()
             }
@@ -75,7 +65,7 @@ impl KubeCore {
         let starlane_api: Api<crate::core::kube::Starlane> = Api::namespaced(client.clone(), namespace.as_str() );
         let starlane: crate::core::kube::Starlane =  match starlane_api.get(kubernetes_instance_name.as_str()).await {
             Ok(starlane) => starlane,
-            Err(err) => {
+            Err(_err) => {
                 let message = format!("FATAL: could not access Kubernetes starlane instance named '{}'", kubernetes_instance_name);
                 error!("{}",message);
                 return Err(message.into());
@@ -100,7 +90,7 @@ impl KubeCore {
 impl Host for KubeCore {
     async fn assign(
         &mut self,
-        assign: ResourceAssign<AssignResourceStateSrc>,
+        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<Resource, Fail> {
 
 
@@ -112,10 +102,10 @@ impl Host for KubeCore {
             list_params = list_params.labels(format!("kind={}", kind).as_str());
         }
         if let Option::Some(specific) = parts.specific {
-            list_params = list_params.labels(format!("vendor={}", specific.vendor).as_str());
+            list_params = list_params.labels(format!("vendor={}", specific.vendor.to_string()).as_str());
             list_params = list_params.labels(format!("product={}", specific.product).as_str());
             list_params = list_params.labels(format!("variant={}", specific.variant).as_str());
-            list_params = list_params.labels(format!("version={}", specific.version).as_str());
+            list_params = list_params.labels(format!("version={}", specific.version.to_string()).as_str());
         }
 
         let mut provisioners = provisioners.list(&list_params ).await?;
@@ -126,7 +116,7 @@ impl Host for KubeCore {
            return Err(Fail::NoProvisioner(assign.stub.archetype.kind.clone()));
         }
 
-        let mut provisioner:StarlaneProvisioner  = provisioners.items.remove(0);
+        let provisioner:StarlaneProvisioner  = provisioners.items.remove(0);
         let provisioner_name = provisioner.metadata.name.ok_or("expected provisioner to have a name")?;
 
         let starlane_resource_api: Api<StarlaneResource> = Api::default_namespaced(self.client.clone());
@@ -149,34 +139,28 @@ impl Host for KubeCore {
 
         println!("STARLANE RESOURCE CREATED!");
 
-        let data_transfer: Arc<dyn DataTransfer> = Arc::new(MemoryDataTransfer::none());
 
         let resource = Resource::new(
             assign.stub.key,
             assign.stub.address,
             assign.stub.archetype,
-            data_transfer
+            DataSet::new()
         );
 
         Ok(resource)
     }
 
-    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail> {
+    async fn get(&self, _identifier: ResourceKey ) -> Result<Option<Resource>, Fail> {
         unimplemented!()
 //        self.store.get(identifier).await
     }
 
-    async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {
-        unimplemented!()
-/*        if let Ok(Option::Some(resource)) = self.store.get(identifier.clone()).await {
-            Ok(RemoteDataSrc::None)
-        } else {
-            Err(Fail::ResourceNotFound(identifier))
-        }
- */
+    async fn state(&self, identifier: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
+        todo!()
     }
 
-    async fn delete(&self, identifier: ResourceIdentifier) -> Result<(), Fail> {
+
+    async fn delete(&self, _identifier: ResourceKey ) -> Result<(), Fail> {
         unimplemented!("I don't know how to DELETE yet.");
         Ok(())
     }

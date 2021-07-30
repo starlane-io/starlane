@@ -1,18 +1,19 @@
-use std::net::ToSocketAddrs;
 
-use crate::message::Fail;
-use crate::resource::ResourceAddress;
-use crate::star::variant::StarVariant;
-use crate::star::StarSkel;
-use crate::starlane::api::{StarlaneApi, StarlaneApiRelay};
-use actix_web::client::Client;
-use actix_web::http::StatusCode;
-use actix_web::web::Data;
-use actix_web::{middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer, Responder};
 use std::str::FromStr;
-use std::sync::Arc;
+
 use std::thread;
+
+use actix_web::{App, Error, HttpRequest, HttpResponse, HttpServer, middleware, web};
+use actix_web::client::Client;
+
+use actix_web::web::Data;
 use url::Url;
+
+
+use crate::resource::ResourceAddress;
+use crate::star::StarSkel;
+use crate::star::variant::StarVariant;
+use crate::starlane::api::{StarlaneApi, StarlaneApiRelay};
 
 pub struct WebVariant {
     skel: StarSkel,
@@ -42,28 +43,32 @@ fn start(api: StarlaneApiRelay) {
 
 async fn forward(
     req: HttpRequest,
-    body: web::Bytes,
+    _body: web::Bytes,
     api: web::Data<StarlaneApiRelay>,
-    client: web::Data<Client>,
+    _client: web::Data<Client>,
 ) -> Result<HttpResponse, Error> {
     let address = ResourceAddress::from_str(
         format!("hyperspace:default:*:website:{}::<File>", req.path()).as_str(),
     )
     .unwrap();
-    let responder = match api.get_resource_state(address.into()).await {
+
+unimplemented!("switched to BinSrc");
+/*    let responder = match api.get_resource_state(address.into()).await {
         Ok(state) => match state {
             None => "404".to_string(),
             Some(state) => String::from_utf8((*state).clone()).unwrap(),
         },
-        Err(err) => "500".to_string(),
+        Err(_err) => "500".to_string(),
     };
+
     Ok(responder.into())
+ */
 }
 
 async fn proxy(
     req: HttpRequest,
     body: web::Bytes,
-    api: web::Data<StarlaneApi>,
+    _api: web::Data<StarlaneApi>,
     client: web::Data<Client>,
 ) -> Result<HttpResponse, Error> {
     println!("Hello");

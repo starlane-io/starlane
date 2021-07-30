@@ -1,25 +1,25 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::future::Future;
+use std::fs::File;
+
 use std::hash::Hash;
+use std::io::{Read, Seek, Write};
+use std::path::Path;
+use std::thread;
+
 
 use tokio::sync::{mpsc, oneshot};
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::broadcast;
+use tokio::sync::mpsc::{Receiver};
+
 use tokio::time::Duration;
-use tokio::time::error::Elapsed;
+
+use walkdir::{DirEntry, WalkDir};
+use zip::result::ZipError;
+use zip::write::FileOptions;
 
 use crate::error::Error;
 use crate::message::Fail;
-use std::thread;
-use std::thread::sleep;
-use walkdir::{DirEntry, WalkDir};
-use std::io::{Seek, Write, Read};
-use zip::write::FileOptions;
-use std::path::Path;
-use std::fs::File;
-use zip::result::ZipError;
 
 lazy_static!{
     pub static ref SHUTDOWN_TX: broadcast::Sender<()> = {
@@ -190,7 +190,7 @@ pub async fn wait_for_it<R>(rx: oneshot::Receiver<Result<R, Error>>) -> Result<R
                 }
             }
         }
-        Err(err) => {
+        Err(_err) => {
             log_err(Fail::Timeout)
         }
     }
@@ -208,7 +208,7 @@ pub async fn wait_for_it_whatever<R>(rx: oneshot::Receiver<R>) -> Result<R, Erro
                 }
             }
         }
-        Err(err) => {
+        Err(_err) => {
             log_err(Fail::Timeout)
         }
     }
@@ -236,7 +236,7 @@ pub async fn wait_for_it_for<R>(
                 }
             }
         }
-        Err(err) => {
+        Err(_err) => {
             log_err(Fail::Timeout)
         }
     }

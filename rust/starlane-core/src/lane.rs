@@ -1,37 +1,37 @@
-use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
-use std::fmt;
-use std::pin::Pin;
-use std::task::Poll;
-
-use futures::{FutureExt, TryFutureExt};
-use futures::future::select_all;
-use futures::task;
-use futures::task::Context;
-use lru::LruCache;
-use serde::{Deserialize, Serialize};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf, WriteHalf};
-use tokio::net::TcpStream;
-use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::mpsc::error::SendError;
-use tokio::sync::oneshot;
-use tokio::time::Duration;
-use url::Url;
-
-use crate::error::Error;
-use crate::frame::{Frame, ProtoFrame};
-use crate::id::Id;
-use crate::proto::{local_tunnels, ProtoStar, ProtoTunnel};
-use crate::star::{Star, StarCommand, StarKey};
-use crate::starlane::{StarlaneCommand, VersionFrame};
 use std::cell::Cell;
-use serde::de::DeserializeOwned;
-use crate::template::{ConstellationSelector, StarInConstellationTemplateHandle, StarInConstellationTemplateSelector};
+
+
 use std::convert::TryInto;
+use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
+
+
+
+use futures::{FutureExt};
+
+
+
+use lru::LruCache;
+use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
+use tokio::net::TcpStream;
+use tokio::sync::{broadcast, mpsc};
+use tokio::sync::mpsc::{Receiver, Sender};
+
+
+use tokio::time::Duration;
+
+
+use crate::error::Error;
+use crate::frame::{Frame};
+
+use crate::proto::{local_tunnels, ProtoTunnel};
+use crate::star::{StarCommand, StarKey};
+
+use crate::template::{StarInConstellationTemplateSelector};
 
 pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
 pub static LANE_QUEUE_SIZE: usize = 32;
@@ -125,7 +125,7 @@ impl LaneMiddle {
         // need to signal to Connector that this lane is now DEAD
     }
 
-    async fn process_command(&mut self, command: Option<LaneCommand>) {}
+    async fn process_command(&mut self, _command: Option<LaneCommand>) {}
 }
 
 pub enum LaneCommand {
@@ -190,7 +190,7 @@ impl LaneWrapper {
             LaneWrapper::Proto(lane) => {
                 lane.remote_star = Option::Some(remote_star)
             }
-            LaneWrapper::Lane(lane) => {
+            LaneWrapper::Lane(_lane) => {
                 error!("cannot set the remote star for a lane, it should be already set.");
             }
         }
@@ -422,7 +422,7 @@ pub struct ClientSideTunnelConnector {
 impl ClientSideTunnelConnector {
     pub async fn new(lane: &ProtoLaneEndpoint, host_address: String, selector: StarInConstellationTemplateSelector ) -> Result<ConnectorController, Error> {
         let (command_tx, command_rx) = mpsc::channel(16);
-        let mut connector = Self {
+        let connector = Self {
             out: lane.outgoing.clone(),
             in_tx: lane.get_tunnel_in_tx(),
             command_rx,
@@ -454,7 +454,7 @@ impl ClientSideTunnelConnector {
                         self.out.out_tx.send(LaneCommand::Tunnel(TunnelOutState::Out(tunnel_out))) .await;
                         self.in_tx.send(TunnelInState::In(tunnel_in)).await;
 
-                        let command = self.command_rx.recv().await;
+                        let _command = self.command_rx.recv().await;
                         self.out.out_tx.send(LaneCommand::Tunnel(TunnelOutState::None)).await;
                     }
                     Err(error) => {
@@ -499,7 +499,7 @@ impl Debug for ServerSideTunnelConnector{
 impl ServerSideTunnelConnector {
     pub async fn new(low_lane: &ProtoLaneEndpoint, stream: TcpStream) -> Result<ConnectorController, Error> {
         let (command_tx, command_rx) = mpsc::channel(1);
-        let mut connector = Self {
+        let connector = Self {
             out: low_lane.outgoing.clone(),
             tunnel_in_tx: low_lane.get_tunnel_in_tx(),
             command_rx,
@@ -587,11 +587,11 @@ impl LocalTunnelConnector {
 
     async fn run(&mut self) {
         loop {
-            let (mut high, mut low) = local_tunnels();
+            let (high, low) = local_tunnels();
 
             let (high, low) = tokio::join!(high.evolve(), low.evolve());
 
-            if let (Ok((high_out, mut high_in)), Ok((low_out, low_in))) =
+            if let (Ok((high_out, high_in)), Ok((low_out, low_in))) =
             (high, low)
             {
                 self.high.out_tx.send(LaneCommand::Tunnel(TunnelOutState::Out(high_out))) .await;
@@ -616,7 +616,7 @@ impl LocalTunnelConnector {
                         .await;
                     return;
                 }
-                Some(Reset) => {
+                Some(_Reset) => {
                     // first set olds to None
                     self.high
                         .out_tx
@@ -628,7 +628,7 @@ impl LocalTunnelConnector {
                         .await;
                     // allow loop to continue
                 }
-                Some(Close) => {
+                Some(_Close) => {
                     self.high
                         .out_tx
                         .send(LaneCommand::Tunnel(TunnelOutState::None))
@@ -761,7 +761,7 @@ impl FrameCodex {
         let len = read.read_u32().await?;
 
         let mut buf = vec![0 as u8; len as usize];
-        let mut buf_ref = buf.as_mut_slice();
+        let buf_ref = buf.as_mut_slice();
 
         read.read_exact(buf_ref).await?;
 
@@ -815,24 +815,25 @@ impl LaneIndex {
 
 #[cfg(test)]
 mod test {
+    use std::net::{SocketAddr, ToSocketAddrs};
+    use std::str::FromStr;
+
     use futures::FutureExt;
+    use tokio::net::{TcpListener, TcpStream};
     use tokio::runtime::Runtime;
+    use tokio::sync::oneshot;
     use tokio::time::Duration;
 
     use crate::error::Error;
     use crate::frame::{Diagnose, ProtoFrame};
     use crate::id::Id;
-    use crate::lane::{LaneEndpoint, LaneCommand, FrameCodex, ProtoLaneEndpoint};
+    use crate::lane::{FrameCodex, LaneCommand, LaneEndpoint, ProtoLaneEndpoint};
     use crate::lane::ConnectorCommand;
     use crate::lane::Frame;
     use crate::lane::LocalTunnelConnector;
     use crate::lane::TunnelConnector;
     use crate::proto::local_tunnels;
     use crate::star::{StarCommand, StarKey};
-    use tokio::net::{TcpListener, TcpStream};
-    use std::net::{ToSocketAddrs, SocketAddr};
-    use std::str::FromStr;
-    use tokio::sync::oneshot;
 
     #[test]
     fn frame_codex()

@@ -1,77 +1,75 @@
-use std::collections::HashSet;
-use std::convert::{TryFrom, TryInto};
-use std::iter::FromIterator;
-use std::str::FromStr;
+
+
+
+
 use std::sync::Arc;
 
-use rusqlite::types::ValueRef;
-use rusqlite::{params, Connection, Transaction};
-use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, oneshot};
 
-use crate::app::ConfigSrc;
+
+
+
+
+
+use starlane_resources::{ResourceIdentifier};
+
+
+
 use crate::core::Host;
-use crate::error::Error;
-use crate::file_access::FileAccess;
-use crate::frame::ResourceHostAction;
-use crate::keys::ResourceKey;
+
+
+
 use crate::message::Fail;
-use crate::names::{Name, Specific};
-use crate::resource;
-use crate::resource::store::{
-    ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult,
-    ResourceStoreSqlLite,
+
+
+use crate::resource::{ArtifactKind, AssignResourceStateSrc, LocalStateSetSrc, Names, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceKey};
+
+use crate::resource::state_store::{
+    StateStore,
 };
-use crate::resource::user::UserState;
-use crate::resource::{
-    AssignResourceStateSrc, DataTransfer, FileDataTransfer, LocalDataSrc, MemoryDataTransfer,
-    Names, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign,
-    ResourceIdentifier, ResourceKind, ResourceStatePersistenceManager, ResourceStateSrc,
-    ResourceType,
-};
+
 use crate::star::StarSkel;
-use crate::artifact::{ArtifactRef, ArtifactKind};
-use clap::App;
+use std::collections::HashMap;
+use crate::data::{DataSet, BinSrc};
 
 #[derive(Debug)]
 pub struct DefaultHost {
     skel: StarSkel,
-    store: ResourceStore,
+    store: StateStore,
 }
 
 impl DefaultHost {
     pub async fn new(skel: StarSkel) -> Self {
         DefaultHost {
-            skel: skel,
-            store: ResourceStore::new().await,
+            skel: skel.clone(),
+            store: StateStore::new(skel).await,
         }
     }
 }
 
 #[async_trait]
 impl Host for DefaultHost {
-    #[instrument]
     async fn assign(
         &mut self,
-        assign: ResourceAssign<AssignResourceStateSrc>,
+        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<Resource, Fail> {
         // if there is Initialization to do for assignment THIS is where we do it
-        let data_transfer = match assign.state_src {
+        let state = match assign.state_src {
             AssignResourceStateSrc::Direct(data) => {
-                let data_transfer: Arc<dyn DataTransfer> = Arc::new(MemoryDataTransfer::new(data));
-                data_transfer
+                data
             }
-            AssignResourceStateSrc::Hosted => Arc::new(MemoryDataTransfer::none()),
-            AssignResourceStateSrc::None => Arc::new(MemoryDataTransfer::none()),
-            AssignResourceStateSrc::InitArgs(ref args) =>  {
-                Arc::new(if args.trim().is_empty() && assign.stub.archetype.kind.init_clap_config()?.is_none() {
-                    MemoryDataTransfer::none()
-                } else if assign.stub.archetype.kind.init_clap_config()?.is_none(){
+            AssignResourceStateSrc::AlreadyHosted => DataSet::new(),
+            AssignResourceStateSrc::None => DataSet::new(),
+            AssignResourceStateSrc::CreateArgs(ref args) =>  {
+                if args.trim().is_empty() && assign.stub.archetype.kind.init_clap_config().is_none() {
+                    DataSet::new()
+                } else if assign.stub.archetype.kind.init_clap_config().is_none(){
                     return Err(format!("resource {} does not take init args",assign.archetype().kind.to_string()).into());
                 }
                 else {
+                    /*
 info!("enter");
-                    let artifact = assign.archetype().kind.init_clap_config()?.expect("expected init clap config");
+                    let artifact = assign.archetype().kind.init_clap_config().expect("expected init clap config");
+                    let artifact: ResourceAddress =  artifact.into();
 info!("got init clapConfig");
                     let mut cache = self.skel.caches.create();
 println!("artifact is::: {}",artifact.to_string());
@@ -101,7 +99,9 @@ info!("App::from(&yaml)" );
                     // now not sure what to do with matches
 println!("seems to have worked....");
                     MemoryDataTransfer::none()
-                })
+                     */
+                    unimplemented!()
+                }
             }
 
 
@@ -109,16 +109,29 @@ println!("seems to have worked....");
 
         let assign = ResourceAssign {
             stub: assign.stub,
-            state_src: data_transfer,
+            state_src: state,
         };
 
         Ok(self.store.put(assign).await?)
     }
 
-    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail> {
-        self.store.get(identifier).await
+    async fn get(&self, key: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
+        self.store.get(key).await
     }
 
+    /*
+    async fn state(&self, identifier: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
+        if let Option::Some(resource) = self.store.get(identifier.clone()).await? {
+            Ok(resource.state_src())
+        } else {
+            Err(Fail::ResourceNotFound(identifier.into()))
+        }
+
+    }
+
+     */
+
+    /*jjjj
     async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {
         if let Option::Some(resource) = self.store.get(identifier.clone()).await? {
             Ok(RemoteDataSrc::Memory(resource.state_src().get().await?))
@@ -126,8 +139,9 @@ println!("seems to have worked....");
             Err(Fail::ResourceNotFound(identifier))
         }
     }
+     */
 
-    async fn delete(&self, identifier: ResourceIdentifier) -> Result<(), Fail> {
+    async fn delete(&self, _identifier: ResourceKey ) -> Result<(), Fail> {
         unimplemented!()
     }
 }

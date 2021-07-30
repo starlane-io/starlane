@@ -1,42 +1,45 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
+
+
+use std::convert::TryInto;
+
+use std::hash::{Hasher};
+
+use std::ops::Deref;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 
-use tokio::io::{AsyncRead, AsyncReadExt};
-use tokio::runtime::{Handle, Runtime};
-use tokio::sync::oneshot::Receiver;
+use futures::FutureExt;
+
+use tokio::io::{AsyncReadExt};
+use tokio::runtime::{Handle};
 use tokio::sync::{broadcast, mpsc, oneshot};
 
-use crate::artifact::{
-    ArtifactAddress, ArtifactBundleAddress, ArtifactBundleId, ArtifactBundleIdentifier,
-    ArtifactBundleKey, ArtifactIdentifier, ArtifactKey, ArtifactKind, ArtifactRef,
-};
+
+
+use starlane_resources::ResourceIdentifier;
+
+use crate::artifact::ArtifactRef;
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use crate::keys::{ResourceId, ResourceKey, SpaceKey, SubSpaceKey};
-use crate::logger::{elog, LogInfo, StaticLogInfo};
+
 use crate::message::Fail;
-use crate::resource::artifact::ArtifactBundle;
+use crate::resource::{ArtifactBundleAddress, ArtifactBundleIdentifier, Path, ResourceAddress, ResourceArchetype, ResourceKind, ResourceLocation, ResourceRecord, ResourceStub};
+
+use crate::resource::ArtifactAddress;
+
+
+use crate::resource::ArtifactKind;
 use crate::resource::config::Parser;
 use crate::resource::domain::{DomainConfig, DomainConfigParser};
-use crate::resource::{
-    ArtifactBundleKind, Path, ResourceAddress, ResourceArchetype, ResourceIdentifier, ResourceKind,
-    ResourceLocation, ResourceRecord, ResourceStub,
-};
-use crate::star::{StarCommand, StarKey};
+
+
+
+
+
 use crate::starlane::api::StarlaneApi;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
-use futures::FutureExt;
-use std::collections::hash_map::RandomState;
-use std::collections::hash_set::Difference;
-use std::convert::TryInto;
-use std::future::Future;
-use std::hash::{Hash, Hasher};
-use std::iter::FromIterator;
-use std::ops::Deref;
-use std::str::FromStr;
-use tokio::fs;
-use tokio::sync::oneshot::error::RecvError;
 
 pub type Data = Arc<Vec<u8>>;
 pub type ZipFile = Path;
@@ -139,7 +142,7 @@ impl ProtoArtifactCaches {
         let mut caches = ArtifactCaches::new();
         let claims = self.claims.into_map().await?;
 
-        for (artifact, claim) in claims {
+        for (artifact, _claim) in claims {
             match artifact.kind {
                 ArtifactKind::DomainConfig => {
                     caches
@@ -376,13 +379,13 @@ println!("fetchED resource record.");
     async fn has(&self, bundle: ArtifactBundleAddress) -> Result<(), Error> {
         let file_access =
             ArtifactBundleCache::with_bundle_path(self.file_access.clone(), bundle.clone())?;
-        file_access.read(&Path::new("/.ready")?).await?;
+        file_access.read(&Path::from_str("/.ready")?).await?;
         Ok(())
     }
 
     async fn download_and_extract(
         src: ArtifactBundleSrc,
-        mut file_access: FileAccess,
+        file_access: FileAccess,
         bundle: ArtifactBundleAddress,
         logger: AuditLogger,
     ) -> Result<(), Error> {
@@ -399,8 +402,8 @@ println!("download&extract src.fetch_resource_record DONE");
 
         let mut file_access =
             ArtifactBundleCache::with_bundle_path(file_access, record.stub.address.try_into()?)?;
-        let bundle_zip = Path::new("/bundle.zip")?;
-        let key_file = Path::new("/key.ser")?;
+        let bundle_zip = Path::from_str("/bundle.zip")?;
+        let key_file = Path::from_str("/key.ser")?;
         file_access.write(
             &key_file,
             Arc::new(record.stub.key.to_string().as_bytes().to_vec()),
@@ -411,7 +414,7 @@ println!("download&extract src.fetch_resource_record DONE");
             .unzip("bundle.zip".to_string(), "files".to_string())
             .await?;
 
-        let ready_file = Path::new("/.ready")?;
+        let ready_file = Path::from_str("/.ready")?;
         file_access
             .write(
                 &ready_file,
@@ -476,7 +479,6 @@ impl ArtifactBundleCache {
 #[derive(Clone)]
 pub enum ArtifactBundleSrc {
     STARLANE_API(StarlaneApi),
-    MOCK(MockArtifactBundleSrc),
 }
 
 impl ArtifactBundleSrc {
@@ -485,8 +487,12 @@ impl ArtifactBundleSrc {
         identifier: ResourceIdentifier,
     ) -> Result<Option<Arc<Vec<u8>>>, Fail> {
         match self {
-            ArtifactBundleSrc::STARLANE_API(api) => api.get_resource_state(identifier),
-            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(identifier).await,
+            ArtifactBundleSrc::STARLANE_API(api) => {
+
+//                api.get_resource_state(identifier)
+unimplemented!()
+            },
+//            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(identifier).await,
         }
     }
 
@@ -496,7 +502,8 @@ impl ArtifactBundleSrc {
     ) -> Result<ResourceRecord, Fail> {
         match self {
             ArtifactBundleSrc::STARLANE_API(api) => api.fetch_resource_record(identifier).await,
-            ArtifactBundleSrc::MOCK(mock) => mock.fetch_resource_record(identifier).await,
+
+//            ArtifactBundleSrc::MOCK(mock) => mock.fetch_resource_record(identifier).await,
         }
     }
 }
@@ -507,6 +514,7 @@ impl From<StarlaneApi> for ArtifactBundleSrc {
     }
 }
 
+/*
 impl From<MockArtifactBundleSrc> for ArtifactBundleSrc {
     fn from(mock: MockArtifactBundleSrc) -> Self {
         ArtifactBundleSrc::MOCK(mock)
@@ -522,7 +530,7 @@ impl MockArtifactBundleSrc {
     pub fn new() -> Result<Self, Error> {
         let key = ResourceKey::ArtifactBundle(ArtifactBundleKey {
             sub_space: SubSpaceKey {
-                space: SpaceKey::HyperSpace,
+                space: SpaceKey::new(RootKey{},0),
                 id: 0,
             },
             id: 0,
@@ -544,7 +552,6 @@ impl MockArtifactBundleSrc {
                 },
                 location: ResourceLocation {
                     host: StarKey::central(),
-                    gathering: None,
                 },
             },
         })
@@ -569,6 +576,8 @@ impl MockArtifactBundleSrc {
         Ok(self.resource.clone())
     }
 }
+
+ */
 
 pub struct RefCount<C: Cacheable> {
     pub count: usize,
@@ -819,7 +828,7 @@ impl<C: Cacheable> AsyncProcessor<RootItemCacheCall<C>> for RootItemCacheProc<C>
                     None => {}
                     Some(ref_count) => {
                         ref_count.dec();
-                        if (ref_count.count <= 0) {
+                        if ref_count.count <= 0 {
                             self.map.remove(&artifact);
                         }
                     }
@@ -896,16 +905,18 @@ impl<C: Cacheable> RootItemCacheProc<C> {
         bundle_cache: ArtifactBundleCache,
     ) -> Result<Arc<X>, Error> {
 println!("root: cache_artifact: {}", artifact.address.to_string());
+        let address: ResourceAddress  = artifact.address.parent().into();
+        let address: ResourceIdentifier = address.into();
         bundle_cache
-            .download(artifact.address.parent().into())
+            .download(address.try_into()?)
             .await?;
 println!("bundle cached : parsing: {}", artifact.address.to_string());
         let file_access = ArtifactBundleCache::with_bundle_files_path(
             bundle_cache.file_access(),
-            artifact.address.parent(),
+            artifact.address.parent().try_into()?,
         )?;
 println!("file acces scached : parsing: {}", artifact.address.to_string());
-        let data = file_access.read(&artifact.address.path()?).await?;
+        let data = file_access.read(&artifact.address.path()).await?;
 println!("root: parsing: {}", artifact.address.to_string());
         parser.parse(artifact, data)
     }
@@ -1002,7 +1013,7 @@ impl AuditLogCollectorProc {
         tx
     }
 
-    pub fn run(mut self) {
+    pub fn run(self) {
         let handle = Handle::current();
 
         let tx = self.tx;
@@ -1031,20 +1042,26 @@ impl AuditLogCollectorProc {
     }
 }
 
+/*
 #[cfg(test)]
 mod test {
-    use crate::artifact::ArtifactBundleAddress;
-    use crate::artifact::{ArtifactAddress, ArtifactKind, ArtifactRef};
+    use std::fs;
+    use std::str::FromStr;
+
+    use tokio::runtime::Runtime;
+    use tokio::time::{Duration, sleep};
+
+    use crate::artifact::ArtifactRef;
     use crate::cache::{
         ArtifactBundleCache, ArtifactBundleSrc, AuditLogger, MockArtifactBundleSrc,
         ProtoArtifactCachesFactory, RootArtifactCaches, RootItemCache,
     };
     use crate::error::Error;
     use crate::file_access::FileAccess;
-    use std::fs;
-    use std::str::FromStr;
-    use tokio::runtime::Runtime;
-    use tokio::time::{sleep, Duration};
+    use crate::resource::ArtifactAddress;
+    use crate::resource::ArtifactBundleAddress;
+    use crate::resource::ArtifactKind;
+    use crate::resource::RootKey;
 
     fn reset() {
         let data_dir = "tmp/data";
@@ -1082,7 +1099,8 @@ mod test {
 
         let mut proto_caches = factory.create();
         let artifact = ArtifactAddress::from_str("hyperspace:default:whiz:1.0.0:/routes.txt")?;
-        let artifact = artifact.as_ref(ArtifactKind::DomainConfig);
+
+        let artifact = ArtifactRef::new(artifact, ArtifactKind::DomainConfig );
 
         proto_caches.cache(vec![artifact.clone()]).await?;
 
@@ -1157,6 +1175,8 @@ mod test {
         Ok(())
     }
 }
+
+ */
 
 pub struct Raw{
     data: Data,

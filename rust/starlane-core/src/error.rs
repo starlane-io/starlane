@@ -1,21 +1,23 @@
-use crate::frame::ProtoFrame;
-use crate::message::Fail;
-use base64::DecodeError;
-use futures::channel::oneshot::Canceled;
-use semver::SemVerError;
-use std::convert::{TryFrom, Infallible};
+use std::convert::{Infallible};
 use std::env::VarError;
 use std::fmt;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Formatter};
 use std::num::ParseIntError;
 use std::string::FromUtf8Error;
-use std::sync::Arc;
+
+
+use base64::DecodeError;
+use futures::channel::oneshot::Canceled;
+use nom::error::VerboseError;
+use semver::SemVerError;
 use tokio::sync::broadcast;
+use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::mpsc::error::{SendError, TrySendError};
 use tokio::time::error::Elapsed;
 use zip::result::ZipError;
-use tokio::sync::broadcast::error::RecvError;
-use nom::error::VerboseError;
+
+
+use crate::message::Fail;
 
 #[derive(Debug, Clone,Eq,PartialEq)]
 pub struct Error {
@@ -46,6 +48,14 @@ impl From<ZipError> for Error {
         }
     }
 }
+
+
+impl From<starlane_resources::error::Error> for Error {
+    fn from(e: starlane_resources::error::Error) -> Self {
+        e.to_string().into()
+    }
+}
+
 
 impl From<kube::Error> for Error {
     fn from(e: kube::Error) -> Self {
@@ -177,7 +187,7 @@ impl From<Fail> for Error {
 }
 
 impl From<()> for Error {
-    fn from(e: ()) -> Self {
+    fn from(_e: ()) -> Self {
         Error {
             error: "() Error".to_string(),
         }
@@ -217,7 +227,7 @@ impl From<SemVerError> for Error {
 }
 
 impl From<Error> for rusqlite::Error {
-    fn from(e: Error) -> Self {
+    fn from(_e: Error) -> Self {
         rusqlite::Error::InvalidQuery
     }
 }
@@ -277,3 +287,5 @@ impl<T> From<SendError<T>> for Error {
         }
     }
 }
+
+

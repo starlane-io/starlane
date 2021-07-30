@@ -1,27 +1,31 @@
-use std::cell::Cell;
+
 use std::collections::HashSet;
-use std::fmt;
-use std::fmt::{Display, Formatter};
+use std::convert::Infallible;
+
+
+use std::string::FromUtf8Error;
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast, mpsc, oneshot};
-use tokio::sync::broadcast::error::RecvError;
-use tokio::sync::mpsc::Sender;
-use tokio::sync::oneshot::Receiver;
+use tokio::sync::{broadcast, oneshot};
+
+
+
+use uuid::Uuid;
+
+use starlane_resources::ResourceIdentifier;
 
 use crate::error::Error;
 use crate::frame::{
     Frame, MessageAck, MessagePayload, SimpleReply, StarMessage, StarMessagePayload,
 };
-use crate::id::Id;
-use crate::keys::{MessageId, ResourceId, ResourceKey, SubSpaceKey, UserKey};
-use crate::lane::LaneMeta;
-use crate::names::Specific;
-use crate::resource::{ResourceAddress, ResourceIdentifier, ResourceType, ResourceKind};
+
+
+use crate::resource::{ResourceAddress, ResourceKind, ResourceType, Specific};
 use crate::star::{StarCommand, StarKey, StarSearchTransaction, Transaction, TransactionResult};
-use std::string::FromUtf8Error;
 
 pub mod resource;
+
+pub type MessageId = Uuid;
 
 #[derive(Clone)]
 pub enum ProtoStarMessageTo {
@@ -139,7 +143,7 @@ impl MessageReplyTracker {
     pub fn on_message(&self, message: &StarMessage) -> TrackerJob {
         match &message.payload {
             StarMessagePayload::Reply(reply) => match reply {
-                SimpleReply::Ok(reply) => {
+                SimpleReply::Ok(_reply) => {
                     self.tx.send(MessageUpdate::Result(MessageResult::Ok(
                         message.payload.clone(),
                     )));
@@ -394,11 +398,11 @@ impl ToString for Fail {
             Fail::DoNotKnowSpecific(_) => "DoNotKnowSpecific".to_string(),
             Fail::ResourceNotFound(id) => format!("ResourceNotFound({})",id.to_string()).to_string(),
             Fail::WrongResourceType {
-                expected: expected,
-                received: received,
+                expected,
+                received,
             } => format!(
                 "WrongResourceType(expected:[{}],received:{})",
-                ResourceType::hash_to_string(expected),
+                hash_to_string(expected),
                 received.to_string()
             ),
             Fail::ChannelRecvErr => "ChannelRecvErr".to_string(),
@@ -406,7 +410,7 @@ impl ToString for Fail {
             Fail::CannotSelectResourceHost => "CannotSelectResourceHost".to_string(),
             Fail::WrongParentResourceType { expected, received } => format!(
                 "WrongParentResourceType(expected:[{}],received:{})",
-                ResourceType::hash_to_string(expected),
+                hash_to_string(expected),
                 match received {
                     None => "None".to_string(),
                     Some(expected) => expected.to_string(),
@@ -497,3 +501,29 @@ impl From<kube::Error> for Fail {
 }
 
 
+impl From<starlane_resources::error::Error> for Fail {
+
+    fn from(e: starlane_resources::error::Error) -> Self {
+        Fail::Error(e.to_string())
+    }
+}
+
+
+
+impl From<Infallible> for Fail{
+    fn from(e: Infallible) -> Self {
+        Fail::Error(
+            format!("{}", e.to_string()),
+        )
+    }
+}
+
+
+fn hash_to_string( hash: &HashSet<ResourceType> ) -> String {
+    let mut rtn = String::new();
+    for i in hash.iter() {
+        rtn.push_str( i.to_string().as_str() );
+        rtn.push_str( ", " );
+    }
+    rtn
+}

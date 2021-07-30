@@ -1,9 +1,10 @@
-use crate::error::Error;
-use crate::keys::ResourceKey;
-use serde::{Deserialize, Serialize};
-use std::fmt;
+
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
+
+use serde::{Deserialize, Serialize};
+
+use crate::error::Error;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Id {

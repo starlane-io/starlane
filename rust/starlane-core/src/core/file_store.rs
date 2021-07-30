@@ -1,38 +1,42 @@
 use std::collections::HashSet;
-use std::convert::{TryFrom, TryInto};
+
+use std::fmt;
+use std::fmt::{Debug, Formatter};
+use std::fs;
 use std::iter::FromIterator;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::fmt;
 
-use rusqlite::Connection;
-use tokio::sync::{mpsc, Mutex};
+
+use tokio::sync::{Mutex};
+
+use starlane_resources::ResourceIdentifier;
 
 use crate::core::Host;
 use crate::error::Error;
 use crate::file_access::{FileAccess, FileEvent};
-use crate::keys::{FileSystemKey, ResourceKey};
 use crate::message::Fail;
-use crate::resource::store::{
-    ResourceStore, ResourceStoreAction, ResourceStoreCommand, ResourceStoreResult,
-};
 use crate::resource::{
-    AddressCreationSrc, AssignResourceStateSrc, DataTransfer, FileKind, KeyCreationSrc,
-    MemoryDataTransfer, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype,
-    ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber,
-    ResourceIdentifier, ResourceKind, ResourceStateSrc, ResourceStub, ResourceType,
+    AddressCreationSrc, AssignResourceStateSrc, FileKind,
+    FileSystemKey, KeyCreationSrc, Path, RemoteDataSrc, Resource,
+    ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate,
+    ResourceCreateStrategy, ResourceCreationChamber, ResourceKind, ResourceStub,
+    ResourceType
+};
+use crate::resource::ResourceKey;
+use crate::resource::state_store::{
+    StateStore,
 };
 use crate::star::StarSkel;
-
 use crate::util;
-use std::fs;
-use std::fmt::{Debug, Formatter};
+use std::convert::TryInto;
+use crate::data::{DataSet, BinSrc};
 
 pub struct FileStoreHost {
     skel: StarSkel,
     file_access: FileAccess,
-    store: ResourceStore,
+    store: StateStore,
     mutex: Arc<Mutex<u8>>,
 }
 
@@ -44,11 +48,11 @@ impl Debug for FileStoreHost {
 
 impl FileStoreHost {
     pub async fn new(skel: StarSkel, file_access: FileAccess) -> Result<Self, Error> {
-        let mut file_access = file_access.with_path("filesystems".to_string())?;
+        let file_access = file_access.with_path("filesystems".to_string())?;
         let rtn = FileStoreHost {
-            skel: skel,
+            skel: skel.clone(),
             file_access: file_access,
-            store: ResourceStore::new().await,
+            store: StateStore::new(skel).await,
             mutex: Arc::new(Mutex::new(0)),
         };
 
@@ -60,6 +64,9 @@ impl FileStoreHost {
     }
 
     async fn walk(&self) -> Result<(), Error> {
+        unimplemented!()
+        /*
+
         let mut event_rx = self.file_access.walk().await?;
         let dir = PathBuf::from(self.file_access.path());
         let root_path = fs::canonicalize(&dir)?
@@ -90,10 +97,13 @@ impl FileStoreHost {
             }
         });
         Ok(())
+         */
     }
 
     #[instrument]
     async fn watch(&self) -> Result<(), Error> {
+        unimplemented!()
+        /*
         let mut event_rx = self.file_access.watch().await?;
         let dir = PathBuf::from(self.file_access.path());
         let root_path = fs::canonicalize(&dir)?
@@ -105,7 +115,7 @@ impl FileStoreHost {
         let mutex = self.mutex.clone();
         tokio::spawn(async move {
             while let Option::Some(event) = event_rx.recv().await {
-                let lock = mutex.lock().await;
+                let _lock = mutex.lock().await;
                 match Self::handle_event(
                     root_path.clone(),
                     event.clone(),
@@ -126,12 +136,15 @@ impl FileStoreHost {
             }
         });
         Ok(())
+
+         */
     }
 
+    /*
     async fn handle_event(
         root_path: String,
         event: FileEvent,
-        store: ResourceStore,
+        store: StateStore,
         skel: StarSkel,
     ) -> Result<(), Error> {
         let mut path = event.path.clone();
@@ -170,16 +183,12 @@ impl FileStoreHost {
         filesystem_key: ResourceKey,
         file_path: String,
         kind: FileKind,
-        store: ResourceStore,
+        store: StateStore,
         skel: StarSkel,
     ) -> Result<(), Error> {
         let filesystem = store
             .get(filesystem_key.clone().into())
-            .await?
-            .ok_or(format!(
-                "expected filesystem to be present in hosted environment: {}",
-                filesystem_key.as_filesystem()?.to_string()
-            ))?;
+            .await?;
         let filesystem: ResourceStub = filesystem.into();
 
         let archetype = ResourceArchetype {
@@ -193,7 +202,7 @@ impl FileStoreHost {
             parent: filesystem.key.clone().into(),
             archetype: archetype,
             address: AddressCreationSrc::Append(file_path),
-            src: AssignResourceStateSrc::Hosted,
+            state_src: AssignResourceStateSrc::AlreadyHosted,
             registry_info: Option::None,
             owner: Option::None,
             strategy: ResourceCreateStrategy::Ensure,
@@ -201,16 +210,18 @@ impl FileStoreHost {
 
         let rx = ResourceCreationChamber::new(filesystem, create, skel.clone()).await;
 
-        let x = util::wait_for_it_whatever(rx).await??;
+        let _x = util::wait_for_it_whatever(rx).await??;
         Ok(())
     }
+     */
 }
+
 
 #[async_trait]
 impl Host for FileStoreHost {
     async fn assign(
         &mut self,
-        assign: ResourceAssign<AssignResourceStateSrc>,
+        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<Resource, Fail> {
         // if there is Initialization to do for assignment THIS is where we do it
 
@@ -219,42 +230,42 @@ impl Host for FileStoreHost {
                 // here we just ensure that a directory exists for the filesystem
                 if let ResourceKey::FileSystem(filesystem_key) = &assign.stub.key {
                     let path =
-                        Path::new(format!("/{}", filesystem_key.to_string().as_str()).as_str())?;
+                        Path::from_str(format!("/{}", filesystem_key.to_string().as_str()).as_str())?;
                     self.file_access.mkdir(&path).await?;
                 }
             }
             ResourceType::File => {
                 match assign.state_src {
                     AssignResourceStateSrc::Direct(data) => {
-                        let filesystem_key = assign
+                        let filesystem_key= assign
                             .stub
                             .key
-                            .parent()
-                            .ok_or("Wheres the filesystem key?")?
-                            .as_filesystem()?;
-                        let filesystem_path = Path::new(
+                            .ancestor_of_type(ResourceType::FileSystem)?;
+                        let filesystem_path = Path::from_str(
                             format!("/{}", filesystem_key.to_string().as_str()).as_str(),
                         )?;
                         let path = format!(
                             "{}{}",
                             filesystem_path.to_string(),
-                            assign.stub.address.last_to_string()?
+                            assign.stub.address.last_to_string()
                         );
 
-                        let lock = self.mutex.lock().await;
+                        let _lock = self.mutex.lock().await;
+                        let content = data.get("content").cloned().ok_or("expected file content")?;
+                        let content = content.to_bin(self.skel.machine.bin_context())?;
                         self.file_access
-                            .write(&Path::from_str(path.as_str())?, data)
+                            .write(&Path::from_str(path.as_str())?, content)
                             .await?;
                     }
-                    AssignResourceStateSrc::Hosted => {
+                    AssignResourceStateSrc::AlreadyHosted => {
                         // do nothing, the file should already be present in the filesystem detected by the watcher and
                         // this call to assign is just making sure the database registry is updated
                     }
                     AssignResourceStateSrc::None => {
                         // do nothing, there is no data (this should never happen of course in a file)
                     }
-                    AssignResourceStateSrc::InitArgs(_) => {
-                        return Err("File cannot be created with InitArgs".into());
+                    AssignResourceStateSrc::CreateArgs(_) => {
+                        return Err("File cannot be created with CreateArgs".into());
                         // cannot create with init_args
                     }
 
@@ -271,50 +282,50 @@ impl Host for FileStoreHost {
             }
         }
 
-        let data_transfer: Arc<dyn DataTransfer> = Arc::new(MemoryDataTransfer::none());
+        let state = DataSet::new();
 
         let assign = ResourceAssign {
             stub: assign.stub,
-            state_src: data_transfer,
+            state_src: state,
         };
 
         Ok(self.store.put(assign).await?)
     }
 
-    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail> {
-        self.store.get(identifier).await
+    async fn get(&self, key: ResourceKey ) -> Result<Option<Resource>, Fail> {
+        self.store.get(key).await
     }
 
-    async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {
-        if let Ok(Option::Some(resource)) = self.store.get(identifier.clone()).await {
-            match identifier.resource_type() {
+    async fn state(&self, key: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
+        if let Ok(Option::Some(resource)) = self.store.get(key.clone()).await {
+            match key.resource_type() {
                 ResourceType::File => {
                     let filesystem_key = resource
                         .key()
-                        .parent()
-                        .ok_or("Wheres the filesystem key?")?
-                        .as_filesystem()?;
+                        .ancestor_of_type(ResourceType::FileSystem)?;
                     let filesystem_path =
-                        Path::new(format!("/{}", filesystem_key.to_string().as_str()).as_str())?;
+                        Path::from_str(format!("/{}", filesystem_key.to_string().as_str()).as_str())?;
                     let path = format!(
                         "{}{}",
                         filesystem_path.to_string(),
-                        resource.address().last_to_string()?
+                        resource.address().last_to_string()
                     );
                     let data = self
                         .file_access
                         .read(&Path::from_str(path.as_str())?)
                         .await?;
-                    Ok(RemoteDataSrc::Memory(data))
+                    let mut state = DataSet::new();
+                    state.insert("content".to_string(), BinSrc::Memory(data));
+                    Ok(state)
                 }
-                _ => Ok(RemoteDataSrc::None),
+                _ => Ok(DataSet::new()),
             }
         } else {
-            Err(Fail::ResourceNotFound(identifier))
+            Err(Fail::ResourceNotFound(key.into()))
         }
     }
 
-    async fn delete(&self, identifier: ResourceIdentifier) -> Result<(), Fail> {
+    async fn delete(&self, _identifier: ResourceKey ) -> Result<(), Fail> {
         unimplemented!()
     }
 }

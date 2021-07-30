@@ -3,25 +3,25 @@
 #![feature(derive_eq)]
 #![feature(fmt_internals)]
 
-use starlane_macros::resources;
-use std::convert::TryInto;
 use std::convert::TryFrom;
-use serde::{Serialize,Deserialize};
+use std::convert::TryInto;
 use std::str::FromStr;
 
-use starlane_core::resource::address::ResourceAddressPart;
-use starlane_core::resource::address::ResourceKindParts;
+use nom::error::{context, ErrorKind, ParseError, VerboseError};
+use serde::{Deserialize, Serialize};
+use serde::de::Error as OtherError;
+
+use starlane_core::error::Error;
+use starlane_core::resource::address::KeyBit;
+use starlane_core::resource::address::KeyBits;
 use starlane_core::resource::address::ParentAddressPatternRecognizer;
 use starlane_core::resource::address::parse_address;
 use starlane_core::resource::address::Res;
-use starlane_core::resource::address::KeyBit;
-use starlane_core::resource::address::KeyBits;
+use starlane_core::resource::address::ResourceAddressPart;
+use starlane_core::resource::address::ResourceKindParts;
 use starlane_core::resource::address::Specific;
-use nom::error::{context, ErrorKind, ParseError, VerboseError};
-use starlane_core::error::Error;
 use starlane_core::star::StarKind;
-use serde::de::Error as OtherError;
-
+use starlane_macros::resources;
 
 pub fn parse_address_part(string: &str) -> Result<(&str, Vec<ResourceAddressPart>),Error>
 {
@@ -90,12 +90,13 @@ pub enum DatabaseKind{
 
 #[cfg(test)]
 mod tests {
-
-use crate::DatabaseKind;
-use crate::ResourceKind;
-    use starlane_core::resource::address::Specific;
-    use starlane_core::error::Error;
     use std::str::FromStr;
+
+    use starlane_core::error::Error;
+    use starlane_core::resource::address::Specific;
+
+    use crate::DatabaseKind;
+    use crate::ResourceKind;
 
     #[test]
     fn space_key() -> Result<(),Error>{

@@ -1,36 +1,33 @@
-use std::collections::{HashMap, HashSet};
+
 use std::fmt;
-use std::sync::Arc;
+use std::fmt::{Debug, Formatter};
 
-use serde::{Deserialize, Serialize, Serializer};
-use tokio::sync::oneshot::error::RecvError;
+
+use semver::SemVerError;
+use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
-use tokio::time::error::Elapsed;
-use tokio::time::Instant;
 
-use crate::actor::ActorKey;
-use crate::crypt::{Encrypted, HashEncrypted, HashId};
+use tokio::time::error::Elapsed;
+
+
+use starlane_resources::ResourceIdentifier;
+
+
 use crate::error::Error;
 use crate::id::Id;
-use crate::keys::{AppKey, MessageId, ResourceId, ResourceKey, SubSpaceKey, UserKey};
 use crate::logger::Flags;
+use crate::message::{Fail, MessageExpect, MessageId, MessageUpdate, ProtoStarMessage};
 use crate::message::resource::{
     ActorMessage, Message, MessageReply, RawState, ResourceRequestMessage, ResourceResponseMessage,
 };
-use crate::message::{Fail, MessageExpect, MessageResult, MessageUpdate, ProtoStarMessage};
-use crate::names::Name;
-use crate::permissions::{AuthToken, Authentication};
-use crate::resource::{
-    AssignResourceStateSrc, Labels, ResourceAddress, ResourceAssign, ResourceBinding,
-    ResourceCreate, ResourceIdentifier, ResourceRecord, ResourceRegistration, ResourceSelector,
-    ResourceSliceAssign, ResourceSliceStatus, ResourceStatus, ResourceStub, ResourceType,
-};
+
+
+use crate::resource::{ActorKey, AppKey, AssignResourceStateSrc, Labels, ResourceAddress, ResourceAssign, ResourceBinding, ResourceCreate, ResourceId, ResourceKey, ResourceRecord, ResourceRegistration, ResourceSelector, ResourceSliceAssign, ResourceSliceStatus, ResourceStatus, ResourceStub, ResourceType, SubSpaceKey, UserKey};
 use crate::star::{
     LocalResourceLocation, Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify,
     StarSubGraphKey, StarWatchInfo,
 };
-use semver::SemVerError;
-use std::fmt::{Debug, Formatter};
+use crate::data::{DataSet, BinSrc};
 
 #[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum Frame {
@@ -140,7 +137,7 @@ impl WindAction {
                     )
                 }
             }
-            WindAction::Flags(flags) => Ok(WindResults::None),
+            WindAction::Flags(_flags) => Ok(WindResults::None),
         }
     }
 }
@@ -244,7 +241,7 @@ impl StarMessage {
         }
     }
 
-    pub fn forward(&self, to: &StarKey) -> ProtoStarMessage {
+    pub fn forward(&self, _to: &StarKey) -> ProtoStarMessage {
         let mut proto = ProtoStarMessage::new();
         proto.to = self.to.clone().into();
         proto.payload = self.payload.clone();
@@ -263,7 +260,7 @@ impl StarMessage {
                     let proto = message.reply(payload);
                     star_tx.send(StarCommand::SendProtoMessage(proto));
                 }
-                Err(error) => {
+                Err(_error) => {
                     let proto = message.reply_err("no reply".to_string());
                     star_tx.send(StarCommand::SendProtoMessage(proto));
                 }
@@ -356,7 +353,7 @@ pub enum MessagePayload {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum ResourceHostAction {
     IsHosting(ResourceKey),
-    Assign(ResourceAssign<AssignResourceStateSrc>),
+    Assign(ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>),
 }
 
 pub enum ResourceHostResult {
@@ -416,7 +413,7 @@ impl ToString for SimpleReply {
         match self {
             SimpleReply::Ok(ok) => format!("Ok({})", ok.to_string()),
             SimpleReply::Fail(fail) => format!("Fail({})", fail.to_string()),
-            SimpleReply::Ack(ack) => "Ack".to_string(),
+            SimpleReply::Ack(_ack) => "Ack".to_string(),
         }
     }
 }
@@ -600,25 +597,6 @@ pub enum ActorLookup {
     Key(ActorKey),
 }
 
-impl ActorLookup {
-    pub fn app(&self) -> AppKey {
-        match self {
-            ActorLookup::Key(key) => key.app.clone(),
-        }
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ActorNameLookup {
-    pub app_id: Id,
-    pub name: String,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ActorBind {
-    pub key: ResourceKey,
-    pub star: StarKey,
-}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Rejection {
@@ -683,7 +661,7 @@ impl fmt::Display for StarPattern {
             StarPattern::Any => "Any".to_string(),
             StarPattern::None => "None".to_string(),
             StarPattern::StarKey(key) => format!("{}", key.to_string()).to_string(),
-            StarPattern::StarKind(kind) => format!("{}", kind).to_string(),
+            StarPattern::StarKind(kind) => format!("{}", kind.to_string()).to_string(),
         };
         write!(f, "{}", r)
     }
@@ -714,7 +692,7 @@ impl From<Error> for Fail {
 }
 
 impl From<Elapsed> for Fail {
-    fn from(e: Elapsed) -> Self {
+    fn from(_e: Elapsed) -> Self {
         Fail::Timeout
     }
 }
@@ -726,7 +704,7 @@ pub trait FromReply<T, E>: Sized {
 impl FromReply<(), Fail> for Reply {
     fn from_result(t: Result<(), Fail>) -> Result<Self, Fail> {
         match t {
-            Ok(ok) => Ok(Reply::Empty),
+            Ok(_ok) => Ok(Reply::Empty),
             Err(e) => Err(e),
         }
     }
@@ -759,7 +737,7 @@ impl From<rusqlite::Error> for Fail {
 }
 
 impl From<()> for Fail {
-    fn from(error: ()) -> Self {
+    fn from(_error: ()) -> Self {
         Fail::Error("() From Error".to_string())
 
     }

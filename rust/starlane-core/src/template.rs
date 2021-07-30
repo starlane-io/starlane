@@ -1,17 +1,17 @@
-use std::cmp::Ordering;
+
 use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::StarCoreExt;
+
 use crate::error::Error;
-use crate::id::Id;
-use crate::lane::{ConnectionInfo, ConnectionKind};
-use crate::proto::{PlaceholderKernel, ProtoStar, ProtoStarKernel, ProtoStarKey};
-use crate::proto::ProtoStarKernel::Mesh;
+
+
+use crate::proto::{ProtoStarKey};
+
 use crate::star::{ServerKindExt, StarKey, StarKind, StarSubGraphKey, StarTemplateId};
-use crate::star::pledge::StarHandle;
+
 
 pub type StarKeyConstellationIndex=u16;
 
@@ -102,7 +102,7 @@ impl ConstellationTemplate {
     }
 
 
-    pub fn new_basic_with(mut star_templates: Vec<StarTemplate> ) -> Self {
+    pub fn new_basic_with(star_templates: Vec<StarTemplate> ) -> Self {
         let mut standalone = Self::new_basic();
         let mut mesh = standalone.get_star("mesh".into()).cloned().unwrap();
         for mut star_template in star_templates {
@@ -115,7 +115,7 @@ impl ConstellationTemplate {
     }
 
     pub fn new_basic_with_external() -> Self {
-        let mut external = StarTemplate::new(
+        let external = StarTemplate::new(
             StarKeyTemplate::central_geodesic(10),
             StarKind::Kube,
             "database".into(),
@@ -126,7 +126,7 @@ impl ConstellationTemplate {
     pub fn new_client(gateway_machine: MachineName) -> Self {
         let mut template = ConstellationTemplate { stars: vec![] };
 
-        let subgraph_data_key = "client".to_string();
+        let _subgraph_data_key = "client".to_string();
 
         let request_from_constellation = ConstellationSelector::AnyWithGatewayInsideMachine(gateway_machine.clone());
 

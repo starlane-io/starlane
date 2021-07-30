@@ -1,85 +1,74 @@
-use std::borrow::Borrow;
-use std::cell::Cell;
-use std::cmp::{min, Ordering};
-use std::collections::hash_map::RandomState;
-use std::collections::{HashMap, HashSet};
-use std::convert::TryInto;
-use std::future::Future;
-use std::iter::FromIterator;
-use std::str::FromStr;
-use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU64};
-use std::sync::Arc;
 use std::{cmp, fmt};
 
+
+use tokio::task::JoinHandle;
+use std::cmp::{min, Ordering};
+use std::collections::{HashMap, HashSet};
+
+use std::convert::TryInto;
+use std::fmt::{Debug, Formatter};
+
+use std::iter::FromIterator;
+
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64};
+
+
 use futures::future::select_all;
-use futures::future::{join_all, BoxFuture, Map};
-use futures::prelude::future::FusedFuture;
 use futures::FutureExt;
+
 use lru::LruCache;
-use serde::de::Unexpected;
 use serde::{Deserialize, Serialize};
-use tokio::sync::broadcast::error::{RecvError, SendError};
+
+use tokio::sync::{broadcast, oneshot};
+
 use tokio::sync::mpsc;
 use tokio::sync::oneshot::Sender;
-use tokio::sync::{broadcast, oneshot};
-use tokio::time::error::Elapsed;
-use tokio::time::{timeout, Duration, Instant};
-use url::Url;
+use tokio::time::{Duration, Instant, timeout};
 
+
+
+
+use starlane_resources::ResourceIdentifier;
 use variant::StarVariant;
 
-use crate::actor::{ActorKey, ActorKind};
+use crate::actor::ActorKind;
 use crate::cache::ProtoArtifactCachesFactory;
+use crate::constellation::ConstellationStatus;
 use crate::core::{StarCoreAction, StarCoreCommand, StarCoreResult};
 use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use crate::frame::WindAction::SearchHits;
 use crate::frame::{
-    ActorLookup, ChildManagerResourceAction, Event, Frame, FromReply, MessagePayload, ProtoFrame,
+    ActorLookup, ChildManagerResourceAction, Event, Frame, MessagePayload, ProtoFrame,
     Reply, ResourceHostAction, SimpleReply, SpaceMessage, StarMessage, StarMessagePayload,
     StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp,
 };
-use crate::id::{Id, IdSeq};
-use crate::keys::{
-    AppKey, GatheringKey, MessageId, ResourceId, ResourceKey, SpaceKey, Unique, UniqueSrc, UserKey,
-};
-use crate::lane::{ConnectionInfo, ConnectorController, LaneEndpoint, LaneCommand, LaneMeta, OutgoingSide, TunnelConnector, TunnelConnectorFactory, ProtoLaneEndpoint, LaneIndex, LaneWrapper};
+
+use crate::id::{Id};
+use crate::lane::{ConnectionInfo, ConnectorController, LaneCommand, LaneEndpoint, LaneIndex, LaneMeta, LaneWrapper, OutgoingSide, ProtoLaneEndpoint, TunnelConnector, TunnelConnectorFactory};
 use crate::logger::{
-    Flag, Flags, Log, LogInfo, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag, StaticLogInfo,
+    Flag, Flags, Log, Logger, LogInfo, ProtoStarLog, ProtoStarLogPayload, StarFlag, StaticLogInfo,
 };
+use crate::message::{Fail, MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage, ProtoStarMessageTo, StarMessageDeliveryInsurance, TrackerJob};
 use crate::message::resource::{
-    Delivery, Message, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage,
+    Delivery, Message, ResourceRequestMessage, ResourceResponseMessage,
 };
-use crate::message::{
-    Fail, MessageExpect, MessageExpectWait, MessageReplyTracker, MessageResult, MessageUpdate,
-    ProtoStarMessage, ProtoStarMessageTo, StarMessageDeliveryInsurance, TrackerJob,
-};
-use crate::permissions::{AuthToken, AuthTokenSource, Authentication, Credentials};
-use crate::proto::{PlaceholderKernel, ProtoStar, ProtoTunnel};
-use crate::resource::space::SpaceState;
-use crate::resource::sub_space::SubSpaceState;
-use crate::resource::user::UserState;
-use crate::resource::{
-    AddressCreationSrc, AssignResourceStateSrc, FieldSelection, HostedResourceStore,
-    KeyCreationSrc, Labels, LocalDataSrc, LocalHostedResource, LocalResourceHost,
-    MemoryDataTransfer, Parent, ParentCore, Registry, RegistryReservation, RegistryUniqueSrc,
-    RemoteResourceManager, Resource, ResourceAddress, ResourceArchetype, ResourceAssign,
-    ResourceBinding, ResourceCreate, ResourceHost, ResourceIdentifier, ResourceKind,
-    ResourceLocation, ResourceManager, ResourceManagerKey, ResourceNamesReservationRequest,
-    ResourceParent, ResourceRecord, ResourceRegistration, ResourceRegistryAction,
-    ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector,
-    ResourceStateSrc, ResourceStub, ResourceType,
-};
+use crate::permissions::{AuthToken, AuthTokenSource, Credentials};
+
+use crate::resource::{ActorKey, AddressCreationSrc, AppKey, AssignResourceStateSrc, FieldSelection, HostedResourceStore, KeyCreationSrc, Labels, LocalStateSetSrc, LocalHostedResource, LocalResourceHost, Parent, ParentCore, Registry, RegistryReservation, RegistryUniqueSrc, RemoteResourceManager, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceBinding, ResourceCreate, ResourceHost, ResourceKey, ResourceKind, ResourceLocation, ResourceManager, ResourceManagerKey, ResourceNamesReservationRequest, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector,  ResourceStub, ResourceType, UniqueSrc, UserKey};
+
+
+
 use crate::star::pledge::{ResourceHostSelector, Satisfaction, StarHandle, StarHandleBacking};
-use crate::star::variant::web::WebVariant;
-use crate::util;
-use crate::util::AsyncHashMap;
-use crate::template::StarTemplateHandle;
-use std::fmt::{Debug, Formatter};
-use tracing::field::{Field, Visit};
-use crate::constellation::ConstellationStatus;
 use crate::star::variant::StarShellInstructions;
+
+use crate::template::StarTemplateHandle;
+use std::future::Future;
+use crate::data::{DataSet, BinContext};
+use actix_web::rt::Runtime;
+use crate::starlane::StarlaneMachine;
+
 
 pub mod filestore;
 pub mod pledge;
@@ -101,7 +90,12 @@ pub enum StarKind {
     Kube,
 }
 
+
+
 impl StarKind {
+
+
+
     pub fn is_resource_manager(&self) -> bool {
         match self {
             StarKind::Central => true,
@@ -136,7 +130,7 @@ impl StarKind {
         }
     }
 
-    pub fn handles(&self) -> HashSet<StarKind> {
+    pub fn distributes_to(&self) -> HashSet<StarKind> {
         HashSet::from_iter(
             match self {
                 StarKind::Central => vec![StarKind::SpaceHost],
@@ -180,7 +174,7 @@ impl StarKind {
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
                 StarKind::Client => vec![],
-                StarKind::Web => vec![ResourceType::Domain, ResourceType::UrlPathPattern],
+                StarKind::Web => vec![ResourceType::Domain],
                 StarKind::FileStore => vec![ResourceType::File],
                 StarKind::ArtifactStore => vec![ResourceType::Artifact],
                 StarKind::Kube => vec![ResourceType::Database],
@@ -190,7 +184,105 @@ impl StarKind {
         )
     }
 
-    pub fn hosts(&self) -> HashSet<ResourceType> {
+    pub fn provisions(rt: &ResourceType) -> StarKind {
+        match rt {
+            ResourceType::Root => {
+                Self::Central
+            }
+            ResourceType::Space => {
+                Self::Central
+            }
+            ResourceType::SubSpace => {
+                Self::SpaceHost
+            }
+            ResourceType::User => {
+                Self::SpaceHost
+            }
+            ResourceType::App => {
+                Self::SpaceHost
+            }
+            ResourceType::Actor => {
+                Self::AppHost
+            }
+            ResourceType::FileSystem => {
+                Self::SpaceHost
+            }
+            ResourceType::File => {
+                Self::SpaceHost
+            }
+            ResourceType::Database => {
+                Self::Kube
+            }
+            ResourceType::ArtifactBundleVersions => {
+                Self::SpaceHost
+            }
+            ResourceType::ArtifactBundle => {
+                Self::ArtifactStore
+            }
+            ResourceType::Artifact => {
+                Self::ArtifactStore
+            }
+            ResourceType::Proxy => {
+                Self::SpaceHost
+            }
+            ResourceType::Domain => {
+                Self::SpaceHost
+            }
+        }
+    }
+
+    pub fn hosts(rt: &ResourceType) -> StarKind {
+        match rt {
+
+            ResourceType::Root =>{
+                Self::Central
+            }
+            ResourceType::Space => {
+                Self::SpaceHost
+            }
+            ResourceType::SubSpace => {
+                Self::SpaceHost
+            }
+            ResourceType::User=> {
+                Self::SpaceHost
+            }
+            ResourceType::App=> {
+                Self::AppHost
+            }
+            ResourceType::Actor=> {
+                Self::ActorHost
+            }
+            ResourceType::FileSystem => {
+                Self::FileStore
+            }
+            ResourceType::File=> {
+                Self::FileStore
+            }
+            ResourceType::Database=> {
+                Self::Kube
+            }
+            ResourceType::ArtifactBundleVersions=> {
+                Self::ArtifactStore
+            }
+            ResourceType::ArtifactBundle=> {
+                Self::ArtifactStore
+            }
+            ResourceType::Artifact=> {
+                Self::ArtifactStore
+            }
+            ResourceType::Proxy=> {
+                Self::SpaceHost
+            }
+            ResourceType::Domain=> {
+                Self::SpaceHost
+            }
+        }
+    }
+
+
+
+
+    pub fn hosted(&self) -> HashSet<ResourceType> {
         HashSet::from_iter(
             match self {
                 StarKind::Central => vec![ResourceType::Root],
@@ -199,7 +291,6 @@ impl StarKind {
                     ResourceType::SubSpace,
                     ResourceType::User,
                     ResourceType::Domain,
-                    ResourceType::UrlPathPattern,
                     ResourceType::Proxy,
                 ],
                 StarKind::Mesh => vec![],
@@ -211,7 +302,7 @@ impl StarKind {
                 StarKind::Web => vec![],
                 StarKind::FileStore => vec![ResourceType::FileSystem, ResourceType::File],
                 StarKind::ArtifactStore => {
-                    vec![ResourceType::ArtifactBundle, ResourceType::Artifact]
+                    vec![ResourceType::ArtifactBundleVersions,ResourceType::ArtifactBundle, ResourceType::Artifact]
                 }
                 StarKind::Kube => vec![ResourceType::Database],
             }
@@ -663,7 +754,7 @@ if self.skel.core_tx.is_closed() {
         loop {
             let mut futures = vec![];
             let mut lanes = vec![];
-            for (key, mut lane) in &mut self.lanes {
+            for (key, lane) in &mut self.lanes {
                 futures.push(lane.incoming().recv().boxed());
                 lanes.push(key.clone())
             }
@@ -711,7 +802,7 @@ if self.skel.core_tx.is_closed() {
                             set_flags.tx.send(());
                         }
                         StarCommand::AddProtoLaneEndpoint(lane) => {
-                            let result = lane.outgoing.out_tx.try_send( LaneCommand::Frame(Frame::Proto(ProtoFrame::ReportStarKey(self.skel.info.key.clone()))));
+                            let _result = lane.outgoing.out_tx.try_send( LaneCommand::Frame(Frame::Proto(ProtoFrame::ReportStarKey(self.skel.info.key.clone()))));
                             self.proto_lanes.push(LaneWrapper::Proto(LaneMeta::new(lane)));
                         }
                         StarCommand::AddLaneEndpoint(lane) => {
@@ -736,10 +827,10 @@ if self.skel.core_tx.is_closed() {
                             }
                         }
 
-                        StarCommand::AddLogger(tx) => {
+                        StarCommand::AddLogger(_tx) => {
                             //                        self.logger.tx.push(tx);
                         }
-                        StarCommand::Test(test) => {
+                        StarCommand::Test(_test) => {
                             /*                        match test
                                                {
                                                    StarTest::StarSearchForStarKey(star) => {
@@ -890,7 +981,7 @@ if self.skel.core_tx.is_closed() {
         }
 
         if let Option::Some(star_handler) = &self.skel.star_handler {
-            for kind in self.skel.info.kind.handles() {
+            for kind in self.skel.info.kind.distributes_to() {
                 let (search, rx) =
                     Wind::new(StarPattern::StarKind(kind.clone()), WindAction::SearchHits);
                 self.skel.star_tx.send(StarCommand::WindInit(search)).await;
@@ -924,13 +1015,13 @@ if self.skel.core_tx.is_closed() {
                     Err(error) => {
                         error!(
                             "error encountered when attempting to get a handle for: {} TIMEOUT: {}",
-                            kind, error.to_string()
+                            kind.to_string(), error.to_string()
                         );
                     }
                     Ok(Err(error)) => {
                             error!(
                                 "error encountered when attempting to get a handle for: {} ERROR: {}",
-                                kind, error.to_string()
+                                kind.to_string(), error.to_string()
                             );
                     }
 
@@ -943,7 +1034,7 @@ if self.skel.core_tx.is_closed() {
     async fn check_status(&mut self) {
         if self.status == StarStatus::Pending {
             if let Option::Some(star_handler) = &self.skel.star_handler {
-                let satisfied = star_handler.satisfied(self.skel.info.kind.handles()).await;
+                let satisfied = star_handler.satisfied(self.skel.info.kind.distributes_to()).await;
                 if let Result::Ok(Satisfaction::Ok) = satisfied {
                     self.set_status(StarStatus::Initializing);
                     let (tx, rx) = oneshot::channel();
@@ -983,7 +1074,7 @@ if self.skel.core_tx.is_closed() {
         match tokio::time::timeout(Duration::from_secs(15), rx).await {
             Ok(result) => match result {
                 Ok(result) => result,
-                Err(err) => Err(Fail::ChannelRecvErr),
+                Err(_err) => Err(Fail::ChannelRecvErr),
             },
             Err(_) => Err(Fail::Timeout),
         }
@@ -995,6 +1086,7 @@ if self.skel.core_tx.is_closed() {
         &mut self,
         request: Request<ResourceIdentifier, ResourceRecord>,
     ) {
+println!("locate_resource_record request star: {} identifier: {}", self.skel.info.kind.to_string(), request.payload.to_string() );
         if request.log {
             self.log(
                 LogId(request.payload.to_string()),
@@ -1016,11 +1108,10 @@ if self.skel.core_tx.is_closed() {
                 .tx
                 .send(Ok(self.get_resource_record(&request.payload).unwrap()));
             return;
-        } else if request
+        } else if StarKind::provisions(&request
             .payload
-            .resource_type()
-            .star_manager()
-            .contains(&self.skel.info.kind)
+            .resource_type()) ==
+            self.skel.info.kind
         {
             if request.log {
                 self.log(
@@ -1407,7 +1498,7 @@ if self.skel.core_tx.is_closed() {
             .await;
     }
 
-    async fn on_wind_up_hop(&mut self, mut wind_up: WindUp, lane_key: StarKey) {
+    async fn on_wind_up_hop(&mut self, wind_up: WindUp, lane_key: StarKey) {
         if wind_up.pattern.is_match(&self.skel.info) {
             if wind_up.pattern.is_single_match() {
                 let hit = WindHit {
@@ -1516,7 +1607,7 @@ if self.skel.core_tx.is_closed() {
                         .collect();
                     match wind_up.action.update(hits, WindResults::None) {
                         Ok(result) => {
-                            let mut wind_down = WindDown {
+                            let wind_down = WindDown {
                                 missed: None,
                                 hops: wind_up.hops.clone(),
                                 wind_up: wind_up.clone(),
@@ -1604,7 +1695,7 @@ if self.skel.core_tx.is_closed() {
                                 }
                             }
                         }
-                        Err(elapsed) => {
+                        Err(_elapsed) => {
                             delivery.retries = delivery.retries - 1;
                             if delivery.retries == 0 {
                                 if delivery.expect.retry_forever() {
@@ -1671,7 +1762,7 @@ if self.skel.core_tx.is_closed() {
     }
 
     fn lane_with_shortest_path_to_star(&mut self, star: &StarKey) -> Option<&mut LaneWrapper> {
-        let mut min_hops = usize::MAX;
+        let min_hops = usize::MAX;
         let mut rtn = Option::None;
 
         for (_, lane) in &mut self.lanes {
@@ -1749,7 +1840,7 @@ if self.skel.core_tx.is_closed() {
         }
     }*/
 
-    async fn on_wind_down(&mut self, mut search_result: WindDown, lane_key: StarKey) {
+    async fn on_wind_down(&mut self, _search_result: WindDown, _lane_key: StarKey) {
         //        println!("ON STAR SEARCH RESULTS");
     }
     /*
@@ -1885,7 +1976,7 @@ if self.skel.core_tx.is_closed() {
                 }
             },
             Frame::StarMessage(message) => match self.on_message(message).await {
-                Ok(messages) => {}
+                Ok(_messages) => {}
                 Err(error) => {
                     error!("X error: {}", error)
                 }
@@ -1896,7 +1987,7 @@ if self.skel.core_tx.is_closed() {
         }
     }
 
-    async fn on_event(&mut self, event: Event, lane_key: StarKey) {
+    async fn on_event(&mut self, _event: Event, _lane_key: StarKey) {
         unimplemented!()
         /*
         let watches = self.watches.get(&event.actor );
@@ -1946,13 +2037,13 @@ if self.skel.core_tx.is_closed() {
                 watches.insert(watch_info.id.clone(), star_watch);
                 self.watches.insert(watch_info.actor.clone(), watches);
             }
-            Some(mut watches) => {
+            Some(watches) => {
                 watches.insert(watch_info.id.clone(), star_watch);
             }
         }
     }
 
-    async fn forward_watch(&mut self, watch: Watch) {
+    async fn forward_watch(&mut self, _watch: Watch) {
         unimplemented!()
         /*
         let has_entity = match &watch
@@ -2005,7 +2096,7 @@ if self.skel.core_tx.is_closed() {
          */
     }
 
-    async fn on_message(&mut self, mut message: StarMessage) -> Result<(), Error> {
+    async fn on_message(&mut self, message: StarMessage) -> Result<(), Error> {
         if message.log {
 /*            info!(
                 "{} => {} : {}",
@@ -2036,7 +2127,7 @@ if self.skel.core_tx.is_closed() {
 
     async fn process_resource_message(
         &mut self,
-        mut star_message: StarMessage,
+        star_message: StarMessage,
     ) -> Result<(), Error> {
         //println!("process_message---> {}", message.payload.to_string() );
         match &star_message.payload {
@@ -2076,7 +2167,7 @@ if self.skel.core_tx.is_closed() {
                 let parent_key = match create.parent.clone().key_or("expected parent to be a ResourceKey"){
                     Ok(key) => {key}
                     Err(error) => {
-                        return Err(error);
+                        return Err(error.to_string().into());
                     }
                 };
                 let child_manager = self
@@ -2124,12 +2215,34 @@ if self.skel.core_tx.is_closed() {
                     .await?;
             }
             ResourceRequestMessage::State => {
-                let (action, mut rx) =
-                    StarCoreAction::new(StarCoreCommand::State(delivery.message.to.clone()));
+
+                let key: ResourceKey = if delivery.message.to.is_key() {
+                    delivery.message.to.clone().try_into()?
+                } else {
+                    let resource_record = self.skel.registry.as_ref().expect("Expected resource registry").get(delivery.message.to.clone()).await?;
+                    resource_record.ok_or(format!("expected resource record for identifier {}", delivery.message.to.to_string()) )?.stub.key
+                };
+
+
+                let (action, rx) =
+                    StarCoreAction::new(StarCoreCommand::State(key));
                 self.skel.core_tx.send(action).await?;
                 tokio::spawn(async move {
                     let result = rx.await;
                     if let Ok(Ok(StarCoreResult::State(state))) = result {
+
+                        let state  = match state.try_into(){
+                            Ok(state) => state,
+                            Err(_)=>{
+                                error!("error when try_into from BinSrc to NetworkBinSrc");
+                                delivery
+                                    .reply(ResourceResponseMessage::Fail(Fail::expected("Ok(Ok(StarCoreResult::State(state)))")))
+                                    .await
+                                    .unwrap_or_default();
+                                return;
+                            }
+                        };
+
                         delivery
                             .reply(ResourceResponseMessage::State(state))
                             .await
@@ -2200,11 +2313,11 @@ if self.skel.core_tx.is_closed() {
                         }
                     }
                 }
-                ChildManagerResourceAction::Status(report) => {
+                ChildManagerResourceAction::Status(_report) => {
                     unimplemented!()
                 }
 
-                ChildManagerResourceAction::Create(create) => {
+                ChildManagerResourceAction::Create(_create) => {
                     unimplemented!();
 /*                    let child_manager = self
                         .get_child_resource_manager(parent )
@@ -2308,7 +2421,10 @@ if self.skel.core_tx.is_closed() {
                 }
             }
             ResourceHostAction::Assign(assign) => {
-                let (action, rx) = StarCoreAction::new(StarCoreCommand::Assign(assign.clone()));
+
+
+
+                let (action, rx) = StarCoreAction::new(StarCoreCommand::Assign(assign.try_into()?));
                 self.skel.core_tx.send(action).await;
                 let result = rx.await??;
                 if let StarCoreResult::Resource(Option::Some(resource)) = result {
@@ -2342,7 +2458,7 @@ if self.skel.core_tx.is_closed() {
                         specific: None,
                         config: None,
                     },
-                    Arc::new(MemoryDataTransfer::none()),
+                    DataSet::new()
                 ))
             }
             _ => self.get_resource(&key).await?,
@@ -2438,7 +2554,7 @@ if self.skel.core_tx.is_closed() {
             Diagnose::HandlersSatisfied(satisfied) => {
                 if let Option::Some(star_handler) = &self.skel.star_handler {
                     if let Result::Ok(satisfaction) =
-                        star_handler.satisfied(self.skel.info.kind.handles()).await
+                        star_handler.satisfied(self.skel.info.kind.distributes_to()).await
                     {
                         satisfied.tx.send(satisfaction);
                     } else {
@@ -2596,14 +2712,12 @@ pub enum ServerCommand {
 
 pub struct LocalResourceLocation {
     pub resource: ResourceKey,
-    pub gathering: Option<GatheringKey>,
 }
 
 impl LocalResourceLocation {
-    pub fn new(resource: ResourceKey, gathering: Option<GatheringKey>) -> Self {
+    pub fn new(resource: ResourceKey) -> Self {
         LocalResourceLocation {
             resource: resource,
-            gathering: gathering,
         }
     }
 }
@@ -2804,9 +2918,9 @@ impl ResourceLocationRequestTransaction {
 impl Transaction for ResourceLocationRequestTransaction {
     async fn on_frame(
         &mut self,
-        frame: &Frame,
-        lane: Option<&mut LaneWrapper>,
-        command_tx: &mut mpsc::Sender<StarCommand>,
+        _frame: &Frame,
+        _lane: Option<&mut LaneWrapper>,
+        _command_tx: &mut mpsc::Sender<StarCommand>,
     ) -> TransactionResult {
         /*
 
@@ -2857,7 +2971,7 @@ impl StarSearchTransaction {
 
     fn collapse(&self) -> HashMap<StarKey, usize> {
         let mut rtn = HashMap::new();
-        for (lane, map) in &self.hits {
+        for (_lane, map) in &self.hits {
             for (star, hops) in map {
                 if rtn.contains_key(star) {
                     if let Some(old) = rtn.get(star) {
@@ -2914,7 +3028,7 @@ impl Transaction for StarSearchTransaction {
         &mut self,
         frame: &Frame,
         lane: Option<&mut LaneWrapper>,
-        command_tx: &mut mpsc::Sender<StarCommand>,
+        _command_tx: &mut mpsc::Sender<StarCommand>,
     ) -> TransactionResult {
         if let Option::None = lane {
             eprintln!("lane is not set for StarSearchTransaction");
@@ -2996,7 +3110,7 @@ pub enum TransactionResult {
 
 #[async_trait]
 pub trait Transaction: Send + Sync {
-    async fn on_lane_closed( &mut self, key: &StarKey ) -> TransactionResult  {
+    async fn on_lane_closed( &mut self, _key: &StarKey ) -> TransactionResult  {
             TransactionResult::Continue
     }
 
@@ -3075,12 +3189,12 @@ impl StarKey {
 
 impl StarKey {
     pub fn bin(&self) -> Result<Vec<u8>, Error> {
-        let mut bin = bincode::serialize(self)?;
+        let bin = bincode::serialize(self)?;
         Ok(bin)
     }
 
-    pub fn from_bin(mut bin: Vec<u8>) -> Result<StarKey, Error> {
-        let mut key = bincode::deserialize::<StarKey>(bin.as_slice())?;
+    pub fn from_bin(bin: Vec<u8>) -> Result<StarKey, Error> {
+        let key = bincode::deserialize::<StarKey>(bin.as_slice())?;
         Ok(key)
     }
 }
@@ -3187,7 +3301,9 @@ pub struct StarSkel {
     pub persistence: Persistence,
     pub data_access: FileAccess,
     pub caches: Arc<ProtoArtifactCachesFactory>,
+    pub machine: StarlaneMachine
 }
+
 
 impl Debug for StarSkel{
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -3274,7 +3390,7 @@ impl PublicKeySource {
         PublicKeySource {}
     }
 
-    pub async fn get_public_key_and_hash(&self, star: &StarKey) -> (PublicKey, UniqueHash) {
+    pub async fn get_public_key_and_hash(&self, _star: &StarKey) -> (PublicKey, UniqueHash) {
         (
             PublicKey {
                 id: Default::default(),
@@ -3289,9 +3405,9 @@ impl PublicKeySource {
 
     pub async fn create_encrypted_payloads(
         &self,
-        creds: &Credentials,
-        star: &StarKey,
-        payload: SpaceMessage,
+        _creds: &Credentials,
+        _star: &StarKey,
+        _payload: SpaceMessage,
     ) -> Result<(HashEncrypted<AuthToken>, Encrypted<SpaceMessage>), Error> {
         unimplemented!();
         /*
@@ -3362,10 +3478,10 @@ impl StarComm {
         tokio::spawn(async move {
             let reply = match rx.await {
                 Ok(result) => match result {
-                    Ok(ok) => SimpleReply::Ok(Reply::Empty),
+                    Ok(_ok) => SimpleReply::Ok(Reply::Empty),
                     Err(fail) => SimpleReply::Fail(fail),
                 },
-                Err(err) => SimpleReply::Fail(Fail::ChannelRecvErr),
+                Err(_err) => SimpleReply::Fail(Fail::ChannelRecvErr),
             };
             let proto = message.reply(StarMessagePayload::Reply(reply));
             star_tx.send(StarCommand::SendProtoMessage(proto)).await;
@@ -3382,7 +3498,7 @@ impl StarComm {
                 Ok(result) => match result {
                     Ok(payload) => match payload {
                         StarMessagePayload::Reply(reply) => match reply {
-                            SimpleReply::Ok(reply) => {
+                            SimpleReply::Ok(_reply) => {
                                 tx.send(Result::Ok(()));
                             }
                             SimpleReply::Fail(fail) => {
@@ -3396,11 +3512,11 @@ impl StarComm {
                             tx.send(Result::Err(Fail::expected("StarMessagePayload::Reply(_)")));
                         }
                     },
-                    Err(error) => {
+                    Err(_error) => {
                         tx.send(Result::Err(Fail::expected("Result::Ok(_)")) );
                     }
                 },
-                Err(elapsed) => {
+                Err(_elapsed) => {
                     tx.send(Result::Err(Fail::Timeout));
                 }
             };
@@ -3439,7 +3555,7 @@ impl StarComm {
                         tx.send(Result::Err(Fail::Error(error.to_string())));
                     }
                 },
-                Err(elapsed) => {
+                Err(_elapsed) => {
                     tx.send(Result::Err(Fail::Timeout));
                 }
             };
@@ -3475,7 +3591,7 @@ impl StarComm {
                         star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                     }
                 },
-                Err(err) => {
+                Err(_err) => {
                     let proto =
                         message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Timeout)));
                     star_tx.send(StarCommand::SendProtoMessage(proto)).await;
@@ -3509,7 +3625,7 @@ impl StarComm {
                         star_tx.send(StarCommand::SendProtoMessage(proto)).await;
                     }
                 },
-                Err(fail) => {
+                Err(_fail) => {
                     let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(
                         Fail::expected("Ok(result)"),
                     )));
@@ -3521,7 +3637,7 @@ impl StarComm {
 
     pub async fn reply_result_empty(&self, message: StarMessage, result: Result<(), Fail>) {
         match result {
-            Ok(reply) => {
+            Ok(_reply) => {
                 let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
                 self.star_tx
                     .send(StarCommand::SendProtoMessage(proto))
@@ -3682,11 +3798,15 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
     }
 
     async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<ResourceRecord>, Fail> {
+println!("getting : {}",identifier.to_string()  );
         let (request, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Get(identifier));
         self.registry.send(request).await;
         //match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
         match Self::timeout( rx).await? {
-            ResourceRegistryResult::Resource(resource) => Ok(resource),
+            ResourceRegistryResult::Resource(resource) => {
+println!("returning resource...{}",resource.is_some());
+                Ok(resource)
+            },
             _ => Err(Fail::expected("ResourceRegistryResult::Resource(_)")),
         }
     }

@@ -1,9 +1,10 @@
+use std::marker::PhantomData;
+
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::error::Error;
-use crate::permissions::{AuthToken, User};
-use serde::{Deserialize, Serialize, Serializer};
-use std::marker::PhantomData;
+
+
 
 pub type CryptKeyId = Uuid;
 pub type HashId = Uuid;
@@ -64,7 +65,7 @@ where
         }
     }
 
-    pub fn decrypt(&self, private_key: &PrivateKey) -> D {
+    pub fn decrypt(&self, _private_key: &PrivateKey) -> D {
         //        let mut str = String::from_utf8(self.data.clone() ).unwrap();
         //        serde_json::from_str(str.as_str() ).unwrap()
         unimplemented!()
@@ -93,7 +94,7 @@ where
         }
     }
 
-    pub fn decrypt(&self, hash: &Vec<u8>, private_key: &PrivateKey) -> D {
+    pub fn decrypt(&self, _hash: &Vec<u8>, _private_key: &PrivateKey) -> D {
         //        let mut str = String::from_utf8(self.data.clone() ).unwrap();
         //        serde_json::from_str(str.as_str() ).unwrap()
         unimplemented!()

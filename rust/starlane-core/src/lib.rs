@@ -1,44 +1,35 @@
 #[macro_use]
-extern crate futures;
-
-#[macro_use]
-extern crate log;
-
+extern crate actix_web;
 #[macro_use]
 extern crate async_trait;
-
-#[macro_use]
-extern crate lazy_static;
-
 #[macro_use]
 extern crate error_chain;
-
+#[macro_use]
+extern crate futures;
+#[macro_use]
+extern crate k8s_openapi;
+#[macro_use]
+extern crate kube;
+#[macro_use]
+extern crate kube_derive;
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate nom;
+#[macro_use]
+extern crate schemars;
+#[macro_use]
+extern crate strum_macros;
+#[macro_use]
+extern crate tracing;
 #[macro_use]
 extern crate validate;
 
-#[macro_use]
-extern crate actix_web;
+use std::str::FromStr;
 
-#[macro_use]
-extern crate nom;
-
-#[macro_use]
-extern crate tracing;
-
-#[macro_use]
-extern crate strum_macros;
-
-#[macro_use]
-extern crate k8s_openapi;
-
-#[macro_use]
-extern crate kube;
-
-#[macro_use]
-extern crate kube_derive;
-
-#[macro_use]
-extern crate schemars;
+use semver;
 
 pub mod actor;
 pub mod app;
@@ -53,7 +44,6 @@ pub mod file_access;
 pub mod filesystem;
 pub mod frame;
 pub mod id;
-pub mod keys;
 pub mod lane;
 pub mod logger;
 pub mod main;
@@ -69,9 +59,7 @@ pub mod star;
 pub mod starlane;
 pub mod template;
 pub mod util;
-
-use semver;
-use std::str::FromStr;
+pub mod data;
 
 lazy_static! {
     static ref VERSION: semver::Version = {

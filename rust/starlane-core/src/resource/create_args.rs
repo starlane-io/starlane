@@ -1,13 +1,14 @@
-use crate::error::Error;
-use crate::artifact::ArtifactBundleAddress;
+
+use std::fs::File;
+use std::io::{Read, Write};
 
 use std::str::FromStr;
-use zip::{ZipWriter, CompressionMethod};
+
+use zip::{CompressionMethod, ZipWriter};
 use zip::write::FileOptions;
-use std::io::{Write, Read};
-use std::fs::File;
-use std::path::Path;
-use std::fs;
+
+use crate::error::Error;
+use crate::resource::ArtifactBundleAddress;
 
 lazy_static!{
 
@@ -40,7 +41,7 @@ pub fn artifact_bundle_address() -> ArtifactBundleAddress{
 }
 
 pub fn create_init_args_artifact_bundle() -> Result<Vec<u8>,Error> {
-   let mut zipfile = tempfile::NamedTempFile::new()?;
+   let zipfile = tempfile::NamedTempFile::new()?;
    let mut zip = ZipWriter::new(zipfile.reopen() ? );
 
    write_file_to_zip(&mut zip, "init-args/space.yaml", &SPACE )?;

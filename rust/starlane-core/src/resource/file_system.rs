@@ -1,17 +1,17 @@
-use crate::error::Error;
-use crate::keys::{FileSystemKey, ResourceKey};
-use crate::resource::{
-    AssignResourceStateSrc, LocalDataSrc, Resource, ResourceAddress, ResourceType, SrcTransfer,
-};
-use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
+
+use serde::{Deserialize, Serialize};
+
+use crate::error::Error;
+use crate::resource::{AssignResourceStateSrc, FileSystemKey, LocalStateSetSrc, Resource, ResourceAddress, ResourceType };
+use crate::data::{BinSrc, DataSet};
 
 #[derive(Clone)]
 pub struct FileSystem {
     key: FileSystemKey,
     address: ResourceAddress,
-    state_src: SrcTransfer<FileSystemState>,
+    state_src: DataSet<BinSrc>
 }
 
 #[derive(Clone, Serialize, Deserialize)]

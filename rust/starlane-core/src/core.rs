@@ -1,41 +1,39 @@
-use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, HashSet};
-use std::future::Future;
-use std::marker::PhantomData;
-use std::ops::Deref;
-use std::pin::Pin;
-use std::sync::mpsc::Receiver;
-use std::sync::Arc;
-use std::{thread, io};
+use std::{thread};
 
-use futures::future::BoxFuture;
-use futures::FutureExt;
-use tokio::runtime::{Runtime, Builder};
-use tokio::sync::mpsc::Sender;
+
+
+
+
+
+
+
+
+
+
+
+use tokio::runtime::{Builder};
 use tokio::sync::{mpsc, oneshot};
-use tokio::time::Duration;
 
-use crate::actor::ActorKey;
+
+
+use starlane_resources::ResourceIdentifier;
+
 use crate::core::artifact::ArtifactHost;
 use crate::core::default::DefaultHost;
 use crate::core::file_store::FileStoreHost;
+use crate::core::kube::KubeCore;
 use crate::error::Error;
-use crate::file_access::FileAccess;
+
 use crate::frame::MessagePayload;
-use crate::id::{Id, IdSeq};
-use crate::keys::{AppKey, ResourceKey};
+
 use crate::message::Fail;
-use crate::resource::store::ResourceStoreSqlLite;
-use crate::resource::{
-    AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource,
-    RemoteDataSrc, Resource, ResourceAssign, ResourceIdentifier, ResourceSliceAssign,
-};
-use crate::star::variant::StarVariantCommand;
+use crate::resource::{AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource, RemoteDataSrc, Resource, ResourceAssign, ResourceSliceAssign, ResourceKey};
+
 use crate::star::{
     ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel,
 };
-use crate::core::kube::KubeCore;
-use std::io::Write;
+use crate::data::{DataSet, BinSrc};
+
 
 pub mod artifact;
 pub mod default;
@@ -73,9 +71,9 @@ impl StarCoreAction {
 
 #[derive(strum_macros::Display)]
 pub enum StarCoreCommand {
-    Get(ResourceIdentifier),
-    State(ResourceIdentifier),
-    Assign(ResourceAssign<AssignResourceStateSrc>),
+    Get(ResourceKey),
+    State(ResourceKey),
+    Assign(ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>),
     Shutdown
 }
 
@@ -84,7 +82,7 @@ pub enum StarCoreResult {
     Resource(Option<Resource>),
     LocalLocation(LocalResourceLocation),
     MessageReply(MessagePayload),
-    State(RemoteDataSrc),
+    State(DataSet<BinSrc>),
 }
 
 impl ToString for StarCoreResult {
@@ -203,26 +201,27 @@ impl InertHost {
 impl Host for InertHost {
     async fn assign(
         &mut self,
-        assign: ResourceAssign<AssignResourceStateSrc>,
+        _assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<Resource, Fail> {
         Err(Fail::Error(
             "This is an InertHost which cannot actually host anything".into(),
         ))
     }
 
-    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail> {
+    async fn get(&self, _identifier: ResourceKey) -> Result<Option<Resource>, Fail> {
         Err(Fail::Error(
             "This is an InertHost which cannot actually host anything".into(),
         ))
     }
 
-    async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail> {
+    async fn state(&self, identifier: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
         Err(Fail::Error(
             "This is an InertHost which cannot actually host anything".into(),
         ))
     }
 
-    async fn delete(&self, identifier: ResourceIdentifier) -> Result<(), Fail> {
+
+    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Fail> {
         Err(Fail::Error(
             "This is an InertHost which cannot actually host anything".into(),
         ))
@@ -257,14 +256,13 @@ pub trait StarCoreExtFactory: Send+Sync
  */
 
 #[async_trait]
-pub trait Host: Send + Sync {
+    pub trait Host: Send + Sync {
     async fn assign(
-        &mut self,
-        assign: ResourceAssign<AssignResourceStateSrc>,
+    &mut self,
+    assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<Resource, Fail>;
-    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<Resource>, Fail>;
-    async fn state(&self, identifier: ResourceIdentifier) -> Result<RemoteDataSrc, Fail>;
-    async fn delete(&self, identifier: ResourceIdentifier) -> Result<(), Fail>;
+    async fn get(&self, key: ResourceKey) -> Result<DataSet<BinSrc>, Fail>;
+    async fn delete(&self, key: ResourceKey) -> Result<(), Fail>;
     fn shutdown(&self) {}
 }
 
@@ -327,12 +325,12 @@ impl StarCore2 {
             StarCoreCommand::Assign(assign) => Ok(StarCoreResult::Resource(Option::Some(
                 self.host.assign(assign).await?,
             ))),
-            StarCoreCommand::Get(identifier) => {
-                let resource = self.host.get(identifier).await?;
+            StarCoreCommand::Get(key) => {
+                let resource = self.host.get(key).await?;
                 Ok(StarCoreResult::Resource(resource))
             }
-            StarCoreCommand::State(identifier) => {
-                let state_src = self.host.state(identifier).await?;
+            StarCoreCommand::State(key) => {
+                let state_src = self.host.state(key).await?;
                 Ok(StarCoreResult::State(state_src))
             }
             StarCoreCommand::Shutdown => {
