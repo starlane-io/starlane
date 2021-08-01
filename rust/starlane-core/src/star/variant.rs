@@ -5,7 +5,7 @@ use tokio::sync::oneshot;
 use crate::error::Error;
 use crate::frame::{StarMessage};
 use crate::lane::LaneWrapper;
-use crate::star::{CoreRequest, StarCommand, StarKind, StarSkel};
+use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::star::variant::central::CentralVariant;
 use crate::star::variant::gateway::GatewayVariant;
 use crate::star::variant::web::WebVariant;
@@ -38,7 +38,6 @@ impl StarVariant for PlaceholderStarManager {
 pub enum StarVariantCommand {
     StarSkel(StarSkel),
     Init,
-    CoreRequest(CoreRequest),
     StarMessage(StarMessage),
 }
 
@@ -50,7 +49,6 @@ impl fmt::Display for StarVariantCommand {
             }
             StarVariantCommand::Init => "Init".to_string(),
             StarVariantCommand::StarSkel(_) => "StarSkel".to_string(),
-            StarVariantCommand::CoreRequest(_) => "CoreRequest".to_string(),
         };
         write!(f, "{}", r)
     }

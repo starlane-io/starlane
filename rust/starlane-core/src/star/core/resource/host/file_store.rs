@@ -13,11 +13,6 @@ use tokio::sync::{Mutex};
 
 use starlane_resources::ResourceIdentifier;
 
-<<<<<<< HEAD:rust/starlane-core/src/star/core/resource/host/file_store.rs
-use crate::star::core::resource::host::Host;
-=======
-use crate::star::core::component::resource::host::Host;
->>>>>>> f2361a20ec5930eab8327e64fbc6e3b3d95d08d0:rust/starlane-core/src/core/file_store.rs
 use crate::error::Error;
 use crate::file_access::{FileAccess, FileEvent};
 use crate::message::Fail;

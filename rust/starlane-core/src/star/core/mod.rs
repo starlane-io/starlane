@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 use crate::data::DataSet;
 use crate::error::Error;
 use crate::frame::{RegistryAction, MessagePayload, Reply, SimpleReply, StarMessage, StarMessagePayload, ResourceHostAction};
@@ -18,7 +17,6 @@ use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use std::convert::TryInto;
 use tokio::sync::{mpsc, oneshot};
 
-pub mod message;
 pub mod resource;
 
 pub enum CoreCall {
@@ -144,8 +142,8 @@ impl Router {
             ResourceRequestMessage::State => {
                 let key: ResourceKey = delivery.message.to.clone().try_into()?;
 
-                let (tx,rx) = oneshot::channel();
-                self.host_tx.send(HostCall::Get{ key, tx }).await?;
+                let (tx, rx) = oneshot::channel();
+                self.host_tx.send(HostCall::Get { key, tx }).await?;
                 tokio::spawn(async move {
                     let result = rx.await;
                     if let Ok(Ok(Option::Some(state))) = result {
@@ -262,7 +260,7 @@ impl Router {
         action: ResourceHostAction,
     ) -> Result<(), Error> {
         match action {
-/*            ResourceHostAction::IsHosting(resource) => {
+            /*            ResourceHostAction::IsHosting(resource) => {
                 if let Option::Some(resource) = self.get_resource(&resource).await? {
                     let record = resource.into();
                     let record = ResourceRecord::new(record, self.skel.info.key.clone());
@@ -286,21 +284,20 @@ impl Router {
                 let call = HostCall::Assign { assign, tx };
                 self.host_tx.send(call).await;
                 rx.await??;
-                    if let Result::Ok(Option::Some(record)) = self
-                        .skel
-                        .registry.as_ref()
-                        .expect("expected registry")
-                        .get(key.into())
-                        .await
-                    {
-                        self.skel
-                            .comm()
-                            .simple_reply(message, SimpleReply::Ok(Reply::Resource(record)))
-                            .await;
-                    } else {
-                        error!("could not get resource record");
-                    }
-
+                if let Result::Ok(Option::Some(record)) = self
+                    .skel
+                    .registry.as_ref()
+                    .expect("expected registry")
+                    .get(key.into())
+                    .await
+                {
+                    self.skel
+                        .comm()
+                        .simple_reply(message, SimpleReply::Ok(Reply::Resource(record)))
+                        .await;
+                } else {
+                    error!("could not get resource record");
+                }
             }
         }
         Ok(())
@@ -311,56 +308,23 @@ impl Router {
             .skel
             .registry
             .as_ref()
-            .expect("expected reegistry").get(key.into() ).await?.ok_or("expected parent resource")?;
+            .expect("expected reegistry").get(key.into()).await?.ok_or("expected parent resource")?;
 
 
-            Ok(Parent {
-                core: ParentCore {
-                    stub: resource.into(),
-                    selector: ResourceHostSelector::new(self.skel.clone()),
-                    child_registry: self.skel.registry.as_ref().unwrap().clone(),
-                    skel: self.skel.clone(),
-                },
-            })
+        Ok(Parent {
+            core: ParentCore {
+                stub: resource.into(),
+                selector: ResourceHostSelector::new(self.skel.clone()),
+                child_registry: self.skel.registry.as_ref().unwrap().clone(),
+                skel: self.skel.clone(),
+            },
+        })
     }
 
-    pub async fn has_resource(&self, key: &ResourceKey) -> Result<bool,Error> {
-        let (tx,mut rx) = oneshot::channel();
-        self.host_tx.send( HostCall::Has{ key: key.clone(), tx } ).await?;
+    pub async fn has_resource(&self, key: &ResourceKey) -> Result<bool, Error> {
+        let (tx, mut rx) = oneshot::channel();
+        self.host_tx.send(HostCall::Has { key: key.clone(), tx }).await?;
         Ok(rx.await?)
     }
-
-=======
-use crate::frame::StarMessage;
-use crate::star::StarSkel;
-use tokio::sync::mpsc;
-use crate::util::{AsyncRunner, AsyncProcessor};
-
-pub mod component;
-
-pub enum CoreCall {
-    Message(StarMessage)
 }
 
-pub struct Router {
-    skel: StarSkel
-}
-
-impl Router {
-    pub fn new(skel: StarSkel) -> mpsc::Sender<CoreCall> {
-        let (tx,rx) = mpsc::channel(1024);
-
-        AsyncRunner::new(Self{
-            skel: skel
-        },tx.clone(), rx);
-
-        tx
-    }
-}
-
-impl AsyncProcessor<CoreCall> for Router {
-    async fn process(&mut self, call: CoreCall) {
-        todo!()
-    }
->>>>>>> f2361a20ec5930eab8327e64fbc6e3b3d95d08d0
-}

@@ -9,7 +9,7 @@ use std::sync::atomic::Ordering;
 use crate::frame::{Frame, ProtoFrame};
 use crate::lane::{LaneCommand, LaneWrapper};
 
-use crate::star::{PublicKeySource, StarCommand, StarKey, StarSkel, StarSubGraphKey};
+use crate::star::{StarCommand, StarKey, StarSkel, StarSubGraphKey};
 use crate::star::variant::{StarShellInstructions, StarVariant};
 
 

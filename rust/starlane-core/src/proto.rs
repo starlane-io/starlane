@@ -219,7 +219,6 @@ impl ProtoStar {
                             core_tx: core_tx.clone(),
                             logger: self.logger.clone(),
                             flags: self.flags.clone(),
-                            auth_token_source: AuthTokenSource {},
                             registry: resource_registry,
                             star_handler: star_handler,
                             persistence: Persistence::Memory,
@@ -236,6 +235,7 @@ impl ProtoStar {
                         return Ok(Star::from_proto(
                             skel,
                             self.star_rx,
+                            core_tx,
                             self.lanes,
                             self.proto_lanes,
                             self.connector_ctrls,

@@ -10,7 +10,6 @@ use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 
 pub mod artifact;
-pub mod default;
 pub mod file_store;
 pub mod kube;
 mod space;

@@ -16,7 +16,7 @@ use crate::error::Error;
 use crate::message::{Fail};
 use crate::resource::{ResourceAssign, ResourceHost, ResourceLocationAffinity, ResourceType, RemoteResourceHost};
 use crate::star::{
-    LocalResourceLocation, StarComm, StarCommand, StarInfo, StarKey, StarKind, StarSkel,
+    StarComm, StarCommand, StarInfo, StarKey, StarKind, StarSkel,
 };
 
 #[derive(Clone)]

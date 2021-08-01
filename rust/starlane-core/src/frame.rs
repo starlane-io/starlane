@@ -24,8 +24,8 @@ use crate::message::resource::{
 
 use crate::resource::{ActorKey, AppKey, AssignResourceStateSrc, Labels, ResourceAddress, ResourceAssign, ResourceBinding, ResourceCreate, ResourceId, ResourceKey, ResourceRecord, ResourceRegistration, ResourceSelector, ResourceSliceAssign, ResourceSliceStatus, ResourceStatus, ResourceStub, ResourceType, SubSpaceKey, UserKey};
 use crate::star::{
-    LocalResourceLocation, Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify,
-    StarSubGraphKey, StarWatchInfo,
+    Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify,
+    StarSubGraphKey
 };
 use crate::data::{DataSet, BinSrc};
 
@@ -357,10 +357,7 @@ pub enum ResourceHostAction {
 }
 
 
-pub enum ResourceHostResult {
-    Ok,
-    Location(LocalResourceLocation),
-}
+
 
 #[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum RegistryAction {
