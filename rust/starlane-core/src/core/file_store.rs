@@ -13,7 +13,7 @@ use tokio::sync::{Mutex};
 
 use starlane_resources::ResourceIdentifier;
 
-use crate::core::Host;
+use crate::star::core::component::resource::host::Host;
 use crate::error::Error;
 use crate::file_access::{FileAccess, FileEvent};
 use crate::message::Fail;

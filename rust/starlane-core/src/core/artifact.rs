@@ -11,16 +11,17 @@ use tokio::sync::Mutex;
 
 use starlane_resources::ResourceIdentifier;
 
-use crate::core::{Host, StarCoreAction, StarCoreCommand};
+use crate::core::{StarCoreAction, StarCoreCommand};
+use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::message::Fail;
 use crate::resource::{AddressCreationSrc, ArtifactBundleKind, ArtifactKind, AssignResourceStateSrc, FileSystemKey, KeyCreationSrc, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceKey, ResourceKind, ResourceRecord, ResourceRegistration, ResourceRegistryInfo, ResourceStub, ResourceType};
 use crate::resource::ArtifactBundleKey;
 use crate::resource::state_store::StateStore;
+use crate::star::core::component::resource::host::Host;
 use crate::star::StarSkel;
 use crate::util;
-use crate::data::{DataSet, BinSrc};
 
 pub struct ArtifactHost {
     skel: StarSkel,

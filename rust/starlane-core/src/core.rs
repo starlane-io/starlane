@@ -1,54 +1,39 @@
-use std::{thread};
+use std::thread;
 
-
-
-
-
-
-
-
-
-
-
-
-use tokio::runtime::{Builder};
+use tokio::runtime::Builder;
 use tokio::sync::{mpsc, oneshot};
-
-
 
 use starlane_resources::ResourceIdentifier;
 
 use crate::core::artifact::ArtifactHost;
-use crate::core::default::DefaultHost;
+use crate::star::core::component::resource::host::DefaultHost;
 use crate::core::file_store::FileStoreHost;
 use crate::core::kube::KubeCore;
+use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
-
 use crate::frame::MessagePayload;
-
 use crate::message::Fail;
-use crate::resource::{AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource, RemoteDataSrc, Resource, ResourceAssign, ResourceSliceAssign, ResourceKey};
-
+use crate::resource::{
+    AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource,
+    RemoteDataSrc, Resource, ResourceAssign, ResourceKey, ResourceSliceAssign,
+};
 use crate::star::{
     ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel,
 };
-use crate::data::{DataSet, BinSrc};
-
+use crate::star::core::component::resource::host::Host;
 
 pub mod artifact;
 pub mod default;
 pub mod file_store;
-pub mod server;
 mod kube;
-
-
+pub mod server;
 
 pub struct StarCoreAction {
     pub command: StarCoreCommand,
     pub tx: oneshot::Sender<Result<StarCoreResult, Fail>>,
 }
 
-impl ToString for StarCoreAction{
+impl ToString for StarCoreAction {
     fn to_string(&self) -> String {
         self.command.to_string()
     }
@@ -73,7 +58,7 @@ impl StarCoreAction {
 pub enum StarCoreCommand {
     GetState(ResourceKey),
     Assign(ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>),
-    Shutdown
+    Shutdown,
 }
 
 pub enum StarCoreResult {
@@ -109,11 +94,9 @@ pub struct CoreRunner {
 
 impl CoreRunner {
     pub fn new() -> Result<Self, Error> {
-
         let factory = StarCoreFactory::new();
         let (tx, mut rx) = mpsc::channel(1);
         thread::spawn(move || {
-
             let runtime = Builder::new_multi_thread()
                 .worker_threads(4)
                 .thread_name("star-core-runner")
@@ -122,7 +105,6 @@ impl CoreRunner {
                 .build()
                 .unwrap();
 
-
             runtime.block_on(async move {
                 while let Option::Some(CoreRunnerCommand::Core { skel, rx }) = rx.recv().await {
                     let core = match factory.create(skel, rx).await {
@@ -130,7 +112,7 @@ impl CoreRunner {
                         Err(err) => {
                             error!("FATAL: {}", err);
                             panic!("FATAL: {}", err);
-//                            std::process::exit(1);
+                            //                            std::process::exit(1);
                         }
                     };
                     tokio::spawn(async move {
@@ -139,7 +121,6 @@ impl CoreRunner {
                 }
             });
         });
-
 
         Ok(CoreRunner { tx: tx })
     }
@@ -172,15 +153,11 @@ impl StarCoreFactory {
         let file_access = skel.data_access.clone();
 
         let host: Box<dyn Host> = match skel.info.kind {
-            StarKind::FileStore => {
-                Box::new(FileStoreHost::new(skel.clone(), file_access).await?)
-            },
+            StarKind::FileStore => Box::new(FileStoreHost::new(skel.clone(), file_access).await?),
             StarKind::ArtifactStore => {
                 Box::new(ArtifactHost::new(skel.clone(), file_access).await?)
             }
-            StarKind::Kube => {
-                Box::new(KubeCore::new(skel.clone()).await?)
-            }
+            StarKind::Kube => Box::new(KubeCore::new(skel.clone()).await?),
             _ => Box::new(DefaultHost::new(skel.clone()).await),
         };
         Ok(StarCore2::new(skel, core_rx, host).await)
@@ -192,32 +169,6 @@ pub struct InertHost {}
 impl InertHost {
     pub fn new() -> Self {
         InertHost {}
-    }
-}
-
-#[async_trait]
-impl Host for InertHost {
-    async fn assign(
-        &mut self,
-        _assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<Resource, Fail> {
-        Err(Fail::Error(
-            "This is an InertHost which cannot actually host anything".into(),
-        ))
-    }
-
-    async fn get(&self, _identifier: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
-        Err(Fail::Error(
-            "This is an InertHost which cannot actually host anything".into(),
-        ))
-    }
-
-
-
-    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Fail> {
-        Err(Fail::Error(
-            "This is an InertHost which cannot actually host anything".into(),
-        ))
     }
 }
 
@@ -248,17 +199,6 @@ pub trait StarCoreExtFactory: Send+Sync
 
  */
 
-#[async_trait]
-    pub trait Host: Send + Sync {
-    async fn assign(
-    &mut self,
-    assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<Resource, Fail>;
-    async fn get(&self, key: ResourceKey) -> Result<DataSet<BinSrc>, Fail>;
-    async fn delete(&self, key: ResourceKey) -> Result<(), Fail>;
-    fn shutdown(&self) {}
-}
-
 pub struct StarCore2 {
     skel: StarSkel,
     rx: mpsc::Receiver<StarCoreAction>,
@@ -278,10 +218,9 @@ impl StarCore2 {
         }
     }
 
-
     pub async fn run(mut self) {
         while let Option::Some(action) = self.rx.recv().await {
-            if let StarCoreCommand::Shutdown = action.command  {
+            if let StarCoreCommand::Shutdown = action.command {
                 self.process(action.command).await;
                 break;
             }
@@ -289,7 +228,6 @@ impl StarCore2 {
             action.tx.send(result);
         }
     }
-
 
     /*
     pub async fn run(mut self) {
@@ -311,19 +249,17 @@ impl StarCore2 {
 
      */
 
-
-
     async fn process(&mut self, command: StarCoreCommand) -> Result<StarCoreResult, Fail> {
         match command {
             StarCoreCommand::Assign(assign) => Ok(StarCoreResult::Resource(Option::Some(
                 self.host.assign(assign).await?,
             ))),
             StarCoreCommand::GetState(key) => {
-                let state= self.host.get(key).await?;
+                let state = self.host.get(key).await?;
                 Ok(StarCoreResult::State(state))
             }
             StarCoreCommand::Shutdown => {
-                self.host.shutdown();
+//                self.host.shutdown();
                 Ok(StarCoreResult::Ok)
             }
         }

@@ -1,75 +1,3 @@
-use std::{cmp, fmt};
-
-
-use tokio::task::JoinHandle;
-use std::cmp::{min, Ordering};
-use std::collections::{HashMap, HashSet};
-
-use std::convert::TryInto;
-use std::fmt::{Debug, Formatter};
-
-use std::iter::FromIterator;
-
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64};
-
-
-use futures::future::select_all;
-use futures::FutureExt;
-
-use lru::LruCache;
-use serde::{Deserialize, Serialize};
-
-use tokio::sync::{broadcast, oneshot};
-
-use tokio::sync::mpsc;
-use tokio::sync::oneshot::Sender;
-use tokio::time::{Duration, Instant, timeout};
-
-
-
-
-use starlane_resources::ResourceIdentifier;
-use variant::StarVariant;
-
-use crate::actor::ActorKind;
-use crate::cache::ProtoArtifactCachesFactory;
-use crate::constellation::ConstellationStatus;
-use crate::core::{StarCoreAction, StarCoreCommand, StarCoreResult};
-use crate::crypt::{Encrypted, HashEncrypted, HashId, PublicKey, UniqueHash};
-use crate::error::Error;
-use crate::file_access::FileAccess;
-use crate::frame::{
-    ActorLookup, ChildManagerResourceAction, Event, Frame, MessagePayload, ProtoFrame,
-    Reply, ResourceHostAction, SimpleReply, SpaceMessage, StarMessage, StarMessagePayload,
-    StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp,
-};
-
-use crate::id::{Id};
-use crate::lane::{ConnectionInfo, ConnectorController, LaneCommand, LaneEndpoint, LaneIndex, LaneMeta, LaneWrapper, OutgoingSide, ProtoLaneEndpoint, TunnelConnector, TunnelConnectorFactory};
-use crate::logger::{
-    Flag, Flags, Log, Logger, LogInfo, ProtoStarLog, ProtoStarLogPayload, StarFlag, StaticLogInfo,
-};
-use crate::message::{Fail, MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage, ProtoStarMessageTo, StarMessageDeliveryInsurance, TrackerJob};
-use crate::message::resource::{
-    Delivery, Message, ResourceRequestMessage, ResourceResponseMessage,
-};
-use crate::permissions::{AuthToken, AuthTokenSource, Credentials};
-
-use crate::resource::{ActorKey, AddressCreationSrc, AppKey, AssignResourceStateSrc, FieldSelection, HostedResourceStore, KeyCreationSrc, Labels, LocalStateSetSrc, LocalHostedResource, LocalResourceHost, Parent, ParentCore, Registry, RegistryReservation, RegistryUniqueSrc, RemoteResourceManager, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceBinding, ResourceCreate, ResourceHost, ResourceKey, ResourceKind, ResourceLocation, ResourceManager, ResourceManagerKey, ResourceNamesReservationRequest, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryInfo, ResourceRegistryResult, ResourceSelector,  ResourceStub, ResourceType, UniqueSrc, UserKey};
-
-
-
-use crate::star::pledge::{ResourceHostSelector, Satisfaction, StarHandle, StarHandleBacking};
-use crate::star::variant::StarShellInstructions;
-
-use crate::template::StarTemplateHandle;
-use std::future::Future;
-use crate::data::{DataSet, BinContext};
-use actix_web::rt::Runtime;
-use crate::starlane::StarlaneMachine;
-
-
 pub mod filestore;
 pub mod pledge;
 pub mod variant;
@@ -90,7 +18,6 @@ pub enum StarKind {
     Web,
     Kube,
 }
-
 
 
 impl StarKind {
@@ -313,31 +240,6 @@ impl StarKind {
     }
 }
 
-/*
-impl FromStr for StarKind {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<StarKind, Self::Err> {
-        match input {
-            "Central" => Ok(StarKind::Central),
-            "Mesh" => Ok(StarKind::Mesh),
-            "AppHost" => Ok(StarKind::AppHost),
-            "ActorHost" => Ok(StarKind::ActorHost),
-            "Gateway" => Ok(StarKind::Gateway),
-            "Link" => Ok(StarKind::Link),
-            "Client" => Ok(StarKind::Client),
-            "SpaceHost" => Ok(StarKind::SpaceHost),
-            "Web" => Ok(StarKind::Web),
-            "FileStore" => Ok(StarKind::FileStore),
-            "ArtifactStore" => Ok(StarKind::ArtifactStore),
-            "Kube" => Ok(StarKind::Kube),
-            _ => Err(()),
-        }
-    }
-}
-
- */
-
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize)]
 pub struct ServerKindExt {
     pub name: String,
@@ -435,32 +337,6 @@ impl StarKind {
     }
 }
 
-/*
-impl fmt::Display for StarKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                StarKind::Central => "Central".to_string(),
-                StarKind::Mesh => "Mesh".to_string(),
-                StarKind::AppHost => "AppHost".to_string(),
-                StarKind::ActorHost => "ActorHost".to_string(),
-                StarKind::Gateway => "Gateway".to_string(),
-                StarKind::Link => "Link".to_string(),
-                StarKind::Client => "Client".to_string(),
-                StarKind::SpaceHost => "SpaceHost".to_string(),
-                StarKind::Web => "Web".to_string(),
-                StarKind::FileStore => "FileStore".to_string(),
-                StarKind::ArtifactStore => "ArtifactStore".to_string(),
-                StarKind::Kube => "Database".to_string(),
-            }
-        )
-    }
-}
-
- */
-
 impl fmt::Display for ActorLookup {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
@@ -474,8 +350,8 @@ pub static MAX_HOPS: usize = 32;
 
 pub struct Star {
     skel: StarSkel,
-    star_rx: mpsc::Receiver<StarCommand>,
-    core_tx: mpsc::Sender<StarCoreAction>,
+    star_rx: bounded::Receiver<StarCommand>,
+    core_tx: bounded::Sender<StarCoreAction>,
     variant: Box<dyn StarVariant>,
     lanes: HashMap<StarKey, LaneWrapper>,
     proto_lanes: Vec<LaneWrapper>,
@@ -502,8 +378,8 @@ impl Debug for Star{
 impl Star {
     pub async fn from_proto(
         data: StarSkel,
-        star_rx: mpsc::Receiver<StarCommand>,
-        core_tx: mpsc::Sender<StarCoreAction>,
+        star_rx: bounded::Receiver<StarCommand>,
+        core_tx: bounded::Sender<StarCoreAction>,
         lanes: HashMap<StarKey, LaneWrapper>,
         proto_lanes: Vec<LaneWrapper>,
         connector_ctrls: Vec<ConnectorController>,
@@ -1633,7 +1509,7 @@ println!("locate_resource_record request star: {} identifier: {}", self.skel.inf
         &self.skel.info.key
     }
 
-    pub fn star_tx(&self) -> mpsc::Sender<StarCommand> {
+    pub fn star_tx(&self) -> bounded::Sender<StarCommand> {
         self.skel.star_tx.clone()
     }
 
@@ -2583,6 +2459,7 @@ println!("locate_resource_record request star: {} identifier: {}", self.skel.inf
 }
 
 pub trait StarKernel: Send {}
+
 #[derive(strum_macros::Display)]
 pub enum StarCommand {
     InvokeProtoStarEvolution,
@@ -2657,7 +2534,7 @@ pub struct ForwardFrame {
 }
 
 pub struct AddResourceLocation {
-    pub tx: mpsc::Sender<()>,
+    pub tx: bounded::Sender<()>,
     pub resource_location: ResourceRecord,
 }
 
@@ -2824,49 +2701,9 @@ pub enum StarTest {
     StarSearchForStarKey(StarKey),
 }
 
-/*
-impl fmt::Display for StarCommand {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let r = match self {
-            StarCommand::Init => "Init".to_string(),
-            StarCommand::AddLaneEndpoint(_) => format!("AddLane").to_string(),
-            StarCommand::AddConnectorController(_) => format!("AddConnectorController").to_string(),
-            StarCommand::AddLogger(_) => format!("AddLogger").to_string(),
-            StarCommand::Test(_) => format!("Test").to_string(),
-            StarCommand::Frame(frame) => format!("Frame({})", frame).to_string(),
-            StarCommand::FrameTimeout(_) => format!("FrameTimeout").to_string(),
-            StarCommand::FrameError(_) => format!("FrameError").to_string(),
-            StarCommand::WindInit(_) => format!("Search").to_string(),
-            StarCommand::WindCommit(_) => format!("SearchResult").to_string(),
-            StarCommand::ReleaseHold(_) => format!("ReleaseHold").to_string(),
-            StarCommand::ForwardFrame(_) => format!("ForwardFrame").to_string(),
-            StarCommand::WindDown(_) => format!("SearchReturnResult").to_string(),
-            StarCommand::SendProtoMessage(_) => format!("SendProtoMessage(_)").to_string(),
-            StarCommand::SetFlags(_) => format!("SetFlags(_)").to_string(),
-            StarCommand::ConstellationBroadcast(_)=> {
-                "ConstellationBroadcast".to_string()
-            }
-            StarCommand::ResourceRecordRequest(_) => "ResourceRecordRequest".to_string(),
-            StarCommand::ResourceRecordSet(_) => "SetResourceLocation".to_string(),
-            StarCommand::Diagnose(_) => "Diagnose".to_string(),
-            StarCommand::CheckStatus => "CheckStatus".to_string(),
-            StarCommand::ResourceRecordRequestFromStar(_) => {
-                "ResourceRecordRequestFromStar".to_string()
-            }
-            StarCommand::SetStatus(_) => "StarStatus".to_string(),
-            StarCommand::GetCaches(_) => "GetCaches".to_string(),
-            StarCommand::GetStarInfo(_) => "GetStarInfo".to_string(),
-            StarCommand::AddProtoLaneEndpoint(_) => "ProtoLaneEndpoint".to_string()
-        };
-        write!(f, "{}", r)
-    }
-}
-
- */
-
 #[derive(Clone)]
 pub struct StarController {
-    pub star_tx: mpsc::Sender<StarCommand>,
+    pub star_tx: bounded::Sender<StarCommand>,
 }
 
 impl StarController {
@@ -2905,12 +2742,12 @@ pub struct StarWatchInfo {
 }
 
 pub struct ResourceLocationRequestTransaction {
-    pub tx: mpsc::Sender<()>,
+    pub tx: bounded::Sender<()>,
 }
 
 impl ResourceLocationRequestTransaction {
-    pub fn new() -> (Self, mpsc::Receiver<()>) {
-        let (tx, rx) = mpsc::channel(1);
+    pub fn new() -> (Self, bounded::Receiver<()>) {
+        let (tx, rx) = bounded::channel(1);
         (ResourceLocationRequestTransaction { tx: tx }, rx)
     }
 }
@@ -2921,7 +2758,7 @@ impl Transaction for ResourceLocationRequestTransaction {
         &mut self,
         _frame: &Frame,
         _lane: Option<&mut LaneWrapper>,
-        _command_tx: &mut mpsc::Sender<StarCommand>,
+        _command_tx: &mut bounded::Sender<StarCommand>,
     ) -> TransactionResult {
         /*
 
@@ -2946,7 +2783,7 @@ pub struct StarSearchTransaction {
     pub reported_lanes: HashSet<StarKey>,
     pub lanes: HashSet<StarKey>,
     pub hits: HashMap<StarKey, HashMap<StarKey, usize>>,
-    command_tx: mpsc::Sender<StarCommand>,
+    command_tx: bounded::Sender<StarCommand>,
     tx: Vec<oneshot::Sender<WindHits>>,
     local_hit: Option<StarKey>,
 }
@@ -2954,7 +2791,7 @@ pub struct StarSearchTransaction {
 impl StarSearchTransaction {
     pub fn new(
         pattern: StarPattern,
-        command_tx: mpsc::Sender<StarCommand>,
+        command_tx: bounded::Sender<StarCommand>,
         tx: oneshot::Sender<WindHits>,
         lanes: HashSet<StarKey>,
         local_hit: Option<StarKey>,
@@ -3029,7 +2866,7 @@ impl Transaction for StarSearchTransaction {
         &mut self,
         frame: &Frame,
         lane: Option<&mut LaneWrapper>,
-        _command_tx: &mut mpsc::Sender<StarCommand>,
+        _command_tx: &mut bounded::Sender<StarCommand>,
     ) -> TransactionResult {
         if let Option::None = lane {
             eprintln!("lane is not set for StarSearchTransaction");
@@ -3119,7 +2956,7 @@ pub trait Transaction: Send + Sync {
         &mut self,
         frame: &Frame,
         lane: Option<&mut LaneWrapper>,
-        command_tx: &mut mpsc::Sender<StarCommand>,
+        command_tx: &mut bounded::Sender<StarCommand>,
     ) -> TransactionResult;
 }
 
@@ -3291,8 +3128,8 @@ pub enum Persistence {
 #[derive(Clone)]
 pub struct StarSkel {
     pub info: StarInfo,
-    pub star_tx: mpsc::Sender<StarCommand>,
-    pub core_tx: mpsc::Sender<StarCoreAction>,
+    pub star_tx: bounded::Sender<StarCommand>,
+    pub core_tx: bounded::Sender<StarCoreAction>,
     pub flags: Flags,
     pub logger: Logger,
     pub sequence: Arc<AtomicU64>,
@@ -3322,13 +3159,11 @@ impl StarSkel {
 }
 
 
-
 #[derive(Debug,Clone)]
 pub struct StarInfo {
     pub key: StarKey,
     pub kind: StarKind,
 }
-
 
 
 impl StarInfo {
@@ -3438,8 +3273,8 @@ impl StarNotify {
 
 #[derive(Clone)]
 pub struct StarComm {
-    pub star_tx: mpsc::Sender<StarCommand>,
-    pub core_tx: mpsc::Sender<StarCoreAction>,
+    pub star_tx: bounded::Sender<StarCommand>,
+    pub core_tx: bounded::Sender<StarCoreAction>,
 }
 
 impl StarComm {
@@ -3838,8 +3673,6 @@ impl ToString for StarStatus {
     }
 }
 
-pub struct LogId<T>(T);
-
 impl Into<LogId<String>> for &'static ResourceIdentifier {
     fn into(self) -> LogId<String> {
         match self {
@@ -3864,34 +3697,5 @@ impl Into<LogId<String>> for &'static StarMessage {
 impl Into<LogId<String>> for &'static ProtoStarMessage {
     fn into(self) -> LogId<String> {
         LogId("<proto>".to_string())
-    }
-}
-impl ToString for LogId<String> {
-    fn to_string(&self) -> String {
-        self.0.clone()
-    }
-}
-
-impl ToString for LogId<&Star> {
-    fn to_string(&self) -> String {
-        format!("{}", self.0.skel.info.to_string())
-    }
-}
-
-impl ToString for LogId<&mut Star> {
-    fn to_string(&self) -> String {
-        format!("{}", self.0.skel.info.to_string())
-    }
-}
-
-impl ToString for LogId<&StarMessage> {
-    fn to_string(&self) -> String {
-        format!("<Message>[{}]", self.0.id.to_string())
-    }
-}
-
-impl ToString for LogId<&ProtoStarMessage> {
-    fn to_string(&self) -> String {
-        "<proto>".to_string()
     }
 }

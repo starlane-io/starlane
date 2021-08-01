@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 use starlane_resources::{ResourceIdentifier, ResourceKindParts};
 
-use crate::core::Host;
+use crate::star::core::component::resource::host::Host;
 use crate::error::Error;
 
 use crate::message::Fail;

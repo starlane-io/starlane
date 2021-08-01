@@ -1,9 +1,9 @@
-pub mod component;
-
-use crate::util::{AsyncProcessor, AsyncRunner};
 use crate::frame::StarMessage;
 use crate::star::StarSkel;
 use tokio::sync::mpsc;
+use crate::util::{AsyncRunner, AsyncProcessor};
+
+pub mod component;
 
 pub enum CoreCall {
     Message(StarMessage)
