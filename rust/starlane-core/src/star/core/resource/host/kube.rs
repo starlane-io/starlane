@@ -32,6 +32,7 @@ use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc
 use crate::star::StarSkel;
 use crate::data::{DataSet, BinSrc};
 
+/*
 
 pub struct KubeCore {
     skel: StarSkel,
@@ -203,3 +204,6 @@ struct StarlaneProvisionerSpec{
 
 
 
+
+
+ */

@@ -47,7 +47,7 @@ impl StateStore {
     pub async fn put(
         &self,
         assign: ResourceAssign<DataSet<BinSrc>>,
-    ) -> Result<(), Fail> {
+    ) -> Result<DataSet<BinSrc>, Fail> {
         let (tx, rx) = oneshot::channel();
 
         self.tx
@@ -79,7 +79,7 @@ impl StateStore {
 #[derive(strum_macros::Display)]
 pub enum ResourceStoreCommand {
     Close,
-    Save{assign: ResourceAssign<DataSet<BinSrc>>, tx: oneshot::Sender<Result<(),Error>>},
+    Save{assign: ResourceAssign<DataSet<BinSrc>>, tx: oneshot::Sender<Result<DataSet<BinSrc>,Error>>},
     Get{key:ResourceKey, tx: oneshot::Sender<Result<Option<DataSet<BinSrc>>,Error>>},
     Has{key:ResourceKey, tx: oneshot::Sender<bool>},
 }
@@ -119,7 +119,7 @@ impl StateStoreFS {
         Ok(())
     }
 
-    async fn save( &mut self, assign: ResourceAssign<DataSet<BinSrc>> ) -> Result<(),Error>{
+    async fn save( &mut self, assign: ResourceAssign<DataSet<BinSrc>> ) -> Result<DataSet<BinSrc>,Error>{
         let key = assign.stub.key.to_string();
 
         let state_path= Path::from_str(format!("/stars/{}/states/{}",self.skel.info.key.to_string(), key).as_str())?;
@@ -128,7 +128,7 @@ impl StateStoreFS {
         data_access.mkdir(&state_path).await?;
 
         let mut rxs = vec![];
-        for (aspect, data) in assign.state_src {
+        for (aspect, data) in &assign.state_src {
             let state_aspect_file = Path::from_str(format!("/stars/{}/states/{}/{}",self.skel.info.key.to_string(),key.to_string(),aspect).as_str())?;
             let (tx,rx) = oneshot::channel();
             let bin_context = self.skel.machine.bin_context();
@@ -140,7 +140,7 @@ impl StateStoreFS {
             rx.await?;
         }
 
-        Ok(())
+        Ok(assign.state_src)
     }
 
     async fn get( &self, key: ResourceKey ) -> Result<Option<DataSet<BinSrc>>,Error>{

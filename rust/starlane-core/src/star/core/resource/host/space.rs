@@ -1,7 +1,7 @@
 use crate::star::StarSkel;
 use crate::star::core::resource::state::StateStore;
 use crate::star::core::resource::host::Host;
-use crate::resource::{ResourceAssign, AssignResourceStateSrc, ResourceKey};
+use crate::resource::{ResourceAssign, AssignResourceStateSrc, ResourceKey, Resource};
 use crate::data::{DataSet, BinSrc};
 use crate::message::Fail;
 use crate::error::Error;
@@ -26,14 +26,14 @@ impl Host for SpaceHost {
     async fn assign(
         &self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<(), Fail> {
-        // if there is Initialization to do for assignment THIS is where we do it
+    ) -> Result<DataSet<BinSrc>, Fail> {
         let state = match assign.state_src {
             AssignResourceStateSrc::Direct(data) => {
                 data
             }
-            AssignResourceStateSrc::AlreadyHosted => DataSet::new(),
-            AssignResourceStateSrc::None => DataSet::new(),
+            AssignResourceStateSrc::Stateless => {
+                return Err("space cannot be stateless".into())
+            },
             AssignResourceStateSrc::CreateArgs(ref args) =>  {
                 if args.trim().is_empty() && assign.stub.archetype.kind.init_clap_config().is_none() {
                     DataSet::new()
@@ -52,6 +52,7 @@ impl Host for SpaceHost {
             stub: assign.stub,
             state_src: state,
         };
+
 
         Ok(self.store.put(assign).await?)
     }

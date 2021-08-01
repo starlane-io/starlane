@@ -432,7 +432,7 @@ impl SpaceApi {
     }
 
     pub fn create_domain(&self, domain: &str) -> Result<Creation<DomainApi>, Fail> {
-        let resource_src = AssignResourceStateSrc::None;
+        let resource_src = AssignResourceStateSrc::Stateless;
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
             key: KeyCreationSrc::None,
@@ -492,7 +492,7 @@ impl SubSpaceApi {
     }
 
     pub fn create_file_system(&self, name: &str) -> Result<Creation<FileSystemApi>, Fail> {
-        let resource_src = AssignResourceStateSrc::None;
+        let resource_src = AssignResourceStateSrc::Stateless;
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
             key: KeyCreationSrc::None,
@@ -514,7 +514,7 @@ impl SubSpaceApi {
         &self,
         name: &str,
     ) -> Result<Creation<ArtifactBundleVersionsApi>, Fail> {
-        let resource_src = AssignResourceStateSrc::None;
+        let resource_src = AssignResourceStateSrc::Stateless;
 
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),

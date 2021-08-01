@@ -31,6 +31,7 @@ use crate::star::StarSkel;
 use std::collections::HashMap;
 use crate::data::{DataSet, BinSrc};
 
+/*
 #[derive(Debug)]
 pub struct DefaultHost {
     skel: StarSkel,
@@ -57,8 +58,7 @@ impl Host for DefaultHost {
             AssignResourceStateSrc::Direct(data) => {
                 data
             }
-            AssignResourceStateSrc::AlreadyHosted => DataSet::new(),
-            AssignResourceStateSrc::None => DataSet::new(),
+            AssignResourceStateSrc::Stateless => DataSet::new(),
             AssignResourceStateSrc::CreateArgs(ref args) =>  {
                 if args.trim().is_empty() && assign.stub.archetype.kind.init_clap_config().is_none() {
                     DataSet::new()
@@ -149,3 +149,6 @@ println!("seems to have worked....");
         unimplemented!()
     }
 }
+
+
+ */

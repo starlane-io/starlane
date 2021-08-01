@@ -33,6 +33,7 @@ use crate::util;
 use std::convert::TryInto;
 use crate::data::{DataSet, BinSrc};
 
+/*
 pub struct FileStoreHost {
     skel: StarSkel,
     file_access: FileAccess,
@@ -261,7 +262,7 @@ impl Host for FileStoreHost {
                         // do nothing, the file should already be present in the filesystem detected by the watcher and
                         // this call to assign is just making sure the database registry is updated
                     }
-                    AssignResourceStateSrc::None => {
+                    AssignResourceStateSrc::Stateless => {
                         // do nothing, there is no data (this should never happen of course in a file)
                     }
                     AssignResourceStateSrc::CreateArgs(_) => {
@@ -311,3 +312,6 @@ impl Host for FileStoreHost {
         unimplemented!()
     }
 }
+
+
+ */

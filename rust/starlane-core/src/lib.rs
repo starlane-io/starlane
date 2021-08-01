@@ -37,7 +37,6 @@ pub mod artifact;
 pub mod cache;
 pub mod config;
 pub mod constellation;
-pub mod core;
 pub mod crypt;
 pub mod error;
 pub mod file_access;

@@ -24,7 +24,6 @@ use tokio::sync::oneshot;
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::constellation::{Constellation, ConstellationStatus};
-use crate::core::CoreRunner;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 
@@ -145,7 +144,6 @@ pub struct StarlaneMachineRunner {
     star_controllers: AsyncHashMap<StarInConstellationTemplateHandle, StarController>,
     star_manager_factory: Arc<dyn StarVariantFactory>,
     //    star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
-    core_runner: Arc<CoreRunner>,
     data_access: FileAccess,
     cache_access: FileAccess,
     pub logger: Logger,
@@ -170,7 +168,6 @@ impl StarlaneMachineRunner {
             command_rx,
             star_manager_factory: Arc::new(StarVariantFactoryDefault {}),
             //            star_core_ext_factory: Arc::new(ExampleStarCoreExtFactory::new() ),
-            core_runner: Arc::new(CoreRunner::new()?),
             logger: Logger::new(),
             flags: Flags::new(),
             data_access: FileAccess::new(

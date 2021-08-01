@@ -2494,10 +2494,9 @@ pub enum KeySrc {
 /// can have other options like to Initialize the state data
 #[derive(Debug,Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum AssignResourceStateSrc<DATASET> {
-    None,
+    Stateless,
     Direct(DATASET),
     CreateArgs(String),
-    AlreadyHosted,
 }
 
 impl TryInto<LocalStateSetSrc> for AssignResourceStateSrc<DataSet<BinSrc>> {
@@ -2506,8 +2505,7 @@ impl TryInto<LocalStateSetSrc> for AssignResourceStateSrc<DataSet<BinSrc>> {
     fn try_into(self) -> Result<LocalStateSetSrc, Self::Error> {
         match self {
             AssignResourceStateSrc::Direct(state) => Ok(LocalStateSetSrc::Some(state.try_into()?)),
-            AssignResourceStateSrc::AlreadyHosted => Ok(LocalStateSetSrc::AlreadyHosted),
-            AssignResourceStateSrc::None => Ok(LocalStateSetSrc::None),
+            AssignResourceStateSrc::Stateless => Ok(LocalStateSetSrc::None),
             _ => {
                 Err(format!("cannot turn {}", self.to_string() ).into())
             }
