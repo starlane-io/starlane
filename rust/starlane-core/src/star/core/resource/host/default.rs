@@ -14,7 +14,7 @@ use starlane_resources::{ResourceIdentifier};
 
 
 
-use crate::core::Host;
+use crate::star::core::resource::host::Host;
 
 
 
@@ -23,7 +23,7 @@ use crate::message::Fail;
 
 use crate::resource::{ArtifactKind, AssignResourceStateSrc, LocalStateSetSrc, Names, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKind, ResourceKey};
 
-use crate::resource::state_store::{
+use crate::star::core::resource::state::{
     StateStore,
 };
 
@@ -49,7 +49,7 @@ impl DefaultHost {
 #[async_trait]
 impl Host for DefaultHost {
     async fn assign(
-        &mut self,
+        &self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<(), Fail> {
         // if there is Initialization to do for assignment THIS is where we do it
@@ -115,7 +115,11 @@ println!("seems to have worked....");
         Ok(self.store.put(assign).await?)
     }
 
-    async fn get(&self, key: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
+    async fn has(&self, key: ResourceKey) -> bool {
+        todo!()
+    }
+
+    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Fail> {
         self.store.get(key).await
     }
 

@@ -381,7 +381,6 @@ impl StarlaneMachineRunner {
                         .clone(),
                     self.data_access.clone(),
                     self.star_manager_factory.clone(),
-                    self.core_runner.clone(),
                     constellation_broadcaster.subscribe(),
                     self.flags.clone(),
                     self.logger.clone(),

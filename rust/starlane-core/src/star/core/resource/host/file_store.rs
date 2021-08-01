@@ -13,7 +13,7 @@ use tokio::sync::{Mutex};
 
 use starlane_resources::ResourceIdentifier;
 
-use crate::core::Host;
+use crate::star::core::resource::host::Host;
 use crate::error::Error;
 use crate::file_access::{FileAccess, FileEvent};
 use crate::message::Fail;
@@ -25,7 +25,7 @@ use crate::resource::{
     ResourceType
 };
 use crate::resource::ResourceKey;
-use crate::resource::state_store::{
+use crate::star::core::resource::state::{
     StateStore,
 };
 use crate::star::StarSkel;
@@ -56,7 +56,7 @@ impl FileStoreHost {
             mutex: Arc::new(Mutex::new(0)),
         };
 
-        rtn.walk().await?;
+//        rtn.walk().await?;
 
         //rtn.watch().await?;
 
@@ -220,7 +220,7 @@ impl FileStoreHost {
 #[async_trait]
 impl Host for FileStoreHost {
     async fn assign(
-        &mut self,
+        &self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<(), Fail> {
         // if there is Initialization to do for assignment THIS is where we do it
@@ -292,11 +292,15 @@ impl Host for FileStoreHost {
         Ok(self.store.put(assign).await?)
     }
 
+    async fn has(&self, key: ResourceKey) -> bool {
+        todo!()
+    }
 
-    async fn get(&self, key: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
+
+    async fn get(&self, key: ResourceKey ) -> Result<Option<DataSet<BinSrc>>, Fail> {
         if let Ok(resource) = self.store.get(key.clone()).await {
             match key.resource_type() {
-                _ => Ok(DataSet::new()),
+                _ => Ok(Option::Some(DataSet::new())),
             }
         } else {
             Err(Fail::ResourceNotFound(key.into()))

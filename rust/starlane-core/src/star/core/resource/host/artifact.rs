@@ -11,17 +11,18 @@ use tokio::sync::Mutex;
 
 use starlane_resources::ResourceIdentifier;
 
-use crate::core::{Host, StarCoreAction, StarCoreCommand};
+use crate::core::{StarCoreAction, StarCoreCommand};
+use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::message::Fail;
 use crate::resource::{AddressCreationSrc, ArtifactBundleKind, ArtifactKind, AssignResourceStateSrc, FileSystemKey, KeyCreationSrc, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceKey, ResourceKind, ResourceRecord, ResourceRegistration, ResourceRegistryInfo, ResourceStub, ResourceType};
 use crate::resource::ArtifactBundleKey;
-use crate::resource::state_store::StateStore;
+use crate::star::core::resource::state::StateStore;
+use crate::star::core::resource::host::Host;
 use crate::star::StarSkel;
 use crate::util;
-use crate::data::{DataSet, BinSrc};
-
+/*
 pub struct ArtifactHost {
     skel: StarSkel,
     file_access: FileAccess,
@@ -128,6 +129,7 @@ impl ArtifactHost {
         let assign = util::wait_for_it_whatever(rx).await??;
         let stub = assign.stub.clone();
         let (action,rx) = StarCoreAction::new(StarCoreCommand::Assign(assign.try_into()?));
+/*
         skel.core_tx.send( action ).await;
 
         util::wait_for_it_whatever(rx).await??;
@@ -137,13 +139,16 @@ impl ArtifactHost {
         skel.registry.as_ref().expect("expected resource register to be available on ArtifactStore").register(registration).await;
 
         Ok(())
+        joj
+ */
+        unimplemented!()
     }
 }
 
 #[async_trait]
 impl Host for ArtifactHost {
     async fn assign(
-        &mut self,
+        &self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<(), Fail> {
 
@@ -213,7 +218,11 @@ impl Host for ArtifactHost {
         Ok(())
     }
 
-    async fn get(&self, key: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
+    async fn has(&self, key: ResourceKey) -> bool {
+        todo!()
+    }
+
+    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Fail> {
         self.store.get(key).await
     }
 
@@ -289,3 +298,6 @@ fn get_artifacts(data: Arc<Vec<u8>>) -> Result<Vec<String>, Fail> {
     }
 }
 
+
+
+ */

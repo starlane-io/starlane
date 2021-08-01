@@ -98,7 +98,7 @@ impl FileAccess {
         Ok(util::wait_for_it(rx).await?)
     }
 
-    pub async fn write(&mut self, path: &Path, data: Arc<Vec<u8>>) -> Result<(), Error> {
+    pub async fn write(&self, path: &Path, data: Arc<Vec<u8>>) -> Result<(), Error> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.tx
             .send(FileCommand::Write {
@@ -134,7 +134,7 @@ impl FileAccess {
         Ok(util::wait_for_it_for(rx, Duration::from_secs(60 * 2)).await?)
     }
 
-    pub async fn mkdir(&mut self, path: &Path) -> Result<FileAccess, Error> {
+    pub async fn mkdir(&self, path: &Path) -> Result<FileAccess, Error> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.tx
             .send(FileCommand::MkDir {

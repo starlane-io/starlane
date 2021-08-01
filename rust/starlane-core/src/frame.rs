@@ -321,7 +321,7 @@ impl StarMessage {
 pub enum StarMessagePayload {
     None,
     MessagePayload(MessagePayload),
-    ResourceManager(ChildManagerResourceAction),
+    ResourceManager(RegistryAction),
     ResourceHost(ResourceHostAction),
     Space(SpaceMessage),
     Reply(SimpleReply),
@@ -352,9 +352,10 @@ pub enum MessagePayload {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum ResourceHostAction {
-    IsHosting(ResourceKey),
+    //IsHosting(ResourceKey),
     Assign(ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>),
 }
+
 
 pub enum ResourceHostResult {
     Ok,
@@ -362,12 +363,11 @@ pub enum ResourceHostResult {
 }
 
 #[derive(Debug,Clone, Serialize, Deserialize)]
-pub enum ChildManagerResourceAction {
+pub enum RegistryAction {
     Register(ResourceRegistration),
     Location(ResourceRecord),
     Find(ResourceIdentifier),
     Status(ResourceStatusReport),
-    Create(ResourceCreate),
     UniqueResourceId {
         parent: ResourceIdentifier,
         child_type: ResourceType,
@@ -376,15 +376,14 @@ pub enum ChildManagerResourceAction {
 
 
 
-impl ToString for ChildManagerResourceAction {
+impl ToString for RegistryAction {
     fn to_string(&self) -> String {
         match self {
-            ChildManagerResourceAction::Register(_) => "Register".to_string(),
-            ChildManagerResourceAction::Location(_) => "Location".to_string(),
-            ChildManagerResourceAction::Find(_) => "Find".to_string(),
-            ChildManagerResourceAction::Status(_) => "Status".to_string(),
-            ChildManagerResourceAction::Create(_) => "Create".to_string(),
-            ChildManagerResourceAction::UniqueResourceId { .. } => "UniqueResourceId".to_string(),
+            RegistryAction::Register(_) => "Register".to_string(),
+            RegistryAction::Location(_) => "Location".to_string(),
+            RegistryAction::Find(_) => "Find".to_string(),
+            RegistryAction::Status(_) => "Status".to_string(),
+            RegistryAction::UniqueResourceId { .. } => "UniqueResourceId".to_string(),
         }
     }
 }

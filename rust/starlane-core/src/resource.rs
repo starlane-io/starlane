@@ -3,40 +3,26 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::fs::DirBuilder;
-
 use std::hash::Hash;
 use std::iter::FromIterator;
-
 use std::str::FromStr;
-
 use std::sync::Arc;
 use std::time::Duration;
-
-
-
 
 use rusqlite::{Connection, params, params_from_iter, Row, ToSql, Transaction};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 use serde::{Deserialize, Serialize};
-
-
 use tokio::sync::{mpsc, oneshot};
-
 use tokio::sync::oneshot::Receiver;
-
 
 use starlane_resources::ResourceIdentifier;
 
 use crate::{error, logger, util};
-
 use crate::app::ConfigSrc;
+use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use crate::frame::{
-    ResourceHostAction, SimpleReply,
-    StarMessagePayload,
-};
-
+use crate::frame::{SimpleReply, StarMessagePayload, ResourceHostAction};
 use crate::logger::{elog, LogInfo, StaticLogInfo};
 use crate::message::{Fail, ProtoStarMessage};
 use crate::message::resource::{
@@ -44,24 +30,18 @@ use crate::message::resource::{
     ResourceResponseMessage,
 };
 use crate::names::Name;
-
-
-
-
 use crate::star::{
     ResourceRegistryBacking, StarComm, StarCommand, StarInfo, StarKey, StarSkel,
 };
-use crate::star::pledge::{ResourceHostSelector, StarHandle};
+use crate::star::pledge::{StarHandle, ResourceHostSelector};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
-use crate::data::{DataSet, BinSrc};
 
 pub mod artifact;
 pub mod config;
 pub mod domain;
 pub mod file;
 pub mod file_system;
-pub mod state_store;
 pub mod sub_space;
 pub mod user;
 pub mod selector;
@@ -1871,6 +1851,13 @@ impl From<ResourceRecord> for ResourceAddress {
     }
 }
 
+impl Into<ResourceStub> for ResourceRecord{
+    fn into(self) -> ResourceStub {
+        self.stub
+    }
+}
+
+
 #[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct ResourceLocation {
     pub host: StarKey,
@@ -2721,6 +2708,7 @@ impl ResourceHost for RemoteResourceHost {
         }
     }
 }
+
 
 
 #[derive(Clone)]

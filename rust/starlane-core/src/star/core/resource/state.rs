@@ -31,6 +31,19 @@ impl StateStore {
         }
     }
 
+    pub async fn has(
+        &self, key: ResourceKey
+    ) -> Result<bool,Error> {
+        let (tx, rx) = oneshot::channel();
+
+        self.tx
+            .send( ResourceStoreCommand::Has{key,tx} )
+            .await?;
+
+        Ok(rx.await?)
+    }
+
+
     pub async fn put(
         &self,
         assign: ResourceAssign<DataSet<BinSrc>>,
@@ -44,7 +57,7 @@ impl StateStore {
         Ok(rx.await??)
     }
 
-    pub async fn get(&self, key: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
+    pub async fn get(&self, key: ResourceKey ) -> Result<Option<DataSet<BinSrc>>, Fail> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send( ResourceStoreCommand::Get{key: key.clone(), tx } )
@@ -67,7 +80,8 @@ impl StateStore {
 pub enum ResourceStoreCommand {
     Close,
     Save{assign: ResourceAssign<DataSet<BinSrc>>, tx: oneshot::Sender<Result<(),Error>>},
-    Get{key:ResourceKey, tx: oneshot::Sender<Result<DataSet<BinSrc>,Error>>},
+    Get{key:ResourceKey, tx: oneshot::Sender<Result<Option<DataSet<BinSrc>>,Error>>},
+    Has{key:ResourceKey, tx: oneshot::Sender<bool>},
 }
 
 pub struct StateStoreFS {
@@ -129,7 +143,7 @@ impl StateStoreFS {
         Ok(())
     }
 
-    async fn get( &self, key: ResourceKey ) -> Result<DataSet<BinSrc>,Error>{
+    async fn get( &self, key: ResourceKey ) -> Result<Option<DataSet<BinSrc>>,Error>{
         let key = key.to_string();
         let machine_filesystem = self.skel.machine.machine_filesystem();
         let mut data_access = machine_filesystem.data_access();
@@ -143,8 +157,17 @@ impl StateStoreFS {
             let bin_src = BinSrc::Memory(bin);
             dataset.insert( aspect.last_segment().ok_or("expected final segment from list")?, bin_src );
         }
-        Ok(dataset)
+        Ok(Option::Some(dataset))
     }
+
+    async fn has( &self, key: ResourceKey ) -> bool {
+       if let Ok(Some(_)) = self.get(key).await {
+           true
+       } else {
+           false
+       }
+    }
+
 
     async fn process(
         &mut self,
@@ -156,6 +179,9 @@ impl StateStoreFS {
             }
             ResourceStoreCommand::Get { key, tx } => {
                 tx.send(self.get(key).await ).unwrap_or_default();
+            }
+            ResourceStoreCommand::Has { key, tx } => {
+                tx.send(self.has(key).await ).unwrap_or_default();
             }
             ResourceStoreCommand::Close => {}
         }

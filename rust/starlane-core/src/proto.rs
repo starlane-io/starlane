@@ -38,6 +38,7 @@ use crate::star::variant::{StarVariantFactory};
 
 use crate::template::{StarKeyConstellationIndex};
 use crate::starlane::StarlaneMachine;
+use crate::star::core::Router;
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -52,7 +53,6 @@ pub struct ProtoStar {
     connector_ctrls: Vec<ConnectorController>,
     star_manager_factory: Arc<dyn StarVariantFactory>,
     //  star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
-    core_runner: Arc<CoreRunner>,
     logger: Logger,
     frame_hold: FrameHold,
     caches: Arc<ProtoArtifactCachesFactory>,
@@ -73,7 +73,6 @@ impl ProtoStar {
         caches: Arc<ProtoArtifactCachesFactory>,
         data_access: FileAccess,
         star_manager_factory: Arc<dyn StarVariantFactory>,
-        core_runner: Arc<CoreRunner>,
         proto_constellation_broadcast: broadcast::Receiver<ConstellationBroadcast>,
         flags: Flags,
         logger: Logger,
@@ -91,7 +90,6 @@ impl ProtoStar {
                 proto_lanes: vec![],
                 connector_ctrls: vec![],
                 star_manager_factory: star_manager_factory,
-                core_runner: core_runner,
                 logger: logger,
                 frame_hold: FrameHold::new(),
                 caches: caches,
@@ -233,17 +231,12 @@ impl ProtoStar {
 
                         let variant = self.star_manager_factory.create(skel.clone()).await;
 
-                        self.core_runner
-                            .send(CoreRunnerCommand::Core {
-                                skel: skel.clone(),
-                                rx: core_rx,
-                            })
-                            .await;
+                        // start the core router
+                        Router::start(skel.clone(), core_rx);
 
                         return Ok(Star::from_proto(
-                            skel.clone(),
+                            skel,
                             self.star_rx,
-                            core_tx,
                             self.lanes,
                             self.proto_lanes,
                             self.connector_ctrls,

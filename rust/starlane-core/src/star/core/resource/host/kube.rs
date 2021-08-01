@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 use starlane_resources::{ResourceIdentifier, ResourceKindParts};
 
-use crate::core::Host;
+use crate::star::core::resource::host::Host;
 use crate::error::Error;
 
 use crate::message::Fail;
@@ -62,8 +62,8 @@ impl KubeCore {
             }
         };
 
-        let starlane_api: Api<crate::core::kube::Starlane> = Api::namespaced(client.clone(), namespace.as_str() );
-        let starlane: crate::core::kube::Starlane =  match starlane_api.get(kubernetes_instance_name.as_str()).await {
+        let starlane_api: Api<crate::star::core::resource::host::kube::Starlane> = Api::namespaced(client.clone(), namespace.as_str() );
+        let starlane: crate::star::core::resource::host::kube::Starlane =  match starlane_api.get(kubernetes_instance_name.as_str()).await {
             Ok(starlane) => starlane,
             Err(_err) => {
                 let message = format!("FATAL: could not access Kubernetes starlane instance named '{}'", kubernetes_instance_name);
@@ -89,7 +89,7 @@ impl KubeCore {
 #[async_trait]
 impl Host for KubeCore {
     async fn assign(
-        &mut self,
+        &self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<(), Fail> {
 
@@ -142,7 +142,11 @@ impl Host for KubeCore {
         Ok(())
     }
 
-    async fn get(&self, _identifier: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
+    async fn has(&self, key: ResourceKey) -> bool {
+        todo!()
+    }
+
+    async fn get(&self, _identifier: ResourceKey ) -> Result<Option<DataSet<BinSrc>>, Fail> {
         unimplemented!()
 //        self.store.get(identifier).await
     }

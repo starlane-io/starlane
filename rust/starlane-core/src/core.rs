@@ -1,46 +1,22 @@
-use std::{thread};
+use std::thread;
 
-
-
-
-
-
-
-
-
-
-
-
-use tokio::runtime::{Builder};
+use tokio::runtime::Builder;
 use tokio::sync::{mpsc, oneshot};
-
-
 
 use starlane_resources::ResourceIdentifier;
 
-use crate::core::artifact::ArtifactHost;
-use crate::core::default::DefaultHost;
-use crate::core::file_store::FileStoreHost;
-use crate::core::kube::KubeCore;
+use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
-
 use crate::frame::MessagePayload;
-
 use crate::message::Fail;
-use crate::resource::{AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource, RemoteDataSrc, Resource, ResourceAssign, ResourceSliceAssign, ResourceKey};
-
+use crate::resource::{AssignResourceStateSrc, HostedResource, HostedResourceStore, LocalHostedResource, RemoteDataSrc, Resource, ResourceAssign, ResourceKey, ResourceSliceAssign};
 use crate::star::{
     ActorCreate, LocalResourceLocation, Request, StarCommand, StarKey, StarKind, StarSkel,
 };
-use crate::data::{DataSet, BinSrc};
-
-
-pub mod artifact;
-pub mod default;
-pub mod file_store;
-mod kube;
-
-
+use crate::star::core::resource::host::default::DefaultHost;
+use crate::star::core::resource::host::file_store::FileStoreHost;
+use crate::star::core::resource::host::Host;
+use crate::star::core::resource::host::kube::KubeCore;
 
 pub struct StarCoreAction {
     pub command: StarCoreCommand,
@@ -176,9 +152,11 @@ impl StarCoreFactory {
             StarKind::FileStore => {
                 Box::new(FileStoreHost::new(skel.clone(), file_access).await?)
             },
-            StarKind::ArtifactStore => {
-                Box::new(ArtifactHost::new(skel.clone(), file_access).await?)
+ /*           StarKind::ArtifactStore => {
+//                Box::new(ArtifactHost::new(skel.clone(), file_access).await?)
             }
+
+  */
             StarKind::Kube => {
                 Box::new(KubeCore::new(skel.clone()).await?)
             }
@@ -193,32 +171,6 @@ pub struct InertHost {}
 impl InertHost {
     pub fn new() -> Self {
         InertHost {}
-    }
-}
-
-#[async_trait]
-impl Host for InertHost {
-    async fn assign(
-        &mut self,
-        _assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<(), Fail> {
-        Err(Fail::Error(
-            "This is an InertHost which cannot actually host anything".into(),
-        ))
-    }
-
-
-    async fn get(&self, identifier: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
-        Err(Fail::Error(
-            "This is an InertHost which cannot actually host anything".into(),
-        ))
-    }
-
-
-    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Fail> {
-        Err(Fail::Error(
-            "This is an InertHost which cannot actually host anything".into(),
-        ))
     }
 }
 
@@ -248,17 +200,6 @@ pub trait StarCoreExtFactory: Send+Sync
 }
 
  */
-
-#[async_trait]
-    pub trait Host: Send + Sync {
-    async fn assign(
-    &mut self,
-    assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<(), Fail>;
-    async fn get(&self, key: ResourceKey) -> Result<DataSet<BinSrc>, Fail>;
-    async fn delete(&self, key: ResourceKey) -> Result<(), Fail>;
-    fn shutdown(&self) {}
-}
 
 pub struct StarCore2 {
     skel: StarSkel,
@@ -316,12 +257,14 @@ impl StarCore2 {
 
     async fn process(&mut self, command: StarCoreCommand) -> Result<StarCoreResult, Fail> {
         match command {
-            StarCoreCommand::Assign(assign) => Ok(StarCoreResult::Resource(Option::Some(
-                unimplemented!()
-               // self.host.assign(assign).await?,
-            ))),
+            StarCoreCommand::Assign(assign) => {
+                self.host.assign(assign).await?;
+                // must return a Resource
+               unimplemented!()
+//                Ok(StarCoreResult::Ok)
+            }
             StarCoreCommand::State(key) => {
-                let state_src = self.host.get(key).await?;
+                let state_src = self.host.get(key).await?.ok_or("expected resource state")?;
                 Ok(StarCoreResult::State(state_src))
             }
             StarCoreCommand::Shutdown => {
