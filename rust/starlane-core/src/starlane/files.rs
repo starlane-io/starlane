@@ -6,6 +6,7 @@ use crate::file_access::FileAccess;
 use crate::star::StarKey;
 use std::collections::HashSet;
 use tokio::sync::RwLock;
+use crate::error::Error;
 
 pub struct MachineFileSystem {
   runtime: Runtime,
@@ -14,14 +15,14 @@ pub struct MachineFileSystem {
 }
 
 impl MachineFileSystem{
-  pub fn new()->Self{
-      Self {
+  pub fn new()->Result<Self,Error>{
+      Ok(Self {
           runtime: Runtime::new().expect("expected a new tokio Runtime"),
           local_stars: RwLock::new(HashSet::new()),
           data_access: FileAccess::new(
               std::env::var("STARLANE_DATA").unwrap_or("data".to_string()),
           )?,
-      }
+      })
   }
 
   pub async fn add_local_star( &self, star: StarKey ) {

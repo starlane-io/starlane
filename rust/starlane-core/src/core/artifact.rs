@@ -145,7 +145,7 @@ impl Host for ArtifactHost {
     async fn assign(
         &mut self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<Resource, Fail> {
+    ) -> Result<(), Fail> {
 
         Self::validate(&assign)?;
 
@@ -208,36 +208,9 @@ impl Host for ArtifactHost {
             state_src: DataSet::new(),
         };
 
-
         self.store.put(assign.clone()).await?;
-/*        {
-            // at some point we need to ensure all of the artifacts but it must be AFTER
-            // the registration for Bundle is fully commited...
 
-            let skel = self.skel.clone();
-            let parent: ResourceStub = resource.clone().into();
-            tokio::spawn(async move {
-                for artifact in artifacts {
-                    let artifact = format!("/{}", artifact);
-                    match Self::ensure_artifact(parent.clone(), artifact, skel.clone()).await{
-                        Ok(_) => {}
-                        Err(error) => {
-                            error!("ensure artifact ERROR: {}",error.to_string());
-                        }
-                    }
-                }
-            });
-        }
-
- */
-
-        let resource = Resource::new(
-             assign.stub.key,
-            assign.stub.address,
-            assign.stub.archetype,
-            assign.state_src);
-
-        Ok(resource)
+        Ok(())
     }
 
     async fn get(&self, key: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {

@@ -222,7 +222,7 @@ impl Host for FileStoreHost {
     async fn assign(
         &mut self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<Resource, Fail> {
+    ) -> Result<(), Fail> {
         // if there is Initialization to do for assignment THIS is where we do it
 
         match assign.stub.key.resource_type() {
@@ -292,32 +292,10 @@ impl Host for FileStoreHost {
         Ok(self.store.put(assign).await?)
     }
 
-    async fn get(&self, key: ResourceKey ) -> Result<Option<Resource>, Fail> {
-        self.store.get(key).await
-    }
 
-    async fn state(&self, key: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
-        if let Ok(Option::Some(resource)) = self.store.get(key.clone()).await {
+    async fn get(&self, key: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
+        if let Ok(resource) = self.store.get(key.clone()).await {
             match key.resource_type() {
-                ResourceType::File => {
-                    let filesystem_key = resource
-                        .key()
-                        .ancestor_of_type(ResourceType::FileSystem)?;
-                    let filesystem_path =
-                        Path::from_str(format!("/{}", filesystem_key.to_string().as_str()).as_str())?;
-                    let path = format!(
-                        "{}{}",
-                        filesystem_path.to_string(),
-                        resource.address().last_to_string()
-                    );
-                    let data = self
-                        .file_access
-                        .read(&Path::from_str(path.as_str())?)
-                        .await?;
-                    let mut state = DataSet::new();
-                    state.insert("content".to_string(), BinSrc::Memory(data));
-                    Ok(state)
-                }
                 _ => Ok(DataSet::new()),
             }
         } else {

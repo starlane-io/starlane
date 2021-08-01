@@ -91,7 +91,7 @@ impl Host for KubeCore {
     async fn assign(
         &mut self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<Resource, Fail> {
+    ) -> Result<(), Fail> {
 
 
         let provisioners: Api<StarlaneProvisioner> = Api::default_namespaced(self.client.clone() );
@@ -139,25 +139,14 @@ impl Host for KubeCore {
 
         println!("STARLANE RESOURCE CREATED!");
 
-
-        let resource = Resource::new(
-            assign.stub.key,
-            assign.stub.address,
-            assign.stub.archetype,
-            DataSet::new()
-        );
-
-        Ok(resource)
+        Ok(())
     }
 
-    async fn get(&self, _identifier: ResourceKey ) -> Result<Option<Resource>, Fail> {
+    async fn get(&self, _identifier: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
         unimplemented!()
 //        self.store.get(identifier).await
     }
 
-    async fn state(&self, identifier: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
-        todo!()
-    }
 
 
     async fn delete(&self, _identifier: ResourceKey ) -> Result<(), Fail> {

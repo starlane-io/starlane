@@ -73,6 +73,7 @@ use crate::starlane::StarlaneMachine;
 pub mod filestore;
 pub mod pledge;
 pub mod variant;
+pub mod core;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize, Hash, strum_macros::EnumString, strum_macros::Display )]
 pub enum StarKind {

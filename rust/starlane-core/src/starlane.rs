@@ -74,7 +74,7 @@ impl StarlaneMachine {
         let starlane = Self {
             tx: tx,
             run_complete_signal_tx: run_complete_signal_tx,
-            machine_filesystem: Arc::new(MachineFileSystem::new() )
+            machine_filesystem: Arc::new(MachineFileSystem::new()? )
         };
 
         Ok(starlane)

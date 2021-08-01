@@ -38,7 +38,6 @@ use crate::data::{DataSet, BinSrc};
 pub mod artifact;
 pub mod default;
 pub mod file_store;
-pub mod server;
 mod kube;
 
 
@@ -79,10 +78,10 @@ pub enum StarCoreCommand {
 
 pub enum StarCoreResult {
     Ok,
-    Resource(Option<Resource>),
     LocalLocation(LocalResourceLocation),
     MessageReply(MessagePayload),
     State(DataSet<BinSrc>),
+    Resource(Option<Resource>)
 }
 
 impl ToString for StarCoreResult {
@@ -202,19 +201,14 @@ impl Host for InertHost {
     async fn assign(
         &mut self,
         _assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<Resource, Fail> {
+    ) -> Result<(), Fail> {
         Err(Fail::Error(
             "This is an InertHost which cannot actually host anything".into(),
         ))
     }
 
-    async fn get(&self, _identifier: ResourceKey) -> Result<Option<Resource>, Fail> {
-        Err(Fail::Error(
-            "This is an InertHost which cannot actually host anything".into(),
-        ))
-    }
 
-    async fn state(&self, identifier: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
+    async fn get(&self, identifier: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
         Err(Fail::Error(
             "This is an InertHost which cannot actually host anything".into(),
         ))
@@ -260,7 +254,7 @@ pub trait StarCoreExtFactory: Send+Sync
     async fn assign(
     &mut self,
     assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<Resource, Fail>;
+    ) -> Result<(), Fail>;
     async fn get(&self, key: ResourceKey) -> Result<DataSet<BinSrc>, Fail>;
     async fn delete(&self, key: ResourceKey) -> Result<(), Fail>;
     fn shutdown(&self) {}
@@ -323,19 +317,19 @@ impl StarCore2 {
     async fn process(&mut self, command: StarCoreCommand) -> Result<StarCoreResult, Fail> {
         match command {
             StarCoreCommand::Assign(assign) => Ok(StarCoreResult::Resource(Option::Some(
-                self.host.assign(assign).await?,
+                unimplemented!()
+               // self.host.assign(assign).await?,
             ))),
-            StarCoreCommand::Get(key) => {
-                let resource = self.host.get(key).await?;
-                Ok(StarCoreResult::Resource(resource))
-            }
             StarCoreCommand::State(key) => {
-                let state_src = self.host.state(key).await?;
+                let state_src = self.host.get(key).await?;
                 Ok(StarCoreResult::State(state_src))
             }
             StarCoreCommand::Shutdown => {
                 self.host.shutdown();
                 Ok(StarCoreResult::Ok)
+            }
+            StarCoreCommand::Get(_) => {
+                unimplemented!()
             }
         }
     }

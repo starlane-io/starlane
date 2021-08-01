@@ -51,7 +51,7 @@ impl Host for DefaultHost {
     async fn assign(
         &mut self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<Resource, Fail> {
+    ) -> Result<(), Fail> {
         // if there is Initialization to do for assignment THIS is where we do it
         let state = match assign.state_src {
             AssignResourceStateSrc::Direct(data) => {
