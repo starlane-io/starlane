@@ -1,10 +1,9 @@
-
-
-
-
+use std::collections::HashMap;
 use std::sync::Arc;
 
+use starlane_resources::ResourceIdentifier;
 
+<<<<<<< HEAD:rust/starlane-core/src/star/core/resource/host/default.rs
 
 
 
@@ -152,3 +151,12 @@ println!("seems to have worked....");
 
 
  */
+=======
+use crate::data::{BinSrc, DataSet};
+use crate::message::Fail;
+use crate::resource::{ArtifactKind, AssignResourceStateSrc, LocalStateSetSrc, Names, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceKey, ResourceKind};
+use crate::resource::state_store::StateStore;
+use crate::star::core::component::resource::host::Host;
+use crate::star::StarSkel;
+
+>>>>>>> f2361a20ec5930eab8327e64fbc6e3b3d95d08d0:rust/starlane-core/src/core/default.rs

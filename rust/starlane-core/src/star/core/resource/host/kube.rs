@@ -22,7 +22,11 @@ use serde::{Deserialize, Serialize};
 
 use starlane_resources::{ResourceIdentifier, ResourceKindParts};
 
+<<<<<<< HEAD:rust/starlane-core/src/star/core/resource/host/kube.rs
 use crate::star::core::resource::host::Host;
+=======
+use crate::star::core::component::resource::host::Host;
+>>>>>>> f2361a20ec5930eab8327e64fbc6e3b3d95d08d0:rust/starlane-core/src/core/kube.rs
 use crate::error::Error;
 
 use crate::message::Fail;
@@ -147,12 +151,19 @@ impl Host for KubeCore {
         todo!()
     }
 
+<<<<<<< HEAD:rust/starlane-core/src/star/core/resource/host/kube.rs
     async fn get(&self, _identifier: ResourceKey ) -> Result<Option<DataSet<BinSrc>>, Fail> {
+=======
+    async fn get(&self, _identifier: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
+>>>>>>> f2361a20ec5930eab8327e64fbc6e3b3d95d08d0:rust/starlane-core/src/core/kube.rs
         unimplemented!()
 //        self.store.get(identifier).await
     }
 
+<<<<<<< HEAD:rust/starlane-core/src/star/core/resource/host/kube.rs
 
+=======
+>>>>>>> f2361a20ec5930eab8327e64fbc6e3b3d95d08d0:rust/starlane-core/src/core/kube.rs
 
     async fn delete(&self, _identifier: ResourceKey ) -> Result<(), Fail> {
         unimplemented!("I don't know how to DELETE yet.");

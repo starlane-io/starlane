@@ -13,7 +13,11 @@ use tokio::sync::{Mutex};
 
 use starlane_resources::ResourceIdentifier;
 
+<<<<<<< HEAD:rust/starlane-core/src/star/core/resource/host/file_store.rs
 use crate::star::core::resource::host::Host;
+=======
+use crate::star::core::component::resource::host::Host;
+>>>>>>> f2361a20ec5930eab8327e64fbc6e3b3d95d08d0:rust/starlane-core/src/core/file_store.rs
 use crate::error::Error;
 use crate::file_access::{FileAccess, FileEvent};
 use crate::message::Fail;
@@ -293,6 +297,7 @@ impl Host for FileStoreHost {
         Ok(self.store.put(assign).await?)
     }
 
+<<<<<<< HEAD:rust/starlane-core/src/star/core/resource/host/file_store.rs
     async fn has(&self, key: ResourceKey) -> bool {
         todo!()
     }
@@ -300,6 +305,15 @@ impl Host for FileStoreHost {
 
     async fn get(&self, key: ResourceKey ) -> Result<Option<DataSet<BinSrc>>, Fail> {
         if let Ok(resource) = self.store.get(key.clone()).await {
+=======
+    async fn get(&self, key: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
+        self.store.get(key).await
+    }
+
+    /*
+    async fn state(&self, key: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
+        if let Ok(Option::Some(resource)) = self.store.get(key.clone()).await {
+>>>>>>> f2361a20ec5930eab8327e64fbc6e3b3d95d08d0:rust/starlane-core/src/core/file_store.rs
             match key.resource_type() {
                 _ => Ok(Option::Some(DataSet::new())),
             }
@@ -307,6 +321,8 @@ impl Host for FileStoreHost {
             Err(Fail::ResourceNotFound(key.into()))
         }
     }
+
+     */
 
     async fn delete(&self, _identifier: ResourceKey ) -> Result<(), Fail> {
         unimplemented!()

@@ -1,11 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
   <component name="CargoProjects">
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
     <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/starlane-core/src/star/core/component/mod.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/starlane-core/src/star/core/component/resource/host.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+<<<<<<< HEAD
       <change beforePath="$PROJECT_DIR$/starlane-core/src/core.rs" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lib.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/proto.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/proto.rs" afterDir="false" />
@@ -21,6 +28,16 @@
       <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/state.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/state.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" afterDir="false" />
+=======
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/core.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/core/artifact.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/artifact.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/core/default.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/default.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/core/file_store.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/file_store.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/core/kube.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/kube.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/component.rs" beforeDir="false" />
+>>>>>>> f2361a20ec5930eab8327e64fbc6e3b3d95d08d0
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -33,6 +50,7 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
+        <option value="package-info" />
         <option value="Rust File" />
       </list>
     </option>
@@ -72,6 +90,7 @@
     <property name="dart.analysis.tool.window.visible" value="false" />
     <property name="last_opened_file_path" value="$PROJECT_DIR$/starlane-resources/src" />
     <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
+    <property name="org.rust.disableDetachedFileInspection/Users/scott/projects/starlane/rust/starlane-core/src/star/core/mod.rs" value="true" />
     <property name="org.rust.disableDetachedFileInspection/Users/scott/projects/starlane/rust/starlane-macros-test/src/main.rs" value="true" />
     <property name="org.rust.disableDetachedFileInspection/Users/scott/projects/starlane/rust/starlane-resources/src/address.rs" value="true" />
     <property name="org.rust.disableDetachedFileInspection/Users/scott/projects/starlane/rust/starlane-resources/src/lib.rs" value="true" />
@@ -84,13 +103,21 @@
       <recent name="$PROJECT_DIR$/starlane-core/src/core" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+<<<<<<< HEAD
       <recent name="$PROJECT_DIR$/starlane-core/src/star/core/resource" />
       <recent name="$PROJECT_DIR$/starlane-core/src/star/core/resource/host" />
       <recent name="$PROJECT_DIR$/starlane-resources/src" />
       <recent name="$PROJECT_DIR$/starlane/src" />
+=======
+      <recent name="$PROJECT_DIR$/starlane-core/src/star/core/component/resource" />
+      <recent name="$PROJECT_DIR$/starlane-core/src/star" />
+      <recent name="$PROJECT_DIR$/starlane-core/src/" />
+      <recent name="$PROJECT_DIR$/starlane-core/src" />
+      <recent name="$PROJECT_DIR$/starlane-core/src/star/core/component" />
+>>>>>>> f2361a20ec5930eab8327e64fbc6e3b3d95d08d0
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Run starlane">
+  <component name="RunManager" selected="Cargo.Run">
     <configuration default="true" type="ArquillianJUnit" factoryName="" nameIsGenerated="true">
       <option name="arquillianRunConfiguration">
         <value>
@@ -198,23 +225,6 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <list>
-      <item itemvalue="Cargo.Run" />
-      <item itemvalue="Cargo.Test tests::camel" />
-      <item itemvalue="Cargo.Test tests::test_kind" />
-      <item itemvalue="Cargo.Test starlane::test::starlane" />
-      <item itemvalue="Cargo.Run starlane" />
-      <item itemvalue="Cargo.Expand starlane_core::data" />
-    </list>
-    <recent_temporary>
-      <list>
-        <item itemvalue="Cargo.Run starlane" />
-        <item itemvalue="Cargo.Expand starlane_core::data" />
-        <item itemvalue="Cargo.Test starlane::test::starlane" />
-        <item itemvalue="Cargo.Test tests::camel" />
-        <item itemvalue="Cargo.Test tests::test_kind" />
-      </list>
-    </recent_temporary>
   </component>
   <component name="RustProjectSettings">
     <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
@@ -241,8 +251,18 @@
       <workItem from="1626964242980" duration="688000" />
       <workItem from="1627279190622" duration="68086000" />
       <workItem from="1627473965888" duration="16565000" />
+<<<<<<< HEAD
       <workItem from="1627538161105" duration="39551000" />
       <workItem from="1627800756791" duration="22184000" />
+=======
+      <workItem from="1627538161105" duration="41574000" />
+      <workItem from="1627720460243" duration="18000" />
+      <workItem from="1627720488424" duration="127000" />
+      <workItem from="1627720626568" duration="186000" />
+      <workItem from="1627720955365" duration="8213000" />
+      <workItem from="1627781217553" duration="3723000" />
+      <workItem from="1627785337294" duration="1008000" />
+>>>>>>> f2361a20ec5930eab8327e64fbc6e3b3d95d08d0
     </task>
     <servers />
   </component>
@@ -260,5 +280,9 @@
       </map>
     </option>
     <option name="oldMeFiltersMigrated" value="true" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
   </component>
 </project>
