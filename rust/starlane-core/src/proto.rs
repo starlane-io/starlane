@@ -1,43 +1,40 @@
-use std::cell::{Cell};
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
-
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU64, Ordering};
 
-
-use futures::future::{select_all};
+use futures::future::select_all;
 use futures::FutureExt;
 use futures::prelude::*;
-
-
-
 use tokio::sync::{broadcast, mpsc};
-
 use tokio::sync::mpsc::{Receiver, Sender};
-
 use tokio::time::{Duration, Instant};
 
 use crate::cache::ProtoArtifactCachesFactory;
-use crate::constellation::{ConstellationStatus};
+use crate::constellation::ConstellationStatus;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::{
     Frame, ProtoFrame, SequenceMessage, StarMessage, StarMessagePayload, StarPattern, WindDown,
     WindHit, WindUp,
 };
-
 use crate::lane::{ConnectorController, LaneCommand, LaneEndpoint, LaneIndex, LaneMeta, LaneWrapper, ProtoLaneEndpoint, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelIn, TunnelOut, TunnelOutState};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::permissions::AuthTokenSource;
-
 use crate::star::{ConstellationBroadcast, FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBacking, ResourceRegistryBackingSqLite, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarSearchTransaction, StarSkel, Transaction};
-use crate::star::pledge::StarHandleBacking;
-use crate::star::variant::{StarVariantFactory};
-
-use crate::template::{StarKeyConstellationIndex};
+use crate::star::core::message::MessagingEndpointComponent;
+use crate::star::shell::pledge::StarHandleBacking;
+use crate::star::shell::locator::ResourceLocatorApi;
+use crate::star::shell::locator::ResourceLocatorComponent;
+use crate::star::variant::StarVariantFactory;
 use crate::starlane::StarlaneMachine;
-use crate::star::core::Router;
+use crate::template::StarKeyConstellationIndex;
+use crate::star::shell::router::{RouterApi, RouterComponent};
+use crate::star::shell::locator::resource::{ResourceLocatorComponent, ResourceLocatorApi};
+use crate::star::shell::locator::star::{StarLocatorComponent, StarLocatorApi};
+use crate::star::shell::message::MessagingComponent;
+use crate::star::shell::lanes::{LanesApi, LanesComponent};
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -191,7 +188,18 @@ impl ProtoStar {
                             kind: self.kind.clone(),
                         };
 
-                        let (core_tx, core_rx) = mpsc::channel(16);
+                        let (core_messaging_endpoint_tx, core_messaging_endpoint_rx) = mpsc::channel(1024);
+                        let (resource_locator_tx, resource_locator_rx) = mpsc::channel(1024);
+                        let (star_locator_tx, star_locator_rx) = mpsc::channel(1024);
+                        let (router_tx, router_rx) = mpsc::channel(1024);
+                        let (messaging_tx, messaging_rx) = mpsc::channel(1024);
+                        let (lanes_tx, lanes_rx) = mpsc::channel(1024);
+
+                        let resource_locator_api = ResourceLocatorApi::new(resource_locator_tx);
+                        let star_locator_api = StarLocatorApi::new(star_locator_tx);
+                        let router_api = RouterApi::new(router_tx);
+                        let messaging_api= RouterApi::new(messaging_tx);
+                        let lanes_api = LanesApi::new(lanes_tx);
 
                         let data_access = self.data_access.with_path(format!("stars/{}", info.key.to_string()))?;
 
@@ -216,7 +224,7 @@ impl ProtoStar {
                             info: info,
                             sequence: self.sequence.clone(),
                             star_tx: self.star_tx.clone(),
-                            core_tx: core_tx.clone(),
+                            core_messaging_endpoint_tx: core_messaging_endpoint_tx.clone(),
                             logger: self.logger.clone(),
                             flags: self.flags.clone(),
                             registry: resource_registry,
@@ -224,18 +232,28 @@ impl ProtoStar {
                             persistence: Persistence::Memory,
                             data_access: data_access,
                             caches: self.caches.clone(),
-                            machine: self.machine.clone()
+                            machine: self.machine.clone(),
+
+                            resource_locator_api,
+                            star_locator_api,
+                            router_api,
+                            messaging_api,
+                            lanes_api
                         };
 
                         let variant = self.star_manager_factory.create(skel.clone()).await;
 
-                        // start the core router
-                        Router::start(skel.clone(), core_rx);
+                        MessagingEndpointComponent::start(skel.clone(), core_messaging_endpoint_rx );
+                        ResourceLocatorComponent::start(skel.clone(), resource_locator_rx);
+                        StarLocatorComponent::start(skel.clone(), star_locator_rx);
+                        RouterComponent::start(skel.clone(), router_rx );
+                        MessagingComponent::start(skel.clone(), messaging_rx );
+                        LanesComponent::start(skel.clone(), lanes_rx );
 
                         return Ok(Star::from_proto(
                             skel,
                             self.star_rx,
-                            core_tx,
+                            core_messaging_endpoint_tx,
                             self.lanes,
                             self.proto_lanes,
                             self.connector_ctrls,

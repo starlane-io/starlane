@@ -66,12 +66,13 @@ impl StarVariant for CentralVariant {
 impl CentralVariant {
     async fn ensure(starlane_api: StarlaneApi) -> Result<(), Error> {
 
-println!("ensuring hyperspace.");
+println!("ensuring hyperspace...");
         let mut creation = starlane_api.create_space("hyperspace", "Hyper Space")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         let space_api = creation.submit().await?;
 println!("hyperspace ensured.");
 
+println!("ensuring subspace...");
         let mut creation = space_api.create_sub_space("starlane", "Starlane")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         let subspace_api= creation.submit().await?;

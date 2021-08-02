@@ -16,9 +16,7 @@ use uuid::Uuid;
 use starlane_resources::ResourceIdentifier;
 
 use crate::error::Error;
-use crate::frame::{
-    Frame, MessageAck, MessagePayload, SimpleReply, StarMessage, StarMessagePayload,
-};
+use crate::frame::{Frame, MessageAck, MessagePayload, SimpleReply, StarMessage, StarMessagePayload, ReplyKind};
 
 
 use crate::resource::{ResourceAddress, ResourceKind, ResourceType, Specific};
@@ -225,34 +223,10 @@ impl StarMessageDeliveryInsurance {
 #[derive(Clone)]
 pub enum MessageExpect {
     None,
-    ReplyErrOrTimeout(MessageExpectWait),
-    RetryUntilOk,
+    Reply(ReplyKind),
 }
 
-impl MessageExpect {
-    pub(crate) fn wait_seconds(&self) -> u64 {
-        match self {
-            MessageExpect::None => 30,
-            MessageExpect::ReplyErrOrTimeout(wait) => wait.wait_seconds(),
-            MessageExpect::RetryUntilOk => 5,
-        }
-    }
 
-    pub fn retries(&self) -> usize {
-        match self {
-            MessageExpect::None => 1,
-            MessageExpect::ReplyErrOrTimeout(wait) => wait.retries(),
-            MessageExpect::RetryUntilOk => 10,
-        }
-    }
-
-    pub fn retry_forever(&self) -> bool {
-        match self {
-            MessageExpect::RetryUntilOk => true,
-            _ => false,
-        }
-    }
-}
 
 #[derive(Clone)]
 pub enum MessageExpectWait {

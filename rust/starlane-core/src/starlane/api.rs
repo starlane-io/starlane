@@ -39,11 +39,13 @@ use crate::star::{Request, StarCommand, StarKind, Wind};
 use crate::starlane::StarlaneCommand;
 use crate::data::{BinSrc, DataSet};
 use starlane_resources::data::Meta;
+use crate::star::surface::SurfaceApi;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
     star_tx: mpsc::Sender<StarCommand>,
-    starlane_tx: Option<mpsc::Sender<StarlaneCommand>>
+    starlane_tx: Option<mpsc::Sender<StarlaneCommand>>,
+    surface_api: SurfaceApi
 }
 
 impl StarlaneApi {
@@ -65,10 +67,11 @@ impl StarlaneApi {
 }
 
 impl StarlaneApi {
-    pub fn new(star_tx: mpsc::Sender<StarCommand>) -> Self {
+    pub fn new(star_tx: mpsc::Sender<StarCommand>, surface_api: SurfaceApi ) -> Self {
         Self {
             star_tx,
-            starlane_tx: Option::None
+            starlane_tx: Option::None,
+            surface_api
         }
     }
 
@@ -136,9 +139,7 @@ impl StarlaneApi {
         &self,
         identifier: ResourceIdentifier,
     ) -> Result<ResourceRecord, Fail> {
-        let (request, rx) = Request::new(identifier);
-        self.star_tx.send(StarCommand::ResourceRecordRequest(request)).await;
-        Self::timeout(rx).await
+        self.surface_api.locate(identifier).await
     }
 
     pub async fn get_caches(&self) -> Result<Arc<ProtoArtifactCachesFactory>, Fail> {

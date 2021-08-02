@@ -35,6 +35,7 @@ use crate::template::{StarInConstellationTemplateSelector};
 
 pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
 pub static LANE_QUEUE_SIZE: usize = 32;
+pub type LaneKey = StarKey;
 
 #[derive(Clone)]
 pub struct OutgoingSide {

@@ -438,6 +438,49 @@ pub enum Reply {
     Seq(u64),
 }
 
+pub enum ReplyKind {
+    Empty,
+    Key,
+    Address,
+    Records,
+    Record,
+    Message,
+    Id,
+    Seq
+}
+
+impl ReplyKind {
+    pub fn expected( &self, reply: Reply ) {
+        match reply {
+            Reply::Empty => {
+                self == Self::Empty
+            }
+            Reply::Key(_) => {
+                self == Self::Key
+            }
+            Reply::Address(_) => {
+                self == Self::Address
+            }
+            Reply::Records(_) => {
+                self == Self::Records
+            }
+            Reply::Record(_) => {
+
+                self == Self::Record
+            }
+            Reply::Message(_) => {
+                self == Self::Message
+            }
+            Reply::Id(_) => {
+                self == Self::Id
+            }
+            Reply::Seq(_) => {
+                self == Self::Seq
+            }
+        }
+    }
+}
+
 impl ToString for Reply {
     fn to_string(&self) -> String {
         match self {

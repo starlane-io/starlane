@@ -33,7 +33,7 @@ use crate::names::Name;
 use crate::star::{
     ResourceRegistryBacking, StarComm, StarCommand, StarInfo, StarKey, StarSkel,
 };
-use crate::star::pledge::{StarHandle, ResourceHostSelector};
+use crate::star::shell::pledge::{StarHandle, ResourceHostSelector};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
 
