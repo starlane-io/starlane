@@ -144,7 +144,7 @@ impl StarKind {
         )
     }
 
-    pub fn provisions(rt: &ResourceType) -> StarKind {
+    pub fn registry(rt: &ResourceType) -> StarKind {
         match rt {
             ResourceType::Root => {
                 Self::Central
@@ -1000,7 +1000,7 @@ println!("locate_resource_record request star: {} identifier: {}", self.skel.inf
                 .tx
                 .send(Ok(self.get_resource_record(&request.payload).unwrap()));
             return;
-        } else if StarKind::provisions(&request
+        } else if StarKind::registry(&request
             .payload
             .resource_type()) ==
             self.skel.info.kind
@@ -1075,7 +1075,7 @@ println!("locate_resource_record request star: {} identifier: {}", self.skel.inf
                     .as_str(),
                 );
             }
-
+info!("REQUESTING child location from  PARENT");
             let (mut new_request, rx) = Request::new(request.payload.parent().unwrap().clone());
             new_request.log = request.log;
             self.skel
@@ -1131,7 +1131,7 @@ println!("locate_resource_record request star: {} identifier: {}", self.skel.inf
         tokio::spawn(async move {
             let result = reply.await;
 
-            if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Resource(record)))) =
+            if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Record(record)))) =
                 result
             {
                 let (set, rx) = Set::new(record);
@@ -1882,13 +1882,12 @@ println!("locate_resource_record request star: {} identifier: {}", self.skel.inf
 
     async fn on_message(&mut self, message: StarMessage) -> Result<(), Error> {
         if message.log {
-/*            info!(
+            info!(
                 "{} => {} : {}",
                 self.skel.info.to_string(),
                 LogId(&message).to_string(),
                 "on_message"
             );
- */
         }
         if message.to != self.skel.info.key {
             if self.skel.info.kind.relay() || message.from == self.skel.info.key {
@@ -3021,7 +3020,7 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
     }
 
     async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<ResourceRecord>, Fail> {
-println!("getting : {}",identifier.to_string()  );
+
         let (request, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Get(identifier));
         self.registry.send(request).await;
         //match tokio::time::timeout(Duration::from_secs(5), rx).await?? {

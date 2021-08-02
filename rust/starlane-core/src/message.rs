@@ -1,3 +1,4 @@
+pub mod resource;
 
 use std::collections::HashSet;
 use std::convert::Infallible;
@@ -23,7 +24,6 @@ use crate::frame::{
 use crate::resource::{ResourceAddress, ResourceKind, ResourceType, Specific};
 use crate::star::{StarCommand, StarKey, StarSearchTransaction, Transaction, TransactionResult};
 
-pub mod resource;
 
 pub type MessageId = Uuid;
 

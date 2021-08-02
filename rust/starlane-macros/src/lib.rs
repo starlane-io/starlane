@@ -1300,6 +1300,12 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
 
         impl ToString for ResourceKey {
             fn to_string(&self) -> String {
+
+                if let Self::Root = self {
+                    return "root".to_string();
+                }
+
+
                 let mut ancestors = self.ancestors_not_root();
                 ancestors.reverse();
                 ancestors.push(self.clone());

@@ -114,6 +114,7 @@ impl Router {
                 });
             }
             ResourceRequestMessage::Select(selector) => {
+info!("select resource.");
                 let resources = self
                     .skel
                     .registry
@@ -208,7 +209,7 @@ impl Router {
                             Some(record) => {
                                 self.skel
                                     .comm()
-                                    .reply_result(message.clone(), Ok(Reply::Resource(record)))
+                                    .reply_result(message.clone(), Ok(Reply::Record(record)))
                                     .await;
                             }
                             None => {
@@ -280,24 +281,13 @@ impl Router {
             }*/
             ResourceHostAction::Assign(assign) => {
                 let (tx, rx) = oneshot::channel();
-                let key = assign.stub.key.clone();
                 let call = HostCall::Assign { assign, tx };
                 self.host_tx.send(call).await;
-                rx.await??;
-                if let Result::Ok(Option::Some(record)) = self
-                    .skel
-                    .registry.as_ref()
-                    .expect("expected registry")
-                    .get(key.into())
-                    .await
-                {
-                    self.skel
-                        .comm()
-                        .simple_reply(message, SimpleReply::Ok(Reply::Resource(record)))
-                        .await;
-                } else {
-                    error!("could not get resource record");
-                }
+                let state = rx.await??;
+                self.skel
+                    .comm()
+                    .simple_reply(message, SimpleReply::Ok(Reply::Empty))
+                    .await;
             }
         }
         Ok(())

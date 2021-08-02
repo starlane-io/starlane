@@ -807,7 +807,7 @@ println!("and key : {} ",ResourceKey::from_bin(params.key.clone().unwrap())?.to_
                 Ok(ResourceRegistryResult::Ok)
             }
             ResourceRegistryCommand::Get(identifier) => {
-
+info!("REGISTRY {} getting : {}", self.star_info.kind.to_string(), identifier.to_string() );
                 if identifier.resource_type() == ResourceType::Root {
                     return Ok(ResourceRegistryResult::Resource(Option::Some(ResourceRecord::root())));
                 }

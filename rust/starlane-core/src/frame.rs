@@ -225,7 +225,7 @@ impl StarMessage {
             payload: payload,
             reply_to: Option::None,
             trace: false,
-            log: false,
+            log: true,
         }
     }
 
@@ -430,9 +430,9 @@ impl StarMessagePayload {
 pub enum Reply {
     Empty,
     Key(ResourceKey),
-    Resources(Vec<ResourceRecord>),
-    Resource(ResourceRecord),
     Address(ResourceAddress),
+    Records(Vec<ResourceRecord>),
+    Record(ResourceRecord),
     Message(MessageReply<ResourceResponseMessage>),
     Id(ResourceId),
     Seq(u64),
@@ -443,10 +443,10 @@ impl ToString for Reply {
         match self {
             Reply::Empty => "Empty".to_string(),
             Reply::Key(_) => "Key".to_string(),
-            Reply::Resources(_) => "Keys".to_string(),
-            Reply::Resource(_) => "ResourceRecord".to_string(),
+            Reply::Records(_) => "Records".to_string(),
+            Reply::Record(_) => "Record".to_string(),
             Reply::Address(_) => "Address".to_string(),
-            Reply::Resource(_) => "Resource".to_string(),
+            Reply::Record(_) => "Resource".to_string(),
             Reply::Seq(_) => "Seq".to_string(),
             Reply::Id(_) => "Id".to_string(),
             Reply::Message(_) => "Message".to_string(),
@@ -709,7 +709,7 @@ impl FromReply<(), Fail> for Reply {
 impl FromReply<Vec<ResourceRecord>, Fail> for Reply {
     fn from_result(t: Result<Vec<ResourceRecord>, Fail>) -> Result<Self, Fail> {
         match t {
-            Ok(ok) => Ok(Reply::Resources(ok)),
+            Ok(ok) => Ok(Reply::Records(ok)),
             Err(e) => Err(e),
         }
     }
