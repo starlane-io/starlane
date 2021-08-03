@@ -53,7 +53,7 @@ impl StarVariant for CentralVariant {
          tokio::spawn( async move {
             let registry = skel.registry.as_ref().unwrap();
             registry.register(registration).await.unwrap();
-            let starlane_api = StarlaneApi::new(skel.star_tx.clone());
+            let starlane_api = StarlaneApi::new(skel.star_tx.clone()).await.expect("expected to be able to get the starlane_api");
             let result =   Self::ensure(starlane_api).await;
             if let Result::Err(error) = result.as_ref() {
                 error!("Central Init Error: {}",error.to_string() );

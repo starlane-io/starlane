@@ -248,6 +248,7 @@ impl StarMessage {
         proto
     }
 
+    /*
     pub async fn reply_tx(
         self,
         star_tx: mpsc::Sender<StarCommand>,
@@ -269,6 +270,8 @@ impl StarMessage {
 
         tx
     }
+
+     */
 
     pub fn fail(&self, fail: Fail) -> ProtoStarMessage {
         self.reply(StarMessagePayload::Reply(SimpleReply::Fail(fail)))
@@ -304,13 +307,11 @@ impl StarMessage {
 
     pub fn resubmit(
         self,
-        expect: MessageExpect,
         tx: broadcast::Sender<MessageUpdate>,
         rx: broadcast::Receiver<MessageUpdate>,
     ) -> ProtoStarMessage {
         let mut proto = ProtoStarMessage::with_txrx(tx, rx);
         proto.to = self.from.clone().into();
-        proto.expect = expect;
         proto.reply_to = Option::Some(self.id.clone());
         proto.payload = self.payload;
         proto
@@ -426,7 +427,7 @@ impl StarMessagePayload {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum Reply {
     Empty,
     Key(ResourceKey),
@@ -435,9 +436,11 @@ pub enum Reply {
     Record(ResourceRecord),
     Message(MessageReply<ResourceResponseMessage>),
     Id(ResourceId),
+    State(DataSet<BinSrc>),
     Seq(u64),
 }
 
+#[derive(Clone,Eq,PartialEq,strum_macros::Display)]
 pub enum ReplyKind {
     Empty,
     Key,
@@ -446,56 +449,46 @@ pub enum ReplyKind {
     Record,
     Message,
     Id,
-    Seq
+    Seq,
+    State
 }
 
 impl ReplyKind {
-    pub fn expected( &self, reply: Reply ) {
+    pub fn is_match(&self, reply: &Reply ) -> bool {
         match reply {
             Reply::Empty => {
-                self == Self::Empty
+                *self == Self::Empty
             }
             Reply::Key(_) => {
-                self == Self::Key
+                *self == Self::Key
             }
             Reply::Address(_) => {
-                self == Self::Address
+                *self == Self::Address
             }
             Reply::Records(_) => {
-                self == Self::Records
+                *self == Self::Records
             }
             Reply::Record(_) => {
 
-                self == Self::Record
+                *self == Self::Record
             }
             Reply::Message(_) => {
-                self == Self::Message
+                *self == Self::Message
             }
             Reply::Id(_) => {
-                self == Self::Id
+                *self == Self::Id
             }
             Reply::Seq(_) => {
-                self == Self::Seq
+                *self == Self::Seq
+            }
+            Reply::State(_) => {
+                *self == Self::State
             }
         }
     }
 }
 
-impl ToString for Reply {
-    fn to_string(&self) -> String {
-        match self {
-            Reply::Empty => "Empty".to_string(),
-            Reply::Key(_) => "Key".to_string(),
-            Reply::Records(_) => "Records".to_string(),
-            Reply::Record(_) => "Record".to_string(),
-            Reply::Address(_) => "Address".to_string(),
-            Reply::Record(_) => "Resource".to_string(),
-            Reply::Seq(_) => "Seq".to_string(),
-            Reply::Id(_) => "Id".to_string(),
-            Reply::Message(_) => "Message".to_string(),
-        }
-    }
-}
+
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum SequenceMessage {

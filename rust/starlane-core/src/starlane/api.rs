@@ -12,14 +12,14 @@ use semver::Version;
 
 
 use tokio::runtime::{Handle};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 
 use starlane_resources::ResourceIdentifier;
 
 use crate::data::Binary;
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
-use crate::frame::{StarPattern, WindAction};
+use crate::frame::{StarPattern, WindAction, ReplyKind, Reply};
 
 use crate::message::{Fail};
 use crate::message::resource::{
@@ -34,12 +34,14 @@ use crate::resource::FileKind;
 use crate::resource::ResourceKey;
 use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
-use crate::star::{Request, StarCommand, StarKind, Wind};
+use crate::star::{Request, StarCommand, StarKind, Wind, StarSkel};
 
 use crate::starlane::StarlaneCommand;
 use crate::data::{BinSrc, DataSet};
 use starlane_resources::data::Meta;
 use crate::star::surface::SurfaceApi;
+use tokio::time::error::Elapsed;
+use tokio::sync::oneshot::error::RecvError;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -67,19 +69,35 @@ impl StarlaneApi {
 }
 
 impl StarlaneApi {
-    pub fn new(star_tx: mpsc::Sender<StarCommand>, surface_api: SurfaceApi ) -> Self {
-        Self {
+
+    pub async fn new(star_tx: mpsc::Sender<StarCommand>) -> Result<Self,Fail> {
+       Self::new_with_options(star_tx,Option::None).await
+    }
+    async fn new_with_options(star_tx: mpsc::Sender<StarCommand>, starlane_tx: Option<mpsc::Sender<StarlaneCommand>>) -> Result<Self,Fail> {
+        let (tx,rx) = oneshot::channel();
+        star_tx.send(StarCommand::GetSkel(tx)).await;
+
+        let surface_api = match tokio::time::timeout(Duration::from_secs(15), rx).await {
+            Ok(Ok(skel)) => {
+                SurfaceApi::new(skel)
+            }
+            Err(_) => {
+                return Err(Fail::Timeout);
+            }
+            _ => {
+                return Err(Fail::Error("StarlaneApi: could not get star SurfaceApi".to_string()));
+            }
+        };
+
+        Ok(Self {
             star_tx,
-            starlane_tx: Option::None,
+            starlane_tx,
             surface_api
-        }
+        })
     }
 
-    pub fn with_starlane_ctrl(star_tx: mpsc::Sender<StarCommand>, starlane_tx: mpsc::Sender<StarlaneCommand>) -> Self {
-        Self {
-            star_tx,
-            starlane_tx: Option::Some(starlane_tx)
-        }
+    pub async fn with_starlane_ctrl(star_tx: mpsc::Sender<StarCommand>, starlane_tx: mpsc::Sender<StarlaneCommand>) -> Result<Self,Fail> {
+        Self::new_with_options(star_tx,Option::Some(starlane_tx)).await
     }
 
     pub async fn to_key( &self, identifier: ResourceIdentifier ) -> Result<ResourceKey,Fail> {
@@ -164,17 +182,13 @@ impl StarlaneApi {
         proto.to( create.parent.clone().into() );
         proto.from( MessageFrom::Inject );
         proto.payload = Option::Some(ResourceRequestMessage::Create(create));
-        let reply = proto.reply();
         let proto = proto.to_proto_star_message().await?;
-        self.star_tx.send( StarCommand::SendProtoMessage(proto)).await?;
 
-        let result = Self::timeout(reply).await?;
+        let reply = self.surface_api.exchange(proto,ReplyKind::Record, "StarlaneApi: create_resource").await?;
 
-        match result.payload{
-            ResourceResponseMessage::Resource(Option::Some(resource)) => {
-                Ok(resource)
-            }
-            _ => Err(Fail::expected("ResourceResponseMessage::Resource(Option::Some(resource))"))
+        match reply{
+            Reply::Record(record) => Ok(record),
+            _ => unimplemented!("StarlaneApi::create_resource() did not receive the expected reply from surface_api")
         }
     }
 
@@ -190,17 +204,13 @@ impl StarlaneApi {
         proto.to( resource );
         proto.from( MessageFrom::Inject );
         proto.payload = Option::Some(ResourceRequestMessage::Select(selector));
-        let reply = proto.reply();
         let proto = proto.to_proto_star_message().await?;
-        self.star_tx.send( StarCommand::SendProtoMessage(proto)).await?;
 
-        let result = Self::timeout(reply).await?;
+        let reply = self.surface_api.exchange(proto,ReplyKind::Records, "StarlaneApi: create_resource").await?;
 
-        match result.payload{
-            ResourceResponseMessage::Resources(resources) => {
-                Ok(resources)
-            }
-            _ => Err(Fail::expected("ResourceResponseMessage::Resource(Option::Some(resource))"))
+        match reply{
+            Reply::Records(records) => Ok(records),
+            _ => unimplemented!("StarlaneApi::create_resource() did not receive the expected reply from surface_api")
         }
     }
 
@@ -209,40 +219,6 @@ impl StarlaneApi {
         self.select(identifier, selector).await
     }
 
-
-    /*
-    pub async fn create_resource(&self, create: ResourceCreate) -> Result<ResourceStub, Fail> {
-        let parent_location = match &create.parent {
-            ResourceKey::Root => ResourceRecord::new(ResourceStub::nothing(), StarKey::central()),
-            _ => {
-                let (request, rx) = Request::new(create.parent.clone().into());
-                self.star_tx
-                    .send(StarCommand::ResourceRecordRequest(request))
-                    .await;
-                StarlaneApi::timeout(rx).await?
-            }
-        };
-
-        let mut proto = ProtoStarMessage::new();
-        proto.to(parent_location.location.host.into());
-        proto.payload =
-            StarMessagePayload::ResourceManager(ChildManagerResourceAction::Create(create));
-        let result = proto.get_ok_result().await;
-        self.star_tx
-            .send(StarCommand::SendProtoMessage(proto))
-            .await;
-        match result.await? {
-            StarMessagePayload::Reply(SimpleReply::Ok(Reply::Resource(record))) => Ok(record.stub),
-            StarMessagePayload::Reply(SimpleReply::Fail(fail)) => Err(fail),
-            payload => {
-                println!("create_resource: unexpected payload: {}", payload);
-                Err(Fail::Error(
-                    format!("create_resource: unexpected payload: {}", payload).into(),
-                ))
-            }
-        }
-    }
-    */
 
     pub async fn create_api<API>(&self, create: ResourceCreate) -> Result<API, Fail>
     where
@@ -292,7 +268,7 @@ impl StarlaneApi {
         &self,
         identifier: ResourceIdentifier,
     ) -> Result<DataSet<BinSrc>, Fail> {
-        let star_tx = self.star_tx.clone();
+        let surface_api= self.surface_api.clone();
 
         let handle = Handle::current();
         handle.block_on(async {
@@ -300,15 +276,12 @@ impl StarlaneApi {
             proto.payload = Option::Some(ResourceRequestMessage::State);
             proto.to = Option::Some(identifier);
             proto.from = Option::Some(MessageFrom::Inject);
-            let reply = proto.reply();
             let proto = proto.to_proto_star_message().await?;
-            star_tx.send(StarCommand::SendProtoMessage(proto)).await?;
-
-            let result = Self::timeout(reply).await?;
-
-            match result.payload {
-                ResourceResponseMessage::State(data) => Ok(data),
-                _ => Err(Fail::expected("ResourceResponseMessage::State(data)")),
+            let result = surface_api.exchange(proto,ReplyKind::State, "StarlaneApi::get_resource_state_src()").await;
+            match result {
+                Ok(Reply::State(state)) => Ok(state),
+                Err(fail) => Err(fail),
+                _ => unimplemented!("StarlaneApi::get_resource_state_src() IMPOSSIBLE!")
             }
         })
     }
@@ -384,7 +357,11 @@ impl SpaceApi {
     }
 
     pub fn starlane_api(&self) -> StarlaneApi {
-        StarlaneApi::new(self.star_tx.clone() )
+        let handle = Handle::current();
+        let star_tx = self.star_tx.clone();
+        handle.block_on( async move {
+            StarlaneApi::new(star_tx).await
+        }).expect("expecting starlaneApi")
     }
 
     pub fn create_user(&self, email: &str) -> Result<Creation<UserApi>, Fail> {
@@ -489,7 +466,11 @@ impl SubSpaceApi {
     }
 
     pub fn starlane_api(&self) -> StarlaneApi {
-        StarlaneApi::new(self.star_tx.clone())
+        let handle = Handle::current();
+        let star_tx = self.star_tx.clone();
+        handle.block_on( async move {
+            StarlaneApi::new(star_tx).await
+        }).expect("expecting starlaneApi")
     }
 
     pub fn create_file_system(&self, name: &str) -> Result<Creation<FileSystemApi>, Fail> {
@@ -572,7 +553,11 @@ impl FileSystemApi {
     }
 
     pub fn starlane_api(&self) -> StarlaneApi {
-        StarlaneApi::new(self.star_tx.clone() )
+        let handle = Handle::current();
+        let star_tx = self.star_tx.clone();
+        handle.block_on( async move {
+            StarlaneApi::new(star_tx).await
+        }).expect("expecting starlaneApi")
     }
 
     pub fn create_file_from_string(
@@ -700,7 +685,11 @@ impl ArtifactBundleVersionsApi {
     }
 
     pub fn starlane_api(&self) -> StarlaneApi {
-        StarlaneApi::new(self.star_tx.clone() )
+        let handle = Handle::current();
+        let star_tx = self.star_tx.clone();
+        handle.block_on( async move {
+            StarlaneApi::new(star_tx).await
+        }).expect("expecting starlaneApi")
     }
 
 }

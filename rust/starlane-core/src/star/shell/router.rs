@@ -37,7 +37,7 @@ pub struct RouterComponent {
 
 impl RouterComponent {
     pub fn start(skel: StarSkel, rx: mpsc::Receiver<RouterCall>) {
-        AsyncRunner::new(Box::new(Self { skel:skel.clone()}), skel.core_messaging_endpoint_tx.clone(), rx);
+        AsyncRunner::new(Box::new(Self { skel:skel.clone()}), skel.router_api.tx.clone(), rx);
     }
 }
 

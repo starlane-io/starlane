@@ -25,15 +25,13 @@ use crate::permissions::AuthTokenSource;
 use crate::star::{ConstellationBroadcast, FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBacking, ResourceRegistryBackingSqLite, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarSearchTransaction, StarSkel, Transaction};
 use crate::star::core::message::MessagingEndpointComponent;
 use crate::star::shell::pledge::StarHandleBacking;
-use crate::star::shell::locator::ResourceLocatorApi;
-use crate::star::shell::locator::ResourceLocatorComponent;
 use crate::star::variant::StarVariantFactory;
 use crate::starlane::StarlaneMachine;
 use crate::template::StarKeyConstellationIndex;
 use crate::star::shell::router::{RouterApi, RouterComponent};
 use crate::star::shell::locator::resource::{ResourceLocatorComponent, ResourceLocatorApi};
 use crate::star::shell::locator::star::{StarLocatorComponent, StarLocatorApi};
-use crate::star::shell::message::MessagingComponent;
+use crate::star::shell::message::{MessagingComponent, MessagingApi};
 use crate::star::shell::lanes::{LanesApi, LanesComponent};
 
 pub static MAX_HOPS: i32 = 32;
@@ -198,7 +196,7 @@ impl ProtoStar {
                         let resource_locator_api = ResourceLocatorApi::new(resource_locator_tx);
                         let star_locator_api = StarLocatorApi::new(star_locator_tx);
                         let router_api = RouterApi::new(router_tx);
-                        let messaging_api= RouterApi::new(messaging_tx);
+                        let messaging_api= MessagingApi::new(messaging_tx);
                         let lanes_api = LanesApi::new(lanes_tx);
 
                         let data_access = self.data_access.with_path(format!("stars/{}", info.key.to_string()))?;

@@ -8,10 +8,7 @@ use crate::message::Fail;
 use crate::message::resource::{
     Delivery, Message, ResourceRequestMessage, ResourceResponseMessage,
 };
-use crate::resource::{
-    Parent, ParentCore, Resource, ResourceAddress, ResourceArchetype, ResourceKey, ResourceManager,
-    ResourceRecord,
-};
+use crate::resource::{Parent, ParentCore, Resource, ResourceAddress, ResourceArchetype, ResourceKey, ResourceManager, ResourceRecord, ResourceId};
 use crate::resource::{ResourceKind, ResourceType};
 use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::star::core::resource::host::{HostCall, HostComponent};
@@ -64,16 +61,18 @@ impl MessagingEndpointComponent {
                 _ => {}
             }
             StarMessagePayload::ResourceManager(action) => {
-                self.process_registry_message(star_message.clone(), action.clone())
-                    .await?
+                let delivery = Delivery::new(action.clone(), star_message, self.skel.clone());
+                self.process_registry_action(delivery )
+                    .await?;
             }
             StarMessagePayload::ResourceHost(action) => {
-                self.process_resource_host_action(star_message.clone(), action.clone())
-                    .await?
+                let delivery = Delivery::new(action.clone(), star_message, self.skel.clone());
+                self.process_resource_host_action(delivery )
+                    .await?;
             }
 
             _ => {}
-        };
+        }
         Ok(())
     }
 
@@ -82,7 +81,7 @@ impl MessagingEndpointComponent {
         delivery: Delivery<Message<ResourceRequestMessage>>,
     ) -> Result<(), Error> {
 println!("Process resource request....");
-        match delivery.message.payload.clone() {
+        match delivery.payload.payload.clone() {
             ResourceRequestMessage::Create(create) => {
                 let parent_key = match create
                     .parent
@@ -100,12 +99,10 @@ println!("Process resource request....");
                     match record {
                         Ok(record) => match record {
                             Ok(record) => {
-                                delivery
-                                    .reply(ResourceResponseMessage::Resource(Option::Some(record)))
-                                    .await;
+                                delivery.reply(Reply::Record(record));
                             }
                             Err(fail) => {
-                                eprintln!("Fail: {}", fail.to_string());
+                                delivery.fail(fail);
                             }
                         },
                         Err(err) => {
@@ -123,9 +120,7 @@ info!("select resource.");
                     .unwrap()
                     .select(selector.clone())
                     .await?;
-                delivery
-                    .reply(ResourceResponseMessage::Resources(resources))
-                    .await?;
+                delivery.reply(Reply::Records(resources))
             }
             ResourceRequestMessage::Unique(resource_type) => {
                 let unique_src = self
@@ -133,16 +128,12 @@ info!("select resource.");
                     .registry
                     .as_ref()
                     .unwrap()
-                    .unique_src(delivery.message.to.clone().into())
+                    .unique_src(delivery.payload.to.clone().into())
                     .await;
-                delivery
-                    .reply(ResourceResponseMessage::Unique(
-                        unique_src.next(&resource_type).await?,
-                    ))
-                    .await?;
+                delivery.reply(Reply::Id( unique_src.next(&resource_type).await? ));
             }
             ResourceRequestMessage::State => {
-                let key: ResourceKey = delivery.message.to.clone().try_into()?;
+                let key: ResourceKey = delivery.payload.to.clone().try_into()?;
 
                 let (tx, rx) = oneshot::channel();
                 self.host_tx.send(HostCall::Get { key, tx }).await?;
@@ -153,27 +144,14 @@ info!("select resource.");
                             Ok(state) => state,
                             Err(_) => {
                                 error!("error when try_into from BinSrc to NetworkBinSrc");
-                                delivery
-                                    .reply(ResourceResponseMessage::Fail(Fail::expected(
-                                        "Ok(Ok(StarCoreResult::State(state)))",
-                                    )))
-                                    .await
-                                    .unwrap_or_default();
+                                delivery.fail(Fail::expected( "Ok(Ok(StarCoreResult::State(state)))"));
                                 return;
                             }
                         };
 
-                        delivery
-                            .reply(ResourceResponseMessage::State(state))
-                            .await
-                            .unwrap_or_default();
+                        delivery.reply(Reply::State(state));
                     } else {
-                        delivery
-                            .reply(ResourceResponseMessage::Fail(Fail::expected(
-                                "Ok(Ok(StarCoreResult::State(state)))",
-                            )))
-                            .await
-                            .unwrap_or_default();
+                        delivery.fail(Fail::expected( "Ok(Ok(StarCoreResult::State(state)))"));
                     }
                 });
             }
@@ -181,114 +159,73 @@ info!("select resource.");
         Ok(())
     }
 
-    async fn process_registry_message(
+    async fn process_registry_action(
         &mut self,
-        message: StarMessage,
-        action: RegistryAction,
+        delivery: Delivery<RegistryAction>
     ) -> Result<(), Error> {
-        if let Option::Some(manager) = self.skel.registry.clone() {
-            match action {
-                RegistryAction::Register(registration) => {
-                    let result = manager.register(registration.clone()).await;
-                    self.skel
-                        .comm()
-                        .reply_result_empty(message.clone(), result)
-                        .await;
-                }
-                RegistryAction::Location(location) => {
-                    let result = manager.set_location(location.clone()).await;
-                    self.skel
-                        .comm()
-                        .reply_result_empty(message.clone(), result)
-                        .await;
-                }
-                RegistryAction::Find(find) => {
-                    let result = manager.get(find.to_owned()).await;
 
-                    match result {
-                        Ok(result) => match result {
-                            Some(record) => {
-                                self.skel
-                                    .comm()
-                                    .reply_result(message.clone(), Ok(Reply::Record(record)))
-                                    .await;
+        let skel = self.skel.clone();
+
+        tokio::spawn( async move {
+            if let Option::Some(manager) = skel.registry.clone() {
+                match &delivery.payload {
+                    RegistryAction::Register(registration) => {
+                        let result = manager.register(registration.clone()).await;
+                        delivery.result_ok(result);
+                    }
+                    RegistryAction::Location(location) => {
+                        let result = manager.set_location(location.clone()).await;
+                        delivery.result_ok(result);
+                    }
+                    RegistryAction::Find(find) => {
+                        let result = manager.get(find.to_owned()).await;
+
+                        match result {
+                            Ok(result) => match result {
+                                Some(record) => {
+                                    delivery.reply(Reply::Record(record))
+                                }
+                                None => {
+                                    delivery.fail(Fail::ResourceNotFound(find.clone()));
+                                }
+                            },
+                            Err(fail) => {
+                                delivery.fail(fail);
                             }
-                            None => {
-                                self.skel
-                                    .comm()
-                                    .reply_result(
-                                        message.clone(),
-                                        Err(Fail::ResourceNotFound(find)),
-                                    )
-                                    .await;
+                        }
+                    }
+                    RegistryAction::Status(_report) => {
+                        unimplemented!()
+                    }
+                    RegistryAction::UniqueResourceId { parent, child_type } => {
+                        let unique_src = skel.registry.as_ref().unwrap().unique_src(parent.clone()).await;
+                        let result: Result<ResourceId, Fail> = unique_src.next(child_type).await;
+                        match result {
+                            Ok(id) => {
+                                delivery.reply(Reply::Id(id));
                             }
-                        },
-                        Err(fail) => {
-                            self.skel
-                                .comm()
-                                .reply_result(message.clone(), Err(fail))
-                                .await;
+                            Err(fail) => {
+                                delivery.fail(fail);
+                            }
                         }
                     }
                 }
-                RegistryAction::Status(_report) => {
-                    unimplemented!()
-                }
-                RegistryAction::UniqueResourceId { parent, child_type } => {
-                    let unique_src = self
-                        .skel
-                        .registry
-                        .as_ref()
-                        .unwrap()
-                        .unique_src(parent)
-                        .await;
-                    let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(
-                        Reply::Id(unique_src.next(&child_type).await?),
-                    )));
-                    self.skel
-                        .star_tx
-                        .send(StarCommand::SendProtoMessage(proto))
-                        .await;
-                }
             }
-        }
+        });
 
         Ok(())
     }
 
     async fn process_resource_host_action(
         &self,
-        message: StarMessage,
-        action: ResourceHostAction,
+        delivery: Delivery<ResourceHostAction>,
     ) -> Result<(), Error> {
-        match action {
-            /*            ResourceHostAction::IsHosting(resource) => {
-                if let Option::Some(resource) = self.get_resource(&resource).await? {
-                    let record = resource.into();
-                    let record = ResourceRecord::new(record, self.skel.info.key.clone());
-                    self.skel
-                        .comm()
-                        .simple_reply(message, SimpleReply::Ok(Reply::Resource(record)))
-                        .await;
-                } else {
-                    self.skel
-                        .comm()
-                        .simple_reply(
-                            message,
-                            SimpleReply::Fail(Fail::ResourceNotFound(resource.into())),
-                        )
-                        .await;
-                }
-            }*/
+        match &delivery.payload {
             ResourceHostAction::Assign(assign) => {
                 let (tx, rx) = oneshot::channel();
-                let call = HostCall::Assign { assign, tx };
-                self.host_tx.send(call).await;
-                let state = rx.await??;
-                self.skel
-                    .comm()
-                    .simple_reply(message, SimpleReply::Ok(Reply::Empty))
-                    .await;
+                let call = HostCall::Assign { assign:assign.clone(), tx };
+                self.host_tx.try_send(call).unwrap_or_default();
+                delivery.result_rx(rx);
             }
         }
         Ok(())

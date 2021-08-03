@@ -248,7 +248,7 @@ impl StarlaneMachineRunner {
 
                         let (_info, star_ctrl) = best.unwrap();
 
-                        tx.send(Ok(StarlaneApi::with_starlane_ctrl(star_ctrl.star_tx, self.command_tx.clone())));
+                        tx.send(Ok(StarlaneApi::with_starlane_ctrl(star_ctrl.star_tx, self.command_tx.clone()).await.expect("expected to be able to get starlane_api") ));
                     }
                     StarlaneCommand::Shutdown => {
                         let listening = {
@@ -359,7 +359,7 @@ impl StarlaneMachineRunner {
                 self.star_controllers.put(star_template_id, star_ctrl).await;
 
                 if self.artifact_caches.is_none() {
-                    let api = StarlaneApi::new(star_tx.clone());
+                    let api = StarlaneApi::new(star_tx.clone() ).await?;
                     let caches = Arc::new(ProtoArtifactCachesFactory::new(
                         api.into(),
                         self.cache_access.clone(),

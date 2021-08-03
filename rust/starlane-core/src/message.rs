@@ -68,7 +68,6 @@ pub struct ProtoStarMessage {
     pub payload: StarMessagePayload,
     pub tx: broadcast::Sender<MessageUpdate>,
     pub rx: broadcast::Receiver<MessageUpdate>,
-    pub expect: MessageExpect,
     pub reply_to: Option<MessageId>,
     pub trace: bool,
     pub log: bool,
@@ -89,7 +88,6 @@ impl ProtoStarMessage {
             payload: StarMessagePayload::None,
             tx: tx,
             rx: rx,
-            expect: MessageExpect::None,
             reply_to: Option::None,
             trace: false,
             log: false,
@@ -125,11 +123,7 @@ impl ProtoStarMessage {
         return Ok(());
     }
 
-    pub async fn get_ok_result(&self) -> oneshot::Receiver<StarMessagePayload> {
-        let (waiter, rx) = OkResultWaiter::new(self.tx.subscribe());
-        waiter.wait().await;
-        rx
-    }
+
 }
 
 pub struct MessageReplyTracker {
@@ -190,35 +184,6 @@ impl<OK> ToString for MessageResult<OK> {
     }
 }
 
-pub struct StarMessageDeliveryInsurance {
-    pub message: StarMessage,
-    pub expect: MessageExpect,
-    pub retries: usize,
-    pub tx: broadcast::Sender<MessageUpdate>,
-    pub rx: broadcast::Receiver<MessageUpdate>,
-}
-
-impl StarMessageDeliveryInsurance {
-    pub fn new(message: StarMessage, expect: MessageExpect) -> Self {
-        let (tx, rx) = broadcast::channel(8);
-        StarMessageDeliveryInsurance::with_txrx(message, expect, tx, rx)
-    }
-
-    pub fn with_txrx(
-        message: StarMessage,
-        expect: MessageExpect,
-        tx: broadcast::Sender<MessageUpdate>,
-        rx: broadcast::Receiver<MessageUpdate>,
-    ) -> Self {
-        StarMessageDeliveryInsurance {
-            message: message,
-            retries: expect.retries(),
-            expect: expect,
-            tx: tx,
-            rx: rx,
-        }
-    }
-}
 
 #[derive(Clone)]
 pub enum MessageExpect {
@@ -341,7 +306,8 @@ pub enum Fail {
     ResourceTypeMismatch(String),
     Timeout,
     InvalidResourceState(String),
-    NoProvisioner(ResourceKind)
+    NoProvisioner(ResourceKind),
+    QueueOverflow
 }
 
 impl Fail{
@@ -404,7 +370,8 @@ impl ToString for Fail {
             Fail::ResourceStateFinal(_) => "ResourceStateFinal".to_string(),
             Fail::ResourceAddressAlreadyInUse(_) => "ResourceAddressAlreadyInUse".to_string(),
             Fail::InvalidResourceState(message) => format!("InvalidResourceState({})",message).to_string(),
-            Fail::NoProvisioner(kind) => format!("NoProvisioner({})",kind.to_string()).to_string()
+            Fail::NoProvisioner(kind) => format!("NoProvisioner({})",kind.to_string()).to_string(),
+            Fail::QueueOverflow => "QueueOverflow".to_string()
         }
     }
 }
@@ -482,6 +449,11 @@ impl From<starlane_resources::error::Error> for Fail {
     }
 }
 
+impl <T> From<tokio::sync::mpsc::error::TrySendError<T>> for Fail{
+    fn from(_: tokio::sync::mpsc::error::TrySendError<T>) -> Self {
+        Fail::QueueOverflow
+    }
+}
 
 
 impl From<Infallible> for Fail{

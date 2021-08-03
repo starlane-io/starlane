@@ -21,10 +21,10 @@ impl StarLocatorApi {
         }
     }
 
-    pub async fn get_lane_for_star(&self, star: StarMessage ) -> Result<LaneKey,Error> {
+    pub async fn get_lane_for_star(&self, star: StarKey ) -> Result<LaneKey,Error> {
         let( tx, rx ) = oneshot::channel();
         self.tx.try_send(StarLocateCall::GetLaneForStar {star,tx})?;
-        Ok(tokio::time::timeout(Duration::from_secs(15), rx).await??)
+        Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
     }
 }
 

@@ -17,4 +17,3 @@ pub mod pledge;
 pub mod message;
 pub mod router;
 pub mod lanes;
-pub mod finder;

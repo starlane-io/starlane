@@ -16,7 +16,7 @@ use crate::error::Error;
 use crate::message::{Fail};
 use crate::resource::{ResourceAssign, ResourceHost, ResourceLocationAffinity, ResourceType, RemoteResourceHost};
 use crate::star::{
-    StarComm, StarCommand, StarInfo, StarKey, StarKind, StarSkel,
+    StarCommand, StarInfo, StarKey, StarKind, StarSkel,
 };
 
 #[derive(Clone)]
@@ -103,7 +103,7 @@ impl ResourceHostSelector {
                 hops: None,
             };
             let host = RemoteResourceHost {
-                comm: self.skel.comm(),
+                skel: self.skel.clone(),
                 handle: handle,
             };
             Ok(Arc::new(host))
@@ -117,7 +117,7 @@ impl ResourceHostSelector {
             let handle = handler.next(selector).await?;
 
             let host = RemoteResourceHost {
-                comm: self.skel.comm(),
+                skel: self.skel.clone(),
                 handle: handle,
             };
 

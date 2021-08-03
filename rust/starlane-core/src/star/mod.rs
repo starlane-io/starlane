@@ -16,8 +16,6 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
-use shell::locator::ResourceLocatorApi;
-use shell::locator::ResourceLocateCall;
 use shell::pledge::{Satisfaction, StarHandle, StarHandleBacking};
 use starlane_resources::ResourceIdentifier;
 
@@ -29,7 +27,7 @@ use crate::frame::{ActorLookup, Frame, ProtoFrame, RegistryAction, Reply, Simple
 use crate::id::Id;
 use crate::lane::{ConnectorController, LaneCommand, LaneEndpoint, LaneIndex, LaneMeta, LaneWrapper, ProtoLaneEndpoint, LaneKey};
 use crate::logger::{Flags, Logger, LogInfo};
-use crate::message::{Fail, MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage, ProtoStarMessageTo, StarMessageDeliveryInsurance, TrackerJob};
+use crate::message::{Fail, MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage, ProtoStarMessageTo, TrackerJob};
 use crate::resource::{ActorKey, Registry, RegistryReservation, RegistryUniqueSrc, Resource, ResourceAddress, ResourceKey, ResourceNamesReservationRequest, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryResult, ResourceSelector, ResourceType, UniqueSrc};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::variant::{StarShellInstructions, StarVariant};
@@ -516,9 +514,6 @@ impl Star {
                         StarCommand::AddConnectorController(connector_ctrl) => {
                             self.connector_ctrls.push(connector_ctrl);
                         }
-                        StarCommand::SendProtoMessage(message) => {
-                            self.send_proto_message(message).await;
-                        }
                         StarCommand::ReleaseHold(star) => {
                             if let Option::Some(frames) = self.frame_hold.release(&star) {
                                 let lane = self.lane_with_shortest_path_to_star(&star);
@@ -634,6 +629,9 @@ impl Star {
                         }
                         StarCommand::GetLaneForStar { star, tx } => {
                             self.find_lane_for_star(star,tx).await;
+                        }
+                        StarCommand::GetSkel(tx) => {
+                            tx.send(self.skel.clone()).unwrap_or_default();
                         }
                         StarCommand::Shutdown => {
                             for (_,lane) in &mut self.lanes {
@@ -1044,7 +1042,7 @@ impl Star {
         }
     }
 
-    async fn message(&mut self, delivery: StarMessageDeliveryInsurance) {
+/*    async fn message(&mut self, delivery: StarMessageDeliveryInsurance) {
         let message = delivery.message.clone();
         if !delivery.message.payload.is_ack() {
             let tracker = MessageReplyTracker {
@@ -1129,10 +1127,16 @@ impl Star {
                 .await;
         }
     }
+
+ */
     async fn find_lane_for_star(&mut self, star: StarKey, lane_tx: oneshot::Sender<Result<LaneKey,Error>> )  {
         let lane = self.lane_with_shortest_path_to_star(&star);
         if let Option::Some(lane) = lane {
-            lane_tx.send(Ok(lane.get_remote_star().ok_or("expected to no longer be a proto star").into()) ).unwrap_or_default();
+            if let Option::Some(lane) = lane.get_remote_star() {
+                lane_tx.send(Ok(lane) ).unwrap_or_default();
+            } else {
+                error!("not expecting lane to be a proto")
+            }
         } else {
             let star_tx = self.skel.star_tx.clone();
             let (tx, rx) = oneshot::channel();
@@ -1473,7 +1477,6 @@ pub enum StarCommand {
     Init,
     AddConnectorController(ConnectorController),
     AddLogger(broadcast::Sender<Logger>),
-    SendProtoMessage(ProtoStarMessage),
     SetFlags(SetFlags),
     ReleaseHold(StarKey),
     GetStarInfo(oneshot::Sender<Option<StarInfo>>),
@@ -1496,7 +1499,8 @@ pub enum StarCommand {
 
     GetCaches(oneshot::Sender<Arc<ProtoArtifactCachesFactory>>),
     GetLaneForStar{ star: StarKey, tx: oneshot::Sender<Result<LaneKey,Error>>},
-    Shutdown
+    Shutdown,
+    GetSkel(oneshot::Sender<StarSkel>)
 }
 
 #[derive(Clone)]
@@ -2094,15 +2098,6 @@ impl Debug for StarSkel{
     }
 }
 
-impl StarSkel {
-    pub fn comm(&self) -> StarComm {
-        StarComm {
-            star_tx: self.star_tx.clone(),
-            core_tx: self.core_messaging_endpoint_tx.clone(),
-        }
-    }
-}
-
 
 #[derive(Debug,Clone)]
 pub struct StarInfo {
@@ -2176,288 +2171,6 @@ impl StarNotify {
         StarNotify {
             star: star,
             transaction: transaction,
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct StarComm {
-    pub star_tx: mpsc::Sender<StarCommand>,
-    pub core_tx: mpsc::Sender<CoreMessageCall>,
-}
-
-impl StarComm {
-    pub async fn send(&self, proto: ProtoStarMessage) {
-        self.star_tx
-            .send(StarCommand::SendProtoMessage(proto))
-            .await;
-    }
-    pub async fn reply<R>(&self, message: StarMessage, result: Result<R, Fail>) {
-        match result {
-            Ok(_) => {
-                let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
-                self.send(proto).await;
-            }
-            Err(fail) => {
-                let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(fail)));
-                self.send(proto).await;
-            }
-        }
-    }
-
-    pub async fn reply_ok(&self, message: StarMessage) {
-        let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
-        self.star_tx
-            .send(StarCommand::SendProtoMessage(proto))
-            .await;
-    }
-
-    pub async fn handle_ok_response<R>(
-        &self,
-        rx: oneshot::Receiver<Result<R, Fail>>,
-        message: StarMessage,
-    ) where
-        R: Send + Sync + 'static,
-    {
-        let star_tx = self.star_tx.clone();
-        tokio::spawn(async move {
-            let reply = match rx.await {
-                Ok(result) => match result {
-                    Ok(_ok) => SimpleReply::Ok(Reply::Empty),
-                    Err(fail) => SimpleReply::Fail(fail),
-                },
-                Err(_err) => SimpleReply::Fail(Fail::ChannelRecvErr),
-            };
-            let proto = message.reply(StarMessagePayload::Reply(reply));
-            star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-        });
-    }
-    pub async fn send_and_get_ok_result(
-        &self,
-        proto: ProtoStarMessage,
-        tx: oneshot::Sender<Result<(), Fail>>,
-    ) {
-        let result = proto.get_ok_result().await;
-        tokio::spawn(async move {
-            match tokio::time::timeout(Duration::from_secs(30), result).await {
-                Ok(result) => match result {
-                    Ok(payload) => match payload {
-                        StarMessagePayload::Reply(reply) => match reply {
-                            SimpleReply::Ok(_reply) => {
-                                tx.send(Result::Ok(()));
-                            }
-                            SimpleReply::Fail(fail) => {
-                                tx.send(Result::Err(fail));
-                            }
-                            _ => {
-                                tx.send(Result::Err(Fail::expected("SimpleReply::Ok(reply)")));
-                            }
-                        },
-                        _ => {
-                            tx.send(Result::Err(Fail::expected("StarMessagePayload::Reply(_)")));
-                        }
-                    },
-                    Err(_error) => {
-                        tx.send(Result::Err(Fail::expected("Result::Ok(_)")) );
-                    }
-                },
-                Err(_elapsed) => {
-                    tx.send(Result::Err(Fail::Timeout));
-                }
-            };
-        });
-        self.star_tx
-            .send(StarCommand::SendProtoMessage(proto))
-            .await;
-    }
-
-    pub async fn send_and_get_result(
-        &self,
-        proto: ProtoStarMessage,
-        tx: oneshot::Sender<Result<Reply, Fail>>,
-    ) {
-        let result = proto.get_ok_result().await;
-        tokio::spawn(async move {
-            match tokio::time::timeout(Duration::from_secs(30), result).await {
-                Ok(result) => match result {
-                    Ok(payload) => match payload {
-                        StarMessagePayload::Reply(reply) => match reply {
-                            SimpleReply::Ok(reply) => {
-                                tx.send(Result::Ok(reply));
-                            }
-                            SimpleReply::Fail(fail) => {
-                                tx.send(Result::Err(fail));
-                            }
-                            _ => {
-                                tx.send(Result::Err(Fail::expected("SimpleReply::Ok(_)")));
-                            }
-                        },
-                        _ => {
-                            tx.send(Result::Err(Fail::expected("SimpleReply::Ok(_)")));
-                        }
-                    },
-                    Err(error) => {
-                        tx.send(Result::Err(Fail::Error(error.to_string())));
-                    }
-                },
-                Err(_elapsed) => {
-                    tx.send(Result::Err(Fail::Timeout));
-                }
-            };
-        });
-        self.star_tx
-            .send(StarCommand::SendProtoMessage(proto))
-            .await;
-    }
-}
-
-impl StarComm {
-    pub async fn reply_rx(&self, message: StarMessage, rx: oneshot::Receiver<Result<Reply, Fail>>) {
-        let star_tx = self.star_tx.clone();
-        tokio::spawn(async move {
-            match tokio::time::timeout(Duration::from_secs(5), rx).await {
-                Ok(result) => match result {
-                    Ok(result) => match result {
-                        Ok(reply) => {
-                            let proto =
-                                message.reply(StarMessagePayload::Reply(SimpleReply::Ok(reply)));
-                            star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                        }
-                        Err(fail) => {
-                            let proto =
-                                message.reply(StarMessagePayload::Reply(SimpleReply::Fail(fail)));
-                            star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                        }
-                    },
-                    Err(_) => {
-                        let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(
-                            Fail::Error("Internal Error".to_string()),
-                        )));
-                        star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                    }
-                },
-                Err(_err) => {
-                    let proto =
-                        message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Timeout)));
-                    star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                }
-            }
-        });
-    }
-
-    pub async fn simple_reply(&self, message: StarMessage, reply: SimpleReply) {
-        let proto = message.reply(StarMessagePayload::Reply(reply));
-        self.send(proto).await;
-    }
-
-    pub async fn reply_result_empty_rx(
-        &self,
-        message: StarMessage,
-        rx: oneshot::Receiver<Result<(), Fail>>,
-    ) {
-        let star_tx = self.star_tx.clone();
-        tokio::spawn(async move {
-            match rx.await {
-                Ok(result) => match result {
-                    Ok(_) => {
-                        let proto =
-                            message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
-                        star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                    }
-                    Err(fail) => {
-                        let proto =
-                            message.reply(StarMessagePayload::Reply(SimpleReply::Fail(fail)));
-                        star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                    }
-                },
-                Err(_fail) => {
-                    let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(
-                        Fail::expected("Ok(result)"),
-                    )));
-                    star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                }
-            }
-        });
-    }
-
-    pub async fn reply_result_empty(&self, message: StarMessage, result: Result<(), Fail>) {
-        match result {
-            Ok(_reply) => {
-                let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Empty)));
-                self.star_tx
-                    .send(StarCommand::SendProtoMessage(proto))
-                    .await;
-            }
-            Err(fail) => {
-                let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(fail)));
-                self.star_tx
-                    .send(StarCommand::SendProtoMessage(proto))
-                    .await;
-            }
-        }
-    }
-
-    pub async fn reply_result(&self, message: StarMessage, result: Result<Reply, Fail>) {
-        match result {
-            Ok(reply) => {
-                let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(reply)));
-                self.star_tx
-                    .send(StarCommand::SendProtoMessage(proto))
-                    .await;
-            }
-            Err(fail) => {
-                let proto = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(fail)));
-                self.star_tx
-                    .send(StarCommand::SendProtoMessage(proto))
-                    .await;
-            }
-        }
-    }
-
-    /*
-    pub async fn relay( &self, message: StarMessage, rx: oneshot::Receiver<StarMessagePayload> )
-    {
-        self.relay_trigger(message,rx, Option::None, Option::None).await;
-    }
-
-    pub async fn relay_trigger(&self, message: StarMessage, rx: oneshot::Receiver<StarMessagePayload>, trigger: Option<StarVariantCommand>, trigger_reply: Option<Reply> )
-    {
-        let star_tx = self.star_tx.clone();
-        tokio::spawn(async move {
-            let proto = match rx.await
-            {
-                Ok(payload) => {
-                    if let Option::Some(command) = trigger {
-                        variant_tx.send(command).await;
-                    }
-                    Self::relay_payload(message,payload,trigger_reply)
-                }
-                Err(err) => {
-                    message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error("rx recv error".to_string()))))
-                }
-            };
-            star_tx.send( StarCommand::SendProtoMessage(proto)).await;
-        });
-    }
-
-     */
-
-    fn relay_payload(
-        message: StarMessage,
-        payload: StarMessagePayload,
-        trigger_reply: Option<Reply>,
-    ) -> ProtoStarMessage {
-        match payload {
-            StarMessagePayload::Reply(payload_reply) => match payload_reply {
-                SimpleReply::Ok(_) => match trigger_reply {
-                    None => message.reply(StarMessagePayload::Reply(payload_reply)),
-                    Some(reply) => message.reply(StarMessagePayload::Reply(SimpleReply::Ok(reply))),
-                },
-                _ => message.reply(StarMessagePayload::Reply(payload_reply)),
-            },
-            _ => message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error(
-                "unexpected response".to_string(),
-            )))),
         }
     }
 }

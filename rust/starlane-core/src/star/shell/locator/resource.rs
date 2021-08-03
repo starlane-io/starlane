@@ -1,15 +1,10 @@
-use alloc::boxed::Box;
 use async_trait::async_trait;
 use core::option::Option::{None, Some};
 use core::option::Option;
 use core::result::Result;
 use core::result::Result::{Err, Ok};
 use core::time::Duration;
-use starlane_core::frame::{RegistryAction, Reply, SimpleReply, StarMessagePayload};
-use starlane_core::message::{Fail, ProtoStarMessage};
-use starlane_core::resource::{ResourceAddress, ResourceKey, ResourceRecord};
-use starlane_core::star::{Request, Set, StarCommand, StarKey, StarSkel};
-use starlane_core::util::{AsyncProcessor, AsyncRunner, Call};
+
 
 use lru::LruCache;
 use tokio::sync::mpsc;
@@ -17,7 +12,7 @@ use tokio::sync::oneshot;
 
 use starlane_resources::ResourceIdentifier;
 
-use crate::frame::{RegistryAction, Reply, SimpleReply, StarMessagePayload};
+use crate::frame::{RegistryAction, Reply, SimpleReply, StarMessagePayload, ReplyKind};
 use crate::message::{Fail, ProtoStarMessage};
 use crate::resource::{ResourceAddress, ResourceKey, ResourceRecord, ResourceType};
 use crate::star::{LogId, Request, ResourceRegistryBacking, Set, Star, StarCommand, StarKey, StarKind, StarSkel};
@@ -25,12 +20,12 @@ use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
 #[derive(Clone)]
 pub struct ResourceLocatorApi {
-    pub tx: bounded::Sender<ResourceLocateCall>
+    pub tx: mpsc::Sender<ResourceLocateCall>
 }
 
 impl ResourceLocatorApi {
 
-    pub fn new(tx: bounded::Sender<ResourceLocateCall> ) -> Self {
+    pub fn new(tx: mpsc::Sender<ResourceLocateCall> ) -> Self {
         Self {
             tx
         }
@@ -82,8 +77,9 @@ impl ResourceLocatorApi {
 
 
     pub fn found( &self, record: ResourceRecord ) {
+        let tx = self.tx.clone();
         tokio::spawn( async move {
-            self.tx.send( ResourceLocateCall::Found(record) ).await.unwrap_or_default();
+            tx.send( ResourceLocateCall::Found(record) ).await.unwrap_or_default();
         });
     }
 
@@ -111,7 +107,7 @@ pub struct ResourceLocatorComponent {
 }
 
 impl ResourceLocatorComponent {
-    pub fn start(skel: StarSkel, rx: bounded::Receiver<ResourceLocateCall>) {
+    pub fn start(skel: StarSkel, rx: mpsc::Receiver<ResourceLocateCall>) {
         AsyncRunner::new(Box::new(Self { skel:skel.clone(), resource_address_to_key: LruCache::new(1024), resource_record_cache: LruCache::new(1024) }), skel.resource_locator_api.tx.clone(), rx);
     }
 }
@@ -127,8 +123,8 @@ impl AsyncProcessor<ResourceLocateCall> for ResourceLocatorComponent {
                 self.external_locate(identifier,star,tx);
             }
             ResourceLocateCall::Found(record) => {
-                self.resource_address_to_key.insert( record.stub.address.clone(), record.stub.key.clone() );
-                self.resource_record_cache.insert( record.stub.key.clone(), record );
+                self.resource_address_to_key.put( record.stub.address.clone(), record.stub.key.clone() );
+                self.resource_record_cache.put( record.stub.key.clone(), record );
             }
         }
     }
@@ -138,10 +134,15 @@ impl ResourceLocatorComponent {
 
     fn locate( &mut self, identifier: ResourceIdentifier, tx: oneshot::Sender<Result<ResourceRecord,Fail>>) {
         if self.has_cached_record(&identifier) {
-            let result = self.get_cached_record(&identifier).ok_or("expected resource record")();
-            tx.send(result.into() ).unwrap_or_default();
-        } else if identifier.resource_type().parent().is_some() {
-            let locator_api= self.skel.locator_api.clone();
+            let result = match self.get_cached_record(&identifier).ok_or("expected resource record")
+            {
+                Ok(record) => Ok(record),
+                Err(s) => Err(Fail::Error(s.to_string()))
+            };
+
+            tx.send(result).unwrap_or_default();
+        } else if identifier.parent().is_some() {
+            let locator_api= self.skel.resource_locator_api.clone();
             tokio::spawn( async move {
 
                 async fn locate(locator_api: ResourceLocatorApi, identifier: ResourceIdentifier) -> Result<ResourceRecord,Fail> {
@@ -154,7 +155,7 @@ impl ResourceLocatorComponent {
             });
         } else {
             // This is for Root
-            let locator_api= self.skel.locator_api.clone();
+            let locator_api= self.skel.resource_locator_api.clone();
             tokio::spawn( async move {
 
                 async fn locate(locator_api: ResourceLocatorApi, identifier: ResourceIdentifier) -> Result<ResourceRecord,Fail> {
@@ -218,43 +219,18 @@ impl ResourceLocatorComponent {
         proto.payload =
             StarMessagePayload::ResourceManager(RegistryAction::Find(identifier));
         proto.log = locate.log;
-        let reply = proto.get_ok_result().await;
-        self.send_proto_message(proto).await;
-        let star_tx = self.skel.star_tx.clone();
+        let skel = self.skel.clone();
         tokio::spawn(async move {
-            let result = reply.await;
-
-            if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Record(record)))) =
-            result
-            {
-                let (set, rx) = Set::new(record);
-                star_tx.send(StarCommand::ResourceRecordSet(set)).await;
-                tokio::spawn(async move {
-                    if let Result::Ok(record) = rx.await {
-                        locate.tx.send(Ok(record));
-                    } else {
-                        locate.tx.send(Err(Fail::expected("ResourceRecord")));
-                    }
-                });
-            } else if let Result::Ok(StarMessagePayload::Reply(SimpleReply::Fail(fail))) = result {
-                locate.tx.send(Err(fail));
-            } else {
-                match result {
-                    Ok(StarMessagePayload::Reply(SimpleReply::Fail(Fail::ResourceNotFound(id)))) => {
-                        error!("resource not found : {}", id.to_string());
-                        locate.tx.send(Err(Fail::ResourceNotFound(id) ) );
-                    }
-
-                    Ok(result) => {
-                        error!("payload: {}", result );
-                        locate.tx.send(Err(Fail::unexpected("Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Resource(record))))", format!("{}",result.to_string()))));
-
-                    }
-                    Err(error) => {
-                        error!("{}",error.to_string());
-                        locate.tx.send(Err(Fail::expected("Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Resource(record))))")));
-                    }
+            let result = skel.messaging_api.exchange(proto,ReplyKind::Record, "ResourceLocatorComponent.request_resource_record_from_star()").await;
+            match result {
+                Ok(Reply::Record(record)) => {
+                    skel.resource_locator_api.found(record.clone());
+                    locate.tx.send(Ok(record) ).unwrap_or_default();
                 }
+                Err(fail) => {
+                    locate.tx.send(Err(fail) ).unwrap_or_default();
+                }
+                _ => unimplemented!("ResourceLocatorComponent.request_resource_record_from_star(): IMPOSSIBLE!")
             }
         });
     }}

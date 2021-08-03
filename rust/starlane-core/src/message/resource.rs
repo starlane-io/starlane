@@ -19,6 +19,7 @@ use crate::resource::{RemoteDataSrc, ResourceCreate, ResourceId, ResourceRecord,
 use crate::star::{StarCommand, StarSkel};
 use crate::util;
 use crate::data::{BinSrc, DataSet};
+use tokio::time::Duration;
 
 pub type MessageTo = ResourceIdentifier;
 
@@ -35,24 +36,22 @@ pub enum MessageFrom {
 
 
 
-pub struct ProtoMessage<P, R> {
+pub struct ProtoMessage<P> {
     pub id: MessageId,
     pub from: Option<MessageFrom>,
     pub to: Option<MessageTo>,
     pub payload: Option<P>,
-    pub reply_tx: Cell<Option<oneshot::Sender<Result<MessageReply<R>, Fail>>>>,
     pub trace: bool,
     pub log: bool,
 }
 
-impl<P, R> ProtoMessage<P, R> {
+impl<P> ProtoMessage<P> {
     pub fn new() -> Self {
         ProtoMessage {
             id: MessageId::new_v4(),
             from: Option::None,
             to: Option::None,
             payload: None,
-            reply_tx: Cell::new(Option::None),
             trace: false,
             log: false,
         }
@@ -99,44 +98,17 @@ impl<P, R> ProtoMessage<P, R> {
         self.payload = Option::Some(payload);
     }
 
-    pub fn reply(&mut self) -> oneshot::Receiver<Result<MessageReply<R>, Fail>> {
-        let (tx, rx) = oneshot::channel();
-        self.reply_tx.replace(Option::Some(tx));
-        rx
-    }
-
-    pub fn sender(
-        &mut self,
-    ) -> Option<tokio::sync::oneshot::Sender<Result<MessageReply<R>, Fail>>> {
-        self.reply_tx.replace(Option::None)
-    }
 }
 
-impl ProtoMessage<ResourceRequestMessage, ResourceResponseMessage> {
+impl ProtoMessage<ResourceRequestMessage> {
     pub async fn to_proto_star_message(mut self) -> Result<ProtoStarMessage, Error> {
         self.validate()?;
-        let tx = self.sender();
         let message = self.create()?;
         let mut proto = ProtoStarMessage::new();
         proto.to = message.to.clone().into();
         proto.trace = message.trace;
         proto.log = message.log;
         proto.payload = StarMessagePayload::MessagePayload(MessagePayload::Request(message));
-        let reply = proto.get_ok_result().await;
-
-        if let Option::Some(tx) = tx {
-            tokio::spawn(async move {
-                let result = util::wait_for_it_whatever(reply).await;
-                if let Ok(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Message(message)))) =
-                    result
-                {
-                    tx.send(Ok(message));
-                } else if let Err(error) = result {
-                    tx.send(Err(Fail::Error(format!("message reply error: {}", error))));
-                }
-            });
-        }
-
         Ok(proto)
     }
 }
@@ -242,42 +214,89 @@ where
 {
     skel: StarSkel,
     star_message: StarMessage,
-    pub message: M,
+    pub payload: M,
 }
 
 impl<M> Delivery<M>
 where
-    M: Clone,
+    M: Clone+Send+Sync+'static,
 {
-    pub fn new(message: M, star_message: StarMessage, skel: StarSkel) -> Self {
+    pub fn new(payload: M, star_message: StarMessage, skel: StarSkel) -> Self {
         Delivery {
-            message: message,
+            payload,
             star_message: star_message,
             skel: skel,
         }
     }
 }
 
-impl<P> Delivery<Message<P>>
-where
-    P: Clone,
+impl<M> Delivery<M>
+    where
+        M: Clone+Send+Sync+'static,
 {
-    pub async fn reply(&self, response: ResourceResponseMessage) -> Result<(), Error> {
-        let mut proto = ProtoMessageReply::new();
-        proto.payload = Option::Some(response);
-        proto.reply_to = Option::Some(self.message.id.clone());
-        proto.from = Option::Some(MessageFrom::Resource(self.message.to.clone()));
+    pub fn result(&self, result: Result<Reply, Fail>) {
+        match result {
+            Ok(reply) => {
+                self.reply(reply);
+            }
+            Err(fail) => {
+                self.fail(fail);
+            }
+        }
+    }
+
+    pub fn result_ok<T>(&self, result: Result<T,Fail>){
+        match result {
+            Ok(_) => {
+                self.reply(Reply::Empty);
+            }
+            Err(fail) => {
+                self.fail(fail);
+            }
+        }
+    }
+
+    pub fn result_rx<T>(self, mut rx: oneshot::Receiver<Result<T,Fail>>) where T:Send+Sync+'static{
+        tokio::spawn( async move {
+            match tokio::time::timeout(Duration::from_secs(15),rx).await {
+                Ok(Ok(Ok(_))) => {
+                    self.reply(Reply::Empty);
+                }
+                Ok(Ok(Err(fail))) => {
+                    self.fail(fail);
+                }
+                Ok(Err(_)) => {
+                    self.fail(Fail::Timeout);
+                }
+                Err(_) => {
+                    self.fail(Fail::ChannelRecvErr);
+                }
+            }
+        });
+    }
+
+    pub fn ok(&self) {
+        self.reply(Reply::Empty);
+    }
+
+    pub fn reply(&self, reply: Reply ){
         let proto = self
             .star_message
-            .reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Message(
-                proto.create()?,
-            ))));
+            .reply(StarMessagePayload::Reply(SimpleReply::Ok(reply)));
         self.skel
-            .star_tx
-            .send(StarCommand::SendProtoMessage(proto))
-            .await;
-        Ok(())
+            .messaging_api
+            .send(proto);
     }
+
+    pub fn fail(&self, fail: Fail) {
+        let proto = self
+            .star_message
+            .reply(StarMessagePayload::Reply(SimpleReply::Fail(fail)));
+        self.skel
+            .messaging_api
+            .send(proto);
+    }
+
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -287,6 +306,20 @@ pub enum ResourceRequestMessage {
     Unique(ResourceType),
     State,
 }
+
+/*
+#[derive(Clone, Serialize, Deserialize)]
+pub enum Reply {
+    Empty,
+    Key(ResourceKey),
+    Address(ResourceAddress),
+    Records(Vec<ResourceRecord>),
+    Record(ResourceRecord),
+    Message(MessageReply<ResourceResponseMessage>),
+    Id(ResourceId),
+    Seq(u64),
+}
+ */
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum ResourceResponseMessage {

@@ -22,16 +22,16 @@ use crate::app::ConfigSrc;
 use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use crate::frame::{SimpleReply, StarMessagePayload, ResourceHostAction};
+use crate::frame::{SimpleReply, StarMessagePayload, ResourceHostAction, ReplyKind, Reply};
 use crate::logger::{elog, LogInfo, StaticLogInfo};
-use crate::message::{Fail, ProtoStarMessage};
+use crate::message::{Fail, ProtoStarMessage, MessageExpect};
 use crate::message::resource::{
     MessageFrom, MessageReply, MessageTo, ProtoMessage, ResourceRequestMessage,
     ResourceResponseMessage,
 };
 use crate::names::Name;
 use crate::star::{
-    ResourceRegistryBacking, StarComm, StarCommand, StarInfo, StarKey, StarSkel,
+    ResourceRegistryBacking,  StarInfo, StarKey, StarSkel,
 };
 use crate::star::shell::pledge::{StarHandle, ResourceHostSelector};
 use crate::starlane::api::StarlaneApi;
@@ -1537,10 +1537,7 @@ impl ResourceCreationChamber {
                         self.create.archetype.kind.resource_type(),
                     ));
 
-                    let rx: Receiver<Result<MessageReply<ResourceResponseMessage>, Fail>> =
-                        proto.reply();
-
-                    let proto_star_message = match proto.to_proto_star_message().await {
+                    let mut proto_star_message = match proto.to_proto_star_message().await {
                         Ok(proto_star_message) => proto_star_message,
                         Err(error) => {
                             eprintln!(
@@ -1551,41 +1548,29 @@ impl ResourceCreationChamber {
                         }
                     };
 
-                    self.skel
-                        .star_tx
-                        .send(StarCommand::SendProtoMessage(proto_star_message))
-                        .await;
+
+                    let skel = self.skel.clone();
 
                     tokio::spawn(async move {
-                        if let Ok(Ok(MessageReply {
-                            id: _,
-                            from: _,
-                            reply_to: _,
-                            payload: ResourceResponseMessage::Unique(id),
-                            trace: _,
-                            log: _,
-                        })) = util::wait_for_it_whatever(rx).await
+                        match skel.messaging_api.exchange(proto_star_message, ReplyKind::Id, "ResourceCreationChamber requesting unique id from parent to create unique ResourceKey" ).await
                         {
-                            match ResourceKey::new(self.parent.key.clone(), id.clone()) {
-                                Ok(key) => {
-                                    let final_create = self.finalize_create(key.clone()).await;
-                                    self.tx.send(final_create);
-                                    return;
-                                }
-                                Err(error) => {
-                                    self.tx.send(Err(format!(
-                                        "error '{}' when trying to create resource key with id {}", error.to_string(),
-                                        id.to_string()
-                                    )
-                                    .into()));
-                                    return;
+                            Ok(Reply::Id(id)) => {
+                                match ResourceKey::new(self.parent.key.clone(), id.clone()) {
+                                    Ok(key) => {
+                                        let final_create = self.finalize_create(key.clone()).await;
+                                        self.tx.send(final_create);
+                                        return;
+                                    }
+                                    Err(error) => {
+                                        self.tx.send(Err(error.into()));
+                                        return;
+                                    }
                                 }
                             }
-                        } else {
-                            self.tx.send(Err(
-                                "unexpected response, expected ResourceResponse::Unique".into(),
-                            ));
-                            return;
+                            Err(fail) => self.tx.send(Err(fail)).unwrap_or_default(),
+                            _ => {
+                                unimplemented!("ResourceCreationChamber: it should not be possible to get any other message Result other than a Result::Ok(Reply::Id(_)) or Result::Err(Fail) when expecting ReplyKind::Id" )
+                            }
                         }
                     });
                 }
@@ -2655,7 +2640,7 @@ impl ResourceHost for LocalResourceHost {
 }
 
 pub struct RemoteResourceHost {
-    pub comm: StarComm,
+    pub skel: StarSkel,
     pub handle: StarHandle,
 }
 
@@ -2681,29 +2666,10 @@ impl ResourceHost for RemoteResourceHost {
         let mut proto = ProtoStarMessage::new();
         proto.to = self.handle.key.clone().into();
         proto.payload = StarMessagePayload::ResourceHost(ResourceHostAction::Assign(assign.try_into()?));
-        let reply = proto.get_ok_result().await;
-        self.comm
-            .star_tx
-            .send(StarCommand::SendProtoMessage(proto))
-            .await;
 
-        match tokio::time::timeout(Duration::from_secs(25), reply).await {
-            Ok(result) => {
-                match result {
-                    Result::Ok(StarMessagePayload::Reply(SimpleReply::Ok(_))) => {
-                        Ok(())
-                    }
-                    Result::Ok(_what) => {
-                        Err(Fail::expected("Ok(StarMessagePayload::Reply(SimpleReply::Ok(_)))"))
-                    }
-                    Result::Err(_err) => {
-                        Err(Fail::expected("Ok(StarMessagePayload::Reply(SimpleReply::Ok(_)))"))
-                    }
-                }
+        self.skel.messaging_api.exchange(proto,ReplyKind::Empty, "RemoteResourceHost: assign resource to host").await?;
 
-            }
-            Err(_err) => Err(Fail::Timeout)
-        }
+        Ok(())
     }
 }
 

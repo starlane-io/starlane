@@ -38,7 +38,7 @@ pub struct LanesComponent {
 
 impl LanesComponent {
     pub fn start(skel: StarSkel, rx: mpsc::Receiver<LanesCall>) {
-        AsyncRunner::new(Box::new(Self { skel:skel.clone()}), skel.core_messaging_endpoint_tx.clone(), rx);
+        AsyncRunner::new(Box::new(Self { skel:skel.clone()}), skel.lanes_api.tx.clone(), rx);
     }
 }
 
