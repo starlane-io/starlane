@@ -45,9 +45,8 @@ use tokio::sync::oneshot::error::RecvError;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
-    star_tx: mpsc::Sender<StarCommand>,
+    surface_api: SurfaceApi,
     starlane_tx: Option<mpsc::Sender<StarlaneCommand>>,
-    surface_api: SurfaceApi
 }
 
 impl StarlaneApi {
@@ -70,34 +69,18 @@ impl StarlaneApi {
 
 impl StarlaneApi {
 
-    pub async fn new(star_tx: mpsc::Sender<StarCommand>) -> Result<Self,Fail> {
-       Self::new_with_options(star_tx,Option::None).await
+    pub fn new(surface_api: SurfaceApi) -> Self {
+       Self::new_with_options(surface_api,Option::None)
     }
-    async fn new_with_options(star_tx: mpsc::Sender<StarCommand>, starlane_tx: Option<mpsc::Sender<StarlaneCommand>>) -> Result<Self,Fail> {
-        let (tx,rx) = oneshot::channel();
-        star_tx.send(StarCommand::GetSkel(tx)).await;
-
-        let surface_api = match tokio::time::timeout(Duration::from_secs(15), rx).await {
-            Ok(Ok(skel)) => {
-                SurfaceApi::new(skel)
-            }
-            Err(_) => {
-                return Err(Fail::Timeout);
-            }
-            _ => {
-                return Err(Fail::Error("StarlaneApi: could not get star SurfaceApi".to_string()));
-            }
-        };
-
-        Ok(Self {
-            star_tx,
+    fn new_with_options(surface_api: SurfaceApi, starlane_tx: Option<mpsc::Sender<StarlaneCommand>>) -> Self {
+        Self {
+            surface_api,
             starlane_tx,
-            surface_api
-        })
+        }
     }
 
-    pub async fn with_starlane_ctrl(star_tx: mpsc::Sender<StarCommand>, starlane_tx: mpsc::Sender<StarlaneCommand>) -> Result<Self,Fail> {
-        Self::new_with_options(star_tx,Option::Some(starlane_tx)).await
+    pub fn with_starlane_ctrl(surface_api: SurfaceApi, starlane_tx: mpsc::Sender<StarlaneCommand>) -> Self {
+        Self::new_with_options(surface_api,Option::Some(starlane_tx))
     }
 
     pub async fn to_key( &self, identifier: ResourceIdentifier ) -> Result<ResourceKey,Fail> {
@@ -129,15 +112,17 @@ impl StarlaneApi {
         }
     }
 
+    /*
     pub async fn ping_gateway(&self) -> Result<(),Fail> {
 
         let (wind,gateway_search_rx) = Wind::new(StarPattern::StarKind(StarKind::Gateway), WindAction::SearchHits);
-        self.star_tx.send( StarCommand::WindInit(wind)).await;
+        self.surface_api.send( StarCommand::WindInit(wind)).await;
 
         let result = tokio::time::timeout( Duration::from_secs(5), gateway_search_rx ).await;
         result??;
         Ok(())
     }
+     */
 
     pub async fn fetch_resource_address(&self, key: ResourceKey) -> Result<ResourceAddress, Fail> {
         match self.fetch_resource_record(key.into()).await {
@@ -161,15 +146,13 @@ impl StarlaneApi {
     }
 
     pub async fn get_caches(&self) -> Result<Arc<ProtoArtifactCachesFactory>, Fail> {
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        self.star_tx.send(StarCommand::GetCaches(tx)).await;
-        Ok(rx.await?)
+        self.surface_api.get_caches().await
     }
 
     /*
     pub async fn get_child_resource_manager(&self, key: ResourceKey ) -> Result<ChildResourceManager,Fail> {
         let (request,rx)  = Request::new(key);
-        self.star_tx.send( StarCommand::GetResourceManager(request)).await;
+        self.surface_api.send( StarCommand::GetResourceManager(request)).await;
         Ok(rx.await??)
     }
 
@@ -226,7 +209,7 @@ impl StarlaneApi {
     {
         let resource_api = ResourceApi {
             stub: self.create_resource(create).await?.stub,
-            star_tx: self.star_tx.clone(),
+            surface_api: self.surface_api.clone(),
         };
 
         let api = API::try_from(resource_api);
@@ -311,18 +294,18 @@ impl StarlaneApi {
 
     pub async fn get_space(&self, identifier: ResourceIdentifier) -> Result<SpaceApi, Fail> {
         let record = self.fetch_resource_record(identifier).await?;
-        Ok(SpaceApi::new(self.star_tx.clone(), record.stub)?)
+        Ok(SpaceApi::new(self.surface_api.clone(), record.stub)?)
     }
 
     pub async fn get_sub_space(&self, identifier: ResourceIdentifier) -> Result<SubSpaceApi, Fail> {
         let record = self.fetch_resource_record(identifier).await?;
-        Ok(SubSpaceApi::new(self.star_tx.clone(), record.stub)?)
+        Ok(SubSpaceApi::new(self.surface_api.clone(), record.stub)?)
     }
 }
 
 pub struct SpaceApi {
     stub: ResourceStub,
-    star_tx: mpsc::Sender<StarCommand>,
+    surface_api: SurfaceApi
 }
 
 impl SpaceApi {
@@ -334,7 +317,7 @@ impl SpaceApi {
         self.stub.address.clone()
     }
 
-    pub fn new(star_tx: mpsc::Sender<StarCommand>, stub: ResourceStub) -> Result<Self, Error> {
+    pub fn new(surface_api: SurfaceApi, stub: ResourceStub) -> Result<Self, Error> {
         if stub.key.resource_type() != ResourceType::Space {
             return Err(format!(
                 "wrong key resource type for SpaceApi: {}",
@@ -351,17 +334,13 @@ impl SpaceApi {
         }
 
         Ok(SpaceApi {
-            stub: stub,
-            star_tx: star_tx,
+            stub,
+            surface_api
         })
     }
 
     pub fn starlane_api(&self) -> StarlaneApi {
-        let handle = Handle::current();
-        let star_tx = self.star_tx.clone();
-        handle.block_on( async move {
-            StarlaneApi::new(star_tx).await
-        }).expect("expecting starlaneApi")
+        StarlaneApi::new(self.surface_api.clone())
     }
 
     pub fn create_user(&self, email: &str) -> Result<Creation<UserApi>, Fail> {
@@ -431,7 +410,7 @@ impl SpaceApi {
 
 pub struct SubSpaceApi {
     stub: ResourceStub,
-    star_tx: mpsc::Sender<StarCommand>,
+    surface_api: SurfaceApi,
 }
 
 impl SubSpaceApi {
@@ -443,7 +422,7 @@ impl SubSpaceApi {
         self.stub.address.clone()
     }
 
-    pub fn new(star_tx: mpsc::Sender<StarCommand>, stub: ResourceStub) -> Result<Self, Error> {
+    pub fn new(surface_api: SurfaceApi, stub: ResourceStub) -> Result<Self, Error> {
         if stub.key.resource_type() != ResourceType::SubSpace {
             return Err(format!(
                 "wrong key resource type for SubSpaceApi: {}",
@@ -461,16 +440,12 @@ impl SubSpaceApi {
 
         Ok(SubSpaceApi {
             stub: stub,
-            star_tx: star_tx,
+            surface_api: surface_api,
         })
     }
 
     pub fn starlane_api(&self) -> StarlaneApi {
-        let handle = Handle::current();
-        let star_tx = self.star_tx.clone();
-        handle.block_on( async move {
-            StarlaneApi::new(star_tx).await
-        }).expect("expecting starlaneApi")
+        StarlaneApi::new(self.surface_api.clone())
     }
 
     pub fn create_file_system(&self, name: &str) -> Result<Creation<FileSystemApi>, Fail> {
@@ -518,7 +493,7 @@ impl SubSpaceApi {
 
 pub struct FileSystemApi {
     stub: ResourceStub,
-    star_tx: mpsc::Sender<StarCommand>,
+    surface_api: SurfaceApi,
 }
 
 impl FileSystemApi {
@@ -530,7 +505,7 @@ impl FileSystemApi {
         self.stub.address.clone()
     }
 
-    pub fn new(star_tx: mpsc::Sender<StarCommand>, stub: ResourceStub) -> Result<Self, Error> {
+    pub fn new(surface_api: SurfaceApi, stub: ResourceStub) -> Result<Self, Error> {
         if stub.key.resource_type() != ResourceType::FileSystem {
             return Err(format!(
                 "wrong key resource type for FileSystemApi: {}",
@@ -548,16 +523,11 @@ impl FileSystemApi {
 
         Ok(FileSystemApi {
             stub: stub,
-            star_tx: star_tx,
+            surface_api: surface_api,
         })
     }
-
     pub fn starlane_api(&self) -> StarlaneApi {
-        let handle = Handle::current();
-        let star_tx = self.star_tx.clone();
-        handle.block_on( async move {
-            StarlaneApi::new(star_tx).await
-        }).expect("expecting starlaneApi")
+        StarlaneApi::new(self.surface_api.clone())
     }
 
     pub fn create_file_from_string(
@@ -598,11 +568,11 @@ impl FileSystemApi {
 
 pub struct FileApi {
     stub: ResourceStub,
-    star_tx: mpsc::Sender<StarCommand>,
+    surface_api: SurfaceApi,
 }
 
 impl FileApi {
-    pub fn new(star_tx: mpsc::Sender<StarCommand>, stub: ResourceStub) -> Result<Self, Error> {
+    pub fn new(surface_api: SurfaceApi, stub: ResourceStub) -> Result<Self, Error> {
         if stub.key.resource_type() != ResourceType::File {
             return Err(format!(
                 "wrong key resource type for FileApi: {}",
@@ -619,7 +589,7 @@ impl FileApi {
         }
 
         Ok(FileApi {
-            star_tx: star_tx,
+            surface_api: surface_api,
             stub: stub,
         })
     }
@@ -627,11 +597,11 @@ impl FileApi {
 
 pub struct ArtifactBundleVersionsApi {
     stub: ResourceStub,
-    star_tx: mpsc::Sender<StarCommand>,
+    surface_api: SurfaceApi,
 }
 
 impl ArtifactBundleVersionsApi {
-    pub fn new(star_tx: mpsc::Sender<StarCommand>, stub: ResourceStub) -> Result<Self, Error> {
+    pub fn new(surface_api: SurfaceApi, stub: ResourceStub) -> Result<Self, Error> {
         if stub.key.resource_type() != ResourceType::ArtifactBundleVersions{
             return Err(format!(
                 "wrong key resource type for ArtifactVersionsBundleApi: {}",
@@ -648,7 +618,7 @@ impl ArtifactBundleVersionsApi {
         }
 
         Ok(Self{
-            star_tx: star_tx,
+            surface_api: surface_api,
             stub: stub,
         })
     }
@@ -685,22 +655,18 @@ impl ArtifactBundleVersionsApi {
     }
 
     pub fn starlane_api(&self) -> StarlaneApi {
-        let handle = Handle::current();
-        let star_tx = self.star_tx.clone();
-        handle.block_on( async move {
-            StarlaneApi::new(star_tx).await
-        }).expect("expecting starlaneApi")
+        StarlaneApi::new(self.surface_api.clone())
     }
 
 }
 
 pub struct ArtifactBundleApi {
     stub: ResourceStub,
-    star_tx: mpsc::Sender<StarCommand>,
+    surface_api: SurfaceApi,
 }
 
 impl ArtifactBundleApi {
-    pub fn new(star_tx: mpsc::Sender<StarCommand>, stub: ResourceStub) -> Result<Self, Error> {
+    pub fn new(surface_api: SurfaceApi, stub: ResourceStub) -> Result<Self, Error> {
         if stub.key.resource_type() != ResourceType::ArtifactBundle {
             return Err(format!(
                 "wrong key resource type for ArtifactBundleApi: {}",
@@ -717,18 +683,18 @@ impl ArtifactBundleApi {
         }
 
         Ok(ArtifactBundleApi {
-            star_tx: star_tx,
+            surface_api: surface_api,
             stub: stub,
         })
     }
 }
 pub struct UserApi {
     stub: ResourceStub,
-    star_tx: mpsc::Sender<StarCommand>,
+    surface_api: SurfaceApi,
 }
 
 impl UserApi {
-    pub fn new(star_tx: mpsc::Sender<StarCommand>, stub: ResourceStub) -> Result<Self, Error> {
+    pub fn new(surface_api: SurfaceApi, stub: ResourceStub) -> Result<Self, Error> {
         if stub.key.resource_type() != ResourceType::User {
             return Err(format!(
                 "wrong key resource type for UserApi: {}",
@@ -745,7 +711,7 @@ impl UserApi {
         }
 
         Ok(UserApi {
-            star_tx: star_tx,
+            surface_api: surface_api,
             stub: stub,
         })
     }
@@ -753,11 +719,11 @@ impl UserApi {
 
 pub struct DomainApi {
     stub: ResourceStub,
-    star_tx: mpsc::Sender<StarCommand>,
+    surface_api: SurfaceApi,
 }
 
 impl DomainApi {
-    pub fn new(star_tx: mpsc::Sender<StarCommand>, stub: ResourceStub) -> Result<Self, Error> {
+    pub fn new(surface_api: SurfaceApi, stub: ResourceStub) -> Result<Self, Error> {
         if stub.key.resource_type() != ResourceType::Domain {
             return Err(format!(
                 "wrong key resource type for DomainApi: {}",
@@ -774,7 +740,7 @@ impl DomainApi {
         }
 
         Ok(DomainApi {
-            star_tx: star_tx,
+            surface_api: surface_api,
             stub: stub,
         })
     }
@@ -827,14 +793,14 @@ where
 
 pub struct ResourceApi {
     stub: ResourceStub,
-    star_tx: mpsc::Sender<StarCommand>,
+    surface_api: SurfaceApi,
 }
 
 impl TryFrom<ResourceApi> for FileSystemApi {
     type Error = Fail;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
-        Ok(Self::new(value.star_tx, value.stub)?)
+        Ok(Self::new(value.surface_api, value.stub)?)
     }
 }
 
@@ -842,7 +808,7 @@ impl TryFrom<ResourceApi> for FileApi {
     type Error = Fail;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
-        Ok(Self::new(value.star_tx, value.stub)?)
+        Ok(Self::new(value.surface_api, value.stub)?)
     }
 }
 
@@ -850,7 +816,7 @@ impl TryFrom<ResourceApi> for ArtifactBundleApi {
     type Error = Fail;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
-        Ok(Self::new(value.star_tx, value.stub)?)
+        Ok(Self::new(value.surface_api, value.stub)?)
     }
 }
 
@@ -858,7 +824,7 @@ impl TryFrom<ResourceApi> for ArtifactBundleVersionsApi {
     type Error = Fail;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
-        Ok(Self::new(value.star_tx, value.stub)?)
+        Ok(Self::new(value.surface_api, value.stub)?)
     }
 }
 
@@ -867,7 +833,7 @@ impl TryFrom<ResourceApi> for SubSpaceApi {
     type Error = Fail;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
-        Ok(Self::new(value.star_tx, value.stub)?)
+        Ok(Self::new(value.surface_api, value.stub)?)
     }
 }
 
@@ -875,7 +841,7 @@ impl TryFrom<ResourceApi> for SpaceApi {
     type Error = Fail;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
-        Ok(Self::new(value.star_tx, value.stub)?)
+        Ok(Self::new(value.surface_api, value.stub)?)
     }
 }
 
@@ -883,7 +849,7 @@ impl TryFrom<ResourceApi> for UserApi {
     type Error = Fail;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
-        Ok(Self::new(value.star_tx, value.stub)?)
+        Ok(Self::new(value.surface_api, value.stub)?)
     }
 }
 
@@ -891,7 +857,7 @@ impl TryFrom<ResourceApi> for DomainApi {
     type Error = Fail;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
-        Ok(Self::new(value.star_tx, value.stub)?)
+        Ok(Self::new(value.surface_api, value.stub)?)
     }
 }
 

@@ -38,6 +38,7 @@ use crate::star::shell::message::MessagingApi;
 use crate::star::shell::locator::star::StarLocatorApi;
 use crate::star::shell::locator::resource::ResourceLocatorApi;
 use crate::star::shell::lanes::LanesApi;
+use crate::star::surface::SurfaceApi;
 
 pub mod variant;
 pub mod core;
@@ -1027,6 +1028,11 @@ impl Star {
         self.skel.star_tx.clone()
     }
 
+    pub fn surface_api(&self) -> SurfaceApi {
+        self.skel.surface_api.clone()
+    }
+
+
     async fn broadcast(&mut self, frame: Frame) {
         self.broadcast_excluding(frame, &Option::None).await;
     }
@@ -1670,6 +1676,7 @@ pub enum StarTest {
 #[derive(Clone)]
 pub struct StarController {
     pub star_tx: mpsc::Sender<StarCommand>,
+    pub surface_api: SurfaceApi
 }
 
 impl StarController {
@@ -2093,6 +2100,7 @@ pub struct StarSkel {
     pub resource_locator_api: ResourceLocatorApi,
     pub star_locator_api: StarLocatorApi,
     pub router_api: RouterApi,
+    pub surface_api: SurfaceApi,
     pub messaging_api: MessagingApi,
     pub lanes_api: LanesApi,
     pub flags: Flags,

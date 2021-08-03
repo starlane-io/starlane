@@ -43,6 +43,7 @@ use crate::template::{ConstellationData, ConstellationLayout, ConstellationSelec
 use crate::util::AsyncHashMap;
 use crate::starlane::files::MachineFileSystem;
 use crate::data::BinContext;
+use crate::star::surface::SurfaceApi;
 
 pub mod api;
 pub mod files;
@@ -248,7 +249,7 @@ impl StarlaneMachineRunner {
 
                         let (_info, star_ctrl) = best.unwrap();
 
-                        tx.send(Ok(StarlaneApi::with_starlane_ctrl(star_ctrl.star_tx, self.command_tx.clone()).await.expect("expected to be able to get starlane_api") ));
+                        tx.send(Ok(StarlaneApi::with_starlane_ctrl(star_ctrl.surface_api, self.command_tx.clone()) ));
                     }
                     StarlaneCommand::Shutdown => {
                         let listening = {
@@ -351,17 +352,19 @@ impl StarlaneMachineRunner {
                 let (evolve_tx, evolve_rx) = oneshot::channel();
                 evolve_rxs.push(evolve_rx);
 
-                let (star_tx, star_rx) = mpsc::channel(32);
+                let (star_tx, star_rx) = mpsc::channel(1024);
+                let (surface_tx, surface_rx) = mpsc::channel(1024);
+                let surface_api = SurfaceApi::new(surface_tx);
 
                 let star_ctrl = StarController {
-                    star_tx: star_tx.clone()
+                    star_tx: star_tx.clone(),
+                    surface_api: surface_api.clone()
                 };
                 self.star_controllers.put(star_template_id, star_ctrl).await;
 
-                /*
                 if self.artifact_caches.is_none() {
 println!("BEFORE STARLANE ...");
-                    let api = StarlaneApi::new(star_tx.clone() ).await?;
+                    let api = StarlaneApi::new(surface_api.clone() );
 println!("NEW STARLANE API!");
                     let caches = Arc::new(ProtoArtifactCachesFactory::new(
                         api.into(),
@@ -369,13 +372,14 @@ println!("NEW STARLANE API!");
                     )?);
                     self.artifact_caches = Option::Some(caches);
                 }
-                 */
 
                 let (proto_star, _star_ctrl) = ProtoStar::new(
                     star_key.clone(),
                     star_template.kind.clone(),
                     star_tx.clone(),
                     star_rx,
+                    surface_api,
+                    surface_rx,
                     self.data_access.clone(),
                     self.star_manager_factory.clone(),
                     constellation_broadcaster.subscribe(),
@@ -394,12 +398,13 @@ println!("NEW STARLANE API!");
 
 
                         let star_tx = star.star_tx();
+                        let surface_api = star.surface_api();
                         tokio::spawn(async move {
                             star.run().await;
                         });
                         evolve_tx.send(ProtoStarEvolution {
                             star: key.clone(),
-                            controller: StarController { star_tx: star_tx },
+                            controller: StarController { star_tx, surface_api },
                         });
                         /*
                         println!(

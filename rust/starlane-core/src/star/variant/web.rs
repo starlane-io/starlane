@@ -30,19 +30,16 @@ impl WebVariant {
 #[async_trait]
 impl StarVariant for WebVariant {
     fn init(&self, tx: tokio::sync::oneshot::Sender<Result<(), crate::error::Error>>) {
-        let skel = self.skel.clone();
-        tokio::spawn( async move {
-            start(skel).await;
-        });
+        let api = StarlaneApi::new(self.skel.surface_api.clone()).into();
+
+        start(api);
+
         tx.send(Ok(())).unwrap_or_default();
     }
 }
 
-async fn start(skel: StarSkel) {
-
-    let api = StarlaneApi::new(skel.star_tx.clone()).await.expect("expected to get the starlane_api").into();
-
-    thread::spawn(|| {
+fn start(api: StarlaneApiRelay) {
+    thread::spawn(move || {
         web_server(api);
     });
 }

@@ -2,7 +2,7 @@ use tokio::sync::{mpsc, oneshot};
 use crate::message::resource::ProtoMessage;
 use crate::message::{ProtoStarMessage, Fail, MessageId, ProtoStarMessageTo};
 use crate::util::{Call, AsyncRunner, AsyncProcessor};
-use crate::star::{StarSkel, StarKey};
+use crate::star::{StarSkel, StarKey, StarCommand};
 use crate::frame::{Reply, ReplyKind, StarMessage};
 use tokio::time::Duration;
 use crate::error::Error;
@@ -58,7 +58,7 @@ impl AsyncProcessor<StarLocateCall> for StarLocatorComponent {
 impl StarLocatorComponent {
 
     fn get_lane_for_star( &self, star: StarKey, tx: oneshot::Sender<Result<LaneKey,Error>> ) {
-
+        self.skel.star_tx.try_send( StarCommand::GetLaneForStar { star, tx } ).unwrap_or_default();
     }
 
 }

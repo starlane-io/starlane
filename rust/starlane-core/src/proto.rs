@@ -33,6 +33,7 @@ use crate::star::shell::locator::resource::{ResourceLocatorComponent, ResourceLo
 use crate::star::shell::locator::star::{StarLocatorComponent, StarLocatorApi};
 use crate::star::shell::message::{MessagingComponent, MessagingApi};
 use crate::star::shell::lanes::{LanesApi, LanesComponent};
+use crate::star::surface::{SurfaceApi, SurfaceCall, SurfaceComponent};
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -42,6 +43,8 @@ pub struct ProtoStar {
     kind: StarKind,
     star_tx: mpsc::Sender<StarCommand>,
     star_rx: mpsc::Receiver<StarCommand>,
+    surface_api: SurfaceApi,
+    surface_rx: mpsc::Receiver<SurfaceCall>,
     lanes: HashMap<StarKey, LaneWrapper>,
     proto_lanes: Vec<LaneWrapper>,
     connector_ctrls: Vec<ConnectorController>,
@@ -63,6 +66,8 @@ impl ProtoStar {
         kind: StarKind,
         star_tx: Sender<StarCommand>,
         star_rx: Receiver<StarCommand>,
+        surface_api: SurfaceApi,
+        surface_rx: mpsc::Receiver<SurfaceCall>,
         data_access: FileAccess,
         star_manager_factory: Arc<dyn StarVariantFactory>,
         proto_constellation_broadcast: broadcast::Receiver<ConstellationBroadcast>,
@@ -89,9 +94,11 @@ impl ProtoStar {
                 tracker: ProtoTracker::new(),
                 flags: flags,
                 constellation_status: ConstellationStatus::Unknown,
-                machine: machine
+                machine: machine,
+                surface_api: surface_api.clone(),
+                surface_rx
             },
-            StarController { star_tx },
+            StarController { star_tx, surface_api },
         )
     }
 
@@ -227,7 +234,7 @@ impl ProtoStar {
                             persistence: Persistence::Memory,
                             data_access: data_access,
                             machine: self.machine.clone(),
-
+                            surface_api: self.surface_api,
                             resource_locator_api,
                             star_locator_api,
                             router_api,
@@ -243,6 +250,7 @@ impl ProtoStar {
                         RouterComponent::start(skel.clone(), router_rx );
                         MessagingComponent::start(skel.clone(), messaging_rx );
                         LanesComponent::start(skel.clone(), lanes_rx );
+                        SurfaceComponent::start(skel.clone(), self.surface_rx );
 
                         return Ok(Star::from_proto(
                             skel,
