@@ -14,6 +14,8 @@ use crate::resource::ResourceAddress;
 use crate::star::StarSkel;
 use crate::star::variant::StarVariant;
 use crate::starlane::api::{StarlaneApi, StarlaneApiRelay};
+use tokio::sync::oneshot;
+
 
 pub struct WebVariant {
     skel: StarSkel,
@@ -28,18 +30,18 @@ impl WebVariant {
 #[async_trait]
 impl StarVariant for WebVariant {
     fn init(&self, tx: tokio::sync::oneshot::Sender<Result<(), crate::error::Error>>) {
-
-        let api = tokio::runtime::Handle::current().block_on( async move {
-            let api = StarlaneApi::new(self.skel.star_tx.clone()).await.expect("expected to get the starlane_api").into();
-            api
+        let skel = self.skel.clone();
+        tokio::spawn( async move {
+            start(skel).await;
         });
-
-        start(api);
-        tx.send(Ok(()));
+        tx.send(Ok(())).unwrap_or_default();
     }
 }
 
-fn start(api: StarlaneApiRelay) {
+async fn start(skel: StarSkel) {
+
+    let api = StarlaneApi::new(skel.star_tx.clone()).await.expect("expected to get the starlane_api").into();
+
     thread::spawn(|| {
         web_server(api);
     });

@@ -618,7 +618,8 @@ impl Star {
 //                            println!("{} {}", &self.skel.info.kind, &self.status.to_string());
                         }
                         StarCommand::GetCaches(tx) => {
-                            tx.send(self.skel.caches.clone());
+//                            tx.send(self.skel.caches.clone());
+                            unimplemented!()
                         }
                         StarCommand::Diagnose(diagnose) => {
                             self.diagnose(diagnose).await;
@@ -2087,7 +2088,6 @@ pub struct StarSkel {
     pub star_handler: Option<StarHandleBacking>,
     pub persistence: Persistence,
     pub data_access: FileAccess,
-    pub caches: Arc<ProtoArtifactCachesFactory>,
     pub machine: StarlaneMachine
 }
 

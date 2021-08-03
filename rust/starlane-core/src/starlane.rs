@@ -358,24 +358,24 @@ impl StarlaneMachineRunner {
                 };
                 self.star_controllers.put(star_template_id, star_ctrl).await;
 
+                /*
                 if self.artifact_caches.is_none() {
+println!("BEFORE STARLANE ...");
                     let api = StarlaneApi::new(star_tx.clone() ).await?;
+println!("NEW STARLANE API!");
                     let caches = Arc::new(ProtoArtifactCachesFactory::new(
                         api.into(),
                         self.cache_access.clone(),
                     )?);
                     self.artifact_caches = Option::Some(caches);
                 }
+                 */
 
                 let (proto_star, _star_ctrl) = ProtoStar::new(
                     star_key.clone(),
                     star_template.kind.clone(),
                     star_tx.clone(),
                     star_rx,
-                    self.artifact_caches
-                        .as_ref()
-                        .ok_or("already established that caches exists, what gives?")?
-                        .clone(),
                     self.data_access.clone(),
                     self.star_manager_factory.clone(),
                     constellation_broadcaster.subscribe(),
@@ -385,7 +385,7 @@ impl StarlaneMachineRunner {
                 );
 
 
-//                println!("created proto star: {:?}", &star_template.kind);
+                println!("created proto star: {:?}", &star_template.kind);
 
                 tokio::spawn(async move {
                     let star = proto_star.evolve().await;
