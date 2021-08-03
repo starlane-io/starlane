@@ -50,7 +50,6 @@ impl AsyncProcessor<CoreMessageCall> for MessagingEndpointComponent {
 
 impl MessagingEndpointComponent {
     async fn process_resource_message(&mut self, star_message: StarMessage) -> Result<(), Error> {
-        //println!("process_message---> {}", message.payload.to_string() );
         match &star_message.payload {
             StarMessagePayload::MessagePayload(message_payload) => match &message_payload {
                 MessagePayload::Request(request) => {
@@ -80,7 +79,6 @@ impl MessagingEndpointComponent {
         &mut self,
         delivery: Delivery<Message<ResourceRequestMessage>>,
     ) -> Result<(), Error> {
-println!("Process resource request....");
         match delivery.payload.payload.clone() {
             ResourceRequestMessage::Create(create) => {
                 let parent_key = match create
@@ -112,7 +110,6 @@ println!("Process resource request....");
                 });
             }
             ResourceRequestMessage::Select(selector) => {
-info!("select resource.");
                 let resources = self
                     .skel
                     .registry
@@ -123,6 +120,7 @@ info!("select resource.");
                 delivery.reply(Reply::Records(resources))
             }
             ResourceRequestMessage::Unique(resource_type) => {
+
                 let unique_src = self
                     .skel
                     .registry
@@ -232,7 +230,6 @@ info!("select resource.");
     }
 
     async fn get_parent_resource(&mut self, key: ResourceKey) -> Result<Parent, Fail> {
-println!("getting parent resource for {}", key.to_string() );
         let resource = self
             .skel
             .registry

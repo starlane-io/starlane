@@ -10,6 +10,7 @@ use tokio::time::Instant;
 use tokio::sync::mpsc::error::TrySendError;
 use crate::resource::ResourceRecord;
 use crate::error::Error;
+use tokio::time::error::Elapsed;
 
 
 #[derive(Clone)]
@@ -33,6 +34,7 @@ impl MessagingApi {
        let call = MessagingCall::Exchange { proto, expect, description: description.to_string(), tx };
        self.tx.try_send(call)?;
        rx.await?
+
     }
 
     pub fn on_reply( &self, message: StarMessage )  {
@@ -100,9 +102,12 @@ impl MessagingComponent {
         if let Option::Some(reply_to) = message.reply_to {
 
             if let StarMessagePayload::Reply(SimpleReply::Ack(_)) = &message.payload {
-                // do nothing, this is just an ack message
+                if let Option::Some(exchanger) = self.exchanges.get( &reply_to ) {
+                    exchanger.timeout_tx.try_send( TimeoutCall::Extend ).unwrap_or_default();
+                }
             }
             else if let Option::Some( exchanger ) = self.exchanges.remove( &reply_to ) {
+                exchanger.timeout_tx.try_send( TimeoutCall::Done ).unwrap_or_default();
                 let result = match message.payload {
                     StarMessagePayload::Reply(SimpleReply::Ok(reply)) => {
                         match exchanger.expect.is_match(&reply)
@@ -145,12 +150,32 @@ impl MessagingComponent {
 
     async fn exchange(&mut self, mut proto: ProtoStarMessage, expect: ReplyKind, tx: oneshot::Sender<Result<Reply,Fail>>, description: String ) {
         let id = MessageId::new_v4();
-        self.exchanges.insert(id.clone(), MessageExchanger::new(expect, tx, description ));
+        let (timeout_tx,mut timeout_rx) = mpsc::channel(1);
+        self.exchanges.insert(id.clone(), MessageExchanger::new(expect, tx, timeout_tx, description ));
         let messaging_tx = self.skel.messaging_api.tx.clone();
         let cancel_id = id.clone();
         tokio::spawn( async move {
-          tokio::time::sleep_until(Instant::now().checked_add(Duration::from_secs(15)).expect("expected to be able to add 15 seconds"));
-          messaging_tx.try_send(MessagingCall::TimeoutExchange(cancel_id)).unwrap_or_default();
+          loop {
+              match tokio::time::timeout( Duration::from_secs(10), timeout_rx.recv() ).await {
+                  Ok(Option::Some(call)) => {
+                      match call{
+                          TimeoutCall::Extend => {
+                              // in this case we extend the waiting time
+                              info!("Extending wait time for message.");
+                          },
+                          TimeoutCall::Done => {
+                              return;
+                          }
+                      }
+                  }
+                  Ok(Option::None) => {
+                      return;
+                  }
+                  Err(_) => {
+                      messaging_tx.try_send(MessagingCall::TimeoutExchange(cancel_id)).unwrap_or_default();
+                  }
+              }
+          }
         });
         self.send_with_id(proto,id).await;
     }
@@ -169,6 +194,7 @@ impl MessagingComponent {
                     let record = match skel.resource_locator_api.locate(ident.clone()).await {
                         Ok(record) => record,
                         Err(fail) => {
+                            error!("locator could not find resource record: {}",ident.to_string());
                             skel.messaging_api.fail_exchange(id, fail);
                             return;
                         }
@@ -206,14 +232,21 @@ impl MessagingComponent {
 struct MessageExchanger {
     pub expect: ReplyKind,
     pub tx: oneshot::Sender<Result<Reply,Fail>>,
+    pub timeout_tx: mpsc::Sender<TimeoutCall>,
     pub description: String
 }
 
+pub enum TimeoutCall {
+    Extend,
+    Done
+}
+
 impl MessageExchanger {
-    pub fn new( expected: ReplyKind, tx: oneshot::Sender<Result<Reply,Fail>>, description: String ) -> Self {
+    pub fn new( expected: ReplyKind, tx: oneshot::Sender<Result<Reply,Fail>>, timeout_tx: mpsc::Sender<TimeoutCall>,description: String ) -> Self {
         Self{
             expect: expected,
             tx,
+            timeout_tx,
             description
         }
     }

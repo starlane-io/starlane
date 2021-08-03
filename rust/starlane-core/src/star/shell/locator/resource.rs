@@ -14,7 +14,7 @@ use starlane_resources::ResourceIdentifier;
 
 use crate::frame::{RegistryAction, Reply, SimpleReply, StarMessagePayload, ReplyKind};
 use crate::message::{Fail, ProtoStarMessage};
-use crate::resource::{ResourceAddress, ResourceKey, ResourceRecord, ResourceType};
+use crate::resource::{ResourceAddress, ResourceKey, ResourceRecord, ResourceType, ResourceStub, ResourceArchetype, ResourceKind};
 use crate::star::{LogId, Request, ResourceRegistryBacking, Set, Star, StarCommand, StarKey, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
@@ -154,17 +154,17 @@ impl ResourceLocatorComponent {
 
             });
         } else {
-            // This is for Root
-            let locator_api= self.skel.resource_locator_api.clone();
-            tokio::spawn( async move {
-
-                async fn locate(locator_api: ResourceLocatorApi, identifier: ResourceIdentifier) -> Result<ResourceRecord,Fail> {
-                    Ok(locator_api.external_locate(identifier,StarKey::central() ).await?)
-                }
-
-                tx.send(locator_api.clone().filter(locate(locator_api, identifier).await)).unwrap_or_default();
-
-            });
+            let record = ResourceRecord::new(ResourceStub{
+                key: ResourceKey::Root,
+                address: ResourceAddress::root(),
+                archetype: ResourceArchetype {
+                    kind: ResourceKind::Root,
+                    specific: None,
+                    config: None
+                },
+                owner: None
+            }, StarKey::central());
+            tx.send( Ok(record)).unwrap_or_default();
         }
     }
 

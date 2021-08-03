@@ -1392,20 +1392,29 @@ impl Star {
                     }
                 }
             },
-            Frame::StarMessage(message) => match self.on_message(message).await {
+            Frame::StarMessage(message) => {
+                self.skel.router_api.route(message).unwrap_or_default();
+            }
+/*            Frame::StarMessage(message) => match self.on_message(message).await {
                 Ok(_messages) => {}
                 Err(error) => {
                     error!("X error: {}", error)
                 }
             },
+ */
             _ => {
                 error!("star does not handle frame: {}", frame)
             }
+
         }
     }
 
 
+    /*
     async fn on_message(&mut self, message: StarMessage) -> Result<(), Error> {
+
+println!("STAR ON MESSAGE");
+
         if message.log {
             info!(
                 "{} => {} : {}",
@@ -1427,11 +1436,16 @@ impl Star {
                 );
             }
         } else {
-            self.process_message_reply(&message).await;
-            self.skel.core_messaging_endpoint_tx.send(CoreMessageCall::Message(message)).await?;
+println!("Star on_message() -> message.reply_to.is_some(): {}", message.reply_to.is_some() );
+            if message.reply_to.is_some() {
+                self.skel.messaging_api.on_reply(message);
+            } else {
+                self.skel.core_messaging_endpoint_tx.try_send(CoreMessageCall::Message(message)).unwrap_or_default();
+            }
             Ok(())
         }
     }
+     */
 
 
     async fn diagnose(&self, diagnose: Diagnose) {

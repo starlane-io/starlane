@@ -56,7 +56,11 @@ impl RouterComponent {
 
     fn route(&self, message: StarMessage ) {
         if message.to == self.skel.info.key {
-            self.skel.core_messaging_endpoint_tx.try_send(CoreMessageCall::Message(message)).unwrap_or_default();
+            if message.reply_to.is_some() {
+                self.skel.messaging_api.on_reply(message);
+            } else {
+                self.skel.core_messaging_endpoint_tx.try_send(CoreMessageCall::Message(message)).unwrap_or_default();
+            }
         } else {
             let skel = self.skel.clone();
             tokio::spawn( async move {
