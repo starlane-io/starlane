@@ -71,6 +71,9 @@ impl HostComponent {
             ResourceType::Space => {
                 Box::new(SpaceHost::new(self.skel.clone()).await )
             }
+            ResourceType::SubSpace => {
+                Box::new(SpaceHost::new(self.skel.clone()).await )
+            }
             _ => unimplemented!()
         }
     }

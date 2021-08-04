@@ -165,18 +165,18 @@ impl MessagingEndpointComponent {
         let skel = self.skel.clone();
 
         tokio::spawn( async move {
-            if let Option::Some(manager) = skel.registry.clone() {
+            if let Option::Some(registry) = skel.registry.clone() {
                 match &delivery.payload {
                     RegistryAction::Register(registration) => {
-                        let result = manager.register(registration.clone()).await;
+                        let result = registry.register(registration.clone()).await;
                         delivery.result_ok(result);
                     }
                     RegistryAction::Location(location) => {
-                        let result = manager.set_location(location.clone()).await;
+                        let result = registry.set_location(location.clone()).await;
                         delivery.result_ok(result);
                     }
                     RegistryAction::Find(find) => {
-                        let result = manager.get(find.to_owned()).await;
+                        let result = registry.get(find.to_owned()).await;
 
                         match result {
                             Ok(result) => match result {
@@ -230,11 +230,14 @@ impl MessagingEndpointComponent {
     }
 
     async fn get_parent_resource(&mut self, key: ResourceKey) -> Result<Parent, Fail> {
+        /*
         let resource = self
             .skel
             .registry
             .as_ref()
             .expect("expected registry").get(key.into()).await?.ok_or("expected parent resource")?;
+         */
+        let resource = self.skel.resource_locator_api.locate(key.clone().into()).await?;
 
 
         Ok(Parent {
