@@ -120,7 +120,7 @@ impl StateStoreFS {
     }
 
     async fn save( &mut self, assign: ResourceAssign<DataSet<BinSrc>> ) -> Result<DataSet<BinSrc>,Error>{
-        let key = assign.stub.key.to_string();
+        let key = assign.stub.key.to_snake_case();
 
         let state_path= Path::from_str(format!("/stars/{}/states/{}",self.skel.info.key.to_string(), key).as_str())?;
         let machine_filesystem = self.skel.machine.machine_filesystem();
@@ -129,7 +129,7 @@ impl StateStoreFS {
 
         let mut rxs = vec![];
         for (aspect, data) in &assign.state_src {
-            let state_aspect_file = Path::from_str(format!("/stars/{}/states/{}/{}",self.skel.info.key.to_string(),key.to_string(),aspect).as_str())?;
+            let state_aspect_file = Path::from_str(format!("/stars/{}/states/{}/{}",self.skel.info.key.to_string(),key,aspect).as_str())?;
             let (tx,rx) = oneshot::channel();
             let bin_context = self.skel.machine.bin_context();
             data.mv( bin_context, state_aspect_file, tx ).await;
@@ -144,14 +144,14 @@ impl StateStoreFS {
     }
 
     async fn get( &self, key: ResourceKey ) -> Result<Option<DataSet<BinSrc>>,Error>{
-        let key = key.to_string();
+        let key = key.to_snake_case();
         let machine_filesystem = self.skel.machine.machine_filesystem();
         let mut data_access = machine_filesystem.data_access();
 
         let state_path= Path::from_str(format!("/stars/{}/states/{}",self.skel.info.key.to_string(), key).as_str())?;
         let mut dataset = DataSet::new();
         for aspect in data_access.list(&state_path).await? {
-            let state_aspect_file = Path::from_str(format!("/stars/{}/states/{}/{}",self.skel.info.key.to_string(),key.to_string(),aspect.last_segment().ok_or("expected final segment from list")?).as_str())?;
+            let state_aspect_file = Path::from_str(format!("/stars/{}/states/{}/{}",self.skel.info.key.to_string(),key,aspect.last_segment().ok_or("expected final segment from list")?).as_str())?;
 
             let bin= data_access.read(&state_aspect_file).await?;
             let bin_src = BinSrc::Memory(bin);

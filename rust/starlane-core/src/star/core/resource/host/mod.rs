@@ -8,11 +8,13 @@ use crate::error::Error;
 use crate::star::core::resource::host::space::SpaceHost;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
+use crate::star::core::resource::host::domain::DomainHost;
 
 pub mod artifact;
 pub mod file_store;
 pub mod kube;
 mod space;
+mod domain;
 
 pub enum HostCall{
     Assign{   assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>, tx: oneshot::Sender<Result<Resource,Fail>> },
@@ -74,7 +76,11 @@ impl HostComponent {
             ResourceType::SubSpace => {
                 Box::new(SpaceHost::new(self.skel.clone()).await )
             }
-            _ => unimplemented!()
+            ResourceType::Domain=> {
+                Box::new(DomainHost::new(self.skel.clone()).await )
+            }
+
+            t => unimplemented!("no HOST implementation for type {}",t.to_string())
         }
     }
 }

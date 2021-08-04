@@ -92,6 +92,7 @@ println!("hyperuser ensured.");
 println!("localhost ensured.");
 
         {
+println!("ensuring artifact: {}",create_args::artifact_bundle_address().to_string());
             let address: ResourceAddress = create_args::artifact_bundle_address().into();
             let mut creation = subspace_api.create_artifact_bundle_versions(address.parent().unwrap().name().as_str())?;
             creation.set_strategy(ResourceCreateStrategy::Ensure);
