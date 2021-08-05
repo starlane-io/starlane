@@ -28,8 +28,7 @@ use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload,
 use crate::permissions::AuthTokenSource;
 use crate::star::core::message::MessagingEndpointComponent;
 use crate::star::shell::lanes::{LanesApi, LanesComponent};
-use crate::star::shell::locator::resource::{ResourceLocatorApi, ResourceLocatorComponent};
-use crate::star::shell::locator::star::{StarLocatorApi, StarLocatorComponent};
+use crate::star::shell::search::{StarSearchApi, StarSearchComponent, StarSearchTransaction, ShortestPathStarKey};
 use crate::star::shell::message::{MessagingApi, MessagingComponent};
 use crate::star::shell::pledge::StarHandleBacking;
 use crate::star::shell::router::{RouterApi, RouterComponent};
@@ -37,13 +36,14 @@ use crate::star::surface::{SurfaceApi, SurfaceCall, SurfaceComponent};
 use crate::star::variant::StarVariantFactory;
 use crate::star::{
     ConstellationBroadcast, FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBacking,
-    ResourceRegistryBackingSqLite, ShortestPathStarKey, Star, StarCommand, StarController,
-    StarInfo, StarKernel, StarKey, StarKind, StarSearchTransaction, StarSkel, Transaction,
+    ResourceRegistryBackingSqLite, Star, StarCommand, StarController,
+    StarInfo, StarKernel, StarKey, StarKind, StarSkel,
 };
 use crate::starlane::StarlaneMachine;
 use crate::template::StarKeyConstellationIndex;
+use crate::star::shell::locator::{ResourceLocatorApi, ResourceLocatorComponent};
+use crate::star::shell::golden::{GoldenPathApi, GoldenPathComponent};
 
-pub static MAX_HOPS: i32 = 32;
 
 pub struct ProtoStar {
     star_key: ProtoStarKey,
@@ -221,12 +221,14 @@ impl ProtoStar {
                         let (router_tx, router_rx) = mpsc::channel(1024);
                         let (messaging_tx, messaging_rx) = mpsc::channel(1024);
                         let (lanes_tx, lanes_rx) = mpsc::channel(1024);
+                        let (golden_path_tx, golden_path_rx) = mpsc::channel(1024);
 
                         let resource_locator_api = ResourceLocatorApi::new(resource_locator_tx);
-                        let star_locator_api = StarLocatorApi::new(star_locator_tx);
+                        let star_search_api = StarSearchApi::new(star_locator_tx);
                         let router_api = RouterApi::new(router_tx);
                         let messaging_api = MessagingApi::new(messaging_tx);
                         let lanes_api = LanesApi::new(lanes_tx);
+                        let golden_path_api = GoldenPathApi::new(golden_path_tx);
 
                         let data_access = self
                             .data_access
@@ -266,21 +268,23 @@ impl ProtoStar {
                             machine: self.machine.clone(),
                             surface_api: self.surface_api,
                             resource_locator_api,
-                            star_locator_api,
+                            star_search_api,
                             router_api,
                             messaging_api,
                             lanes_api,
+                            golden_path_api
                         };
 
                         let variant = self.star_manager_factory.create(skel.clone()).await;
 
                         MessagingEndpointComponent::start(skel.clone(), core_messaging_endpoint_rx);
                         ResourceLocatorComponent::start(skel.clone(), resource_locator_rx);
-                        StarLocatorComponent::start(skel.clone(), star_locator_rx);
+                        StarSearchComponent::start(skel.clone(), star_locator_rx);
                         RouterComponent::start(skel.clone(), router_rx);
                         MessagingComponent::start(skel.clone(), messaging_rx);
                         LanesComponent::start(skel.clone(), lanes_rx);
                         SurfaceComponent::start(skel.clone(), self.surface_rx);
+                        GoldenPathComponent::start(skel.clone(), golden_path_rx);
 
                         return Ok(Star::from_proto(
                             skel,

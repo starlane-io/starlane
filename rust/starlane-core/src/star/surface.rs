@@ -3,7 +3,6 @@ use crate::error::Error;
 use crate::frame::{Reply, ReplyKind};
 use crate::message::{Fail, ProtoStarMessage};
 use crate::resource::ResourceRecord;
-use crate::star::shell::locator::resource::ResourceLocateCall;
 use crate::star::shell::message::MessagingCall;
 use crate::star::{StarCommand, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
@@ -11,6 +10,7 @@ use starlane_resources::ResourceIdentifier;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
+use crate::star::shell::locator::ResourceLocateCall;
 
 #[derive(Clone)]
 pub struct SurfaceApi {

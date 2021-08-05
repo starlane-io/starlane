@@ -68,8 +68,7 @@ impl RouterComponent {
                 }
             } else {
                 if let Result::Ok(lane) = skel
-                    .star_locator_api
-                    .get_lane_for_star(message.to.clone())
+                    .golden_path_api.golden_lane_leading_to_star(message.to.clone())
                     .await
                 {
                     skel.lanes_api

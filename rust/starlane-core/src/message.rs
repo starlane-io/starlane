@@ -18,7 +18,8 @@ use crate::frame::{
 };
 
 use crate::resource::{ResourceAddress, ResourceKind, ResourceType, Specific};
-use crate::star::{StarCommand, StarKey, StarSearchTransaction, Transaction, TransactionResult};
+use crate::star::{StarCommand, StarKey};
+use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
 
 pub type MessageId = Uuid;
 
