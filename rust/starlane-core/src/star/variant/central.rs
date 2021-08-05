@@ -100,9 +100,7 @@ impl CentralVariant {
             let mut creation = subspace_api
                 .create_artifact_bundle_versions(address.parent().unwrap().name().as_str())?;
             creation.set_strategy(ResourceCreateStrategy::Ensure);
-            println!("ABOUT TO CREATE");
             let artifact_bundle_versions_api = creation.submit().await?;
-            println!("created artifact bundle VERSIONS.");
 
             let version = semver::Version::from_str(address.name().as_str())?;
             let mut creation = artifact_bundle_versions_api.create_artifact_bundle(

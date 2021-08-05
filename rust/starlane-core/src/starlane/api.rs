@@ -119,7 +119,7 @@ impl StarlaneApi {
                 Err(_err) => Err(Fail::ChannelRecvErr),
             },
             Err(err) => {
-                println!("elapsed error: {}", err);
+                eprintln!("elapsed error: {}", err);
                 Err(Fail::Timeout)
             }
         }
@@ -172,7 +172,6 @@ impl StarlaneApi {
      */
 
     pub async fn create_resource(&self, create: ResourceCreate) -> Result<ResourceRecord, Fail> {
-        println!("StarlaneApi:..create resource...");
         let create = create.to_keyed(self.clone()).await?;
 
         let mut proto = ProtoMessage::new();
@@ -181,12 +180,10 @@ impl StarlaneApi {
         proto.payload = Option::Some(ResourceRequestMessage::Create(create));
         let proto = proto.to_proto_star_message().await?;
 
-        println!("StarlaneApi:..exchange...");
         let reply = self
             .surface_api
             .exchange(proto, ReplyKind::Record, "StarlaneApi: create_resource")
             .await?;
-        println!("StarlaneApi:..exchange.RETURNED");
 
         match reply{
             Reply::Record(record) => Ok(record),
@@ -265,7 +262,6 @@ impl StarlaneApi {
         &self,
         identifier: ResourceIdentifier,
     ) -> Result<DataSet<BinSrc>, Fail> {
-        println!("get_resource_state block_on");
         let state_src = self.get_resource_state_src(identifier)?;
         Ok(state_src)
     }

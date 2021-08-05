@@ -54,16 +54,13 @@ impl ResourceLocatorApi {
 
     pub async fn locate(&self, identifier: ResourceIdentifier) -> Result<ResourceRecord, Fail> {
         let (tx, mut rx) = oneshot::channel();
-        println!("Sending locate request...");
         self.tx
             .send(ResourceLocateCall::Locate { identifier, tx })
             .await
             .unwrap_or_default();
-        println!("locate request sent.");
 
         //Ok(tokio::time::timeout( Duration::from_secs(15), rx).await???)
         let rtn = tokio::time::timeout(Duration::from_secs(15), rx).await???;
-        println!("LOCATED => {}", rtn.stub.key.to_string());
         Ok(rtn)
     }
 
@@ -167,7 +164,6 @@ impl ResourceLocatorComponent {
         identifier: ResourceIdentifier,
         tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
     ) {
-        println!("LOC: looking for: {}", identifier.to_string());
         if self.has_cached_record(&identifier) {
             let result = match self
                 .get_cached_record(&identifier)
@@ -177,7 +173,6 @@ impl ResourceLocatorComponent {
                 Err(s) => Err(Fail::Error(s.to_string())),
             };
 
-            println!("LOC: has cached");
             tx.send(result).unwrap_or_default();
         } else if identifier.parent().is_some() {
             let locator_api = self.skel.resource_locator_api.clone();
@@ -186,7 +181,6 @@ impl ResourceLocatorComponent {
                     locator_api: ResourceLocatorApi,
                     identifier: ResourceIdentifier,
                 ) -> Result<ResourceRecord, Fail> {
-                    println!("LOC: entered locate()");
                     let parent_record = locator_api.filter(
                         locator_api
                             .locate(
@@ -196,19 +190,15 @@ impl ResourceLocatorComponent {
                             )
                             .await,
                     )?;
-                    println!("LOC: got parent record()");
                     let rtn = locator_api
                         .external_locate(identifier, parent_record.location.host)
                         .await?;
-                    println!("LOC: got resourceREcrod");
 
                     Ok(rtn)
                 }
 
-                println!("LOC: seeking parent");
                 tx.send(locate(locator_api, identifier).await)
                     .unwrap_or_default();
-                println!("LOC: found parent ");
             });
         } else {
             let record = ResourceRecord::new(
@@ -276,7 +266,6 @@ impl ResourceLocatorComponent {
         &mut self,
         locate: Request<(ResourceIdentifier, StarKey), ResourceRecord>,
     ) {
-        println!("LOC: request_resource_record_from_star");
         let (identifier, star) = locate.payload.clone();
         let mut proto = ProtoStarMessage::new();
         proto.to = star.clone().into();
@@ -284,10 +273,6 @@ impl ResourceLocatorComponent {
         proto.log = locate.log;
         let skel = self.skel.clone();
         tokio::spawn(async move {
-            println!(
-                "LOC: request_resource_record_from_star :: entered: Sending message to: {}",
-                star.to_string()
-            );
             let result = skel
                 .messaging_api
                 .exchange(
@@ -296,7 +281,6 @@ impl ResourceLocatorComponent {
                     "ResourceLocatorComponent.request_resource_record_from_star()",
                 )
                 .await;
-            println!("LOC: request_resource_record_from_star :: GOT RESULT");
             match result {
                 Ok(Reply::Record(record)) => {
                     skel.resource_locator_api.found(record.clone());

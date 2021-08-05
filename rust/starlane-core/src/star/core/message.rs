@@ -99,7 +99,6 @@ impl MessagingEndpointComponent {
             ) -> Result<(), Error> {
                 match delivery.payload.payload.clone() {
                     ResourceRequestMessage::Create(create) => {
-                        println!("CORE: CREATE RESOURCE...");
                         let parent_key = match create
                             .parent
                             .clone()
@@ -110,16 +109,13 @@ impl MessagingEndpointComponent {
                                 return Err(error.to_string().into());
                             }
                         };
-                        println!("CORE: getting parent...");
                         let parent = MessagingEndpointComponent::get_parent_resource(
                             skel.clone(),
                             parent_key,
                         )
                         .await?;
-                        println!("CORE: got PARENT...");
                         let record = parent.create(create.clone()).await.await;
 
-                        println!("CORE: got create result...");
                         match record {
                             Ok(record) => match record {
                                 Ok(record) => {
@@ -207,11 +203,7 @@ impl MessagingEndpointComponent {
                         delivery.result_ok(result);
                     }
                     RegistryAction::Find(find) => {
-                        println!(
-                            "FIND resource: {} star {}",
-                            find.to_string(),
-                            skel.info.kind.to_string()
-                        );
+
                         let result = registry.get(find.to_owned()).await;
 
                         match result {

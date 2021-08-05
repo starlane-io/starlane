@@ -635,14 +635,6 @@ impl Registry {
 
             ResourceRegistryCommand::Commit(registration) => {
                 let params = RegistryParams::from_registration(registration.clone())?;
-                println!(
-                    "COMMIT address: {} ",
-                    params.address.clone().unwrap().to_string()
-                );
-                println!(
-                    "and key : {} ",
-                    ResourceKey::from_bin(params.key.clone().unwrap())?.to_string()
-                );
 
                 let trans = self.conn.transaction()?;
 
@@ -786,11 +778,7 @@ impl Registry {
                 Ok(ResourceRegistryResult::Ok)
             }
             ResourceRegistryCommand::Get(identifier) => {
-                info!(
-                    "REGISTRY {} getting : {}",
-                    self.star_info.kind.to_string(),
-                    identifier.to_string()
-                );
+
                 if identifier.resource_type() == ResourceType::Root {
                     return Ok(ResourceRegistryResult::Resource(Option::Some(
                         ResourceRecord::root(),
@@ -1636,7 +1624,6 @@ impl ResourceCreationChamber {
             stub: stub,
             state_src: self.create.state_src.clone(),
         };
-        println!("return create...");
         Ok(assign)
     }
 }

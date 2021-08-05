@@ -2276,7 +2276,6 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
         //match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
         match Self::timeout(rx).await? {
             ResourceRegistryResult::Resource(resource) => {
-                println!("returning resource...{}", resource.is_some());
                 Ok(resource)
             }
             _ => Err(Fail::expected("ResourceRegistryResult::Resource(_)")),
