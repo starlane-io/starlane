@@ -85,6 +85,7 @@ impl HostComponent {
         match rt {
             ResourceType::Space => Box::new(SpaceHost::new(self.skel.clone()).await),
             ResourceType::SubSpace => Box::new(SpaceHost::new(self.skel.clone()).await),
+            ResourceType::ArtifactBundleVersions => Box::new(SpaceHost::new(self.skel.clone()).await),
             ResourceType::Domain => Box::new(DomainHost::new(self.skel.clone()).await),
 
             t => unimplemented!("no HOST implementation for type {}", t.to_string()),

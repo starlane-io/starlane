@@ -89,86 +89,103 @@ impl MessagingEndpointComponent {
         &mut self,
         delivery: Delivery<Message<ResourceRequestMessage>>,
     ) -> Result<(), Error> {
-        match delivery.payload.payload.clone() {
-            ResourceRequestMessage::Create(create) => {
-                println!("CORE: CREATE RESOURCE...");
-                let parent_key = match create
-                    .parent
-                    .clone()
-                    .key_or("expected parent to be a ResourceKey")
-                {
-                    Ok(key) => key,
-                    Err(error) => {
-                        return Err(error.to_string().into());
-                    }
-                };
-                println!("CORE: getting parent...");
-                let parent = self.get_parent_resource(parent_key).await?;
-                println!("CORE: got PARENT...");
-                tokio::spawn(async move {
-                    let record = parent.create(create.clone()).await.await;
-
-                    println!("CORE: got create result...");
-                    match record {
-                        Ok(record) => match record {
-                            Ok(record) => {
-                                delivery.reply(Reply::Record(record));
-                            }
-                            Err(fail) => {
-                                delivery.fail(fail);
-                            }
-                        },
-                        Err(err) => {
-                            eprintln!("Error: {}", err);
-                        }
-                    }
-                });
-            }
-            ResourceRequestMessage::Select(selector) => {
-                let resources = self
-                    .skel
-                    .registry
-                    .as_ref()
-                    .unwrap()
-                    .select(selector.clone())
-                    .await?;
-                delivery.reply(Reply::Records(resources))
-            }
-            ResourceRequestMessage::Unique(resource_type) => {
-                let unique_src = self
-                    .skel
-                    .registry
-                    .as_ref()
-                    .unwrap()
-                    .unique_src(delivery.payload.to.clone().into())
-                    .await;
-                delivery.reply(Reply::Id(unique_src.next(&resource_type).await?));
-            }
-            ResourceRequestMessage::State => {
-                let key: ResourceKey = delivery.payload.to.clone().try_into()?;
-
-                let (tx, rx) = oneshot::channel();
-                self.host_tx.send(HostCall::Get { key, tx }).await?;
-                tokio::spawn(async move {
-                    let result = rx.await;
-                    if let Ok(Ok(Option::Some(state))) = result {
-                        let state = match state.try_into() {
-                            Ok(state) => state,
-                            Err(_) => {
-                                error!("error when try_into from BinSrc to NetworkBinSrc");
-                                delivery
-                                    .fail(Fail::expected("Ok(Ok(StarCoreResult::State(state)))"));
-                                return;
+        let skel = self.skel.clone();
+        let host_tx = self.host_tx.clone();
+        tokio::spawn(async move {
+            async fn process(
+                skel: StarSkel,
+                host_tx: mpsc::Sender<HostCall>,
+                delivery: Delivery<Message<ResourceRequestMessage>>,
+            ) -> Result<(), Error> {
+                match delivery.payload.payload.clone() {
+                    ResourceRequestMessage::Create(create) => {
+                        println!("CORE: CREATE RESOURCE...");
+                        let parent_key = match create
+                            .parent
+                            .clone()
+                            .key_or("expected parent to be a ResourceKey")
+                        {
+                            Ok(key) => key,
+                            Err(error) => {
+                                return Err(error.to_string().into());
                             }
                         };
+                        println!("CORE: getting parent...");
+                        let parent = MessagingEndpointComponent::get_parent_resource(
+                            skel.clone(),
+                            parent_key,
+                        )
+                        .await?;
+                        println!("CORE: got PARENT...");
+                        let record = parent.create(create.clone()).await.await;
 
-                        delivery.reply(Reply::State(state));
-                    } else {
-                        delivery.fail(Fail::expected("Ok(Ok(StarCoreResult::State(state)))"));
+                        println!("CORE: got create result...");
+                        match record {
+                            Ok(record) => match record {
+                                Ok(record) => {
+                                    delivery.reply(Reply::Record(record));
+                                }
+                                Err(fail) => {
+                                    delivery.fail(fail);
+                                }
+                            },
+                            Err(err) => {
+                                eprintln!("Error: {}", err);
+                            }
+                        }
                     }
-                });
+                    ResourceRequestMessage::Select(selector) => {
+                        let resources = skel
+                            .registry
+                            .as_ref()
+                            .unwrap()
+                            .select(selector.clone())
+                            .await?;
+                        delivery.reply(Reply::Records(resources))
+                    }
+                    ResourceRequestMessage::Unique(resource_type) => {
+                        let unique_src = skel
+                            .registry
+                            .as_ref()
+                            .unwrap()
+                            .unique_src(delivery.payload.to.clone().into())
+                            .await;
+                        delivery.reply(Reply::Id(unique_src.next(&resource_type).await?));
+                    }
+                    ResourceRequestMessage::State => {
+                        let key: ResourceKey = delivery.payload.to.clone().try_into()?;
+
+                        let (tx, rx) = oneshot::channel();
+                        host_tx.send(HostCall::Get { key, tx }).await?;
+                        let result = rx.await;
+                        if let Ok(Ok(Option::Some(state))) = result {
+                            let state = match state.try_into() {
+                                Ok(state) => state,
+                                Err(_) => {
+                                    error!("error when try_into from BinSrc to NetworkBinSrc");
+                                    delivery.fail(Fail::expected(
+                                        "Ok(Ok(StarCoreResult::State(state)))",
+                                    ));
+                                    return Err("error when try_into from BinSrc to NetworkBinSrc".into());
+                                }
+                            };
+
+                            delivery.reply(Reply::State(state));
+                        } else {
+                            delivery.fail(Fail::expected("Ok(Ok(StarCoreResult::State(state)))"));
+                        }
+                    }
+                }
+                Ok(())
             }
-        }
+
+            match process(skel, host_tx, delivery).await {
+                Ok(_) => {}
+                Err(err) => {
+                    error!("{}", err.to_string());
+                }
+            }
+        });
         Ok(())
     }
 
@@ -190,6 +207,11 @@ impl MessagingEndpointComponent {
                         delivery.result_ok(result);
                     }
                     RegistryAction::Find(find) => {
+                        println!(
+                            "FIND resource: {} star {}",
+                            find.to_string(),
+                            skel.info.kind.to_string()
+                        );
                         let result = registry.get(find.to_owned()).await;
 
                         match result {
@@ -249,21 +271,17 @@ impl MessagingEndpointComponent {
         Ok(())
     }
 
-    async fn get_parent_resource(&mut self, key: ResourceKey) -> Result<Parent, Fail> {
+    async fn get_parent_resource(skel: StarSkel, key: ResourceKey) -> Result<Parent, Fail> {
         println!("CORE: locating parent resource record");
-        let resource = self
-            .skel
-            .resource_locator_api
-            .locate(key.clone().into())
-            .await?;
+        let resource = skel.resource_locator_api.locate(key.clone().into()).await?;
         println!("CORE: got parent resource record...");
 
         Ok(Parent {
             core: ParentCore {
                 stub: resource.into(),
-                selector: ResourceHostSelector::new(self.skel.clone()),
-                child_registry: self.skel.registry.as_ref().unwrap().clone(),
-                skel: self.skel.clone(),
+                selector: ResourceHostSelector::new(skel.clone()),
+                child_registry: skel.registry.as_ref().unwrap().clone(),
+                skel: skel.clone(),
             },
         })
     }
