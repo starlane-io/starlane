@@ -272,9 +272,7 @@ impl MessagingEndpointComponent {
     }
 
     async fn get_parent_resource(skel: StarSkel, key: ResourceKey) -> Result<Parent, Fail> {
-        println!("CORE: locating parent resource record");
         let resource = skel.resource_locator_api.locate(key.clone().into()).await?;
-        println!("CORE: got parent resource record...");
 
         Ok(Parent {
             core: ParentCore {

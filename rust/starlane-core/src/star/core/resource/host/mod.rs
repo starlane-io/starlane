@@ -4,16 +4,17 @@ use crate::message::Fail;
 use crate::resource::{
     AssignResourceStateSrc, Resource, ResourceAssign, ResourceKey, ResourceType,
 };
-use crate::star::core::resource::host::domain::DomainHost;
+use crate::star::core::resource::host::default::StatelessHost;
 use crate::star::core::resource::host::space::SpaceHost;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use tokio::sync::{mpsc, oneshot};
+use crate::star::core::resource::host::artifact::ArtifactBundleHost;
 
 pub mod artifact;
-mod domain;
+mod default;
 pub mod file_store;
 pub mod kube;
 mod space;
@@ -85,8 +86,9 @@ impl HostComponent {
         match rt {
             ResourceType::Space => Box::new(SpaceHost::new(self.skel.clone()).await),
             ResourceType::SubSpace => Box::new(SpaceHost::new(self.skel.clone()).await),
-            ResourceType::ArtifactBundleVersions => Box::new(SpaceHost::new(self.skel.clone()).await),
-            ResourceType::Domain => Box::new(DomainHost::new(self.skel.clone()).await),
+            ResourceType::ArtifactBundleVersions => Box::new(StatelessHost::new(self.skel.clone()).await),
+            ResourceType::ArtifactBundle=> Box::new(ArtifactBundleHost::new(self.skel.clone()).await),
+            ResourceType::Domain => Box::new(StatelessHost::new(self.skel.clone()).await),
 
             t => unimplemented!("no HOST implementation for type {}", t.to_string()),
         }

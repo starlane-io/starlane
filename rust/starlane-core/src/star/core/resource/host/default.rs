@@ -7,14 +7,14 @@ use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 
 #[derive(Debug)]
-pub struct DomainHost {
+pub struct StatelessHost {
     skel: StarSkel,
     store: StateStore,
 }
 
-impl DomainHost {
+impl StatelessHost {
     pub async fn new(skel: StarSkel) -> Self {
-        DomainHost {
+        StatelessHost {
             skel: skel.clone(),
             store: StateStore::new(skel).await,
         }
@@ -22,7 +22,7 @@ impl DomainHost {
 }
 
 #[async_trait]
-impl Host for DomainHost {
+impl Host for StatelessHost {
     async fn assign(
         &self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
