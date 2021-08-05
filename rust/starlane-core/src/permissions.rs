@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
-use crate::crypt::{JwtDecoder};
+use crate::crypt::JwtDecoder;
 use crate::error::Error;
 use crate::resource::{Labels, ResourceKey, UserKey};
 

@@ -3,15 +3,18 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::Error;
-use crate::resource::{AssignResourceStateSrc, FileSystemKey, LocalStateSetSrc, Resource, ResourceAddress, ResourceType };
 use crate::data::{BinSrc, DataSet};
+use crate::error::Error;
+use crate::resource::{
+    AssignResourceStateSrc, FileSystemKey, LocalStateSetSrc, Resource, ResourceAddress,
+    ResourceType,
+};
 
 #[derive(Clone)]
 pub struct FileSystem {
     key: FileSystemKey,
     address: ResourceAddress,
-    state_src: DataSet<BinSrc>
+    state_src: DataSet<BinSrc>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

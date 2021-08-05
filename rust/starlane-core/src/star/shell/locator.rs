@@ -1,5 +1,5 @@
-pub mod star;
 pub mod resource;
+pub mod star;
 
 use std::time::Duration;
 
@@ -12,6 +12,7 @@ use starlane_resources::ResourceIdentifier;
 use crate::frame::{RegistryAction, Reply, SimpleReply, StarMessagePayload};
 use crate::message::{Fail, ProtoStarMessage};
 use crate::resource::{ResourceAddress, ResourceKey, ResourceRecord, ResourceType};
-use crate::star::{LogId, Request, ResourceRegistryBacking, Set, Star, StarCommand, StarKey, StarKind, StarSkel};
+use crate::star::{
+    LogId, Request, ResourceRegistryBacking, Set, Star, StarCommand, StarKey, StarKind, StarSkel,
+};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-

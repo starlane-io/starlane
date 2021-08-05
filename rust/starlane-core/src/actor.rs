@@ -1,29 +1,17 @@
-
-
 use std::fmt;
-
 
 use std::str::FromStr;
 
-
 use serde::{Deserialize, Serialize};
-
-
-
-
 
 use crate::error::Error;
 
-
-
 use crate::names::Name;
-
-
 
 pub type ActorSpecific = Name;
 pub type GatheringSpecific = Name;
 
-#[derive(Debug,Eq, PartialEq, Hash, Clone, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone, Serialize, Deserialize)]
 pub enum ActorKind {
     Stateful,
     Stateless,

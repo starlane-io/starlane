@@ -1,9 +1,8 @@
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast};
-
+use tokio::sync::broadcast;
 
 use crate::star::{StarInfo, StarKey, StarKind};
 
@@ -95,7 +94,7 @@ impl LogAggregate {
     }
 }
 
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Flags {
     map: HashMap<Flag, bool>,
 }
@@ -124,12 +123,12 @@ impl Flags {
     }
 }
 
-#[derive(Debug,Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Flag {
     Star(StarFlag),
 }
 
-#[derive(Debug,Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum StarFlag {
     DiagnoseSequence,
     DiagnosePledge,

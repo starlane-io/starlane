@@ -1,28 +1,18 @@
-
-
-
-
 use std::str::{FromStr, Split};
 
 use serde::{Deserialize, Serialize};
 
-
-
-
-
 use crate::error::Error;
 
-
-
-
-use crate::resource::{ArtifactAddress, ArtifactBundleAddress, ArtifactBundleKey, ArtifactKey, ArtifactKind, Path, ResourceAddress, ResourceAddressPart, ResourceKey, ResourceType, SubSpaceKey};
+use crate::resource::{
+    ArtifactAddress, ArtifactBundleAddress, ArtifactBundleKey, ArtifactKey, ArtifactKind, Path,
+    ResourceAddress, ResourceAddressPart, ResourceKey, ResourceType, SubSpaceKey,
+};
 
 pub enum ArtifactIdentifier {
     Key(ArtifactKey),
     Address(ArtifactAddress),
 }
-
-
 
 #[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct ArtifactBundle {
@@ -199,21 +189,17 @@ impl SubSpaceName {
     }
 }
 
-
-
-
-
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct ArtifactRef {
     pub address: ArtifactAddress,
     pub kind: ArtifactKind,
 }
 
-impl ArtifactRef{
-    pub fn new( address: ArtifactAddress, kind: ArtifactKind ) -> Self {
+impl ArtifactRef {
+    pub fn new(address: ArtifactAddress, kind: ArtifactKind) -> Self {
         Self {
             address: address,
-            kind: kind
+            kind: kind,
         }
     }
 }

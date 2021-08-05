@@ -1,12 +1,12 @@
-use std::{cmp, fmt};
 use std::cmp::{min, Ordering};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::fmt::{Debug, Formatter};
 use std::iter::FromIterator;
-use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
+use std::{cmp, fmt};
 
 use futures::future::select_all;
 use futures::FutureExt;
@@ -23,100 +23,128 @@ use crate::cache::ProtoArtifactCachesFactory;
 use crate::constellation::ConstellationStatus;
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use crate::frame::{ActorLookup, Frame, ProtoFrame, RegistryAction, Reply, SimpleReply, StarMessage, StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit, WindResults, WindUp};
+use crate::frame::{
+    ActorLookup, Frame, ProtoFrame, RegistryAction, Reply, SimpleReply, StarMessage,
+    StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit,
+    WindResults, WindUp,
+};
 use crate::id::Id;
-use crate::lane::{ConnectorController, LaneCommand, LaneEndpoint, LaneIndex, LaneMeta, LaneWrapper, ProtoLaneEndpoint, LaneKey};
-use crate::logger::{Flags, Logger, LogInfo};
-use crate::message::{Fail, MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage, ProtoStarMessageTo, TrackerJob};
-use crate::resource::{ActorKey, Registry, RegistryReservation, RegistryUniqueSrc, Resource, ResourceAddress, ResourceKey, ResourceNamesReservationRequest, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryResult, ResourceSelector, ResourceType, UniqueSrc};
+use crate::lane::{
+    ConnectorController, LaneCommand, LaneEndpoint, LaneIndex, LaneKey, LaneMeta, LaneWrapper,
+    ProtoLaneEndpoint,
+};
+use crate::logger::{Flags, LogInfo, Logger};
+use crate::message::{
+    Fail, MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage,
+    ProtoStarMessageTo, TrackerJob,
+};
+use crate::resource::{
+    ActorKey, Registry, RegistryReservation, RegistryUniqueSrc, Resource, ResourceAddress,
+    ResourceKey, ResourceNamesReservationRequest, ResourceRecord, ResourceRegistration,
+    ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryResult, ResourceSelector,
+    ResourceType, UniqueSrc,
+};
 use crate::star::core::message::CoreMessageCall;
+use crate::star::shell::lanes::LanesApi;
+use crate::star::shell::locator::resource::ResourceLocatorApi;
+use crate::star::shell::locator::star::StarLocatorApi;
+use crate::star::shell::message::MessagingApi;
+use crate::star::shell::router::RouterApi;
+use crate::star::surface::SurfaceApi;
 use crate::star::variant::{StarShellInstructions, StarVariant};
 use crate::starlane::StarlaneMachine;
 use crate::template::StarTemplateHandle;
-use crate::star::shell::router::RouterApi;
-use crate::star::shell::message::MessagingApi;
-use crate::star::shell::locator::star::StarLocatorApi;
-use crate::star::shell::locator::resource::ResourceLocatorApi;
-use crate::star::shell::lanes::LanesApi;
-use crate::star::surface::SurfaceApi;
 
-pub mod variant;
 pub mod core;
 pub mod shell;
 pub mod surface;
+pub mod variant;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Serialize, Deserialize, Hash, strum_macros::EnumString, strum_macros::Display )]
+#[derive(
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Hash,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
 pub enum StarKind {
     Central,
-    SpaceHost,
+    Space,
     Mesh,
-    AppHost,
-    ActorHost,
+    App,
+    Actor,
     FileStore,
     ArtifactStore,
     Gateway,
     Link,
     Client,
     Web,
-    Kube,
+    K8s,
 }
 
-
 impl StarKind {
-
-
-
     pub fn is_resource_manager(&self) -> bool {
         match self {
             StarKind::Central => true,
-            StarKind::SpaceHost => true,
+            StarKind::Space => true,
             StarKind::Mesh => false,
-            StarKind::AppHost => true,
-            StarKind::ActorHost => false,
+            StarKind::App => true,
+            StarKind::Actor => false,
             StarKind::FileStore => true,
             StarKind::Gateway => false,
             StarKind::Link => false,
             StarKind::Client => false,
             StarKind::Web => false,
             StarKind::ArtifactStore => true,
-            StarKind::Kube => true,
+            StarKind::K8s => true,
         }
     }
 
     pub fn is_resource_host(&self) -> bool {
         match self {
             StarKind::Central => false,
-            StarKind::SpaceHost => true,
+            StarKind::Space => true,
             StarKind::Mesh => false,
-            StarKind::AppHost => true,
-            StarKind::ActorHost => true,
+            StarKind::App => true,
+            StarKind::Actor => true,
             StarKind::FileStore => true,
             StarKind::Gateway => false,
             StarKind::Link => false,
             StarKind::Client => true,
             StarKind::Web => true,
             StarKind::ArtifactStore => true,
-            StarKind::Kube => true,
+            StarKind::K8s => true,
         }
     }
 
     pub fn distributes_to(&self) -> HashSet<StarKind> {
         HashSet::from_iter(
             match self {
-                StarKind::Central => vec![StarKind::SpaceHost],
-                StarKind::SpaceHost => {
-                    vec![StarKind::FileStore, StarKind::Web, StarKind::ArtifactStore, StarKind::Kube]
+                StarKind::Central => vec![StarKind::Space],
+                StarKind::Space => {
+                    vec![
+                        StarKind::FileStore,
+                        StarKind::Web,
+                        StarKind::ArtifactStore,
+                        StarKind::K8s,
+                    ]
                 }
                 StarKind::Mesh => vec![],
-                StarKind::AppHost => vec![StarKind::ActorHost, StarKind::FileStore],
-                StarKind::ActorHost => vec![],
+                StarKind::App => vec![StarKind::Actor, StarKind::FileStore],
+                StarKind::Actor => vec![],
                 StarKind::FileStore => vec![],
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
                 StarKind::Client => vec![],
                 StarKind::Web => vec![],
                 StarKind::ArtifactStore => vec![],
-                StarKind::Kube => vec![],
+                StarKind::K8s => vec![],
             }
             .iter()
             .cloned(),
@@ -127,7 +155,7 @@ impl StarKind {
         HashSet::from_iter(
             match self {
                 StarKind::Central => vec![ResourceType::Space],
-                StarKind::SpaceHost => vec![
+                StarKind::Space => vec![
                     ResourceType::SubSpace,
                     ResourceType::App,
                     ResourceType::FileSystem,
@@ -135,19 +163,19 @@ impl StarKind {
                     ResourceType::Database,
                 ],
                 StarKind::Mesh => vec![],
-                StarKind::AppHost => vec![
+                StarKind::App => vec![
                     ResourceType::Actor,
                     ResourceType::FileSystem,
                     ResourceType::Database,
                 ],
-                StarKind::ActorHost => vec![],
+                StarKind::Actor => vec![],
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
                 StarKind::Client => vec![],
                 StarKind::Web => vec![ResourceType::Domain],
                 StarKind::FileStore => vec![ResourceType::File],
                 StarKind::ArtifactStore => vec![ResourceType::Artifact],
-                StarKind::Kube => vec![ResourceType::Database],
+                StarKind::K8s => vec![ResourceType::Database],
             }
             .iter()
             .cloned(),
@@ -156,107 +184,47 @@ impl StarKind {
 
     pub fn registry(rt: &ResourceType) -> StarKind {
         match rt {
-            ResourceType::Root => {
-                Self::Central
-            }
-            ResourceType::Space => {
-                Self::Central
-            }
-            ResourceType::SubSpace => {
-                Self::SpaceHost
-            }
-            ResourceType::User => {
-                Self::SpaceHost
-            }
-            ResourceType::App => {
-                Self::SpaceHost
-            }
-            ResourceType::Actor => {
-                Self::AppHost
-            }
-            ResourceType::FileSystem => {
-                Self::SpaceHost
-            }
-            ResourceType::File => {
-                Self::SpaceHost
-            }
-            ResourceType::Database => {
-                Self::Kube
-            }
-            ResourceType::ArtifactBundleVersions => {
-                Self::SpaceHost
-            }
-            ResourceType::ArtifactBundle => {
-                Self::ArtifactStore
-            }
-            ResourceType::Artifact => {
-                Self::ArtifactStore
-            }
-            ResourceType::Proxy => {
-                Self::SpaceHost
-            }
-            ResourceType::Domain => {
-                Self::SpaceHost
-            }
+            ResourceType::Root => Self::Central,
+            ResourceType::Space => Self::Central,
+            ResourceType::SubSpace => Self::Space,
+            ResourceType::User => Self::Space,
+            ResourceType::App => Self::Space,
+            ResourceType::Actor => Self::App,
+            ResourceType::FileSystem => Self::Space,
+            ResourceType::File => Self::Space,
+            ResourceType::Database => Self::K8s,
+            ResourceType::ArtifactBundleVersions => Self::Space,
+            ResourceType::ArtifactBundle => Self::ArtifactStore,
+            ResourceType::Artifact => Self::ArtifactStore,
+            ResourceType::Proxy => Self::Space,
+            ResourceType::Domain => Self::Space,
         }
     }
 
     pub fn hosts(rt: &ResourceType) -> StarKind {
         match rt {
-
-            ResourceType::Root =>{
-                Self::Central
-            }
-            ResourceType::Space => {
-                Self::SpaceHost
-            }
-            ResourceType::SubSpace => {
-                Self::SpaceHost
-            }
-            ResourceType::User=> {
-                Self::SpaceHost
-            }
-            ResourceType::App=> {
-                Self::AppHost
-            }
-            ResourceType::Actor=> {
-                Self::ActorHost
-            }
-            ResourceType::FileSystem => {
-                Self::FileStore
-            }
-            ResourceType::File=> {
-                Self::FileStore
-            }
-            ResourceType::Database=> {
-                Self::Kube
-            }
-            ResourceType::ArtifactBundleVersions=> {
-                Self::ArtifactStore
-            }
-            ResourceType::ArtifactBundle=> {
-                Self::ArtifactStore
-            }
-            ResourceType::Artifact=> {
-                Self::ArtifactStore
-            }
-            ResourceType::Proxy=> {
-                Self::SpaceHost
-            }
-            ResourceType::Domain=> {
-                Self::SpaceHost
-            }
+            ResourceType::Root => Self::Central,
+            ResourceType::Space => Self::Space,
+            ResourceType::SubSpace => Self::Space,
+            ResourceType::User => Self::Space,
+            ResourceType::App => Self::App,
+            ResourceType::Actor => Self::Actor,
+            ResourceType::FileSystem => Self::FileStore,
+            ResourceType::File => Self::FileStore,
+            ResourceType::Database => Self::K8s,
+            ResourceType::ArtifactBundleVersions => Self::ArtifactStore,
+            ResourceType::ArtifactBundle => Self::ArtifactStore,
+            ResourceType::Artifact => Self::ArtifactStore,
+            ResourceType::Proxy => Self::Space,
+            ResourceType::Domain => Self::Space,
         }
     }
-
-
-
 
     pub fn hosted(&self) -> HashSet<ResourceType> {
         HashSet::from_iter(
             match self {
                 StarKind::Central => vec![ResourceType::Root],
-                StarKind::SpaceHost => vec![
+                StarKind::Space => vec![
                     ResourceType::Space,
                     ResourceType::SubSpace,
                     ResourceType::User,
@@ -264,17 +232,21 @@ impl StarKind {
                     ResourceType::Proxy,
                 ],
                 StarKind::Mesh => vec![],
-                StarKind::AppHost => vec![ResourceType::App],
-                StarKind::ActorHost => vec![ResourceType::Actor],
+                StarKind::App => vec![ResourceType::App],
+                StarKind::Actor => vec![ResourceType::Actor],
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
                 StarKind::Client => vec![ResourceType::Actor],
                 StarKind::Web => vec![],
                 StarKind::FileStore => vec![ResourceType::FileSystem, ResourceType::File],
                 StarKind::ArtifactStore => {
-                    vec![ResourceType::ArtifactBundleVersions,ResourceType::ArtifactBundle, ResourceType::Artifact]
+                    vec![
+                        ResourceType::ArtifactBundleVersions,
+                        ResourceType::ArtifactBundle,
+                        ResourceType::Artifact,
+                    ]
                 }
-                StarKind::Kube => vec![ResourceType::Database],
+                StarKind::K8s => vec![ResourceType::Database],
             }
             .iter()
             .cloned(),
@@ -314,7 +286,7 @@ impl StarKind {
     }
 
     pub fn is_supervisor(&self) -> bool {
-        if let StarKind::AppHost = self {
+        if let StarKind::App = self {
             return true;
         } else {
             return false;
@@ -338,7 +310,7 @@ impl StarKind {
     }
 
     pub fn supervisor_result(&self) -> Result<(), Error> {
-        if let StarKind::AppHost = self {
+        if let StarKind::App = self {
             Ok(())
         } else {
             Err("not supervisor".into())
@@ -346,7 +318,7 @@ impl StarKind {
     }
 
     pub fn server_result(&self) -> Result<(), Error> {
-        if let StarKind::ActorHost = self {
+        if let StarKind::Actor = self {
             Ok(())
         } else {
             Err("not server".into())
@@ -365,16 +337,16 @@ impl StarKind {
         match self {
             StarKind::Central => false,
             StarKind::Mesh => true,
-            StarKind::AppHost => false,
-            StarKind::ActorHost => true,
+            StarKind::App => false,
+            StarKind::Actor => true,
             StarKind::Gateway => true,
             StarKind::Client => true,
             StarKind::Link => true,
-            StarKind::SpaceHost => false,
+            StarKind::Space => false,
             StarKind::Web => false,
             StarKind::FileStore => false,
             StarKind::ArtifactStore => false,
-            StarKind::Kube => false,
+            StarKind::K8s => false,
         }
     }
 }
@@ -405,12 +377,12 @@ pub struct Star {
     star_subgraph_expansion_seq: AtomicU64,
 
     status: StarStatus,
-    status_broadcast: broadcast::Sender<StarStatus>
+    status_broadcast: broadcast::Sender<StarStatus>,
 }
 
-impl Debug for Star{
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(),std::fmt::Error> {
-        f.write_str(self.skel.info.to_string().as_str() );
+impl Debug for Star {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.write_str(self.skel.info.to_string().as_str());
         Ok(())
     }
 }
@@ -426,7 +398,7 @@ impl Star {
         frame_hold: FrameHold,
         variant: Box<dyn StarVariant>,
     ) -> Self {
-        let (status_broadcast,_) = broadcast::channel(8);
+        let (status_broadcast, _) = broadcast::channel(8);
         Star {
             skel: data,
             variant: variant,
@@ -441,7 +413,7 @@ impl Star {
             star_subgraph_expansion_seq: AtomicU64::new(0),
             status: StarStatus::Unknown,
             status_broadcast: status_broadcast,
-            core_tx
+            core_tx,
         }
     }
 
@@ -449,12 +421,8 @@ impl Star {
         self.skel.info.clone()
     }
 
-
-
-
     #[instrument]
     pub async fn run(mut self) {
-
         loop {
             let mut futures = vec![];
             let mut lanes = vec![];
@@ -464,7 +432,7 @@ impl Star {
             }
             let mut proto_lane_index = vec![];
 
-            for (index,lane) in &mut self.proto_lanes.iter_mut().enumerate() {
+            for (index, lane) in &mut self.proto_lanes.iter_mut().enumerate() {
                 futures.push(lane.incoming().recv().boxed());
                 proto_lane_index.push(index);
             }
@@ -474,23 +442,35 @@ impl Star {
             let (command, future_index, _) = select_all(futures).await;
 
             let lane_index = if future_index < lanes.len() {
-                LaneIndex::Lane(lanes.get(future_index).expect("expected a lane at this index").clone())
-            } else if future_index < lanes.len()+ proto_lane_index.len() {
-                LaneIndex::ProtoLane(future_index-lanes.len())
+                LaneIndex::Lane(
+                    lanes
+                        .get(future_index)
+                        .expect("expected a lane at this index")
+                        .clone(),
+                )
+            } else if future_index < lanes.len() + proto_lane_index.len() {
+                LaneIndex::ProtoLane(future_index - lanes.len())
             } else {
                 LaneIndex::None
             };
 
             let mut lane = if future_index < lanes.len() {
-                Option::Some(self.lanes.get_mut(lanes.get(future_index).as_ref().unwrap() ).expect("expected to get lane"))
-            } else if future_index < lanes.len()+ proto_lane_index.len() {
-                Option::Some(self.proto_lanes.get_mut( future_index-lanes.len()).expect("expected to get proto_lane"))
+                Option::Some(
+                    self.lanes
+                        .get_mut(lanes.get(future_index).as_ref().unwrap())
+                        .expect("expected to get lane"),
+                )
+            } else if future_index < lanes.len() + proto_lane_index.len() {
+                Option::Some(
+                    self.proto_lanes
+                        .get_mut(future_index - lanes.len())
+                        .expect("expected to get proto_lane"),
+                )
             } else {
                 Option::None
             };
 
             if let Some(command) = command {
-
                 let instructions = self.variant.filter(&command, &mut lane);
 
                 if let StarShellInstructions::Handle = instructions {
@@ -506,11 +486,20 @@ impl Star {
                             set_flags.tx.send(());
                         }
                         StarCommand::AddProtoLaneEndpoint(lane) => {
-                            let _result = lane.outgoing.out_tx.try_send( LaneCommand::Frame(Frame::Proto(ProtoFrame::ReportStarKey(self.skel.info.key.clone()))));
-                            self.proto_lanes.push(LaneWrapper::Proto(LaneMeta::new(lane)));
+                            let _result =
+                                lane.outgoing
+                                    .out_tx
+                                    .try_send(LaneCommand::Frame(Frame::Proto(
+                                        ProtoFrame::ReportStarKey(self.skel.info.key.clone()),
+                                    )));
+                            self.proto_lanes
+                                .push(LaneWrapper::Proto(LaneMeta::new(lane)));
                         }
                         StarCommand::AddLaneEndpoint(lane) => {
-                            self.lanes.insert(lane.remote_star.clone(), LaneWrapper::Lane(LaneMeta::new(lane)));
+                            self.lanes.insert(
+                                lane.remote_star.clone(),
+                                LaneWrapper::Lane(LaneMeta::new(lane)),
+                            );
                         }
                         StarCommand::AddConnectorController(connector_ctrl) => {
                             self.connector_ctrls.push(connector_ctrl);
@@ -520,7 +509,10 @@ impl Star {
                                 let lane = self.lane_with_shortest_path_to_star(&star);
                                 if let Option::Some(lane) = lane {
                                     for frame in frames {
-                                        lane.outgoing().out_tx.send(LaneCommand::Frame(frame)).await;
+                                        lane.outgoing()
+                                            .out_tx
+                                            .send(LaneCommand::Frame(frame))
+                                            .await;
                                     }
                                 } else {
                                     eprintln!("release hold called on star that is not ready!")
@@ -533,18 +525,18 @@ impl Star {
                         }
                         StarCommand::Test(_test) => {
                             /*                        match test
-                                               {
-                                                   StarTest::StarSearchForStarKey(star) => {
-                                                       let search = Search{
-                                                           pattern: StarSearchPattern::StarKey(star),
-                                                           tx: (),
-                                                           max_hops: 0
-                                                       };
-                                                       self.do_search(star).await;
+                                                   {
+                                                       StarTest::StarSearchForStarKey(star) => {
+                                                           let search = Search{
+                                                               pattern: StarSearchPattern::StarKey(star),
+                                                               tx: (),
+                                                               max_hops: 0
+                                                           };
+                                                           self.do_search(star).await;
+                                                       }
                                                    }
-                                               }
 
-                        */
+                            */
                         }
                         StarCommand::WindInit(search) => {
                             self.do_wind(search).await;
@@ -569,7 +561,6 @@ impl Star {
                         }
                         StarCommand::Frame(frame) => {
                             if let Frame::Close = frame {
-
                                 match lane_index {
                                     LaneIndex::None => {}
                                     LaneIndex::Lane(key) => {
@@ -580,31 +571,43 @@ impl Star {
                                         self.proto_lanes.remove(index);
                                     }
                                 }
-                            } else if let Frame::Proto(ProtoFrame::ReportStarKey(remote_star)) = frame {
-                                match lane_index.expect_proto_lane()
-                                {
+                            } else if let Frame::Proto(ProtoFrame::ReportStarKey(remote_star)) =
+                                frame
+                            {
+                                match lane_index.expect_proto_lane() {
                                     Ok(proto_lane_index) => {
-                                        let mut lane = self.proto_lanes.remove(proto_lane_index).expect_proto_lane().unwrap();
+                                        let mut lane = self
+                                            .proto_lanes
+                                            .remove(proto_lane_index)
+                                            .expect_proto_lane()
+                                            .unwrap();
                                         lane.remote_star = Option::Some(remote_star);
                                         let lane = match lane.try_into() {
-                                            Ok(lane) => {
-                                                lane
-                                            }
+                                            Ok(lane) => lane,
                                             Err(error) => {
-                                                error!("error converting proto_lane into lane: {}", error);
+                                                error!(
+                                                    "error converting proto_lane into lane: {}",
+                                                    error
+                                                );
                                                 continue;
                                             }
                                         };
-                                        self.skel.star_tx.send(StarCommand::AddLaneEndpoint(lane)).await;
+                                        self.skel
+                                            .star_tx
+                                            .send(StarCommand::AddLaneEndpoint(lane))
+                                            .await;
                                     }
                                     Err(err) => {
                                         error!("{}", err)
                                     }
                                 }
                             } else {
-                                if lane_index.is_lane()
-                                {
-                                    self.process_frame(frame, Option::Some(&lane_index.expect_lane().unwrap())).await;
+                                if lane_index.is_lane() {
+                                    self.process_frame(
+                                        frame,
+                                        Option::Some(&lane_index.expect_lane().unwrap()),
+                                    )
+                                    .await;
                                 }
                             }
                         }
@@ -616,38 +619,38 @@ impl Star {
                         }
                         StarCommand::SetStatus(status) => {
                             self.set_status(status.clone());
-//                            println!("{} {}", &self.skel.info.kind, &self.status.to_string());
+                            //                            println!("{} {}", &self.skel.info.kind, &self.status.to_string());
                         }
                         StarCommand::GetCaches(tx) => {
-//                            tx.send(self.skel.caches.clone());
+                            //                            tx.send(self.skel.caches.clone());
                             unimplemented!()
                         }
                         StarCommand::Diagnose(diagnose) => {
                             self.diagnose(diagnose).await;
-                        },
+                        }
                         StarCommand::GetStatusListener(tx) => {
                             tx.send(self.status_broadcast.subscribe());
                             self.status_broadcast.send(self.status.clone());
                         }
                         StarCommand::GetLaneForStar { star, tx } => {
-                            self.find_lane_for_star(star,tx).await;
+                            self.find_lane_for_star(star, tx).await;
                         }
                         StarCommand::GetSkel(tx) => {
                             tx.send(self.skel.clone()).unwrap_or_default();
                         }
                         StarCommand::Shutdown => {
-                            for (_,lane) in &mut self.lanes {
-                                lane.outgoing().out_tx.try_send(LaneCommand::Shutdown );
+                            for (_, lane) in &mut self.lanes {
+                                lane.outgoing().out_tx.try_send(LaneCommand::Shutdown);
                             }
-                            for lane in &mut self.proto_lanes{
-                                lane.outgoing().out_tx.try_send(LaneCommand::Shutdown );
+                            for lane in &mut self.proto_lanes {
+                                lane.outgoing().out_tx.try_send(LaneCommand::Shutdown);
                             }
 
                             self.lanes.clear();
                             self.proto_lanes.clear();
 
                             break;
-                        },
+                        }
                         _ => {
                             eprintln!("cannot process command: {}", command.to_string());
                         }
@@ -665,7 +668,7 @@ impl Star {
         self.check_status().await;
     }
 
-    fn set_status( &mut self, status: StarStatus ) {
+    fn set_status(&mut self, status: StarStatus) {
         self.status = status.clone();
         self.status_broadcast.send(status);
     }
@@ -687,39 +690,38 @@ impl Star {
                     let result = tokio::time::timeout(Duration::from_secs(5), rx).await;
                     match result {
                         Ok(Ok(hits)) => {
-                        for (star, hops) in hits.hits {
-                            let handle = StarHandle {
-                                key: star,
-                                kind: kind.clone(),
-                                hops: Option::Some(hops),
-                            };
-                            let result = star_handler.add_star_handle(handle).await;
-                            match result {
-                                Ok(_) => {
-                                    skel.star_tx.send(StarCommand::CheckStatus).await;
-                                }
-                                Err(error) => {
-                                    eprintln!(
-                                        "error when adding star handle: {}",
-                                        error.to_string()
-                                    )
+                            for (star, hops) in hits.hits {
+                                let handle = StarHandle {
+                                    key: star,
+                                    kind: kind.clone(),
+                                    hops: Option::Some(hops),
+                                };
+                                let result = star_handler.add_star_handle(handle).await;
+                                match result {
+                                    Ok(_) => {
+                                        skel.star_tx.send(StarCommand::CheckStatus).await;
+                                    }
+                                    Err(error) => {
+                                        eprintln!(
+                                            "error when adding star handle: {}",
+                                            error.to_string()
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
-                    Err(error) => {
-                        error!(
+                        Err(error) => {
+                            error!(
                             "error encountered when attempting to get a handle for: {} TIMEOUT: {}",
                             kind.to_string(), error.to_string()
                         );
-                    }
-                    Ok(Err(error)) => {
+                        }
+                        Ok(Err(error)) => {
                             error!(
                                 "error encountered when attempting to get a handle for: {} ERROR: {}",
                                 kind.to_string(), error.to_string()
                             );
-                    }
-
+                        }
                     }
                 });
             }
@@ -729,7 +731,9 @@ impl Star {
     async fn check_status(&mut self) {
         if self.status == StarStatus::Pending {
             if let Option::Some(star_handler) = &self.skel.star_handler {
-                let satisfied = star_handler.satisfied(self.skel.info.kind.distributes_to()).await;
+                let satisfied = star_handler
+                    .satisfied(self.skel.info.kind.distributes_to())
+                    .await;
                 if let Result::Ok(Satisfaction::Ok) = satisfied {
                     self.set_status(StarStatus::Initializing);
                     let (tx, rx) = oneshot::channel();
@@ -774,9 +778,6 @@ impl Star {
             Err(_) => Err(Fail::Timeout),
         }
     }
-
-
-
 
     /*
         async fn send_resource_message( &mut self, mut builder: ProtoMessage)
@@ -830,8 +831,6 @@ impl Star {
 
          */
 
-
-
     async fn search_for_star(&mut self, star: StarKey, tx: oneshot::Sender<WindHits>) {
         let wind = Wind {
             pattern: StarPattern::StarKey(star),
@@ -859,7 +858,6 @@ impl Star {
             .sequence
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-
         let local_hit = match wind.pattern.is_match(&self.skel.info) {
             true => Option::Some(self.skel.info.key.clone()),
             false => Option::None,
@@ -868,10 +866,10 @@ impl Star {
         let mut lanes = HashSet::from_iter(self.lanes.keys().cloned().into_iter());
 
         match &exclude {
-            None => {},
+            None => {}
             Some(exclude) => {
-                lanes.retain( |k| !exclude.contains(k));
-            },
+                lanes.retain(|k| !exclude.contains(k));
+            }
         }
 
         let transaction = Box::new(StarSearchTransaction::new(
@@ -1032,7 +1030,6 @@ impl Star {
         self.skel.surface_api.clone()
     }
 
-
     async fn broadcast(&mut self, frame: Frame) {
         self.broadcast_excluding(frame, &Option::None).await;
     }
@@ -1049,98 +1046,102 @@ impl Star {
         }
     }
 
-/*    async fn message(&mut self, delivery: StarMessageDeliveryInsurance) {
-        let message = delivery.message.clone();
-        if !delivery.message.payload.is_ack() {
-            let tracker = MessageReplyTracker {
-                reply_to: delivery.message.id.clone(),
-                tx: delivery.tx.clone(),
-            };
+    /*    async fn message(&mut self, delivery: StarMessageDeliveryInsurance) {
+           let message = delivery.message.clone();
+           if !delivery.message.payload.is_ack() {
+               let tracker = MessageReplyTracker {
+                   reply_to: delivery.message.id.clone(),
+                   tx: delivery.tx.clone(),
+               };
 
-            self.message_reply_trackers
-                .insert(delivery.message.id.clone(), tracker);
+               self.message_reply_trackers
+                   .insert(delivery.message.id.clone(), tracker);
 
-            let star_tx = self.skel.star_tx.clone();
-            tokio::spawn(async move {
-                let mut delivery = delivery;
-                delivery.retries = delivery.expect.retries();
+               let star_tx = self.skel.star_tx.clone();
+               tokio::spawn(async move {
+                   let mut delivery = delivery;
+                   delivery.retries = delivery.expect.retries();
 
-                loop {
-                    let wait = if delivery.retries == 0 && delivery.expect.retry_forever() {
-                        // take a 2 minute break if retry_forever to be sure that all messages have expired
-                        120 as u64
-                    } else {
-                        delivery.expect.wait_seconds()
-                    };
-                    let result = tokio::time::timeout(Duration::from_secs(wait), delivery.rx.recv()).await;
-                    match result {
-                        Ok(result) => {
-                            match result {
-                                Ok(update) => {
-                                    match update {
-                                        MessageUpdate::Result(_) => {
-                                            // the result will have been captured on another
-                                            // rx as this is a broadcast.  no longer need to wait.
-                                            break;
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                                Err(_) => {
-                                    // probably the TX got dropped. no point in sticking around.
-                                    break;
-                                }
-                            }
-                        }
-                        Err(_elapsed) => {
-                            delivery.retries = delivery.retries - 1;
-                            if delivery.retries == 0 {
-                                if delivery.expect.retry_forever() {
-                                    // we have to keep trying with a new message Id since the old one is now expired
-                                    let proto = delivery.message.resubmit(
-                                        delivery.expect,
-                                        delivery.tx.clone(),
-                                        delivery.tx.subscribe(),
-                                    );
-                                    star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                    break;
-                                } else {
-                                    // out of retries, this
-                                    delivery
-                                        .tx
-                                        .send(MessageUpdate::Result(MessageResult::Timeout));
-                                    break;
-                                }
-                            } else {
-                                // we resend the message and hope it arrives this time
-                                star_tx
-                                    .send(StarCommand::ForwardFrame(ForwardFrame {
-                                        to: delivery.message.to.clone(),
-                                        frame: Frame::StarMessage(delivery.message.clone()),
-                                    }))
-                                    .await;
-                            }
-                        }
-                    }
-                }
-            });
-        }
-        if message.to != self.skel.info.key {
-            self.send_frame(message.to.clone(), Frame::StarMessage(message))
-                .await;
-        } else {
-            // a special exception for sending a message to ourselves
-            self.process_frame(Frame::StarMessage(message), Option::None)
-                .await;
-        }
-    }
+                   loop {
+                       let wait = if delivery.retries == 0 && delivery.expect.retry_forever() {
+                           // take a 2 minute break if retry_forever to be sure that all messages have expired
+                           120 as u64
+                       } else {
+                           delivery.expect.wait_seconds()
+                       };
+                       let result = tokio::time::timeout(Duration::from_secs(wait), delivery.rx.recv()).await;
+                       match result {
+                           Ok(result) => {
+                               match result {
+                                   Ok(update) => {
+                                       match update {
+                                           MessageUpdate::Result(_) => {
+                                               // the result will have been captured on another
+                                               // rx as this is a broadcast.  no longer need to wait.
+                                               break;
+                                           }
+                                           _ => {}
+                                       }
+                                   }
+                                   Err(_) => {
+                                       // probably the TX got dropped. no point in sticking around.
+                                       break;
+                                   }
+                               }
+                           }
+                           Err(_elapsed) => {
+                               delivery.retries = delivery.retries - 1;
+                               if delivery.retries == 0 {
+                                   if delivery.expect.retry_forever() {
+                                       // we have to keep trying with a new message Id since the old one is now expired
+                                       let proto = delivery.message.resubmit(
+                                           delivery.expect,
+                                           delivery.tx.clone(),
+                                           delivery.tx.subscribe(),
+                                       );
+                                       star_tx.send(StarCommand::SendProtoMessage(proto)).await;
+                                       break;
+                                   } else {
+                                       // out of retries, this
+                                       delivery
+                                           .tx
+                                           .send(MessageUpdate::Result(MessageResult::Timeout));
+                                       break;
+                                   }
+                               } else {
+                                   // we resend the message and hope it arrives this time
+                                   star_tx
+                                       .send(StarCommand::ForwardFrame(ForwardFrame {
+                                           to: delivery.message.to.clone(),
+                                           frame: Frame::StarMessage(delivery.message.clone()),
+                                       }))
+                                       .await;
+                               }
+                           }
+                       }
+                   }
+               });
+           }
+           if message.to != self.skel.info.key {
+               self.send_frame(message.to.clone(), Frame::StarMessage(message))
+                   .await;
+           } else {
+               // a special exception for sending a message to ourselves
+               self.process_frame(Frame::StarMessage(message), Option::None)
+                   .await;
+           }
+       }
 
- */
-    async fn find_lane_for_star(&mut self, star: StarKey, lane_tx: oneshot::Sender<Result<LaneKey,Error>> )  {
+    */
+    async fn find_lane_for_star(
+        &mut self,
+        star: StarKey,
+        lane_tx: oneshot::Sender<Result<LaneKey, Error>>,
+    ) {
         let lane = self.lane_with_shortest_path_to_star(&star);
         if let Option::Some(lane) = lane {
             if let Option::Some(lane) = lane.get_remote_star() {
-                lane_tx.send(Ok(lane) ).unwrap_or_default();
+                lane_tx.send(Ok(lane)).unwrap_or_default();
             } else {
                 error!("not expecting lane to be a proto")
             }
@@ -1151,7 +1152,9 @@ impl Star {
             tokio::spawn(async move {
                 match rx.await {
                     Ok(_) => {
-                       star_tx.try_send( StarCommand::GetLaneForStar { star, tx: lane_tx } ).unwrap_or_default();
+                        star_tx
+                            .try_send(StarCommand::GetLaneForStar { star, tx: lane_tx })
+                            .unwrap_or_default();
                     }
                     Err(error) => {
                         lane_tx.send(Err(error.into())).unwrap_or_default();
@@ -1348,18 +1351,17 @@ impl Star {
         }
     }
 
-    async fn on_lane_closed( &mut self, key: &StarKey ) {
+    async fn on_lane_closed(&mut self, key: &StarKey) {
         // we should notify any waiting WIND transactions that this lane is no longer participating
         let mut remove = HashSet::new();
-        for (tid,transaction) in self.transactions.iter_mut() {
+        for (tid, transaction) in self.transactions.iter_mut() {
             if let TransactionResult::Done = transaction.on_lane_closed(key).await {
-                remove.insert(tid.clone() );
+                remove.insert(tid.clone());
             }
         }
 
-        self.transactions.retain( |k,_| !remove.contains(k) );
+        self.transactions.retain(|k, _| !remove.contains(k));
     }
-
 
     async fn process_message_reply(&mut self, message: &StarMessage) {
         if message.reply_to.is_some()
@@ -1401,65 +1403,63 @@ impl Star {
             Frame::StarMessage(message) => {
                 self.skel.router_api.route(message).unwrap_or_default();
             }
-/*            Frame::StarMessage(message) => match self.on_message(message).await {
-                Ok(_messages) => {}
-                Err(error) => {
-                    error!("X error: {}", error)
-                }
-            },
- */
+            /*            Frame::StarMessage(message) => match self.on_message(message).await {
+                           Ok(_messages) => {}
+                           Err(error) => {
+                               error!("X error: {}", error)
+                           }
+                       },
+            */
             _ => {
                 error!("star does not handle frame: {}", frame)
             }
-
         }
     }
-
 
     /*
-    async fn on_message(&mut self, message: StarMessage) -> Result<(), Error> {
+        async fn on_message(&mut self, message: StarMessage) -> Result<(), Error> {
 
-println!("STAR ON MESSAGE");
+    println!("STAR ON MESSAGE");
 
-        if message.log {
-            info!(
-                "{} => {} : {}",
-                self.skel.info.to_string(),
-                LogId(&message).to_string(),
-                "on_message"
-            );
-        }
-        if message.to != self.skel.info.key {
-            if self.skel.info.kind.relay() || message.from == self.skel.info.key {
-                //forward the message
-                self.send_frame(message.to.clone(), Frame::StarMessage(message))
-                    .await;
-                return Ok(());
-            } else {
-                error!("this star does not relay Messages");
-                return Err(
-                    format!("this star {} does not relay Messages", self.skel.info.kind.to_string()).into(),
+            if message.log {
+                info!(
+                    "{} => {} : {}",
+                    self.skel.info.to_string(),
+                    LogId(&message).to_string(),
+                    "on_message"
                 );
             }
-        } else {
-println!("Star on_message() -> message.reply_to.is_some(): {}", message.reply_to.is_some() );
-            if message.reply_to.is_some() {
-                self.skel.messaging_api.on_reply(message);
+            if message.to != self.skel.info.key {
+                if self.skel.info.kind.relay() || message.from == self.skel.info.key {
+                    //forward the message
+                    self.send_frame(message.to.clone(), Frame::StarMessage(message))
+                        .await;
+                    return Ok(());
+                } else {
+                    error!("this star does not relay Messages");
+                    return Err(
+                        format!("this star {} does not relay Messages", self.skel.info.kind.to_string()).into(),
+                    );
+                }
             } else {
-                self.skel.core_messaging_endpoint_tx.try_send(CoreMessageCall::Message(message)).unwrap_or_default();
+    println!("Star on_message() -> message.reply_to.is_some(): {}", message.reply_to.is_some() );
+                if message.reply_to.is_some() {
+                    self.skel.messaging_api.on_reply(message);
+                } else {
+                    self.skel.core_messaging_endpoint_tx.try_send(CoreMessageCall::Message(message)).unwrap_or_default();
+                }
+                Ok(())
             }
-            Ok(())
         }
-    }
-     */
-
+         */
 
     async fn diagnose(&self, diagnose: Diagnose) {
         match diagnose {
             Diagnose::HandlersSatisfied(satisfied) => {
                 if let Option::Some(star_handler) = &self.skel.star_handler {
-                    if let Result::Ok(satisfaction) =
-                        star_handler.satisfied(self.skel.info.kind.distributes_to()).await
+                    if let Result::Ok(satisfaction) = star_handler
+                        .satisfied(self.skel.info.kind.distributes_to())
+                        .await
                     {
                         satisfied.tx.send(satisfaction);
                     } else {
@@ -1517,16 +1517,18 @@ pub enum StarCommand {
     SetStatus(StarStatus),
     RefreshHandles,
 
-
     GetCaches(oneshot::Sender<Arc<ProtoArtifactCachesFactory>>),
-    GetLaneForStar{ star: StarKey, tx: oneshot::Sender<Result<LaneKey,Error>>},
+    GetLaneForStar {
+        star: StarKey,
+        tx: oneshot::Sender<Result<LaneKey, Error>>,
+    },
     Shutdown,
-    GetSkel(oneshot::Sender<StarSkel>)
+    GetSkel(oneshot::Sender<StarSkel>),
 }
 
 #[derive(Clone)]
-pub enum ConstellationBroadcast{
-    Status(ConstellationStatus)
+pub enum ConstellationBroadcast {
+    Status(ConstellationStatus),
 }
 
 pub enum Diagnose {
@@ -1537,7 +1539,6 @@ pub struct SetFlags {
     pub flags: Flags,
     pub tx: oneshot::Sender<()>,
 }
-
 
 pub struct ForwardFrame {
     pub to: StarKey,
@@ -1571,22 +1572,19 @@ impl Wind {
     }
 }
 
-
-pub struct Request<P:Debug, R> {
+pub struct Request<P: Debug, R> {
     pub payload: P,
     pub tx: oneshot::Sender<Result<R, Fail>>,
     pub log: bool,
 }
 
-impl<P:Debug, R> Debug for Request<P,R>
-{
+impl<P: Debug, R> Debug for Request<P, R> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.payload.fmt(f)
     }
 }
 
-
-impl<P:Debug, R> Request<P, R> {
+impl<P: Debug, R> Request<P, R> {
     pub fn new(payload: P) -> (Self, oneshot::Receiver<Result<R, Fail>>) {
         let (tx, rx) = oneshot::channel();
         (
@@ -1676,7 +1674,7 @@ pub enum StarTest {
 #[derive(Clone)]
 pub struct StarController {
     pub star_tx: mpsc::Sender<StarCommand>,
-    pub surface_api: SurfaceApi
+    pub surface_api: SurfaceApi,
 }
 
 impl StarController {
@@ -1700,13 +1698,12 @@ impl StarController {
         Ok(tokio::time::timeout(Duration::from_secs(5), rx).await??)
     }
 
-    pub async fn get_star_info( &self )->Result<Option<StarInfo>,Error> {
-        let (tx,rx) = oneshot::channel();
+    pub async fn get_star_info(&self) -> Result<Option<StarInfo>, Error> {
+        let (tx, rx) = oneshot::channel();
         self.star_tx.send(StarCommand::GetStarInfo(tx)).await;
         Ok(rx.await?)
     }
 }
-
 
 pub struct ResourceLocationRequestTransaction {
     pub tx: mpsc::Sender<()>,
@@ -1816,10 +1813,9 @@ impl StarSearchTransaction {
 
 #[async_trait]
 impl Transaction for StarSearchTransaction {
-
-    async fn on_lane_closed( &mut self, key: &StarKey ) -> TransactionResult  {
-        self.lanes.remove(key );
-        self.reported_lanes.remove(key );
+    async fn on_lane_closed(&mut self, key: &StarKey) -> TransactionResult {
+        self.lanes.remove(key);
+        self.reported_lanes.remove(key);
 
         if self.reported_lanes == self.lanes {
             self.commit().await;
@@ -1857,12 +1853,14 @@ impl Transaction for StarSearchTransaction {
                     }
                 }
 
-                self.hits
-                    .insert(lane.get_remote_star().unwrap(), lane_hits);
+                self.hits.insert(lane.get_remote_star().unwrap(), lane_hits);
             }
         }
 
-        self.reported_lanes.insert( lane.get_remote_star().expect("expected the lane to have a remote star key") );
+        self.reported_lanes.insert(
+            lane.get_remote_star()
+                .expect("expected the lane to have a remote star key"),
+        );
 
         if self.reported_lanes == self.lanes {
             self.commit().await;
@@ -1915,8 +1913,8 @@ pub enum TransactionResult {
 
 #[async_trait]
 pub trait Transaction: Send + Sync {
-    async fn on_lane_closed( &mut self, _key: &StarKey ) -> TransactionResult  {
-            TransactionResult::Continue
+    async fn on_lane_closed(&mut self, _key: &StarKey) -> TransactionResult {
+        TransactionResult::Continue
     }
 
     async fn on_frame(
@@ -2042,7 +2040,6 @@ pub struct StarTemplateId {
 }
 
 impl StarKey {
-
     pub fn new(index: u16) -> Self {
         StarKey {
             subgraph: vec![],
@@ -2080,9 +2077,9 @@ impl StarKey {
         }
     }
 
-    pub fn child_subgraph( &self ) -> Vec<StarSubGraphKey>{
+    pub fn child_subgraph(&self) -> Vec<StarSubGraphKey> {
         let mut subgraph = self.subgraph.clone();
-        subgraph.push( StarSubGraphKey::Small(self.index));
+        subgraph.push(StarSubGraphKey::Small(self.index));
         subgraph
     }
 }
@@ -2110,23 +2107,20 @@ pub struct StarSkel {
     pub star_handler: Option<StarHandleBacking>,
     pub persistence: Persistence,
     pub data_access: FileAccess,
-    pub machine: StarlaneMachine
+    pub machine: StarlaneMachine,
 }
 
-
-impl Debug for StarSkel{
+impl Debug for StarSkel {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.info.fmt(f)
     }
 }
 
-
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct StarInfo {
     pub key: StarKey,
     pub kind: StarKind,
 }
-
 
 impl StarInfo {
     pub fn new(star: StarKey, kind: StarKind) -> Self {
@@ -2181,7 +2175,6 @@ impl ToString for StarInfo {
     }
 }
 
-
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarNotify {
     pub star: StarKey,
@@ -2223,7 +2216,7 @@ impl ResourceRegistryBackingSqLite {
         Ok(rtn)
     }
 
-    async fn timeout<X>( rx: oneshot::Receiver<X>) -> Result<X,Fail> {
+    async fn timeout<X>(rx: oneshot::Receiver<X>) -> Result<X, Fail> {
         Ok(tokio::time::timeout(Duration::from_secs(25), rx).await??)
     }
 }
@@ -2237,23 +2230,23 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
         let (action, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Reserve(request));
         self.registry.send(action).await?;
 
-        match Self::timeout( rx ).await? {
+        match Self::timeout(rx).await? {
             ResourceRegistryResult::Reservation(reservation) => Result::Ok(reservation),
             _ => Result::Err(Fail::expected("ResourceRegistryResult::Reservation(_)")),
         }
 
-/*        match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
-            ResourceRegistryResult::Reservation(reservation) => Result::Ok(reservation),
-            _ => Result::Err(Fail::Timeout),
-        }
- */
+        /*        match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
+                   ResourceRegistryResult::Reservation(reservation) => Result::Ok(reservation),
+                   _ => Result::Err(Fail::Timeout),
+               }
+        */
     }
 
     async fn register(&self, registration: ResourceRegistration) -> Result<(), Fail> {
         let (request, rx) =
             ResourceRegistryAction::new(ResourceRegistryCommand::Commit(registration));
         self.registry.send(request).await?;
-//        tokio::time::timeout(Duration::from_secs(5), rx).await??;
+        //        tokio::time::timeout(Duration::from_secs(5), rx).await??;
         Self::timeout(rx).await?;
         Ok(())
     }
@@ -2261,8 +2254,8 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
     async fn select(&self, selector: ResourceSelector) -> Result<Vec<ResourceRecord>, Fail> {
         let (request, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Select(selector));
         self.registry.send(request).await?;
-       // match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
-        match Self::timeout( rx).await? {
+        // match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
+        match Self::timeout(rx).await? {
             ResourceRegistryResult::Resources(resources) => Result::Ok(resources),
             _ => Result::Err(Fail::Timeout),
         }
@@ -2278,15 +2271,14 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
     }
 
     async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<ResourceRecord>, Fail> {
-
         let (request, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Get(identifier));
         self.registry.send(request).await;
         //match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
-        match Self::timeout( rx).await? {
+        match Self::timeout(rx).await? {
             ResourceRegistryResult::Resource(resource) => {
-println!("returning resource...{}",resource.is_some());
+                println!("returning resource...{}", resource.is_some());
                 Ok(resource)
-            },
+            }
             _ => Err(Fail::expected("ResourceRegistryResult::Resource(_)")),
         }
     }
@@ -2346,7 +2338,7 @@ impl Into<LogId<String>> for &'static ProtoStarMessage {
 
 pub struct LogId<T>(T);
 
-impl <T> ToString for LogId<T>{
+impl<T> ToString for LogId<T> {
     fn to_string(&self) -> String {
         "log-id".to_string()
     }

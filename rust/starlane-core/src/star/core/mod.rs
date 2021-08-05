@@ -1,5 +1,2 @@
-
-
-pub mod resource;
 pub mod message;
-
+pub mod resource;

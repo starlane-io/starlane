@@ -1,36 +1,26 @@
-use std::{env};
-
-
-
-
-
-
-
+use std::env;
 
 use std::sync::Arc;
 
-
-
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
-use kube::{Api};
 use kube::api::{ListParams, PostParams};
-
+use kube::Api;
 
 use serde::{Deserialize, Serialize};
 
-
-
 use starlane_resources::{ResourceIdentifier, ResourceKindParts};
-
 
 use crate::error::Error;
 
 use crate::message::Fail;
-use crate::resource::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, Path, RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceCreationChamber, ResourceKind, ResourceStub, ResourceKey};
+use crate::resource::{
+    AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, Path, RemoteDataSrc, Resource,
+    ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy,
+    ResourceCreationChamber, ResourceKey, ResourceKind, ResourceStub,
+};
 
-
+use crate::data::{BinSrc, DataSet};
 use crate::star::StarSkel;
-use crate::data::{DataSet, BinSrc};
 
 /*
 

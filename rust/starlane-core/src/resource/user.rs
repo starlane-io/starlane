@@ -3,9 +3,11 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::Error;
-use crate::resource::{AssignResourceStateSrc, LocalStateSetSrc, Resource, ResourceAddress, ResourceType, UserKey};
 use crate::data::{BinSrc, DataSet};
+use crate::error::Error;
+use crate::resource::{
+    AssignResourceStateSrc, LocalStateSetSrc, Resource, ResourceAddress, ResourceType, UserKey,
+};
 
 #[derive(Clone)]
 pub struct User {

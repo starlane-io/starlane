@@ -3,18 +3,23 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::data::DataSet;
 use crate::error::Error;
-use crate::frame::{MessagePayload, RegistryAction, Reply, ResourceHostAction, SimpleReply, StarMessage, StarMessagePayload};
-use crate::message::Fail;
+use crate::frame::{
+    MessagePayload, RegistryAction, Reply, ResourceHostAction, SimpleReply, StarMessage,
+    StarMessagePayload,
+};
 use crate::message::resource::{
     Delivery, Message, ResourceRequestMessage, ResourceResponseMessage,
 };
-use crate::resource::{Parent, ParentCore, Resource, ResourceAddress, ResourceArchetype, ResourceKey, ResourceManager, ResourceRecord, ResourceId};
+use crate::message::Fail;
+use crate::resource::{
+    Parent, ParentCore, Resource, ResourceAddress, ResourceArchetype, ResourceId, ResourceKey,
+    ResourceManager, ResourceRecord,
+};
 use crate::resource::{ResourceKind, ResourceType};
-use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::star::core::resource::host::{HostCall, HostComponent};
 use crate::star::shell::pledge::ResourceHostSelector;
+use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-
 
 pub enum CoreMessageCall {
     Message(StarMessage),
@@ -30,7 +35,14 @@ pub struct MessagingEndpointComponent {
 impl MessagingEndpointComponent {
     pub fn start(skel: StarSkel, rx: mpsc::Receiver<CoreMessageCall>) {
         let host_tx = HostComponent::new(skel.clone());
-        AsyncRunner::new(Box::new(Self { skel:skel.clone(), host_tx }), skel.core_messaging_endpoint_tx.clone(), rx);
+        AsyncRunner::new(
+            Box::new(Self {
+                skel: skel.clone(),
+                host_tx,
+            }),
+            skel.core_messaging_endpoint_tx.clone(),
+            rx,
+        );
     }
 }
 
@@ -38,7 +50,8 @@ impl MessagingEndpointComponent {
 impl AsyncProcessor<CoreMessageCall> for MessagingEndpointComponent {
     async fn process(&mut self, call: CoreMessageCall) {
         match call {
-            CoreMessageCall::Message(message) => match self.process_resource_message(message).await {
+            CoreMessageCall::Message(message) => match self.process_resource_message(message).await
+            {
                 Ok(_) => {}
                 Err(err) => {
                     error!("{}", err);
@@ -54,20 +67,17 @@ impl MessagingEndpointComponent {
             StarMessagePayload::MessagePayload(message_payload) => match &message_payload {
                 MessagePayload::Request(request) => {
                     let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
-                    self.process_resource_request(delivery)
-                        .await?;
+                    self.process_resource_request(delivery).await?;
                 }
                 _ => {}
-            }
+            },
             StarMessagePayload::ResourceManager(action) => {
                 let delivery = Delivery::new(action.clone(), star_message, self.skel.clone());
-                self.process_registry_action(delivery )
-                    .await?;
+                self.process_registry_action(delivery).await?;
             }
             StarMessagePayload::ResourceHost(action) => {
                 let delivery = Delivery::new(action.clone(), star_message, self.skel.clone());
-                self.process_resource_host_action(delivery )
-                    .await?;
+                self.process_resource_host_action(delivery).await?;
             }
 
             _ => {}
@@ -81,6 +91,7 @@ impl MessagingEndpointComponent {
     ) -> Result<(), Error> {
         match delivery.payload.payload.clone() {
             ResourceRequestMessage::Create(create) => {
+                println!("CORE: CREATE RESOURCE...");
                 let parent_key = match create
                     .parent
                     .clone()
@@ -91,9 +102,13 @@ impl MessagingEndpointComponent {
                         return Err(error.to_string().into());
                     }
                 };
+                println!("CORE: getting parent...");
                 let parent = self.get_parent_resource(parent_key).await?;
+                println!("CORE: got PARENT...");
                 tokio::spawn(async move {
                     let record = parent.create(create.clone()).await.await;
+
+                    println!("CORE: got create result...");
                     match record {
                         Ok(record) => match record {
                             Ok(record) => {
@@ -120,7 +135,6 @@ impl MessagingEndpointComponent {
                 delivery.reply(Reply::Records(resources))
             }
             ResourceRequestMessage::Unique(resource_type) => {
-
                 let unique_src = self
                     .skel
                     .registry
@@ -128,7 +142,7 @@ impl MessagingEndpointComponent {
                     .unwrap()
                     .unique_src(delivery.payload.to.clone().into())
                     .await;
-                delivery.reply(Reply::Id( unique_src.next(&resource_type).await? ));
+                delivery.reply(Reply::Id(unique_src.next(&resource_type).await?));
             }
             ResourceRequestMessage::State => {
                 let key: ResourceKey = delivery.payload.to.clone().try_into()?;
@@ -142,14 +156,15 @@ impl MessagingEndpointComponent {
                             Ok(state) => state,
                             Err(_) => {
                                 error!("error when try_into from BinSrc to NetworkBinSrc");
-                                delivery.fail(Fail::expected( "Ok(Ok(StarCoreResult::State(state)))"));
+                                delivery
+                                    .fail(Fail::expected("Ok(Ok(StarCoreResult::State(state)))"));
                                 return;
                             }
                         };
 
                         delivery.reply(Reply::State(state));
                     } else {
-                        delivery.fail(Fail::expected( "Ok(Ok(StarCoreResult::State(state)))"));
+                        delivery.fail(Fail::expected("Ok(Ok(StarCoreResult::State(state)))"));
                     }
                 });
             }
@@ -159,12 +174,11 @@ impl MessagingEndpointComponent {
 
     async fn process_registry_action(
         &mut self,
-        delivery: Delivery<RegistryAction>
+        delivery: Delivery<RegistryAction>,
     ) -> Result<(), Error> {
-
         let skel = self.skel.clone();
 
-        tokio::spawn( async move {
+        tokio::spawn(async move {
             if let Option::Some(registry) = skel.registry.clone() {
                 match &delivery.payload {
                     RegistryAction::Register(registration) => {
@@ -180,9 +194,7 @@ impl MessagingEndpointComponent {
 
                         match result {
                             Ok(result) => match result {
-                                Some(record) => {
-                                    delivery.reply(Reply::Record(record))
-                                }
+                                Some(record) => delivery.reply(Reply::Record(record)),
                                 None => {
                                     delivery.fail(Fail::ResourceNotFound(find.clone()));
                                 }
@@ -196,7 +208,12 @@ impl MessagingEndpointComponent {
                         unimplemented!()
                     }
                     RegistryAction::UniqueResourceId { parent, child_type } => {
-                        let unique_src = skel.registry.as_ref().unwrap().unique_src(parent.clone()).await;
+                        let unique_src = skel
+                            .registry
+                            .as_ref()
+                            .unwrap()
+                            .unique_src(parent.clone())
+                            .await;
                         let result: Result<ResourceId, Fail> = unique_src.next(child_type).await;
                         match result {
                             Ok(id) => {
@@ -221,7 +238,10 @@ impl MessagingEndpointComponent {
         match &delivery.payload {
             ResourceHostAction::Assign(assign) => {
                 let (tx, rx) = oneshot::channel();
-                let call = HostCall::Assign { assign:assign.clone(), tx };
+                let call = HostCall::Assign {
+                    assign: assign.clone(),
+                    tx,
+                };
                 self.host_tx.try_send(call).unwrap_or_default();
                 delivery.result_rx(rx);
             }
@@ -230,15 +250,13 @@ impl MessagingEndpointComponent {
     }
 
     async fn get_parent_resource(&mut self, key: ResourceKey) -> Result<Parent, Fail> {
-        /*
+        println!("CORE: locating parent resource record");
         let resource = self
             .skel
-            .registry
-            .as_ref()
-            .expect("expected registry").get(key.into()).await?.ok_or("expected parent resource")?;
-         */
-        let resource = self.skel.resource_locator_api.locate(key.clone().into()).await?;
-
+            .resource_locator_api
+            .locate(key.clone().into())
+            .await?;
+        println!("CORE: got parent resource record...");
 
         Ok(Parent {
             core: ParentCore {
@@ -252,7 +270,12 @@ impl MessagingEndpointComponent {
 
     pub async fn has_resource(&self, key: &ResourceKey) -> Result<bool, Error> {
         let (tx, mut rx) = oneshot::channel();
-        self.host_tx.send(HostCall::Has { key: key.clone(), tx }).await?;
+        self.host_tx
+            .send(HostCall::Has {
+                key: key.clone(),
+                tx,
+            })
+            .await?;
         Ok(rx.await?)
     }
 }

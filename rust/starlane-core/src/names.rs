@@ -3,10 +3,7 @@ use std::str::{FromStr, Split};
 
 use serde::{Deserialize, Serialize};
 
-
-
-
-use crate::artifact::{SubSpaceName};
+use crate::artifact::SubSpaceName;
 use crate::error::Error;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -60,4 +57,3 @@ impl FromStr for Name {
         Ok(name)
     }
 }
-

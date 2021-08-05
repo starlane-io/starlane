@@ -7,10 +7,9 @@ use std::io::{Read, Seek, Write};
 use std::path::Path;
 use std::thread;
 
-
-use tokio::sync::{mpsc, oneshot};
 use tokio::sync::broadcast;
-use tokio::sync::mpsc::{Receiver};
+use tokio::sync::mpsc::Receiver;
+use tokio::sync::{mpsc, oneshot};
 
 use tokio::time::Duration;
 
@@ -21,10 +20,8 @@ use zip::write::FileOptions;
 use crate::error::Error;
 use crate::message::Fail;
 
-lazy_static!{
-    pub static ref SHUTDOWN_TX: broadcast::Sender<()> = {
-        broadcast::channel(1).0
-    };
+lazy_static! {
+    pub static ref SHUTDOWN_TX: broadcast::Sender<()> = { broadcast::channel(1).0 };
 }
 
 pub struct Progress<E> {
@@ -56,7 +53,7 @@ where
     },
     GetMap(oneshot::Sender<HashMap<K, V>>),
     SetMap(HashMap<K, V>),
-    Clear
+    Clear,
 }
 
 #[derive(Clone)]
@@ -112,7 +109,7 @@ where
     }
 
     pub fn clear(&self) -> Result<(), Error> {
-        self.tx.try_send(AsyncHashMapCommand::Clear )?;
+        self.tx.try_send(AsyncHashMapCommand::Clear)?;
         Ok(())
     }
 
@@ -173,44 +170,24 @@ where
 
 pub async fn wait_for_it<R>(rx: oneshot::Receiver<Result<R, Error>>) -> Result<R, Error> {
     match tokio::time::timeout(Duration::from_secs(4), rx).await {
-        Ok(result) => {
-            match result {
-                Ok(result) => {
-                    match result {
-                        Ok(result) => {
-                            Ok(result)
-                        }
-                        Err(error) => {
-                            log_err(error)
-                        }
-                    }
-                }
-                Err(error) => {
-                    log_err(error)
-                }
-            }
-        }
-        Err(_err) => {
-            log_err(Fail::Timeout)
-        }
+        Ok(result) => match result {
+            Ok(result) => match result {
+                Ok(result) => Ok(result),
+                Err(error) => log_err(error),
+            },
+            Err(error) => log_err(error),
+        },
+        Err(_err) => log_err(Fail::Timeout),
     }
 }
 
 pub async fn wait_for_it_whatever<R>(rx: oneshot::Receiver<R>) -> Result<R, Error> {
     match tokio::time::timeout(Duration::from_secs(4), rx).await {
-        Ok(result) => {
-            match result {
-                Ok(result) => {
-                    Ok(result)
-                }
-                Err(error) => {
-                    log_err(error)
-                }
-            }
-        }
-        Err(_err) => {
-            log_err(Fail::Timeout)
-        }
+        Ok(result) => match result {
+            Ok(result) => Ok(result),
+            Err(error) => log_err(error),
+        },
+        Err(_err) => log_err(Fail::Timeout),
     }
 }
 
@@ -219,26 +196,14 @@ pub async fn wait_for_it_for<R>(
     duration: Duration,
 ) -> Result<R, Error> {
     match tokio::time::timeout(duration, rx).await {
-        Ok(result) => {
-            match result {
-                Ok(result) => {
-                    match result {
-                        Ok(result) => {
-                            Ok(result)
-                        }
-                        Err(error) => {
-                            log_err(error)
-                        }
-                    }
-                }
-                Err(error) => {
-                    log_err(error)
-                }
-            }
-        }
-        Err(_err) => {
-            log_err(Fail::Timeout)
-        }
+        Ok(result) => match result {
+            Ok(result) => match result {
+                Ok(result) => Ok(result),
+                Err(error) => log_err(error),
+            },
+            Err(error) => log_err(error),
+        },
+        Err(_err) => log_err(Fail::Timeout),
     }
 }
 
@@ -276,14 +241,9 @@ impl<C: Call> AsyncRunner<C> {
     }
 }
 
-pub fn sort<T:Ord+PartialOrd+ToString>(a: T, b: T) -> Result<(T, T), Error> {
+pub fn sort<T: Ord + PartialOrd + ToString>(a: T, b: T) -> Result<(T, T), Error> {
     if a == b {
-        Err(format!(
-            "both items are equal. {}=={}",
-            a.to_string(),
-            b.to_string()
-        )
-            .into())
+        Err(format!("both items are equal. {}=={}", a.to_string(), b.to_string()).into())
     } else if a.cmp(&b) == Ordering::Greater {
         Ok((a, b))
     } else {
@@ -291,12 +251,10 @@ pub fn sort<T:Ord+PartialOrd+ToString>(a: T, b: T) -> Result<(T, T), Error> {
     }
 }
 
-pub fn log_err<E:ToString,OK,O:From<E>>(err: E ) -> Result<OK,O>{
-  error!("{}",err.to_string());
-  Err(err.into())
+pub fn log_err<E: ToString, OK, O: From<E>>(err: E) -> Result<OK, O> {
+    error!("{}", err.to_string());
+    Err(err.into())
 }
-
-
 
 fn zip_dir<T>(
     it: &mut dyn Iterator<Item = DirEntry>,
@@ -304,8 +262,8 @@ fn zip_dir<T>(
     writer: T,
     method: zip::CompressionMethod,
 ) -> zip::result::ZipResult<()>
-    where
-        T: Write + Seek,
+where
+    T: Write + Seek,
 {
     let mut zip = zip::ZipWriter::new(writer);
     let options = FileOptions::default()
@@ -320,9 +278,9 @@ fn zip_dir<T>(
         // Write file or directory explicitly
         // Some unzip tools unzip files with directory paths correctly, some do not!
         if path.is_file() {
-//            println!("adding file {:?} as {:?} ...", path, name);
+            //            println!("adding file {:?} as {:?} ...", path, name);
             #[allow(deprecated)]
-                zip.start_file_from_path(name, options)?;
+            zip.start_file_from_path(name, options)?;
             let mut f = File::open(path)?;
 
             f.read_to_end(&mut buffer)?;
@@ -333,7 +291,7 @@ fn zip_dir<T>(
             // and mapname conversion failed error on unzip
             println!("adding dir {:?} as {:?} ...", path, name);
             #[allow(deprecated)]
-                zip.add_directory_from_path(name, options)?;
+            zip.add_directory_from_path(name, options)?;
         }
     }
     zip.finish()?;
@@ -349,10 +307,10 @@ pub fn zip(
         return Err(ZipError::FileNotFound);
     }
 
-/*    let path = Path::new(dst_file);
-    let file = File::create(&path).unwrap();
+    /*    let path = Path::new(dst_file);
+       let file = File::create(&path).unwrap();
 
- */
+    */
 
     let walkdir = WalkDir::new(src_dir.to_string());
     let it = walkdir.into_iter();
@@ -362,11 +320,10 @@ pub fn zip(
     Ok(())
 }
 
-
 pub fn shutdown() {
     SHUTDOWN_TX.send(());
-    thread::spawn( move || {
-        std::thread::sleep( std::time::Duration::from_millis(100));
+    thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(100));
         std::process::exit(0);
     });
 }

@@ -1,14 +1,14 @@
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU64, Ordering};
+use std::sync::Arc;
 
 use futures::future::select_all;
-use futures::FutureExt;
 use futures::prelude::*;
-use tokio::sync::{broadcast, mpsc};
+use futures::FutureExt;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::{broadcast, mpsc};
 use tokio::time::{Duration, Instant};
 
 use crate::cache::ProtoArtifactCachesFactory;
@@ -19,21 +19,29 @@ use crate::frame::{
     Frame, ProtoFrame, SequenceMessage, StarMessage, StarMessagePayload, StarPattern, WindDown,
     WindHit, WindUp,
 };
-use crate::lane::{ConnectorController, LaneCommand, LaneEndpoint, LaneIndex, LaneMeta, LaneWrapper, ProtoLaneEndpoint, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelIn, TunnelOut, TunnelOutState};
+use crate::lane::{
+    ConnectorController, LaneCommand, LaneEndpoint, LaneIndex, LaneMeta, LaneWrapper,
+    ProtoLaneEndpoint, TunnelConnector, TunnelIn, TunnelOut, TunnelOutState,
+    STARLANE_PROTOCOL_VERSION,
+};
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::permissions::AuthTokenSource;
-use crate::star::{ConstellationBroadcast, FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBacking, ResourceRegistryBackingSqLite, ShortestPathStarKey, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarSearchTransaction, StarSkel, Transaction};
 use crate::star::core::message::MessagingEndpointComponent;
+use crate::star::shell::lanes::{LanesApi, LanesComponent};
+use crate::star::shell::locator::resource::{ResourceLocatorApi, ResourceLocatorComponent};
+use crate::star::shell::locator::star::{StarLocatorApi, StarLocatorComponent};
+use crate::star::shell::message::{MessagingApi, MessagingComponent};
 use crate::star::shell::pledge::StarHandleBacking;
+use crate::star::shell::router::{RouterApi, RouterComponent};
+use crate::star::surface::{SurfaceApi, SurfaceCall, SurfaceComponent};
 use crate::star::variant::StarVariantFactory;
+use crate::star::{
+    ConstellationBroadcast, FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBacking,
+    ResourceRegistryBackingSqLite, ShortestPathStarKey, Star, StarCommand, StarController,
+    StarInfo, StarKernel, StarKey, StarKind, StarSearchTransaction, StarSkel, Transaction,
+};
 use crate::starlane::StarlaneMachine;
 use crate::template::StarKeyConstellationIndex;
-use crate::star::shell::router::{RouterApi, RouterComponent};
-use crate::star::shell::locator::resource::{ResourceLocatorComponent, ResourceLocatorApi};
-use crate::star::shell::locator::star::{StarLocatorComponent, StarLocatorApi};
-use crate::star::shell::message::{MessagingComponent, MessagingApi};
-use crate::star::shell::lanes::{LanesApi, LanesComponent};
-use crate::star::surface::{SurfaceApi, SurfaceCall, SurfaceComponent};
 
 pub static MAX_HOPS: i32 = 32;
 
@@ -57,7 +65,7 @@ pub struct ProtoStar {
     constellation_status: ConstellationStatus,
     flags: Flags,
     tracker: ProtoTracker,
-    machine: StarlaneMachine
+    machine: StarlaneMachine,
 }
 
 impl ProtoStar {
@@ -73,7 +81,7 @@ impl ProtoStar {
         proto_constellation_broadcast: broadcast::Receiver<ConstellationBroadcast>,
         flags: Flags,
         logger: Logger,
-        machine: StarlaneMachine
+        machine: StarlaneMachine,
     ) -> (Self, StarController) {
         //        let (star_tx, star_rx) = mpsc::channel(32);
         (
@@ -90,27 +98,36 @@ impl ProtoStar {
                 logger: logger,
                 frame_hold: FrameHold::new(),
                 data_access: data_access,
-                proto_constellation_broadcast: Cell::new(Option::Some(proto_constellation_broadcast)),
+                proto_constellation_broadcast: Cell::new(Option::Some(
+                    proto_constellation_broadcast,
+                )),
                 tracker: ProtoTracker::new(),
                 flags: flags,
                 constellation_status: ConstellationStatus::Unknown,
                 machine: machine,
                 surface_api: surface_api.clone(),
-                surface_rx
+                surface_rx,
             },
-            StarController { star_tx, surface_api },
+            StarController {
+                star_tx,
+                surface_api,
+            },
         )
     }
 
     pub async fn evolve(mut self) -> Result<Star, Error> {
-
-        let mut proto_constellation_broadcast = self.proto_constellation_broadcast.replace(Option::None).ok_or("expected proto_constellation_broadcast to be Option::Some()")?;
+        let mut proto_constellation_broadcast = self
+            .proto_constellation_broadcast
+            .replace(Option::None)
+            .ok_or("expected proto_constellation_broadcast to be Option::Some()")?;
 
         let star_tx = self.star_tx.clone();
-        tokio::spawn( async move {
-           while let Result::Ok(broadcast) =  proto_constellation_broadcast.recv().await {
-               star_tx.send( StarCommand::ConstellationBroadcast(broadcast)).await;
-           }
+        tokio::spawn(async move {
+            while let Result::Ok(broadcast) = proto_constellation_broadcast.recv().await {
+                star_tx
+                    .send(StarCommand::ConstellationBroadcast(broadcast))
+                    .await;
+            }
         });
 
         loop {
@@ -123,8 +140,8 @@ impl ProtoStar {
                 lanes.push(key.clone())
             }
             let mut proto_lane_index = vec![];
-//println!("adding proto lane to futures....{}", self.proto_lanes.len() );
-            for (index,lane) in &mut self.proto_lanes.iter_mut().enumerate() {
+            //println!("adding proto lane to futures....{}", self.proto_lanes.len() );
+            for (index, lane) in &mut self.proto_lanes.iter_mut().enumerate() {
                 futures.push(lane.incoming().recv().boxed());
                 proto_lane_index.push(index);
             }
@@ -138,47 +155,54 @@ impl ProtoStar {
             let (command, future_index, _) = select_all(futures).await;
 
             let lane_index = if future_index < lanes.len() {
-                LaneIndex::Lane(lanes.get(future_index).expect("expected a lane at this index").clone())
-            } else if future_index < lanes.len()+ proto_lane_index.len() {
-                LaneIndex::ProtoLane(future_index-lanes.len())
+                LaneIndex::Lane(
+                    lanes
+                        .get(future_index)
+                        .expect("expected a lane at this index")
+                        .clone(),
+                )
+            } else if future_index < lanes.len() + proto_lane_index.len() {
+                LaneIndex::ProtoLane(future_index - lanes.len())
             } else {
                 LaneIndex::None
             };
 
             let _lane = if future_index < lanes.len() {
-                Option::Some(self.lanes.get_mut(lanes.get(future_index).as_ref().unwrap() ).expect("expected to get lane"))
-            } else if future_index < lanes.len()+ proto_lane_index.len() {
-                Option::Some(self.proto_lanes.get_mut( future_index-lanes.len()).unwrap())
+                Option::Some(
+                    self.lanes
+                        .get_mut(lanes.get(future_index).as_ref().unwrap())
+                        .expect("expected to get lane"),
+                )
+            } else if future_index < lanes.len() + proto_lane_index.len() {
+                Option::Some(
+                    self.proto_lanes
+                        .get_mut(future_index - lanes.len())
+                        .unwrap(),
+                )
             } else {
                 Option::None
             };
 
             if let Some(command) = command {
                 match command {
-                    StarCommand::GetStarInfo(tx) => {
-                        match &self.star_key{
-                            ProtoStarKey::Key(key) => {
-                                tx.send( Option::Some(StarInfo{
-                                    key: key.clone(),
-                                    kind: self.kind.clone()
-                                })  );
-
-                            }
-                            ProtoStarKey::RequestSubKeyExpansion(_) => {
-                                tx.send(Option::None);
-                            }
+                    StarCommand::GetStarInfo(tx) => match &self.star_key {
+                        ProtoStarKey::Key(key) => {
+                            tx.send(Option::Some(StarInfo {
+                                key: key.clone(),
+                                kind: self.kind.clone(),
+                            }));
                         }
-                    }
-                    StarCommand::ConstellationBroadcast(broadcast)=> {
-                        match broadcast {
-                            ConstellationBroadcast::Status(constellation_status) => {
-                                self.constellation_status = constellation_status;
-                                self.check_ready();
-                            }
+                        ProtoStarKey::RequestSubKeyExpansion(_) => {
+                            tx.send(Option::None);
                         }
-                    }
-                    StarCommand::InvokeProtoStarEvolution=> {
-
+                    },
+                    StarCommand::ConstellationBroadcast(broadcast) => match broadcast {
+                        ConstellationBroadcast::Status(constellation_status) => {
+                            self.constellation_status = constellation_status;
+                            self.check_ready();
+                        }
+                    },
+                    StarCommand::InvokeProtoStarEvolution => {
                         let star_key = match self.star_key
                         {
                             ProtoStarKey::Key(star_key) => star_key,
@@ -190,7 +214,8 @@ impl ProtoStar {
                             kind: self.kind.clone(),
                         };
 
-                        let (core_messaging_endpoint_tx, core_messaging_endpoint_rx) = mpsc::channel(1024);
+                        let (core_messaging_endpoint_tx, core_messaging_endpoint_rx) =
+                            mpsc::channel(1024);
                         let (resource_locator_tx, resource_locator_rx) = mpsc::channel(1024);
                         let (star_locator_tx, star_locator_rx) = mpsc::channel(1024);
                         let (router_tx, router_rx) = mpsc::channel(1024);
@@ -200,15 +225,21 @@ impl ProtoStar {
                         let resource_locator_api = ResourceLocatorApi::new(resource_locator_tx);
                         let star_locator_api = StarLocatorApi::new(star_locator_tx);
                         let router_api = RouterApi::new(router_tx);
-                        let messaging_api= MessagingApi::new(messaging_tx);
+                        let messaging_api = MessagingApi::new(messaging_tx);
                         let lanes_api = LanesApi::new(lanes_tx);
 
-                        let data_access = self.data_access.with_path(format!("stars/{}", info.key.to_string()))?;
+                        let data_access = self
+                            .data_access
+                            .with_path(format!("stars/{}", info.key.to_string()))?;
 
                         let resource_registry: Option<Arc<dyn ResourceRegistryBacking>> =
                             if info.kind.is_resource_manager() {
                                 Option::Some(Arc::new(
-                                    ResourceRegistryBackingSqLite::new(info.clone(), data_access.path() ).await?,
+                                    ResourceRegistryBackingSqLite::new(
+                                        info.clone(),
+                                        data_access.path(),
+                                    )
+                                    .await?,
                                 ))
                             } else {
                                 Option::None
@@ -220,7 +251,6 @@ impl ProtoStar {
                             } else {
                                 Option::None
                             };
-
 
                         let skel = StarSkel {
                             info: info,
@@ -239,18 +269,18 @@ impl ProtoStar {
                             star_locator_api,
                             router_api,
                             messaging_api,
-                            lanes_api
+                            lanes_api,
                         };
 
                         let variant = self.star_manager_factory.create(skel.clone()).await;
 
-                        MessagingEndpointComponent::start(skel.clone(), core_messaging_endpoint_rx );
+                        MessagingEndpointComponent::start(skel.clone(), core_messaging_endpoint_rx);
                         ResourceLocatorComponent::start(skel.clone(), resource_locator_rx);
                         StarLocatorComponent::start(skel.clone(), star_locator_rx);
-                        RouterComponent::start(skel.clone(), router_rx );
-                        MessagingComponent::start(skel.clone(), messaging_rx );
-                        LanesComponent::start(skel.clone(), lanes_rx );
-                        SurfaceComponent::start(skel.clone(), self.surface_rx );
+                        RouterComponent::start(skel.clone(), router_rx);
+                        MessagingComponent::start(skel.clone(), messaging_rx);
+                        LanesComponent::start(skel.clone(), lanes_rx);
+                        SurfaceComponent::start(skel.clone(), self.surface_rx);
 
                         return Ok(Star::from_proto(
                             skel,
@@ -265,26 +295,39 @@ impl ProtoStar {
                         .await);
                     }
                     StarCommand::AddLaneEndpoint(lane) => {
-                          let remote_star = lane.remote_star.clone();
-                            self.lanes.insert(lane.remote_star.clone(), LaneWrapper::Lane(LaneMeta::new(lane)));
+                        let remote_star = lane.remote_star.clone();
+                        self.lanes.insert(
+                            lane.remote_star.clone(),
+                            LaneWrapper::Lane(LaneMeta::new(lane)),
+                        );
 
-                            if let Option::Some(frames) = self.frame_hold.release(&remote_star) {
-                                for frame in frames {
-                                    self.send_frame(&remote_star, frame).await;
-                                }
-                            }
-                    }
-                    StarCommand::AddProtoLaneEndpoint(lane) => {
-                        match &self.star_key
-                        {
-                            ProtoStarKey::Key(star_key) => {
-                                lane.outgoing.out_tx.send(LaneCommand::Frame(Frame::Proto(ProtoFrame::ReportStarKey(star_key.clone())))).await?;
-                            }
-                            ProtoStarKey::RequestSubKeyExpansion(_index) => {
-                                lane.outgoing.out_tx.send(LaneCommand::Frame(Frame::Proto(ProtoFrame::GatewaySelect))).await?;
+                        if let Option::Some(frames) = self.frame_hold.release(&remote_star) {
+                            for frame in frames {
+                                self.send_frame(&remote_star, frame).await;
                             }
                         }
-                        self.proto_lanes.push(LaneWrapper::Proto(LaneMeta::new(lane)));
+                    }
+                    StarCommand::AddProtoLaneEndpoint(lane) => {
+                        match &self.star_key {
+                            ProtoStarKey::Key(star_key) => {
+                                lane.outgoing
+                                    .out_tx
+                                    .send(LaneCommand::Frame(Frame::Proto(
+                                        ProtoFrame::ReportStarKey(star_key.clone()),
+                                    )))
+                                    .await?;
+                            }
+                            ProtoStarKey::RequestSubKeyExpansion(_index) => {
+                                lane.outgoing
+                                    .out_tx
+                                    .send(LaneCommand::Frame(Frame::Proto(
+                                        ProtoFrame::GatewaySelect,
+                                    )))
+                                    .await?;
+                            }
+                        }
+                        self.proto_lanes
+                            .push(LaneWrapper::Proto(LaneMeta::new(lane)));
                     }
                     StarCommand::AddConnectorController(connector_ctrl) => {
                         self.connector_ctrls.push(connector_ctrl);
@@ -293,39 +336,45 @@ impl ProtoStar {
                         //                        self.logger =
                     }
                     StarCommand::Frame(frame) => {
-
                         self.tracker.process(&frame);
                         match frame {
-                            Frame::Proto(proto_frame) => {
-                                match proto_frame
-                                {
-                                    ProtoFrame::ReportStarKey(remote_star) => {
-                                        if let LaneIndex::ProtoLane(index) = lane_index {
-                                            let mut lane = self.proto_lanes.remove(index).expect_proto_lane().unwrap();
-                                            lane.remote_star = Option::Some(remote_star);
-                                            let lane: LaneEndpoint = lane.try_into()?;
-                                            self.star_tx.send(StarCommand::AddLaneEndpoint(lane)).await;
-                                        }
+                            Frame::Proto(proto_frame) => match proto_frame {
+                                ProtoFrame::ReportStarKey(remote_star) => {
+                                    if let LaneIndex::ProtoLane(index) = lane_index {
+                                        let mut lane = self
+                                            .proto_lanes
+                                            .remove(index)
+                                            .expect_proto_lane()
+                                            .unwrap();
+                                        lane.remote_star = Option::Some(remote_star);
+                                        let lane: LaneEndpoint = lane.try_into()?;
+                                        self.star_tx.send(StarCommand::AddLaneEndpoint(lane)).await;
                                     }
-                                    ProtoFrame::GatewayAssign(subgraph) => {
-                                        match self.star_key {
-                                            ProtoStarKey::Key(_) => {
-                                                warn!("should not receive a subgraph for starkey as starkey is already assigned");
-                                            }
-                                            ProtoStarKey::RequestSubKeyExpansion(index) => {
-                                                let star_key = StarKey::new_with_subgraph(subgraph, index);
-                                                self.star_key = ProtoStarKey::Key(star_key.clone());
-                                                self.broadcast(Frame::Proto(ProtoFrame::ReportStarKey(star_key)), &Option::None ).await;
-                                                self.check_ready();
-                                            }
-                                        }
-                                    }
-
-                                    _ => {}
                                 }
-                            }
+                                ProtoFrame::GatewayAssign(subgraph) => match self.star_key {
+                                    ProtoStarKey::Key(_) => {
+                                        warn!("should not receive a subgraph for starkey as starkey is already assigned");
+                                    }
+                                    ProtoStarKey::RequestSubKeyExpansion(index) => {
+                                        let star_key = StarKey::new_with_subgraph(subgraph, index);
+                                        self.star_key = ProtoStarKey::Key(star_key.clone());
+                                        self.broadcast(
+                                            Frame::Proto(ProtoFrame::ReportStarKey(star_key)),
+                                            &Option::None,
+                                        )
+                                        .await;
+                                        self.check_ready();
+                                    }
+                                },
+
+                                _ => {}
+                            },
                             _ => {
-                                println!("{} frame unsupported by ProtoStar: {}", self.kind.to_string(), frame);
+                                println!(
+                                    "{} frame unsupported by ProtoStar: {}",
+                                    self.kind.to_string(),
+                                    frame
+                                );
                             }
                         }
                     }
@@ -350,9 +399,9 @@ impl ProtoStar {
     fn check_ready(&mut self) {
         if self.constellation_status == ConstellationStatus::Assembled && self.star_key.is_some() {
             let star_tx = self.star_tx.clone();
-            tokio::spawn( async move {
-                star_tx.send( StarCommand::InvokeProtoStarEvolution ).await;
-            } );
+            tokio::spawn(async move {
+                star_tx.send(StarCommand::InvokeProtoStarEvolution).await;
+            });
         }
     }
 
@@ -382,7 +431,11 @@ impl ProtoStar {
         }
 
         for proto_lane in &mut self.proto_lanes {
-            proto_lane.outgoing().out_tx.send(LaneCommand::Frame(frame.clone())).await;
+            proto_lane
+                .outgoing()
+                .out_tx
+                .send(LaneCommand::Frame(frame.clone()))
+                .await;
         }
     }
 
@@ -398,7 +451,11 @@ impl ProtoStar {
         }
 
         for proto_lane in &mut self.proto_lanes {
-            proto_lane.outgoing().out_tx.send(LaneCommand::Frame(frame.clone())).await;
+            proto_lane
+                .outgoing()
+                .out_tx
+                .send(LaneCommand::Frame(frame.clone()))
+                .await;
         }
     }
 
@@ -449,22 +506,22 @@ impl ProtoStar {
 
         for (_, lane) in &mut self.lanes {
             if let Option::Some(hops) = lane.get_hops_to_star(to) {
-//                if lane.lane.remote_star.is_some() {
-                    if let Option::None = rtn {
+                //                if lane.lane.remote_star.is_some() {
+                if let Option::None = rtn {
+                    rtn = Option::Some(ShortestPathStarKey {
+                        to: to.clone(),
+                        next_lane: lane.get_remote_star().as_ref().unwrap().clone(),
+                        hops,
+                    });
+                } else if let Option::Some(min) = &rtn {
+                    if hops < min.hops {
                         rtn = Option::Some(ShortestPathStarKey {
                             to: to.clone(),
                             next_lane: lane.get_remote_star().as_ref().unwrap().clone(),
                             hops,
                         });
-                    } else if let Option::Some(min) = &rtn {
-                        if hops < min.hops {
-                            rtn = Option::Some(ShortestPathStarKey {
-                                to: to.clone(),
-                                next_lane: lane.get_remote_star().as_ref().unwrap().clone(),
-                                hops,
-                            });
-                        }
                     }
+                }
                 //}
             }
         }
@@ -540,8 +597,6 @@ pub struct ProtoTunnel {
 
 impl ProtoTunnel {
     pub async fn evolve(mut self) -> Result<(TunnelOut, TunnelIn), Error> {
-
-
         self.tx
             .send(Frame::Proto(ProtoFrame::StarLaneProtocolVersion(
                 STARLANE_PROTOCOL_VERSION,
@@ -557,15 +612,14 @@ impl ProtoTunnel {
                     // do nothing... we move onto the next step
                     return Ok((
                         TunnelOut {
-//                            remote_star: remote_star_key.clone(),
+                            //                            remote_star: remote_star_key.clone(),
                             tx: self.tx,
                         },
                         TunnelIn {
-//                            remote_star: remote_star_key.clone(),
+                            //                            remote_star: remote_star_key.clone(),
                             rx: self.rx,
                         },
                     ));
-
                 }
                 ProtoFrame::StarLaneProtocolVersion(version) => {
                     return Err(format!("wrong version: {}", version).into());
@@ -583,11 +637,11 @@ impl ProtoTunnel {
                 ProtoFrame::ReportStarKey(_remote_star_key) => {
                     return Ok((
                         TunnelOut {
-//                            remote_star: remote_star_key.clone(),
+                            //                            remote_star: remote_star_key.clone(),
                             tx: self.tx,
                         },
                         TunnelIn {
-//                            remote_star: remote_star_key.clone(),
+                            //                            remote_star: remote_star_key.clone(),
                             rx: self.rx,
                         },
                     ));
@@ -611,14 +665,8 @@ pub fn local_tunnels() -> (ProtoTunnel, ProtoTunnel) {
     let (btx, brx) = mpsc::channel::<Frame>(32);
 
     (
-        ProtoTunnel {
-            tx: atx,
-            rx: brx,
-        },
-        ProtoTunnel {
-            tx: btx,
-            rx: arx,
-        },
+        ProtoTunnel { tx: atx, rx: brx },
+        ProtoTunnel { tx: btx, rx: arx },
     )
 }
 
@@ -698,21 +746,17 @@ pub struct LaneToCentral {
     hops: usize,
 }
 
-
 #[derive(Clone)]
 pub enum ProtoStarKey {
     Key(StarKey),
-    RequestSubKeyExpansion(StarKeyConstellationIndex)
+    RequestSubKeyExpansion(StarKeyConstellationIndex),
 }
 
-
 impl ProtoStarKey {
-
     pub fn is_some(&self) -> bool {
         match self {
             ProtoStarKey::Key(_) => true,
-            ProtoStarKey::RequestSubKeyExpansion(_) => false
+            ProtoStarKey::RequestSubKeyExpansion(_) => false,
         }
     }
-
 }

@@ -3,9 +3,6 @@ use std::marker::PhantomData;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-
-
-
 pub type CryptKeyId = Uuid;
 pub type HashId = Uuid;
 pub type Hash = Vec<u8>;

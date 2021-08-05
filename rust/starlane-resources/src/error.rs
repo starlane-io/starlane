@@ -1,13 +1,15 @@
 use std::fmt::Display;
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct Error {
-    pub message: String
+    pub message: String,
 }
 
-impl <T:Display> From<T> for Error{
+impl<T: Display> From<T> for Error {
     fn from(t: T) -> Self {
-        Error{message:format!("{}",t)}
+        Error {
+            message: format!("{}", t),
+        }
     }
 }
 

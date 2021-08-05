@@ -1,7 +1,5 @@
-
 use std::fmt;
 use std::fmt::{Debug, Formatter};
-
 
 use semver::SemVerError;
 use serde::{Deserialize, Serialize};
@@ -9,27 +7,26 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 
 use tokio::time::error::Elapsed;
 
-
 use starlane_resources::ResourceIdentifier;
-
 
 use crate::error::Error;
 use crate::id::Id;
 use crate::logger::Flags;
-use crate::message::{Fail, MessageExpect, MessageId, MessageUpdate, ProtoStarMessage};
 use crate::message::resource::{
     ActorMessage, Message, MessageReply, RawState, ResourceRequestMessage, ResourceResponseMessage,
 };
+use crate::message::{Fail, MessageExpect, MessageId, MessageUpdate, ProtoStarMessage};
 
-
-use crate::resource::{ActorKey, AppKey, AssignResourceStateSrc, Labels, ResourceAddress, ResourceAssign, ResourceBinding, ResourceCreate, ResourceId, ResourceKey, ResourceRecord, ResourceRegistration, ResourceSelector, ResourceSliceAssign, ResourceSliceStatus, ResourceStatus, ResourceStub, ResourceType, SubSpaceKey, UserKey};
-use crate::star::{
-    Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify,
-    StarSubGraphKey
+use crate::data::{BinSrc, DataSet};
+use crate::resource::{
+    ActorKey, AppKey, AssignResourceStateSrc, Labels, ResourceAddress, ResourceAssign,
+    ResourceBinding, ResourceCreate, ResourceId, ResourceKey, ResourceRecord, ResourceRegistration,
+    ResourceSelector, ResourceSliceAssign, ResourceSliceStatus, ResourceStatus, ResourceStub,
+    ResourceType, SubSpaceKey, UserKey,
 };
-use crate::data::{DataSet, BinSrc};
+use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey};
 
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Frame {
     Proto(ProtoFrame),
     Diagnose(Diagnose),
@@ -39,52 +36,49 @@ pub enum Frame {
     //Event(Event),
     Ping,
     Pong,
-    Close
+    Close,
 }
 
-
-
-
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StarWind {
     Up(WindUp),
     Down(WindDown),
 }
 
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ProtoFrame {
     StarLaneProtocolVersion(i32),
     ReportStarKey(StarKey),
     GatewaySelect,
-    GatewayAssign( Vec<StarSubGraphKey> ),
+    GatewayAssign(Vec<StarSubGraphKey>),
 }
 
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Watch {
     Add(WatchInfo),
     Remove(WatchInfo),
 }
 
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WatchInfo {
     pub id: Id,
     pub actor: ActorKey,
 }
 
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StarMessageAck {
     pub from: StarKey,
     pub to: StarKey,
     pub id: Id,
 }
 
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Diagnose {
     Ping,
     Pong,
 }
 
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WindUp {
     pub from: StarKey,
     pub pattern: StarPattern,
@@ -107,7 +101,7 @@ impl WindUp {
     }
 }
 
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WindAction {
     SearchHits,
     Flags(Flags),
@@ -142,7 +136,7 @@ impl WindAction {
     }
 }
 
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WindResults {
     None,
     Hits(Vec<WindHit>),
@@ -155,7 +149,7 @@ impl WindUp {
     }
 }
 
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StarPattern {
     Any,
     None,
@@ -183,7 +177,7 @@ impl StarPattern {
     }
 }
 
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WindDown {
     pub missed: Option<StarKey>,
     pub result: WindResults,
@@ -199,13 +193,13 @@ impl WindDown {
     }
 }
 
-#[derive(Debug,Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct WindHit {
     pub star: StarKey,
     pub hops: usize,
 }
 
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StarMessage {
     pub from: StarKey,
     pub to: StarKey,
@@ -329,8 +323,8 @@ pub enum StarMessagePayload {
     UniqueId(ResourceId),
 }
 
-impl Debug for StarMessagePayload{
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(),std::fmt::Error> {
+impl Debug for StarMessagePayload {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.write_str(match self {
             StarMessagePayload::None => "None",
             StarMessagePayload::MessagePayload(_) => "MessagePayload",
@@ -338,7 +332,7 @@ impl Debug for StarMessagePayload{
             StarMessagePayload::ResourceHost(_) => "ResourceHost",
             StarMessagePayload::Space(_) => "Space",
             StarMessagePayload::Reply(_) => "Reply",
-            StarMessagePayload::UniqueId(_) => "UniqueId"
+            StarMessagePayload::UniqueId(_) => "UniqueId",
         });
         Ok(())
     }
@@ -357,10 +351,7 @@ pub enum ResourceHostAction {
     Assign(ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>),
 }
 
-
-
-
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RegistryAction {
     Register(ResourceRegistration),
     Location(ResourceRecord),
@@ -371,8 +362,6 @@ pub enum RegistryAction {
         child_type: ResourceType,
     },
 }
-
-
 
 impl ToString for RegistryAction {
     fn to_string(&self) -> String {
@@ -386,7 +375,7 @@ impl ToString for RegistryAction {
     }
 }
 
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceStatusReport {
     pub key: ResourceKey,
     pub status: ResourceStatus,
@@ -427,7 +416,7 @@ impl StarMessagePayload {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize,strum_macros::Display)]
+#[derive(Clone, Serialize, Deserialize, strum_macros::Display)]
 pub enum Reply {
     Empty,
     Key(ResourceKey),
@@ -440,7 +429,7 @@ pub enum Reply {
     Seq(u64),
 }
 
-#[derive(Clone,Eq,PartialEq,strum_macros::Display)]
+#[derive(Clone, Eq, PartialEq, strum_macros::Display)]
 pub enum ReplyKind {
     Empty,
     Key,
@@ -450,45 +439,24 @@ pub enum ReplyKind {
     Message,
     Id,
     Seq,
-    State
+    State,
 }
 
 impl ReplyKind {
-    pub fn is_match(&self, reply: &Reply ) -> bool {
+    pub fn is_match(&self, reply: &Reply) -> bool {
         match reply {
-            Reply::Empty => {
-                *self == Self::Empty
-            }
-            Reply::Key(_) => {
-                *self == Self::Key
-            }
-            Reply::Address(_) => {
-                *self == Self::Address
-            }
-            Reply::Records(_) => {
-                *self == Self::Records
-            }
-            Reply::Record(_) => {
-
-                *self == Self::Record
-            }
-            Reply::Message(_) => {
-                *self == Self::Message
-            }
-            Reply::Id(_) => {
-                *self == Self::Id
-            }
-            Reply::Seq(_) => {
-                *self == Self::Seq
-            }
-            Reply::State(_) => {
-                *self == Self::State
-            }
+            Reply::Empty => *self == Self::Empty,
+            Reply::Key(_) => *self == Self::Key,
+            Reply::Address(_) => *self == Self::Address,
+            Reply::Records(_) => *self == Self::Records,
+            Reply::Record(_) => *self == Self::Record,
+            Reply::Message(_) => *self == Self::Message,
+            Reply::Id(_) => *self == Self::Id,
+            Reply::Seq(_) => *self == Self::Seq,
+            Reply::State(_) => *self == Self::State,
         }
     }
 }
-
-
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum SequenceMessage {
@@ -629,7 +597,6 @@ pub enum ActorLookup {
     Key(ActorKey),
 }
 
-
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Rejection {
     pub message: String,
@@ -668,10 +635,10 @@ impl fmt::Display for Frame {
             Frame::Diagnose(diagnose) => format!("Diagnose({})", diagnose).to_string(),
             Frame::StarMessage(inner) => format!("StarMessage({})", inner.payload).to_string(),
             Frame::StarWind(wind) => format!("StarWind({})", wind).to_string(),
-//            Frame::Watch(_) => format!("Watch").to_string(),
-//            Frame::Event(_) => format!("ActorEvent").to_string(),
+            //            Frame::Watch(_) => format!("Watch").to_string(),
+            //            Frame::Event(_) => format!("ActorEvent").to_string(),
             Frame::Ping => "Ping".to_string(),
-            Frame::Pong => "Pong".to_string()
+            Frame::Pong => "Pong".to_string(),
         };
         write!(f, "{}", r)
     }
@@ -709,9 +676,7 @@ impl fmt::Display for ProtoFrame {
                 format!("ReportStarKey({})", key.to_string()).to_string()
             }
             ProtoFrame::GatewaySelect => format!("GatewaySelect").to_string(),
-            ProtoFrame::GatewayAssign{..} => {
-                "GatewayAssign".to_string()
-            }
+            ProtoFrame::GatewayAssign { .. } => "GatewayAssign".to_string(),
         };
         write!(f, "{}", r)
     }
@@ -771,7 +736,6 @@ impl From<rusqlite::Error> for Fail {
 impl From<()> for Fail {
     fn from(_error: ()) -> Self {
         Fail::Error("() From Error".to_string())
-
     }
 }
 

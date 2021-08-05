@@ -4,20 +4,19 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use futures::TryFutureExt;
-use rusqlite::{Connection, params, params_from_iter, ToSql};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
+use rusqlite::{params, params_from_iter, Connection, ToSql};
 use tokio::sync::{mpsc, oneshot};
 
 use tokio::time::Duration;
 
-
 use crate::error::Error;
 
-use crate::message::{Fail};
-use crate::resource::{ResourceAssign, ResourceHost, ResourceLocationAffinity, ResourceType, RemoteResourceHost};
-use crate::star::{
-    StarCommand, StarInfo, StarKey, StarKind, StarSkel,
+use crate::message::Fail;
+use crate::resource::{
+    RemoteResourceHost, ResourceAssign, ResourceHost, ResourceLocationAffinity, ResourceType,
 };
+use crate::star::{StarCommand, StarInfo, StarKey, StarKind, StarSkel};
 
 #[derive(Clone)]
 pub struct StarHandleBacking {
@@ -46,12 +45,8 @@ impl StarHandleBacking {
         self.tx.send(action).await?;
         let result = tokio::time::timeout(Duration::from_secs(5), rx).await??;
         match result {
-            StarHandleResult::StarHandles(handles) => {
-                Ok(handles)
-            }
-            _what => {
-                Err(Fail::expected("StarHandleResult::StarHandles(handles)"))
-            }
+            StarHandleResult::StarHandles(handles) => Ok(handles),
+            _what => Err(Fail::expected("StarHandleResult::StarHandles(handles)")),
         }
     }
 
@@ -60,12 +55,8 @@ impl StarHandleBacking {
         self.tx.send(action).await?;
         let result = tokio::time::timeout(Duration::from_secs(5), rx).await??;
         match result {
-            StarHandleResult::StarHandle(handle) => {
-                Ok(handle)
-            }
-            _what => {
-                Err(Fail::expected("StarHandleResult::StarHandle(handle)"))
-            }
+            StarHandleResult::StarHandle(handle) => Ok(handle),
+            _what => Err(Fail::expected("StarHandleResult::StarHandle(handle)")),
         }
     }
 
@@ -75,17 +66,13 @@ impl StarHandleBacking {
         self.tx.send(action).await?;
         let result = tokio::time::timeout(Duration::from_secs(5), rx).await??;
         match result {
-            StarHandleResult::Satisfaction(satisfaction) => {
-                Ok(satisfaction)
-            }
-            _what => {
-                Err(Fail::expected("StarHandleResult::Satisfaction(_)"))
-            }
+            StarHandleResult::Satisfaction(satisfaction) => Ok(satisfaction),
+            _what => Err(Fail::expected("StarHandleResult::Satisfaction(_)")),
         }
     }
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct ResourceHostSelector {
     skel: StarSkel,
 }
@@ -226,7 +213,6 @@ pub enum StarHandleCommand {
     Satisfied(HashSet<StarKind>),
 }
 
-
 #[derive(strum_macros::Display)]
 pub enum StarHandleResult {
     Ok,
@@ -235,8 +221,6 @@ pub enum StarHandleResult {
     Fail(Fail),
     Satisfaction(Satisfaction),
 }
-
-
 
 #[derive(Eq, PartialEq, Debug)]
 pub enum Satisfaction {

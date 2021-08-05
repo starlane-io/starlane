@@ -27,7 +27,6 @@ extern crate tracing;
 #[macro_use]
 extern crate validate;
 
-
 use std::str::FromStr;
 
 use semver;
@@ -39,6 +38,7 @@ pub mod cache;
 pub mod config;
 pub mod constellation;
 pub mod crypt;
+pub mod data;
 pub mod error;
 pub mod file_access;
 pub mod filesystem;
@@ -59,10 +59,10 @@ pub mod star;
 pub mod starlane;
 pub mod template;
 pub mod util;
-pub mod data;
 
 lazy_static! {
     static ref VERSION: semver::Version = {
-      semver::Version::from_str("0.1.0-alpha").expect("expected starlane::VERSION semver string to parse.")
+        semver::Version::from_str("0.1.0-alpha")
+            .expect("expected starlane::VERSION semver string to parse.")
     };
 }

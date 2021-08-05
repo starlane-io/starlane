@@ -1,9 +1,8 @@
-use std::collections::{HashMap};
-
+use std::collections::HashMap;
 
 use std::convert::TryInto;
 
-use std::hash::{Hasher};
+use std::hash::Hasher;
 
 use std::ops::Deref;
 use std::str::FromStr;
@@ -12,11 +11,9 @@ use std::thread;
 
 use futures::FutureExt;
 
-use tokio::io::{AsyncReadExt};
-use tokio::runtime::{Handle};
+use tokio::io::AsyncReadExt;
+use tokio::runtime::Handle;
 use tokio::sync::{broadcast, mpsc, oneshot};
-
-
 
 use starlane_resources::ResourceIdentifier;
 
@@ -25,18 +22,16 @@ use crate::error::Error;
 use crate::file_access::FileAccess;
 
 use crate::message::Fail;
-use crate::resource::{ArtifactBundleAddress, ArtifactBundleIdentifier, Path, ResourceAddress, ResourceArchetype, ResourceKind, ResourceLocation, ResourceRecord, ResourceStub};
+use crate::resource::{
+    ArtifactBundleAddress, ArtifactBundleIdentifier, Path, ResourceAddress, ResourceArchetype,
+    ResourceKind, ResourceLocation, ResourceRecord, ResourceStub,
+};
 
 use crate::resource::ArtifactAddress;
 
-
-use crate::resource::ArtifactKind;
 use crate::resource::config::Parser;
 use crate::resource::domain::{DomainConfig, DomainConfigParser};
-
-
-
-
+use crate::resource::ArtifactKind;
 
 use crate::starlane::api::StarlaneApi;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
@@ -150,9 +145,7 @@ impl ProtoArtifactCaches {
                         .add(self.root_caches.domain_configs.get(artifact).await?);
                 }
                 ArtifactKind::Raw => {
-                    caches
-                        .raw
-                        .add(self.root_caches.raw.get(artifact).await?);
+                    caches.raw.add(self.root_caches.raw.get(artifact).await?);
                 }
             }
         }
@@ -198,20 +191,20 @@ impl ProtoArtifactCacheProc {
         let mut more = vec![];
 
         for artifact in artifacts {
-println!(".... CACHING... {}", artifact.clone().address.to_string() );
+            println!(".... CACHING... {}", artifact.clone().address.to_string());
             let claim = root_caches.claim(artifact).await?;
-println!("claimed...");
+            println!("claimed...");
             let references = claim.references();
             claims.put(claim.artifact.clone(), claim).await?;
-println!("put...");
+            println!("put...");
             for reference in references {
                 if !claims.contains(reference.clone()).await? {
                     more.push(reference);
                 }
             }
-println!("processed artifact...");
+            println!("processed artifact...");
         }
-println!("more is_empty(): {}",more.is_empty() );
+        println!("more is_empty(): {}", more.is_empty());
         if !more.is_empty() {
             let (sub_tx, sub_rx) = oneshot::channel();
             proc_tx
@@ -305,7 +298,7 @@ impl ArtifactBundleCacheRunner {
             match command {
                 ArtifactBundleCacheCommand::Cache { bundle, tx } => {
                     let bundle: ResourceIdentifier = bundle.into();
-println!("fetching resource record..." );
+                    println!("fetching resource record...");
                     let record = match self.src.fetch_resource_record(bundle.clone()).await {
                         Ok(record) => record,
                         Err(err) => {
@@ -313,7 +306,7 @@ println!("fetching resource record..." );
                             continue;
                         }
                     };
-println!("fetchED resource record.");
+                    println!("fetchED resource record.");
                     let bundle: ArtifactBundleAddress = match record.stub.address.try_into() {
                         Ok(ok) => ok,
                         Err(err) => {
@@ -391,9 +384,9 @@ println!("fetchED resource record.");
     ) -> Result<(), Error> {
         let bundle: ResourceAddress = bundle.into();
         let bundle: ResourceIdentifier = bundle.into();
-println!("download&extract src.fetch_resource_record...");
+        println!("download&extract src.fetch_resource_record...");
         let record = src.fetch_resource_record(bundle.clone()).await?;
-println!("download&extract src.fetch_resource_record DONE");
+        println!("download&extract src.fetch_resource_record DONE");
 
         let stream = src
             .get_resource_state(bundle.clone())
@@ -488,11 +481,10 @@ impl ArtifactBundleSrc {
     ) -> Result<Option<Arc<Vec<u8>>>, Fail> {
         match self {
             ArtifactBundleSrc::STARLANE_API(api) => {
-
-//                api.get_resource_state(identifier)
-unimplemented!()
-            },
-//            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(identifier).await,
+                //                api.get_resource_state(identifier)
+                unimplemented!()
+            }
+            //            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(identifier).await,
         }
     }
 
@@ -502,8 +494,7 @@ unimplemented!()
     ) -> Result<ResourceRecord, Fail> {
         match self {
             ArtifactBundleSrc::STARLANE_API(api) => api.fetch_resource_record(identifier).await,
-
-//            ArtifactBundleSrc::MOCK(mock) => mock.fetch_resource_record(identifier).await,
+            //            ArtifactBundleSrc::MOCK(mock) => mock.fetch_resource_record(identifier).await,
         }
     }
 }
@@ -868,7 +859,10 @@ impl<C: Cacheable> RootItemCacheProc<C> {
             "could not find artifact: '{}'",
             artifact.address.to_string()
         ))?;
-        Ok(ArtifactItem::new(ref_count.reference.clone(), self.proc_tx.clone()))
+        Ok(ArtifactItem::new(
+            ref_count.reference.clone(),
+            self.proc_tx.clone(),
+        ))
     }
 
     async fn cache(&self, artifact: ArtifactRef) {
@@ -904,20 +898,21 @@ impl<C: Cacheable> RootItemCacheProc<C> {
         parser: Arc<dyn Parser<X>>,
         bundle_cache: ArtifactBundleCache,
     ) -> Result<Arc<X>, Error> {
-println!("root: cache_artifact: {}", artifact.address.to_string());
-        let address: ResourceAddress  = artifact.address.parent().into();
+        println!("root: cache_artifact: {}", artifact.address.to_string());
+        let address: ResourceAddress = artifact.address.parent().into();
         let address: ResourceIdentifier = address.into();
-        bundle_cache
-            .download(address.try_into()?)
-            .await?;
-println!("bundle cached : parsing: {}", artifact.address.to_string());
+        bundle_cache.download(address.try_into()?).await?;
+        println!("bundle cached : parsing: {}", artifact.address.to_string());
         let file_access = ArtifactBundleCache::with_bundle_files_path(
             bundle_cache.file_access(),
             artifact.address.parent().try_into()?,
         )?;
-println!("file acces scached : parsing: {}", artifact.address.to_string());
+        println!(
+            "file acces scached : parsing: {}",
+            artifact.address.to_string()
+        );
         let data = file_access.read(&artifact.address.path()).await?;
-println!("root: parsing: {}", artifact.address.to_string());
+        println!("root: parsing: {}", artifact.address.to_string());
         parser.parse(artifact, data)
     }
 }
@@ -938,13 +933,12 @@ impl RootArtifactCaches {
     }
 
     async fn claim(&self, artifact: ArtifactRef) -> Result<Claim, Error> {
-        let claim= match artifact.kind {
+        let claim = match artifact.kind {
             ArtifactKind::DomainConfig => self.domain_configs.cache(artifact).await?.into(),
             ArtifactKind::Raw => self.raw.cache(artifact).await?.into(),
         };
 
         Ok(claim)
-
     }
 }
 
@@ -1178,28 +1172,26 @@ mod test {
 
  */
 
-pub struct Raw{
+pub struct Raw {
     data: Data,
     artifact: ArtifactRef,
 }
 
 impl Raw {
-    pub fn data(&self)->Data {
+    pub fn data(&self) -> Data {
         self.data.clone()
     }
 }
 
 impl Cacheable for Raw {
-
     fn artifact(&self) -> ArtifactRef {
         self.artifact.clone()
     }
 
     fn references(&self) -> Vec<ArtifactRef> {
-        vec!()
+        vec![]
     }
 }
-
 
 pub struct RawParser;
 
@@ -1211,9 +1203,9 @@ impl RawParser {
 
 impl Parser<Raw> for RawParser {
     fn parse(&self, artifact: ArtifactRef, data: Data) -> Result<Arc<Raw>, Error> {
-        Ok(Arc::new(Raw{
+        Ok(Arc::new(Raw {
             artifact: artifact,
-            data: data
+            data: data,
         }))
     }
 }

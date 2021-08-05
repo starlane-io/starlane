@@ -6,35 +6,33 @@ use std::collections::HashSet;
 use std::iter::FromIterator;
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::{oneshot};
+use tokio::sync::oneshot;
 
 use starlane_resources::ResourceIdentifier;
 
 use crate::error::Error;
 use crate::frame::{MessagePayload, Reply, SimpleReply, StarMessage, StarMessagePayload};
 
-
+use crate::data::{BinSrc, DataSet};
 use crate::message::{Fail, MessageId, ProtoStarMessage};
-use crate::resource::{RemoteDataSrc, ResourceCreate, ResourceId, ResourceRecord, ResourceSelector, ResourceType};
+use crate::resource::{
+    RemoteDataSrc, ResourceCreate, ResourceId, ResourceRecord, ResourceSelector, ResourceType,
+};
 use crate::star::{StarCommand, StarSkel};
 use crate::util;
-use crate::data::{BinSrc, DataSet};
 use tokio::time::Duration;
 
 pub type MessageTo = ResourceIdentifier;
 
 pub fn reverse(to: MessageTo) -> MessageFrom {
-        MessageFrom::Resource(to)
-    }
-
+    MessageFrom::Resource(to)
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum MessageFrom {
     Inject,
     Resource(ResourceIdentifier),
 }
-
-
 
 pub struct ProtoMessage<P> {
     pub id: MessageId,
@@ -97,7 +95,6 @@ impl<P> ProtoMessage<P> {
     pub fn payload(&mut self, payload: P) {
         self.payload = Option::Some(payload);
     }
-
 }
 
 impl ProtoMessage<ResourceRequestMessage> {
@@ -219,7 +216,7 @@ where
 
 impl<M> Delivery<M>
 where
-    M: Clone+Send+Sync+'static,
+    M: Clone + Send + Sync + 'static,
 {
     pub fn new(payload: M, star_message: StarMessage, skel: StarSkel) -> Self {
         Delivery {
@@ -231,8 +228,8 @@ where
 }
 
 impl<M> Delivery<M>
-    where
-        M: Clone+Send+Sync+'static,
+where
+    M: Clone + Send + Sync + 'static,
 {
     pub fn result(&self, result: Result<Reply, Fail>) {
         match result {
@@ -245,7 +242,7 @@ impl<M> Delivery<M>
         }
     }
 
-    pub fn result_ok<T>(&self, result: Result<T,Fail>){
+    pub fn result_ok<T>(&self, result: Result<T, Fail>) {
         match result {
             Ok(_) => {
                 self.reply(Reply::Empty);
@@ -256,9 +253,12 @@ impl<M> Delivery<M>
         }
     }
 
-    pub fn result_rx<T>(self, mut rx: oneshot::Receiver<Result<T,Fail>>) where T:Send+Sync+'static{
-        tokio::spawn( async move {
-            match tokio::time::timeout(Duration::from_secs(15),rx).await {
+    pub fn result_rx<T>(self, mut rx: oneshot::Receiver<Result<T, Fail>>)
+    where
+        T: Send + Sync + 'static,
+    {
+        tokio::spawn(async move {
+            match tokio::time::timeout(Duration::from_secs(15), rx).await {
                 Ok(Ok(Ok(_))) => {
                     self.reply(Reply::Empty);
                 }
@@ -279,24 +279,19 @@ impl<M> Delivery<M>
         self.reply(Reply::Empty);
     }
 
-    pub fn reply(&self, reply: Reply ){
+    pub fn reply(&self, reply: Reply) {
         let proto = self
             .star_message
             .reply(StarMessagePayload::Reply(SimpleReply::Ok(reply)));
-        self.skel
-            .messaging_api
-            .send(proto);
+        self.skel.messaging_api.send(proto);
     }
 
     pub fn fail(&self, fail: Fail) {
         let proto = self
             .star_message
             .reply(StarMessagePayload::Reply(SimpleReply::Fail(fail)));
-        self.skel
-            .messaging_api
-            .send(proto);
+        self.skel.messaging_api.send(proto);
     }
-
 }
 
 #[derive(Clone, Serialize, Deserialize)]

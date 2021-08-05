@@ -1,10 +1,10 @@
-use crate::star::StarSkel;
-use crate::star::core::resource::state::StateStore;
-use crate::star::core::resource::host::Host;
-use crate::resource::{ResourceAssign, AssignResourceStateSrc, ResourceKey, Resource};
-use crate::data::{DataSet, BinSrc};
-use crate::message::Fail;
+use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
+use crate::message::Fail;
+use crate::resource::{AssignResourceStateSrc, Resource, ResourceAssign, ResourceKey};
+use crate::star::core::resource::host::Host;
+use crate::star::core::resource::state::StateStore;
+use crate::star::StarSkel;
 
 #[derive(Debug)]
 pub struct DomainHost {
@@ -28,22 +28,19 @@ impl Host for DomainHost {
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<DataSet<BinSrc>, Fail> {
         match assign.state_src {
-            AssignResourceStateSrc::Stateless => {
-            },
-            _ =>  {
+            AssignResourceStateSrc::Stateless => {}
+            _ => {
                 return Err("domain must be stateless".into());
             }
         };
-
 
         Ok(DataSet::new())
     }
 
     async fn has(&self, key: ResourceKey) -> bool {
-        match self.store.has(key).await
-        {
+        match self.store.has(key).await {
             Ok(v) => v,
-            Err(_) => false
+            Err(_) => false,
         }
     }
 
@@ -51,7 +48,7 @@ impl Host for DomainHost {
         self.store.get(key).await
     }
 
-    async fn delete(&self, _identifier: ResourceKey ) -> Result<(), Fail> {
+    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Fail> {
         unimplemented!()
     }
 }

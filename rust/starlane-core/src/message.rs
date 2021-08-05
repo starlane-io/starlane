@@ -3,25 +3,22 @@ pub mod resource;
 use std::collections::HashSet;
 use std::convert::Infallible;
 
-
 use std::string::FromUtf8Error;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, oneshot};
-
-
 
 use uuid::Uuid;
 
 use starlane_resources::ResourceIdentifier;
 
 use crate::error::Error;
-use crate::frame::{Frame, MessageAck, MessagePayload, SimpleReply, StarMessage, StarMessagePayload, ReplyKind};
-
+use crate::frame::{
+    Frame, MessageAck, MessagePayload, ReplyKind, SimpleReply, StarMessage, StarMessagePayload,
+};
 
 use crate::resource::{ResourceAddress, ResourceKind, ResourceType, Specific};
 use crate::star::{StarCommand, StarKey, StarSearchTransaction, Transaction, TransactionResult};
-
 
 pub type MessageId = Uuid;
 
@@ -122,8 +119,6 @@ impl ProtoStarMessage {
 
         return Ok(());
     }
-
-
 }
 
 pub struct MessageReplyTracker {
@@ -184,14 +179,11 @@ impl<OK> ToString for MessageResult<OK> {
     }
 }
 
-
 #[derive(Clone)]
 pub enum MessageExpect {
     None,
     Reply(ReplyKind),
 }
-
-
 
 #[derive(Clone)]
 pub enum MessageExpectWait {
@@ -283,7 +275,10 @@ impl ResultWaiter {
 pub enum Fail {
     Error(String),
     Reject(Reject),
-    Unexpected{expected:String,received:String},
+    Unexpected {
+        expected: String,
+        received: String,
+    },
     DoNotKnowSpecific(Specific),
     ResourceStateFinal(ResourceIdentifier),
     ResourceAddressAlreadyInUse(ResourceAddress),
@@ -307,24 +302,29 @@ pub enum Fail {
     Timeout,
     InvalidResourceState(String),
     NoProvisioner(ResourceKind),
-    QueueOverflow
+    QueueOverflow,
 }
 
-impl Fail{
-
-    pub fn trace( fail: Fail )->Self{
-        error!("{}",fail.to_string().as_str());
+impl Fail {
+    pub fn trace(fail: Fail) -> Self {
+        error!("{}", fail.to_string().as_str());
         fail
     }
 
-    pub fn expected( expected: &str) -> Self {
+    pub fn expected(expected: &str) -> Self {
         error!(expected);
-        Self::Unexpected {expected:expected.to_string(), received: "_".to_string() }
+        Self::Unexpected {
+            expected: expected.to_string(),
+            received: "_".to_string(),
+        }
     }
 
-    pub fn unexpected<T: ToString>( expected: &str, received: T) -> Self {
-        error!("expected: {}, received: {}", expected, received.to_string() );
-        Self::Unexpected {expected:expected.to_string(), received: received.to_string() }
+    pub fn unexpected<T: ToString>(expected: &str, received: T) -> Self {
+        error!("expected: {}, received: {}", expected, received.to_string());
+        Self::Unexpected {
+            expected: expected.to_string(),
+            received: received.to_string(),
+        }
     }
 }
 
@@ -334,13 +334,16 @@ impl ToString for Fail {
             Fail::Timeout => "Timeout".to_string(),
             Fail::Error(message) => format!("Error({})", message),
             Fail::Reject(_) => "Reject".to_string(),
-            Fail::Unexpected{expected,received} => format!("Unexpected( expected: {}, received: {} )",expected,received).to_string(),
+            Fail::Unexpected { expected, received } => format!(
+                "Unexpected( expected: {}, received: {} )",
+                expected, received
+            )
+            .to_string(),
             Fail::DoNotKnowSpecific(_) => "DoNotKnowSpecific".to_string(),
-            Fail::ResourceNotFound(id) => format!("ResourceNotFound({})",id.to_string()).to_string(),
-            Fail::WrongResourceType {
-                expected,
-                received,
-            } => format!(
+            Fail::ResourceNotFound(id) => {
+                format!("ResourceNotFound({})", id.to_string()).to_string()
+            }
+            Fail::WrongResourceType { expected, received } => format!(
                 "WrongResourceType(expected:[{}],received:{})",
                 hash_to_string(expected),
                 received.to_string()
@@ -369,9 +372,11 @@ impl ToString for Fail {
             }
             Fail::ResourceStateFinal(_) => "ResourceStateFinal".to_string(),
             Fail::ResourceAddressAlreadyInUse(_) => "ResourceAddressAlreadyInUse".to_string(),
-            Fail::InvalidResourceState(message) => format!("InvalidResourceState({})",message).to_string(),
-            Fail::NoProvisioner(kind) => format!("NoProvisioner({})",kind.to_string()).to_string(),
-            Fail::QueueOverflow => "QueueOverflow".to_string()
+            Fail::InvalidResourceState(message) => {
+                format!("InvalidResourceState({})", message).to_string()
+            }
+            Fail::NoProvisioner(kind) => format!("NoProvisioner({})", kind.to_string()).to_string(),
+            Fail::QueueOverflow => "QueueOverflow".to_string(),
         }
     }
 }
@@ -401,7 +406,6 @@ impl From<FromUtf8Error> for Fail {
     }
 }
 
-
 impl From<yaml_rust::scanner::ScanError> for Fail {
     fn from(e: yaml_rust::scanner::ScanError) -> Self {
         Fail::Error(e.to_string())
@@ -410,7 +414,7 @@ impl From<yaml_rust::scanner::ScanError> for Fail {
 
 impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Fail {
     fn from(e: tokio::sync::mpsc::error::SendError<T>) -> Self {
-        Fail::Error(format!("{}",e.to_string()))
+        Fail::Error(format!("{}", e.to_string()))
     }
 }
 
@@ -420,56 +424,47 @@ impl From<actix_web::error::Canceled> for Fail {
     }
 }
 
-impl From<clap::Error> for Fail{
+impl From<clap::Error> for Fail {
     fn from(e: clap::Error) -> Self {
         Fail::Error(e.to_string())
     }
 }
 
 impl From<strum::ParseError> for Fail {
-
     fn from(e: strum::ParseError) -> Self {
         Fail::Error(e.to_string())
     }
 }
 
-
 impl From<kube::Error> for Fail {
-
     fn from(e: kube::Error) -> Self {
         Fail::Error(e.to_string())
     }
 }
 
-
 impl From<starlane_resources::error::Error> for Fail {
-
     fn from(e: starlane_resources::error::Error) -> Self {
         Fail::Error(e.to_string())
     }
 }
 
-impl <T> From<tokio::sync::mpsc::error::TrySendError<T>> for Fail{
+impl<T> From<tokio::sync::mpsc::error::TrySendError<T>> for Fail {
     fn from(_: tokio::sync::mpsc::error::TrySendError<T>) -> Self {
         Fail::QueueOverflow
     }
 }
 
-
-impl From<Infallible> for Fail{
+impl From<Infallible> for Fail {
     fn from(e: Infallible) -> Self {
-        Fail::Error(
-            format!("{}", e.to_string()),
-        )
+        Fail::Error(format!("{}", e.to_string()))
     }
 }
 
-
-fn hash_to_string( hash: &HashSet<ResourceType> ) -> String {
+fn hash_to_string(hash: &HashSet<ResourceType>) -> String {
     let mut rtn = String::new();
     for i in hash.iter() {
-        rtn.push_str( i.to_string().as_str() );
-        rtn.push_str( ", " );
+        rtn.push_str(i.to_string().as_str());
+        rtn.push_str(", ");
     }
     rtn
 }

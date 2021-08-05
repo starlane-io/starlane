@@ -1,21 +1,18 @@
-
 use std::str::FromStr;
 
 use std::thread;
 
-use actix_web::{App, Error, HttpRequest, HttpResponse, HttpServer, middleware, web};
 use actix_web::client::Client;
+use actix_web::{middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer};
 
 use actix_web::web::Data;
 use url::Url;
 
-
 use crate::resource::ResourceAddress;
-use crate::star::StarSkel;
 use crate::star::variant::StarVariant;
+use crate::star::StarSkel;
 use crate::starlane::api::{StarlaneApi, StarlaneApiRelay};
 use tokio::sync::oneshot;
-
 
 pub struct WebVariant {
     skel: StarSkel,
@@ -55,17 +52,17 @@ async fn forward(
     )
     .unwrap();
 
-unimplemented!("switched to BinSrc");
-/*    let responder = match api.get_resource_state(address.into()).await {
-        Ok(state) => match state {
-            None => "404".to_string(),
-            Some(state) => String::from_utf8((*state).clone()).unwrap(),
-        },
-        Err(_err) => "500".to_string(),
-    };
+    unimplemented!("switched to BinSrc");
+    /*    let responder = match api.get_resource_state(address.into()).await {
+           Ok(state) => match state {
+               None => "404".to_string(),
+               Some(state) => String::from_utf8((*state).clone()).unwrap(),
+           },
+           Err(_err) => "500".to_string(),
+       };
 
-    Ok(responder.into())
- */
+       Ok(responder.into())
+    */
 }
 
 async fn proxy(

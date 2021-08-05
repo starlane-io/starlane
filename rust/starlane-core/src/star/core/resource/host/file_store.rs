@@ -8,29 +8,24 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
-
-use tokio::sync::{Mutex};
+use tokio::sync::Mutex;
 
 use starlane_resources::ResourceIdentifier;
 
+use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
 use crate::file_access::{FileAccess, FileEvent};
 use crate::message::Fail;
-use crate::resource::{
-    AddressCreationSrc, AssignResourceStateSrc, FileKind,
-    FileSystemKey, KeyCreationSrc, Path, RemoteDataSrc, Resource,
-    ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate,
-    ResourceCreateStrategy, ResourceCreationChamber, ResourceKind, ResourceStub,
-    ResourceType
-};
 use crate::resource::ResourceKey;
-use crate::star::core::resource::state::{
-    StateStore,
+use crate::resource::{
+    AddressCreationSrc, AssignResourceStateSrc, FileKind, FileSystemKey, KeyCreationSrc, Path,
+    RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate,
+    ResourceCreateStrategy, ResourceCreationChamber, ResourceKind, ResourceStub, ResourceType,
 };
+use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util;
 use std::convert::TryInto;
-use crate::data::{DataSet, BinSrc};
 
 /*
 pub struct FileStoreHost {

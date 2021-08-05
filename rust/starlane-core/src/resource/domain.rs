@@ -2,20 +2,14 @@ use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
-
-
-
-
-
-
 use serde::{Deserialize, Serialize};
 
 use crate::artifact::ArtifactRef;
 use crate::cache::{Cacheable, Data};
 use crate::error::Error;
-use crate::resource::{ArtifactAddress, DomainKey, ResourceAddress, ResourceKind};
-use crate::resource::ArtifactKind;
 use crate::resource::config::{Parser, ResourceConfig};
+use crate::resource::ArtifactKind;
+use crate::resource::{ArtifactAddress, DomainKey, ResourceAddress, ResourceKind};
 
 pub struct Domain {
     key: DomainKey,
@@ -108,13 +102,13 @@ impl Parser<DomainConfig> for DomainConfigParser {
 
 #[cfg(test)]
 mod test {
-    use nom::{branch::alt, bytes::complete::tag, Err, IResult};
     use nom::bytes::complete::{take_while, take_while1};
     use nom::character::complete::{alpha0, alphanumeric0, digit0, newline, one_of, space0};
     use nom::character::is_alphanumeric;
     use nom::combinator::{opt, recognize};
     use nom::error::{Error, ErrorKind};
     use nom::sequence::{pair, preceded};
+    use nom::{branch::alt, bytes::complete::tag, Err, IResult};
 
     fn is_path_char(c: char) -> bool {
         '-' == c || c.is_alphanumeric() || '_' == c || '/' == c

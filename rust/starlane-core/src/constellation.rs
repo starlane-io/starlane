@@ -1,12 +1,3 @@
-
-
-
-
-
-
-
-
-
 use crate::template::{StarTemplate, StarTemplateSelector};
 
 pub struct Constellation {
@@ -14,15 +5,15 @@ pub struct Constellation {
     pub stars: Vec<StarTemplate>,
 }
 
-impl Constellation{
+impl Constellation {
     pub fn new(name: String) -> Self {
-        Self{
+        Self {
             name: name,
-            stars: vec![]
+            stars: vec![],
         }
     }
 
-    pub fn select( &self, selector: StarTemplateSelector ) -> Option<StarTemplate> {
+    pub fn select(&self, selector: StarTemplateSelector) -> Option<StarTemplate> {
         for star in &self.stars {
             match &selector {
                 StarTemplateSelector::Handle(handle) => {
@@ -41,11 +32,11 @@ impl Constellation{
     }
 }
 
-#[derive(Clone,Eq,PartialEq)]
-pub enum ConstellationStatus{
+#[derive(Clone, Eq, PartialEq)]
+pub enum ConstellationStatus {
     Unknown,
     Assembled,
-    Ready
+    Ready,
 }
 
 #[cfg(test)]

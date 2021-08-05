@@ -1,10 +1,10 @@
-use crate::star::StarSkel;
-use crate::star::core::resource::state::StateStore;
-use crate::star::core::resource::host::Host;
-use crate::resource::{ResourceAssign, AssignResourceStateSrc, ResourceKey, Resource};
-use crate::data::{DataSet, BinSrc};
-use crate::message::Fail;
+use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
+use crate::message::Fail;
+use crate::resource::{AssignResourceStateSrc, Resource, ResourceAssign, ResourceKey};
+use crate::star::core::resource::host::Host;
+use crate::star::core::resource::state::StateStore;
+use crate::star::StarSkel;
 
 #[derive(Debug)]
 pub struct SpaceHost {
@@ -28,19 +28,19 @@ impl Host for SpaceHost {
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<DataSet<BinSrc>, Fail> {
         let state = match assign.state_src {
-            AssignResourceStateSrc::Direct(data) => {
-                data
-            }
-            AssignResourceStateSrc::Stateless => {
-                return Err("space cannot be stateless".into())
-            },
-            AssignResourceStateSrc::CreateArgs(ref args) =>  {
-                if args.trim().is_empty() && assign.stub.archetype.kind.init_clap_config().is_none() {
+            AssignResourceStateSrc::Direct(data) => data,
+            AssignResourceStateSrc::Stateless => return Err("space cannot be stateless".into()),
+            AssignResourceStateSrc::CreateArgs(ref args) => {
+                if args.trim().is_empty() && assign.stub.archetype.kind.init_clap_config().is_none()
+                {
                     DataSet::new()
-                } else if assign.stub.archetype.kind.init_clap_config().is_none(){
-                    return Err(format!("resource {} does not take init args",assign.archetype().kind.to_string()).into());
-                }
-                else {
+                } else if assign.stub.archetype.kind.init_clap_config().is_none() {
+                    return Err(format!(
+                        "resource {} does not take init args",
+                        assign.archetype().kind.to_string()
+                    )
+                    .into());
+                } else {
                     unimplemented!()
                 }
             }
@@ -51,15 +51,13 @@ impl Host for SpaceHost {
             state_src: state,
         };
 
-
         Ok(self.store.put(assign).await?)
     }
 
     async fn has(&self, key: ResourceKey) -> bool {
-        match self.store.has(key).await
-        {
+        match self.store.has(key).await {
             Ok(v) => v,
-            Err(_) => false
+            Err(_) => false,
         }
     }
 
@@ -67,7 +65,7 @@ impl Host for SpaceHost {
         self.store.get(key).await
     }
 
-    async fn delete(&self, _identifier: ResourceKey ) -> Result<(), Fail> {
+    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Fail> {
         unimplemented!()
     }
 }

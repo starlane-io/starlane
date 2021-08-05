@@ -1,30 +1,15 @@
-
-
-
 use std::str::FromStr;
-
 
 use serde::{Deserialize, Serialize};
 
-
-
-
-
-
-
-
 use crate::error::Error;
 
+use crate::resource::{
+    AssignResourceStateSrc, Labels, Names, ResourceAddress, ResourceArchetype, ResourceAssign,
+    ResourceCreate, ResourceKind, ResourceRecord, ResourceRegistration, ResourceStub, Specific,
+};
 
-
-
-
-use crate::resource::{AssignResourceStateSrc, Labels, Names, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceKind, ResourceRecord, ResourceRegistration, ResourceStub, Specific};
-
-
-
-
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ConfigSrc {
     None,
     //    Artifact(Artifact)

@@ -1,57 +1,70 @@
 use crate::data::{BinSrc, DataSet};
-use crate::message::Fail;
-use crate::resource::{AssignResourceStateSrc, ResourceAssign, ResourceKey, Resource, ResourceType};
-use tokio::sync::{mpsc, oneshot};
-use crate::star::StarSkel;
-use crate::util::{AsyncRunner, AsyncProcessor, Call};
 use crate::error::Error;
+use crate::message::Fail;
+use crate::resource::{
+    AssignResourceStateSrc, Resource, ResourceAssign, ResourceKey, ResourceType,
+};
+use crate::star::core::resource::host::domain::DomainHost;
 use crate::star::core::resource::host::space::SpaceHost;
+use crate::star::StarSkel;
+use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
-use crate::star::core::resource::host::domain::DomainHost;
+use tokio::sync::{mpsc, oneshot};
 
 pub mod artifact;
+mod domain;
 pub mod file_store;
 pub mod kube;
 mod space;
-mod domain;
 
-pub enum HostCall{
-    Assign{   assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>, tx: oneshot::Sender<Result<Resource,Fail>> },
-    Get{ key: ResourceKey, tx: oneshot::Sender<Result<Option<DataSet<BinSrc>>,Fail>> },
-    Has{ key: ResourceKey, tx: oneshot::Sender<bool> }
+pub enum HostCall {
+    Assign {
+        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
+        tx: oneshot::Sender<Result<Resource, Fail>>,
+    },
+    Get {
+        key: ResourceKey,
+        tx: oneshot::Sender<Result<Option<DataSet<BinSrc>>, Fail>>,
+    },
+    Has {
+        key: ResourceKey,
+        tx: oneshot::Sender<bool>,
+    },
 }
 
-impl Call for HostCall{}
+impl Call for HostCall {}
 
-pub struct HostComponent{
-    skel: StarSkel
+pub struct HostComponent {
+    skel: StarSkel,
 }
 
-impl HostComponent{
+impl HostComponent {
     pub fn new(skel: StarSkel) -> mpsc::Sender<HostCall> {
-        let (tx,rx) = mpsc::channel(1024);
-        AsyncRunner::new(Box::new(Self{
-            skel
-        }), tx.clone(), rx );
+        let (tx, rx) = mpsc::channel(1024);
+        AsyncRunner::new(Box::new(Self { skel }), tx.clone(), rx);
         tx
     }
 }
 
 #[async_trait]
-impl AsyncProcessor<HostCall> for HostComponent{
+impl AsyncProcessor<HostCall> for HostComponent {
     async fn process(&mut self, call: HostCall) {
         match call {
             HostCall::Get { key, tx } => {
-                let host = self.host( key.resource_type() ).await;
+                let host = self.host(key.resource_type()).await;
                 tx.send(host.get(key).await);
             }
             HostCall::Assign { assign, tx } => {
-                let host = self.host( assign.stub.key.resource_type() ).await;
-                match host.assign(assign.clone()).await
-                {
+                let host = self.host(assign.stub.key.resource_type()).await;
+                match host.assign(assign.clone()).await {
                     Ok(state) => {
-                        let resource = Resource::new(assign.stub.key, assign.stub.address, assign.stub.archetype, state);
+                        let resource = Resource::new(
+                            assign.stub.key,
+                            assign.stub.address,
+                            assign.stub.archetype,
+                            state,
+                        );
                         tx.send(Ok(resource));
                     }
                     Err(err) => {
@@ -60,7 +73,7 @@ impl AsyncProcessor<HostCall> for HostComponent{
                 }
             }
             HostCall::Has { key, tx } => {
-                let host = self.host( key.resource_type() ).await;
+                let host = self.host(key.resource_type()).await;
                 tx.send(host.has(key).await);
             }
         }
@@ -68,26 +81,16 @@ impl AsyncProcessor<HostCall> for HostComponent{
 }
 
 impl HostComponent {
-    async fn host( &self, rt: ResourceType ) -> Box<dyn Host> {
+    async fn host(&self, rt: ResourceType) -> Box<dyn Host> {
         match rt {
-            ResourceType::Space => {
-                Box::new(SpaceHost::new(self.skel.clone()).await )
-            }
-            ResourceType::SubSpace => {
-                Box::new(SpaceHost::new(self.skel.clone()).await )
-            }
-            ResourceType::Domain=> {
-                Box::new(DomainHost::new(self.skel.clone()).await )
-            }
+            ResourceType::Space => Box::new(SpaceHost::new(self.skel.clone()).await),
+            ResourceType::SubSpace => Box::new(SpaceHost::new(self.skel.clone()).await),
+            ResourceType::Domain => Box::new(DomainHost::new(self.skel.clone()).await),
 
-            t => unimplemented!("no HOST implementation for type {}",t.to_string())
+            t => unimplemented!("no HOST implementation for type {}", t.to_string()),
         }
     }
 }
-
-
-
-
 
 #[async_trait]
 pub trait Host: Send + Sync {

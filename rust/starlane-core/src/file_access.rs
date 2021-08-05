@@ -1,27 +1,26 @@
-use std::{fs, thread};
 use std::collections::HashMap;
+use std::{fs, thread};
 
 use std::fs::{DirBuilder, File};
 
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::{Arc, mpsc};
+use std::sync::{mpsc, Arc};
 
-
-use notify::{Op, raw_watcher, RawEvent, RecursiveMode, Watcher};
-use tokio::io::{AsyncReadExt};
+use notify::{raw_watcher, Op, RawEvent, RecursiveMode, Watcher};
+use tokio::io::AsyncReadExt;
 use tokio::time::Duration;
-use walkdir::{WalkDir};
+use walkdir::WalkDir;
 
 use crate::error::Error;
-use crate::resource::Path;
 use crate::resource::FileKind;
+use crate::resource::Path;
 
 use crate::util;
-use tokio::fs::ReadDir;
-use std::convert::TryInto;
 use std::convert::TryFrom;
+use std::convert::TryInto;
+use tokio::fs::ReadDir;
 
 pub enum FileCommand {
     List {
@@ -53,7 +52,7 @@ pub enum FileCommand {
         target: String,
         tx: tokio::sync::oneshot::Sender<Result<(), Error>>,
     },
-    Shutdown
+    Shutdown,
 }
 
 #[derive(Clone)]
@@ -79,7 +78,7 @@ impl FileAccess {
     pub async fn list(&self, path: &Path) -> Result<Vec<Path>, Error> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.tx
-            .send(FileCommand::List{
+            .send(FileCommand::List {
                 path: path.clone(),
                 tx: tx,
             })
@@ -109,8 +108,6 @@ impl FileAccess {
             .await?;
         Ok(util::wait_for_it(rx).await?)
     }
-
-
 
     /*
     pub async fn write_stream( &mut self, path: &Path, stream: Box<dyn AsyncReadExt> )->Result<(),Error> {
@@ -219,7 +216,6 @@ impl LocalFileAccess {
     async fn run(mut self) {
         tokio::spawn(async move {
             while let Option::Some(command) = self.rx.recv().await {
-
                 if let FileCommand::Shutdown = command {
                     break;
                 }
@@ -237,16 +233,12 @@ impl LocalFileAccess {
     async fn process(&mut self, command: FileCommand) -> Result<(), Error> {
         match command {
             FileCommand::List { path, tx } => {
-                tx.send( self.list(path).await ).unwrap_or_default();
+                tx.send(self.list(path).await).unwrap_or_default();
             }
             FileCommand::Read { path, tx } => {
                 tx.send(self.read(&path)).unwrap_or_default();
             }
-            FileCommand::Write {
-                path,
-                data,
-                tx,
-            } => {
+            FileCommand::Write { path, data, tx } => {
                 tx.send(self.write(&path, data)).unwrap_or_default();
             }
             /*            FileCommand::WriteStream { path: path, stream, tx } => {
@@ -271,20 +263,23 @@ impl LocalFileAccess {
         Ok(())
     }
 
-    async fn list(&self, dir_path: Path) -> Result<Vec<Path>,Error>{
+    async fn list(&self, dir_path: Path) -> Result<Vec<Path>, Error> {
         let path = self.cat_path(dir_path.to_relative().as_str())?;
         let mut read_dir = tokio::fs::read_dir(path).await?;
 
-        let mut rtn = vec!();
+        let mut rtn = vec![];
         while let Result::Ok(Option::Some(entry)) = read_dir.next_entry().await {
-            let entry = Path::make_absolute(entry.file_name().to_str().ok_or("expected os str to be able to change to str")?)?;
+            let entry = Path::make_absolute(
+                entry
+                    .file_name()
+                    .to_str()
+                    .ok_or("expected os str to be able to change to str")?,
+            )?;
             let entry = dir_path.cat(&entry)?;
-            rtn.push(entry );
+            rtn.push(entry);
         }
         Ok(rtn)
     }
-
-
 
     pub fn cat_path(&self, path: &str) -> Result<String, Error> {
         if path.len() < 1 {

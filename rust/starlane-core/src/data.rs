@@ -1,4 +1,4 @@
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
@@ -6,108 +6,104 @@ use tokio::task::JoinHandle;
 use crate::error::Error;
 use starlane_resources::Path;
 
-use std::future::Future;
-use std::convert::TryFrom;
-use crate::star::StarKey;
 use crate::file_access::FileAccess;
+use crate::star::StarKey;
 use starlane_resources::data::Meta;
+use std::convert::TryFrom;
+use std::future::Future;
 use tokio::runtime::Handle;
 
-
 pub type Binary = Arc<Vec<u8>>;
-pub type DataSet<B> = HashMap<String,B>;
+pub type DataSet<B> = HashMap<String, B>;
 
-#[derive(Debug,Clone,Serialize,Deserialize)]
-pub enum BinSize{
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum BinSize {
     Unknown,
-    Size(i32)
+    Size(i32),
 }
 
-#[derive(Debug,Clone,Serialize,Deserialize)]
-pub enum BinSizeCategory{
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum BinSizeCategory {
     Small,
-    Large
+    Large,
 }
 
-#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
-pub enum FileSpace{
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub enum FileSpace {
     Perm,
-    Temp
+    Temp,
 }
 
-#[derive(Debug,Clone,Serialize,Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BinNetworkAddress {
     pub star: StarKey,
     pub filepath: String,
-    pub filespace: FileSpace
+    pub filespace: FileSpace,
 }
 
-#[derive(Debug,Clone,Serialize,Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum BinSrc {
-  Memory(Binary),
-  Network{address:BinNetworkAddress, size: BinSize}
+    Memory(Binary),
+    Network {
+        address: BinNetworkAddress,
+        size: BinSize,
+    },
 }
 
-impl BinSrc{
+impl BinSrc {
     pub fn new(bin: Binary) -> Self {
         Self::Memory(bin)
     }
 }
 
 #[async_trait]
-pub trait BinContext : Sync+Send {
-//  fn open(&self) -> OutputStream;
-//  fn mv(&self, tmp_file: &Path, new_file: &Path )->Result<(),Error>;
+pub trait BinContext: Sync + Send {
+    //  fn open(&self) -> OutputStream;
+    //  fn mv(&self, tmp_file: &Path, new_file: &Path )->Result<(),Error>;
 
-  fn file_access(&self) -> FileAccess;
-  fn runtime_handle(&self) -> &Handle;
-  async fn is_local_star( &self, star: &StarKey ) -> bool;
+    fn file_access(&self) -> FileAccess;
+    fn runtime_handle(&self) -> &Handle;
+    async fn is_local_star(&self, star: &StarKey) -> bool;
 }
 
-pub struct BinTransfer{
+pub struct BinTransfer {
     pub ctx: Arc<dyn BinContext>,
     pub index: i32,
-    pub complete: bool
+    pub complete: bool,
 }
 
-impl BinTransfer{
+impl BinTransfer {
     pub fn new(ctx: Arc<dyn BinContext>) -> Self {
         Self {
             ctx,
             index: 0,
-            complete: false
+            complete: false,
         }
     }
 }
 
-impl BinSrc{
-    pub fn size(&self) -> BinSize{
+impl BinSrc {
+    pub fn size(&self) -> BinSize {
         match self {
-            BinSrc::Memory(binary) => {
-                BinSize::Size(binary.len() as _)
-            }
-            BinSrc::Network{ address:_, size } => {
-                size.clone()
-            }
+            BinSrc::Memory(binary) => BinSize::Size(binary.len() as _),
+            BinSrc::Network { address: _, size } => size.clone(),
         }
     }
 
-    pub fn to_bin(&self, ctx: Arc<dyn BinContext>) -> Result<Binary,Error> {
+    pub fn to_bin(&self, ctx: Arc<dyn BinContext>) -> Result<Binary, Error> {
         match self {
-            BinSrc::Memory(bin) => {
-                Ok(bin.clone())
-            }
+            BinSrc::Memory(bin) => Ok(bin.clone()),
             BinSrc::Network { .. } => {
                 unimplemented!()
             }
         }
     }
 
-    fn transfer_block(&self, transfer: &mut BinTransfer ) -> Result<Option<Vec<u8>>,Error> {
+    fn transfer_block(&self, transfer: &mut BinTransfer) -> Result<Option<Vec<u8>>, Error> {
         match self {
             BinSrc::Memory(bin) => {
                 if transfer.index > 0 {
-                    return Ok(Option::None)
+                    return Ok(Option::None);
                 }
                 transfer.index = bin.len() as _;
                 transfer.complete = true;
@@ -120,12 +116,18 @@ impl BinSrc{
     }
 
     /// if the file is local (or bin is in memory) it's better to issue a move command
-    pub async fn mv(&self, ctx: Arc<dyn BinContext>, path: Path, tx: tokio::sync::oneshot::Sender<Result<(),Error>> ) {
+    pub async fn mv(
+        &self,
+        ctx: Arc<dyn BinContext>,
+        path: Path,
+        tx: tokio::sync::oneshot::Sender<Result<(), Error>>,
+    ) {
         match self {
             BinSrc::Memory(bin) => {
-                tx.send(ctx.file_access().write( &path, bin.clone() ).await).unwrap_or_default();
+                tx.send(ctx.file_access().write(&path, bin.clone()).await)
+                    .unwrap_or_default();
             }
-            BinSrc::Network { address,size: _ } => {
+            BinSrc::Network { address, size: _ } => {
                 unimplemented!()
                 /*
                 if address.filespace == FileSpace::Temp && ctx.is_local_star(&address.star).await
@@ -175,10 +177,10 @@ impl BinSrc{
     }
 }
 
-impl TryFrom<Meta> for BinSrc{
+impl TryFrom<Meta> for BinSrc {
     type Error = Error;
 
-    fn try_from(meta: Meta) -> Result<Self,Self::Error> {
+    fn try_from(meta: Meta) -> Result<Self, Self::Error> {
         Ok(BinSrc::Memory(Arc::new(bincode::serialize(&meta)?)))
     }
 }

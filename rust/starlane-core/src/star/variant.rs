@@ -3,16 +3,16 @@ use std::fmt;
 use tokio::sync::oneshot;
 
 use crate::error::Error;
-use crate::frame::{StarMessage};
+use crate::frame::StarMessage;
 use crate::lane::LaneWrapper;
-use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::star::variant::central::CentralVariant;
 use crate::star::variant::gateway::GatewayVariant;
 use crate::star::variant::web::WebVariant;
+use crate::star::{StarCommand, StarKind, StarSkel};
 
 pub mod central;
-pub mod web;
 pub mod gateway;
+pub mod web;
 
 #[async_trait]
 pub trait StarVariant: Send + Sync {
@@ -20,7 +20,11 @@ pub trait StarVariant: Send + Sync {
         tx.send(Ok(()));
     }
 
-    fn filter(&mut self, _command: &StarCommand, _lane: &mut Option<&mut LaneWrapper> ) -> StarShellInstructions {
+    fn filter(
+        &mut self,
+        _command: &StarCommand,
+        _lane: &mut Option<&mut LaneWrapper>,
+    ) -> StarShellInstructions {
         StarShellInstructions::Handle
     }
 }
@@ -31,9 +35,7 @@ pub enum StarShellInstructions {
 }
 
 #[async_trait]
-impl StarVariant for PlaceholderStarManager {
-
-}
+impl StarVariant for PlaceholderStarManager {}
 
 pub enum StarVariantCommand {
     StarSkel(StarSkel),

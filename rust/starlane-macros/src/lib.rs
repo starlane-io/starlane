@@ -3,13 +3,16 @@ use std::collections::{HashMap, HashSet};
 use nom::bytes::complete::take_till1;
 use nom::character::complete::anychar;
 use nom::error::{context, VerboseError};
-use nom::IResult;
 use nom::multi::many1;
 use nom::sequence::tuple;
-use quote::quote;
+use nom::IResult;
 use quote::__private::TokenStream;
-use syn::{Expr, Ident, Item, ItemEnum, Lit, Meta, MetaList, MetaNameValue, NestedMeta, parse_macro_input, Path, PathArguments, Token, Type, Visibility};
+use quote::quote;
 use syn::parse::{Parse, ParseStream};
+use syn::{
+    parse_macro_input, Expr, Ident, Item, ItemEnum, Lit, Meta, MetaList, MetaNameValue, NestedMeta,
+    Path, PathArguments, Token, Type, Visibility,
+};
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
@@ -20,8 +23,8 @@ struct ResourceParser {
 }
 
 impl ResourceParser {
-    pub fn children_of(&self, parent: Resource ) -> Vec<Resource> {
-        let mut rtn = vec!();
+    pub fn children_of(&self, parent: Resource) -> Vec<Resource> {
+        let mut rtn = vec![];
         for child in &self.resources {
             for parent_ident in child.parents.clone() {
                 if parent.get_ident().to_string() == parent_ident.to_string() {
@@ -32,8 +35,8 @@ impl ResourceParser {
         rtn
     }
 
-    pub fn parents_of(&self, resource: Resource ) -> Vec<Resource> {
-        let mut rtn = vec!();
+    pub fn parents_of(&self, resource: Resource) -> Vec<Resource> {
+        let mut rtn = vec![];
         for parent in &self.resources {
             for parent_ident in resource.parents.clone() {
                 if parent.get_ident().to_string() == parent_ident.to_string() {
@@ -44,54 +47,52 @@ impl ResourceParser {
         rtn
     }
 
-    pub fn build_paths( &self, resource: Resource )  -> HashMap<String,Vec<String>>{
+    pub fn build_paths(&self, resource: Resource) -> HashMap<String, Vec<String>> {
         let mut parts = vec![];
-        parts.push( resource.path_part.as_ref().unwrap().to_string() );
+        parts.push(resource.path_part.as_ref().unwrap().to_string());
         let mut rtn = HashMap::new();
 
-        for parent in self.parents_of(resource.clone())
-        {
-            for path in self.paths(parent.clone(), parts.clone() ){
-                rtn.insert( parent.get_ident().to_string(), path.clone() );
+        for parent in self.parents_of(resource.clone()) {
+            for path in self.paths(parent.clone(), parts.clone()) {
+                rtn.insert(parent.get_ident().to_string(), path.clone());
             }
         }
 
         rtn
     }
 
-    pub fn paths( &self, resource: Resource,mut parts: Vec<String> )  -> HashSet<Vec<String>>{
+    pub fn paths(&self, resource: Resource, mut parts: Vec<String>) -> HashSet<Vec<String>> {
         let mut rtn = HashSet::new();
-        parts.push( resource.path_part.as_ref().unwrap().to_string() );
-        for parent in self.parents_of(resource.clone())
-        {
-            for path in self.paths(parent, parts.clone() ){
+        parts.push(resource.path_part.as_ref().unwrap().to_string());
+        for parent in self.parents_of(resource.clone()) {
+            for path in self.paths(parent, parts.clone()) {
                 rtn.insert(path);
             }
         }
 
         if self.parents_of(resource).is_empty() {
             parts.reverse();
-            rtn.insert( parts );
+            rtn.insert(parts);
         }
 
         rtn
     }
 
-    pub fn kind_for(&self, resource: &Resource ) -> Option<ItemEnum> {
+    pub fn kind_for(&self, resource: &Resource) -> Option<ItemEnum> {
         for kind in &self.kinds {
-               if kind.ident.to_string() == format!("{}Kind",resource.get_ident().to_string()) {
-println!("FOUND KIND MATCH");
-                   return Option::Some(kind.clone())
-               }
+            if kind.ident.to_string() == format!("{}Kind", resource.get_ident().to_string()) {
+                println!("FOUND KIND MATCH");
+                return Option::Some(kind.clone());
+            }
         }
         Option::None
     }
 }
 
-#[derive(Clone,Hash,Eq,PartialEq)]
-struct PathIdent{
-   pub resource: String,
-   pub parts: Vec<String>
+#[derive(Clone, Hash, Eq, PartialEq)]
+struct PathIdent {
+    pub resource: String,
+    pub parts: Vec<String>,
 }
 
 #[derive(Clone)]
@@ -101,28 +102,26 @@ struct Resource {
     key_prefix: Option<String>,
     path_part: Option<Ident>,
     state_persistence: Option<Path>,
-    state_aspects: HashMap<String,String>
+    state_aspects: HashMap<String, String>,
 }
 
 impl Resource {
-    pub fn new( item: Item) -> Self {
+    pub fn new(item: Item) -> Self {
         Self {
             item: item,
             parents: vec![],
             key_prefix: Option::None,
             path_part: Option::None,
             state_persistence: Option::None,
-            state_aspects: HashMap::new()
+            state_aspects: HashMap::new(),
         }
     }
 
     pub fn get_ident(&self) -> Ident {
         match &self.item {
-            Item::Struct(el_struct) => {
-                el_struct.ident.clone()
-            }
+            Item::Struct(el_struct) => el_struct.ident.clone(),
             _ => {
-            panic!("expected struct");
+                panic!("expected struct");
             }
         }
     }
@@ -142,15 +141,12 @@ impl Resource {
             });
         }
     }
-
 }
-
-
 
 impl Parse for ResourceParser {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut kinds: Vec<ItemEnum> = vec![];
-        let mut resources:Vec<Resource> = vec![];
+        let mut resources: Vec<Resource> = vec![];
 
         while !input.is_empty() {
             let item = input.parse::<Item>()?;
@@ -162,30 +158,55 @@ impl Parse for ResourceParser {
                             let content: Meta = attr.parse_args()?;
                             match content {
                                 Meta::Path(path) => {
-                                    if path.segments.first().is_some() && path.segments.first().unwrap().ident.to_string().as_str() == "ResourcePathSegmentKind"
+                                    if path.segments.first().is_some()
+                                        && path.segments.first().unwrap().ident.to_string().as_str()
+                                            == "ResourcePathSegmentKind"
                                     {
-                                        resource.path_part = Option::Some( path.segments.last().unwrap().ident.clone() );
-                                    }
-                                    else if path.segments.first().is_some() && path.segments.first().unwrap().ident.to_string().as_str() == "ResourceStatePersistenceManager"
+                                        resource.path_part = Option::Some(
+                                            path.segments.last().unwrap().ident.clone(),
+                                        );
+                                    } else if path.segments.first().is_some()
+                                        && path.segments.first().unwrap().ident.to_string().as_str()
+                                            == "ResourceStatePersistenceManager"
                                     {
-                                        resource.state_persistence= Option::Some( path );
+                                        resource.state_persistence = Option::Some(path);
                                     }
                                 }
                                 Meta::List(list) => {
-                                    match list.path.segments.last().unwrap().ident.to_string().as_str() {
+                                    match list
+                                        .path
+                                        .segments
+                                        .last()
+                                        .unwrap()
+                                        .ident
+                                        .to_string()
+                                        .as_str()
+                                    {
                                         "parents" => {
                                             resource.parents = to_idents(&list);
                                         }
                                         "state" => {
-                                            for  aspect in list.nested {
-                                                if let NestedMeta::Meta(aspect ) = aspect {
-                                                    let name = aspect.path().segments.first().expect("expected a first").ident.to_string();
-                                                    let kind = aspect.path().segments.last().expect("expected a last").ident.to_string();
-println!("name & kind : {}: {} ",name, kind );
-                                                    resource.state_aspects.insert( name, kind );
+                                            for aspect in list.nested {
+                                                if let NestedMeta::Meta(aspect) = aspect {
+                                                    let name = aspect
+                                                        .path()
+                                                        .segments
+                                                        .first()
+                                                        .expect("expected a first")
+                                                        .ident
+                                                        .to_string();
+                                                    let kind = aspect
+                                                        .path()
+                                                        .segments
+                                                        .last()
+                                                        .expect("expected a last")
+                                                        .ident
+                                                        .to_string();
+                                                    println!("name & kind : {}: {} ", name, kind);
+                                                    resource.state_aspects.insert(name, kind);
                                                 }
                                             }
-//                                            resource.parents = to_idents(&list);
+                                            //                                            resource.parents = to_idents(&list);
                                         }
 
                                         what => {
@@ -207,53 +228,50 @@ println!("name & kind : {}: {} ",name, kind );
 
                 resource.strip_resource_attributes();
                 resources.push(resource);
-            } else  if let Item::Enum(e) = &item {
+            } else if let Item::Enum(e) = &item {
                 if !e.ident.to_string().ends_with("Kind") {
                     panic!("only ResourceKinds can be defined here");
                 }
-println!("ADDING KIND: {}",e.ident.to_string());
-                kinds.push(e.clone() );
+                println!("ADDING KIND: {}", e.ident.to_string());
+                kinds.push(e.clone());
             } else {
             }
         }
 
-
-
         let mut ident_to_resource = HashMap::new();
         for resource in &resources {
-            ident_to_resource.insert(resource.get_ident().to_string(), resource.clone() );
+            ident_to_resource.insert(resource.get_ident().to_string(), resource.clone());
         }
 
-
-
-        Ok(Self{
+        Ok(Self {
             kinds: kinds,
             resources: resources,
-            ident_to_resource
+            ident_to_resource,
         })
     }
 }
 
-fn to_idents( list: &MetaList ) -> Vec<Ident> {
+fn to_idents(list: &MetaList) -> Vec<Ident> {
     let mut idents = vec![];
-        for parent in &list.nested {
-            if let NestedMeta::Meta(parent ) = parent {
-                idents.push(parent.path().segments.last().unwrap().ident.clone());
-            }
+    for parent in &list.nested {
+        if let NestedMeta::Meta(parent) = parent {
+            idents.push(parent.path().segments.last().unwrap().ident.clone());
         }
+    }
     idents
 }
 
 #[proc_macro]
 pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let parsed = parse_macro_input!(input as ResourceParser );
+    let parsed = parse_macro_input!(input as ResourceParser);
 
-    let rts: Vec<Ident> = parsed.resources.iter().map(|resource|{
-        resource.get_ident()
-    }).collect();
+    let rts: Vec<Ident> = parsed
+        .resources
+        .iter()
+        .map(|resource| resource.get_ident())
+        .collect();
 
-
-    let resource_type_enum_def = quote!{
+    let resource_type_enum_def = quote! {
         #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
         pub enum ResourceType {
           Root,
@@ -297,10 +315,9 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         }
     };
 
-
     // the pathway method is kinda hacked using the number of segments to determine parent,
     // vector matchin doesn't actually seem to work as expected
-    let mut pathways  = String::new();
+    let mut pathways = String::new();
     pathways.push_str("impl ResourceType {");
     pathways.push_str("pub fn parent_path_matcher( &self, path: Vec<ResourcePathSegmentKind> ) -> Result<ResourceType,Error> {");
     pathways.push_str("match self { ");
@@ -314,34 +331,33 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     state_schema.push_str("Self::Root => StateSchema::new(),");
      */
 
-
     for resource in &parsed.resources {
         let _ident = resource.get_ident();
-        pathways.push_str( format!("Self::{} => {{", resource.get_ident().to_string() ).as_str());
+        pathways.push_str(format!("Self::{} => {{", resource.get_ident().to_string()).as_str());
 
-        for (parent,path) in parsed.build_paths(resource.clone()).iter() {
-            pathways.push_str( format!("let {} = vec![", parent.to_lowercase()).as_str());
+        for (parent, path) in parsed.build_paths(resource.clone()).iter() {
+            pathways.push_str(format!("let {} = vec![", parent.to_lowercase()).as_str());
             for part in path {
-                pathways.push_str( "ResourcePathSegmentKind::");
+                pathways.push_str("ResourcePathSegmentKind::");
                 pathways.push_str(part);
                 pathways.push_str(",");
             }
-            pathways.push_str( "];");
-
-
+            pathways.push_str("];");
         }
-        pathways.push_str( "match (path.len(), path) {");
-        for (parent,path) in parsed.build_paths(resource.clone()).iter() {
-            pathways.push_str( format!("({}, {}) => {{", path.len(),parent.to_lowercase()).as_str(), );
-            pathways.push_str(format!("Ok(Self::{})",parent).as_str());
-            pathways.push_str( "}");
+        pathways.push_str("match (path.len(), path) {");
+        for (parent, path) in parsed.build_paths(resource.clone()).iter() {
+            pathways
+                .push_str(format!("({}, {}) => {{", path.len(), parent.to_lowercase()).as_str());
+            pathways.push_str(format!("Ok(Self::{})", parent).as_str());
+            pathways.push_str("}");
         }
 
-        pathways.push_str( "(_,_) => Err(\"could not find parent match for resource pathway\".into())");
+        pathways
+            .push_str("(_,_) => Err(\"could not find parent match for resource pathway\".into())");
 
-        pathways.push_str( "}");
+        pathways.push_str("}");
 
-        pathways.push_str( "},");
+        pathways.push_str("},");
 
         /*
         state_schema.push_str( format!("Self::{}=>{{", resource.get_ident().to_string()).as_str() );
@@ -355,67 +371,78 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
          */
     }
 
-
-
     pathways.push_str("}}}");
     //state_schema.push_str( "}}}");
-//println!("{}",pathways);
-    let pathways = syn::parse_str::<Item>( pathways.as_str() ).unwrap();
-    let pathways = quote!{#pathways};
+    //println!("{}",pathways);
+    let pathways = syn::parse_str::<Item>(pathways.as_str()).unwrap();
+    let pathways = quote! {#pathways};
 
     /*
     let state_schema = syn::parse_str::<Item>( state_schema.as_str() ).unwrap();
     let state_schema = quote!{#state_schema};
      */
 
-    let state_persistences: Vec<Path> = parsed.resources.clone().iter().map(|resource|{
-        resource.state_persistence.as_ref().expect("expected ResourceStatePersistenceManager to be set").clone()
-    }).collect();
+    let state_persistences: Vec<Path> = parsed
+        .resources
+        .clone()
+        .iter()
+        .map(|resource| {
+            resource
+                .state_persistence
+                .as_ref()
+                .expect("expected ResourceStatePersistenceManager to be set")
+                .clone()
+        })
+        .collect();
 
+    let idents: Vec<Ident> = parsed
+        .resources
+        .clone()
+        .iter()
+        .map(|resource| resource.get_ident())
+        .collect();
 
-    let idents : Vec<Ident> = parsed.resources.clone().iter().map(|resource|{
-        resource.get_ident()
-    }).collect();
-
-    let parents: Vec<Vec<Ident>> = parsed.resources.iter().map(|resource|{
-        resource.parents.clone()
-    }).collect();
+    let parents: Vec<Vec<Ident>> = parsed
+        .resources
+        .iter()
+        .map(|resource| resource.parents.clone())
+        .collect();
 
     let resource_impl_def = quote! {
-impl ResourceType {
-   pub fn parents(&self) -> Vec<Self> {
-      match self {
-        Self::Root => vec!(),
-        #(Self::#idents => vec![#(Self::#parents),*]),*
-      }
-   }
+    impl ResourceType {
+       pub fn parents(&self) -> Vec<Self> {
+          match self {
+            Self::Root => vec!(),
+            #(Self::#idents => vec![#(Self::#parents),*]),*
+          }
+       }
 
-  pub fn state_persistence(&self) -> ResourceStatePersistenceManager {
-      match self {
-                    Self::Root => ResourceStatePersistenceManager::None,
-                    #(Self::#idents => #state_persistences),*
-     }
-   }
-}
-#pathways
-    };
+      pub fn state_persistence(&self) -> ResourceStatePersistenceManager {
+          match self {
+                        Self::Root => ResourceStatePersistenceManager::None,
+                        #(Self::#idents => #state_persistences),*
+         }
+       }
+    }
+    #pathways
+        };
 
+    let resources_def: Vec<Item> = parsed
+        .resources
+        .clone()
+        .iter()
+        .map(|resource| resource.item.clone())
+        .collect();
 
-    let resources_def:Vec<Item> =  parsed.resources.clone().iter().map( |resource| {
-        resource.item.clone()
-    } ).collect();
+    println!("resources_def.len() {}", resources_def.len());
 
-    println!("resources_def.len() {}",resources_def.len());
-
-    let keys= keys(&parsed);
+    let keys = keys(&parsed);
     let identifiers = identifiers(&parsed);
     let ids = ids(&parsed);
 
-
     let kinds = kinds(&parsed);
 
-
-    let paths= paths(&parsed);
+    let paths = paths(&parsed);
     /*
     proc_macro::TokenStream::from( quote!{
        #extras
@@ -429,7 +456,7 @@ impl ResourceType {
     })
      */
 
-    proc_macro::TokenStream::from( quote!{
+    proc_macro::TokenStream::from(quote! {
        #resource_type_enum_def
        #(#resources_def)*
        #identifiers
@@ -441,18 +468,24 @@ impl ResourceType {
        #resource_impl_def
     })
 }
-fn paths( parsed: &ResourceParser ) -> TokenStream {
-
-
-
+fn paths(parsed: &ResourceParser) -> TokenStream {
     let mut paths = vec![];
-    for resource in &parsed.resources{
-        let _ident = Ident::new(resource.get_ident().to_string().as_str(), resource.get_ident().span());
-        let path_ident = Ident::new(format!("{}Path",resource.get_ident().to_string()).as_str(), resource.get_ident().span());
+    for resource in &parsed.resources {
+        let _ident = Ident::new(
+            resource.get_ident().to_string().as_str(),
+            resource.get_ident().span(),
+        );
+        let path_ident = Ident::new(
+            format!("{}Path", resource.get_ident().to_string()).as_str(),
+            resource.get_ident().span(),
+        );
 
         if resource.parents.len() == 1 {
             let parent = resource.parents.first().unwrap().clone();
-            let parent_path= Ident::new(format!("{}Path",parent.to_string()).as_str(), parent.span());
+            let parent_path = Ident::new(
+                format!("{}Path", parent.to_string()).as_str(),
+                parent.span(),
+            );
             paths.push( quote!{
                  impl #path_ident {
                     pub fn parent(&self)->ResourcePath {
@@ -464,7 +497,16 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
             } );
         } else {
             let _parents = resource.parents.clone();
-            let _parent_path: Vec<Ident>= resource.parents.iter().map( |parent|Ident::new(format!("{}Path",parent.to_string()).as_str(), parent.span())).collect();
+            let _parent_path: Vec<Ident> = resource
+                .parents
+                .iter()
+                .map(|parent| {
+                    Ident::new(
+                        format!("{}Path", parent.to_string()).as_str(),
+                        parent.span(),
+                    )
+                })
+                .collect();
             paths.push( quote!{
                  impl #path_ident {
                     pub fn parent(&self)->ResourcePath {
@@ -473,26 +515,34 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
                     }
                 }
             } );
-
         }
     }
 
-    let idents: Vec<Ident> = parsed.resources.clone().iter().map(|resource|{
-        resource.get_ident()
-    }).collect();
+    let idents: Vec<Ident> = parsed
+        .resources
+        .clone()
+        .iter()
+        .map(|resource| resource.get_ident())
+        .collect();
     let idents2 = idents.clone();
 
-    let path_idents: Vec<Ident> = parsed.resources.iter().map(|resource|{
-        Ident::new( format!("{}Path",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
-    }).collect();
+    let path_idents: Vec<Ident> = parsed
+        .resources
+        .iter()
+        .map(|resource| {
+            Ident::new(
+                format!("{}Path", resource.get_ident().to_string()).as_str(),
+                resource.get_ident().span(),
+            )
+        })
+        .collect();
 
     let path_idents2 = path_idents.clone();
     let path_idents3 = path_idents.clone();
-    let path_idents4= path_idents.clone();
-    let path_idents5= path_idents.clone();
+    let path_idents4 = path_idents.clone();
+    let path_idents5 = path_idents.clone();
 
-
-    quote!{
+    quote! {
 
         #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
         pub struct RootPath{
@@ -722,13 +772,12 @@ fn paths( parsed: &ResourceParser ) -> TokenStream {
         #(#paths)*
     }
     //#(ResourceType::#idents => Ok(Option::Some(#path_idents::parent()?.unwrap().into())) ),*
-
 }
 
-fn kinds( parsed: &ResourceParser ) -> TokenStream {
-  let mut kind_stuff = vec![];
+fn kinds(parsed: &ResourceParser) -> TokenStream {
+    let mut kind_stuff = vec![];
 
-  let mut resource_kind_enum = String::new();
+    let mut resource_kind_enum = String::new();
     resource_kind_enum.push_str("#[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]");
     resource_kind_enum.push_str("pub enum ResourceKind {");
     resource_kind_enum.push_str("Root,");
@@ -736,184 +785,232 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
     let mut resource_kind_from_parts = String::new();
     resource_kind_from_parts.push_str("impl TryFrom<ResourceKindParts> for ResourceKind {");
     resource_kind_from_parts.push_str("type Error = Error;");
-    resource_kind_from_parts.push_str("fn try_from( parts: ResourceKindParts ) -> Result<Self,Self::Error> { ");
-    resource_kind_from_parts.push_str("match parts.resource_type.as_str() { " );
+    resource_kind_from_parts
+        .push_str("fn try_from( parts: ResourceKindParts ) -> Result<Self,Self::Error> { ");
+    resource_kind_from_parts.push_str("match parts.resource_type.as_str() { ");
 
     let mut into_resource_kind_parts = String::new();
-    into_resource_kind_parts.push_str( "impl Into<ResourceKindParts> for ResourceKind {");
-    into_resource_kind_parts.push_str( "fn into(self) -> ResourceKindParts {");
-    into_resource_kind_parts.push_str( "match self {");
+    into_resource_kind_parts.push_str("impl Into<ResourceKindParts> for ResourceKind {");
+    into_resource_kind_parts.push_str("fn into(self) -> ResourceKindParts {");
+    into_resource_kind_parts.push_str("match self {");
     into_resource_kind_parts.push_str( "Self::Root => ResourceKindParts{ resource_type: \"Root\".to_string(), kind:Option::None, specific:Option::None },");
 
-
     let mut resource_type = String::new();
-    resource_type.push_str( "impl ResourceKind {");
-    resource_type.push_str( "pub fn resource_type(&self) -> ResourceType {");
-    resource_type.push_str( "match self {");
-    resource_type.push_str( "Self::Root => ResourceType::Root,");
-
+    resource_type.push_str("impl ResourceKind {");
+    resource_type.push_str("pub fn resource_type(&self) -> ResourceType {");
+    resource_type.push_str("match self {");
+    resource_type.push_str("Self::Root => ResourceType::Root,");
 
     for resource in &parsed.resources {
-      if let Option::Some(kind) = parsed.kind_for(resource) {
+        if let Option::Some(kind) = parsed.kind_for(resource) {
+            let _ident = resource.get_ident();
+            let ident_kind = Ident::new(
+                format!("{}Kind", resource.get_ident().to_string()).as_str(),
+                resource.get_ident().span(),
+            );
+            kind_stuff.push(quote! {
+                impl ToString for #ident_kind {
+                    fn to_string(&self) -> String {
+                        let kind: ResourceKind = self.clone().into();
+                        kind.to_string()
+                    }
+                }
+            });
 
+            resource_kind_enum.push_str(
+                format!(
+                    "{}({}),",
+                    resource.get_ident().to_string(),
+                    kind.ident.to_string()
+                )
+                .as_str(),
+            );
+            resource_kind_from_parts.push_str(
+                format!(
+                    "\"{}\"=>Ok({}Kind::try_from(parts)?.into()),",
+                    resource.get_ident().to_string(),
+                    resource.get_ident().to_string()
+                )
+                .as_str(),
+            );
+            into_resource_kind_parts.push_str(
+                format!(
+                    "Self::{}(kind)=>kind.into(),",
+                    resource.get_ident().to_string()
+                )
+                .as_str(),
+            );
+            resource_type.push_str(
+                format!(
+                    "Self::{}(_)=>ResourceType::{},",
+                    resource.get_ident().to_string(),
+                    resource.get_ident().to_string()
+                )
+                .as_str(),
+            );
+            let kind_cp = kind.clone();
+            kind_stuff.push(quote! {#kind_cp});
 
-          let _ident = resource.get_ident();
-          let ident_kind = Ident::new(format!("{}Kind",resource.get_ident().to_string()).as_str(), resource.get_ident().span() );
-          kind_stuff.push( quote! {
-              impl ToString for #ident_kind {
-                  fn to_string(&self) -> String {
-                      let kind: ResourceKind = self.clone().into();
-                      kind.to_string()
-                  }
-              }
-          } );
+            let kind_ident = kind.ident.clone();
+            let resource_ident = resource.get_ident();
 
+            let mut variants = vec![];
+            let mut get_specific = String::new();
+            get_specific.push_str(format!("impl {} {}", kind.ident.to_string(), "{").as_str());
+            get_specific.push_str("pub fn get_specific(&self)->Option<Specific> {");
+            get_specific.push_str("match self {");
 
+            let mut has_specific = String::new();
+            has_specific.push_str(format!("impl {} {}", kind.ident.to_string(), "{").as_str());
+            has_specific.push_str("pub fn has_specific(&self)->bool {");
+            has_specific.push_str("match self {");
 
-          resource_kind_enum.push_str(format!("{}({}),",resource.get_ident().to_string(),kind.ident.to_string()).as_str() );
-          resource_kind_from_parts.push_str( format!("\"{}\"=>Ok({}Kind::try_from(parts)?.into()),",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str(), );
-          into_resource_kind_parts.push_str(format!("Self::{}(kind)=>kind.into(),",resource.get_ident().to_string()).as_str() );
-          resource_type.push_str(format!("Self::{}(_)=>ResourceType::{},",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str() );
-          let kind_cp = kind.clone();
-          kind_stuff.push(quote!{#kind_cp});
+            let mut from_parts = String::new();
+            from_parts.push_str(
+                format!(
+                    "impl TryFrom<ResourceKindParts> for {} {{",
+                    kind.ident.to_string()
+                )
+                .as_str(),
+            );
+            from_parts.push_str("type Error=Error;");
+            from_parts.push_str("fn try_from(parts: ResourceKindParts)->Result<Self,Self::Error>{");
+            from_parts.push_str("match parts.kind.ok_or(\"expected kind\")?.as_str() {");
 
-          let kind_ident = kind.ident.clone();
-          let resource_ident = resource.get_ident();
+            let mut into_parts = String::new();
+            into_parts.push_str(
+                format!(
+                    "impl Into<ResourceKindParts> for {} {{",
+                    kind.ident.to_string()
+                )
+                .as_str(),
+            );
+            into_parts.push_str("fn into(self)->ResourceKindParts {");
+            into_parts.push_str("match self {");
 
-          let mut variants = vec![];
-          let mut get_specific = String::new();
-          get_specific.push_str(format!("impl {} {}", kind.ident.to_string(), "{").as_str() );
-          get_specific.push_str("pub fn get_specific(&self)->Option<Specific> {" );
-          get_specific.push_str("match self {");
+            for variant in &kind.variants {
+                variants.push(variant.ident.clone());
+                has_specific.push_str(format!("Self::{}", variant.ident.to_string()).as_str());
+                if !variant.fields.is_empty() {
+                    has_specific.push_str("(_)=>true,");
+                } else {
+                    has_specific.push_str("=>false,");
+                }
 
-          let mut has_specific = String::new();
-          has_specific.push_str(format!("impl {} {}", kind.ident.to_string(), "{").as_str() );
-          has_specific.push_str("pub fn has_specific(&self)->bool {" );
-          has_specific.push_str("match self {");
+                get_specific.push_str(format!("Self::{}", variant.ident.to_string()).as_str());
+                if !variant.fields.is_empty() {
+                    get_specific.push_str("(specific)=>Option::Some(specific.clone()),");
+                } else {
+                    get_specific.push_str("=>Option::None,");
+                }
 
+                if !variant.fields.is_empty() {
+                    from_parts.push_str(format!("\"{}\" => Ok(Self::{}(parts.specific.ok_or(\"expected a specific\")?)),", variant.ident.to_string(), variant.ident.to_string()).as_str());
+                } else {
+                    from_parts.push_str(
+                        format!(
+                            "\"{}\" => Ok(Self::{}),",
+                            variant.ident.to_string(),
+                            variant.ident.to_string()
+                        )
+                        .as_str(),
+                    );
+                }
 
-          let mut from_parts = String::new();
-          from_parts.push_str(format!("impl TryFrom<ResourceKindParts> for {} {{", kind.ident.to_string()).as_str() );
-          from_parts.push_str("type Error=Error;");
-          from_parts.push_str("fn try_from(parts: ResourceKindParts)->Result<Self,Self::Error>{" );
-          from_parts.push_str("match parts.kind.ok_or(\"expected kind\")?.as_str() {");
-
-
-          let mut into_parts= String::new();
-          into_parts.push_str(format!("impl Into<ResourceKindParts> for {} {{", kind.ident.to_string()).as_str() );
-          into_parts.push_str("fn into(self)->ResourceKindParts {" );
-          into_parts.push_str("match self {");
-
-
-          for variant in &kind.variants {
-              variants.push( variant.ident.clone() );
-              has_specific.push_str(format!("Self::{}", variant.ident.to_string()).as_str());
-              if!variant.fields.is_empty()
-              {
-                  has_specific.push_str("(_)=>true,");
-              } else {
-                  has_specific.push_str("=>false,");
-              }
-
-              get_specific.push_str(format!("Self::{}", variant.ident.to_string()).as_str());
-              if!variant.fields.is_empty()
-              {
-                  get_specific.push_str("(specific)=>Option::Some(specific.clone()),");
-              } else {
-                  get_specific.push_str("=>Option::None,");
-              }
-
-
-              if!variant.fields.is_empty() {
-                  from_parts.push_str(format!("\"{}\" => Ok(Self::{}(parts.specific.ok_or(\"expected a specific\")?)),", variant.ident.to_string(), variant.ident.to_string()).as_str());
-              } else {
-                  from_parts.push_str(format!("\"{}\" => Ok(Self::{}),", variant.ident.to_string(), variant.ident.to_string()).as_str());
-              }
-
-              if!variant.fields.is_empty() {
-                  into_parts.push_str(format!("Self::{}(specific)=>ResourceKindParts{{resource_type:\"{}\".to_string(),kind:Option::Some(\"{}\".to_string()),specific:Option::Some(specific)}},",variant.ident.to_string(),resource.get_ident().to_string(),variant.ident.to_string(),).as_str() );
-              } else {
-                  into_parts.push_str(format!("Self::{}=>ResourceKindParts{{resource_type:\"{}\".to_string(),kind:Option::Some(\"{}\".to_string()),specific:Option::None}},",variant.ident.to_string(),resource.get_ident().to_string(),variant.ident.to_string(),).as_str() );
-              }
-
-          }
-          has_specific.push_str("}}}" );
-          get_specific.push_str("}}}" );
-          from_parts.push_str("_ => Err(\"could not match kind\".into())");
-          from_parts.push_str("}}}" );
-          into_parts.push_str("}}}" );
-
-
-
-
-          let has_specific= syn::parse_str::<Item>( has_specific.as_str() ).unwrap();
-          kind_stuff.push(quote!{#has_specific});
-
-          let get_specific= syn::parse_str::<Item>( get_specific.as_str() ).unwrap();
-          kind_stuff.push(quote!{#get_specific});
-
-          let from_parts = syn::parse_str::<Item>( from_parts.as_str() ).unwrap();
-          kind_stuff.push(quote!{#from_parts});
-
-          let into_parts= syn::parse_str::<Item>( into_parts.as_str() ).unwrap();
-          kind_stuff.push(quote!{#into_parts});
-
-
-          kind_stuff.push(quote!{
-
-            impl #kind_ident{
-                pub fn resource_type(&self) -> ResourceType {
-                    ResourceType::#resource_ident
+                if !variant.fields.is_empty() {
+                    into_parts.push_str(format!("Self::{}(specific)=>ResourceKindParts{{resource_type:\"{}\".to_string(),kind:Option::Some(\"{}\".to_string()),specific:Option::Some(specific)}},",variant.ident.to_string(),resource.get_ident().to_string(),variant.ident.to_string(),).as_str() );
+                } else {
+                    into_parts.push_str(format!("Self::{}=>ResourceKindParts{{resource_type:\"{}\".to_string(),kind:Option::Some(\"{}\".to_string()),specific:Option::None}},",variant.ident.to_string(),resource.get_ident().to_string(),variant.ident.to_string(),).as_str() );
                 }
             }
+            has_specific.push_str("}}}");
+            get_specific.push_str("}}}");
+            from_parts.push_str("_ => Err(\"could not match kind\".into())");
+            from_parts.push_str("}}}");
+            into_parts.push_str("}}}");
 
+            let has_specific = syn::parse_str::<Item>(has_specific.as_str()).unwrap();
+            kind_stuff.push(quote! {#has_specific});
 
-            impl Into<ResourceKind> for #kind_ident {
-                  fn into(self) -> ResourceKind {
-                      ResourceKind::#resource_ident(self)
+            let get_specific = syn::parse_str::<Item>(get_specific.as_str()).unwrap();
+            kind_stuff.push(quote! {#get_specific});
+
+            let from_parts = syn::parse_str::<Item>(from_parts.as_str()).unwrap();
+            kind_stuff.push(quote! {#from_parts});
+
+            let into_parts = syn::parse_str::<Item>(into_parts.as_str()).unwrap();
+            kind_stuff.push(quote! {#into_parts});
+
+            kind_stuff.push(quote! {
+
+              impl #kind_ident{
+                  pub fn resource_type(&self) -> ResourceType {
+                      ResourceType::#resource_ident
                   }
               }
 
-            impl TryInto<#kind_ident> for ResourceKind {
-                  type Error=Error;
-                  fn try_into(self) -> Result<#kind_ident,Self::Error>{
-                      if let Self::#resource_ident(rtn) = self {
-                          Ok(rtn)
-                      } else {
-                          Err("could not convert".into())
-                      }
-                  }
-              }
 
-          });
+              impl Into<ResourceKind> for #kind_ident {
+                    fn into(self) -> ResourceKind {
+                        ResourceKind::#resource_ident(self)
+                    }
+                }
 
-      } else {
-          resource_kind_enum.push_str(format!("{},",resource.get_ident().to_string()).as_str() );
-          resource_kind_from_parts.push_str( format!("\"{}\"=>Ok(Self::{}),",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str(), );
-          into_resource_kind_parts.push_str(format!("Self::{}=>ResourceKindParts{{resource_type:\"{}\".to_string(),kind:Option::None,specific:Option::None}},",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str() );
-          resource_type.push_str(format!("Self::{}=>ResourceType::{},",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str() );
-      }
-  }
+              impl TryInto<#kind_ident> for ResourceKind {
+                    type Error=Error;
+                    fn try_into(self) -> Result<#kind_ident,Self::Error>{
+                        if let Self::#resource_ident(rtn) = self {
+                            Ok(rtn)
+                        } else {
+                            Err("could not convert".into())
+                        }
+                    }
+                }
+
+            });
+        } else {
+            resource_kind_enum.push_str(format!("{},", resource.get_ident().to_string()).as_str());
+            resource_kind_from_parts.push_str(
+                format!(
+                    "\"{}\"=>Ok(Self::{}),",
+                    resource.get_ident().to_string(),
+                    resource.get_ident().to_string()
+                )
+                .as_str(),
+            );
+            into_resource_kind_parts.push_str(format!("Self::{}=>ResourceKindParts{{resource_type:\"{}\".to_string(),kind:Option::None,specific:Option::None}},",resource.get_ident().to_string(),resource.get_ident().to_string()).as_str() );
+            resource_type.push_str(
+                format!(
+                    "Self::{}=>ResourceType::{},",
+                    resource.get_ident().to_string(),
+                    resource.get_ident().to_string()
+                )
+                .as_str(),
+            );
+        }
+    }
     resource_kind_enum.push_str("}");
-    resource_kind_from_parts.push_str("what => Err(format!(\"cannot identify ResourceType: '{}'\",what).into())" );
-    resource_kind_from_parts.push_str("}}}" );
-    into_resource_kind_parts.push_str("}}}" );
+    resource_kind_from_parts
+        .push_str("what => Err(format!(\"cannot identify ResourceType: '{}'\",what).into())");
+    resource_kind_from_parts.push_str("}}}");
+    into_resource_kind_parts.push_str("}}}");
     resource_type.push_str("}}}");
 
     let resource_kind_emum = syn::parse_str::<Item>(resource_kind_enum.as_str()).unwrap();
-    kind_stuff.push( quote!{#resource_kind_emum});
+    kind_stuff.push(quote! {#resource_kind_emum});
 
-    let resource_kind_from_parts = syn::parse_str::<Item>(resource_kind_from_parts.as_str()).unwrap();
-    kind_stuff.push( quote!{#resource_kind_from_parts});
+    let resource_kind_from_parts =
+        syn::parse_str::<Item>(resource_kind_from_parts.as_str()).unwrap();
+    kind_stuff.push(quote! {#resource_kind_from_parts});
 
-    let into_resource_kind_parts= syn::parse_str::<Item>(into_resource_kind_parts.as_str()).unwrap();
-    kind_stuff.push( quote!{#into_resource_kind_parts});
+    let into_resource_kind_parts =
+        syn::parse_str::<Item>(into_resource_kind_parts.as_str()).unwrap();
+    kind_stuff.push(quote! {#into_resource_kind_parts});
 
-    let resource_type= syn::parse_str::<Item>(resource_type.as_str()).unwrap();
-    kind_stuff.push( quote!{#resource_type});
+    let resource_type = syn::parse_str::<Item>(resource_type.as_str()).unwrap();
+    kind_stuff.push(quote! {#resource_type});
 
-
-    let rtn = quote!{
+    let rtn = quote! {
         #(#kind_stuff)*
 
         impl ToString for ResourceKind {
@@ -936,13 +1033,18 @@ fn kinds( parsed: &ResourceParser ) -> TokenStream {
     rtn
 }
 
-fn keys( parsed: &ResourceParser) -> TokenStream {
+fn keys(parsed: &ResourceParser) -> TokenStream {
     let mut key_stuff = vec![];
     for resource in &parsed.resources {
-        let ident = Ident::new(format!("{}Key", resource.get_ident().to_string()).as_str(), resource.get_ident().span());
-        let id = Ident::new(format!("{}Id", resource.get_ident().to_string()).as_str(), resource.get_ident().span());
+        let ident = Ident::new(
+            format!("{}Key", resource.get_ident().to_string()).as_str(),
+            resource.get_ident().span(),
+        );
+        let id = Ident::new(
+            format!("{}Id", resource.get_ident().to_string()).as_str(),
+            resource.get_ident().span(),
+        );
         let resource_ident = resource.get_ident();
-
 
         let key = if resource.parents.is_empty() {
             quote! {
@@ -972,14 +1074,20 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
             }
         } else {
             let parent = if resource.parents.len() > 1 {
-                let parent=Ident::new(format!("{}ParentKey", resource.get_ident().to_string()).as_str(), resource.get_ident().span());
+                let parent = Ident::new(
+                    format!("{}ParentKey", resource.get_ident().to_string()).as_str(),
+                    resource.get_ident().span(),
+                );
                 let parents = resource.parents.clone();
                 let parents2 = resource.parents.clone();
-                let mut parent_keys = vec!();
-                let mut parent_x_parents = vec!();
-                for p in &resource.parents{
-                    parent_keys.push( Ident::new( format!( "{}Key", p.to_string()).as_str(), p.span() ));
-                    parent_x_parents.push( parent.clone() );
+                let mut parent_keys = vec![];
+                let mut parent_x_parents = vec![];
+                for p in &resource.parents {
+                    parent_keys.push(Ident::new(
+                        format!("{}Key", p.to_string()).as_str(),
+                        p.span(),
+                    ));
+                    parent_x_parents.push(parent.clone());
                 }
 
                 key_stuff.push(quote! {
@@ -1044,7 +1152,10 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
                 Ident::new(format!("{}Key", parent.to_string()).as_str(), parent.span())
             };
 
-            let prefix = Ident::new(resource.key_prefix.as_ref().unwrap().clone().as_str(), resource.get_ident().span() );
+            let prefix = Ident::new(
+                resource.key_prefix.as_ref().unwrap().clone().as_str(),
+                resource.get_ident().span(),
+            );
             quote! {
 
                 #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
@@ -1093,11 +1204,23 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
         key_stuff.push(key);
 
         //COMMON KEY
-        let prefix: TokenStream  = resource.key_prefix.as_ref().expect("expected key prefix").clone().parse().unwrap();
-        let ident = Ident::new(format!("{}Key", resource.get_ident().to_string()).as_str(), resource.get_ident().span());
-        let ident_lower = Ident::new(resource.get_ident().to_string().to_lowercase().as_str(), resource.get_ident().span());
+        let prefix: TokenStream = resource
+            .key_prefix
+            .as_ref()
+            .expect("expected key prefix")
+            .clone()
+            .parse()
+            .unwrap();
+        let ident = Ident::new(
+            format!("{}Key", resource.get_ident().to_string()).as_str(),
+            resource.get_ident().span(),
+        );
+        let ident_lower = Ident::new(
+            resource.get_ident().to_string().to_lowercase().as_str(),
+            resource.get_ident().span(),
+        );
         let resource = resource.get_ident();
-        key_stuff.push(quote!{
+        key_stuff.push(quote! {
 
             impl FromStr for #ident {
                 type Err=Error;
@@ -1146,20 +1269,24 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
             }
 
         });
-
     }
 
-    let mut idents = vec!();
-    let mut idents_keys = vec!();
+    let mut idents = vec![];
+    let mut idents_keys = vec![];
     let mut prefixes = vec![];
     for resource in &parsed.resources {
-        idents.push( resource.get_ident() );
-        idents_keys.push( Ident::new( format!("{}Key",resource.get_ident().to_string()).as_str(), resource.get_ident().span() ) );
-        prefixes.push(Ident::new(resource.key_prefix.as_ref().unwrap().clone().as_str(), resource.get_ident().span() ) );
+        idents.push(resource.get_ident());
+        idents_keys.push(Ident::new(
+            format!("{}Key", resource.get_ident().to_string()).as_str(),
+            resource.get_ident().span(),
+        ));
+        prefixes.push(Ident::new(
+            resource.key_prefix.as_ref().unwrap().clone().as_str(),
+            resource.get_ident().span(),
+        ));
     }
 
-
-    let rtn = quote!{
+    let rtn = quote! {
     #(#key_stuff)*
 
         #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
@@ -1343,43 +1470,58 @@ fn keys( parsed: &ResourceParser) -> TokenStream {
     rtn
 }
 
+fn extras() -> TokenStream {
+    quote! {
 
-fn extras( )  -> TokenStream {
-
-    quote!{
-
-pub struct Error {
-    message: String
-}
-
-
-
-
+    pub struct Error {
+        message: String
     }
 
 
+
+
+        }
 }
 
+fn identifiers(parsed: &ResourceParser) -> TokenStream {
+    let _idents: Vec<Ident> = parsed
+        .resources
+        .clone()
+        .iter()
+        .map(|resource| resource.get_ident())
+        .collect();
+    let identifier_idents: Vec<Ident> = parsed
+        .resources
+        .iter()
+        .map(|resource| {
+            Ident::new(
+                format!("{}Identifier", resource.get_ident().to_string()).as_str(),
+                resource.get_ident().span(),
+            )
+        })
+        .collect();
 
+    let key_idents: Vec<Ident> = parsed
+        .resources
+        .iter()
+        .map(|resource| {
+            Ident::new(
+                format!("{}Key", resource.get_ident().to_string()).as_str(),
+                resource.get_ident().span(),
+            )
+        })
+        .collect();
 
-fn identifiers(parsed: &ResourceParser ) -> TokenStream {
-
-
-    let _idents: Vec<Ident> = parsed.resources.clone().iter().map(|resource|{
-        resource.get_ident()
-    }).collect();
-    let identifier_idents : Vec<Ident> = parsed.resources.iter().map(|resource|{
-        Ident::new( format!("{}Identifier",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
-    }).collect();
-
-    let key_idents : Vec<Ident> = parsed.resources.iter().map(|resource|{
-        Ident::new( format!("{}Key",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
-    }).collect();
-
-    let path_idents : Vec<Ident> = parsed.resources.iter().map(|resource|{
-        Ident::new( format!("{}Path",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
-    }).collect();
-
+    let path_idents: Vec<Ident> = parsed
+        .resources
+        .iter()
+        .map(|resource| {
+            Ident::new(
+                format!("{}Path", resource.get_ident().to_string()).as_str(),
+                resource.get_ident().span(),
+            )
+        })
+        .collect();
 
     quote! {
         #(
@@ -1424,28 +1566,47 @@ fn identifiers(parsed: &ResourceParser ) -> TokenStream {
         )*
 
     }
-
 }
 
+fn ids(parsed: &ResourceParser) -> TokenStream {
+    let idents: Vec<Ident> = parsed
+        .resources
+        .clone()
+        .iter()
+        .map(|resource| resource.get_ident())
+        .collect();
+    let ids: Vec<Ident> = parsed
+        .resources
+        .iter()
+        .map(|resource| {
+            Ident::new(
+                format!("{}Id", resource.get_ident().to_string()).as_str(),
+                resource.get_ident().span(),
+            )
+        })
+        .collect();
 
-fn ids(parsed: &ResourceParser ) -> TokenStream {
+    let _key_idents: Vec<Ident> = parsed
+        .resources
+        .iter()
+        .map(|resource| {
+            Ident::new(
+                format!("{}Key", resource.get_ident().to_string()).as_str(),
+                resource.get_ident().span(),
+            )
+        })
+        .collect();
 
-
-    let idents: Vec<Ident> = parsed.resources.clone().iter().map(|resource|{
-        resource.get_ident()
-    }).collect();
-    let ids: Vec<Ident> = parsed.resources.iter().map(|resource|{
-        Ident::new( format!("{}Id",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
-    }).collect();
-
-    let _key_idents : Vec<Ident> = parsed.resources.iter().map(|resource|{
-        Ident::new( format!("{}Key",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
-    }).collect();
-
-    let _path_idents : Vec<Ident> = parsed.resources.iter().map(|resource|{
-        Ident::new( format!("{}Path",resource.get_ident().to_string()).as_str(), resource.get_ident().span() )
-    }).collect();
-
+    let _path_idents: Vec<Ident> = parsed
+        .resources
+        .iter()
+        .map(|resource| {
+            Ident::new(
+                format!("{}Path", resource.get_ident().to_string()).as_str(),
+                resource.get_ident().span(),
+            )
+        })
+        .collect();
 
     quote! {
         #(
@@ -1479,21 +1640,22 @@ fn ids(parsed: &ResourceParser ) -> TokenStream {
         }
 
     }
-
 }
 
-fn is_uppercase(a: char) -> bool { (a as char).is_uppercase() }
-
+fn is_uppercase(a: char) -> bool {
+    (a as char).is_uppercase()
+}
 
 fn parse_camel(input: &str) -> Res<&str, Vec<String>> {
-    context(
-        "camel",
-        many1( tuple( (anychar, take_till1(is_uppercase) ) )
-    ))(input).map( |(input,vec)| {
-        let vec: Vec<String> = vec.iter().map( |(c,s):&(char,&str)| { format!("{}{}",c,s) } ).collect();
-        (input,vec)
-    })
-
+    context("camel", many1(tuple((anychar, take_till1(is_uppercase)))))(input).map(
+        |(input, vec)| {
+            let vec: Vec<String> = vec
+                .iter()
+                .map(|(c, s): &(char, &str)| format!("{}{}", c, s))
+                .collect();
+            (input, vec)
+        },
+    )
 }
 
 #[cfg(test)]
@@ -1511,14 +1673,11 @@ mod tests {
             assert!(false)
         }
 
-
         assert!(leftover.is_empty());
         if let Option::Some(romulan) = rtn.get(1).cloned() {
-            assert_eq!("Varool".to_string(), romulan );
+            assert_eq!("Varool".to_string(), romulan);
         } else {
             assert!(false)
         }
-
     }
-
 }
