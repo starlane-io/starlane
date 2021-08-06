@@ -1,17 +1,18 @@
-use crate::error::Error;
-use crate::frame::{Reply, ReplyKind, StarMessage, StarPattern, WindAction, WindUp, StarWind, Frame, WindHit, WindResults, WindDown};
-use crate::lane::{LaneKey, LaneCommand, LaneWrapper};
-use crate::message::resource::ProtoMessage;
-use crate::message::{Fail, MessageId, ProtoStarMessage, ProtoStarMessageTo};
-use crate::star::core::message::CoreMessageCall;
-use crate::util::{AsyncProcessor, AsyncRunner, Call};
+use std::cmp::min;
+use std::collections::{HashMap, HashSet};
+use std::iter::FromIterator;
+
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
-use std::collections::{HashSet, HashMap};
-use std::cmp::min;
-use std::iter::FromIterator;
-use crate::star::{StarKey, StarCommand, Wind, StarSkel};
 
+use crate::error::Error;
+use crate::frame::{Frame, Reply, ReplyKind, SearchResults, SearchTraversal, SearchWindDown, SearchWindUp, StarMessage, StarPattern, TraversalAction, SearchHit};
+use crate::lane::{LaneCommand, LaneKey, LaneWrapper};
+use crate::message::{Fail, MessageId, ProtoStarMessage, ProtoStarMessageTo};
+use crate::message::resource::ProtoMessage;
+use crate::star::{StarCommand, StarKey, StarSkel, StarKind};
+use crate::star::core::message::CoreMessageCall;
+use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
 pub static MAX_HOPS: usize = 32;
 
@@ -27,23 +28,32 @@ impl StarSearchApi {
 
     pub async fn search(&self, pattern: StarPattern ) -> Result<SearchHits,Error> {
         let (tx, rx) = oneshot::channel();
-        self.tx.try_send(StarSearchCall::Search { pattern, tx })?;
+        let init = SearchInit::new(pattern, TraversalAction::SearchHits );
+        self.tx.try_send(StarSearchCall::Search { init , tx })?;
+        Ok(tokio::time::timeout(Duration::from_secs(15), rx).await??)
+    }
+
+    pub async fn search_action(&self, init: SearchInit) -> Result<SearchHits,Error> {
+        let (tx, rx) = oneshot::channel();
+        self.tx.try_send(StarSearchCall::Search { init , tx })?;
         Ok(tokio::time::timeout(Duration::from_secs(15), rx).await??)
     }
 
 
-    pub fn on_frame(&mut self, frame: Frame, lane_key: LaneKey ) {
-        self.tx.try_send(StarSearchCall::OnFrame {frame,lane_key}).unwrap_or_default();
+
+    pub fn on_traversal(&self, traversal: SearchTraversal, lane_key: LaneKey ) {
+        self.tx.try_send(StarSearchCall::OnSearchTraversal {traversal,lane_key}).unwrap_or_default();
     }
 }
 
 pub enum StarSearchCall {
-    Search {
-        pattern: StarPattern,
+
+    Search{
+        init: SearchInit,
         tx: oneshot::Sender<SearchHits>,
     },
 
-    OnFrame { frame: Frame, lane_key: LaneKey }
+    OnSearchTraversal { traversal: SearchTraversal, lane_key: LaneKey }
 }
 
 impl Call for StarSearchCall {}
@@ -67,11 +77,11 @@ impl StarSearchComponent {
 impl AsyncProcessor<StarSearchCall> for StarSearchComponent {
     async fn process(&mut self, call: StarSearchCall) {
         match call {
-            StarSearchCall::Search { pattern , tx } => {
-                self.search(pattern, tx).await;
+            StarSearchCall::Search { init, tx } => {
+                self.search(init, tx).await;
             }
-            StarSearchCall::OnFrame { frame, lane_key } => {
-                self.on_frame(frame,lane_key).await;
+            StarSearchCall::OnSearchTraversal { traversal, lane_key } => {
+                self.on_search_traversal(traversal, lane_key).await;
             }
         }
     }
@@ -79,12 +89,20 @@ impl AsyncProcessor<StarSearchCall> for StarSearchComponent {
 
 impl StarSearchComponent {
 
-    async fn on_frame(&mut self, frame: Frame, lane_key: LaneKey) {
-        match frame {
-            Frame::StarWind(StarWind::Up(up)) => {
+    async fn on_search_traversal(&mut self, traversal: SearchTraversal, lane_key: LaneKey) {
+
+        match traversal {
+            SearchTraversal::Up(up) => {
+                if let StarPattern::StarKind(StarKind::Space) = up.pattern {
+
+                    println!("on_search_Traversal: UP: {}", self.skel.info.kind.to_string() );
+                }
                 self.land_windup_hop(up, lane_key).await;
             }
-            Frame::StarWind(StarWind::Down(down)) => {
+            SearchTraversal::Down(down) => {
+                if let StarPattern::StarKind(StarKind::Space) = down.wind_up.pattern{
+                    println!("on_search_Traversal: DOWN : {}", self.skel.info.kind.to_string() );
+                }
                 self.process_search_transaction(down,lane_key)
             }
             _ => {
@@ -93,24 +111,22 @@ impl StarSearchComponent {
         }
     }
 
-    async fn search(&mut self, pattern: StarPattern, tx: oneshot::Sender<SearchHits>) {
-        let wind = Wind {
-            pattern,
-            tx,
-            max_hops: 16,
-            action: WindAction::SearchHits
-        };
-        let tx = wind.tx;
-        let wind_up = WindUp::new(self.skel.info.key.clone(), wind.pattern, wind.action);
+    async fn search(&mut self, init: SearchInit, tx: oneshot::Sender<SearchHits>) {
+        let wind_up = SearchWindUp::new(self.skel.info.key.clone(), init.pattern, init.action);
         self.launch_windup_hop(wind_up, tx, Option::None).await;
     }
 
+
     async fn launch_windup_hop(
         &mut self,
-        mut wind: WindUp,
+        mut wind: SearchWindUp,
         tx: oneshot::Sender<SearchHits>,
         exclude: Option<HashSet<StarKey>>,
     ) {
+
+if let StarPattern::StarKind(StarKind::Space) = wind.pattern {
+    println!("LAUNCH HOP ! {} ~> {} hops", self.skel.info.kind.to_string(), wind.hops.len());
+}
         let tid = self
             .skel
             .sequence
@@ -142,20 +158,24 @@ impl StarSearchComponent {
         wind.transactions.push(tid.clone());
         wind.hops.push(self.skel.info.key.clone());
 
-        self.skel.lanes_api.broadcast_excluding(Frame::StarWind(StarWind::Up(wind)), exclude);
+        self.skel.lanes_api.broadcast_excluding(Frame::SearchTraversal(SearchTraversal::Up(wind)), exclude);
     }
 
-    async fn land_windup_hop(&mut self, wind_up: WindUp, lane_key: LaneKey) {
+    async fn land_windup_hop(&mut self, wind_up: SearchWindUp, lane_key: LaneKey) {
+
+        if let StarPattern::StarKind(StarKind::Space) = wind_up.pattern {
+            println!("LAND HOP! {} ~> {} hops", self.skel.info.kind.to_string(), wind_up.hops.len());
+        }
         if wind_up.pattern.is_match(&self.skel.info) {
             if wind_up.pattern.is_single_match() {
-                let hit = WindHit {
+                let hit = SearchHit {
                     star: self.skel.info.key.clone(),
                     hops: wind_up.hops.len() + 1,
                 };
 
-                match wind_up.action.update(vec![hit], WindResults::None) {
+                match wind_up.action.update(vec![hit], SearchResults::None) {
                     Ok(result) => {
-                        let wind_down = WindDown {
+                        let wind_down = SearchWindDown {
                             missed: None,
                             hops: wind_up.hops.clone(),
                             transactions: wind_up.transactions.clone(),
@@ -163,7 +183,7 @@ impl StarSearchComponent {
                             result: result,
                         };
 
-                        let wind = Frame::StarWind(StarWind::Down(wind_down));
+                        let wind = Frame::SearchTraversal(SearchTraversal::Down(wind_down));
 
                         self.skel.lanes_api.forward(lane_key,wind);
                     }
@@ -190,7 +210,7 @@ impl StarSearchComponent {
         {
             let hits = match hit {
                 true => {
-                    vec![WindHit {
+                    vec![SearchHit {
                         star: self.skel.info.key.clone(),
                         hops: wind_up.hops.len().clone() + 1,
                     }]
@@ -200,9 +220,9 @@ impl StarSearchComponent {
                 }
             };
 
-            match wind_up.action.update(hits, WindResults::None) {
+            match wind_up.action.update(hits, SearchResults::None) {
                 Ok(result) => {
-                    let wind_down = WindDown {
+                    let wind_down = SearchWindDown {
                         missed: None,
                         hops: wind_up.hops.clone(),
                         transactions: wind_up.transactions.clone(),
@@ -210,7 +230,7 @@ impl StarSearchComponent {
                         result: result,
                     };
 
-                    let wind = Frame::StarWind(StarWind::Down(wind_down));
+                    let wind = Frame::SearchTraversal(SearchTraversal::Down(wind_down));
 
                     self.skel.lanes_api.forward( lane_key, wind).unwrap_or_default();
                 }
@@ -232,7 +252,7 @@ impl StarSearchComponent {
 
         let relay_wind_up = wind_up.clone();
 
-        self.launch_windup_hop(relay_wind_up, tx, Option::Some(exclude));
+        self.launch_windup_hop(relay_wind_up, tx, Option::Some(exclude)).await;
 
         let skel = self.skel.clone();
 
@@ -244,14 +264,14 @@ impl StarSearchComponent {
                     let hits = wind_result
                         .hits
                         .iter()
-                        .map(|(star, hops)| WindHit {
+                        .map(|(star, hops)| SearchHit {
                             star: star.clone(),
                             hops: hops.clone() + 1,
                         })
                         .collect();
-                    match wind_up.action.update(hits, WindResults::None) {
+                    match wind_up.action.update(hits, SearchResults::None) {
                         Ok(result) => {
-                            let wind_down = WindDown {
+                            let wind_down = SearchWindDown {
                                 missed: None,
                                 hops: wind_up.hops.clone(),
                                 wind_up: wind_up.clone(),
@@ -261,7 +281,7 @@ impl StarSearchComponent {
 //                            command_tx.send(StarCommand::WindDown(wind_down)).await;
 
                             let lane = wind_down.hops.last().unwrap();
-                            skel.lanes_api.forward(lane.clone(), Frame::StarWind(StarWind::Down(wind_down))).unwrap_or_default();
+                            skel.lanes_api.forward(lane.clone(), Frame::SearchTraversal(SearchTraversal::Down(wind_down))).unwrap_or_default();
                         }
                         Err(error) => {
                             eprintln!("{}", error);
@@ -313,21 +333,25 @@ impl StarSearchComponent {
 
 
 
-    fn process_search_transaction(&mut self, down: WindDown, lane_key: LaneKey) {
+    fn process_search_transaction(&mut self, down: SearchWindDown, lane_key: LaneKey) {
         let tid = down.transactions.last().cloned();
 
         if let Option::Some(tid) = tid {
             let transaction = self.transactions.get_mut(&tid);
             if let Option::Some(transaction) = transaction {
 
-                match transaction.on_frame(Frame::StarWind(StarWind::Down(down)), lane_key)
+                match transaction.on_frame(Frame::SearchTraversal(SearchTraversal::Down(down)), lane_key)
                 {
                     TransactionResult::Continue => {}
                     TransactionResult::Done => {
-                        self.transactions.remove(&tid);
+                        let transaction = self.transactions.remove(&tid);
+                        let mut transaction = transaction.unwrap();
+                        transaction.commit();
                     }
                 }
             }
+        } else {
+println!("TRANSACTION NOT FOUND");
         }
     }
 
@@ -340,7 +364,7 @@ pub struct StarSearchTransaction {
     pub reported_lanes: HashSet<StarKey>,
     pub lanes: HashSet<StarKey>,
     pub hits: HashMap<StarKey, HashMap<StarKey, usize>>,
-    tx: Vec<oneshot::Sender<SearchHits>>,
+    tx: oneshot::Sender<SearchHits>,
     local_hit: Option<StarKey>,
 }
 
@@ -355,7 +379,7 @@ impl StarSearchTransaction {
             pattern: pattern,
             reported_lanes: HashSet::new(),
             hits: HashMap::new(),
-            tx: vec![tx],
+            tx: tx,
             lanes: lanes,
             local_hit: local_hit,
         }
@@ -384,21 +408,13 @@ impl StarSearchTransaction {
         rtn
     }
 
-    pub async fn commit(&mut self) {
-        if self.tx.len() != 0 {
-            let tx = self.tx.remove(0);
-            let commit = WindCommit {
-                tx: tx,
-                result: SearchHits {
+    pub fn commit(mut self) {
+            let hits = SearchHits {
                     pattern: self.pattern.clone(),
                     hits: self.collapse(),
                     lane_hits: self.hits.clone(),
-                },
-            };
-
-            unimplemented!()
-//            self.command_tx.send(StarCommand::WindCommit(commit)).await;
-        }
+                };
+            self.tx.send(hits).unwrap_or_default();
     }
 }
 
@@ -408,7 +424,6 @@ impl StarSearchTransaction {
         self.reported_lanes.remove(key);
 
         if self.reported_lanes == self.lanes {
-            self.commit();
             TransactionResult::Done
         } else {
             TransactionResult::Continue
@@ -421,8 +436,8 @@ impl StarSearchTransaction {
         lane_key: LaneKey
     ) -> TransactionResult {
 
-        if let Frame::StarWind(StarWind::Down(wind_down)) = frame {
-            if let WindResults::Hits(hits) = &wind_down.result {
+        if let Frame::SearchTraversal(SearchTraversal::Down(wind_down)) = frame {
+            if let SearchResults::Hits(hits) = &wind_down.result {
                 let mut lane_hits = HashMap::new();
                 for hit in hits.clone() {
                     if !lane_hits.contains_key(&hit.star) {
@@ -443,7 +458,6 @@ impl StarSearchTransaction {
         self.reported_lanes.insert( lane_key );
 
         if self.reported_lanes == self.lanes {
-            self.commit();
             TransactionResult::Done
         } else {
             TransactionResult::Continue
@@ -458,7 +472,7 @@ pub struct LaneHit {
     hops: usize,
 }
 
-pub struct WindCommit {
+pub struct SearchCommit {
     pub result: SearchHits,
     pub tx: oneshot::Sender<SearchHits>,
 }
@@ -471,12 +485,12 @@ pub struct SearchHits {
 }
 
 impl SearchHits {
-    pub fn nearest(&self) -> Option<WindHit> {
-        let mut min: Option<WindHit> = Option::None;
+    pub fn nearest(&self) -> Option<SearchHit> {
+        let mut min: Option<SearchHit> = Option::None;
 
         for (star, hops) in &self.hits {
             if min.as_ref().is_none() || hops < &min.as_ref().unwrap().hops {
-                min = Option::Some(WindHit {
+                min = Option::Some(SearchHit {
                     star: star.clone(),
                     hops: hops.clone(),
                 });
@@ -497,4 +511,18 @@ pub struct ShortestPathStarKey {
     pub to: StarKey,
     pub next_lane: StarKey,
     pub hops: usize,
+}
+
+pub struct SearchInit {
+    pub pattern: StarPattern,
+    pub action: TraversalAction,
+}
+
+impl SearchInit {
+    pub fn new(pattern: StarPattern, action: TraversalAction) -> Self {
+            Self{
+                pattern: pattern,
+                action: action,
+            }
+    }
 }

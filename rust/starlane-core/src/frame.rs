@@ -30,7 +30,7 @@ use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, St
 pub enum Frame {
     Proto(ProtoFrame),
     Diagnose(Diagnose),
-    StarWind(StarWind),
+    SearchTraversal(SearchTraversal),
     StarMessage(StarMessage),
     //Watch(Watch),
     //Event(Event),
@@ -40,9 +40,9 @@ pub enum Frame {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum StarWind {
-    Up(WindUp),
-    Down(WindDown),
+pub enum SearchTraversal {
+    Up(SearchWindUp),
+    Down(SearchWindDown),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,18 +79,18 @@ pub enum Diagnose {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WindUp {
+pub struct SearchWindUp {
     pub from: StarKey,
     pub pattern: StarPattern,
     pub hops: Vec<StarKey>,
     pub transactions: Vec<u64>,
     pub max_hops: usize,
-    pub action: WindAction,
+    pub action: TraversalAction,
 }
 
-impl WindUp {
-    pub fn new(from: StarKey, pattern: StarPattern, action: WindAction) -> Self {
-        WindUp {
+impl SearchWindUp {
+    pub fn new(from: StarKey, pattern: StarPattern, action: TraversalAction) -> Self {
+        SearchWindUp {
             from: from,
             pattern: pattern,
             action: action,
@@ -102,28 +102,28 @@ impl WindUp {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum WindAction {
+pub enum TraversalAction {
     SearchHits,
     Flags(Flags),
 }
 
-impl WindAction {
+impl TraversalAction {
     pub fn update(
         &self,
-        mut new_hits: Vec<WindHit>,
-        result: WindResults,
-    ) -> Result<WindResults, Error> {
+        mut new_hits: Vec<SearchHit>,
+        result: SearchResults,
+    ) -> Result<SearchResults, Error> {
         match self {
-            WindAction::SearchHits => {
-                if let WindResults::None = result {
+            TraversalAction::SearchHits => {
+                if let SearchResults::None = result {
                     let mut hits = vec![];
                     hits.append(&mut new_hits);
-                    Ok(WindResults::Hits(hits))
-                } else if let WindResults::Hits(mut old_hits) = result {
+                    Ok(SearchResults::Hits(hits))
+                } else if let SearchResults::Hits(mut old_hits) = result {
                     let mut hits = vec![];
                     hits.append(&mut old_hits);
                     hits.append(&mut new_hits);
-                    Ok(WindResults::Hits(hits))
+                    Ok(SearchResults::Hits(hits))
                 } else {
                     Err(
                         "when action is SearchHIts, expecting WindResult::Hits or WindResult::None"
@@ -131,18 +131,18 @@ impl WindAction {
                     )
                 }
             }
-            WindAction::Flags(_flags) => Ok(WindResults::None),
+            TraversalAction::Flags(_flags) => Ok(SearchResults::None),
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum WindResults {
+pub enum SearchResults {
     None,
-    Hits(Vec<WindHit>),
+    Hits(Vec<SearchHit>),
 }
 
-impl WindUp {
+impl SearchWindUp {
     pub fn inc(&mut self, hop: StarKey, transaction: u64) {
         self.hops.push(hop);
         self.transactions.push(transaction);
@@ -178,15 +178,15 @@ impl StarPattern {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WindDown {
+pub struct SearchWindDown {
     pub missed: Option<StarKey>,
-    pub result: WindResults,
-    pub wind_up: WindUp,
+    pub result: SearchResults,
+    pub wind_up: SearchWindUp,
     pub transactions: Vec<u64>,
     pub hops: Vec<StarKey>,
 }
 
-impl WindDown {
+impl SearchWindDown {
     pub fn pop(&mut self) {
         self.transactions.pop();
         self.hops.pop();
@@ -194,7 +194,7 @@ impl WindDown {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
-pub struct WindHit {
+pub struct SearchHit {
     pub star: StarKey,
     pub hops: usize,
 }
@@ -634,7 +634,7 @@ impl fmt::Display for Frame {
             Frame::Close => format!("Close").to_string(),
             Frame::Diagnose(diagnose) => format!("Diagnose({})", diagnose).to_string(),
             Frame::StarMessage(inner) => format!("StarMessage({})", inner.payload).to_string(),
-            Frame::StarWind(wind) => format!("StarWind({})", wind).to_string(),
+            Frame::SearchTraversal(wind) => format!("StarWind({})", wind).to_string(),
             //            Frame::Watch(_) => format!("Watch").to_string(),
             //            Frame::Event(_) => format!("ActorEvent").to_string(),
             Frame::Ping => "Ping".to_string(),
@@ -644,11 +644,11 @@ impl fmt::Display for Frame {
     }
 }
 
-impl fmt::Display for StarWind {
+impl fmt::Display for SearchTraversal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
-            StarWind::Up(up) => format!("Up({})", &up.pattern).to_string(),
-            StarWind::Down(_) => "Down".to_string(),
+            SearchTraversal::Up(up) => format!("Up({})", &up.pattern).to_string(),
+            SearchTraversal::Down(_) => "Down".to_string(),
         };
         write!(f, "{}", r)
     }

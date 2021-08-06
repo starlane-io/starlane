@@ -84,6 +84,11 @@ impl GoldenPathComponent {
         let skel = self.skel.clone();
 
         if let Option::Some(lanes) = self.star_to_lane.get(&star) {
+            if lanes.is_empty() {
+                tx.send(Err("lanes are empty".into())).unwrap_or_default();
+                return;
+            }
+
             let min_hops = usize::MAX;
             let mut rtn = Option::None;
 

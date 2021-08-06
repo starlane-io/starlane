@@ -16,8 +16,8 @@ use crate::constellation::ConstellationStatus;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::{
-    Frame, ProtoFrame, SequenceMessage, StarMessage, StarMessagePayload, StarPattern, WindDown,
-    WindHit, WindUp,
+    Frame, ProtoFrame, SequenceMessage, StarMessage, StarMessagePayload, StarPattern, SearchWindDown,
+    SearchHit, SearchWindUp,
 };
 use crate::lane::{
     ConnectorController, LaneCommand, LaneEndpoint, LaneIndex, LaneMeta, LaneWrapper,

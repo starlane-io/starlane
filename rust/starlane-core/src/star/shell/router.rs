@@ -7,6 +7,7 @@ use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
+use crate::lane::LaneKey;
 
 #[derive(Clone)]
 pub struct RouterApi {
@@ -21,10 +22,15 @@ impl RouterApi {
     pub fn route(&self, message: StarMessage) -> Result<(), Error> {
         Ok(self.tx.try_send(RouterCall::Route(message))?)
     }
+
+    pub fn frame(&self, frame: Frame, lane_key: LaneKey) {
+
+    }
 }
 
 pub enum RouterCall {
     Route(StarMessage),
+    Frame{frame: Frame, lane: LaneKey}
 }
 
 impl Call for RouterCall {}
@@ -49,6 +55,9 @@ impl AsyncProcessor<RouterCall> for RouterComponent {
         match call {
             RouterCall::Route(message) => {
                 self.route(message);
+            }
+            RouterCall::Frame { frame, lane } => {
+                self.frame( frame, lane );
             }
         }
     }
@@ -82,5 +91,21 @@ impl RouterComponent {
                 }
             }
         });
+    }
+
+    fn frame(&self, frame: Frame, lane: LaneKey ) {
+        match frame {
+            Frame::Proto(_) => {}
+            Frame::Diagnose(_) => {}
+            Frame::SearchTraversal(traverasal) => {
+                self.skel.star_search_api.on_traversal(traverasal, lane);
+            }
+            Frame::StarMessage(message) => {
+                self.route(message);
+            }
+            Frame::Ping => {}
+            Frame::Pong => {}
+            Frame::Close => {}
+        }
     }
 }

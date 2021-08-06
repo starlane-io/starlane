@@ -6,43 +6,39 @@ use std::thread;
 use std::time::Duration;
 
 use semver::Version;
-
 use tokio::runtime::Handle;
 use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot::error::RecvError;
+use tokio::time::error::Elapsed;
 
+use starlane_resources::data::Meta;
 use starlane_resources::ResourceIdentifier;
 
 use crate::cache::ProtoArtifactCachesFactory;
+use crate::data::{BinSrc, DataSet};
 use crate::data::Binary;
 use crate::error::Error;
-use crate::frame::{Reply, ReplyKind, StarPattern, WindAction};
-
+use crate::frame::{Reply, ReplyKind, StarPattern, TraversalAction};
+use crate::message::Fail;
 use crate::message::resource::{
     MessageFrom, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage,
 };
-use crate::message::Fail;
 use crate::resource::{
     AddressCreationSrc, ArtifactBundleKind, ArtifactBundlePath, AssignResourceStateSrc,
     FieldSelection, KeyCreationSrc, LocalStateSetSrc, Path, RemoteDataSrc, ResourceAddress,
     ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceKind, ResourceRecord,
     ResourceRegistryInfo, ResourceSelector, ResourceStub, ResourceType,
 };
-
 use crate::resource::ArtifactBundleAddress;
-
 use crate::resource::file_system::FileSystemState;
-use crate::resource::sub_space::SubSpaceState;
-use crate::resource::user::UserState;
 use crate::resource::FileKind;
 use crate::resource::ResourceKey;
-use crate::star::{Request, StarCommand, StarKind, StarSkel, Wind};
-
-use crate::data::{BinSrc, DataSet};
+use crate::resource::sub_space::SubSpaceState;
+use crate::resource::user::UserState;
+use crate::star::{Request, StarCommand, StarKind, StarSkel};
+use crate::star::shell::search::SearchInit;
 use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
-use starlane_resources::data::Meta;
-use tokio::sync::oneshot::error::RecvError;
-use tokio::time::error::Elapsed;
 
 #[derive(Clone)]
 pub struct StarlaneApi {

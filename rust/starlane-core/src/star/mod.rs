@@ -1,12 +1,12 @@
+use std::{cmp, fmt};
 use std::cmp::{min, Ordering};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::fmt::{Debug, Formatter};
 use std::iter::FromIterator;
-use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
 use std::time::{Duration, Instant};
-use std::{cmp, fmt};
 
 use futures::future::select_all;
 use futures::FutureExt;
@@ -17,6 +17,7 @@ use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
 use shell::pledge::{Satisfaction, StarHandle, StarHandleBacking};
+use shell::search::{SearchHits, SearchInit, StarSearchTransaction, TransactionResult, SearchCommit};
 use starlane_resources::ResourceIdentifier;
 
 use crate::cache::ProtoArtifactCachesFactory;
@@ -24,16 +25,16 @@ use crate::constellation::ConstellationStatus;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::{
-    ActorLookup, Frame, ProtoFrame, RegistryAction, Reply, SimpleReply, StarMessage,
-    StarMessagePayload, StarPattern, StarWind, Watch, WatchInfo, WindAction, WindDown, WindHit,
-    WindResults, WindUp,
+    ActorLookup, Frame, ProtoFrame, RegistryAction, Reply, SearchResults, SearchTraversal,
+    SearchWindDown, SearchWindUp, SimpleReply, StarMessage, StarMessagePayload, StarPattern, TraversalAction, Watch,
+    WatchInfo, SearchHit,
 };
 use crate::id::Id;
 use crate::lane::{
     ConnectorController, LaneCommand, LaneEndpoint, LaneIndex, LaneKey, LaneMeta, LaneWrapper,
     ProtoLaneEndpoint,
 };
-use crate::logger::{Flags, LogInfo, Logger};
+use crate::logger::{Flags, Logger, LogInfo};
 use crate::message::{
     Fail, MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage,
     ProtoStarMessageTo, TrackerJob,
@@ -45,17 +46,16 @@ use crate::resource::{
     ResourceType, UniqueSrc,
 };
 use crate::star::core::message::CoreMessageCall;
+use crate::star::shell::golden::GoldenPathApi;
 use crate::star::shell::lanes::LanesApi;
+use crate::star::shell::locator::ResourceLocatorApi;
+use crate::star::shell::message::MessagingApi;
 use crate::star::shell::router::RouterApi;
+use crate::star::shell::search::{StarSearchApi, StarSearchCall};
 use crate::star::surface::SurfaceApi;
 use crate::star::variant::{StarShellInstructions, StarVariant};
 use crate::starlane::StarlaneMachine;
 use crate::template::StarTemplateHandle;
-use shell::search::{StarSearchTransaction, SearchHits, TransactionResult, WindCommit};
-use crate::star::shell::locator::ResourceLocatorApi;
-use crate::star::shell::golden::GoldenPathApi;
-use crate::star::shell::search::StarSearchApi;
-use crate::star::shell::message::MessagingApi;
 
 pub mod core;
 pub mod shell;
@@ -540,32 +540,7 @@ impl Star {
 
                             */
                         }
-                        StarCommand::WindInit(search) => {
-                         //   self.do_wind(search).await;
-                        }
-                        StarCommand::WindCommit(commit) => {
-                            /*
-                            for lane in commit.result.lane_hits.keys() {
-                                let hits = commit.result.lane_hits.get(lane).unwrap();
-                                for (star, size) in hits {
-                                    self.lanes
-                                        .get_mut(lane)
-                                        .unwrap()
-                                        .star_paths()
-                                        .put(star.clone(), size.clone());
-                                }
-                            }
-                            commit.tx.send(commit.result);
-                             */
-                        }
-                        StarCommand::WindDown(result) => {
-                            /*
-                            let lane = result.hops.last().unwrap();
-                            self.send_frame(lane.clone(), Frame::StarWind(StarWind::Down(result)))
-                                .await;
 
-                             */
-                        }
                         StarCommand::Frame(frame) => {
                             if let Frame::Close = frame {
                                 match lane_index {
@@ -608,8 +583,8 @@ impl Star {
                                         error!("{}", err)
                                     }
                                 }
-                            } else if let Frame::StarWind(_) = &frame {
-                                self.skel.star_search_api.on_frame(frame, lane.unwrap().get_remote_star().unwrap() );
+                            } else if let Frame::SearchTraversal(traversal) = &frame {
+                                self.skel.star_search_api.on_traversal(traversal.clone(), lane.unwrap().get_remote_star().unwrap() );
                             } else {
                                 if lane_index.is_lane() {
                                     self.process_frame(
@@ -707,14 +682,14 @@ impl Star {
 
         if let Option::Some(star_handler) = &self.skel.star_handler {
             for kind in self.skel.info.kind.distributes_to() {
-                let (search, rx) =
-                    Wind::new(StarPattern::StarKind(kind.clone()), WindAction::SearchHits);
-                self.skel.star_tx.send(StarCommand::WindInit(search)).await;
+                let search = SearchInit::new(StarPattern::StarKind(kind.clone()), TraversalAction::SearchHits);
+                let (tx,rx) = oneshot::channel();
+                self.skel.star_search_api.tx.try_send(StarSearchCall::Search {init:search, tx} ).unwrap_or_default();
                 let star_handler = star_handler.clone();
                 let kind = kind.clone();
                 let skel = self.skel.clone();
                 tokio::spawn(async move {
-                    let result = tokio::time::timeout(Duration::from_secs(5), rx).await;
+                    let result = tokio::time::timeout(Duration::from_secs(15), rx).await;
                     match result {
                         Ok(Ok(hits)) => {
                             for (star, hops) in hits.hits {
@@ -1090,7 +1065,7 @@ error!("dropped frame could not find laneKey: {}",lane_key.to_string() );
         }
     }*/
 
-    async fn on_wind_down(&mut self, _search_result: WindDown, _lane_key: StarKey) {
+    async fn on_wind_down(&mut self, _search_result: SearchWindDown, _lane_key: StarKey) {
         //        println!("ON STAR SEARCH RESULTS");
     }
     /*
@@ -1177,8 +1152,8 @@ error!("dropped frame could not find laneKey: {}",lane_key.to_string() );
     async fn process_frame(&mut self, frame: Frame, lane_key: Option<&StarKey>) {
 //        self.process_transactions(&frame, lane_key).await;
         match frame {
-            Frame::StarWind(_) => {
-                self.skel.star_search_api.on_frame(frame,lane_key.expect("Expected a LaneKey").clone() );
+            Frame::SearchTraversal(traversal) => {
+                self.skel.star_search_api.on_traversal(traversal, lane_key.expect("Expected a LaneKey").clone() );
             },
             Frame::StarMessage(message) => {
                 self.skel.router_api.route(message).unwrap_or_default();
@@ -1281,9 +1256,6 @@ pub enum StarCommand {
     SetFlags(SetFlags),
     ReleaseHold(StarKey),
     GetStarInfo(oneshot::Sender<Option<StarInfo>>),
-    WindInit(Wind),
-    WindCommit(WindCommit),
-    WindDown(WindDown),
 
     Test(StarTest),
 
@@ -1331,28 +1303,6 @@ pub struct ForwardFrame {
 pub struct AddResourceLocation {
     pub tx: mpsc::Sender<()>,
     pub resource_location: ResourceRecord,
-}
-
-pub struct Wind {
-    pub pattern: StarPattern,
-    pub tx: oneshot::Sender<SearchHits>,
-    pub max_hops: usize,
-    pub action: WindAction,
-}
-
-impl Wind {
-    pub fn new(pattern: StarPattern, action: WindAction) -> (Self, oneshot::Receiver<SearchHits>) {
-        let (tx, rx) = oneshot::channel();
-        (
-            Wind {
-                pattern: pattern,
-                tx: tx,
-                max_hops: 16,
-                action: action,
-            },
-            rx,
-        )
-    }
 }
 
 pub struct Request<P: Debug, R> {
