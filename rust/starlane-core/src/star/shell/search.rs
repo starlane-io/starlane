@@ -127,7 +127,7 @@ impl StarSearchComponent {
             false => Option::None,
         };
 
-        let mut lanes = self.skel.lanes_api.lane_keys().await.expect("expected lanekeys");
+        let mut lanes = self.skel.lane_muxer_api.lane_keys().await.expect("expected lanekeys");
         let mut lanes = HashSet::from_iter(lanes);
 
         match &exclude {
@@ -148,7 +148,7 @@ impl StarSearchComponent {
         wind.transactions.push(tid.clone());
         wind.hops.push(self.skel.info.key.clone());
 
-        self.skel.lanes_api.broadcast_excluding(Frame::SearchTraversal(SearchTraversal::Up(wind)), exclude);
+        self.skel.lane_muxer_api.broadcast_excluding(Frame::SearchTraversal(SearchTraversal::Up(wind)), exclude);
     }
 
     async fn land_windup_hop(&mut self, wind_up: SearchWindUp, lane_key: LaneKey) {
@@ -172,7 +172,7 @@ impl StarSearchComponent {
 
                         let wind = Frame::SearchTraversal(SearchTraversal::Down(wind_down));
 
-                        self.skel.lanes_api.forward(lane_key,wind);
+                        self.skel.lane_muxer_api.forward_frame(lane_key, wind);
                     }
                     Err(error) => {
                         eprintln!(
@@ -190,7 +190,7 @@ impl StarSearchComponent {
 
         let hit = wind_up.pattern.is_match(&self.skel.info);
 
-        let lanes = self.skel.lanes_api.lane_keys().await.expect("expected lanekeys");
+        let lanes = self.skel.lane_muxer_api.lane_keys().await.expect("expected lanekeys");
         if wind_up.hops.len() + 1 > min(wind_up.max_hops, MAX_HOPS)
             || lanes.len() <= 1
             || !self.skel.info.kind.relay()
@@ -219,7 +219,7 @@ impl StarSearchComponent {
 
                     let wind = Frame::SearchTraversal(SearchTraversal::Down(wind_down));
 
-                    self.skel.lanes_api.forward( lane_key, wind).unwrap_or_default();
+                    self.skel.lane_muxer_api.forward_frame(lane_key, wind).unwrap_or_default();
                 }
                 Err(error) => {
                     eprintln!(
@@ -268,7 +268,7 @@ impl StarSearchComponent {
 //                            command_tx.send(StarCommand::WindDown(wind_down)).await;
 
                             let lane = wind_down.hops.last().unwrap();
-                            skel.lanes_api.forward(lane.clone(), Frame::SearchTraversal(SearchTraversal::Down(wind_down))).unwrap_or_default();
+                            skel.lane_muxer_api.forward_frame(lane.clone(), Frame::SearchTraversal(SearchTraversal::Down(wind_down))).unwrap_or_default();
                         }
                         Err(error) => {
                             eprintln!("{}", error);

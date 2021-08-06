@@ -25,6 +25,7 @@ use crate::proto::{local_tunnels, ProtoTunnel};
 use crate::star::{StarCommand, StarKey};
 
 use crate::template::StarInConstellationTemplateSelector;
+use crate::star::shell::lanes::LaneMuxerCall;
 
 pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
 pub static LANE_QUEUE_SIZE: usize = 32;
@@ -43,12 +44,12 @@ pub struct IncomingSide {
 
 impl IncomingSide {
     #[instrument]
-    pub async fn recv(&mut self) -> Option<StarCommand> {
+    pub async fn recv(&mut self) -> Option<LaneMuxerCall> {
         loop {
             match &mut self.tunnel {
                 TunnelInState::None => match self.tunnel_receiver_rx.recv().await {
                     None => {
-                        return Option::Some(StarCommand::Frame(Frame::Close));
+                        return Option::Some(LaneMuxerCall::Frame(Frame::Close));
                     }
                     Some(tunnel) => {
                         self.tunnel = tunnel;
@@ -57,10 +58,10 @@ impl IncomingSide {
                 TunnelInState::In(tunnel) => match tunnel.rx.recv().await {
                     None => {
                         self.tunnel = TunnelInState::None;
-                        return Option::Some(StarCommand::Frame(Frame::Close));
+                        return Option::Some(LaneMuxerCall::Frame(Frame::Close));
                     }
                     Some(frame) => {
-                        return Option::Some(StarCommand::Frame(frame));
+                        return Option::Some(LaneMuxerCall::Frame(frame));
                     }
                 },
             }
@@ -211,6 +212,18 @@ impl LaneWrapper {
             LaneWrapper::Proto(lane) => lane.set_hops_to_star(star, hops),
             LaneWrapper::Lane(lane) => lane.set_hops_to_star(star, hops),
         }
+    }
+
+    pub fn is_proto(&self) -> bool {
+        match self {
+            LaneWrapper::Proto(_) => {
+                true
+            }
+            LaneWrapper::Lane(_) => {
+                false
+            }
+        }
+
     }
 }
 

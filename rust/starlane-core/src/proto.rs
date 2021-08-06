@@ -27,11 +27,11 @@ use crate::lane::{
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::permissions::AuthTokenSource;
 use crate::star::core::message::MessagingEndpointComponent;
-use crate::star::shell::lanes::{LanesApi, LanesComponent};
+use crate::star::shell::lanes::{LaneMuxerApi, LaneMuxer};
 use crate::star::shell::search::{StarSearchApi, StarSearchComponent, StarSearchTransaction, ShortestPathStarKey};
 use crate::star::shell::message::{MessagingApi, MessagingComponent};
 use crate::star::shell::pledge::StarHandleBacking;
-use crate::star::shell::router::{RouterApi, RouterComponent};
+use crate::star::shell::router::{RouterApi, RouterComponent, RouterCall};
 use crate::star::surface::{SurfaceApi, SurfaceCall, SurfaceComponent};
 use crate::star::variant::StarVariantFactory;
 use crate::star::{
@@ -66,6 +66,9 @@ pub struct ProtoStar {
     flags: Flags,
     tracker: ProtoTracker,
     machine: StarlaneMachine,
+    lane_muxer_api: LaneMuxerApi,
+    router_tx: mpsc::Sender<RouterCall>,
+    router_booster_rx: RouterCallBooster
 }
 
 impl ProtoStar {
@@ -83,8 +86,11 @@ impl ProtoStar {
         logger: Logger,
         machine: StarlaneMachine,
     ) -> (Self, StarController) {
-        //        let (star_tx, star_rx) = mpsc::channel(32);
+        let (router_tx,router_rx) = mpsc::channel(1024);
+        let router_booster_rx = RouterCallBooster { router_rx };
+        let lane_muxer_api = LaneMuxer::start(router_tx.clone());
         (
+
             ProtoStar {
                 star_key: key,
                 sequence: Arc::new(AtomicU64::new(0)),
@@ -107,6 +113,9 @@ impl ProtoStar {
                 machine: machine,
                 surface_api: surface_api.clone(),
                 surface_rx,
+                lane_muxer_api,
+                router_tx,
+                router_booster_rx
             },
             StarController {
                 star_tx,
@@ -131,60 +140,14 @@ impl ProtoStar {
         });
 
         loop {
-            // request a sequence from central
+
             let mut futures = vec![];
+            futures.push(self.star_rx.recv().boxed() );
+            futures.push(self.router_booster_rx.boost().boxed());
+            let (call,_,_) = select_all(futures).await;
 
-            let mut lanes = vec![];
-            for (key, lane) in &mut self.lanes {
-                futures.push(lane.incoming().recv().boxed());
-                lanes.push(key.clone())
-            }
-            let mut proto_lane_index = vec![];
-            //println!("adding proto lane to futures....{}", self.proto_lanes.len() );
-            for (index, lane) in &mut self.proto_lanes.iter_mut().enumerate() {
-                futures.push(lane.incoming().recv().boxed());
-                proto_lane_index.push(index);
-            }
-
-            futures.push(self.star_rx.recv().boxed());
-
-            if self.tracker.has_expectation() {
-                futures.push(self.tracker.check().boxed())
-            }
-
-            let (command, future_index, _) = select_all(futures).await;
-
-            let lane_index = if future_index < lanes.len() {
-                LaneIndex::Lane(
-                    lanes
-                        .get(future_index)
-                        .expect("expected a lane at this index")
-                        .clone(),
-                )
-            } else if future_index < lanes.len() + proto_lane_index.len() {
-                LaneIndex::ProtoLane(future_index - lanes.len())
-            } else {
-                LaneIndex::None
-            };
-
-            let _lane = if future_index < lanes.len() {
-                Option::Some(
-                    self.lanes
-                        .get_mut(lanes.get(future_index).as_ref().unwrap())
-                        .expect("expected to get lane"),
-                )
-            } else if future_index < lanes.len() + proto_lane_index.len() {
-                Option::Some(
-                    self.proto_lanes
-                        .get_mut(future_index - lanes.len())
-                        .unwrap(),
-                )
-            } else {
-                Option::None
-            };
-
-            if let Some(command) = command {
-                match command {
+            if let Some(call) = call{
+                match call {
                     StarCommand::GetStarInfo(tx) => match &self.star_key {
                         ProtoStarKey::Key(key) => {
                             tx.send(Option::Some(StarInfo {
@@ -218,17 +181,15 @@ impl ProtoStar {
                             mpsc::channel(1024);
                         let (resource_locator_tx, resource_locator_rx) = mpsc::channel(1024);
                         let (star_locator_tx, star_locator_rx) = mpsc::channel(1024);
-                        let (router_tx, router_rx) = mpsc::channel(1024);
                         let (messaging_tx, messaging_rx) = mpsc::channel(1024);
-                        let (lanes_tx, lanes_rx) = mpsc::channel(1024);
                         let (golden_path_tx, golden_path_rx) = mpsc::channel(1024);
 
                         let resource_locator_api = ResourceLocatorApi::new(resource_locator_tx);
                         let star_search_api = StarSearchApi::new(star_locator_tx);
-                        let router_api = RouterApi::new(router_tx);
+                        let router_api = RouterApi::new(self.router_tx);
                         let messaging_api = MessagingApi::new(messaging_tx);
-                        let lanes_api = LanesApi::new(lanes_tx);
                         let golden_path_api = GoldenPathApi::new(golden_path_tx);
+
 
                         let data_access = self
                             .data_access
@@ -271,7 +232,7 @@ impl ProtoStar {
                             star_search_api,
                             router_api,
                             messaging_api,
-                            lanes_api,
+                            lane_muxer_api: self.lane_muxer_api,
                             golden_path_api
                         };
 
@@ -280,9 +241,8 @@ impl ProtoStar {
                         MessagingEndpointComponent::start(skel.clone(), core_messaging_endpoint_rx);
                         ResourceLocatorComponent::start(skel.clone(), resource_locator_rx);
                         StarSearchComponent::start(skel.clone(), star_locator_rx);
-                        RouterComponent::start(skel.clone(), router_rx);
+                        RouterComponent::start(skel.clone(), self.router_booster_rx.router_rx);
                         MessagingComponent::start(skel.clone(), messaging_rx);
-                        LanesComponent::start(skel.clone(), lanes_rx);
                         SurfaceComponent::start(skel.clone(), self.surface_rx);
                         GoldenPathComponent::start(skel.clone(), golden_path_rx);
 
@@ -299,17 +259,7 @@ impl ProtoStar {
                         .await);
                     }
                     StarCommand::AddLaneEndpoint(lane) => {
-                        let remote_star = lane.remote_star.clone();
-                        self.lanes.insert(
-                            lane.remote_star.clone(),
-                            LaneWrapper::Lane(LaneMeta::new(lane)),
-                        );
-
-                        if let Option::Some(frames) = self.frame_hold.release(&remote_star) {
-                            for frame in frames {
-                                self.send_frame(&remote_star, frame).await;
-                            }
-                        }
+                        self.lane_muxer_api.add_lane(lane);
                     }
                     StarCommand::AddProtoLaneEndpoint(lane) => {
                         match &self.star_key {
@@ -330,8 +280,8 @@ impl ProtoStar {
                                     .await?;
                             }
                         }
-                        self.proto_lanes
-                            .push(LaneWrapper::Proto(LaneMeta::new(lane)));
+
+                        self.lane_muxer_api.add_proto_lane(lane);
                     }
                     StarCommand::AddConnectorController(connector_ctrl) => {
                         self.connector_ctrls.push(connector_ctrl);
@@ -344,7 +294,7 @@ impl ProtoStar {
                         match frame {
                             Frame::Proto(proto_frame) => match proto_frame {
                                 ProtoFrame::ReportStarKey(remote_star) => {
-                                    if let LaneIndex::ProtoLane(index) = lane_index {
+/*                                    if let LaneIndex::ProtoLane(index) = lane_index {
                                         let mut lane = self
                                             .proto_lanes
                                             .remove(index)
@@ -354,6 +304,8 @@ impl ProtoStar {
                                         let lane: LaneEndpoint = lane.try_into()?;
                                         self.star_tx.send(StarCommand::AddLaneEndpoint(lane)).await;
                                     }
+
+ */
                                 }
                                 ProtoFrame::GatewayAssign(subgraph) => match self.star_key {
                                     ProtoStarKey::Key(_) => {
@@ -764,3 +716,33 @@ impl ProtoStarKey {
         }
     }
 }
+
+struct RouterCallBooster {
+    router_rx: mpsc::Receiver<RouterCall>
+}
+
+impl RouterCallBooster {
+    pub async fn boost(&mut self) -> Option<StarCommand> {
+        loop {
+            let call = self.router_rx.recv().await;
+
+            match call {
+                None => {
+                    return Option::None;
+                },
+                Some(call) => {
+                    match call {
+                        RouterCall::Frame { frame, lane } => {
+                            return Option::Some(StarCommand::Frame(frame));
+                        }
+                        _ => {
+                            // do nothing
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+

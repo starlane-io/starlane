@@ -47,7 +47,7 @@ use crate::resource::{
 };
 use crate::star::core::message::CoreMessageCall;
 use crate::star::shell::golden::GoldenPathApi;
-use crate::star::shell::lanes::LanesApi;
+use crate::star::shell::lanes::LaneMuxerApi;
 use crate::star::shell::locator::ResourceLocatorApi;
 use crate::star::shell::message::MessagingApi;
 use crate::star::shell::router::RouterApi;
@@ -423,6 +423,7 @@ impl Star {
 
     #[instrument]
     pub async fn run(mut self) {
+        /*
         loop {
             let mut futures = vec![];
             let mut lanes = vec![];
@@ -663,6 +664,7 @@ impl Star {
                 return;
             }
         }
+         */
     }
 
     async fn init(&mut self) {
@@ -1618,7 +1620,7 @@ pub struct StarSkel {
     pub surface_api: SurfaceApi,
     pub messaging_api: MessagingApi,
     pub golden_path_api: GoldenPathApi,
-    pub lanes_api: LanesApi,
+    pub lane_muxer_api: LaneMuxerApi,
     pub flags: Flags,
     pub logger: Logger,
     pub sequence: Arc<AtomicU64>,

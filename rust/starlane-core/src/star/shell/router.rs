@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::frame::{Frame, Reply, ReplyKind, StarMessage};
+use crate::frame::{Frame, Reply, ReplyKind, StarMessage, ProtoFrame};
 use crate::message::resource::ProtoMessage;
 use crate::message::{Fail, MessageId, ProtoStarMessage, ProtoStarMessageTo};
 use crate::star::core::message::CoreMessageCall;
@@ -30,7 +30,7 @@ impl RouterApi {
 
 pub enum RouterCall {
     Route(StarMessage),
-    Frame{frame: Frame, lane: LaneKey}
+    Frame{frame: Frame, lane: LaneKey},
 }
 
 impl Call for RouterCall {}
@@ -80,8 +80,8 @@ impl RouterComponent {
                     .golden_path_api.golden_lane_leading_to_star(message.to.clone())
                     .await
                 {
-                    skel.lanes_api
-                        .forward(lane, Frame::StarMessage(message))
+                    skel.lane_muxer_api
+                        .forward_frame(lane, Frame::StarMessage(message))
                         .unwrap_or_default();
                 } else {
                     error!(
