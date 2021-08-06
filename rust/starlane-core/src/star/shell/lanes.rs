@@ -52,6 +52,7 @@ impl LaneMuxerApi {
     }
 }
 
+#[derive(strum_macros::Display)]
 pub enum LaneMuxerCall {
     ForwardFrame {
         lane: StarKey,
@@ -80,12 +81,15 @@ impl LaneMuxer {
     pub fn start(router_tx: mpsc::Sender<RouterCall>) ->  LaneMuxerApi  {
         let (tx,rx) = mpsc::channel(1024);
 
-        Self{
-            rx,
-            router_tx,
-            lanes: HashMap::new(),
-            proto_lanes: vec![]
-        }.run();
+
+        tokio::spawn( async move {
+            Self {
+                rx,
+                router_tx,
+                lanes: HashMap::new(),
+                proto_lanes: vec![]
+            }.run().await;
+        });
 
         LaneMuxerApi {
             tx
@@ -205,7 +209,7 @@ impl LaneMuxer {
                                 )));
 
                          */
-                        unimplemented!("not sure how to handle adding protolanes yet");
+//                        unimplemented!("not sure how to handle adding protolanes yet");
                         self.proto_lanes
                             .push(LaneWrapper::Proto(LaneMeta::new(lane)));
                     }

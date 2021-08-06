@@ -22,6 +22,11 @@ impl SurfaceApi {
         Self { tx }
     }
 
+    pub fn init(&self)->Result<(),Error> {
+        self.tx.try_send(SurfaceCall::Init)?;
+        Ok(())
+    }
+
     pub async fn locate(&self, identifier: ResourceIdentifier) -> Result<ResourceRecord, Fail> {
         let (tx, rx) = oneshot::channel();
         self.tx.try_send(SurfaceCall::Locate { identifier, tx })?;
@@ -52,6 +57,7 @@ impl SurfaceApi {
 }
 
 pub enum SurfaceCall {
+    Init,
     GetCaches(oneshot::Sender<Arc<ProtoArtifactCachesFactory>>),
     Locate {
         identifier: ResourceIdentifier,
@@ -85,6 +91,12 @@ impl SurfaceComponent {
 impl AsyncProcessor<SurfaceCall> for SurfaceComponent {
     async fn process(&mut self, call: SurfaceCall) {
         match call {
+            SurfaceCall::Init => {
+                self.skel
+                    .star_tx
+                    .try_send(StarCommand::Init)
+                    .unwrap_or_default();
+            }
             SurfaceCall::GetCaches(tx) => {
                 self.skel
                     .star_tx

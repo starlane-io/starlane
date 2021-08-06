@@ -423,58 +423,13 @@ impl Star {
 
     #[instrument]
     pub async fn run(mut self) {
-        /*
         loop {
-            let mut futures = vec![];
-            let mut lanes = vec![];
-            for (key, lane) in &mut self.lanes {
-                futures.push(lane.incoming().recv().boxed());
-                lanes.push(key.clone())
-            }
-            let mut proto_lane_index = vec![];
 
-            for (index, lane) in &mut self.proto_lanes.iter_mut().enumerate() {
-                futures.push(lane.incoming().recv().boxed());
-                proto_lane_index.push(index);
-            }
-
-            futures.push(self.star_rx.recv().boxed());
-
-            let (command, future_index, _) = select_all(futures).await;
-
-            let lane_index = if future_index < lanes.len() {
-                LaneIndex::Lane(
-                    lanes
-                        .get(future_index)
-                        .expect("expected a lane at this index")
-                        .clone(),
-                )
-            } else if future_index < lanes.len() + proto_lane_index.len() {
-                LaneIndex::ProtoLane(future_index - lanes.len())
-            } else {
-                LaneIndex::None
-            };
-
-            let mut lane = if future_index < lanes.len() {
-                Option::Some(
-                    self.lanes
-                        .get_mut(lanes.get(future_index).as_ref().unwrap())
-                        .expect("expected to get lane"),
-                )
-            } else if future_index < lanes.len() + proto_lane_index.len() {
-                Option::Some(
-                    self.proto_lanes
-                        .get_mut(future_index - lanes.len())
-                        .expect("expected to get proto_lane"),
-                )
-            } else {
-                Option::None
-            };
+            let command = self.star_rx.recv().await;
 
             if let Some(command) = command {
-                let instructions = self.variant.filter(&command, &mut lane);
+//                let instructions = self.variant.filter(&command, &mut lane);
 
-                if let StarShellInstructions::Handle = instructions {
                     match command {
                         StarCommand::Init => {
                             self.init().await;
@@ -486,26 +441,11 @@ impl Star {
                             self.skel.flags = set_flags.flags;
                             set_flags.tx.send(());
                         }
-                        StarCommand::AddProtoLaneEndpoint(lane) => {
-                            let _result =
-                                lane.outgoing
-                                    .out_tx
-                                    .try_send(LaneCommand::Frame(Frame::Proto(
-                                        ProtoFrame::ReportStarKey(self.skel.info.key.clone()),
-                                    )));
-                            self.proto_lanes
-                                .push(LaneWrapper::Proto(LaneMeta::new(lane)));
-                        }
-                        StarCommand::AddLaneEndpoint(lane) => {
-                            self.lanes.insert(
-                                lane.remote_star.clone(),
-                                LaneWrapper::Lane(LaneMeta::new(lane)),
-                            );
-                        }
                         StarCommand::AddConnectorController(connector_ctrl) => {
                             self.connector_ctrls.push(connector_ctrl);
                         }
                         StarCommand::ReleaseHold(star) => {
+                            unimplemented!()
 /*                            if let Option::Some(frames) = self.frame_hold.release(&star) {
                                 let lane = self.lane_with_shortest_path_to_star(&star);
                                 if let Option::Some(lane) = lane {
@@ -542,77 +482,12 @@ impl Star {
                             */
                         }
 
-                        StarCommand::Frame(frame) => {
-                            if let Frame::Close = frame {
-                                match lane_index {
-                                    LaneIndex::None => {}
-                                    LaneIndex::Lane(key) => {
-                                        self.lanes.remove(&key);
-                                        self.on_lane_closed(&key).await;
-                                    }
-                                    LaneIndex::ProtoLane(index) => {
-                                        self.proto_lanes.remove(index);
-                                    }
-                                }
-                            } else if let Frame::Proto(ProtoFrame::ReportStarKey(remote_star)) =
-                                frame
-                            {
-                                match lane_index.expect_proto_lane() {
-                                    Ok(proto_lane_index) => {
-                                        let mut lane = self
-                                            .proto_lanes
-                                            .remove(proto_lane_index)
-                                            .expect_proto_lane()
-                                            .unwrap();
-                                        lane.remote_star = Option::Some(remote_star);
-                                        let lane = match lane.try_into() {
-                                            Ok(lane) => lane,
-                                            Err(error) => {
-                                                error!(
-                                                    "error converting proto_lane into lane: {}",
-                                                    error
-                                                );
-                                                continue;
-                                            }
-                                        };
-                                        self.skel
-                                            .star_tx
-                                            .send(StarCommand::AddLaneEndpoint(lane))
-                                            .await;
-                                    }
-                                    Err(err) => {
-                                        error!("{}", err)
-                                    }
-                                }
-                            } else if let Frame::SearchTraversal(traversal) = &frame {
-                                self.skel.star_search_api.on_traversal(traversal.clone(), lane.unwrap().get_remote_star().unwrap() );
-                            } else {
-                                if lane_index.is_lane() {
-                                    self.process_frame(
-                                        frame,
-                                        Option::Some(&lane_index.expect_lane().unwrap()),
-                                    )
-                                    .await;
-                                }
-                            }
-
-
-
-
-                        }
-                        StarCommand::ForwardFrame(forward) => {
-                            self.send_frame(forward.to.clone(), forward.frame).await;
-                        }
                         StarCommand::CheckStatus => {
                             self.check_status().await;
                         }
                         StarCommand::SetStatus(status) => {
                             self.set_status(status.clone());
                             //                            println!("{} {}", &self.skel.info.kind, &self.status.to_string());
-                        }
-                        StarCommand::GetCaches(tx) => {
-                            //                            tx.send(self.skel.caches.clone());
-                            unimplemented!()
                         }
                         StarCommand::Diagnose(diagnose) => {
                             self.diagnose(diagnose).await;
@@ -621,27 +496,11 @@ impl Star {
                             tx.send(self.status_broadcast.subscribe());
                             self.status_broadcast.send(self.status.clone());
                         }
-                        StarCommand::GetLaneForStar { star, tx } => {
-//                            self.find_lane_for_star(star, tx).await;
-                        }
+
                         StarCommand::GetSkel(tx) => {
                             tx.send(self.skel.clone()).unwrap_or_default();
                         }
-                        StarCommand::Broadcast { frame, exclude } =>{
-                            self.broadcast_excluding(frame,&exclude).await;
-                        }
-                        StarCommand::LaneKeys(tx) => {
-                            let mut keys = vec!();
-                            for (k,_) in &self.lanes {
-                                keys.push(k.clone());
-                            }
-                            tx.send(keys);
-                        }
-
-                        StarCommand::LaneWithShortestPathToStar { star, tx } => {
-
-                        }
-                        StarCommand::Shutdown => {
+                       StarCommand::Shutdown => {
                             for (_, lane) in &mut self.lanes {
                                 lane.outgoing().out_tx.try_send(LaneCommand::Shutdown);
                             }
@@ -655,16 +514,11 @@ impl Star {
                             break;
                         }
                         _ => {
-                            eprintln!("cannot process command: {}", command.to_string());
+                            unimplemented!("cannot process command: {}", command.to_string());
                         }
                     }
                 }
-            } else {
-                println!("command_rx has been disconnected");
-                return;
-            }
         }
-         */
     }
 
     async fn init(&mut self) {
@@ -783,59 +637,6 @@ impl Star {
         }
     }
 
-    /*
-        async fn send_resource_message( &mut self, mut builder: ProtoMessage)
-        {
-
-            if let Err(errors) = builder.validate() {
-                eprintln!("resource message is not valid cannot send: {}", errors);
-                return;
-            }
-
-            let tx = builder.sender();
-            let message = if let Ok(message) = builder.build()
-            {
-                message
-            } else {
-                eprintln!("errors when trying to extract resource message builder...");
-                return;
-            };
-
-            let (request,rx) = Request::new(message.to.key.clone().into());
-            self.skel.star_tx.send( StarCommand::ResourceRecordRequest(request)).await;
-            let skel = self.skel.clone();
-
-            tokio::spawn( async move {
-                match Star::wait_for_it(rx).await{
-                    Ok(result) => {
-                        let mut proto = ProtoStarMessage::new();
-                        proto.to(result.location.host.clone().into());
-                        proto.payload = StarMessagePayload::ResourceRequestMessage(message);
-    println!("SEND PROTO MESSAGE FOR RESOURCE MESSAGE....");
-                        let result = proto.get_ok_result().await;
-                        skel.star_tx.send( StarCommand::SendProtoMessage(proto)).await;
-                        match util::wait_for_it_whatever(result).await
-                        {
-                            Ok(result) => {
-                                println!("WHAT WEVE BEEN WAITING FOR RESULT: {}",result );
-                            }
-                            Err(error) => {
-                                println!("Resource Message response Error: {}",error );
-                            }
-                        }
-                    }
-                    Err(fail) => {
-                        eprintln!("Star failed to find resource record: {}", fail.to_string() );
-                    }
-                }
-
-            } );
-
-        }
-
-         */
-
-
     pub fn star_key(&self) -> &StarKey {
         &self.skel.info.key
     }
@@ -847,368 +648,6 @@ impl Star {
     pub fn surface_api(&self) -> SurfaceApi {
         self.skel.surface_api.clone()
     }
-
-    async fn broadcast(&mut self, frame: Frame) {
-        self.broadcast_excluding(frame, &Option::None).await;
-    }
-
-    async fn broadcast_excluding(&mut self, frame: Frame, exclude: &Option<HashSet<StarKey>>) {
-        let mut stars = vec![];
-        for star in self.lanes.keys() {
-            if exclude.is_none() || !exclude.as_ref().unwrap().contains(star) {
-                stars.push(star.clone());
-            }
-        }
-        for star in stars {
-            self.send_frame(star, frame.clone()).await;
-        }
-    }
-
-    /*    async fn message(&mut self, delivery: StarMessageDeliveryInsurance) {
-           let message = delivery.message.clone();
-           if !delivery.message.payload.is_ack() {
-               let tracker = MessageReplyTracker {
-                   reply_to: delivery.message.id.clone(),
-                   tx: delivery.tx.clone(),
-               };
-
-               self.message_reply_trackers
-                   .insert(delivery.message.id.clone(), tracker);
-
-               let star_tx = self.skel.star_tx.clone();
-               tokio::spawn(async move {
-                   let mut delivery = delivery;
-                   delivery.retries = delivery.expect.retries();
-
-                   loop {
-                       let wait = if delivery.retries == 0 && delivery.expect.retry_forever() {
-                           // take a 2 minute break if retry_forever to be sure that all messages have expired
-                           120 as u64
-                       } else {
-                           delivery.expect.wait_seconds()
-                       };
-                       let result = tokio::time::timeout(Duration::from_secs(wait), delivery.rx.recv()).await;
-                       match result {
-                           Ok(result) => {
-                               match result {
-                                   Ok(update) => {
-                                       match update {
-                                           MessageUpdate::Result(_) => {
-                                               // the result will have been captured on another
-                                               // rx as this is a broadcast.  no longer need to wait.
-                                               break;
-                                           }
-                                           _ => {}
-                                       }
-                                   }
-                                   Err(_) => {
-                                       // probably the TX got dropped. no point in sticking around.
-                                       break;
-                                   }
-                               }
-                           }
-                           Err(_elapsed) => {
-                               delivery.retries = delivery.retries - 1;
-                               if delivery.retries == 0 {
-                                   if delivery.expect.retry_forever() {
-                                       // we have to keep trying with a new message Id since the old one is now expired
-                                       let proto = delivery.message.resubmit(
-                                           delivery.expect,
-                                           delivery.tx.clone(),
-                                           delivery.tx.subscribe(),
-                                       );
-                                       star_tx.send(StarCommand::SendProtoMessage(proto)).await;
-                                       break;
-                                   } else {
-                                       // out of retries, this
-                                       delivery
-                                           .tx
-                                           .send(MessageUpdate::Result(MessageResult::Timeout));
-                                       break;
-                                   }
-                               } else {
-                                   // we resend the message and hope it arrives this time
-                                   star_tx
-                                       .send(StarCommand::ForwardFrame(ForwardFrame {
-                                           to: delivery.message.to.clone(),
-                                           frame: Frame::StarMessage(delivery.message.clone()),
-                                       }))
-                                       .await;
-                               }
-                           }
-                       }
-                   }
-               });
-           }
-           if message.to != self.skel.info.key {
-               self.send_frame(message.to.clone(), Frame::StarMessage(message))
-                   .await;
-           } else {
-               // a special exception for sending a message to ourselves
-               self.process_frame(Frame::StarMessage(message), Option::None)
-                   .await;
-           }
-       }
-
-    */
-
-
-    async fn send_frame(&mut self, lane_key: LaneKey, frame: Frame) {
-
-        if let Option::Some(lane) = self.lanes.get_mut(&lane_key) {
-            lane.outgoing().out_tx.send( LaneCommand::Frame(frame)).await;
-        } else {
-error!("dropped frame could not find laneKey: {}",lane_key.to_string() );
-        }
-        /*
-        if let Option::Some(lane) = lane {
-            lane.outgoing().out_tx.send(LaneCommand::Frame(frame)).await;
-        } else {
-            self.frame_hold.add(&star, frame);
-            let (tx, rx) = oneshot::channel();
-
-            self.search_for_star(star.clone(), tx).await;
-            let command_tx = self.skel.star_tx.clone();
-            tokio::spawn(async move {
-                match rx.await {
-                    Ok(_) => {
-                        command_tx.send(StarCommand::ReleaseHold(star)).await;
-                    }
-                    Err(error) => {
-                        eprintln!("RELEASE HOLD RX ERROR : {}", error);
-                    }
-                }
-            });
-        }
-         */
-    }
-
-    async fn lane_with_shortest_path_to_star(&mut self, star: &StarKey) -> Option<&mut LaneWrapper> {
-
-        self.skel.golden_path_api.golden_lane_leading_to_star(star.clone() ).await;
-
-
-
-        let min_hops = usize::MAX;
-        let mut rtn = Option::None;
-
-        for (_, lane) in &mut self.lanes {
-            if let Option::Some(hops) = lane.get_hops_to_star(star) {
-                if hops < min_hops {
-                    rtn = Option::Some(lane);
-                }
-            }
-        }
-
-        rtn
-    }
-
-    fn get_hops_to_star(&mut self, star: &StarKey) -> Option<usize> {
-        let mut rtn = Option::None;
-
-        for (_, lane) in &mut self.lanes {
-            if let Option::Some(hops) = lane.get_hops_to_star(star) {
-                if rtn.is_none() {
-                    rtn = Option::Some(hops);
-                } else if let Option::Some(min_hops) = rtn {
-                    if hops < min_hops {
-                        rtn = Option::Some(hops);
-                    }
-                }
-            }
-        }
-
-        rtn
-    }
-
-    /*
-    async fn search( &mut self, pattern: StarSearchPattern )->Result<StarSearchCompletion,Canceled>
-    {
-        let search_id = self.info.sequence.next();
-        let (search_transaction,rx) = StarSearchTransaction::new(StarSearchPattern::StarKey(self.info.star_key.clone()));
-
-        self.star_search_transactions.insert(search_id, search_transaction );
-
-        let search = StarSearchInner{
-            from: self.info.star_key.clone(),
-            pattern: pattern,
-            hops: vec![self.star_key.clone()],
-            transactions: vec![search_id],
-            max_hops: MAX_HOPS
-        };
-
-        self.broadcast(Frame::StarSearch(search) ).await;
-
-        rx.await
-    }
-
-     */
-
-    /*
-    async fn search_for_star( &mut self, star: StarKey )
-    {
-
-        let search_id = self.transaction_seq.fetch_add(1, std::sync::atomic::Ordering::Relaxed );
-        let (search_transaction,_) = StarSearchTransaction::new(StarSearchPattern::StarKey(self.star_key.clone()));
-        self.star_search_transactions.insert(search_id, search_transaction );
-
-        let search = StarSearchInner{
-            from: self.star_key.clone(),
-            pattern: StarSearchPattern::StarKey(star),
-            hops: vec![self.star_key.clone()],
-            transactions: vec![search_id],
-            max_hops: MAX_HOPS,
-        };
-
-        self.logger.log2(StarLog::StarSearchInitialized(search.clone()));
-        for (star,lane) in &self.lanes
-        {
-            lane.lane.outgoing.tx.send( LaneCommand::Frame( Frame::StarSearch(search.clone()))).await;
-        }
-    }*/
-
-    async fn on_wind_down(&mut self, _search_result: SearchWindDown, _lane_key: StarKey) {
-        //        println!("ON STAR SEARCH RESULTS");
-    }
-    /*
-    async fn on_star_search_result( &mut self, mut search_result: StarSearchResultInner, lane_key: StarKey )
-    {
-
-        self.logger.log2(StarLog::StarSearchResult(search_result.clone()));
-        if let Some(search_id) = search_result.transactions.last()
-        {
-            if let Some(search_trans) = self.star_search_transactions.get_mut(search_id)
-            {
-                for hit in &search_result.hits
-                {
-                    search_trans.hits.insert( hit.star.clone(), hit.clone() );
-                    let lane = self.lanes.get_mut(&lane_key).unwrap();
-                    lane.star_paths.insert( hit.star.clone(), hit.hops.clone() as _ );
-                    if let Some(frames) = self.frame_hold.release( &hit.star )
-                    {
-                        for frame in frames
-                        {
-                            lane.lane.outgoing.tx.send( LaneCommand::Frame(frame) ).await;
-                        }
-                    }
-                }
-                search_trans.reported_lane_count = search_trans.reported_lane_count+1;
-
-                if search_trans.reported_lane_count >= (self.lanes.len() as i32)-1
-                {
-                    // this means all lanes have been searched and the search result can be reported to the next node
-                    if let Some(search_trans) = self.star_search_transactions.remove(search_id)
-                    {
-                        search_result.pop();
-                        if let Some(next)=search_result.hops.last()
-                        {
-                            if let Some(lane)=self.lanes.get_mut(next)
-                            {
-                                search_result.hits = search_trans.hits.values().map(|a|a.clone()).collect();
-                                lane.lane.outgoing.tx.send( LaneCommand::Frame(Frame::StarSearchResult(search_result))).await;
-                            }
-                        }
-
-                        search_trans.complete();
-                    }
-                }
-            }
-        }
-    }
-     */
-
-
-
-    async fn on_lane_closed(&mut self, key: &StarKey) {
-        // we should notify any waiting WIND transactions that this lane is no longer participating
-        /*
-        let mut remove = HashSet::new();
-        for (tid, transaction) in self.transactions.iter_mut() {
-            if let TransactionResult::Done = transaction.on_lane_closed(key).await {
-                remove.insert(tid.clone());
-            }
-        }
-
-        self.transactions.retain(|k, _| !remove.contains(k));
-        */
-    }
-
-    async fn process_message_reply(&mut self, message: &StarMessage) {
-        if message.reply_to.is_some()
-            && self
-                .message_reply_trackers
-                .contains_key(message.reply_to.as_ref().unwrap())
-        {
-            if let Some(tracker) = self
-                .message_reply_trackers
-                .get(message.reply_to.as_ref().unwrap())
-            {
-                if let TrackerJob::Done = tracker.on_message(message) {
-                    self.message_reply_trackers
-                        .remove(message.reply_to.as_ref().unwrap());
-                }
-            }
-        }
-    }
-
-    async fn process_frame(&mut self, frame: Frame, lane_key: Option<&StarKey>) {
-//        self.process_transactions(&frame, lane_key).await;
-        match frame {
-            Frame::SearchTraversal(traversal) => {
-                self.skel.star_search_api.on_traversal(traversal, lane_key.expect("Expected a LaneKey").clone() );
-            },
-            Frame::StarMessage(message) => {
-                self.skel.router_api.route(message).unwrap_or_default();
-            }
-            /*            Frame::StarMessage(message) => match self.on_message(message).await {
-                           Ok(_messages) => {}
-                           Err(error) => {
-                               error!("X error: {}", error)
-                           }
-                       },
-            */
-            _ => {
-                error!("star does not handle frame: {}", frame)
-            }
-        }
-    }
-
-    /*
-        async fn on_message(&mut self, message: StarMessage) -> Result<(), Error> {
-
-    println!("STAR ON MESSAGE");
-
-            if message.log {
-                info!(
-                    "{} => {} : {}",
-                    self.skel.info.to_string(),
-                    LogId(&message).to_string(),
-                    "on_message"
-                );
-            }
-            if message.to != self.skel.info.key {
-                if self.skel.info.kind.relay() || message.from == self.skel.info.key {
-                    //forward the message
-                    self.send_frame(message.to.clone(), Frame::StarMessage(message))
-                        .await;
-                    return Ok(());
-                } else {
-                    error!("this star does not relay Messages");
-                    return Err(
-                        format!("this star {} does not relay Messages", self.skel.info.kind.to_string()).into(),
-                    );
-                }
-            } else {
-    println!("Star on_message() -> message.reply_to.is_some(): {}", message.reply_to.is_some() );
-                if message.reply_to.is_some() {
-                    self.skel.messaging_api.on_reply(message);
-                } else {
-                    self.skel.core_messaging_endpoint_tx.try_send(CoreMessageCall::Message(message)).unwrap_or_default();
-                }
-                Ok(())
-            }
-        }
-         */
 
     async fn diagnose(&self, diagnose: Diagnose) {
         match diagnose {
