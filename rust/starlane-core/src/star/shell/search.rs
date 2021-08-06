@@ -93,16 +93,9 @@ impl StarSearchComponent {
 
         match traversal {
             SearchTraversal::Up(up) => {
-                if let StarPattern::StarKind(StarKind::Space) = up.pattern {
-
-                    println!("on_search_Traversal: UP: {}", self.skel.info.kind.to_string() );
-                }
                 self.land_windup_hop(up, lane_key).await;
             }
             SearchTraversal::Down(down) => {
-                if let StarPattern::StarKind(StarKind::Space) = down.wind_up.pattern{
-                    println!("on_search_Traversal: DOWN : {}", self.skel.info.kind.to_string() );
-                }
                 self.process_search_transaction(down,lane_key)
             }
             _ => {
@@ -124,9 +117,6 @@ impl StarSearchComponent {
         exclude: Option<HashSet<StarKey>>,
     ) {
 
-if let StarPattern::StarKind(StarKind::Space) = wind.pattern {
-    println!("LAUNCH HOP ! {} ~> {} hops", self.skel.info.kind.to_string(), wind.hops.len());
-}
         let tid = self
             .skel
             .sequence
@@ -163,9 +153,6 @@ if let StarPattern::StarKind(StarKind::Space) = wind.pattern {
 
     async fn land_windup_hop(&mut self, wind_up: SearchWindUp, lane_key: LaneKey) {
 
-        if let StarPattern::StarKind(StarKind::Space) = wind_up.pattern {
-            println!("LAND HOP! {} ~> {} hops", self.skel.info.kind.to_string(), wind_up.hops.len());
-        }
         if wind_up.pattern.is_match(&self.skel.info) {
             if wind_up.pattern.is_single_match() {
                 let hit = SearchHit {
@@ -481,7 +468,7 @@ pub struct SearchCommit {
 pub struct SearchHits {
     pub pattern: StarPattern,
     pub hits: HashMap<StarKey, usize>,
-    pub lane_hits: HashMap<StarKey, HashMap<LaneKey, usize>>,
+    pub lane_hits: HashMap<LaneKey, HashMap<StarKey, usize>>,
 }
 
 impl SearchHits {

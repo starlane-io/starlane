@@ -27,12 +27,12 @@ impl GoldenPathApi {
     ) -> Result<LaneKey, Error> {
         let (tx, rx) = oneshot::channel();
         self.tx
-            .try_send(GoldenCall::GoldenLaneLeadingToStar { star, tx })
+            .try_send(GoldenCall::GoldenLaneLeadingToStar { star, tx, try_search: true })
             .unwrap_or_default();
          Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
     }
 
-    fn insert_hops( &self, hops: HashMap<StarKey,HashMap<LaneKey,usize>>) {
+    fn insert_hops( &self, hops: HashMap<LaneKey,HashMap<StarKey,usize>>) {
         self.tx.try_send( GoldenCall::InsertHops(hops)).unwrap_or_default();
     }
 }
@@ -41,8 +41,9 @@ pub enum GoldenCall {
     GoldenLaneLeadingToStar {
         star: StarKey,
         tx: oneshot::Sender<Result<LaneKey,Error>>,
+        try_search: bool
     },
-    InsertHops(HashMap<StarKey,HashMap<LaneKey,usize>>)
+    InsertHops(HashMap<LaneKey,HashMap<StarKey,usize>>)
 }
 
 impl Call for GoldenCall {}
@@ -66,12 +67,21 @@ impl GoldenPathComponent {
 impl AsyncProcessor<GoldenCall> for GoldenPathComponent {
     async fn process(&mut self, call: GoldenCall) {
         match call {
-            GoldenCall::GoldenLaneLeadingToStar { star, tx } => {
-                self.golden_path_leading_to_star(star,tx)
+            GoldenCall::GoldenLaneLeadingToStar { star, tx,try_search } => {
+                self.golden_path_leading_to_star(star,tx,try_search);
             }
             GoldenCall::InsertHops(hops) => {
-                for (star,lane_hops) in hops {
-                    self.star_to_lane.put( star, lane_hops );
+                for (lane,star_hops) in hops {
+                  for (star, hops ) in star_hops {
+                      let mut lane_to_hops = match self.star_to_lane.get( &star ) {
+                          None => {
+                              HashMap::new()
+                          }
+                          Some(map) => {map.clone()}
+                      };
+                      lane_to_hops.insert( lane.clone(), hops );
+                      self.star_to_lane.put( star, lane_to_hops );
+                  }
                 }
             }
         }
@@ -80,7 +90,7 @@ impl AsyncProcessor<GoldenCall> for GoldenPathComponent {
 
 impl GoldenPathComponent {
 
-    fn golden_path_leading_to_star(&mut self, star: StarKey, tx: oneshot::Sender<Result<LaneKey,Error>>)   {
+    fn golden_path_leading_to_star(&mut self, star: StarKey, tx: oneshot::Sender<Result<LaneKey,Error>>, try_search: bool)   {
         let skel = self.skel.clone();
 
         if let Option::Some(lanes) = self.star_to_lane.get(&star) {
@@ -99,14 +109,16 @@ impl GoldenPathComponent {
             }
 
             tx.send(Ok(rtn.unwrap())).unwrap_or_default();
-        } else {
+        } else if try_search {
             tokio::spawn( async move {
-                let result = skel.star_search_api.search(StarPattern::StarKey(star.clone())).await;
+
+
+                    let result = skel.star_search_api.search(StarPattern::StarKey(star.clone())).await;
 
                 match result {
-                    Ok(hops) => {
-                        skel.golden_path_api.insert_hops(hops.lane_hits);
-                        skel.golden_path_api.tx.try_send( GoldenCall::GoldenLaneLeadingToStar {star,tx}).unwrap_or_default();
+                    Ok(hits) => {
+                        skel.golden_path_api.insert_hops(hits.lane_hits);
+                        skel.golden_path_api.tx.try_send(GoldenCall::GoldenLaneLeadingToStar { star, tx, try_search:false }).unwrap_or_default();
                     }
                     Err(error) => {
                         tx.send(Err(error));
@@ -114,6 +126,8 @@ impl GoldenPathComponent {
                 }
 
             });
+        } else {
+            tx.send( Err(format!("could not find star: {}",star.to_string()).into()));
         }
     }
 
