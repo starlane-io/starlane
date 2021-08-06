@@ -397,9 +397,7 @@ impl StarlaneMachineRunner {
                 self.star_controllers.put(star_template_id, star_ctrl).await;
 
                 if self.artifact_caches.is_none() {
-                    println!("BEFORE STARLANE ...");
                     let api = StarlaneApi::new(surface_api.clone());
-                    println!("NEW STARLANE API!");
                     let caches = Arc::new(ProtoArtifactCachesFactory::new(
                         api.into(),
                         self.cache_access.clone(),
@@ -551,7 +549,7 @@ impl StarlaneMachineRunner {
 
         for evolve in evolutions {
             if let Ok(evolve) = evolve {
-                evolve.controller.star_tx.send(StarCommand::Init).await;
+                evolve.controller.surface_api.init();
             } else if let Err(error) = evolve {
                 return Err(error.to_string().into());
             }
