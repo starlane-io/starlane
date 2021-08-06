@@ -1598,7 +1598,7 @@ impl ResourceCreationChamber {
 
                 ResourceAddress::from_str(address.as_str())?
             }
-            AddressCreationSrc::Space(space_name) => {
+            AddressCreationSrc::Just(space_name) => {
                 if self.parent.key.resource_type() != ResourceType::Root {
                     return Err(format!(
                         "Space creation can only be used at top level (Root) not by {}",
@@ -2429,7 +2429,7 @@ pub enum AddressCreationSrc {
     None,
     Append(String),
     Appends(Vec<String>),
-    Space(String),
+    Just(String),
     Exact(ResourceAddress),
 }
 

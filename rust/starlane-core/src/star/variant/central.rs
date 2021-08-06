@@ -86,8 +86,9 @@ impl CentralVariant {
 
                  */
 
-        let mut creation = space_api.create_domain("localhost")?;
+        let mut creation = starlane_api.create_domain("localhost")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
+println!("BEFORE");
         creation.submit().await?;
         println!("localhost ensured.");
 

@@ -156,7 +156,7 @@ impl StarKind {
     pub fn manages(&self) -> HashSet<ResourceType> {
         HashSet::from_iter(
             match self {
-                StarKind::Central => vec![ResourceType::Space],
+                StarKind::Central => vec![ResourceType::Space,ResourceType::Domain],
                 StarKind::Space => vec![
                     ResourceType::SubSpace,
                     ResourceType::App,
@@ -199,7 +199,7 @@ impl StarKind {
             ResourceType::ArtifactBundle => Self::ArtifactStore,
             ResourceType::Artifact => Self::ArtifactStore,
             ResourceType::Proxy => Self::Space,
-            ResourceType::Domain => Self::Space,
+            ResourceType::Domain => Self::Central,
         }
     }
 

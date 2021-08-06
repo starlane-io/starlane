@@ -22,6 +22,15 @@ pub mod data;
 pub mod error;
 pub mod parse;
 
+
+pub enum Galaxy{
+    Local,
+    Default,
+    Exact(DomainCase)
+}
+
+
+
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct ResourceAddress {
     path: ResourcePath,
@@ -1354,7 +1363,7 @@ resources! {
     #[resource(ResourceStatePersistenceManager::Host)]
     pub struct Database();
 
-    #[resource(parents(Space))]
+    #[resource(parents(Root))]
     #[resource(prefix="d")]
     #[resource(ResourcePathSegmentKind::Domain)]
     #[resource(ResourceStatePersistenceManager::None)]
