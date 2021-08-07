@@ -30,7 +30,7 @@ use crate::star::core::message::MessagingEndpointComponent;
 use crate::star::shell::lanes::{LaneMuxerApi, LaneMuxer};
 use crate::star::shell::search::{StarSearchApi, StarSearchComponent, StarSearchTransaction, ShortestPathStarKey};
 use crate::star::shell::message::{MessagingApi, MessagingComponent};
-use crate::star::shell::pledge::StarHandleBacking;
+use crate::star::shell::pledge::StarWranglerBacking;
 use crate::star::shell::router::{RouterApi, RouterComponent, RouterCall};
 use crate::star::surface::{SurfaceApi, SurfaceCall, SurfaceComponent};
 use crate::star::variant::StarVariantFactory;
@@ -208,9 +208,9 @@ impl ProtoStar {
                                 Option::None
                             };
 
-                        let star_handler: Option<StarHandleBacking> =
+                        let star_handler: Option<StarWranglerBacking> =
                             if !info.kind.distributes_to().is_empty() {
-                                Option::Some(StarHandleBacking::new(self.star_tx.clone()).await)
+                                Option::Some(StarWranglerBacking::new(self.star_tx.clone()).await)
                             } else {
                                 Option::None
                             };

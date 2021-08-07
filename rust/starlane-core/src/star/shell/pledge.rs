@@ -19,14 +19,14 @@ use crate::resource::{
 use crate::star::{StarCommand, StarInfo, StarKey, StarKind, StarSkel};
 
 #[derive(Clone)]
-pub struct StarHandleBacking {
+pub struct StarWranglerBacking {
     tx: mpsc::Sender<StarHandleAction>,
     star_tx: mpsc::Sender<StarCommand>,
 }
 
-impl StarHandleBacking {
+impl StarWranglerBacking {
     pub async fn new(star_tx: mpsc::Sender<StarCommand>) -> Self {
-        StarHandleBacking {
+        StarWranglerBacking {
             tx: StarHandleDb::new().await,
             star_tx: star_tx,
         }

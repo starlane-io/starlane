@@ -16,7 +16,7 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
-use shell::pledge::{Satisfaction, StarHandle, StarHandleBacking};
+use shell::pledge::{Satisfaction, StarHandle, StarWranglerBacking};
 use shell::search::{SearchHits, SearchInit, StarSearchTransaction, TransactionResult, SearchCommit};
 use starlane_resources::ResourceIdentifier;
 
@@ -1064,7 +1064,7 @@ pub struct StarSkel {
     pub logger: Logger,
     pub sequence: Arc<AtomicU64>,
     pub registry: Option<Arc<dyn ResourceRegistryBacking>>,
-    pub star_handler: Option<StarHandleBacking>,
+    pub star_handler: Option<StarWranglerBacking>,
     pub persistence: Persistence,
     pub data_access: FileAccess,
     pub machine: StarlaneMachine,

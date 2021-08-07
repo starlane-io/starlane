@@ -7,21 +7,22 @@ use zip::write::FileOptions;
 use zip::{CompressionMethod, ZipWriter};
 
 use crate::error::Error;
-use crate::resource::ArtifactBundleAddress;
+use crate::resource::{ArtifactBundleAddress, ArtifactAddress, ResourceAddress,ResourceType,ResourceKind};
+use std::convert::TryInto;
 
 lazy_static! {
     pub static ref ARTIFACT_BUNDLE: ArtifactBundleAddress = artifact_bundle_address();
     pub static ref SPACE: &'static str = r#"
 name: Space
 args:
-    - display:
+    - display-name:
         about: Takes a human friendly display name
         required: true
    "#;
     pub static ref SUB_SPACE: &'static str = r#"
 name: SubSpace
 args:
-    - display:
+    - display-name:
         about: Takes a human friendly display name
         required: true
    "#;
@@ -38,12 +39,20 @@ pub fn artifact_bundle_address() -> ArtifactBundleAddress {
     )
 }
 
-pub fn create_init_args_artifact_bundle() -> Result<Vec<u8>, Error> {
+pub fn space_address() -> Result<ArtifactAddress,Error> {
+   let address: ResourceAddress = artifact_bundle_address().into();
+   let address = address.append("create-args/space.yaml".to_string(), ResourceType::Artifact )?;
+   let address : ArtifactAddress = address.try_into()?;
+   Ok(address)
+}
+
+
+pub fn create_args_artifact_bundle() -> Result<Vec<u8>, Error> {
     let zipfile = tempfile::NamedTempFile::new()?;
     let mut zip = ZipWriter::new(zipfile.reopen()?);
 
-    write_file_to_zip(&mut zip, "init-args/space.yaml", &SPACE)?;
-    write_file_to_zip(&mut zip, "init-args/sub_space.yaml", &SUB_SPACE)?;
+    write_file_to_zip(&mut zip, "create-args/space.yaml", &SPACE)?;
+    write_file_to_zip(&mut zip, "create-args/sub_space.yaml", &SUB_SPACE)?;
 
     zip.finish()?;
 

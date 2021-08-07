@@ -47,7 +47,7 @@ fn main() -> Result<(), Error> {
                                                             SubCommand::with_name("config").subcommands(vec![SubCommand::with_name("set-host").usage("set the host that the starlane CLI connects to").arg(Arg::with_name("hostname").required(true).help("the hostname of the starlane instance you wish to connect to")).display_order(0),
                                                                                                                             SubCommand::with_name("get-host").usage("get the host that the starlane CLI connects to")]).usage("read or manipulate the cli config").display_order(1).display_order(1),
                                                             SubCommand::with_name("publish").usage("publish an artifact bundle").args(vec![Arg::with_name("dir").required(true).help("the source directory for this bundle"),Arg::with_name("address").required(true).help("the publish address of this bundle i.e. 'space:sub_space:bundle:1.0.0'")].as_slice()),
-                                                            SubCommand::with_name("create").usage("create a resource").setting(clap::AppSettings::TrailingVarArg).args(vec![Arg::with_name("address").required(true).help("address of your new resource"),Arg::with_name("init-args").multiple(true).required(false)].as_slice()),
+                                                            SubCommand::with_name("create").usage("create a resource").setting(clap::AppSettings::TrailingVarArg).args(vec![Arg::with_name("address").required(true).help("address of your new resource"),Arg::with_name("create-args").multiple(true).required(false)].as_slice()),
 
                                                             SubCommand::with_name("ls").usage("list resources").args(vec![Arg::with_name("address").required(true).help("the resource address to list"),Arg::with_name("child-pattern").required(false).help("a pattern describing the children to be listed .i.e '<File>' for returning resource type File")].as_slice())
     ]);
@@ -174,12 +174,12 @@ async fn create(args: ArgMatches<'_>) -> Result<(), Error> {
     let kind = address.kind().clone();
     let address: ResourceAddress = address.into();
 
-    let init_args = match args.values_of("init-args") {
+    let create_args = match args.values_of("create-args") {
         None => "".to_string(),
         Some(args) => {
-            let init_args: Vec<&str> = args.collect();
-            let init_args: Vec<String> = init_args.iter().map(|s| (*s).to_string()).collect();
-            init_args.join(" ")
+            let create_args: Vec<&str> = args.collect();
+            let create_args: Vec<String> = create_args.iter().map(|s| (*s).to_string()).collect();
+            create_args.join(" ")
         }
     };
 
@@ -197,7 +197,7 @@ async fn create(args: ArgMatches<'_>) -> Result<(), Error> {
             specific: None,
             config: None,
         },
-        state_src: AssignResourceStateSrc::CreateArgs(init_args),
+        state_src: AssignResourceStateSrc::CreateArgs(create_args),
         registry_info: Option::None,
         owner: Option::None,
         strategy: ResourceCreateStrategy::Create,

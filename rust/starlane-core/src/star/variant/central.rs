@@ -105,7 +105,7 @@ impl CentralVariant {
             let version = semver::Version::from_str(address.name().as_str())?;
             let mut creation = artifact_bundle_versions_api.create_artifact_bundle(
                 version,
-                Arc::new(create_args::create_init_args_artifact_bundle()?),
+                Arc::new(create_args::create_args_artifact_bundle()?),
             )?;
             creation.set_strategy(ResourceCreateStrategy::Ensure);
             creation.submit().await?;

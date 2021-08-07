@@ -83,12 +83,13 @@ impl StarlaneMachine {
 
     pub async fn get_proto_artifact_caches_factory(
         &self,
-    ) -> Result<Option<Arc<ProtoArtifactCachesFactory>>, Error> {
+    ) -> Result<Arc<ProtoArtifactCachesFactory>,Error> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(StarlaneCommand::GetProtoArtifactCachesFactory(tx))
             .await?;
-        Ok(rx.await?)
+        Ok(rx.await?.ok_or("expected proto artifact cache")?)
+
     }
 
     pub fn bin_context(&self) -> Arc<dyn BinContext> {
