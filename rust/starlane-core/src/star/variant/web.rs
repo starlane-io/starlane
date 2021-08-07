@@ -9,23 +9,43 @@ use actix_web::web::Data;
 use url::Url;
 
 use crate::resource::ResourceAddress;
-use crate::star::variant::StarVariant;
 use crate::star::StarSkel;
 use crate::starlane::api::{StarlaneApi, StarlaneApiRelay};
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, mpsc};
+use crate::star::variant::{VariantCall, FrameVerdict};
+use crate::util::{AsyncRunner, AsyncProcessor};
+
 
 pub struct WebVariant {
     skel: StarSkel,
 }
 
 impl WebVariant {
-    pub async fn new(skel: StarSkel) -> WebVariant {
-        WebVariant { skel: skel.clone() }
+    pub fn start(skel: StarSkel, rx: mpsc::Receiver<VariantCall>) {
+        AsyncRunner::new(
+            Box::new(Self { skel: skel.clone() }),
+            skel.variant_api.tx.clone(),
+            rx,
+        );
     }
 }
 
 #[async_trait]
-impl StarVariant for WebVariant {
+impl AsyncProcessor<VariantCall> for WebVariant {
+    async fn process(&mut self, call: VariantCall) {
+        match call {
+            VariantCall::Init(tx) => {
+                self.init(tx);
+            }
+            VariantCall::Frame { frame, lane, tx } => {
+                tx.send(FrameVerdict::Handle(frame));
+            }
+        }
+    }
+}
+
+
+impl WebVariant {
     fn init(&self, tx: tokio::sync::oneshot::Sender<Result<(), crate::error::Error>>) {
         let api = StarlaneApi::new(self.skel.surface_api.clone()).into();
 

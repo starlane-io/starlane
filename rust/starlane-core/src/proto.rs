@@ -33,7 +33,7 @@ use crate::star::shell::message::{MessagingApi, MessagingComponent};
 use crate::star::shell::pledge::StarWranglerBacking;
 use crate::star::shell::router::{RouterApi, RouterComponent, RouterCall};
 use crate::star::surface::{SurfaceApi, SurfaceCall, SurfaceComponent};
-use crate::star::variant::StarVariantFactory;
+use crate::star::variant::{VariantApi, start_variant};
 use crate::star::{
     ConstellationBroadcast, FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBacking,
     ResourceRegistryBackingSqLite, Star, StarCommand, StarController,
@@ -56,7 +56,6 @@ pub struct ProtoStar {
     lanes: HashMap<StarKey, LaneWrapper>,
     proto_lanes: Vec<LaneWrapper>,
     connector_ctrls: Vec<ConnectorController>,
-    star_manager_factory: Arc<dyn StarVariantFactory>,
     //  star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
     logger: Logger,
     frame_hold: FrameHold,
@@ -80,7 +79,6 @@ impl ProtoStar {
         surface_api: SurfaceApi,
         surface_rx: mpsc::Receiver<SurfaceCall>,
         data_access: FileAccess,
-        star_manager_factory: Arc<dyn StarVariantFactory>,
         proto_constellation_broadcast: broadcast::Receiver<ConstellationBroadcast>,
         flags: Flags,
         logger: Logger,
@@ -100,7 +98,6 @@ impl ProtoStar {
                 lanes: HashMap::new(),
                 proto_lanes: vec![],
                 connector_ctrls: vec![],
-                star_manager_factory: star_manager_factory,
                 logger: logger,
                 frame_hold: FrameHold::new(),
                 data_access: data_access,
@@ -183,12 +180,14 @@ impl ProtoStar {
                         let (star_locator_tx, star_locator_rx) = mpsc::channel(1024);
                         let (messaging_tx, messaging_rx) = mpsc::channel(1024);
                         let (golden_path_tx, golden_path_rx) = mpsc::channel(1024);
+                        let (variant_tx, variant_rx) = mpsc::channel(1024);
 
                         let resource_locator_api = ResourceLocatorApi::new(resource_locator_tx);
                         let star_search_api = StarSearchApi::new(star_locator_tx);
                         let router_api = RouterApi::new(self.router_tx);
                         let messaging_api = MessagingApi::new(messaging_tx);
                         let golden_path_api = GoldenPathApi::new(golden_path_tx);
+                        let variant_api = VariantApi::new(variant_tx);
 
 
                         let data_access = self
@@ -233,10 +232,11 @@ impl ProtoStar {
                             router_api,
                             messaging_api,
                             lane_muxer_api: self.lane_muxer_api,
-                            golden_path_api
+                            golden_path_api,
+                            variant_api
                         };
 
-                        let variant = self.star_manager_factory.create(skel.clone()).await;
+                        start_variant(skel.clone(), variant_rx );
 
                         MessagingEndpointComponent::start(skel.clone(), core_messaging_endpoint_rx);
                         ResourceLocatorComponent::start(skel.clone(), resource_locator_rx);
@@ -254,7 +254,6 @@ impl ProtoStar {
                             self.proto_lanes,
                             self.connector_ctrls,
                             self.frame_hold,
-                            variant,
                         )
                         .await);
                     }

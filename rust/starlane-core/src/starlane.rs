@@ -30,7 +30,6 @@ use crate::proto::{
 
 use crate::data::BinContext;
 use crate::star::surface::SurfaceApi;
-use crate::star::variant::{StarVariantFactory, StarVariantFactoryDefault};
 use crate::star::{ConstellationBroadcast, StarKind, StarStatus};
 use crate::star::{Request, Star, StarCommand, StarController, StarInfo, StarKey, StarTemplateId};
 use crate::starlane::api::StarlaneApi;
@@ -153,7 +152,6 @@ pub struct StarlaneMachineRunner {
     pub command_tx: mpsc::Sender<StarlaneCommand>,
     command_rx: mpsc::Receiver<StarlaneCommand>,
     star_controllers: AsyncHashMap<StarInConstellationTemplateHandle, StarController>,
-    star_manager_factory: Arc<dyn StarVariantFactory>,
     //    star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
     data_access: FileAccess,
     cache_access: FileAccess,
@@ -180,7 +178,6 @@ impl StarlaneMachineRunner {
             star_controllers: AsyncHashMap::new(),
             command_tx,
             command_rx,
-            star_manager_factory: Arc::new(StarVariantFactoryDefault {}),
             //            star_core_ext_factory: Arc::new(ExampleStarCoreExtFactory::new() ),
             logger: Logger::new(),
             flags: Flags::new(),
@@ -414,7 +411,6 @@ impl StarlaneMachineRunner {
                     surface_api,
                     surface_rx,
                     self.data_access.clone(),
-                    self.star_manager_factory.clone(),
                     constellation_broadcaster.subscribe(),
                     self.flags.clone(),
                     self.logger.clone(),

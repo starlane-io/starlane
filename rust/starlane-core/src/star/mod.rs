@@ -53,7 +53,7 @@ use crate::star::shell::message::MessagingApi;
 use crate::star::shell::router::RouterApi;
 use crate::star::shell::search::{StarSearchApi, StarSearchCall};
 use crate::star::surface::SurfaceApi;
-use crate::star::variant::{StarShellInstructions, StarVariant};
+use crate::star::variant::{FrameVerdict, VariantApi};
 use crate::starlane::StarlaneMachine;
 use crate::template::StarTemplateHandle;
 
@@ -368,7 +368,6 @@ pub struct Star {
     skel: StarSkel,
     star_rx: mpsc::Receiver<StarCommand>,
     core_tx: mpsc::Sender<CoreMessageCall>,
-    variant: Box<dyn StarVariant>,
     lanes: HashMap<StarKey, LaneWrapper>,
     proto_lanes: Vec<LaneWrapper>,
     connector_ctrls: Vec<ConnectorController>,
@@ -397,12 +396,10 @@ impl Star {
         proto_lanes: Vec<LaneWrapper>,
         connector_ctrls: Vec<ConnectorController>,
         frame_hold: FrameHold,
-        variant: Box<dyn StarVariant>,
     ) -> Self {
         let (status_broadcast, _) = broadcast::channel(8);
         Star {
             skel: data,
-            variant: variant,
             star_rx: star_rx,
             lanes: lanes,
             proto_lanes: proto_lanes,
@@ -594,15 +591,21 @@ impl Star {
                     .await;
                 if let Result::Ok(Satisfaction::Ok) = satisfied {
                     self.set_status(StarStatus::Initializing);
-                    let (tx, rx) = oneshot::channel();
-                    self.variant.init(tx);
-                    let star_tx = self.skel.star_tx.clone();
+                    let skel = self.skel.clone();
                     tokio::spawn(async move {
-                        // don't really have a mechanism to panic if init fails ... need to add that
-                        rx.await.unwrap();
-                        star_tx
-                            .send(StarCommand::SetStatus(StarStatus::Ready))
-                            .await;
+                        let result = skel.variant_api.init().await;
+                        match result {
+                            Ok(_) => {
+                                skel.star_tx
+                                    .try_send(StarCommand::SetStatus(StarStatus::Ready)).unwrap_or_default();
+                            }
+                            Err(error) => {
+                                skel.star_tx
+                                    .try_send(StarCommand::SetStatus(StarStatus::Panic)).unwrap_or_default();
+                                error!("{}",error.to_string())
+                            }
+                        }
+
                     });
                 } else if let Result::Ok(Satisfaction::Lacking(lacking)) = satisfied {
                     let mut s = String::new();
@@ -614,14 +617,20 @@ impl Star {
                 }
             } else {
                 self.set_status(StarStatus::Initializing);
-                let (tx, rx) = oneshot::channel();
-                self.variant.init(tx);
-                let star_tx = self.skel.star_tx.clone();
+                let skel = self.skel.clone();
                 tokio::spawn(async move {
-                    rx.await;
-                    star_tx
-                        .send(StarCommand::SetStatus(StarStatus::Ready))
-                        .await;
+                    let result = skel.variant_api.init().await;
+                    match result {
+                        Ok(_) => {
+                            skel.star_tx
+                                .try_send(StarCommand::SetStatus(StarStatus::Ready)).unwrap_or_default();
+                        }
+                        Err(error) => {
+                            skel.star_tx
+                                .try_send(StarCommand::SetStatus(StarStatus::Panic)).unwrap_or_default();
+                            error!("{}",error.to_string())
+                        }
+                    }
                 });
             }
         }
@@ -1060,6 +1069,7 @@ pub struct StarSkel {
     pub messaging_api: MessagingApi,
     pub golden_path_api: GoldenPathApi,
     pub lane_muxer_api: LaneMuxerApi,
+    pub variant_api: VariantApi,
     pub flags: Flags,
     pub logger: Logger,
     pub sequence: Arc<AtomicU64>,
