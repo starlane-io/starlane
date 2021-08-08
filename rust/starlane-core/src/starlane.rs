@@ -600,6 +600,7 @@ impl StarlaneMachineRunner {
     }
 
     fn listen(&mut self, result_tx: oneshot::Sender<Result<(), Error>>) {
+println!("LISTEN...");
         {
             let mut inner_flags = self.inner_flags.lock().unwrap();
             let flags = inner_flags.get_mut();
@@ -638,6 +639,7 @@ impl StarlaneMachineRunner {
                                 return;
                             }
                         }
+println!("received TCP Stream...");
                         let _ok = command_tx
                             .send(StarlaneCommand::AddStream(stream))
                             .await

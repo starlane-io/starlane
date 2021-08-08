@@ -519,6 +519,15 @@ impl Star {
                         StarCommand::GetSkel(tx) => {
                             tx.send(self.skel.clone()).unwrap_or_default();
                         }
+                        StarCommand::AddProtoLaneEndpoint(lane) => {
+                                   lane.outgoing
+                                        .out_tx
+                                        .try_send(LaneCommand::Frame(Frame::Proto(
+                                            ProtoFrame::ReportStarKey(self.skel.info.key.clone()),
+                                        ))).unwrap_or_default();
+
+                            self.skel.lane_muxer_api.add_proto_lane(lane, StarPattern::Any );
+                        }
                        StarCommand::Shutdown => {
                             for (_, lane) in &mut self.lanes {
                                 lane.outgoing().out_tx.try_send(LaneCommand::Shutdown);
@@ -552,7 +561,7 @@ impl Star {
 
     async fn refresh_handles(&mut self) {
         if self.status == StarStatus::Unknown {
-            self.set_status(StarStatus::Pending)
+            self.set_status(StarStatus::Pending);
         }
 
         if let Option::Some(star_handler) = &self.skel.star_handler {
