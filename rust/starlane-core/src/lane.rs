@@ -19,7 +19,7 @@ use tokio::sync::{broadcast, mpsc};
 use tokio::time::Duration;
 
 use crate::error::Error;
-use crate::frame::Frame;
+use crate::frame::{Frame, StarPattern};
 
 use crate::proto::{local_tunnels, ProtoTunnel};
 use crate::star::{StarCommand, StarKey};
@@ -140,19 +140,23 @@ impl<T> Chamber<T> {
 }
 
 pub enum LaneWrapper {
-    Proto(LaneMeta<ProtoLaneEndpoint>),
-    Lane(LaneMeta<LaneEndpoint>),
+    Proto(LaneMeta<ProtoLaneEnd>),
+    Lane(LaneMeta<LaneEnd>),
 }
 
 impl LaneWrapper {
-    pub fn star_paths(&mut self) -> &mut LruCache<StarKey, usize> {
+    pub fn pattern(&self) -> StarPattern{
         match self {
-            LaneWrapper::Proto(meta) => meta.star_paths(),
-            LaneWrapper::Lane(meta) => meta.star_paths(),
+            LaneWrapper::Proto(meta) => {
+                meta.pattern.clone()
+            }
+            LaneWrapper::Lane(meta) => {
+                meta.pattern.clone()
+            }
         }
     }
 
-    pub fn expect_proto_lane(self) -> LaneMeta<ProtoLaneEndpoint> {
+    pub fn expect_proto_lane(self) -> LaneMeta<ProtoLaneEnd> {
         match self {
             LaneWrapper::Proto(lane) => lane,
             _ => {
@@ -161,7 +165,7 @@ impl LaneWrapper {
         }
     }
 
-    pub fn expect_lane(self) -> LaneMeta<LaneEndpoint> {
+    pub fn expect_lane(self) -> LaneMeta<LaneEnd> {
         match self {
             LaneWrapper::Lane(lane) => lane,
             _ => {
@@ -186,10 +190,10 @@ impl LaneWrapper {
         }
     }
 
-    pub fn outgoing(&mut self) -> &mut OutgoingSide {
+    pub fn outgoing(&self) -> &OutgoingSide {
         match self {
-            LaneWrapper::Proto(lane) => &mut lane.outgoing,
-            LaneWrapper::Lane(lane) => &mut lane.outgoing,
+            LaneWrapper::Proto(lane) => &lane.outgoing,
+            LaneWrapper::Lane(lane) => &lane.outgoing,
         }
     }
 
@@ -200,19 +204,6 @@ impl LaneWrapper {
         }
     }
 
-    pub fn get_hops_to_star(&mut self, star: &StarKey) -> Option<usize> {
-        match self {
-            LaneWrapper::Proto(lane) => lane.get_hops_to_star(star),
-            LaneWrapper::Lane(lane) => lane.get_hops_to_star(star),
-        }
-    }
-
-    pub fn set_hops_to_star(&mut self, star: StarKey, hops: usize) {
-        match self {
-            LaneWrapper::Proto(lane) => lane.set_hops_to_star(star, hops),
-            LaneWrapper::Lane(lane) => lane.set_hops_to_star(star, hops),
-        }
-    }
 
     pub fn is_proto(&self) -> bool {
         match self {
@@ -227,7 +218,7 @@ impl LaneWrapper {
     }
 }
 
-pub struct ProtoLaneEndpoint {
+pub struct ProtoLaneEnd {
     pub remote_star: Option<StarKey>,
     pub incoming: IncomingSide,
     pub outgoing: OutgoingSide,
@@ -236,7 +227,7 @@ pub struct ProtoLaneEndpoint {
     pub key_requestor: bool,
 }
 
-impl ProtoLaneEndpoint {
+impl ProtoLaneEnd {
     pub fn new(star_key: Option<StarKey>) -> Self {
         let (mid_tx, mid_rx) = mpsc::channel(LANE_QUEUE_SIZE);
         let (in_tx, in_rx) = mpsc::channel(LANE_QUEUE_SIZE);
@@ -254,7 +245,7 @@ impl ProtoLaneEndpoint {
             midlane.run().await;
         });
 
-        ProtoLaneEndpoint {
+        ProtoLaneEnd {
             remote_star: star_key,
             tunnel_receiver_tx: tunnel_receiver_tx,
             incoming: IncomingSide {
@@ -277,23 +268,23 @@ impl ProtoLaneEndpoint {
     }
 }
 
-impl AbstractLaneEndpoint for ProtoLaneEndpoint {
+impl AbstractLaneEndpoint for ProtoLaneEnd {
     fn get_remote_star(&self) -> Option<StarKey> {
         self.remote_star.clone()
     }
 }
 
-impl TryInto<LaneEndpoint> for ProtoLaneEndpoint {
+impl TryInto<LaneEnd> for ProtoLaneEnd {
     type Error = Error;
 
-    fn try_into(self) -> Result<LaneEndpoint, Self::Error> {
+    fn try_into(self) -> Result<LaneEnd, Self::Error> {
         if self.remote_star.is_some() {
             let evolution_tx = self.evolution_tx;
             tokio::spawn(async move {
                 evolution_tx.send(Ok(()));
             });
 
-            Ok(LaneEndpoint {
+            Ok(LaneEnd {
                 remote_star: self.remote_star.unwrap(),
                 incoming: self.incoming,
                 outgoing: self.outgoing,
@@ -312,20 +303,20 @@ impl TryInto<LaneEndpoint> for ProtoLaneEndpoint {
     }
 }
 
-pub struct LaneEndpoint {
+pub struct LaneEnd {
     pub remote_star: StarKey,
     pub incoming: IncomingSide,
     pub outgoing: OutgoingSide,
     tunnel_receiver_tx: Sender<TunnelInState>,
 }
 
-impl LaneEndpoint {
+impl LaneEnd {
     pub fn get_tunnel_in_tx(&self) -> Sender<TunnelInState> {
         self.tunnel_receiver_tx.clone()
     }
 }
 
-impl AbstractLaneEndpoint for LaneEndpoint {
+impl AbstractLaneEndpoint for LaneEnd {
     fn get_remote_star(&self) -> Option<StarKey> {
         Option::Some(self.remote_star.clone())
     }
@@ -400,7 +391,7 @@ pub struct ClientSideTunnelConnector {
 
 impl ClientSideTunnelConnector {
     pub async fn new(
-        lane: &ProtoLaneEndpoint,
+        lane: &ProtoLaneEnd,
         host_address: String,
         selector: StarInConstellationTemplateSelector,
     ) -> Result<ConnectorController, Error> {
@@ -476,7 +467,7 @@ impl Debug for ServerSideTunnelConnector {
 
 impl ServerSideTunnelConnector {
     pub async fn new(
-        low_lane: &ProtoLaneEndpoint,
+        low_lane: &ProtoLaneEnd,
         stream: TcpStream,
     ) -> Result<ConnectorController, Error> {
         let (command_tx, command_rx) = mpsc::channel(1);
@@ -547,8 +538,8 @@ pub struct LocalTunnelConnector {
 
 impl LocalTunnelConnector {
     pub async fn new(
-        high_lane: &ProtoLaneEndpoint,
-        low_lane: &ProtoLaneEndpoint,
+        high_lane: &ProtoLaneEnd,
+        low_lane: &ProtoLaneEnd,
     ) -> Result<ConnectorController, Error> {
         let high_star = low_lane.remote_star.clone();
         let low_star = high_lane.remote_star.clone();
@@ -639,7 +630,7 @@ impl LocalTunnelConnector {
 impl TunnelConnector for LocalTunnelConnector {}
 
 pub struct LaneMeta<L: AbstractLaneEndpoint> {
-    pub star_paths: LruCache<StarKey, usize>,
+    pub pattern: StarPattern,
     pub lane: L,
 }
 
@@ -658,33 +649,30 @@ impl<L: AbstractLaneEndpoint> DerefMut for LaneMeta<L> {
 }
 
 impl<L: AbstractLaneEndpoint> LaneMeta<L> {
-    pub fn star_paths(&mut self) -> &mut LruCache<StarKey, usize> {
-        &mut self.star_paths
-    }
 
     pub fn unwrap(self) -> L {
         self.lane
     }
 
-    pub fn new(lane: L) -> Self {
+    pub fn new(lane: L, pattern: StarPattern) -> Self {
         LaneMeta {
-            star_paths: LruCache::new(32 * 1024),
-            lane: lane,
+            pattern,
+            lane
         }
     }
 
-    pub fn get_hops_to_star(&mut self, star: &StarKey) -> Option<usize> {
-        if self.lane.get_remote_star().is_some() && *star == self.lane.get_remote_star().unwrap() {
-            return Option::Some(1);
-        }
-        match self.star_paths.get(star) {
-            None => Option::None,
-            Some(hops) => Option::Some(hops.clone()),
-        }
-    }
 
-    pub fn set_hops_to_star(&mut self, star: StarKey, hops: usize) {
-        self.star_paths.put(star, hops);
+}
+
+impl TryInto<LaneMeta<LaneEnd>> for LaneMeta<ProtoLaneEnd> {
+    type Error = Error;
+
+    fn try_into(self) -> Result<LaneMeta<LaneEnd>, Self::Error> {
+        let lane: LaneEnd = self.lane.try_into()?;
+        Ok(LaneMeta{
+           pattern: self.pattern,
+           lane
+        })
     }
 }
 
@@ -818,7 +806,7 @@ mod test {
     use crate::lane::Frame;
     use crate::lane::LocalTunnelConnector;
     use crate::lane::TunnelConnector;
-    use crate::lane::{FrameCodex, LaneCommand, LaneEndpoint, ProtoLaneEndpoint};
+    use crate::lane::{FrameCodex, LaneCommand, LaneEnd, ProtoLaneEnd};
     use crate::proto::local_tunnels;
     use crate::star::{StarCommand, StarKey};
 
@@ -896,8 +884,8 @@ mod test {
             let high = StarKey::new(2);
             let low = StarKey::new(1);
 
-            let mut high_lane = ProtoLaneEndpoint::new(Option::Some(low.clone()));
-            let mut low_lane = ProtoLaneEndpoint::new(Option::Some(high.clone()));
+            let mut high_lane = ProtoLaneEnd::new(Option::Some(low.clone()));
+            let mut low_lane = ProtoLaneEnd::new(Option::Some(high.clone()));
 
             let connector_ctrl = LocalTunnelConnector::new(&high_lane, &low_lane)
                 .await
@@ -942,5 +930,53 @@ mod test {
                 assert!(false);
             }
         });
+    }
+}
+
+#[derive(Clone,Hash,Eq,PartialEq)]
+pub enum LaneId {
+    Proto(u64),
+    Lane(LaneKey)
+}
+
+impl LaneId {
+    pub fn is_proto(&self) -> bool {
+        match self {
+            Self::Proto(_) => true,
+            _ => false
+        }
+    }
+}
+
+impl TryInto<LaneKey> for LaneId {
+    type Error = Error;
+
+    fn try_into(self) -> Result<LaneKey, Self::Error> {
+        match self {
+            LaneId::Proto(_) => {
+                Err("cannot turn a proto id into a laneKey".into())
+            }
+            LaneId::Lane(lane) => {
+                Ok(lane)
+            }
+        }
+    }
+}
+
+
+#[derive(Clone)]
+pub struct LaneSession{
+    pub lane_id: LaneId,
+    pub pattern: StarPattern,
+    pub tx: mpsc::Sender<LaneCommand>
+}
+
+impl LaneSession {
+    pub fn new( lane_id: LaneId, pattern: StarPattern, tx: mpsc::Sender<LaneCommand> ) -> Self {
+        Self {
+            lane_id,
+            pattern,
+            tx
+        }
     }
 }

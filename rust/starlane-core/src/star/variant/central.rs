@@ -38,7 +38,7 @@ impl AsyncProcessor<VariantCall> for CentralVariant {
             VariantCall::Init(tx) => {
                 self.init(tx);
             }
-            VariantCall::Frame { frame, lane, tx } => {
+            VariantCall::Frame { frame, session:_, tx } => {
                 tx.send(FrameVerdict::Handle(frame));
             }
         }

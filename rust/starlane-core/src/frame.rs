@@ -149,23 +149,43 @@ impl SearchWindUp {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum StarPattern {
     Any,
     None,
     StarKey(StarKey),
     StarKind(StarKind),
+    StarKeySubgraph(Vec<StarSubGraphKey>)
 }
 
 impl StarPattern {
-    pub fn is_match(&self, info: &StarInfo) -> bool {
+    pub fn info_match(&self, info: &StarInfo) -> bool {
         match self {
             StarPattern::Any => true,
             StarPattern::None => false,
-            StarPattern::StarKey(star) => *star == info.key,
-            StarPattern::StarKind(kind) => *kind == info.kind,
+            StarPattern::StarKey(_) => {
+                self.key_match(&info.key)
+            }
+            StarPattern::StarKind(pattern) => *pattern == info.kind,
+            StarPattern::StarKeySubgraph(_) => {
+                self.key_match(&info.key)
+            }
         }
     }
+
+    pub fn key_match(&self, star: &StarKey) -> bool {
+        match self {
+            StarPattern::Any => true,
+            StarPattern::None => false,
+            StarPattern::StarKey(pattern) => *star == *pattern,
+            StarPattern::StarKind(_) => false,
+            StarPattern::StarKeySubgraph(pattern) => {
+                // TODO match tail end of subgraph
+                *pattern == star.subgraph
+            }
+        }
+    }
+
 
     pub fn is_single_match(&self) -> bool {
         match self {
@@ -173,6 +193,7 @@ impl StarPattern {
             StarPattern::StarKind(_) => false,
             StarPattern::Any => false,
             StarPattern::None => false,
+            StarPattern::StarKeySubgraph(_) => false
         }
     }
 }
@@ -647,24 +668,14 @@ impl fmt::Display for Frame {
 impl fmt::Display for SearchTraversal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
-            SearchTraversal::Up(up) => format!("Up({})", &up.pattern).to_string(),
+            SearchTraversal::Up(up) => format!("Up({})", &up.pattern.to_string()).to_string(),
             SearchTraversal::Down(_) => "Down".to_string(),
         };
         write!(f, "{}", r)
     }
 }
 
-impl fmt::Display for StarPattern {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let r = match self {
-            StarPattern::Any => "Any".to_string(),
-            StarPattern::None => "None".to_string(),
-            StarPattern::StarKey(key) => format!("{}", key.to_string()).to_string(),
-            StarPattern::StarKind(kind) => format!("{}", kind.to_string()).to_string(),
-        };
-        write!(f, "{}", r)
-    }
-}
+
 
 impl fmt::Display for ProtoFrame {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

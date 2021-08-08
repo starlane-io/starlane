@@ -20,7 +20,7 @@ use crate::error::Error;
 use crate::file_access::FileAccess;
 
 use crate::lane::{
-    ClientSideTunnelConnector, LocalTunnelConnector, ProtoLaneEndpoint, ServerSideTunnelConnector,
+    ClientSideTunnelConnector, LocalTunnelConnector, ProtoLaneEnd, ServerSideTunnelConnector,
 };
 use crate::logger::{Flags, Logger};
 
@@ -704,8 +704,8 @@ impl StarlaneMachineRunner {
         high_star_ctrl: StarController,
         low_star_ctrl: StarController,
     ) -> Result<Vec<broadcast::Receiver<Result<(), Error>>>, Error> {
-        let high_lane = ProtoLaneEndpoint::new(Option::None);
-        let low_lane = ProtoLaneEndpoint::new(Option::None);
+        let high_lane = ProtoLaneEnd::new(Option::None);
+        let low_lane = ProtoLaneEnd::new(Option::None);
         let rtn = vec![high_lane.get_evoltion_rx(), low_lane.get_evoltion_rx()];
         let connector = LocalTunnelConnector::new(&high_lane, &low_lane).await?;
         high_star_ctrl
@@ -729,7 +729,7 @@ impl StarlaneMachineRunner {
         low_star_ctrl: StarController,
         stream: TcpStream,
     ) -> Result<broadcast::Receiver<Result<(), Error>>, Error> {
-        let low_lane = ProtoLaneEndpoint::new(Option::None);
+        let low_lane = ProtoLaneEnd::new(Option::None);
         let rtn = low_lane.get_evoltion_rx();
 
         let connector_ctrl = ServerSideTunnelConnector::new(&low_lane, stream).await?;
@@ -754,7 +754,7 @@ impl StarlaneMachineRunner {
         selector: StarInConstellationTemplateSelector,
         key_requestor: bool,
     ) -> Result<broadcast::Receiver<Result<(), Error>>, Error> {
-        let mut lane = ProtoLaneEndpoint::new(Option::None);
+        let mut lane = ProtoLaneEnd::new(Option::None);
         lane.key_requestor = key_requestor;
 
         let rtn = lane.get_evoltion_rx();

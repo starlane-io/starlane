@@ -1,7 +1,7 @@
 use std::sync::atomic::Ordering;
 
 use crate::frame::{Frame, ProtoFrame};
-use crate::lane::{LaneCommand, LaneWrapper, LaneKey};
+use crate::lane::{LaneCommand, LaneWrapper, LaneKey, LaneSession};
 
 use crate::star::variant::{FrameVerdict, VariantCall};
 use crate::star::{StarCommand, StarKey, StarSkel, StarSubGraphKey};
@@ -29,8 +29,8 @@ impl AsyncProcessor<VariantCall> for GatewayVariant{
             VariantCall::Init(tx) => {
                 tx.send(Ok(()));
             }
-            VariantCall::Frame { frame, lane, tx } => {
-                tx.send(self.filter(frame, lane));
+            VariantCall::Frame { frame, session, tx } => {
+                tx.send(self.filter(frame, session));
             }
         }
     }
@@ -41,7 +41,7 @@ impl GatewayVariant {
     fn filter(
         &mut self,
         frame: Frame,
-        lane: LaneKey,
+        session: LaneSession,
     ) -> FrameVerdict {
         match frame{
             Frame::Proto(ProtoFrame::GatewaySelect) => {
@@ -50,14 +50,7 @@ impl GatewayVariant {
                     self.skel.sequence.fetch_add(1, Ordering::Relaxed),
                 ));
 
-                let result = self.skel.lane_muxer_api.forward_frame(lane,
-                Frame::Proto(ProtoFrame::GatewayAssign(
-                    subgraph,
-                )));
-
-               if let Result::Err(error) = result {
-                    error!("lane send error: {}", error.to_string());
-                }
+                session.tx.try_send(LaneCommand::Frame(Frame::Proto(ProtoFrame::GatewayAssign(subgraph)))).unwrap_or_default();
 
                 FrameVerdict::Ignore
             }

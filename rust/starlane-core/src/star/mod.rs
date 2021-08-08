@@ -31,8 +31,8 @@ use crate::frame::{
 };
 use crate::id::Id;
 use crate::lane::{
-    ConnectorController, LaneCommand, LaneEndpoint, LaneIndex, LaneKey, LaneMeta, LaneWrapper,
-    ProtoLaneEndpoint,
+    ConnectorController, LaneCommand, LaneEnd, LaneIndex, LaneKey, LaneMeta, LaneWrapper,
+    ProtoLaneEnd,
 };
 use crate::logger::{Flags, Logger, LogInfo};
 use crate::message::{
@@ -697,8 +697,7 @@ pub trait StarKernel: Send {}
 pub enum StarCommand {
     InvokeProtoStarEvolution,
     GetStatusListener(oneshot::Sender<broadcast::Receiver<StarStatus>>),
-    AddLaneEndpoint(LaneEndpoint),
-    AddProtoLaneEndpoint(ProtoLaneEndpoint),
+    AddProtoLaneEndpoint(ProtoLaneEnd),
     ConstellationBroadcast(ConstellationBroadcast),
     Init,
     AddConnectorController(ConnectorController),

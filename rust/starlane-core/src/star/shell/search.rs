@@ -41,8 +41,8 @@ impl StarSearchApi {
 
 
 
-    pub fn on_traversal(&self, traversal: SearchTraversal, lane_key: LaneKey ) {
-        self.tx.try_send(StarSearchCall::OnSearchTraversal {traversal,lane_key}).unwrap_or_default();
+    pub fn on_traversal(&self, traversal: SearchTraversal, lane: LaneKey ) {
+        self.tx.try_send(StarSearchCall::OnSearchTraversal {traversal, lane}).unwrap_or_default();
     }
 }
 
@@ -53,7 +53,7 @@ pub enum StarSearchCall {
         tx: oneshot::Sender<SearchHits>,
     },
 
-    OnSearchTraversal { traversal: SearchTraversal, lane_key: LaneKey }
+    OnSearchTraversal { traversal: SearchTraversal, lane: LaneKey }
 }
 
 impl Call for StarSearchCall {}
@@ -80,7 +80,7 @@ impl AsyncProcessor<StarSearchCall> for StarSearchComponent {
             StarSearchCall::Search { init, tx } => {
                 self.search(init, tx).await;
             }
-            StarSearchCall::OnSearchTraversal { traversal, lane_key } => {
+            StarSearchCall::OnSearchTraversal { traversal, lane: lane_key } => {
                 self.on_search_traversal(traversal, lane_key).await;
             }
         }
@@ -122,7 +122,7 @@ impl StarSearchComponent {
             .sequence
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-        let local_hit = match wind.pattern.is_match(&self.skel.info) {
+        let local_hit = match wind.pattern.info_match(&self.skel.info) {
             true => Option::Some(self.skel.info.key.clone()),
             false => Option::None,
         };
@@ -153,7 +153,7 @@ impl StarSearchComponent {
 
     async fn land_windup_hop(&mut self, wind_up: SearchWindUp, lane_key: LaneKey) {
 
-        if wind_up.pattern.is_match(&self.skel.info) {
+        if wind_up.pattern.info_match(&self.skel.info) {
             if wind_up.pattern.is_single_match() {
                 let hit = SearchHit {
                     star: self.skel.info.key.clone(),
@@ -188,7 +188,7 @@ impl StarSearchComponent {
             }
         }
 
-        let hit = wind_up.pattern.is_match(&self.skel.info);
+        let hit = wind_up.pattern.info_match(&self.skel.info);
 
         let lanes = self.skel.lane_muxer_api.lane_keys().await.expect("expected lanekeys");
         if wind_up.hops.len() + 1 > min(wind_up.max_hops, MAX_HOPS)

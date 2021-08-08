@@ -4,7 +4,7 @@ use tokio::sync::oneshot;
 
 use crate::error::Error;
 use crate::frame::{StarMessage, Frame};
-use crate::lane::{LaneWrapper, LaneKey};
+use crate::lane::{LaneWrapper, LaneKey, LaneSession};
 use crate::star::variant::central::CentralVariant;
 use crate::star::variant::gateway::GatewayVariant;
 use crate::star::variant::web::WebVariant;
@@ -36,9 +36,9 @@ impl VariantApi {
         rx.await?
     }
 
-    pub async fn filter(&self, frame: Frame, lane: LaneKey) -> Result<FrameVerdict,Error> {
+    pub async fn filter(&self, frame: Frame, session: LaneSession) -> Result<FrameVerdict,Error> {
         let (tx,rx) = oneshot::channel();
-        let call = VariantCall::Frame {frame,lane,tx};
+        let call = VariantCall::Frame {frame,session,tx};
         self.tx.try_send(call).unwrap_or_default();
         Ok(tokio::time::timeout( Duration::from_secs(15), rx).await??)
     }
@@ -47,7 +47,7 @@ impl VariantApi {
 #[derive(strum_macros::Display)]
 pub enum VariantCall {
     Init(oneshot::Sender<Result<(),Error>>),
-    Frame{ frame: Frame, lane: LaneKey, tx: oneshot::Sender<FrameVerdict>}
+    Frame{ frame: Frame, session: LaneSession, tx: oneshot::Sender<FrameVerdict>}
 }
 
 impl Call for VariantCall {}
@@ -76,10 +76,10 @@ impl AsyncProcessor<VariantCall> for NoVariant{
     async fn process(&mut self, call: VariantCall) {
         match call {
             VariantCall::Init(tx) => {
-                tx.send(Ok(()));
+                tx.send(Ok(())).unwrap_or_default();
             }
-            VariantCall::Frame { frame, lane, tx } => {
-                tx.send(FrameVerdict::Handle(frame));
+            VariantCall::Frame { frame, session, tx } => {
+                tx.send(FrameVerdict::Handle(frame)).unwrap_or_default();
             }
         }
     }
