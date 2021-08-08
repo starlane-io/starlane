@@ -200,7 +200,7 @@ impl LaneMuxer {
     }
 
     fn forward_frame(&mut self, lane: LaneKey, frame: Frame) {
-        if let Option::Some(lane) = self.lanes.get_mut(&LaneId::Lane(lane)) {
+        if let Option::Some(lane) = self.lanes.get_mut(&LaneId::Lane(lane.clone())) {
             lane.outgoing().out_tx.try_send( LaneCommand::Frame(frame)).unwrap_or_default();
         } else {
             error!("dropped frame could not find laneKey: {}",lane.to_string() );
