@@ -314,7 +314,7 @@ impl StarlaneApi {
     }
 
     pub fn create_domain(&self, domain: &str) -> Result<Creation<DomainApi>, Fail> {
-        let resource_src = AssignResourceStateSrc::Stateless;
+        let state= AssignResourceStateSrc::Stateless;
         let create = ResourceCreate {
             parent: ResourceKey::Root.into(),
             key: KeyCreationSrc::None,
@@ -324,7 +324,7 @@ impl StarlaneApi {
                 specific: None,
                 config: None,
             },
-            state_src: resource_src,
+            state_src: state,
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
