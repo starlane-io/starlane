@@ -29,7 +29,7 @@ use crate::message::resource::{
 };
 use crate::message::{Fail, MessageExpect, ProtoStarMessage};
 use crate::names::Name;
-use crate::star::shell::pledge::{ResourceHostSelector, StarHandle};
+use crate::star::shell::pledge::{ResourceHostSelector, StarConscript};
 use crate::star::{ResourceRegistryBacking, StarInfo, StarKey, StarSkel};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
@@ -2608,7 +2608,7 @@ impl ResourceHost for LocalResourceHost {
 
 pub struct RemoteResourceHost {
     pub skel: StarSkel,
-    pub handle: StarHandle,
+    pub handle: StarConscript,
 }
 
 #[async_trait]

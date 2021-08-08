@@ -16,7 +16,7 @@ use crate::message::Fail;
 use crate::resource::{
     RemoteResourceHost, ResourceAssign, ResourceHost, ResourceLocationAffinity, ResourceType,
 };
-use crate::star::{StarCommand, StarInfo, StarKey, StarKind, StarSkel};
+use crate::star::{StarCommand, StarInfo, StarKey, StarKind, StarSkel, StarConscriptKind};
 
 #[derive(Clone)]
 pub struct StarWranglerBacking {
@@ -27,46 +27,46 @@ pub struct StarWranglerBacking {
 impl StarWranglerBacking {
     pub async fn new(star_tx: mpsc::Sender<StarCommand>) -> Self {
         StarWranglerBacking {
-            tx: StarHandleDb::new().await,
+            tx: StarConscriptDB::new().await,
             star_tx: star_tx,
         }
     }
 
-    pub async fn add_star_handle(&self, handle: StarHandle) -> Result<(), Fail> {
-        let (action, rx) = StarHandleAction::new(StarHandleCommand::SetStar(handle));
+    pub async fn add_star_handle(&self, handle: StarConscript) -> Result<(), Fail> {
+        let (action, rx) = StarHandleAction::new(StarConscriptCall::SetStar(handle));
         self.tx.send(action).await?;
         tokio::time::timeout(Duration::from_secs(5), rx).await??;
         self.star_tx.send(StarCommand::CheckStatus).await;
         Ok(())
     }
 
-    pub async fn select(&self, selector: StarSelector) -> Result<Vec<StarHandle>, Fail> {
-        let (action, rx) = StarHandleAction::new(StarHandleCommand::Select(selector));
+    pub async fn select(&self, selector: StarSelector) -> Result<Vec<StarConscript>, Fail> {
+        let (action, rx) = StarHandleAction::new(StarConscriptCall::Select(selector));
         self.tx.send(action).await?;
         let result = tokio::time::timeout(Duration::from_secs(5), rx).await??;
         match result {
-            StarHandleResult::StarHandles(handles) => Ok(handles),
+            StarConscriptResult::StarConscripts(handles) => Ok(handles),
             _what => Err(Fail::expected("StarHandleResult::StarHandles(handles)")),
         }
     }
 
-    pub async fn next(&self, selector: StarSelector) -> Result<StarHandle, Fail> {
-        let (action, rx) = StarHandleAction::new(StarHandleCommand::Next(selector));
+    pub async fn next(&self, selector: StarSelector) -> Result<StarConscript, Fail> {
+        let (action, rx) = StarHandleAction::new(StarConscriptCall::Next(selector));
         self.tx.send(action).await?;
         let result = tokio::time::timeout(Duration::from_secs(5), rx).await??;
         match result {
-            StarHandleResult::StarHandle(handle) => Ok(handle),
+            StarConscriptResult::StarConscript(handle) => Ok(handle),
             _what => Err(Fail::expected("StarHandleResult::StarHandle(handle)")),
         }
     }
 
     // must have at least one of each StarKind
-    pub async fn satisfied(&self, set: HashSet<StarKind>) -> Result<Satisfaction, Fail> {
-        let (action, rx) = StarHandleAction::new(StarHandleCommand::Satisfied(set));
+    pub async fn satisfied(&self, set: HashSet<StarConscriptKind>) -> Result<StarConscriptionSatisfaction, Fail> {
+        let (action, rx) = StarHandleAction::new(StarConscriptCall::CheckSatisfaction(set));
         self.tx.send(action).await?;
         let result = tokio::time::timeout(Duration::from_secs(5), rx).await??;
         match result {
-            StarHandleResult::Satisfaction(satisfaction) => Ok(satisfaction),
+            StarConscriptResult::Satisfaction(satisfaction) => Ok(satisfaction),
             _what => Err(Fail::expected("StarHandleResult::Satisfaction(_)")),
         }
     }
@@ -84,7 +84,7 @@ impl ResourceHostSelector {
 
     pub async fn select(&self, resource_type: ResourceType) -> Result<Arc<dyn ResourceHost>, Fail> {
         if StarKind::hosts(&resource_type) == self.skel.info.kind {
-            let handle = StarHandle {
+            let handle = StarConscript {
                 key: self.skel.info.key.clone(),
                 kind: self.skel.info.kind.clone(),
                 hops: None,
@@ -113,7 +113,7 @@ impl ResourceHostSelector {
     }
 }
 
-pub struct StarHandle {
+pub struct StarConscript {
     pub key: StarKey,
     pub kind: StarKind,
     pub hops: Option<usize>,
@@ -187,12 +187,12 @@ impl StarFieldSelection {
 }
 
 pub struct StarHandleAction {
-    pub command: StarHandleCommand,
-    pub tx: oneshot::Sender<StarHandleResult>,
+    pub command: StarConscriptCall,
+    pub tx: oneshot::Sender<StarConscriptResult>,
 }
 
 impl StarHandleAction {
-    pub fn new(command: StarHandleCommand) -> (Self, oneshot::Receiver<StarHandleResult>) {
+    pub fn new(command: StarConscriptCall) -> (Self, oneshot::Receiver<StarConscriptResult>) {
         let (tx, rx) = oneshot::channel();
         (
             StarHandleAction {
@@ -205,42 +205,42 @@ impl StarHandleAction {
 }
 
 #[derive(strum_macros::Display)]
-pub enum StarHandleCommand {
+pub enum StarConscriptCall {
     Close,
-    SetStar(StarHandle),
+    SetStar(StarConscript),
     Select(StarSelector),
     Next(StarSelector),
-    Satisfied(HashSet<StarKind>),
+    CheckSatisfaction(HashSet<StarConscriptKind>),
 }
 
 #[derive(strum_macros::Display)]
-pub enum StarHandleResult {
+pub enum StarConscriptResult {
     Ok,
-    StarHandles(Vec<StarHandle>),
-    StarHandle(StarHandle),
+    StarConscripts(Vec<StarConscript>),
+    StarConscript(StarConscript),
     Fail(Fail),
-    Satisfaction(Satisfaction),
+    Satisfaction(StarConscriptionSatisfaction),
 }
 
 #[derive(Eq, PartialEq, Debug)]
-pub enum Satisfaction {
+pub enum StarConscriptionSatisfaction {
     Ok,
     Lacking(HashSet<StarKind>),
 }
 
-pub struct StarHandleDb {
+pub struct StarConscriptDB {
     pub conn: Connection,
     pub rx: mpsc::Receiver<StarHandleAction>,
 }
 
-impl StarHandleDb {
+impl StarConscriptDB {
     pub async fn new() -> mpsc::Sender<StarHandleAction> {
         let (tx, rx) = mpsc::channel(8 * 1024);
 
         tokio::spawn(async move {
             let conn = Connection::open_in_memory();
             if conn.is_ok() {
-                let mut db = StarHandleDb {
+                let mut db = StarConscriptDB {
                     conn: conn.unwrap(),
                     rx: rx,
                 };
@@ -254,7 +254,7 @@ impl StarHandleDb {
         self.setup()?;
 
         while let Option::Some(request) = self.rx.recv().await {
-            if let StarHandleCommand::Close = request.command {
+            if let StarConscriptCall::Close = request.command {
                 break;
             }
             match self.process(request.command).await {
@@ -263,20 +263,20 @@ impl StarHandleDb {
                 }
                 Err(fail) => {
                     eprintln!("{}", fail.to_string());
-                    request.tx.send(StarHandleResult::Fail(fail));
+                    request.tx.send(StarConscriptResult::Fail(fail));
                 }
             }
         }
         Ok(())
     }
 
-    async fn process(&mut self, command: StarHandleCommand) -> Result<StarHandleResult, Fail> {
+    async fn process(&mut self, command: StarConscriptCall) -> Result<StarConscriptResult, Fail> {
         match command {
-            StarHandleCommand::Close => {
+            StarConscriptCall::Close => {
                 // this is handle in the run() method
-                Ok(StarHandleResult::Ok)
+                Ok(StarConscriptResult::Ok)
             }
-            StarHandleCommand::SetStar(handle) => {
+            StarConscriptCall::SetStar(handle) => {
                 let key = handle.key.bin()?;
                 let kind = handle.kind.to_string();
 
@@ -294,9 +294,9 @@ impl StarHandleDb {
                 }
                 trans.commit()?;
 
-                Ok(StarHandleResult::Ok)
+                Ok(StarConscriptResult::Ok)
             }
-            StarHandleCommand::Select(selector) => {
+            StarConscriptCall::Select(selector) => {
                 let mut params = vec![];
                 let mut where_clause = String::new();
                 let mut param_index = 0;
@@ -354,7 +354,7 @@ impl StarHandleDb {
                         Option::Some(hops)
                     };
 
-                    let handle = StarHandle {
+                    let handle = StarConscript {
                         key: key,
                         kind: kind,
                         hops: hops,
@@ -362,9 +362,9 @@ impl StarHandleDb {
 
                     handles.push(handle);
                 }
-                Ok(StarHandleResult::StarHandles(handles))
+                Ok(StarConscriptResult::StarConscripts(handles))
             }
-            StarHandleCommand::Next(selector) => {
+            StarConscriptCall::Next(selector) => {
                 let mut params = vec![];
                 let mut where_clause = String::new();
                 let mut param_index = 0;
@@ -422,7 +422,7 @@ impl StarHandleDb {
                             Option::Some(hops)
                         };
 
-                        let handle = StarHandle {
+                        let handle = StarConscript {
                             key: key,
                             kind: kind,
                             hops: hops,
@@ -455,11 +455,14 @@ impl StarHandleDb {
 
                 trans.commit()?;
 
-                Ok(StarHandleResult::StarHandle(handle))
+                Ok(StarConscriptResult::StarConscript(handle))
             }
 
-            StarHandleCommand::Satisfied(kinds) => {
+            StarConscriptCall::CheckSatisfaction(mut kinds) => {
                 let mut lacking = HashSet::new();
+                kinds.retain( |c| c.required );
+                let kinds:Vec<StarKind> = kinds.iter().map(|c|c.kind.clone()).collect();
+
                 for kind in kinds {
                     if !self.conn.query_row(
                         "SELECT count(*) AS count FROM stars WHERE kind=?1",
@@ -473,9 +476,9 @@ impl StarHandleDb {
                     }
                 }
                 if lacking.is_empty() {
-                    Ok(StarHandleResult::Satisfaction(Satisfaction::Ok))
+                    Ok(StarConscriptResult::Satisfaction(StarConscriptionSatisfaction::Ok))
                 } else {
-                    Ok(StarHandleResult::Satisfaction(Satisfaction::Lacking(
+                    Ok(StarConscriptResult::Satisfaction(StarConscriptionSatisfaction::Lacking(
                         lacking,
                     )))
                 }

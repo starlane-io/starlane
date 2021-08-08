@@ -16,7 +16,7 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
-use shell::pledge::{Satisfaction, StarHandle, StarWranglerBacking};
+use shell::pledge::{StarConscriptionSatisfaction, StarConscript, StarWranglerBacking};
 use shell::search::{SearchHits, SearchInit, StarSearchTransaction, TransactionResult, SearchCommit};
 use starlane_resources::ResourceIdentifier;
 
@@ -125,20 +125,20 @@ impl StarKind {
         }
     }
 
-    pub fn distributes_to(&self) -> HashSet<StarKind> {
+    pub fn conscripts(&self) -> HashSet<StarConscriptKind> {
         HashSet::from_iter(
             match self {
-                StarKind::Central => vec![StarKind::Space],
+                StarKind::Central => vec![StarConscriptKind::req(StarKind::Space)],
                 StarKind::Space => {
                     vec![
-                        StarKind::FileStore,
-                        StarKind::Web,
-                        StarKind::ArtifactStore,
-                        StarKind::K8s,
+                        StarConscriptKind::req(StarKind::FileStore),
+                        StarConscriptKind::req(StarKind::Web),
+                        StarConscriptKind::req(StarKind::ArtifactStore),
+                        StarConscriptKind::opt(StarKind::K8s),
                     ]
                 }
                 StarKind::Mesh => vec![],
-                StarKind::App => vec![StarKind::Actor, StarKind::FileStore],
+                StarKind::App => vec![StarConscriptKind::req(StarKind::Actor), StarConscriptKind::req(StarKind::FileStore)],
                 StarKind::Actor => vec![],
                 StarKind::FileStore => vec![],
                 StarKind::Gateway => vec![],
@@ -253,6 +253,28 @@ impl StarKind {
             .iter()
             .cloned(),
         )
+    }
+}
+
+#[derive(Clone,Hash,Eq,PartialEq)]
+pub struct StarConscriptKind{
+    pub kind: StarKind,
+    pub required: bool
+}
+
+impl StarConscriptKind {
+    pub fn req(kind:StarKind)->Self {
+        Self {
+            kind,
+            required: true
+        }
+    }
+
+    pub fn opt(kind:StarKind)->Self {
+        Self {
+            kind,
+            required: false
+        }
     }
 }
 
@@ -534,19 +556,20 @@ impl Star {
         }
 
         if let Option::Some(star_handler) = &self.skel.star_handler {
-            for kind in self.skel.info.kind.distributes_to() {
-                let search = SearchInit::new(StarPattern::StarKind(kind.clone()), TraversalAction::SearchHits);
+
+            for conscript_kind in self.skel.info.kind.conscripts() {
+                let search = SearchInit::new(StarPattern::StarKind(conscript_kind.kind.clone()), TraversalAction::SearchHits);
                 let (tx,rx) = oneshot::channel();
                 self.skel.star_search_api.tx.try_send(StarSearchCall::Search {init:search, tx} ).unwrap_or_default();
                 let star_handler = star_handler.clone();
-                let kind = kind.clone();
+                let kind = conscript_kind.kind.clone();
                 let skel = self.skel.clone();
                 tokio::spawn(async move {
                     let result = tokio::time::timeout(Duration::from_secs(15), rx).await;
                     match result {
                         Ok(Ok(hits)) => {
                             for (star, hops) in hits.hits {
-                                let handle = StarHandle {
+                                let handle = StarConscript {
                                     key: star,
                                     kind: kind.clone(),
                                     hops: Option::Some(hops),
@@ -587,9 +610,9 @@ impl Star {
         if self.status == StarStatus::Pending {
             if let Option::Some(star_handler) = &self.skel.star_handler {
                 let satisfied = star_handler
-                    .satisfied(self.skel.info.kind.distributes_to())
+                    .satisfied(self.skel.info.kind.conscripts())
                     .await;
-                if let Result::Ok(Satisfaction::Ok) = satisfied {
+                if let Result::Ok(StarConscriptionSatisfaction::Ok) = satisfied {
                     self.set_status(StarStatus::Initializing);
                     let skel = self.skel.clone();
                     tokio::spawn(async move {
@@ -607,13 +630,13 @@ impl Star {
                         }
 
                     });
-                } else if let Result::Ok(Satisfaction::Lacking(lacking)) = satisfied {
+                } else if let Result::Ok(StarConscriptionSatisfaction::Lacking(lacking)) = satisfied {
                     let mut s = String::new();
                     for lack in lacking {
                         s.push_str(lack.to_string().as_str());
                         s.push_str(", ");
                     }
-                    //                    eprintln!("handles not satisfied for : {} Lacking: [ {}]", self.skel.info.kind, s);
+//                    eprintln!("handles not satisfied for : {} Lacking: [ {}]", self.skel.info.kind.to_string(), s);
                 }
             } else {
                 self.set_status(StarStatus::Initializing);
@@ -663,7 +686,7 @@ impl Star {
             Diagnose::HandlersSatisfied(satisfied) => {
                 if let Option::Some(star_handler) = &self.skel.star_handler {
                     if let Result::Ok(satisfaction) = star_handler
-                        .satisfied(self.skel.info.kind.distributes_to())
+                        .satisfied(self.skel.info.kind.conscripts())
                         .await
                     {
                         satisfied.tx.send(satisfaction);
@@ -671,7 +694,7 @@ impl Star {
                         // let satisfied.tx drop since we can't give it an answer
                     }
                 } else {
-                    satisfied.tx.send(Satisfaction::Ok);
+                    satisfied.tx.send(StarConscriptionSatisfaction::Ok);
                 }
             }
         }
@@ -736,7 +759,7 @@ pub enum ConstellationBroadcast {
 }
 
 pub enum Diagnose {
-    HandlersSatisfied(YesNo<Satisfaction>),
+    HandlersSatisfied(YesNo<StarConscriptionSatisfaction>),
 }
 
 pub struct SetFlags {
@@ -872,7 +895,7 @@ impl StarController {
         rx
     }
 
-    pub async fn diagnose_handlers_satisfaction(&self) -> Result<Satisfaction, Error> {
+    pub async fn diagnose_handlers_satisfaction(&self) -> Result<StarConscriptionSatisfaction, Error> {
         let (yesno, rx) = YesNo::new();
         self.star_tx
             .send(StarCommand::Diagnose(Diagnose::HandlersSatisfied(yesno)))
