@@ -293,6 +293,7 @@ impl ProtoStar {
                                 ProtoFrame::GatewayAssign(subgraph),
                             ), LanePattern::Protos );
 println!("RECEIVED GATEWAY ASSIGN!");
+                            self.check_ready();
                         } else {
                             eprintln!("not expecting a GatewayAssign for this ProtoStarKey which is already assigned.")
                         }
@@ -546,7 +547,6 @@ impl RouterCallBooster {
                 Some(call) => {
                     match call {
                         RouterCall::Frame { frame, session: lane } => {
-println!("boosting FRAME: {}", frame.to_string() );
                             return Option::Some(StarCommand::Frame(frame));
                         }
                         _ => {
