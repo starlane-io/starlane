@@ -60,7 +60,7 @@ impl CentralVariant {
                 owner: None,
             },
             location: ResourceLocation {
-                host: StarKey::central(),
+                star: StarKey::central(),
             },
         };
 

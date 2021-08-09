@@ -112,7 +112,7 @@ impl AsyncProcessor<RouterCall> for RouterComponent {
                 Frame::Proto(_) => {}
                 Frame::Diagnose(_) => {}
                 Frame::SearchTraversal(traversal) => {
-                    match &session.lane_id {
+                    match &session.lane {
                         LaneKey::Proto(_) => {
                             error!("not expecting a search traversal from a proto lane...")
                         }
@@ -124,9 +124,6 @@ impl AsyncProcessor<RouterCall> for RouterComponent {
                 Frame::StarMessage(message) => {
                     self.route(message);
                 }
-                Frame::Ping => {}
-                Frame::Pong => {}
-                Frame::Close => {}
                 Frame::Watch(watch) => {
                     match watch {
                         WatchFrame::Watch(watch) => {
@@ -140,6 +137,7 @@ impl AsyncProcessor<RouterCall> for RouterComponent {
                         }
                     }
                 }
+                Frame::Close => {}
             }
         }
     }

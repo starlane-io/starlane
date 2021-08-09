@@ -966,15 +966,15 @@ impl TryInto<UltimaLaneKey> for LaneKey {
 
 #[derive(Clone)]
 pub struct LaneSession{
-    pub lane_id: LaneKey,
+    pub lane: LaneKey,
     pub pattern: StarPattern,
     pub tx: mpsc::Sender<LaneCommand>
 }
 
 impl LaneSession {
-    pub fn new(lane_id: LaneKey, pattern: StarPattern, tx: mpsc::Sender<LaneCommand> ) -> Self {
+    pub fn new(lane: LaneKey, pattern: StarPattern, tx: mpsc::Sender<LaneCommand> ) -> Self {
         Self {
-            lane_id,
+            lane,
             pattern,
             tx
         }

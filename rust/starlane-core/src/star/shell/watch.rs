@@ -118,12 +118,12 @@ impl AsyncProcessor<WatchCall> for WatchComponent {
 impl WatchComponent {
 
     fn watch(&mut self, watch: Watch, session: LaneSession) {
-        if let LaneKey::Ultima(lane) = session
+        if let LaneKey::Ultima(lane) = session.lane
 
         {
             let watch = WatchLane {
                 key: watch.key,
-                lane: session.lane,
+                lane,
                 selection: watch.selection
             };
 
@@ -145,19 +145,19 @@ impl WatchComponent {
                 async fn find_next(skel: &StarSkel, watch: &WatchLane ) -> Result<NextKind,Error> {
                     match &watch.selection.topic {
                         Topic::Resource(resource_key) => {
-                            let star = skel.resource_locator_api.locate(resource_key.clone().into()).await?;
-                            if skel.info.key == star {
+                            let record = skel.resource_locator_api.locate(resource_key.clone().into()).await?;
+                            if skel.info.key == record.location.star {
                                 Ok(NextKind::Core)
                             } else {
-                                let lane = skel.golden_path_api.golden_lane_leading_to_star(star).await?;
+                                let lane = skel.golden_path_api.golden_lane_leading_to_star(record.location.star).await?;
                                 Ok(NextKind::Lane(lane))
                             }
                         }
                         Topic::Star(star) => {
-                            if& star == skel.info.key {
+                            if *star == skel.info.key {
                                 Ok(NextKind::Shell)
                             } else {
-                                let lane = skel.golden_path_api.golden_lane_leading_to_star(star).await?;
+                                let lane = skel.golden_path_api.golden_lane_leading_to_star(star.clone()).await?;
                                 Ok(NextKind::Lane(lane))
                             }
                         }
@@ -187,14 +187,13 @@ impl WatchComponent {
 
     fn next( &mut self, selection: WatchSelection, next: NextKind ) {
         if !self.selection_to_next.contains_key(&selection ) {
-            let next = NextWatch::new(next, selection );
+            let next = NextWatch::new(next, selection.clone() );
             self.selection_to_next.insert(selection.clone(), next.clone() );
 
             if let NextKind::Lane(lane) = &next.kind {
-                let watch = next.into();
+                let watch = next.clone().into();
                 self.skel.lane_muxer_api.forward_frame(LaneKey::Ultima(lane.clone()), Frame::Watch(WatchFrame::Watch(watch)) ).unwrap_or_default();
             }
-
         }
     }
 
@@ -202,12 +201,10 @@ impl WatchComponent {
         if let Option::Some(watch) = self.key_to_lane.remove(&key) {
             if let Option::Some( mut watches) = self.selection_to_lane.remove(&watch.selection )
             {
-                watches.retain( |w| w != watch );
+                watches.retain( |w| w.key != watch.key );
                 if watches.is_empty() {
-
-                    if let Option::Some(next ) = self.selection_to_next.remove(&key) {
-                        self.key_to_next.remove(&next.key);
-                        if NextKind::Lane(lane) = next.kind {
+                    if let Option::Some(next ) = self.selection_to_next.remove(&watch.selection ) {
+                        if let NextKind::Lane(lane) = next.kind {
                             self.skel.lane_muxer_api.forward_frame(LaneKey::Ultima(lane.clone()), Frame::Watch(WatchFrame::UnWatch(next.key)) ).unwrap_or_default();
                         }
                     }
@@ -255,18 +252,20 @@ impl WatchComponent {
                 }
             }
         };
+
+        self.un_watch(stub.key);
     }
 
     fn notify(&self, notification: Notification ) {
         let mut lanes = HashSet::new();
         if let Option::Some(watch_lanes) = self.selection_to_lane.get(&notification.selection) {
             for watch_lane in watch_lanes {
-                lanes.push( watch_lane.lane.clone() );
+                lanes.insert( watch_lane.lane.clone() );
             }
         }
 
         for lane in lanes {
-            self.skel.lane_muxer_api.forward_frame(LaneKey::Ultima(lane), Frame::Notification(notification.clone()))
+            self.skel.lane_muxer_api.forward_frame(LaneKey::Ultima(lane), Frame::Watch(WatchFrame::Notify(notification.clone())));
         }
 
         if let Option::Some(listeners) = self.listeners.get(&notification.selection ) {
