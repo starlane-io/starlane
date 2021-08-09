@@ -11,7 +11,7 @@ use crate::star::shell::watch::WatchApi;
 
 pub type WatchKey = Uuid;
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Debug,Clone,Serialize,Deserialize)]
 pub struct Watch{
     pub key: WatchKey,
     pub selection: WatchSelection
@@ -26,13 +26,13 @@ impl Watch {
     }
 }
 
-#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct WatchSelection {
   pub topic: Topic,
   pub property: Property
 }
 
-#[derive(Clone,Serialize,Deserialize,strum_macros::Display,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone,Serialize,Deserialize,strum_macros::Display,Hash,Eq,PartialEq)]
 pub enum Topic {
     Resource(ResourceKey),
     Star(StarKey),
@@ -45,20 +45,20 @@ pub enum Property {
     Status
 }
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Debug,Clone,Serialize,Deserialize)]
 pub struct Notification{
     pub selection: WatchSelection,
     pub changes: Vec<Change>
 }
 
-#[derive(Clone,Serialize,Deserialize,strum_macros::Display)]
+#[derive(Debug,Clone,Serialize,Deserialize,strum_macros::Display)]
 pub enum Change {
     State(DataSet<BinSrc>),
     Children(Vec<ChildChange>),
     Status(Status)
 }
 
-#[derive(Clone,Serialize,Deserialize,strum_macros::Display)]
+#[derive(Debug,Clone,Serialize,Deserialize,strum_macros::Display)]
 pub enum ChildChange{
     Add(Topic),
     Remove(Topic)

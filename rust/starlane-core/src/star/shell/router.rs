@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::frame::{Frame, Reply, ReplyKind, StarMessage, ProtoFrame};
+use crate::frame::{Frame, Reply, ReplyKind, StarMessage, ProtoFrame, WatchFrame};
 use crate::message::resource::ProtoMessage;
 use crate::message::{Fail, MessageId, ProtoStarMessage, ProtoStarMessageTo};
 use crate::star::core::message::CoreMessageCall;
@@ -27,6 +27,7 @@ impl RouterApi {
     pub fn frame(&self, frame: Frame, session: LaneSession ) {
         self.tx.try_send(RouterCall::Frame{frame, session}).unwrap_or_default();
     }
+
 }
 
 pub enum RouterCall {
@@ -126,6 +127,19 @@ impl AsyncProcessor<RouterCall> for RouterComponent {
                 Frame::Ping => {}
                 Frame::Pong => {}
                 Frame::Close => {}
+                Frame::Watch(watch) => {
+                    match watch {
+                        WatchFrame::Watch(watch) => {
+                            self.skel.watch_api.watch(watch, session );
+                        }
+                        WatchFrame::UnWatch(key) => {
+                            self.skel.watch_api.un_watch(key);
+                        }
+                        WatchFrame::Notify(notification) => {
+                            self.skel.watch_api.notify(notification);
+                        }
+                    }
+                }
             }
         }
     }

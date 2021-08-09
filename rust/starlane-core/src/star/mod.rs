@@ -26,7 +26,7 @@ use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::{
     ActorLookup, Frame, ProtoFrame, RegistryAction, Reply, SearchResults, SearchTraversal,
-    SearchWindDown, SearchWindUp, SimpleReply, StarMessage, StarMessagePayload, StarPattern, TraversalAction, Watch,
+    SearchWindDown, SearchWindUp, SimpleReply, StarMessage, StarMessagePayload, StarPattern, TraversalAction,
     WatchInfo, SearchHit,
 };
 use crate::id::Id;

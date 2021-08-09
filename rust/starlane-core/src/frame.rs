@@ -25,20 +25,27 @@ use crate::resource::{
     ResourceType, SubSpaceKey, UserKey,
 };
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey};
-use crate::watch::{Notification, Watch};
+use crate::watch::{Notification, Watch, WatchKey};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum Frame {
     Proto(ProtoFrame),
     Diagnose(Diagnose),
     SearchTraversal(SearchTraversal),
     StarMessage(StarMessage),
-    Watch(Watch),
-    Notification(Notification),
-    Ping,
-    Pong,
+    Watch(WatchFrame),
     Close,
 }
+
+
+#[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
+pub enum WatchFrame {
+    Watch(Watch),
+    UnWatch(WatchKey),
+    Notify(Notification)
+}
+
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SearchTraversal {
@@ -645,22 +652,6 @@ impl fmt::Display for StarMessagePayload {
     }
 }
 
-impl fmt::Display for Frame {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let r = match self {
-            Frame::Proto(proto) => format!("Proto({})", proto).to_string(),
-            Frame::Close => format!("Close").to_string(),
-            Frame::Diagnose(diagnose) => format!("Diagnose({})", diagnose).to_string(),
-            Frame::StarMessage(inner) => format!("StarMessage({})", inner.payload).to_string(),
-            Frame::SearchTraversal(wind) => format!("StarWind({})", wind).to_string(),
-            //            Frame::Watch(_) => format!("Watch").to_string(),
-            //            Frame::Event(_) => format!("ActorEvent").to_string(),
-            Frame::Ping => "Ping".to_string(),
-            Frame::Pong => "Pong".to_string(),
-        };
-        write!(f, "{}", r)
-    }
-}
 
 impl fmt::Display for SearchTraversal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
