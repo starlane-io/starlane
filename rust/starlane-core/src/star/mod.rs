@@ -31,7 +31,7 @@ use crate::frame::{
 };
 use crate::id::Id;
 use crate::lane::{
-    ConnectorController, LaneCommand, LaneEnd, LaneIndex, LaneKey, LaneMeta, LaneWrapper,
+    ConnectorController, LaneCommand, LaneEnd, LaneIndex, UltimaLaneKey, LaneMeta, LaneWrapper,
     ProtoLaneEnd,
 };
 use crate::logger::{Flags, Logger, LogInfo};
@@ -753,13 +753,14 @@ pub enum StarCommand {
     GetCaches(oneshot::Sender<Arc<ProtoArtifactCachesFactory>>),
     GetLaneForStar {
         star: StarKey,
-        tx: oneshot::Sender<Result<LaneKey, Error>>,
+        tx: oneshot::Sender<Result<UltimaLaneKey, Error>>,
     },
     Shutdown,
     GetSkel(oneshot::Sender<StarSkel>),
-    Broadcast { frame: Frame, exclude: Option<HashSet<LaneKey>> },
-    LaneKeys(oneshot::Sender<Vec<LaneKey>>),
-    LaneWithShortestPathToStar { star: StarKey, tx: oneshot::Sender<Option<LaneKey>> }
+    Broadcast { frame: Frame, exclude: Option<HashSet<UltimaLaneKey>> },
+    LaneKeys(oneshot::Sender<Vec<UltimaLaneKey>>),
+    LaneWithShortestPathToStar { star: StarKey, tx: oneshot::Sender<Option<UltimaLaneKey>> },
+    GatewayAssign(Vec<StarSubGraphKey>)
 }
 
 #[derive(Clone)]

@@ -27,7 +27,7 @@ use crate::lane::{
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::permissions::AuthTokenSource;
 use crate::star::core::message::MessagingEndpointComponent;
-use crate::star::shell::lanes::{LaneMuxerApi, LaneMuxer};
+use crate::star::shell::lanes::{LaneMuxerApi, LaneMuxer, LanePattern};
 use crate::star::shell::search::{StarSearchApi, StarSearchComponent, StarSearchTransaction, ShortestPathStarKey};
 use crate::star::shell::message::{MessagingApi, MessagingComponent};
 use crate::star::shell::pledge::StarWranglerBacking;
@@ -278,6 +278,24 @@ impl ProtoStar {
                         }
 
                         self.lane_muxer_api.add_proto_lane(lane, StarPattern::Any );
+
+
+                    }
+                    StarCommand::Frame(Frame::Proto( ProtoFrame::GatewayAssign(subgraph))) => {
+                        if let ProtoStarKey::RequestSubKeyExpansion(index) = self.star_key {
+                            let star_key = StarKey::new_with_subgraph(subgraph.clone(), index);
+                            self.star_key = ProtoStarKey::Key(star_key.clone());
+                            self.lane_muxer_api.broadcast(Frame::Proto(
+                                ProtoFrame::ReportStarKey(star_key.clone()),
+                            ), LanePattern::Any );
+
+                            self.lane_muxer_api.broadcast(Frame::Proto(
+                                ProtoFrame::GatewayAssign(subgraph),
+                            ), LanePattern::Protos );
+println!("RECEIVED GATEWAY ASSIGN!");
+                        } else {
+                            eprintln!("not expecting a GatewayAssign for this ProtoStarKey which is already assigned.")
+                        }
                     }
                     StarCommand::AddConnectorController(connector_ctrl) => {
                         self.connector_ctrls.push(connector_ctrl);
@@ -528,6 +546,7 @@ impl RouterCallBooster {
                 Some(call) => {
                     match call {
                         RouterCall::Frame { frame, session: lane } => {
+println!("boosting FRAME: {}", frame.to_string() );
                             return Option::Some(StarCommand::Frame(frame));
                         }
                         _ => {

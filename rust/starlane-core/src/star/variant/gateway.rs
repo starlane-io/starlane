@@ -1,7 +1,7 @@
 use std::sync::atomic::Ordering;
 
 use crate::frame::{Frame, ProtoFrame};
-use crate::lane::{LaneCommand, LaneWrapper, LaneKey, LaneSession};
+use crate::lane::{LaneCommand, LaneWrapper, UltimaLaneKey, LaneSession};
 
 use crate::star::variant::{FrameVerdict, VariantCall};
 use crate::star::{StarCommand, StarKey, StarSkel, StarSubGraphKey};
@@ -45,6 +45,7 @@ impl GatewayVariant {
     ) -> FrameVerdict {
         match frame{
             Frame::Proto(ProtoFrame::GatewaySelect) => {
+println!("RECEIVED GATEWAY SELECT");
                 let mut subgraph = self.skel.info.key.child_subgraph();
                 subgraph.push(StarSubGraphKey::Big(
                     self.skel.sequence.fetch_add(1, Ordering::Relaxed),

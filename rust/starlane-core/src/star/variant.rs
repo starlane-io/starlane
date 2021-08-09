@@ -4,7 +4,7 @@ use tokio::sync::oneshot;
 
 use crate::error::Error;
 use crate::frame::{StarMessage, Frame};
-use crate::lane::{LaneWrapper, LaneKey, LaneSession};
+use crate::lane::{LaneWrapper, UltimaLaneKey, LaneSession};
 use crate::star::variant::central::CentralVariant;
 use crate::star::variant::gateway::GatewayVariant;
 use crate::star::variant::web::WebVariant;

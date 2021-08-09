@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::frame::{Frame, Reply, ReplyKind, StarMessage, StarPattern};
-use crate::lane::{LaneKey, LaneWrapper};
+use crate::lane::{UltimaLaneKey, LaneWrapper};
 use crate::message::resource::ProtoMessage;
 use crate::message::{Fail, MessageId, ProtoStarMessage, ProtoStarMessageTo};
 use crate::star::core::message::CoreMessageCall;
@@ -24,7 +24,7 @@ impl GoldenPathApi {
     pub async fn golden_lane_leading_to_star(
         &self,
         star: StarKey,
-    ) -> Result<LaneKey, Error> {
+    ) -> Result<UltimaLaneKey, Error> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .try_send(GoldenCall::GoldenLaneLeadingToStar { star, tx, try_search: true })
@@ -32,7 +32,7 @@ impl GoldenPathApi {
          Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
     }
 
-    fn insert_hops( &self, hops: HashMap<LaneKey,HashMap<StarKey,usize>>) {
+    fn insert_hops( &self, hops: HashMap<UltimaLaneKey,HashMap<StarKey,usize>>) {
         self.tx.try_send( GoldenCall::InsertHops(hops)).unwrap_or_default();
     }
 }
@@ -40,17 +40,17 @@ impl GoldenPathApi {
 pub enum GoldenCall {
     GoldenLaneLeadingToStar {
         star: StarKey,
-        tx: oneshot::Sender<Result<LaneKey,Error>>,
+        tx: oneshot::Sender<Result<UltimaLaneKey,Error>>,
         try_search: bool
     },
-    InsertHops(HashMap<LaneKey,HashMap<StarKey,usize>>)
+    InsertHops(HashMap<UltimaLaneKey,HashMap<StarKey,usize>>)
 }
 
 impl Call for GoldenCall {}
 
 pub struct GoldenPathComponent {
     skel: StarSkel,
-    star_to_lane: LruCache<StarKey,HashMap<LaneKey,usize>>
+    star_to_lane: LruCache<StarKey,HashMap<UltimaLaneKey,usize>>
 }
 
 impl GoldenPathComponent {
@@ -90,7 +90,7 @@ impl AsyncProcessor<GoldenCall> for GoldenPathComponent {
 
 impl GoldenPathComponent {
 
-    fn golden_path_leading_to_star(&mut self, star: StarKey, tx: oneshot::Sender<Result<LaneKey,Error>>, try_search: bool)   {
+    fn golden_path_leading_to_star(&mut self, star: StarKey, tx: oneshot::Sender<Result<UltimaLaneKey,Error>>, try_search: bool)   {
         let skel = self.skel.clone();
 
         if let Option::Some(lanes) = self.star_to_lane.get(&star) {

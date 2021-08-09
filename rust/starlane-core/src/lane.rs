@@ -29,7 +29,7 @@ use crate::star::shell::lanes::LaneMuxerCall;
 
 pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
 pub static LANE_QUEUE_SIZE: usize = 32;
-pub type LaneKey = StarKey;
+pub type UltimaLaneKey = StarKey;
 
 #[derive(Clone)]
 pub struct OutgoingSide {
@@ -933,13 +933,13 @@ mod test {
     }
 }
 
-#[derive(Clone,Hash,Eq,PartialEq)]
-pub enum LaneId {
+#[derive(Clone,Hash,Eq,PartialEq,strum_macros::Display)]
+pub enum LaneKey {
     Proto(u64),
-    Lane(LaneKey)
+    Ultima(UltimaLaneKey)
 }
 
-impl LaneId {
+impl LaneKey {
     pub fn is_proto(&self) -> bool {
         match self {
             Self::Proto(_) => true,
@@ -948,15 +948,15 @@ impl LaneId {
     }
 }
 
-impl TryInto<LaneKey> for LaneId {
+impl TryInto<UltimaLaneKey> for LaneKey {
     type Error = Error;
 
-    fn try_into(self) -> Result<LaneKey, Self::Error> {
+    fn try_into(self) -> Result<UltimaLaneKey, Self::Error> {
         match self {
-            LaneId::Proto(_) => {
+            LaneKey::Proto(_) => {
                 Err("cannot turn a proto id into a laneKey".into())
             }
-            LaneId::Lane(lane) => {
+            LaneKey::Ultima(lane) => {
                 Ok(lane)
             }
         }
@@ -966,13 +966,13 @@ impl TryInto<LaneKey> for LaneId {
 
 #[derive(Clone)]
 pub struct LaneSession{
-    pub lane_id: LaneId,
+    pub lane_id: LaneKey,
     pub pattern: StarPattern,
     pub tx: mpsc::Sender<LaneCommand>
 }
 
 impl LaneSession {
-    pub fn new( lane_id: LaneId, pattern: StarPattern, tx: mpsc::Sender<LaneCommand> ) -> Self {
+    pub fn new(lane_id: LaneKey, pattern: StarPattern, tx: mpsc::Sender<LaneCommand> ) -> Self {
         Self {
             lane_id,
             pattern,

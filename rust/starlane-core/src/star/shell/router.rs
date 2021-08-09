@@ -7,7 +7,7 @@ use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
-use crate::lane::{LaneKey, LaneId, LaneSession};
+use crate::lane::{UltimaLaneKey, LaneKey, LaneSession};
 use crate::star::variant::FrameVerdict;
 
 #[derive(Clone)]
@@ -82,7 +82,7 @@ impl AsyncProcessor<RouterCall> for RouterComponent {
                         .await
                     {
                         skel.lane_muxer_api
-                            .forward_frame(lane, Frame::StarMessage(message))
+                            .forward_frame(LaneKey::Ultima(lane), Frame::StarMessage(message))
                         .unwrap_or_default();
                 } else {
                     error!(
@@ -112,10 +112,10 @@ impl AsyncProcessor<RouterCall> for RouterComponent {
                 Frame::Diagnose(_) => {}
                 Frame::SearchTraversal(traversal) => {
                     match &session.lane_id {
-                        LaneId::Proto(_) => {
+                        LaneKey::Proto(_) => {
                             error!("not expecting a search traversal from a proto lane...")
                         }
-                        LaneId::Lane(lane) => {
+                        LaneKey::Ultima(lane) => {
                             self.skel.star_search_api.on_traversal(traversal, lane.clone() );
                         }
                     }

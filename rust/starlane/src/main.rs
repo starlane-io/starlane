@@ -167,6 +167,7 @@ async fn list(args: ArgMatches<'_>) -> Result<(), Error> {
 }
 
 async fn create(args: ArgMatches<'_>) -> Result<(), Error> {
+println!("CREATE...");
     let address = ResourceAddressKind::from_str(
         args.value_of("address")
             .ok_or("expected resource address")?,
@@ -183,7 +184,9 @@ async fn create(args: ArgMatches<'_>) -> Result<(), Error> {
         }
     };
 
+println!("creating starlane api...");
     let starlane_api = starlane_api().await?;
+println!("starlane api created.");
 
     let create = ResourceCreate {
         parent: address
@@ -202,7 +205,10 @@ async fn create(args: ArgMatches<'_>) -> Result<(), Error> {
         owner: Option::None,
         strategy: ResourceCreateStrategy::Create,
     };
+
+println!("SENDING CREATE REQUEST...");
     starlane_api.create_resource(create).await?;
+println!("CREATE DONE.");
 
     starlane_api.shutdown();
 
