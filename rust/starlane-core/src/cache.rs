@@ -35,6 +35,8 @@ use crate::resource::ArtifactKind;
 
 use crate::starlane::api::StarlaneApi;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
+use crate::data::{DataSet, BinSrc};
+use crate::starlane::StarlaneMachine;
 
 pub type Data = Arc<Vec<u8>>;
 pub type ZipFile = Path;
@@ -52,8 +54,9 @@ impl ProtoArtifactCachesFactory {
     pub fn new(
         src: ArtifactBundleSrc,
         file_access: FileAccess,
+        machine: StarlaneMachine,
     ) -> Result<ProtoArtifactCachesFactory, Error> {
-        let bundle_cache = ArtifactBundleCache::new(src, file_access, AuditLogger::new())?;
+        let bundle_cache = ArtifactBundleCache::new(src, file_access, machine, AuditLogger::new())?;
         Ok(Self {
             root_caches: Arc::new(RootArtifactCaches::new(bundle_cache)),
         })
@@ -263,12 +266,14 @@ struct ArtifactBundleCacheRunner {
     file_access: FileAccess,
     notify: HashMap<ArtifactBundleAddress, Vec<oneshot::Sender<Result<(), Error>>>>,
     logger: AuditLogger,
+    machine: StarlaneMachine
 }
 
 impl ArtifactBundleCacheRunner {
     pub fn new(
         src: ArtifactBundleSrc,
         file_access: FileAccess,
+        machine: StarlaneMachine,
         logger: AuditLogger,
     ) -> tokio::sync::mpsc::Sender<ArtifactBundleCacheCommand> {
         let (tx, rx) = tokio::sync::mpsc::channel(1024);
@@ -278,6 +283,7 @@ impl ArtifactBundleCacheRunner {
             rx: rx,
             tx: tx.clone(),
             notify: HashMap::new(),
+            machine,
             logger: logger,
         };
         thread::spawn(move || {
@@ -333,11 +339,13 @@ impl ArtifactBundleCacheRunner {
                         let tx = self.tx.clone();
                         if first {
                             let logger = self.logger.clone();
+                            let machine = self.machine.clone();
                             tokio::spawn(async move {
                                 let result = Self::download_and_extract(
                                     src,
                                     file_access,
                                     bundle.clone(),
+                                    machine,
                                     logger,
                                 )
                                 .await;
@@ -380,6 +388,7 @@ impl ArtifactBundleCacheRunner {
         src: ArtifactBundleSrc,
         file_access: FileAccess,
         bundle: ArtifactBundleAddress,
+        machine: StarlaneMachine,
         logger: AuditLogger,
     ) -> Result<(), Error> {
         let bundle: ResourceAddress = bundle.into();
@@ -390,8 +399,7 @@ impl ArtifactBundleCacheRunner {
 
         let stream = src
             .get_resource_state(bundle.clone())
-            .await?
-            .ok_or("expected bundle to have state")?;
+            .await?.get("zip").ok_or("expected a zip file for the bundle")?.to_bin(machine.bin_context())?;
 
         let mut file_access =
             ArtifactBundleCache::with_bundle_path(file_access, record.stub.address.try_into()?)?;
@@ -431,9 +439,10 @@ impl ArtifactBundleCache {
     pub fn new(
         src: ArtifactBundleSrc,
         file_access: FileAccess,
+        machine: StarlaneMachine,
         logger: AuditLogger,
     ) -> Result<Self, Error> {
-        let tx = ArtifactBundleCacheRunner::new(src, file_access.clone(), logger);
+        let tx = ArtifactBundleCacheRunner::new(src, file_access.clone(), machine, logger);
         Ok(ArtifactBundleCache {
             file_access: file_access,
             tx: tx,
@@ -478,11 +487,10 @@ impl ArtifactBundleSrc {
     pub async fn get_resource_state(
         &self,
         identifier: ResourceIdentifier,
-    ) -> Result<Option<Arc<Vec<u8>>>, Fail> {
+    ) -> Result<DataSet<BinSrc>, Fail> {
         match self {
             ArtifactBundleSrc::STARLANE_API(api) => {
-                //                api.get_resource_state(identifier)
-                unimplemented!()
+                                api.get_resource_state(identifier)
             }
             //            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(identifier).await,
         }

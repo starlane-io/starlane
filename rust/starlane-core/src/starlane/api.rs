@@ -651,7 +651,7 @@ impl ArtifactBundleVersionsApi {
     ) -> Result<Creation<ArtifactBundleApi>, Fail> {
         let content = BinSrc::Memory(data);
         let mut state: DataSet<BinSrc> = DataSet::new();
-        state.insert("content".to_string(), content);
+        state.insert("zip".to_string(), content);
 
         let resource_src = AssignResourceStateSrc::Direct(state);
         // hacked to FINAL

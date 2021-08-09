@@ -399,6 +399,7 @@ impl StarlaneMachineRunner {
                     let caches = Arc::new(ProtoArtifactCachesFactory::new(
                         api.into(),
                         self.cache_access.clone(),
+                        starlane_machine.clone()
                     )?);
                     self.artifact_caches = Option::Some(caches);
                 }

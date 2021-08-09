@@ -41,7 +41,7 @@ pub fn artifact_bundle_address() -> ArtifactBundleAddress {
 
 pub fn space_address() -> Result<ArtifactAddress,Error> {
    let address: ResourceAddress = artifact_bundle_address().into();
-   let address = address.append("create-args/space.yaml".to_string(), ResourceType::Artifact )?;
+   let address = address.append("/create-args/space.yaml".to_string(), ResourceType::Artifact )?;
    let address : ArtifactAddress = address.try_into()?;
    Ok(address)
 }
