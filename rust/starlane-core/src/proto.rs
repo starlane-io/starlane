@@ -43,6 +43,7 @@ use crate::starlane::StarlaneMachine;
 use crate::template::StarKeyConstellationIndex;
 use crate::star::shell::locator::{ResourceLocatorApi, ResourceLocatorComponent};
 use crate::star::shell::golden::{GoldenPathApi, GoldenPathComponent};
+use crate::star::shell::watch::{WatchApi, WatchComponent};
 
 
 pub struct ProtoStar {
@@ -181,6 +182,7 @@ impl ProtoStar {
                         let (messaging_tx, messaging_rx) = mpsc::channel(1024);
                         let (golden_path_tx, golden_path_rx) = mpsc::channel(1024);
                         let (variant_tx, variant_rx) = mpsc::channel(1024);
+                        let (watch_tx, watch_rx) = mpsc::channel(1024);
 
                         let resource_locator_api = ResourceLocatorApi::new(resource_locator_tx);
                         let star_search_api = StarSearchApi::new(star_locator_tx);
@@ -188,6 +190,7 @@ impl ProtoStar {
                         let messaging_api = MessagingApi::new(messaging_tx);
                         let golden_path_api = GoldenPathApi::new(golden_path_tx);
                         let variant_api = VariantApi::new(variant_tx);
+                        let watch_api = WatchApi::new(watch_tx);
 
 
                         let data_access = self
@@ -233,7 +236,8 @@ impl ProtoStar {
                             messaging_api,
                             lane_muxer_api: self.lane_muxer_api,
                             golden_path_api,
-                            variant_api
+                            variant_api,
+                            watch_api
                         };
 
                         start_variant(skel.clone(), variant_rx );
@@ -245,6 +249,7 @@ impl ProtoStar {
                         MessagingComponent::start(skel.clone(), messaging_rx);
                         SurfaceComponent::start(skel.clone(), self.surface_rx);
                         GoldenPathComponent::start(skel.clone(), golden_path_rx);
+                        WatchComponent::start(skel.clone(), watch_rx);
 
                         return Ok(Star::from_proto(
                             skel,

@@ -25,6 +25,7 @@ use crate::resource::{
     ResourceType, SubSpaceKey, UserKey,
 };
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey};
+use crate::watch::{Notification, Watch};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Frame {
@@ -32,8 +33,8 @@ pub enum Frame {
     Diagnose(Diagnose),
     SearchTraversal(SearchTraversal),
     StarMessage(StarMessage),
-    //Watch(Watch),
-    //Event(Event),
+    Watch(Watch),
+    Notification(Notification),
     Ping,
     Pong,
     Close,
@@ -53,11 +54,7 @@ pub enum ProtoFrame {
     GatewayAssign(Vec<StarSubGraphKey>),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Watch {
-    Add(WatchInfo),
-    Remove(WatchInfo),
-}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WatchInfo {

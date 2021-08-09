@@ -56,6 +56,7 @@ use crate::star::surface::SurfaceApi;
 use crate::star::variant::{FrameVerdict, VariantApi};
 use crate::starlane::StarlaneMachine;
 use crate::template::StarTemplateHandle;
+use crate::star::shell::watch::WatchApi;
 
 pub mod core;
 pub mod shell;
@@ -1102,6 +1103,7 @@ pub struct StarSkel {
     pub golden_path_api: GoldenPathApi,
     pub lane_muxer_api: LaneMuxerApi,
     pub variant_api: VariantApi,
+    pub watch_api: WatchApi,
     pub flags: Flags,
     pub logger: Logger,
     pub sequence: Arc<AtomicU64>,
