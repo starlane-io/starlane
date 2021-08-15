@@ -57,6 +57,8 @@ use crate::star::variant::{FrameVerdict, VariantApi};
 use crate::starlane::StarlaneMachine;
 use crate::template::StarTemplateHandle;
 use crate::star::shell::watch::WatchApi;
+use crate::watch::{Notification, WatchSelection, Property, Topic, Change};
+use crate::status::Status;
 
 pub mod core;
 pub mod shell;
@@ -551,16 +553,22 @@ impl Star {
     }
 
     async fn init(&mut self) {
-        self.refresh_handles().await;
+        self.refresh_conscript_wrangles().await;
         self.check_status().await;
     }
 
     fn set_status(&mut self, status: StarStatus) {
         self.status = status.clone();
-        self.status_broadcast.send(status);
+        self.status_broadcast.send(status.clone() );
+
+        let notification = Notification{
+            selection: WatchSelection { topic: Topic::Star(self.skel.info.key.clone()), property: Property::Status },
+            changes: vec![Change::Status(status)]
+        };
+        self.skel.watch_api.fire(notification);
     }
 
-    async fn refresh_handles(&mut self) {
+    async fn refresh_conscript_wrangles(&mut self) {
         if self.status == StarStatus::Unknown {
             self.set_status(StarStatus::Pending);
         }
@@ -1291,26 +1299,7 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub enum StarStatus {
-    Unknown,
-    Pending,
-    Initializing,
-    Ready,
-    Panic,
-}
-
-impl ToString for StarStatus {
-    fn to_string(&self) -> String {
-        match self {
-            StarStatus::Unknown => "Unknown".to_string(),
-            StarStatus::Pending => "Pending".to_string(),
-            StarStatus::Ready => "Ready".to_string(),
-            StarStatus::Panic => "Panic".to_string(),
-            StarStatus::Initializing => "Initializing".to_string(),
-        }
-    }
-}
+pub type StarStatus = Status;
 
 impl Into<LogId<String>> for &'static ResourceIdentifier {
     fn into(self) -> LogId<String> {

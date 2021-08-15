@@ -70,9 +70,7 @@ pub struct WatchComponent {
     skel: StarSkel,
     key_to_lane: HashMap<WatchKey,WatchLane>,
     selection_to_lane: HashMap<WatchSelection,Vec<WatchLane>>,
-
     selection_to_next: HashMap<WatchSelection, NextWatch>,
-
     listeners: HashMap<WatchSelection,HashMap<WatchKey,mpsc::Sender<Notification>>>,
 }
 
@@ -162,7 +160,7 @@ impl WatchComponent {
                             }
                         }
                     }
-                }
+                } // find_next()
 
                 match find_next(&skel,&watch).await {
                     Ok(next) => {
@@ -172,12 +170,7 @@ impl WatchComponent {
                         error!("Watch Error: {}", error.to_string() );
                     }
                 }
-
-
             });
-
-
-
         } else {
             error!("proto lanes cannot Watch");
         }

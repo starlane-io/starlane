@@ -934,6 +934,7 @@ mod test {
         info!("tracing works!");
     }
 
+    /*
     #[test]
     pub fn starlane() {
         let subscriber = FmtSubscriber::default();
@@ -1112,4 +1113,6 @@ mod test {
             std::thread::sleep(std::time::Duration::from_secs(1));
         });
     }
+
+     */
 }

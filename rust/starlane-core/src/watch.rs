@@ -41,7 +41,7 @@ pub enum Topic {
 #[derive(Debug,Clone,Serialize,Deserialize,strum_macros::Display,Hash,Eq,PartialEq)]
 pub enum Property {
     State,
-    Children,
+    Child,
     Status
 }
 
