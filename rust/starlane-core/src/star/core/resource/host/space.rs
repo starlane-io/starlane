@@ -69,6 +69,7 @@ impl Host for SpaceHost {
 impl SpaceHost {
     async fn create_from_args(&self, args: String) -> Result<DataSet<BinSrc>,Error> {
 
+println!("SpaceHost: CREATE FROM ARGS...");
         let args:Vec<String> = args.trim().split(" ").map( |s| s.to_string()).collect();
 
         let factory = self.skel.machine.get_proto_artifact_caches_factory().await?;
@@ -78,7 +79,9 @@ impl SpaceHost {
             address: address.clone(),
             kind: ArtifactKind::Raw
         };
+println!("SpaceHost: CACHING...");
         cache.cache(vec![artifact_ref]).await?;
+println!("SpaceHost: CACHED...");
         let cache = cache.to_caches().await?;
         let yaml = cache.raw.get(&address ).ok_or("expected space.yaml")?;
         let yaml = yaml.data();

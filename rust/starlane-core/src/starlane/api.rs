@@ -39,6 +39,7 @@ use crate::star::{Request, StarCommand, StarKind, StarSkel};
 use crate::star::shell::search::SearchInit;
 use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
+use futures::FutureExt;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -254,22 +255,20 @@ impl StarlaneApi {
     }
      */
 
-    pub fn get_resource_state(
+    pub async fn get_resource_state(
         &self,
         identifier: ResourceIdentifier,
     ) -> Result<DataSet<BinSrc>, Fail> {
-        let state_src = self.get_resource_state_src(identifier)?;
+        let state_src = self.get_resource_state_src(identifier).await?;
         Ok(state_src)
     }
 
-    pub fn get_resource_state_src(
+    pub async fn get_resource_state_src(
         &self,
         identifier: ResourceIdentifier,
     ) -> Result<DataSet<BinSrc>, Fail> {
         let surface_api = self.surface_api.clone();
 
-        let handle = Handle::current();
-        handle.block_on(async {
             let mut proto = ProtoMessage::new();
             proto.payload = Option::Some(ResourceRequestMessage::State);
             proto.to = Option::Some(identifier);
@@ -287,7 +286,7 @@ impl StarlaneApi {
                 Err(fail) => Err(fail),
                 _ => unimplemented!("StarlaneApi::get_resource_state_src() IMPOSSIBLE!"),
             }
-        })
+
     }
 
     pub fn create_space(&self, name: &str, display_name: &str) -> Result<Creation<SpaceApi>, Fail> {
@@ -920,7 +919,7 @@ impl StarlaneApiRunner {
     async fn process(&self, action: StarlaneAction) {
         match action {
             StarlaneAction::GetState { identifier, tx } => {
-                tx.send(self.api.get_resource_state(identifier));
+                tx.send(self.api.get_resource_state(identifier).await );
             }
         }
     }

@@ -293,6 +293,7 @@ impl ArtifactBundleCacheRunner {
                 .build()
                 .expect("<ArtifactBundleCacheRunner> FATAL: could not get tokio runtime");
             rt.block_on(async move {
+println!("Staring ArtifactBundleCacheRunner...");
                 runner.run().await;
             });
         });
@@ -490,7 +491,7 @@ impl ArtifactBundleSrc {
     ) -> Result<DataSet<BinSrc>, Fail> {
         match self {
             ArtifactBundleSrc::STARLANE_API(api) => {
-                                api.get_resource_state(identifier)
+                                api.get_resource_state(identifier).await
             }
             //            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(identifier).await,
         }
