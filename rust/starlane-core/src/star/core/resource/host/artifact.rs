@@ -332,19 +332,8 @@ impl Host for ArtifactBundleHost {
             AssignResourceStateSrc::Direct(data) => data,
             AssignResourceStateSrc::Stateless => return Err("ArtifactBundle cannot be stateless".into()),
             AssignResourceStateSrc::CreateArgs(ref args) => {
-                if args.trim().is_empty() && assign.stub.archetype.kind.init_clap_config().is_none()
-                {
-                    DataSet::new()
-                } else if assign.stub.archetype.kind.init_clap_config().is_none() {
-                    return Err(format!(
-                        "resource {} does not take init args",
-                        assign.archetype().kind.to_string()
-                    )
-                        .into());
-                } else {
-                    unimplemented!()
-                }
-            }
+                unimplemented!()
+           }
         };
 
         let assign = ResourceAssign {

@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, mpsc};
 
 use crate::error::Error;
 
@@ -11,22 +11,42 @@ use crate::resource::{
     ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceKind, ResourceLocation,
     ResourceRecord, ResourceRegistration, ResourceStub,
 };
-use crate::star::variant::StarVariant;
+use crate::star::variant::{ VariantCall, FrameVerdict};
 use crate::star::{StarKey, StarSkel};
 use crate::starlane::api::StarlaneApi;
+use crate::util::{AsyncProcessor, AsyncRunner};
+
 
 pub struct CentralVariant {
     skel: StarSkel,
 }
 
 impl CentralVariant {
-    pub async fn new(data: StarSkel) -> CentralVariant {
-        CentralVariant { skel: data.clone() }
+    pub fn start(skel: StarSkel, rx: mpsc::Receiver<VariantCall>) {
+        AsyncRunner::new(
+            Box::new(Self { skel: skel.clone() }),
+            skel.variant_api.tx.clone(),
+            rx,
+        );
     }
 }
 
 #[async_trait]
-impl StarVariant for CentralVariant {
+impl AsyncProcessor<VariantCall> for CentralVariant {
+    async fn process(&mut self, call: VariantCall) {
+        match call {
+            VariantCall::Init(tx) => {
+                self.init(tx);
+            }
+            VariantCall::Frame { frame, session:_, tx } => {
+                tx.send(FrameVerdict::Handle(frame));
+            }
+        }
+    }
+}
+
+
+impl CentralVariant {
     fn init(&self, tx: oneshot::Sender<Result<(), Error>>) {
         let root_resource = ResourceRecord {
             stub: ResourceStub {
@@ -40,7 +60,7 @@ impl StarVariant for CentralVariant {
                 owner: None,
             },
             location: ResourceLocation {
-                host: StarKey::central(),
+                star: StarKey::central(),
             },
         };
 
@@ -106,7 +126,7 @@ println!("BEFORE");
             let version = semver::Version::from_str(address.name().as_str())?;
             let mut creation = artifact_bundle_versions_api.create_artifact_bundle(
                 version,
-                Arc::new(create_args::create_init_args_artifact_bundle()?),
+                Arc::new(create_args::create_args_artifact_bundle()?),
             )?;
             creation.set_strategy(ResourceCreateStrategy::Ensure);
             creation.submit().await?;

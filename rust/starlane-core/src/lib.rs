@@ -59,6 +59,8 @@ pub mod star;
 pub mod starlane;
 pub mod template;
 pub mod util;
+pub mod watch;
+pub mod status;
 
 lazy_static! {
     static ref VERSION: semver::Version = {

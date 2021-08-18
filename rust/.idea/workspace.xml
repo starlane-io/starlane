@@ -1,82 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="AutoImportSettings">
-    <option name="autoReloadType" value="SELECTIVE" />
-  </component>
   <component name="CargoProjects">
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/starlane-core/src/star/core/component/mod.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/starlane-core/src/star/core/component/resource/host.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" afterDir="false" />
+    <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-<<<<<<< HEAD
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/core.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/proto.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/proto.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/artifact.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/artifact.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/default.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/default.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/file_store.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/file_store.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/kube.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/kube.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/cache.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/cache.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/space.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/space.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/state.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/state.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" afterDir="false" />
-=======
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/core.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/core/artifact.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/artifact.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/core/default.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/default.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/core/file_store.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/file_store.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/core/kube.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/core/kube.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/component.rs" beforeDir="false" />
->>>>>>> f2361a20ec5930eab8327e64fbc6e3b3d95d08d0
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
-  <component name="ComposerSettings">
-    <execution />
-  </component>
-  <component name="FileTemplateManagerImpl">
-    <option name="RECENT_TEMPLATES">
-      <list>
-        <option value="package-info" />
-        <option value="Rust File" />
-      </list>
-    </option>
-  </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
-  </component>
-  <component name="GitSEFilterConfiguration">
-    <file-type-list>
-      <filtered-out-file-type name="LOCAL_BRANCH" />
-      <filtered-out-file-type name="REMOTE_BRANCH" />
-      <filtered-out-file-type name="TAG" />
-      <filtered-out-file-type name="COMMIT_BY_MESSAGE" />
-    </file-type-list>
   </component>
   <component name="KotlinMultiplatform">
     <allAvailableExecutables />
   </component>
   <component name="KubernetesApiPersistence">
     <option name="context" value="gke_williams-heavy-industries_us-central1-a_brainiac" />
-    <option name="namespace" value="qa" />
+    <option name="namespace" value="scott" />
   </component>
   <component name="MacroExpansionManager">
-    <option name="directoryName" value="h1ju9bq2" />
+    <option name="directoryName" value="1h4eivq0" />
   </component>
-  <component name="ProjectId" id="1uPX0kefh0HiYYBSxVlBJRcrzs4" />
+  <component name="ProjectId" id="1wdEP6Uvsu2vCkNjQwUBDHCIOIR" />
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -86,67 +38,29 @@
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="aspect.path.notification.shown" value="true" />
-    <property name="dart.analysis.tool.window.visible" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/starlane-resources/src" />
     <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
-    <property name="org.rust.disableDetachedFileInspection/Users/scott/projects/starlane/rust/starlane-core/src/star/core/mod.rs" value="true" />
-    <property name="org.rust.disableDetachedFileInspection/Users/scott/projects/starlane/rust/starlane-macros-test/src/main.rs" value="true" />
-    <property name="org.rust.disableDetachedFileInspection/Users/scott/projects/starlane/rust/starlane-resources/src/address.rs" value="true" />
-    <property name="org.rust.disableDetachedFileInspection/Users/scott/projects/starlane/rust/starlane-resources/src/lib.rs" value="true" />
-    <property name="settings.editor.selected.configurable" value="preferences.pluginManager" />
-  </component>
-  <component name="RecentsManager">
-    <key name="CopyFile.RECENT_KEYS">
-      <recent name="$PROJECT_DIR$/starlane-resources/src" />
-      <recent name="$PROJECT_DIR$/starlane-core/src/star/variant" />
-      <recent name="$PROJECT_DIR$/starlane-core/src/core" />
-    </key>
-    <key name="MoveFile.RECENT_KEYS">
-<<<<<<< HEAD
-      <recent name="$PROJECT_DIR$/starlane-core/src/star/core/resource" />
-      <recent name="$PROJECT_DIR$/starlane-core/src/star/core/resource/host" />
-      <recent name="$PROJECT_DIR$/starlane-resources/src" />
-      <recent name="$PROJECT_DIR$/starlane/src" />
-=======
-      <recent name="$PROJECT_DIR$/starlane-core/src/star/core/component/resource" />
-      <recent name="$PROJECT_DIR$/starlane-core/src/star" />
-      <recent name="$PROJECT_DIR$/starlane-core/src/" />
-      <recent name="$PROJECT_DIR$/starlane-core/src" />
-      <recent name="$PROJECT_DIR$/starlane-core/src/star/core/component" />
->>>>>>> f2361a20ec5930eab8327e64fbc6e3b3d95d08d0
-    </key>
   </component>
   <component name="RunManager" selected="Cargo.Run">
-    <configuration default="true" type="ArquillianJUnit" factoryName="" nameIsGenerated="true">
-      <option name="arquillianRunConfiguration">
-        <value>
-          <option name="containerStateName" value="" />
-        </value>
-      </option>
-      <option name="TEST_OBJECT" value="class" />
-      <method v="2">
-        <option name="Make" enabled="true" />
-      </method>
-    </configuration>
-    <configuration name="Expand starlane_core::data" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="expand --lib --color=always --theme=GitHub --tests data" />
-      <option name="workingDirectory" value="file://$PROJECT_DIR$/starlane-core" />
+    <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
+      <option name="command" value="run  -- serve" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$/starlane" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
       <option name="allFeatures" value="false" />
       <option name="emulateTerminal" value="false" />
       <option name="withSudo" value="false" />
       <option name="backtrace" value="SHORT" />
-      <envs />
+      <envs>
+        <env name="RUST_BACKTRACE" value="full" />
+      </envs>
       <option name="isRedirectInput" value="false" />
       <option name="redirectInputPath" value="" />
       <method v="2">
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Run starlane" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="run --package starlane --bin starlane -- serve" />
+    <configuration name="Test data::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib data::test" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -161,8 +75,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
-      <option name="command" value="run --package rust --bin rust" />
+    <configuration name="Test data::test::buffer" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib data::test::buffer -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -177,54 +91,17 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test starlane::test::starlane" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib starlane::test::starlane -- --exact" />
-      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
-      <option name="channel" value="DEFAULT" />
-      <option name="requiredFeatures" value="true" />
-      <option name="allFeatures" value="false" />
-      <option name="emulateTerminal" value="false" />
-      <option name="withSudo" value="false" />
-      <option name="backtrace" value="SHORT" />
-      <envs />
-      <option name="isRedirectInput" value="false" />
-      <option name="redirectInputPath" value="" />
-      <method v="2">
-        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
-      </method>
-    </configuration>
-    <configuration name="Test tests::camel" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-macros --lib tests::camel -- --exact" />
-      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
-      <option name="channel" value="DEFAULT" />
-      <option name="requiredFeatures" value="true" />
-      <option name="allFeatures" value="false" />
-      <option name="emulateTerminal" value="false" />
-      <option name="withSudo" value="false" />
-      <option name="backtrace" value="SHORT" />
-      <envs />
-      <option name="isRedirectInput" value="false" />
-      <option name="redirectInputPath" value="" />
-      <method v="2">
-        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
-      </method>
-    </configuration>
-    <configuration name="Test tests::test_kind" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-resources --lib tests::test_kind -- --exact" />
-      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
-      <option name="channel" value="DEFAULT" />
-      <option name="requiredFeatures" value="true" />
-      <option name="allFeatures" value="false" />
-      <option name="emulateTerminal" value="false" />
-      <option name="withSudo" value="false" />
-      <option name="backtrace" value="SHORT" />
-      <envs />
-      <option name="isRedirectInput" value="false" />
-      <option name="redirectInputPath" value="" />
-      <method v="2">
-        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
-      </method>
-    </configuration>
+    <list>
+      <item itemvalue="Cargo.Run" />
+      <item itemvalue="Cargo.Test data::test::buffer" />
+      <item itemvalue="Cargo.Test data::test" />
+    </list>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Cargo.Test data::test::buffer" />
+        <item itemvalue="Cargo.Test data::test" />
+      </list>
+    </recent_temporary>
   </component>
   <component name="RustProjectSettings">
     <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
@@ -233,56 +110,16 @@
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
-      <changelist id="7f646b31-b853-4c70-8e61-bb451c5c1a23" name="Default Changelist" comment="" />
-      <created>1624567978464</created>
+      <changelist id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="" />
+      <created>1628780039134</created>
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
-      <updated>1624567978464</updated>
-      <workItem from="1624567980551" duration="193344000" />
-      <workItem from="1625052009343" duration="195350000" />
-      <workItem from="1625759977203" duration="11299000" />
-      <workItem from="1625777595261" duration="13728000" />
-      <workItem from="1625838663767" duration="61485000" />
-      <workItem from="1626011932512" duration="117412000" />
-      <workItem from="1626615343076" duration="107000" />
-      <workItem from="1626617352023" duration="20181000" />
-      <workItem from="1626783803555" duration="485000" />
-      <workItem from="1626890844132" duration="433000" />
-      <workItem from="1626964242980" duration="688000" />
-      <workItem from="1627279190622" duration="68086000" />
-      <workItem from="1627473965888" duration="16565000" />
-<<<<<<< HEAD
-      <workItem from="1627538161105" duration="39551000" />
-      <workItem from="1627800756791" duration="22184000" />
-=======
-      <workItem from="1627538161105" duration="41574000" />
-      <workItem from="1627720460243" duration="18000" />
-      <workItem from="1627720488424" duration="127000" />
-      <workItem from="1627720626568" duration="186000" />
-      <workItem from="1627720955365" duration="8213000" />
-      <workItem from="1627781217553" duration="3723000" />
-      <workItem from="1627785337294" duration="1008000" />
->>>>>>> f2361a20ec5930eab8327e64fbc6e3b3d95d08d0
+      <updated>1628780039134</updated>
+      <workItem from="1628780042092" duration="22584000" />
     </task>
     <servers />
   </component>
-  <component name="TypeScriptGeneratedFilesManager">
-    <option name="version" value="3" />
-  </component>
   <component name="Vcs.Log.Tabs.Properties">
-    <option name="TAB_STATES">
-      <map>
-        <entry key="MAIN">
-          <value>
-            <State />
-          </value>
-        </entry>
-      </map>
-    </option>
     <option name="oldMeFiltersMigrated" value="true" />
-  </component>
-  <component name="XSLT-Support.FileAssociations.UIState">
-    <expand />
-    <select />
   </component>
 </project>

@@ -184,3 +184,13 @@ impl TryFrom<Meta> for BinSrc {
         Ok(BinSrc::Memory(Arc::new(bincode::serialize(&meta)?)))
     }
 }
+
+#[cfg(test)]
+mod test {
+
+    #[test]
+    pub fn buffer() {
+
+    }
+
+}

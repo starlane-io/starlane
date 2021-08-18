@@ -1,6 +1,6 @@
 use crate::error::Error;
-use crate::frame::{Frame, Reply, ReplyKind, StarMessage, ProtoFrame};
-use crate::lane::{LaneKey, LaneWrapper, ProtoLaneEndpoint, LaneEndpoint, LaneIndex, LaneMeta, LaneCommand};
+use crate::frame::{Frame, Reply, ReplyKind, StarMessage, ProtoFrame, StarPattern};
+use crate::lane::{UltimaLaneKey, LaneWrapper, ProtoLaneEnd, LaneEnd, LaneIndex, LaneMeta, LaneCommand, LaneKey, LaneSession, AbstractLaneEndpoint};
 use crate::message::resource::ProtoMessage;
 use crate::message::{Fail, MessageId, ProtoStarMessage, ProtoStarMessageTo};
 use crate::star::core::message::CoreMessageCall;
@@ -15,6 +15,8 @@ use crate::star::shell::router::RouterCall;
 use futures::FutureExt;
 use std::convert::TryInto;
 use futures::future::select_all;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 
 #[derive(Clone)]
 pub struct LaneMuxerApi {
@@ -30,11 +32,11 @@ impl LaneMuxerApi {
         Ok(self.tx.try_send(LaneMuxerCall::ForwardFrame { lane, frame })?)
     }
 
-    pub fn broadcast_excluding(&self, frame: Frame, exclude: Option<HashSet<LaneKey>>) {
-        self.tx.try_send( LaneMuxerCall::Broadcast {frame,exclude }).unwrap_or_default();
+    pub fn broadcast(&self, frame: Frame, pattern: LanePattern ) {
+        self.tx.try_send( LaneMuxerCall::Broadcast {frame,pattern}).unwrap_or_default();
     }
 
-    pub async fn lane_keys(&self) -> Result<Vec<LaneKey>,Error> {
+    pub async fn lane_keys(&self) -> Result<Vec<UltimaLaneKey>,Error> {
       let (tx,rx) = oneshot::channel();
       self.tx
             .try_send(LaneMuxerCall::LaneKeys(tx))
@@ -43,29 +45,25 @@ impl LaneMuxerApi {
       Ok(tokio::time::timeout(Duration::from_secs(15), rx).await??)
     }
 
-    pub fn add_lane( &self, lane: LaneEndpoint) {
-        self.tx.try_send(LaneMuxerCall::AddLane(lane)).unwrap_or_default();
-    }
 
-    pub fn add_proto_lane( &self, lane: ProtoLaneEndpoint) {
-        self.tx.try_send(LaneMuxerCall::AddProtoLane(lane)).unwrap_or_default();
+    pub fn add_proto_lane( &self, proto: ProtoLaneEnd, pattern: StarPattern) {
+        self.tx.try_send(LaneMuxerCall::AddProtoLane{proto,pattern}).unwrap_or_default();
     }
 }
 
 #[derive(strum_macros::Display)]
 pub enum LaneMuxerCall {
     ForwardFrame {
-        lane: StarKey,
+        lane: LaneKey,
         frame: Frame,
     },
-    LaneKeys(oneshot::Sender<Vec<LaneKey>>),
+    LaneKeys(oneshot::Sender<Vec<UltimaLaneKey>>),
     Broadcast {
         frame: Frame,
-        exclude: Option<HashSet<LaneKey>>,
+        pattern: LanePattern
     },
     Frame(Frame),
-    AddLane(LaneEndpoint),
-    AddProtoLane(ProtoLaneEndpoint)
+    AddProtoLane{proto:ProtoLaneEnd, pattern: StarPattern},
 }
 
 impl Call for LaneMuxerCall {}
@@ -74,7 +72,7 @@ pub struct LaneMuxer {
     rx: mpsc::Receiver<LaneMuxerCall>,
     router_tx: mpsc::Sender<RouterCall>,
     lanes: HashMap<LaneKey, LaneWrapper>,
-    proto_lanes: Vec<LaneWrapper>,
+    sequence: AtomicU64
 }
 
 impl LaneMuxer {
@@ -87,7 +85,7 @@ impl LaneMuxer {
                 rx,
                 router_tx,
                 lanes: HashMap::new(),
-                proto_lanes: vec![]
+                sequence: AtomicU64::new(0)
             }.run().await;
         });
 
@@ -106,100 +104,71 @@ impl LaneMuxer {
                 futures.push(lane.incoming().recv().boxed());
                 lanes.push(key.clone())
             }
-            let mut proto_lane_index = vec![];
-
-            for (index, lane) in &mut self.proto_lanes.iter_mut().enumerate() {
-                futures.push(lane.incoming().recv().boxed());
-                proto_lane_index.push(index);
-            }
 
             futures.push(self.rx.recv().boxed());
 
             let (call, future_index, _) = select_all(futures).await;
 
-            let lane_index = if future_index < lanes.len() {
-                LaneIndex::Lane(
-                    lanes
-                        .get(future_index)
-                        .expect("expected a lane at this index")
-                        .clone(),
-                )
-            } else if future_index < lanes.len() + proto_lane_index.len() {
-                LaneIndex::ProtoLane(future_index - lanes.len())
-            } else {
-                LaneIndex::None
-            };
-
-            let mut lane = if future_index < lanes.len() {
-                Option::Some(
-                    self.lanes
-                        .get_mut(lanes.get(future_index).as_ref().unwrap())
-                        .expect("expected to get lane"),
-                )
-            } else if future_index < lanes.len() + proto_lane_index.len() {
-                Option::Some(
-                    self.proto_lanes
-                        .get_mut(future_index - lanes.len())
-                        .expect("expected to get proto_lane"),
-                )
-            } else {
+            let lane_key = if future_index < lanes.len() {
+                lanes.get(future_index).cloned()
+            }  else {
                 Option::None
             };
+
             if let Option::Some(call) = call {
                 match call {
                     LaneMuxerCall::ForwardFrame { lane, frame } => {
                         self.forward_frame(lane, frame);
                     }
-                    LaneMuxerCall::Broadcast { frame, exclude } => {
-                        self.broadcast_excluding(frame,&exclude );
+                    LaneMuxerCall::Broadcast { frame, pattern} => {
+                        self.broadcast(frame,pattern);
                     }
                     LaneMuxerCall::LaneKeys(tx) => {
-                        let mut keys = vec!();
-                        for (k,_) in &self.lanes {
-                            keys.push(k.clone());
-                        }
-                        tx.send(keys);
+                       tx.send(self.lane_keys() ).unwrap_or_default();
                     }
                     LaneMuxerCall::Frame(frame)  => {
-                        if lane.is_some()
-                        {
-                            let lane = lane.expect("expected lane to be some");
-                            match &frame {
-                                Frame::Proto(proto_frame) => {
-                                    match proto_frame {
-                                        ProtoFrame::ReportStarKey(remote_star) => {
-                                            if let LaneIndex::ProtoLane(index) = lane_index {
-                                                let mut lane = self
-                                                    .proto_lanes
-                                                    .remove(index)
-                                                    .expect_proto_lane()
-                                                    .unwrap();
-                                                lane.remote_star = Option::Some(remote_star.clone());
-                                                let lane: LaneEndpoint = lane.try_into().expect("should be able to modify into a lane");
-                                                let lane = LaneWrapper::Lane(LaneMeta::new(lane));
-                                                self.lanes.insert(remote_star.clone(), lane);
-                                            }
-                                        }
-                                        _ => {
-                                            self.router_tx.try_send(RouterCall::Frame { frame: frame, lane: lane.get_remote_star().expect("expected remote star") }).unwrap_or_default();
-                                        }
+
+                        if lane_key.is_some() {
+                            let lane_key = lane_key.expect("expected a lane id lane_key");
+                            if let Frame::Proto(ProtoFrame::ReportStarKey(remote_star)) = &frame {
+                                if lane_key.is_proto() {
+                                    let mut lane = self
+                                        .lanes
+                                        .remove(&lane_key)
+                                        .expect("expected lane wreapper");
+
+                                    let mut lane = lane.expect_proto_lane();
+
+                                    // here we have to eventually check if the remote_star matches the pattern assigned to it
+                                    if lane.pattern.key_match(remote_star) {
+                                        lane.remote_star = Option::Some(remote_star.clone());
+                                        let lane: LaneMeta<LaneEnd> = lane.try_into().expect("should be able to modify into a lane since remote star is set");
+                                        let lane = LaneWrapper::Lane(lane);
+                                        self.lanes.insert(LaneKey::Ultima(remote_star.clone()), lane);
+                                    } else {
+                                        error!("protolane attempted to claim a remote star that did not match the allowable pattern");
+                                        // we do not reinsert the lane... and close it
+                                        lane.outgoing.out_tx.try_send(LaneCommand::Shutdown);
                                     }
+                                } else {
+                                    eprintln!("received a ReportStarKey on a lane that is not proto");
                                 }
-                                _ => {
-                                    if !lane.is_proto() {
-                                        self.router_tx.try_send(RouterCall::Frame { frame, lane: lane.get_remote_star().expect("expected remote star") }).unwrap_or_default();
-                                    }
-                                }
+                            } else {
+                                let lane = self.lanes.get(&lane_key).expect("expected a lane");
+                                let session = LaneSession::new(lane_key.clone(), lane.pattern(), lane.outgoing().out_tx.clone() );
+                                self.router_tx.try_send(RouterCall::Frame { frame,  session }).unwrap_or_default();
                             }
                         }
+                        else {
+                            error!("cannot process a frame that is not associated with a lane_key")
+                        }
                     }
-                    LaneMuxerCall::AddLane(lane) => {
+                    LaneMuxerCall::AddProtoLane{ proto, pattern } => {
+
                         self.lanes.insert(
-                            lane.remote_star.clone(),
-                            LaneWrapper::Lane(LaneMeta::new(lane)),
+                            LaneKey::Proto(self.sequence.fetch_add(1, Ordering::Relaxed)),
+                            LaneWrapper::Proto(LaneMeta::new(proto,pattern)),
                         );
-                    }
-                    LaneMuxerCall::AddProtoLane(lane) => {
                         /*
                         let _result =
                             lane.outgoing
@@ -210,8 +179,6 @@ impl LaneMuxer {
 
                          */
 //                        unimplemented!("not sure how to handle adding protolanes yet");
-                        self.proto_lanes
-                            .push(LaneWrapper::Proto(LaneMeta::new(lane)));
                     }
                 }
             }
@@ -219,28 +186,77 @@ impl LaneMuxer {
     }
 
     fn forward_frame(&mut self, lane: LaneKey, frame: Frame) {
-        if let Option::Some(lane) = self.lanes.get_mut(&lane) {
+        if let Option::Some(lane) = self.lanes.get_mut(&lane ) {
             lane.outgoing().out_tx.try_send( LaneCommand::Frame(frame)).unwrap_or_default();
         } else {
             error!("dropped frame could not find laneKey: {}",lane.to_string() );
         }
     }
 
-    fn broadcast(&mut self, frame: Frame) {
-        self.broadcast_excluding(frame, &Option::None);
-    }
-
-    fn broadcast_excluding(&mut self, frame: Frame, exclude: &Option<HashSet<StarKey>>) {
-        let mut lanes = vec![];
-        for lane in self.lanes.keys() {
-            if exclude.is_none() || !exclude.as_ref().unwrap().contains(lane) {
-                lanes.push(lane.clone());
+    fn lane_keys(&self) -> Vec<UltimaLaneKey> {
+        let mut keys = vec!();
+        for (k,_) in &self.lanes {
+            if !k.is_proto() {
+                keys.push(k.clone().try_into().expect("expected a lane not a protolane"));
             }
         }
-        for lane in lanes {
-            self.forward_frame(lane, frame.clone());
+        keys
+    }
+
+
+    fn broadcast(&mut self, frame: Frame, pattern: LanePattern )
+    {
+        let mut lanes: Vec<LaneKey> = self.lanes.keys().map(|l|l.clone()).collect();;
+        lanes.retain(|lane| pattern.is_match(lane));
+        for lane_key in lanes {
+            self.forward_frame(lane_key,frame.clone());
         }
     }
 }
+
+pub enum LanePattern{
+    None,
+    Any,
+    Excluding(HashSet<LaneKey>),
+    Ultimas,
+    Protos,
+    UltimasExcluding(HashSet<UltimaLaneKey>),
+    ProtosExcluding(HashSet<u64>)
+}
+
+impl LanePattern {
+    pub fn is_match(&self, lane: &LaneKey) -> bool {
+        match self {
+            LanePattern::None => false,
+            LanePattern::Any => true,
+            LanePattern::Excluding(set) => {
+                !set.contains(lane)
+            }
+            LanePattern::Ultimas => {
+                !lane.is_proto()
+            }
+            LanePattern::Protos => {
+                lane.is_proto()
+            }
+            LanePattern::UltimasExcluding(exclude) => {
+                match lane {
+                    LaneKey::Proto(_) => false,
+                    LaneKey::Ultima(lane) => {
+                        !exclude.contains(lane)
+                    }
+                }
+            }
+            LanePattern::ProtosExcluding(exclude) => {
+                match lane {
+                    LaneKey::Proto(proto) => !exclude.contains(proto),
+                    LaneKey::Ultima(_) => {
+                        false
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 

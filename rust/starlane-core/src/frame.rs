@@ -25,19 +25,27 @@ use crate::resource::{
     ResourceType, SubSpaceKey, UserKey,
 };
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey};
+use crate::watch::{Notification, Watch, WatchKey};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum Frame {
     Proto(ProtoFrame),
     Diagnose(Diagnose),
     SearchTraversal(SearchTraversal),
     StarMessage(StarMessage),
-    //Watch(Watch),
-    //Event(Event),
-    Ping,
-    Pong,
+    Watch(WatchFrame),
     Close,
 }
+
+
+#[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
+pub enum WatchFrame {
+    Watch(Watch),
+    UnWatch(WatchKey),
+    Notify(Notification)
+}
+
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SearchTraversal {
@@ -53,11 +61,7 @@ pub enum ProtoFrame {
     GatewayAssign(Vec<StarSubGraphKey>),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Watch {
-    Add(WatchInfo),
-    Remove(WatchInfo),
-}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WatchInfo {
@@ -149,23 +153,43 @@ impl SearchWindUp {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum StarPattern {
     Any,
     None,
     StarKey(StarKey),
     StarKind(StarKind),
+    StarKeySubgraph(Vec<StarSubGraphKey>)
 }
 
 impl StarPattern {
-    pub fn is_match(&self, info: &StarInfo) -> bool {
+    pub fn info_match(&self, info: &StarInfo) -> bool {
         match self {
             StarPattern::Any => true,
             StarPattern::None => false,
-            StarPattern::StarKey(star) => *star == info.key,
-            StarPattern::StarKind(kind) => *kind == info.kind,
+            StarPattern::StarKey(_) => {
+                self.key_match(&info.key)
+            }
+            StarPattern::StarKind(pattern) => *pattern == info.kind,
+            StarPattern::StarKeySubgraph(_) => {
+                self.key_match(&info.key)
+            }
         }
     }
+
+    pub fn key_match(&self, star: &StarKey) -> bool {
+        match self {
+            StarPattern::Any => true,
+            StarPattern::None => false,
+            StarPattern::StarKey(pattern) => *star == *pattern,
+            StarPattern::StarKind(_) => false,
+            StarPattern::StarKeySubgraph(pattern) => {
+                // TODO match tail end of subgraph
+                *pattern == star.subgraph
+            }
+        }
+    }
+
 
     pub fn is_single_match(&self) -> bool {
         match self {
@@ -173,6 +197,7 @@ impl StarPattern {
             StarPattern::StarKind(_) => false,
             StarPattern::Any => false,
             StarPattern::None => false,
+            StarPattern::StarKeySubgraph(_) => false
         }
     }
 }
@@ -627,44 +652,18 @@ impl fmt::Display for StarMessagePayload {
     }
 }
 
-impl fmt::Display for Frame {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let r = match self {
-            Frame::Proto(proto) => format!("Proto({})", proto).to_string(),
-            Frame::Close => format!("Close").to_string(),
-            Frame::Diagnose(diagnose) => format!("Diagnose({})", diagnose).to_string(),
-            Frame::StarMessage(inner) => format!("StarMessage({})", inner.payload).to_string(),
-            Frame::SearchTraversal(wind) => format!("StarWind({})", wind).to_string(),
-            //            Frame::Watch(_) => format!("Watch").to_string(),
-            //            Frame::Event(_) => format!("ActorEvent").to_string(),
-            Frame::Ping => "Ping".to_string(),
-            Frame::Pong => "Pong".to_string(),
-        };
-        write!(f, "{}", r)
-    }
-}
 
 impl fmt::Display for SearchTraversal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
-            SearchTraversal::Up(up) => format!("Up({})", &up.pattern).to_string(),
+            SearchTraversal::Up(up) => format!("Up({})", &up.pattern.to_string()).to_string(),
             SearchTraversal::Down(_) => "Down".to_string(),
         };
         write!(f, "{}", r)
     }
 }
 
-impl fmt::Display for StarPattern {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let r = match self {
-            StarPattern::Any => "Any".to_string(),
-            StarPattern::None => "None".to_string(),
-            StarPattern::StarKey(key) => format!("{}", key.to_string()).to_string(),
-            StarPattern::StarKind(kind) => format!("{}", kind.to_string()).to_string(),
-        };
-        write!(f, "{}", r)
-    }
-}
+
 
 impl fmt::Display for ProtoFrame {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

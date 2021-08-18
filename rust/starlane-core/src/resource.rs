@@ -29,7 +29,7 @@ use crate::message::resource::{
 };
 use crate::message::{Fail, MessageExpect, ProtoStarMessage};
 use crate::names::Name;
-use crate::star::shell::pledge::{ResourceHostSelector, StarHandle};
+use crate::star::shell::pledge::{ResourceHostSelector, StarConscript};
 use crate::star::{ResourceRegistryBacking, StarInfo, StarKey, StarSkel};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
@@ -454,7 +454,7 @@ impl RegistryParams {
             Option::Some(registration.resource.stub.key),
             registration.resource.stub.owner,
             Option::Some(registration.resource.stub.address),
-            Option::Some(registration.resource.location.host),
+            Option::Some(registration.resource.location.star),
         )
     }
 
@@ -768,7 +768,7 @@ impl Registry {
             }
             ResourceRegistryCommand::SetLocation(location_record) => {
                 let key = location_record.stub.key.bin()?;
-                let host = location_record.location.host.bin()?;
+                let host = location_record.location.star.bin()?;
                 let trans = self.conn.transaction()?;
                 trans.execute(
                     "UPDATE resources SET host=?1 WHERE key=?3",
@@ -991,7 +991,7 @@ impl Registry {
 
         let record = ResourceRecord {
             stub: stub,
-            location: ResourceLocation { host: host },
+            location: ResourceLocation { star: host },
         };
 
         Ok(record)
@@ -1818,17 +1818,17 @@ impl Into<ResourceStub> for ResourceRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceLocation {
-    pub host: StarKey,
+    pub star: StarKey,
 }
 
 impl ResourceLocation {
     pub fn new(host: StarKey) -> Self {
-        ResourceLocation { host: host }
+        ResourceLocation { star: host }
     }
 
     pub fn root() -> Self {
         Self {
-            host: StarKey::central(),
+            star: StarKey::central(),
         }
     }
 }
@@ -2608,7 +2608,7 @@ impl ResourceHost for LocalResourceHost {
 
 pub struct RemoteResourceHost {
     pub skel: StarSkel,
-    pub handle: StarHandle,
+    pub handle: StarConscript,
 }
 
 #[async_trait]

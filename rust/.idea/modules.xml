@@ -3,7 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/rust.iml" filepath="$PROJECT_DIR$/.idea/rust.iml" />
-      <module fileurl="file://$PROJECT_DIR$/starlane/starlane.iml" filepath="$PROJECT_DIR$/starlane/starlane.iml" />
     </modules>
   </component>
 </project>

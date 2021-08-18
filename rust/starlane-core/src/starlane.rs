@@ -20,7 +20,7 @@ use crate::error::Error;
 use crate::file_access::FileAccess;
 
 use crate::lane::{
-    ClientSideTunnelConnector, LocalTunnelConnector, ProtoLaneEndpoint, ServerSideTunnelConnector,
+    ClientSideTunnelConnector, LocalTunnelConnector, ProtoLaneEnd, ServerSideTunnelConnector,
 };
 use crate::logger::{Flags, Logger};
 
@@ -30,7 +30,6 @@ use crate::proto::{
 
 use crate::data::BinContext;
 use crate::star::surface::SurfaceApi;
-use crate::star::variant::{StarVariantFactory, StarVariantFactoryDefault};
 use crate::star::{ConstellationBroadcast, StarKind, StarStatus};
 use crate::star::{Request, Star, StarCommand, StarController, StarInfo, StarKey, StarTemplateId};
 use crate::starlane::api::StarlaneApi;
@@ -83,12 +82,13 @@ impl StarlaneMachine {
 
     pub async fn get_proto_artifact_caches_factory(
         &self,
-    ) -> Result<Option<Arc<ProtoArtifactCachesFactory>>, Error> {
+    ) -> Result<Arc<ProtoArtifactCachesFactory>,Error> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(StarlaneCommand::GetProtoArtifactCachesFactory(tx))
             .await?;
-        Ok(rx.await?)
+        Ok(rx.await?.ok_or("expected proto artifact cache")?)
+
     }
 
     pub fn bin_context(&self) -> Arc<dyn BinContext> {
@@ -152,7 +152,6 @@ pub struct StarlaneMachineRunner {
     pub command_tx: mpsc::Sender<StarlaneCommand>,
     command_rx: mpsc::Receiver<StarlaneCommand>,
     star_controllers: AsyncHashMap<StarInConstellationTemplateHandle, StarController>,
-    star_manager_factory: Arc<dyn StarVariantFactory>,
     //    star_core_ext_factory: Arc<dyn StarCoreExtFactory>,
     data_access: FileAccess,
     cache_access: FileAccess,
@@ -179,7 +178,6 @@ impl StarlaneMachineRunner {
             star_controllers: AsyncHashMap::new(),
             command_tx,
             command_rx,
-            star_manager_factory: Arc::new(StarVariantFactoryDefault {}),
             //            star_core_ext_factory: Arc::new(ExampleStarCoreExtFactory::new() ),
             logger: Logger::new(),
             flags: Flags::new(),
@@ -401,6 +399,7 @@ impl StarlaneMachineRunner {
                     let caches = Arc::new(ProtoArtifactCachesFactory::new(
                         api.into(),
                         self.cache_access.clone(),
+                        starlane_machine.clone()
                     )?);
                     self.artifact_caches = Option::Some(caches);
                 }
@@ -413,7 +412,6 @@ impl StarlaneMachineRunner {
                     surface_api,
                     surface_rx,
                     self.data_access.clone(),
-                    self.star_manager_factory.clone(),
                     constellation_broadcaster.subscribe(),
                     self.flags.clone(),
                     self.logger.clone(),
@@ -603,6 +601,7 @@ impl StarlaneMachineRunner {
     }
 
     fn listen(&mut self, result_tx: oneshot::Sender<Result<(), Error>>) {
+println!("LISTEN...");
         {
             let mut inner_flags = self.inner_flags.lock().unwrap();
             let flags = inner_flags.get_mut();
@@ -641,6 +640,7 @@ impl StarlaneMachineRunner {
                                 return;
                             }
                         }
+println!("received TCP Stream...");
                         let _ok = command_tx
                             .send(StarlaneCommand::AddStream(stream))
                             .await
@@ -707,8 +707,8 @@ impl StarlaneMachineRunner {
         high_star_ctrl: StarController,
         low_star_ctrl: StarController,
     ) -> Result<Vec<broadcast::Receiver<Result<(), Error>>>, Error> {
-        let high_lane = ProtoLaneEndpoint::new(Option::None);
-        let low_lane = ProtoLaneEndpoint::new(Option::None);
+        let high_lane = ProtoLaneEnd::new(Option::None);
+        let low_lane = ProtoLaneEnd::new(Option::None);
         let rtn = vec![high_lane.get_evoltion_rx(), low_lane.get_evoltion_rx()];
         let connector = LocalTunnelConnector::new(&high_lane, &low_lane).await?;
         high_star_ctrl
@@ -732,7 +732,7 @@ impl StarlaneMachineRunner {
         low_star_ctrl: StarController,
         stream: TcpStream,
     ) -> Result<broadcast::Receiver<Result<(), Error>>, Error> {
-        let low_lane = ProtoLaneEndpoint::new(Option::None);
+        let low_lane = ProtoLaneEnd::new(Option::None);
         let rtn = low_lane.get_evoltion_rx();
 
         let connector_ctrl = ServerSideTunnelConnector::new(&low_lane, stream).await?;
@@ -757,7 +757,7 @@ impl StarlaneMachineRunner {
         selector: StarInConstellationTemplateSelector,
         key_requestor: bool,
     ) -> Result<broadcast::Receiver<Result<(), Error>>, Error> {
-        let mut lane = ProtoLaneEndpoint::new(Option::None);
+        let mut lane = ProtoLaneEnd::new(Option::None);
         lane.key_requestor = key_requestor;
 
         let rtn = lane.get_evoltion_rx();
@@ -934,6 +934,7 @@ mod test {
         info!("tracing works!");
     }
 
+    /*
     #[test]
     pub fn starlane() {
         let subscriber = FmtSubscriber::default();
@@ -1112,4 +1113,6 @@ mod test {
             std::thread::sleep(std::time::Duration::from_secs(1));
         });
     }
+
+     */
 }

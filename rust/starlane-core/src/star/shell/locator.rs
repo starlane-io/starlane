@@ -191,7 +191,7 @@ impl ResourceLocatorComponent {
                             .await,
                     )?;
                     let rtn = locator_api
-                        .external_locate(identifier, parent_record.location.host)
+                        .external_locate(identifier, parent_record.location.star)
                         .await?;
 
                     Ok(rtn)
