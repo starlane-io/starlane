@@ -51,7 +51,7 @@ impl ConstellationTemplate {
         );
         let mut actor_host = StarTemplate::new(
             StarKeyTemplate::central_geodesic(4),
-            StarKind::Actor,
+            StarKind::Mechtron,
             "actor_host".into(),
         );
         let mut file_store = StarTemplate::new(

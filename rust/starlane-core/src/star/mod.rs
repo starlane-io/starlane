@@ -83,7 +83,7 @@ pub enum StarKind {
     Space,
     Mesh,
     App,
-    Actor,
+    Mechtron,
     FileStore,
     ArtifactStore,
     Gateway,
@@ -100,7 +100,7 @@ impl StarKind {
             StarKind::Space => true,
             StarKind::Mesh => false,
             StarKind::App => true,
-            StarKind::Actor => false,
+            StarKind::Mechtron => false,
             StarKind::FileStore => true,
             StarKind::Gateway => false,
             StarKind::Link => false,
@@ -117,7 +117,7 @@ impl StarKind {
             StarKind::Space => true,
             StarKind::Mesh => false,
             StarKind::App => true,
-            StarKind::Actor => true,
+            StarKind::Mechtron => true,
             StarKind::FileStore => true,
             StarKind::Gateway => false,
             StarKind::Link => false,
@@ -141,8 +141,8 @@ impl StarKind {
                     ]
                 }
                 StarKind::Mesh => vec![],
-                StarKind::App => vec![StarConscriptKind::req(StarKind::Actor), StarConscriptKind::req(StarKind::FileStore)],
-                StarKind::Actor => vec![],
+                StarKind::App => vec![StarConscriptKind::req(StarKind::Mechtron), StarConscriptKind::req(StarKind::FileStore)],
+                StarKind::Mechtron => vec![],
                 StarKind::FileStore => vec![],
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
@@ -169,11 +169,11 @@ impl StarKind {
                 ],
                 StarKind::Mesh => vec![],
                 StarKind::App => vec![
-                    ResourceType::Actor,
+                    ResourceType::Mechtron,
                     ResourceType::FileSystem,
                     ResourceType::Database,
                 ],
-                StarKind::Actor => vec![],
+                StarKind::Mechtron => vec![],
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
                 StarKind::Client => vec![],
@@ -193,11 +193,13 @@ impl StarKind {
             ResourceType::Space => Self::Central,
             ResourceType::SubSpace => Self::Space,
             ResourceType::User => Self::Space,
+            ResourceType::UserBase => Self::Space,
             ResourceType::App => Self::Space,
-            ResourceType::Actor => Self::App,
+            ResourceType::Mechtron => Self::App,
             ResourceType::FileSystem => Self::Space,
             ResourceType::File => Self::Space,
             ResourceType::Database => Self::K8s,
+            ResourceType::Auth=> Self::K8s,
             ResourceType::ArtifactBundleVersions => Self::Space,
             ResourceType::ArtifactBundle => Self::ArtifactStore,
             ResourceType::Artifact => Self::ArtifactStore,
@@ -213,10 +215,12 @@ impl StarKind {
             ResourceType::SubSpace => Self::Space,
             ResourceType::User => Self::Space,
             ResourceType::App => Self::App,
-            ResourceType::Actor => Self::Actor,
+            ResourceType::Mechtron => Self::Mechtron,
             ResourceType::FileSystem => Self::FileStore,
             ResourceType::File => Self::FileStore,
             ResourceType::Database => Self::K8s,
+            ResourceType::Auth=> Self::K8s,
+            ResourceType::UserBase => Self::Space,
             ResourceType::ArtifactBundleVersions => Self::ArtifactStore,
             ResourceType::ArtifactBundle => Self::ArtifactStore,
             ResourceType::Artifact => Self::ArtifactStore,
@@ -238,10 +242,10 @@ impl StarKind {
                 ],
                 StarKind::Mesh => vec![],
                 StarKind::App => vec![ResourceType::App],
-                StarKind::Actor => vec![ResourceType::Actor],
+                StarKind::Mechtron => vec![ResourceType::Mechtron],
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
-                StarKind::Client => vec![ResourceType::Actor],
+                StarKind::Client => vec![ResourceType::Mechtron],
                 StarKind::Web => vec![],
                 StarKind::FileStore => vec![ResourceType::FileSystem, ResourceType::File],
                 StarKind::ArtifactStore => {
@@ -345,7 +349,7 @@ impl StarKind {
     }
 
     pub fn server_result(&self) -> Result<(), Error> {
-        if let StarKind::Actor = self {
+        if let StarKind::Mechtron = self {
             Ok(())
         } else {
             Err("not server".into())
@@ -365,7 +369,7 @@ impl StarKind {
             StarKind::Central => false,
             StarKind::Mesh => true,
             StarKind::App => false,
-            StarKind::Actor => true,
+            StarKind::Mechtron => true,
             StarKind::Gateway => true,
             StarKind::Client => true,
             StarKind::Link => true,
@@ -378,14 +382,7 @@ impl StarKind {
     }
 }
 
-impl fmt::Display for ActorLookup {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let r = match self {
-            ActorLookup::Key(entity) => format!("Key({})", entity.to_string()).to_string(),
-        };
-        write!(f, "{}", r)
-    }
-}
+
 
 pub static MAX_HOPS: usize = 32;
 

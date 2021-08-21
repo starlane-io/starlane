@@ -1338,10 +1338,10 @@ resources! {
     pub struct App();
 
     #[resource(parents(App))]
-    #[resource(prefix="act")]
+    #[resource(prefix="mt")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
     #[resource(ResourceStatePersistenceManager::None)]
-    pub struct Actor();
+    pub struct Mechtron();
 
     #[resource(parents(SubSpace,App))]
     #[resource(prefix="fs")]
@@ -1362,6 +1362,13 @@ resources! {
     #[resource(ResourcePathSegmentKind::SkewerCase)]
     #[resource(ResourceStatePersistenceManager::Host)]
     pub struct Database();
+
+    #[resource(parents(SubSpace,App))]
+    #[resource(prefix="auth")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    pub struct Auth();
+
 
     #[resource(parents(Root))]
     #[resource(prefix="d")]
@@ -1397,6 +1404,13 @@ resources! {
     pub struct Artifact();
 
     #[resource(parents(Space))]
+    #[resource(prefix="ub")]
+    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourceStatePersistenceManager::Host)]
+    pub struct UserBase();
+
+
+    #[resource(parents(Space))]
     #[resource(prefix="u")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
     #[resource(ResourceStatePersistenceManager::Host)]
@@ -1408,6 +1422,12 @@ resources! {
     pub enum DatabaseKind{
         Relational(Specific)
     }
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
+    pub enum AuthKind{
+        OAuth(Specific)
+    }
+
 
     #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
     pub enum FileKind{
