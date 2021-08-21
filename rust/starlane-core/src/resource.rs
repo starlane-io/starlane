@@ -69,7 +69,7 @@ pub type SpaceKey = starlane_resources::SpaceKey;
 pub type SubSpaceKey = starlane_resources::SubSpaceKey;
 pub type AppKey = starlane_resources::AppKey;
 pub type DatabaseKey = starlane_resources::DatabaseKey;
-pub type ActorKey = starlane_resources::ActorKey;
+pub type ActorKey = starlane_resources::MechtronKey;
 pub type ProxyKey = starlane_resources::ProxyKey;
 pub type DomainKey = starlane_resources::DomainKey;
 pub type UserKey = starlane_resources::UserKey;
@@ -131,11 +131,6 @@ impl ResourceSelector {
         selector
     }
 
-    pub fn actor_selector() -> Self {
-        let mut selector = Self::new();
-        selector.add_field(FieldSelection::Type(ResourceType::Actor));
-        selector
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1598,7 +1593,7 @@ impl ResourceCreationChamber {
 
                 ResourceAddress::from_str(address.as_str())?
             }
-            AddressCreationSrc::Space(space_name) => {
+            AddressCreationSrc::Just(space_name) => {
                 if self.parent.key.resource_type() != ResourceType::Root {
                     return Err(format!(
                         "Space creation can only be used at top level (Root) not by {}",
@@ -2429,7 +2424,7 @@ pub enum AddressCreationSrc {
     None,
     Append(String),
     Appends(Vec<String>),
-    Space(String),
+    Just(String),
     Exact(ResourceAddress),
 }
 

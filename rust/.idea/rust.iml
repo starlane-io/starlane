@@ -9,6 +9,8 @@
       <sourceFolder url="file://$MODULE_DIR$/starlane-resources-test/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/starlane-resources/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/starlane/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/mechtron-common/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/mechtron/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

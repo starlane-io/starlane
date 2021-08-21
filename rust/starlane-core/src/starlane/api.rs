@@ -298,9 +298,28 @@ impl StarlaneApi {
         let create = ResourceCreate {
             parent: ResourceKey::Root.into(),
             key: KeyCreationSrc::None,
-            address: AddressCreationSrc::Space(name.to_string()),
+            address: AddressCreationSrc::Just(name.to_string()),
             archetype: ResourceArchetype {
                 kind: ResourceKind::Space,
+                specific: None,
+                config: None,
+            },
+            state_src: state,
+            registry_info: None,
+            owner: None,
+            strategy: ResourceCreateStrategy::Create,
+        };
+        Ok(Creation::new(self.clone(), create))
+    }
+
+    pub fn create_domain(&self, domain: &str) -> Result<Creation<DomainApi>, Fail> {
+        let state= AssignResourceStateSrc::Stateless;
+        let create = ResourceCreate {
+            parent: ResourceKey::Root.into(),
+            key: KeyCreationSrc::None,
+            address: AddressCreationSrc::Just(domain.to_string()),
+            archetype: ResourceArchetype {
+                kind: ResourceKind::Domain,
                 specific: None,
                 config: None,
             },
@@ -409,24 +428,7 @@ impl SpaceApi {
         Ok(Creation::new(self.starlane_api(), create))
     }
 
-    pub fn create_domain(&self, domain: &str) -> Result<Creation<DomainApi>, Fail> {
-        let resource_src = AssignResourceStateSrc::Stateless;
-        let create = ResourceCreate {
-            parent: self.stub.key.clone().into(),
-            key: KeyCreationSrc::None,
-            address: AddressCreationSrc::Append(domain.to_string()),
-            archetype: ResourceArchetype {
-                kind: ResourceKind::Domain,
-                specific: None,
-                config: None,
-            },
-            state_src: resource_src,
-            registry_info: None,
-            owner: None,
-            strategy: ResourceCreateStrategy::Create,
-        };
-        Ok(Creation::new(self.starlane_api(), create))
-    }
+
 }
 
 pub struct SubSpaceApi {

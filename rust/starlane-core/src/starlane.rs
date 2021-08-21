@@ -77,7 +77,7 @@ impl StarlaneMachine {
             machine_filesystem: Arc::new(MachineFileSystem::new()?),
         };
 
-        Ok(starlane)
+        Result::Ok(starlane)
     }
 
     pub async fn get_proto_artifact_caches_factory(
@@ -932,6 +932,63 @@ mod test {
         let subscriber = FmtSubscriber::default();
         set_global_default(subscriber.into()).expect("setting global default failed");
         info!("tracing works!");
+    }
+
+
+    #[test]
+    pub fn mechtron() {
+        let subscriber = FmtSubscriber::default();
+        set_global_default(subscriber.into()).expect("setting global default failed");
+
+        let data_dir = "tmp/data";
+        let cache_dir = "tmp/cache";
+        fs::remove_dir_all(data_dir).unwrap_or_default();
+        fs::remove_dir_all(cache_dir).unwrap_or_default();
+        std::env::set_var("STARLANE_DATA", data_dir);
+        std::env::set_var("STARLANE_CACHE", cache_dir);
+
+        println!("Hello");
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let mut starlane = StarlaneMachine::new("server".to_string()).unwrap();
+            starlane.listen().await.unwrap();
+
+            tokio::spawn(async {
+                println!("PRE CREATE CONSTELLATION");
+            });
+
+            starlane
+                .create_constellation("standalone", ConstellationLayout::standalone().unwrap())
+                .await
+                .unwrap();
+
+            tokio::spawn(async {
+                println!("POST CREATE CONSTELLATION");
+            });
+
+            let starlane_api = starlane.get_starlane_api().await.unwrap();
+
+            let sub_space_api = match starlane_api
+                .get_sub_space(
+                    ResourceAddress::from_str("hyperspace:starlane::<SubSpace>")
+                        .unwrap()
+                        .into(),
+                )
+                .await
+            {
+                Ok(api) => api,
+                Err(err) => {
+                    eprintln!("{}", err.to_string());
+                    panic!(err)
+                }
+            };
+
+
+
+            starlane.shutdown();
+
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        });
     }
 
     /*
