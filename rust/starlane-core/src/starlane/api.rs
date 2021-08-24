@@ -235,7 +235,7 @@ impl StarlaneApi {
 
         match api {
             Ok(api) => Ok(api),
-            Err(_error) => Err(Fail::Error("catastrophic converstion error".into())),
+            Err(error) => Err(Fail::Error(format!("catastrophic conversion error when attempting to try_convert api").into())),
         }
     }
 
@@ -471,6 +471,26 @@ impl SubSpaceApi {
         StarlaneApi::new(self.surface_api.clone())
     }
 
+    pub fn create_app(&self, name: &str) -> Result<Creation<AppApi>, Fail> {
+        let resource_src = AssignResourceStateSrc::Stateless;
+        let create = ResourceCreate {
+            parent: self.stub.key.clone().into(),
+            key: KeyCreationSrc::None,
+            address: AddressCreationSrc::Append(name.to_string()),
+            archetype: ResourceArchetype {
+                kind: ResourceKind::App,
+                specific: None,
+                config: None,
+            },
+            state_src: resource_src,
+            registry_info: None,
+            owner: None,
+            strategy: ResourceCreateStrategy::Create,
+        };
+        Ok(Creation::new(self.starlane_api(), create))
+    }
+
+
     pub fn create_file_system(&self, name: &str) -> Result<Creation<FileSystemApi>, Fail> {
         let resource_src = AssignResourceStateSrc::Stateless;
         let create = ResourceCreate {
@@ -511,6 +531,46 @@ impl SubSpaceApi {
             strategy: ResourceCreateStrategy::Create,
         };
         Ok(Creation::new(self.starlane_api(), create))
+    }
+}
+
+pub struct AppApi{
+    stub: ResourceStub,
+    surface_api: SurfaceApi,
+}
+
+impl AppApi {
+    pub fn key(&self) -> ResourceKey {
+        self.stub.key.clone()
+    }
+
+    pub fn address(&self) -> ResourceAddress {
+        self.stub.address.clone()
+    }
+
+    pub fn new(surface_api: SurfaceApi, stub: ResourceStub) -> Result<Self, Error> {
+        if stub.key.resource_type() != ResourceType::App{
+            return Err(format!(
+                "wrong key resource type for AppApi: {}",
+                stub.key.resource_type().to_string()
+            )
+                .into());
+        }
+        if stub.address.resource_type() != ResourceType::App{
+            return Err(format!(
+                "wrong address resource type for AppApi: {}",
+                stub.address.resource_type().to_string()
+            )
+                .into());
+        }
+
+        Ok(AppApi{
+            stub: stub,
+            surface_api: surface_api,
+        })
+    }
+    pub fn starlane_api(&self) -> StarlaneApi {
+        StarlaneApi::new(self.surface_api.clone())
     }
 }
 
@@ -825,6 +885,14 @@ impl TryFrom<ResourceApi> for FileSystemApi {
 }
 
 impl TryFrom<ResourceApi> for FileApi {
+    type Error = Fail;
+
+    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
+        Ok(Self::new(value.surface_api, value.stub)?)
+    }
+}
+
+impl TryFrom<ResourceApi> for AppApi{
     type Error = Fail;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {

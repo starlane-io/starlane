@@ -8,25 +8,25 @@ use std::iter::FromIterator;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
-use starlane_resources::ResourceIdentifier;
+use starlane_resources::{ResourceIdentifier, Version, SkewerCase};
 
 use crate::error::Error;
 use crate::frame::{MessagePayload, Reply, SimpleReply, StarMessage, StarMessagePayload};
 
 use crate::data::{BinSrc, DataSet};
 use crate::message::{Fail, MessageId, ProtoStarMessage};
-use crate::resource::{
-    RemoteDataSrc, ResourceCreate, ResourceId, ResourceRecord, ResourceSelector, ResourceType,
-};
+use crate::resource::{RemoteDataSrc, ResourceCreate, ResourceId, ResourceRecord, ResourceSelector, ResourceType, ResourceKey};
 use crate::star::{StarCommand, StarSkel};
 use crate::util;
 use tokio::time::Duration;
 
-pub type MessageTo = ResourceIdentifier;
+//pub type MessageTo = ResourceIdentifier;
 
 pub fn reverse(to: MessageTo) -> MessageFrom {
     MessageFrom::Resource(to)
 }
+
+pub type MessageTo = ResourceIdentifier;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum MessageFrom {
@@ -360,3 +360,57 @@ impl Into<StarMessagePayload> for MessageReply<ResourceResponseMessage> {
         StarMessagePayload::MessagePayload(MessagePayload::Response(self))
     }
 }
+
+
+pub struct MechtronMessageTo{
+    resource: ResourceIdentifier,
+    port: PortIdentifier,
+    delivery: DeliverySelector
+}
+
+impl MechtronMessageTo {
+    pub fn new(resource: ResourceIdentifier, port: PortIdentifier) -> Self{
+        Self {
+            resource,
+            port,
+            delivery: DeliverySelector::any()
+        }
+    }
+}
+
+pub enum PortIdentifier{
+    Key(PortKey),
+    Address(PortAddress)
+}
+
+
+pub type PortIndex = u16;
+
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub struct PortKey {
+    pub resource: ResourceIdentifier,
+    pub port: PortIndex
+}
+
+#[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub struct PortAddress{
+    pub resource: ResourceIdentifier,
+    pub port: SkewerCase
+}
+
+pub struct DeliverySelector{
+    selections: Vec<DeliverySelection>
+}
+
+pub enum DeliverySelection{
+ Any
+}
+
+impl DeliverySelector {
+    pub fn any() ->Self {
+        Self {
+            selections: vec![DeliverySelection::Any]
+        }
+    }
+}
+

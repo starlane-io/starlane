@@ -138,6 +138,7 @@ impl StarKind {
                         StarConscriptKind::req(StarKind::Web),
                         StarConscriptKind::req(StarKind::ArtifactStore),
                         StarConscriptKind::opt(StarKind::K8s),
+                        StarConscriptKind::opt(StarKind::App),
                     ]
                 }
                 StarKind::Mesh => vec![],

@@ -937,6 +937,7 @@ mod test {
 
     #[test]
     pub fn mechtron() {
+println!("Mechtron..");
         let subscriber = FmtSubscriber::default();
         set_global_default(subscriber.into()).expect("setting global default failed");
 
@@ -950,44 +951,35 @@ mod test {
         println!("Hello");
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let mut starlane = StarlaneMachine::new("server".to_string()).unwrap();
-            starlane.listen().await.unwrap();
+println!("block ON..");
+            async fn test() -> Result<(),Error> {
+                let mut starlane = StarlaneMachine::new("server".to_string()).unwrap();
 
-            tokio::spawn(async {
-                println!("PRE CREATE CONSTELLATION");
-            });
+                starlane.listen().await.unwrap();
 
-            starlane
-                .create_constellation("standalone", ConstellationLayout::standalone().unwrap())
-                .await
-                .unwrap();
+                starlane.create_constellation("standalone", ConstellationLayout::standalone().unwrap()) .await?;
 
-            tokio::spawn(async {
-                println!("POST CREATE CONSTELLATION");
-            });
+println!("POST CREATE CONSTELLATION");
 
-            let starlane_api = starlane.get_starlane_api().await.unwrap();
+                let starlane_api = starlane.get_starlane_api().await.unwrap();
 
-            let sub_space_api = match starlane_api
-                .get_sub_space(
-                    ResourceAddress::from_str("hyperspace:starlane::<SubSpace>")
-                        .unwrap()
-                        .into(),
-                )
-                .await
-            {
-                Ok(api) => api,
-                Err(err) => {
-                    eprintln!("{}", err.to_string());
-                    panic!(err)
+                let sub_space_api = starlane_api.get_sub_space( ResourceAddress::from_str("hyperspace:starlane<SubSpace>").unwrap() .into(), ) .await?;
+
+                let app_api = sub_space_api.create_app("app")?.submit().await?;
+
+                starlane.shutdown();
+
+                std::thread::sleep(std::time::Duration::from_secs(1));
+
+                Ok(())
+            }
+            match test().await {
+                Ok(_) => {}
+                Err(error) => {
+                    eprintln!("{}",error.to_string());
+                    assert!(false);
                 }
-            };
-
-
-
-            starlane.shutdown();
-
-            std::thread::sleep(std::time::Duration::from_secs(1));
+            }
         });
     }
 

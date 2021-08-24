@@ -92,11 +92,13 @@ impl CentralVariant {
         let space_api = creation.submit().await?;
         println!("hyperspace ensured.");
 
+
         println!("ensuring subspace...");
         let mut creation = space_api.create_sub_space("starlane", "Starlane")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         let subspace_api = creation.submit().await?;
         println!("subspace ensured.");
+
 
         /*
                 let mut creation = space_api.create_user("hyperuser@starlane.io")?;
@@ -106,11 +108,17 @@ impl CentralVariant {
 
                  */
 
+        /*
         let mut creation = starlane_api.create_domain("localhost")?;
+
         creation.set_strategy(ResourceCreateStrategy::Ensure);
 println!("BEFORE");
         creation.submit().await?;
         println!("localhost ensured.");
+
+         */
+
+
 
         {
             println!(
