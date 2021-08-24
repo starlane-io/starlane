@@ -12,12 +12,15 @@ use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use tokio::sync::{mpsc, oneshot};
 use crate::star::core::resource::host::artifact::ArtifactBundleHost;
+use crate::star::core::resource::host::app::AppHost;
 
 pub mod artifact;
 mod default;
 pub mod file_store;
 pub mod kube;
 mod space;
+mod mechtron;
+mod app;
 
 pub enum HostCall {
     Assign {
@@ -89,6 +92,7 @@ impl HostComponent {
             ResourceType::ArtifactBundleVersions => Box::new(StatelessHost::new(self.skel.clone()).await),
             ResourceType::ArtifactBundle=> Box::new(ArtifactBundleHost::new(self.skel.clone()).await),
             ResourceType::Domain => Box::new(StatelessHost::new(self.skel.clone()).await),
+            ResourceType::App=> Box::new(AppHost::new(self.skel.clone()).await),
 
             t => unimplemented!("no HOST implementation for type {}", t.to_string()),
         }

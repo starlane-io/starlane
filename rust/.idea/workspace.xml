@@ -6,14 +6,32 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/starlane-core/src/mechtron.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/app.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/mechtron.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/starlane-core/src/wasm.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/.appveyor.yml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/.cargo-ok" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/.idea/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/.idea/modules.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/.travis.yml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/Cargo.toml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/LICENSE_APACHE" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/LICENSE_MIT" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/Makefile" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/conf/app/appy-config.yaml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/conf/bind/appy.yaml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/conf/mechtron/appy.yaml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/example.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/src/lib.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../wasm/appy/tests/web.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/message/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/message/resource.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant/central.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/central.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -50,7 +68,13 @@
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/starlane-core/src/star/core/resource/host" />
     <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/starlane-core/src/star/core/resource/host" />
+    </key>
   </component>
   <component name="RunManager" selected="Cargo.Test starlane::test::mechtron">
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
@@ -148,7 +172,7 @@
       <workItem from="1628780042092" duration="22584000" />
       <workItem from="1629406960036" duration="15331000" />
       <workItem from="1629548233485" duration="10310000" />
-      <workItem from="1629789716878" duration="6016000" />
+      <workItem from="1629789716878" duration="22853000" />
     </task>
     <servers />
   </component>

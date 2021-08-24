@@ -965,7 +965,28 @@ println!("POST CREATE CONSTELLATION");
 
                 let sub_space_api = starlane_api.get_sub_space( ResourceAddress::from_str("hyperspace:starlane<SubSpace>").unwrap() .into(), ) .await?;
 
-                let app_api = sub_space_api.create_app("app")?.submit().await?;
+                {
+                    let mut file =
+                        File::open("../../wasm/appy/appy.zip").unwrap();
+                    let mut data = vec![];
+                    file.read_to_end(&mut data).unwrap();
+                    let address =  ResourceAddress::from_str("hyperspace:starlane:appy:1.0.0<ArtifactBundle>")?;
+                    let mut creation = sub_space_api
+                        .create_artifact_bundle_versions(address.parent().unwrap().name().as_str())?;
+                    let artifact_bundle_versions_api = creation.submit().await?;
+
+                    let version = semver::Version::from_str(address.name().as_str())?;
+                    let mut creation = artifact_bundle_versions_api.create_artifact_bundle(
+                        version,
+                        Arc::new(data),
+                    )?;
+                    creation.submit().await?;
+                }
+println!("appy bundle published");
+
+                let app_api = sub_space_api.create_app("appy")?.submit().await?;
+
+println!("app created: {}", app_api.key().to_string() );
 
                 starlane.shutdown();
 

@@ -1,0 +1,4 @@
+kind: Mechtron
+spec:
+  bind: "{bundle}:/bind/appy.yaml"
+  wasm: "{bundle}:/wasm/appy.wasm"
