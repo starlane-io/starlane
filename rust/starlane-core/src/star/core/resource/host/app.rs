@@ -62,7 +62,6 @@ println!("artifact : {}", artifact.to_string());
         let caches = proto.to_caches().await?;
         let app_config = caches.app_configs.get(&app_config_artifact).ok_or::<Error>(format!("expected app_config").into())?;
 
-
         println!("App config loaded!");
 
         println!("main: {}", app_config.main.address.to_string() );

@@ -13,6 +13,8 @@ use std::collections::HashMap;
 use tokio::sync::{mpsc, oneshot};
 use crate::star::core::resource::host::artifact::ArtifactBundleHost;
 use crate::star::core::resource::host::app::AppHost;
+use crate::star::core::resource::host::mechtron::MechtronHost;
+use std::sync::Arc;
 
 pub mod artifact;
 mod default;
@@ -41,12 +43,13 @@ impl Call for HostCall {}
 
 pub struct HostComponent {
     skel: StarSkel,
+    hosts: HashMap<ResourceType,Arc<dyn Host>>
 }
 
 impl HostComponent {
     pub fn new(skel: StarSkel) -> mpsc::Sender<HostCall> {
         let (tx, rx) = mpsc::channel(1024);
-        AsyncRunner::new(Box::new(Self { skel }), tx.clone(), rx);
+        AsyncRunner::new(Box::new(Self { skel, hosts: HashMap::new() }), tx.clone(), rx);
         tx
     }
 }
@@ -85,17 +88,26 @@ impl AsyncProcessor<HostCall> for HostComponent {
 }
 
 impl HostComponent {
-    async fn host(&self, rt: ResourceType) -> Box<dyn Host> {
-        match rt {
-            ResourceType::Space => Box::new(SpaceHost::new(self.skel.clone()).await),
-            ResourceType::SubSpace => Box::new(SpaceHost::new(self.skel.clone()).await),
-            ResourceType::ArtifactBundleVersions => Box::new(StatelessHost::new(self.skel.clone()).await),
-            ResourceType::ArtifactBundle=> Box::new(ArtifactBundleHost::new(self.skel.clone()).await),
-            ResourceType::Domain => Box::new(StatelessHost::new(self.skel.clone()).await),
-            ResourceType::App=> Box::new(AppHost::new(self.skel.clone()).await),
+    async fn host(&mut self, rt: ResourceType) -> Arc<dyn Host> {
+
+        if self.hosts.contains_key(&rt) {
+            return self.hosts.get(&rt).cloned().expect("expected reference to host");
+        }
+
+        let host: Arc<dyn Host> = match rt {
+            ResourceType::Space => Arc::new(SpaceHost::new(self.skel.clone()).await),
+            ResourceType::SubSpace => Arc::new(SpaceHost::new(self.skel.clone()).await),
+            ResourceType::ArtifactBundleVersions => Arc::new(StatelessHost::new(self.skel.clone()).await),
+            ResourceType::ArtifactBundle=> Arc::new(ArtifactBundleHost::new(self.skel.clone()).await),
+            ResourceType::Domain => Arc::new(StatelessHost::new(self.skel.clone()).await),
+            ResourceType::App=> Arc::new(AppHost::new(self.skel.clone()).await),
+            ResourceType::Mechtron => Arc::new(MechtronHost::new(self.skel.clone()).await),
 
             t => unimplemented!("no HOST implementation for type {}", t.to_string()),
-        }
+        };
+
+        self.hosts.insert( rt, host.clone() );
+        host
     }
 }
 

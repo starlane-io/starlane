@@ -24,7 +24,7 @@ impl Cacheable for AppConfig {
     }
 
     fn references(&self) -> Vec<ArtifactRef> {
-        vec![self.main.clone()]
+        vec![]
     }
 }
 
