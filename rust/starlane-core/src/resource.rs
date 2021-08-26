@@ -9,42 +9,40 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
+use rusqlite::{Connection, params, params_from_iter, Row, ToSql, Transaction};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
-use rusqlite::{params, params_from_iter, Connection, Row, ToSql, Transaction};
 use serde::{Deserialize, Serialize};
-use tokio::sync::oneshot::Receiver;
 use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot::Receiver;
 
 use starlane_resources::ResourceIdentifier;
 
+use crate::{error, logger, util};
 use crate::app::ConfigSrc;
 use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::{Reply, ReplyKind, ResourceHostAction, SimpleReply, StarMessagePayload};
 use crate::logger::{elog, LogInfo, StaticLogInfo};
+use crate::message::{Fail, MessageExpect, ProtoStarMessage};
 use crate::message::resource::{
     MessageFrom, MessageReply, MessageTo, ProtoMessage, ResourceRequestMessage,
     ResourceResponseMessage,
 };
-use crate::message::{Fail, MessageExpect, ProtoStarMessage};
 use crate::names::Name;
-use crate::star::shell::pledge::{ResourceHostSelector, StarConscript};
 use crate::star::{ResourceRegistryBacking, StarInfo, StarKey, StarSkel};
+use crate::star::shell::pledge::{ResourceHostSelector, StarConscript};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
-use crate::{error, logger, util};
 
 pub mod artifact;
 pub mod config;
 pub mod create_args;
-pub mod domain;
 pub mod file;
 pub mod file_system;
 pub mod selector;
 pub mod sub_space;
 pub mod user;
-pub mod app;
 
 pub type ResourceType = starlane_resources::ResourceType;
 pub type ResourceAddress = starlane_resources::ResourceAddress;

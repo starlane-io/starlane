@@ -30,14 +30,17 @@ use crate::resource::{
 use crate::resource::ArtifactAddress;
 
 use crate::resource::config::Parser;
-use crate::resource::domain::{DomainConfig, DomainConfigParser};
+use crate::config::domain::{DomainConfig, DomainConfigParser};
 use crate::resource::ArtifactKind;
 
 use crate::starlane::api::StarlaneApi;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
 use crate::data::{DataSet, BinSrc};
 use crate::starlane::StarlaneMachine;
-use crate::resource::app::{AppConfig, AppConfigParser};
+use crate::config::app::{AppConfig, AppConfigParser};
+use crate::config::mechtron::{MechtronConfig, MechtronConfigParser};
+use crate::config::wasm::{Wasm, WasmParser};
+use crate::config::bind::{BindConfig, BindConfigParser};
 
 pub type Data = Arc<Vec<u8>>;
 pub type ZipFile = Path;
@@ -72,6 +75,9 @@ pub struct ArtifactCaches {
     pub raw: ArtifactItemCache<Raw>,
     pub domain_configs: ArtifactItemCache<DomainConfig>,
     pub app_configs: ArtifactItemCache<AppConfig>,
+    pub mechtron_configs: ArtifactItemCache<MechtronConfig>,
+    pub bind_configs: ArtifactItemCache<BindConfig>,
+    pub wasms: ArtifactItemCache<Wasm>,
 }
 
 impl ArtifactCaches {
@@ -80,6 +86,9 @@ impl ArtifactCaches {
             raw: ArtifactItemCache::new(),
             domain_configs: ArtifactItemCache::new(),
             app_configs: ArtifactItemCache::new(),
+            mechtron_configs: ArtifactItemCache::new(),
+            bind_configs: ArtifactItemCache::new(),
+            wasms: ArtifactItemCache::new()
         }
     }
 }
@@ -159,7 +168,13 @@ impl ProtoArtifactCaches {
                     caches.raw.add(self.root_caches.raw.get(artifact).await?);
                 }
                 ArtifactKind::MechtronConfig => {
-                    todo!()
+                    caches.mechtron_configs.add( self.root_caches.mechtron_configs.get(artifact).await? );
+                }
+                ArtifactKind::BindConfig => {
+                    caches.bind_configs.add( self.root_caches.bind_configs.get(artifact).await? );
+                }
+                ArtifactKind::Wasm=> {
+                    caches.wasms.add( self.root_caches.wasms.get(artifact).await? );
                 }
             }
         }
@@ -945,6 +960,9 @@ struct RootArtifactCaches {
     raw: RootItemCache<Raw>,
     domain_configs: RootItemCache<DomainConfig>,
     app_configs: RootItemCache<AppConfig>,
+    mechtron_configs: RootItemCache<MechtronConfig>,
+    bind_configs: RootItemCache<BindConfig>,
+    wasms: RootItemCache<Wasm>,
 }
 
 impl RootArtifactCaches {
@@ -953,7 +971,10 @@ impl RootArtifactCaches {
             bundle_cache: bundle_cache.clone(),
             raw: RootItemCache::new(bundle_cache.clone(), Arc::new(RawParser::new())),
             domain_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(DomainConfigParser::new())),
-            app_configs: RootItemCache::new(bundle_cache, Arc::new(AppConfigParser::new())),
+            app_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(AppConfigParser::new())),
+            mechtron_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(MechtronConfigParser::new())),
+            bind_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(BindConfigParser::new())),
+            wasms: RootItemCache::new(bundle_cache.clone(), Arc::new(WasmParser::new())),
         }
     }
 
@@ -961,8 +982,10 @@ impl RootArtifactCaches {
         let claim = match artifact.kind {
             ArtifactKind::DomainConfig => self.domain_configs.cache(artifact).await?.into(),
             ArtifactKind::AppConfig=> self.app_configs.cache(artifact).await?.into(),
-            ArtifactKind::MechtronConfig=> unimplemented!(),
+            ArtifactKind::MechtronConfig=> self.mechtron_configs.cache(artifact).await?.into(),
+            ArtifactKind::BindConfig=> self.bind_configs.cache(artifact).await?.into(),
             ArtifactKind::Raw => self.raw.cache(artifact).await?.into(),
+            ArtifactKind::Wasm=> self.wasms.cache(artifact).await?.into(),
         };
 
         Ok(claim)

@@ -1444,7 +1444,9 @@ resources! {
         Raw,
         DomainConfig,
         AppConfig,
-        MechtronConfig
+        MechtronConfig,
+        BindConfig,
+        Wasm,
     }
 
     #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]

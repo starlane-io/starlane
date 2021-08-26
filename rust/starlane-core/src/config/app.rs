@@ -6,7 +6,7 @@ use crate::artifact::ArtifactRef;
 use crate::resource::config::{ResourceConfig, Parser};
 use std::sync::Arc;
 use crate::error::Error;
-use crate::resource::app::yaml::AppConfigYaml;
+use crate::config::app::yaml::AppConfigYaml;
 use std::str::FromStr;
 use std::convert::TryInto;
 
@@ -24,8 +24,7 @@ impl Cacheable for AppConfig {
     }
 
     fn references(&self) -> Vec<ArtifactRef> {
-//        vec![self.main.clone()]
-        vec![]
+        vec![self.main.clone()]
     }
 }
 

@@ -1,14 +1,14 @@
 kind: Bind
-  spec:
-    name: main
-    state: 
-      kind: Stateless
-    message:
-      inbound:
-        ports:
-        - name: main
-          payload:
-            aspects:
-            - name: args
-              schema: json 
-              artifact: starlane.io:core:1.0.0:/schemas/args.schema
+spec:
+  name: main
+  state: 
+    kind: Stateless
+  message:
+    inbound:
+      ports:
+      - name: main
+        payload:
+          aspects:
+          - name: args
+            schema: json 
+            artifact: "starlane.io:core:1.0.0:/schemas/args.schema"

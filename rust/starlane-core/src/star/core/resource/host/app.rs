@@ -14,7 +14,7 @@ use std::convert::TryInto;
 use std::sync::Arc;
 use crate::app::ConfigSrc;
 use crate::cache::ArtifactItem;
-use crate::resource::app::AppConfig;
+use crate::config::app::AppConfig;
 
 #[derive(Debug)]
 pub struct AppHost {
