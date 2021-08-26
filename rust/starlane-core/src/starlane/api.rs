@@ -23,12 +23,7 @@ use crate::message::Fail;
 use crate::message::resource::{
     MessageFrom, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage,
 };
-use crate::resource::{
-    AddressCreationSrc, ArtifactBundleKind, ArtifactBundlePath, AssignResourceStateSrc,
-    FieldSelection, KeyCreationSrc, LocalStateSetSrc, Path, RemoteDataSrc, ResourceAddress,
-    ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceKind, ResourceRecord,
-    ResourceRegistryInfo, ResourceSelector, ResourceStub, ResourceType,
-};
+use crate::resource::{AddressCreationSrc, ArtifactBundleKind, ArtifactBundlePath, AssignResourceStateSrc, FieldSelection, KeyCreationSrc, LocalStateSetSrc, Path, RemoteDataSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceKind, ResourceRecord, ResourceRegistryInfo, ResourceSelector, ResourceStub, ResourceType, ArtifactAddress};
 use crate::resource::ArtifactBundleAddress;
 use crate::resource::file_system::FileSystemState;
 use crate::resource::FileKind;
@@ -40,6 +35,7 @@ use crate::star::shell::search::SearchInit;
 use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
 use futures::FutureExt;
+use crate::app::ConfigSrc;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -271,6 +267,7 @@ impl StarlaneApi {
 
             let mut proto = ProtoMessage::new();
             proto.payload = Option::Some(ResourceRequestMessage::State);
+println!("identifier: {}", identifier.to_string());
             proto.to = Option::Some(identifier);
             proto.from = Option::Some(MessageFrom::Inject);
             let proto = proto.to_proto_star_message().await?;
@@ -471,7 +468,7 @@ impl SubSpaceApi {
         StarlaneApi::new(self.surface_api.clone())
     }
 
-    pub fn create_app(&self, name: &str) -> Result<Creation<AppApi>, Fail> {
+    pub fn create_app(&self, name: &str, app_config: ArtifactAddress ) -> Result<Creation<AppApi>, Fail> {
         let resource_src = AssignResourceStateSrc::Stateless;
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
@@ -480,7 +477,7 @@ impl SubSpaceApi {
             archetype: ResourceArchetype {
                 kind: ResourceKind::App,
                 specific: None,
-                config: None,
+                config: Option::Some(ConfigSrc::Artifact(app_config)),
             },
             state_src: resource_src,
             registry_info: None,

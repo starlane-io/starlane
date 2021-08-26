@@ -64,6 +64,32 @@ impl ResourceLocatorApi {
         Ok(rtn)
     }
 
+    pub async fn as_key(&self, identifier: ResourceIdentifier) -> Result<ResourceKey, Fail> {
+        match identifier{
+            ResourceIdentifier::Key(key) => {
+                Ok(key)
+            }
+            ResourceIdentifier::Address(address) => {
+                let record = self.locate(address.into()).await?;
+                Ok(record.stub.key)
+            }
+        }
+    }
+
+    pub async fn as_address(&self, identifier: ResourceIdentifier) -> Result<ResourceAddress, Fail> {
+        match identifier{
+            ResourceIdentifier::Key(key) => {
+                let record = self.locate(key.into()).await?;
+                Ok(record.stub.address)
+            }
+            ResourceIdentifier::Address(address) => {
+                Ok(address)
+            }
+        }
+    }
+
+
+
     pub async fn external_locate(
         &self,
         identifier: ResourceIdentifier,

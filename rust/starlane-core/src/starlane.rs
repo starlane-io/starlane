@@ -984,7 +984,10 @@ println!("POST CREATE CONSTELLATION");
                 }
 println!("appy bundle published");
 
-                let app_api = sub_space_api.create_app("appy")?.submit().await?;
+
+
+                let config = ResourceAddress::from_str("hyperspace:starlane:appy:1.0.0:/app/appy-config.yaml<Artifact>")?;
+                let app_api = sub_space_api.create_app("appy", config.try_into()? )?.submit().await?;
 
 println!("app created: {}", app_api.key().to_string() );
 

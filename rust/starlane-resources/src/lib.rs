@@ -1285,16 +1285,19 @@ impl From<ResourceKey> for ResourceIdentifier {
     }
 }
 
+/*
 impl TryInto<ResourceKey> for ResourceIdentifier {
     type Error = Error;
 
     fn try_into(self) -> Result<ResourceKey, Self::Error> {
         match self {
             ResourceIdentifier::Key(key) => Ok(key),
-            ResourceIdentifier::Address(_) => Err("resource identifier is not a key".into()),
+            ResourceIdentifier::Address(address) => Err(format!("resource identifier is not a key.  Instead got address: {}",address.to_string()).into()),
         }
     }
 }
+
+ */
 
 impl TryInto<ResourceAddress> for ResourceIdentifier {
     type Error = Error;
@@ -1439,7 +1442,8 @@ resources! {
     #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
     pub enum ArtifactKind{
         Raw,
-        DomainConfig
+        DomainConfig,
+        AppConfig
     }
 
     #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]

@@ -37,6 +37,7 @@ use crate::starlane::api::StarlaneApi;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
 use crate::data::{DataSet, BinSrc};
 use crate::starlane::StarlaneMachine;
+use crate::resource::app::{AppConfig, AppConfigParser};
 
 pub type Data = Arc<Vec<u8>>;
 pub type ZipFile = Path;
@@ -70,6 +71,7 @@ impl ProtoArtifactCachesFactory {
 pub struct ArtifactCaches {
     pub raw: ArtifactItemCache<Raw>,
     pub domain_configs: ArtifactItemCache<DomainConfig>,
+    pub app_configs: ArtifactItemCache<AppConfig>,
 }
 
 impl ArtifactCaches {
@@ -77,6 +79,7 @@ impl ArtifactCaches {
         ArtifactCaches {
             raw: ArtifactItemCache::new(),
             domain_configs: ArtifactItemCache::new(),
+            app_configs: ArtifactItemCache::new(),
         }
     }
 }
@@ -146,6 +149,11 @@ impl ProtoArtifactCaches {
                     caches
                         .domain_configs
                         .add(self.root_caches.domain_configs.get(artifact).await?);
+                }
+                ArtifactKind::AppConfig => {
+                    caches
+                        .app_configs
+                        .add(self.root_caches.app_configs.get(artifact).await?);
                 }
                 ArtifactKind::Raw => {
                     caches.raw.add(self.root_caches.raw.get(artifact).await?);
@@ -401,7 +409,7 @@ println!("Staring ArtifactBundleCacheRunner...");
         let stream = src
             .get_resource_state(bundle.clone())
             .await?.get("zip").ok_or("expected a zip file for the bundle")?.to_bin(machine.bin_context())?;
-
+println!("Pre FileAccess");
         let mut file_access =
             ArtifactBundleCache::with_bundle_path(file_access, record.stub.address.try_into()?)?;
         let bundle_zip = Path::from_str("/bundle.zip")?;
@@ -410,6 +418,8 @@ println!("Staring ArtifactBundleCacheRunner...");
             &key_file,
             Arc::new(record.stub.key.to_string().as_bytes().to_vec()),
         );
+
+println!("WRITING...");
         file_access.write(&bundle_zip, stream).await?;
 
         file_access
@@ -425,6 +435,7 @@ println!("Staring ArtifactBundleCacheRunner...");
             .await?;
 
         logger.log(Audit::Download(bundle.try_into()?));
+println!("cache DONE");
 
         Ok(())
     }
@@ -930,6 +941,7 @@ struct RootArtifactCaches {
     bundle_cache: ArtifactBundleCache,
     raw: RootItemCache<Raw>,
     domain_configs: RootItemCache<DomainConfig>,
+    app_configs: RootItemCache<AppConfig>,
 }
 
 impl RootArtifactCaches {
@@ -937,13 +949,15 @@ impl RootArtifactCaches {
         Self {
             bundle_cache: bundle_cache.clone(),
             raw: RootItemCache::new(bundle_cache.clone(), Arc::new(RawParser::new())),
-            domain_configs: RootItemCache::new(bundle_cache, Arc::new(DomainConfigParser::new())),
+            domain_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(DomainConfigParser::new())),
+            app_configs: RootItemCache::new(bundle_cache, Arc::new(AppConfigParser::new())),
         }
     }
 
     async fn claim(&self, artifact: ArtifactRef) -> Result<Claim, Error> {
         let claim = match artifact.kind {
             ArtifactKind::DomainConfig => self.domain_configs.cache(artifact).await?.into(),
+            ArtifactKind::AppConfig=> self.app_configs.cache(artifact).await?.into(),
             ArtifactKind::Raw => self.raw.cache(artifact).await?.into(),
         };
 

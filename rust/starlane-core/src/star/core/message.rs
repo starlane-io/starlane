@@ -149,8 +149,7 @@ impl MessagingEndpointComponent {
                         delivery.reply(Reply::Id(unique_src.next(&resource_type).await?));
                     }
                     ResourceRequestMessage::State => {
-                        let key: ResourceKey = delivery.payload.to.clone().try_into()?;
-
+                        let key: ResourceKey = skel.resource_locator_api.as_key(delivery.payload.to.clone()).await?;
                         let (tx, rx) = oneshot::channel();
                         host_tx.send(HostCall::Get { key, tx }).await?;
                         let result = rx.await;

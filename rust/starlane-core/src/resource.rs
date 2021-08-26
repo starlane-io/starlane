@@ -44,6 +44,7 @@ pub mod file_system;
 pub mod selector;
 pub mod sub_space;
 pub mod user;
+pub mod app;
 
 pub type ResourceType = starlane_resources::ResourceType;
 pub type ResourceAddress = starlane_resources::ResourceAddress;

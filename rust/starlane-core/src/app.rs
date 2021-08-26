@@ -4,15 +4,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 
-use crate::resource::{
-    AssignResourceStateSrc, Labels, Names, ResourceAddress, ResourceArchetype, ResourceAssign,
-    ResourceCreate, ResourceKind, ResourceRecord, ResourceRegistration, ResourceStub, Specific,
-};
+use crate::resource::{AssignResourceStateSrc, Labels, Names, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceKind, ResourceRecord, ResourceRegistration, ResourceStub, Specific, ArtifactAddress};
+use starlane_resources::ResourceIdentifier;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ConfigSrc {
     None,
-    //    Artifact(Artifact)
+    Artifact(ArtifactAddress)
 }
 
 impl ToString for ConfigSrc {

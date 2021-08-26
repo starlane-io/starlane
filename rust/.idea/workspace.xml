@@ -6,32 +6,17 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/app.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/mechtron.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/starlane-core/src/wasm.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/.appveyor.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/.cargo-ok" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/.idea/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/.travis.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/Cargo.toml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/LICENSE_APACHE" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/LICENSE_MIT" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/Makefile" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/README.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/conf/app/appy-config.yaml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/conf/bind/appy.yaml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/conf/mechtron/appy.yaml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/example.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/src/lib.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../wasm/appy/tests/web.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/starlane-core/src/resource/app.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/app.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/app.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/cache.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/cache.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/app.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/app.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/shell/locator.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/shell/locator.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/lib.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -172,7 +157,7 @@
       <workItem from="1628780042092" duration="22584000" />
       <workItem from="1629406960036" duration="15331000" />
       <workItem from="1629548233485" duration="10310000" />
-      <workItem from="1629789716878" duration="22853000" />
+      <workItem from="1629789716878" duration="37329000" />
     </task>
     <servers />
   </component>
