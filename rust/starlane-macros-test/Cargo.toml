@@ -10,4 +10,4 @@ edition = "2018"
 starlane-macros = { path = "../starlane-macros" }
 starlane-core = { path = "../starlane-core" }
 serde = { version="1.0.69", features=['derive','rc'] }
-nom = "6.2.1"
+nom = "7"

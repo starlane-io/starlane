@@ -39,8 +39,9 @@ use crate::data::{DataSet, BinSrc};
 use crate::starlane::StarlaneMachine;
 use crate::config::app::{AppConfig, AppConfigParser};
 use crate::config::mechtron::{MechtronConfig, MechtronConfigParser};
-use crate::config::wasm::{Wasm, WasmParser};
+use crate::config::wasm::{Wasm, WasmCompiler};
 use crate::config::bind::{BindConfig, BindConfigParser};
+use wasmer::{Universal, Cranelift, Store};
 
 pub type Data = Arc<Vec<u8>>;
 pub type ZipFile = Path;
@@ -967,6 +968,7 @@ struct RootArtifactCaches {
 
 impl RootArtifactCaches {
     fn new(bundle_cache: ArtifactBundleCache) -> Self {
+
         Self {
             bundle_cache: bundle_cache.clone(),
             raw: RootItemCache::new(bundle_cache.clone(), Arc::new(RawParser::new())),
@@ -974,7 +976,7 @@ impl RootArtifactCaches {
             app_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(AppConfigParser::new())),
             mechtron_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(MechtronConfigParser::new())),
             bind_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(BindConfigParser::new())),
-            wasms: RootItemCache::new(bundle_cache.clone(), Arc::new(WasmParser::new())),
+            wasms: RootItemCache::new(bundle_cache.clone(), Arc::new(WasmCompiler::new())),
         }
     }
 

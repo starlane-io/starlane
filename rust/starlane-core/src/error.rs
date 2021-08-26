@@ -16,6 +16,7 @@ use tokio::time::error::Elapsed;
 use zip::result::ZipError;
 
 use crate::message::Fail;
+use wasmer::CompileError;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Error {
@@ -75,6 +76,14 @@ impl From<serde_json::Error> for Error {
     fn from(i: serde_json::Error) -> Self {
         Error {
             error: format!("{}", i),
+        }
+    }
+}
+
+impl From<CompileError> for Error {
+    fn from(i: CompileError ) -> Self {
+        Error {
+            error: format!("COMPILE ERROR"),
         }
     }
 }

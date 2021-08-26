@@ -6,9 +6,11 @@ use std::sync::Arc;
 use crate::error::Error;
 use std::str::FromStr;
 use std::convert::TryInto;
+use wasmer::{Cranelift, Universal, Store, Module};
 
 pub struct Wasm {
     pub artifact: ArtifactAddress,
+    pub module: Module
 }
 
 impl Cacheable for Wasm {
@@ -24,18 +26,25 @@ impl Cacheable for Wasm {
     }
 }
 
-pub struct WasmParser;
+pub struct WasmCompiler {
+    store: Store
+}
 
-impl WasmParser {
+impl WasmCompiler {
     pub fn new() -> Self {
-        Self {}
+        let engine = Universal::new(Cranelift::default()).engine();
+        let store = Store::new(&engine);
+        Self {store}
     }
 }
 
-impl Parser<Wasm> for WasmParser {
-    fn parse(&self, artifact: ArtifactRef, _data: Data) -> Result<Arc<Wasm>, Error> {
-        Ok(Arc::new(Wasm {
+impl Parser<Wasm> for WasmCompiler{
+    fn parse(&self, artifact: ArtifactRef, data: Data) -> Result<Arc<Wasm>, Error> {
+
+       let module = Module::new( &self.store, data.as_ref() )?;
+       Ok(Arc::new(Wasm{
             artifact: artifact.address,
+            module
         }))
     }
 }

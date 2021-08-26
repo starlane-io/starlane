@@ -45,7 +45,6 @@ impl Parser<BindConfig> for BindConfigParser {
 
         Ok(Arc::new(BindConfig {
             artifact: artifact.address,
-
         }))
     }
 }
