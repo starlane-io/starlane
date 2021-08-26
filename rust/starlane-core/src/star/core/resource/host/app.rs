@@ -13,6 +13,8 @@ use starlane_resources::data::Meta;
 use std::convert::TryInto;
 use std::sync::Arc;
 use crate::app::ConfigSrc;
+use crate::cache::ArtifactItem;
+use crate::resource::app::AppConfig;
 
 #[derive(Debug)]
 pub struct AppHost {
@@ -55,11 +57,15 @@ println!("artifact : {}", artifact.to_string());
 
         let factory = self.skel.machine.get_proto_artifact_caches_factory().await?;
         let mut proto = factory.create();
-        let app_config_artifact_ref = ArtifactRef::new(app_config_artifact, ArtifactKind::AppConfig );
+        let app_config_artifact_ref = ArtifactRef::new(app_config_artifact.clone(), ArtifactKind::AppConfig );
         proto.cache(vec![app_config_artifact_ref]).await?;
-        /*
         let caches = proto.to_caches().await?;
-         */
+        let app_config = caches.app_configs.get(&app_config_artifact).ok_or::<Error>(format!("expected app_config").into())?;
+
+
+        println!("App config loaded!");
+
+        println!("main: {}", app_config.main.address.to_string() );
 
         Ok(DataSet::new())
     }

@@ -1443,7 +1443,8 @@ resources! {
     pub enum ArtifactKind{
         Raw,
         DomainConfig,
-        AppConfig
+        AppConfig,
+        MechtronConfig
     }
 
     #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]

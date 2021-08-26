@@ -94,6 +94,16 @@ impl<T> From<std::sync::PoisonError<T>> for Error {
         }
     }
 }
+
+impl From<serde_yaml::Error> for Error {
+    fn from(e: serde_yaml::Error) -> Self {
+        Error{
+            error: e.to_string()
+        }
+    }
+}
+
+
 impl From<Infallible> for Error {
     fn from(i: Infallible) -> Self {
         Error {

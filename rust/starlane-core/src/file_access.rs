@@ -323,9 +323,13 @@ impl LocalFileAccess {
 
     pub fn read(&self, path: &Path) -> Result<Arc<Vec<u8>>, Error> {
         let path = self.cat_path(path.to_relative().as_str())?;
-
         let mut buf = vec![];
-        let mut file = File::open(&path)?;
+        let mut file = match File::open(&path) {
+            Ok(file) => {file}
+            Err(error) => {
+                return Result::Err(format!("{} PATH: {}", error.to_string(), path.to_string() ).into());
+            }
+        };
         file.read_to_end(&mut buf)?;
         Ok(Arc::new(buf))
     }
@@ -338,6 +342,7 @@ impl LocalFileAccess {
         let path = self.cat_path(path.to_relative().as_str())?;
         let mut file = File::create(&path)?;
         file.write(data.as_slice()).unwrap();
+
         Ok(())
     }
 

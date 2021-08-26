@@ -5,12 +5,12 @@ clean:
 	rm -rf bundle
 
 
-all:
+all: clean
 	wasm-pack --verbose build
 	mkdir -p bundle/wasm
 	cp pkg/appy_bg.wasm bundle/wasm/appy.wasm
 	cp -r conf/* bundle
-	zip -r appy.zip bundle
+	cd bundle && zip -r ../appy.zip .
 
 
 	

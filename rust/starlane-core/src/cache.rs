@@ -158,6 +158,9 @@ impl ProtoArtifactCaches {
                 ArtifactKind::Raw => {
                     caches.raw.add(self.root_caches.raw.get(artifact).await?);
                 }
+                ArtifactKind::MechtronConfig => {
+                    todo!()
+                }
             }
         }
 
@@ -958,6 +961,7 @@ impl RootArtifactCaches {
         let claim = match artifact.kind {
             ArtifactKind::DomainConfig => self.domain_configs.cache(artifact).await?.into(),
             ArtifactKind::AppConfig=> self.app_configs.cache(artifact).await?.into(),
+            ArtifactKind::MechtronConfig=> unimplemented!(),
             ArtifactKind::Raw => self.raw.cache(artifact).await?.into(),
         };
 
