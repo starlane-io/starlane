@@ -80,6 +80,15 @@ impl From<serde_json::Error> for Error {
     }
 }
 
+
+
+impl From<wasm_membrane_host::error::Error> for Error {
+    fn from(i: wasm_membrane_host::error::Error) -> Self {
+        Error {
+            error: i.to_string()
+        }
+    }
+}
 impl From<CompileError> for Error {
     fn from(i: CompileError ) -> Self {
         Error {

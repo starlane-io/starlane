@@ -16,7 +16,7 @@ default = ["console_error_panic_hook"]
 wasm-bindgen = "0.2.76"
 mechtron-common = { path = "../mechtron-common"}
 lazy_static = "1.4.0"
-wasm_membrane_guest = { path = "../../../wasm_membrane/guest/rust/wasm_membrane_guest"}
+wasm_membrane_guest = { path = "../wasm_membrane_guest"}
 #getrandom = { version = "0.2", features = ["js"] }
 
 # The `console_error_panic_hook` crate provides better debugging of panics by

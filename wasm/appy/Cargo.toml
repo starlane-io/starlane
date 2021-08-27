@@ -15,7 +15,7 @@ wasm-bindgen = "0.2.76"
 
 mechtron= { path = "../../rust/mechtron"}
 mechtron-common= { path = "../../rust/mechtron-common"}
-wasm_membrane_guest = { path = "../../../wasm_membrane/guest/rust/wasm_membrane_guest"}
+wasm_membrane_guest = { path = "../../rust/wasm_membrane_guest"}
 
 
 # The `console_error_panic_hook` crate provides better debugging of panics by

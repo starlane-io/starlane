@@ -10,7 +10,7 @@ use wasmer::{Cranelift, Universal, Store, Module};
 
 pub struct Wasm {
     pub artifact: ArtifactAddress,
-    pub module: Module
+    pub module: Arc<Module>
 }
 
 impl Cacheable for Wasm {
@@ -41,7 +41,7 @@ impl WasmCompiler {
 impl Parser<Wasm> for WasmCompiler{
     fn parse(&self, artifact: ArtifactRef, data: Data) -> Result<Arc<Wasm>, Error> {
 
-       let module = Module::new( &self.store, data.as_ref() )?;
+       let module = Arc::new(Module::new( &self.store, data.as_ref() )?);
        Ok(Arc::new(Wasm{
             artifact: artifact.address,
             module

@@ -1,8 +1,8 @@
 
 clean:
-	rm appy.zip
-	rm -rf pkg
-	rm -rf bundle
+	rm appy.zip || true
+	rm -rf pkg || true
+	rm -rf bundle || true
 
 
 all: clean
