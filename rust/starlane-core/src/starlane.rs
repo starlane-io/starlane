@@ -991,7 +991,7 @@ println!("appy bundle published");
 
 println!("app created: {}", app_api.key().to_string() );
 
-                std::thread::sleep(std::time::Duration::from_secs(10));
+                std::thread::sleep(std::time::Duration::from_secs(3));
 
                 starlane.shutdown();
 
