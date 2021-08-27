@@ -35,6 +35,8 @@ impl Host for MechtronHost {
             }
         };
 
+println!("ASSIGN MECHTRON!");
+
         Ok(DataSet::new())
     }
 

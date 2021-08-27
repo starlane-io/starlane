@@ -1,9 +1,7 @@
 use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
 use crate::message::Fail;
-use crate::resource::{
-    AssignResourceStateSrc, Resource, ResourceAssign, ResourceKey, ResourceType,
-};
+use crate::resource::{AssignResourceStateSrc, Resource, ResourceAssign, ResourceKey, ResourceType, AssignKind};
 use crate::star::core::resource::host::default::StatelessHost;
 use crate::star::core::resource::host::space::SpaceHost;
 use crate::star::StarSkel;
@@ -28,6 +26,10 @@ pub enum HostCall {
     Assign {
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
         tx: oneshot::Sender<Result<Resource, Fail>>,
+    },
+    Init{
+        key: ResourceKey,
+        tx: oneshot::Sender<Result<(), Fail>>,
     },
     Get {
         key: ResourceKey,
@@ -67,9 +69,9 @@ impl AsyncProcessor<HostCall> for HostComponent {
                 match host.assign(assign.clone()).await {
                     Ok(state) => {
                         let resource = Resource::new(
-                            assign.stub.key,
-                            assign.stub.address,
-                            assign.stub.archetype,
+                            assign.stub.key.clone(),
+                            assign.stub.address.clone(),
+                            assign.stub.archetype.clone(),
                             state,
                         );
                         tx.send(Ok(resource));
@@ -78,6 +80,10 @@ impl AsyncProcessor<HostCall> for HostComponent {
                         tx.send(Err(err));
                     }
                 }
+            }
+            HostCall::Init { key, tx } => {
+                let host = self.host(key.resource_type()).await;
+                tx.send(host.init(key).await);
             }
             HostCall::Has { key, tx } => {
                 let host = self.host(key.resource_type()).await;
@@ -113,10 +119,18 @@ impl HostComponent {
 
 #[async_trait]
 pub trait Host: Send + Sync {
+
+
     async fn assign(
         &self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<DataSet<BinSrc>, Fail>;
+
+
+    async fn init(&self, key: ResourceKey ) -> Result<(),Fail> {
+        Ok(())
+    }
+
     async fn has(&self, key: ResourceKey) -> bool;
     async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Fail>;
     async fn delete(&self, key: ResourceKey) -> Result<(), Fail>;

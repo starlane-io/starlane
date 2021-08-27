@@ -258,6 +258,15 @@ impl MessagingEndpointComponent {
                 self.host_tx.try_send(call).unwrap_or_default();
                 delivery.result_rx(rx);
             }
+            ResourceHostAction::Init(key) => {
+                let (tx, rx) = oneshot::channel();
+                let call = HostCall::Init{
+                    key: key.clone(),
+                    tx
+                };
+                self.host_tx.try_send(call).unwrap_or_default();
+                delivery.result_rx(rx);
+            }
         }
         Ok(())
     }

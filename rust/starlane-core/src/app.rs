@@ -6,6 +6,7 @@ use crate::error::Error;
 
 use crate::resource::{AssignResourceStateSrc, Labels, Names, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceKind, ResourceRecord, ResourceRegistration, ResourceStub, Specific, ArtifactAddress};
 use starlane_resources::ResourceIdentifier;
+use std::convert::TryInto;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ConfigSrc {
@@ -15,31 +16,29 @@ pub enum ConfigSrc {
 
 impl ToString for ConfigSrc {
     fn to_string(&self) -> String {
-        "None".to_string()
-    }
-    /*        match self
-            {
-    //            ConfigSrc::Artifact(artifact) => format!("Artifact::{}",artifact.to_string()),
-    //            ConfigSrc::ResourceAddressPart(address) => format!("ResourceAddressPart::{}", address.to_string()),
+        match self {
+            ConfigSrc::None => {
+                "None".to_string()
+            }
+            ConfigSrc::Artifact(address) => {
+                let address: ResourceAddress = address.clone().into();
+                address.to_string()
             }
         }
-
-     */
+    }
 }
 
 impl FromStr for ConfigSrc {
     type Err = Error;
 
-    fn from_str(_s: &str) -> Result<Self, Self::Err> {
-        unimplemented!()
-        /*
-                let mut split = s.split("::");
-                match split.next().ok_or("nothing to split")?{
-                    "Artifact" => Ok(ConfigSrc::Artifact(Artifact::from_str(split.next().ok_or("artifact")?)?)),
-        //            "ResourceAddress" => Ok(ConfigSrc::ResourceAddressPart(split.next().ok_or("no more splits")?),
-                    what => Err(format!("cannot process ConfigSrc of type {}",what).to_owned().into())
-                }
-                 */
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if "None" == s {
+            Ok(Self::None)
+        } else {
+            let address = ResourceAddress::from_str(s)?;
+            let address: ArtifactAddress = address.try_into()?;
+            Ok(Self::Artifact(address))
+        }
     }
 }
 

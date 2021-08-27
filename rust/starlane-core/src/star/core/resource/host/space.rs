@@ -1,7 +1,7 @@
 use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
 use crate::message::Fail;
-use crate::resource::{AssignResourceStateSrc, Resource, ResourceAssign, ResourceKey, ResourceAddress,ResourceType,ArtifactKind};
+use crate::resource::{AssignResourceStateSrc, Resource, ResourceAssign, ResourceKey, ResourceAddress, ResourceType, ArtifactKind, AssignKind};
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
@@ -43,6 +43,7 @@ impl Host for SpaceHost {
         };
 
         let assign = ResourceAssign {
+            kind: assign.kind,
             stub: assign.stub,
             state_src: state,
         };

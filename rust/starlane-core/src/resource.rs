@@ -1294,9 +1294,10 @@ impl Parent {
             .select(create.archetype.kind.resource_type())
             .await?;
         let record = ResourceRecord::new(assign.stub.clone(), host.star_key());
-        host.assign(assign.try_into()?).await?;
+        host.assign(assign.clone().try_into()?).await?;
         let (commit_tx, _commit_rx) = oneshot::channel();
         reservation.commit(record.clone(), commit_tx)?;
+        host.init(assign.stub.key).await?;
         Ok(record)
     }
 
@@ -1615,6 +1616,7 @@ impl ResourceCreationChamber {
         };
 
         let assign = ResourceAssign {
+            kind: AssignKind::Create,
             stub: stub,
             state_src: self.create.state_src.clone(),
         };
@@ -1628,6 +1630,11 @@ pub trait ResourceHost: Send + Sync {
     async fn assign(
         &self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
+    ) -> Result<(), Fail>;
+
+    async fn init(
+        &self,
+        key: ResourceKey,
     ) -> Result<(), Fail>;
 }
 
@@ -2552,7 +2559,14 @@ impl ResourceStub {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AssignKind {
+    Create,
+    // eventually we want to allow for Assignments where things are 'Moved' as well
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceAssign<S> {
+    pub kind: AssignKind,
     pub stub: ResourceStub,
     pub state_src: S,
 }
@@ -2581,24 +2595,6 @@ impl TryInto<ResourceAssign<DataSet<BinSrc>>> for ResourceAssign<AssignResourceS
 
  */
 
-pub struct LocalResourceHost {
-    skel: StarSkel,
-    resource: ResourceKey,
-}
-
-#[async_trait]
-impl ResourceHost for LocalResourceHost {
-    fn star_key(&self) -> StarKey {
-        self.skel.info.key.clone()
-    }
-
-    async fn assign(
-        &self,
-        _assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<(), Fail> {
-        unimplemented!()
-    }
-}
 
 pub struct RemoteResourceHost {
     pub skel: StarSkel,
@@ -2638,6 +2634,24 @@ impl ResourceHost for RemoteResourceHost {
                 proto,
                 ReplyKind::Empty,
                 "RemoteResourceHost: assign resource to host",
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    async fn init(&self, key: ResourceKey) -> Result<(), Fail> {
+        let mut proto = ProtoStarMessage::new();
+        proto.to = self.handle.key.clone().into();
+        proto.payload =
+            StarMessagePayload::ResourceHost(ResourceHostAction::Init(key));
+
+        self.skel
+            .messaging_api
+            .exchange(
+                proto,
+                ReplyKind::Empty,
+                "RemoteResourceHost: create resource on host",
             )
             .await?;
 

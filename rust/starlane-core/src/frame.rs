@@ -374,6 +374,7 @@ pub enum MessagePayload {
 pub enum ResourceHostAction {
     //IsHosting(ResourceKey),
     Assign(ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>),
+    Init(ResourceKey),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

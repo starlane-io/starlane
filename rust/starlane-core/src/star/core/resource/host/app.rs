@@ -15,6 +15,7 @@ use std::sync::Arc;
 use crate::app::ConfigSrc;
 use crate::cache::ArtifactItem;
 use crate::config::app::AppConfig;
+use crate::starlane::api::{StarlaneApi, AppApi};
 
 #[derive(Debug)]
 pub struct AppHost {
@@ -46,11 +47,11 @@ impl Host for AppHost {
             }
         }
 
-        let app_config_artifact = match assign.stub.archetype.config {
+        let app_config_artifact = match &assign.stub.archetype.config {
             None => return Err("App requires a config".into() ),
             Some(ConfigSrc::Artifact(artifact)) => {
 println!("artifact : {}", artifact.to_string());
-                artifact
+                artifact.clone()
             }
             _ => return Err("App requires a config referencing an artifact".into() ),
         };
@@ -66,7 +67,32 @@ println!("artifact : {}", artifact.to_string());
 
         println!("main: {}", app_config.main.address.to_string() );
 
+
+
         Ok(DataSet::new())
+    }
+
+    async fn init(&self,
+                  key: ResourceKey,
+    ) -> Result<(),Fail> {
+println!("CREATE APP create()");
+        if key.resource_type() != ResourceType::App {
+            return Err("expected AppHost.init() ResourceType to be ResourceType::App".into());
+        }
+        let record = self.skel.resource_locator_api.locate(key.into() ).await?;
+        if let Option::Some(ConfigSrc::Artifact(app_config_artifact)) = record.stub.archetype.config {
+            let factory = self.skel.machine.get_proto_artifact_caches_factory().await?;
+            let mut proto = factory.create();
+            let app_config_artifact_ref = ArtifactRef::new(app_config_artifact.clone(), ArtifactKind::AppConfig );
+            proto.cache(vec![app_config_artifact_ref]).await?;
+            let caches = proto.to_caches().await?;
+            let app_config = caches.app_configs.get(&app_config_artifact).ok_or::<Error>(format!("expected app_config").into())?;
+println!("SO FAR SO GOOD");
+        } else {
+            return Err("expected App to have an artifact for a ConfigSrc".into())
+        }
+
+        Ok(())
     }
 
     async fn has(&self, key: ResourceKey) -> bool {

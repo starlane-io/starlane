@@ -15,7 +15,7 @@ use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util;
-use crate::resource::{ResourceAssign, AssignResourceStateSrc, ResourceKey};
+use crate::resource::{ResourceAssign, AssignResourceStateSrc, ResourceKey, AssignKind};
 use crate::data::{DataSet, BinSrc};
 use crate::message::Fail;
 /*
@@ -337,6 +337,7 @@ impl Host for ArtifactBundleHost {
         };
 
         let assign = ResourceAssign {
+            kind: AssignKind::Create,
             stub: assign.stub,
             state_src: state,
         };

@@ -267,7 +267,6 @@ impl StarlaneApi {
 
             let mut proto = ProtoMessage::new();
             proto.payload = Option::Some(ResourceRequestMessage::State);
-println!("identifier: {}", identifier.to_string());
             proto.to = Option::Some(identifier);
             proto.from = Option::Some(MessageFrom::Inject);
             let proto = proto.to_proto_star_message().await?;
@@ -562,6 +561,66 @@ impl AppApi {
         }
 
         Ok(AppApi{
+            stub: stub,
+            surface_api: surface_api,
+        })
+    }
+
+    pub fn create_mechtron(&self, name: &str, config: ArtifactAddress ) -> Result<Creation<MechtronApi>, Fail> {
+        let resource_src = AssignResourceStateSrc::Stateless;
+        let create = ResourceCreate {
+            parent: self.stub.key.clone().into(),
+            key: KeyCreationSrc::None,
+            address: AddressCreationSrc::Append(name.to_string()),
+            archetype: ResourceArchetype {
+                kind: ResourceKind::Mechtron,
+                specific: None,
+                config: Option::Some(ConfigSrc::Artifact(config)),
+            },
+            state_src: resource_src,
+            registry_info: None,
+            owner: None,
+            strategy: ResourceCreateStrategy::Create,
+        };
+        Ok(Creation::new(self.starlane_api(), create))
+    }
+
+    pub fn starlane_api(&self) -> StarlaneApi {
+        StarlaneApi::new(self.surface_api.clone())
+    }
+}
+
+pub struct MechtronApi{
+    stub: ResourceStub,
+    surface_api: SurfaceApi,
+}
+
+impl MechtronApi{
+    pub fn key(&self) -> ResourceKey {
+        self.stub.key.clone()
+    }
+
+    pub fn address(&self) -> ResourceAddress {
+        self.stub.address.clone()
+    }
+
+    pub fn new(surface_api: SurfaceApi, stub: ResourceStub) -> Result<Self, Error> {
+        if stub.key.resource_type() != ResourceType::App{
+            return Err(format!(
+                "wrong key resource type for AppApi: {}",
+                stub.key.resource_type().to_string()
+            )
+                .into());
+        }
+        if stub.address.resource_type() != ResourceType::App{
+            return Err(format!(
+                "wrong address resource type for AppApi: {}",
+                stub.address.resource_type().to_string()
+            )
+                .into());
+        }
+
+        Ok(MechtronApi{
             stub: stub,
             surface_api: surface_api,
         })
@@ -890,6 +949,14 @@ impl TryFrom<ResourceApi> for FileApi {
 }
 
 impl TryFrom<ResourceApi> for AppApi{
+    type Error = Fail;
+
+    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
+        Ok(Self::new(value.surface_api, value.stub)?)
+    }
+}
+
+impl TryFrom<ResourceApi> for MechtronApi {
     type Error = Fail;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
