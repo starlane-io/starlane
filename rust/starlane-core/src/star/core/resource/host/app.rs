@@ -15,7 +15,7 @@ use std::sync::Arc;
 use crate::app::ConfigSrc;
 use crate::cache::ArtifactItem;
 use crate::config::app::AppConfig;
-use crate::starlane::api::{StarlaneApi, AppApi};
+use crate::starlane::api::{StarlaneApi, AppApi, MechtronApi};
 
 #[derive(Debug)]
 pub struct AppHost {
@@ -80,7 +80,7 @@ println!("CREATE APP create()");
             return Err("expected AppHost.init() ResourceType to be ResourceType::App".into());
         }
         let record = self.skel.resource_locator_api.locate(key.into() ).await?;
-        if let Option::Some(ConfigSrc::Artifact(app_config_artifact)) = record.stub.archetype.config {
+        if let Option::Some(ConfigSrc::Artifact(app_config_artifact)) = record.stub.archetype.config.clone() {
             let factory = self.skel.machine.get_proto_artifact_caches_factory().await?;
             let mut proto = factory.create();
             let app_config_artifact_ref = ArtifactRef::new(app_config_artifact.clone(), ArtifactKind::AppConfig );
@@ -88,6 +88,15 @@ println!("CREATE APP create()");
             let caches = proto.to_caches().await?;
             let app_config = caches.app_configs.get(&app_config_artifact).ok_or::<Error>(format!("expected app_config").into())?;
 println!("SO FAR SO GOOD");
+            let app_api = AppApi::new( self.skel.surface_api.clone(), record.stub.clone() )?;
+            match app_api.create_mechtron("main", app_config.main.address.clone() )?.submit().await {
+                Ok(_) => {}
+                Err(err) => {
+                    eprintln!("potential non-fatal error when creating mechtron: {}", err.to_string());
+                }
+            }
+println!("MECHTRON CREATED");
+
         } else {
             return Err("expected App to have an artifact for a ConfigSrc".into())
         }
