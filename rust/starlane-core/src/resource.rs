@@ -580,7 +580,6 @@ impl Registry {
                 let reservation = RegistryReservation::new(tx);
                 let action_tx = self.tx.clone();
                 let info = request.info.clone();
-                let log_info = StaticLogInfo::clone_info(Box::new(self));
                 tokio::spawn(async move {
                     let result = rx.await;
                     if let Result::Ok((record, result_tx)) = result {
@@ -930,6 +929,7 @@ impl Parent {
                     .await;
 
             tokio::spawn(async move {
+
                 match Self::process_create(core.clone(), create.clone(), reservation, rx).await {
                     Ok(resource) => {
                         tx.send(Ok(resource));

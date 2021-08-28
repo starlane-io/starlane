@@ -138,7 +138,7 @@ impl StateStoreFS {
         let mut data_access = machine_filesystem.data_access();
         data_access.mkdir(&state_path).await?;
 
-        let mut rxs = vec![];
+//        let mut rxs = vec![];
         for (aspect, data) in &assign.state_src {
             let state_aspect_file = Path::from_str(
                 format!(
@@ -149,16 +149,18 @@ impl StateStoreFS {
                 )
                 .as_str(),
             )?;
-            let (tx, rx) = oneshot::channel();
             let bin_context = self.skel.machine.bin_context();
-unimplemented!();
-//            data.mv(bin_context, state_aspect_file, tx).await;
-            rxs.push(rx);
+            let bin = data.to_bin(bin_context)?;
+
+            let data_access = self.skel.machine.machine_filesystem().data_access();
+            data_access.write(&state_aspect_file,bin).await?;
         }
 
-        for rx in rxs {
+/*        for rx in rxs {
             rx.await?;
         }
+
+ */
 
         Ok(assign.state_src)
     }
