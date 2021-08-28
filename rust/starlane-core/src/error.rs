@@ -15,7 +15,7 @@ use tokio::sync::mpsc::error::{SendError, TrySendError};
 use tokio::time::error::Elapsed;
 use zip::result::ZipError;
 
-use crate::message::Fail;
+use starlane_resources::message::Fail;
 use wasmer::CompileError;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -306,6 +306,20 @@ impl<T> From<SendError<T>> for Error {
     fn from(e: SendError<T>) -> Self {
         Error {
             error: format!("{}", e),
+        }
+    }
+}
+
+impl Into<Fail> for Error {
+    fn into(self) -> Fail {
+        Fail::Error(self.error)
+    }
+}
+
+impl From<strum::ParseError> for Error {
+    fn from(e: strum::ParseError) -> Self {
+        Self{
+            error: e.to_string()
         }
     }
 }

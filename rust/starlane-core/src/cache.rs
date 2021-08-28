@@ -1,47 +1,36 @@
 use std::collections::HashMap;
-
 use std::convert::TryInto;
-
 use std::hash::Hasher;
-
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 
 use futures::FutureExt;
-
 use tokio::io::AsyncReadExt;
 use tokio::runtime::Handle;
 use tokio::sync::{broadcast, mpsc, oneshot};
+use wasmer::{Cranelift, Store, Universal};
 
-use starlane_resources::ResourceIdentifier;
+use starlane_resources::{ResourceArchetype, ResourceIdentifier, ResourceStub};
+use starlane_resources::data::{BinSrc, DataSet};
+use starlane_resources::message::Fail;
 
 use crate::artifact::ArtifactRef;
-use crate::error::Error;
-use crate::file_access::FileAccess;
-
-use crate::message::Fail;
-use crate::resource::{
-    ArtifactBundleAddress, ArtifactBundleIdentifier, Path, ResourceAddress, ResourceArchetype,
-    ResourceKind, ResourceLocation, ResourceRecord, ResourceStub,
-};
-
-use crate::resource::ArtifactAddress;
-
-use crate::resource::config::Parser;
-use crate::config::domain::{DomainConfig, DomainConfigParser};
-use crate::resource::ArtifactKind;
-
-use crate::starlane::api::StarlaneApi;
-use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
-use crate::data::{DataSet, BinSrc};
-use crate::starlane::StarlaneMachine;
 use crate::config::app::{AppConfig, AppConfigParser};
+use crate::config::bind::{BindConfig, BindConfigParser};
+use crate::config::domain::{DomainConfig, DomainConfigParser};
 use crate::config::mechtron::{MechtronConfig, MechtronConfigParser};
 use crate::config::wasm::{Wasm, WasmCompiler};
-use crate::config::bind::{BindConfig, BindConfigParser};
-use wasmer::{Universal, Cranelift, Store};
+use crate::error::Error;
+use crate::file_access::FileAccess;
+use crate::resource::{ArtifactBundleAddress, ArtifactBundleIdentifier, Path, ResourceAddress, ResourceKind, ResourceRecord};
+use crate::resource::ArtifactAddress;
+use crate::resource::ArtifactKind;
+use crate::resource::config::Parser;
+use crate::starlane::api::StarlaneApi;
+use crate::starlane::StarlaneMachine;
+use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
 
 pub type Data = Arc<Vec<u8>>;
 pub type ZipFile = Path;
@@ -518,7 +507,7 @@ impl ArtifactBundleSrc {
     pub async fn get_resource_state(
         &self,
         identifier: ResourceIdentifier,
-    ) -> Result<DataSet<BinSrc>, Fail> {
+    ) -> Result<DataSet<BinSrc>, Error> {
         match self {
             ArtifactBundleSrc::STARLANE_API(api) => {
                                 api.get_resource_state(identifier).await
@@ -530,7 +519,7 @@ impl ArtifactBundleSrc {
     pub async fn fetch_resource_record(
         &self,
         identifier: ResourceIdentifier,
-    ) -> Result<ResourceRecord, Fail> {
+    ) -> Result<ResourceRecord, Error> {
         match self {
             ArtifactBundleSrc::STARLANE_API(api) => api.fetch_resource_record(identifier).await,
             //            ArtifactBundleSrc::MOCK(mock) => mock.fetch_resource_record(identifier).await,

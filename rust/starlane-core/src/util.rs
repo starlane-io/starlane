@@ -18,7 +18,7 @@ use zip::result::ZipError;
 use zip::write::FileOptions;
 
 use crate::error::Error;
-use crate::message::Fail;
+use starlane_resources::message::Fail;
 
 lazy_static! {
     pub static ref SHUTDOWN_TX: broadcast::Sender<()> = { broadcast::channel(1).0 };

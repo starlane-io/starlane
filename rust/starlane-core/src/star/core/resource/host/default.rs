@@ -1,7 +1,9 @@
-use crate::data::{BinSrc, DataSet};
+use starlane_resources::{AssignResourceStateSrc, Resource, ResourceAssign};
+use starlane_resources::data::{BinSrc, DataSet};
+use starlane_resources::message::Fail;
+
 use crate::error::Error;
-use crate::message::Fail;
-use crate::resource::{AssignResourceStateSrc, Resource, ResourceAssign, ResourceKey};
+use crate::resource::ResourceKey;
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
@@ -26,7 +28,7 @@ impl Host for StatelessHost {
     async fn assign(
         &self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<DataSet<BinSrc>, Fail> {
+    ) -> Result<DataSet<BinSrc>, Error> {
         match assign.state_src {
             AssignResourceStateSrc::Stateless => {}
             _ => {
@@ -44,11 +46,11 @@ impl Host for StatelessHost {
         }
     }
 
-    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Fail> {
+    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
         self.store.get(key).await
     }
 
-    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Fail> {
+    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Error> {
         unimplemented!()
     }
 }

@@ -1,24 +1,23 @@
 use std::convert::TryInto;
+
 use tokio::sync::{mpsc, oneshot};
 
-use crate::data::DataSet;
+use starlane_resources::{Resource, ResourceArchetype};
+use starlane_resources::message::{Message, ResourceRequestMessage, ResourceResponseMessage};
+use starlane_resources::message::Fail;
+
+use starlane_resources::data::DataSet;
 use crate::error::Error;
 use crate::frame::{
     MessagePayload, RegistryAction, Reply, ResourceHostAction, SimpleReply, StarMessage,
     StarMessagePayload,
 };
-use crate::message::resource::{
-    Delivery, Message, ResourceRequestMessage, ResourceResponseMessage,
-};
-use crate::message::Fail;
-use crate::resource::{
-    Parent, ParentCore, Resource, ResourceAddress, ResourceArchetype, ResourceId, ResourceKey,
-    ResourceManager, ResourceRecord,
-};
+use crate::message::resource::Delivery;
+use crate::resource::{Parent, ParentCore, ResourceAddress, ResourceId, ResourceKey, ResourceManager, ResourceRecord};
 use crate::resource::{ResourceKind, ResourceType};
+use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::star::core::resource::host::{HostCall, HostComponent};
 use crate::star::shell::pledge::ResourceHostSelector;
-use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
 pub enum CoreMessageCall {
@@ -213,7 +212,7 @@ impl MessagingEndpointComponent {
                                 }
                             },
                             Err(fail) => {
-                                delivery.fail(fail);
+                                delivery.fail(fail.into());
                             }
                         }
                     }
@@ -227,13 +226,13 @@ impl MessagingEndpointComponent {
                             .unwrap()
                             .unique_src(parent.clone())
                             .await;
-                        let result: Result<ResourceId, Fail> = unique_src.next(child_type).await;
+                        let result: Result<ResourceId, Error> = unique_src.next(child_type).await;
                         match result {
                             Ok(id) => {
                                 delivery.reply(Reply::Id(id));
                             }
                             Err(fail) => {
-                                delivery.fail(fail);
+                                delivery.fail(fail.into());
                             }
                         }
                     }
@@ -271,7 +270,7 @@ impl MessagingEndpointComponent {
         Ok(())
     }
 
-    async fn get_parent_resource(skel: StarSkel, key: ResourceKey) -> Result<Parent, Fail> {
+    async fn get_parent_resource(skel: StarSkel, key: ResourceKey) -> Result<Parent, Error> {
         let resource = skel.resource_locator_api.locate(key.clone().into()).await?;
 
         Ok(Parent {

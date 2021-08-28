@@ -1,16 +1,19 @@
-use crate::error::Error;
-use crate::frame::{Frame, Reply, ReplyKind, StarMessage, StarPattern};
-use crate::lane::{UltimaLaneKey, LaneWrapper};
-use crate::message::resource::ProtoMessage;
-use crate::message::{Fail, MessageId, ProtoStarMessage, ProtoStarMessageTo};
-use crate::star::core::message::CoreMessageCall;
-use crate::star::{ForwardFrame, StarCommand, StarKey, StarSkel};
-use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::RandomState;
+
+use lru::LruCache;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
-use lru::LruCache;
-use std::collections::hash_map::RandomState;
+
+use starlane_resources::message::{Fail, MessageId, ProtoMessage};
+
+use crate::error::Error;
+use crate::frame::{Frame, Reply, ReplyKind, StarMessage, StarPattern};
+use crate::lane::{LaneWrapper, UltimaLaneKey};
+use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
+use crate::star::{ForwardFrame, StarCommand, StarKey, StarSkel};
+use crate::star::core::message::CoreMessageCall;
+use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
 #[derive(Clone)]
 pub struct GoldenPathApi {

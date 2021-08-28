@@ -32,7 +32,6 @@ use std::str::FromStr;
 use semver;
 
 pub mod actor;
-pub mod app;
 pub mod artifact;
 pub mod cache;
 pub mod config;

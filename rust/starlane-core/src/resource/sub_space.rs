@@ -3,8 +3,10 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
+use starlane_resources::Resource;
+
 use crate::error::Error;
-use crate::resource::{Resource, ResourceAddress, ResourceType, SubSpaceKey};
+use crate::resource::{ResourceAddress, ResourceType, SubSpaceKey};
 
 pub struct SubSpace {
     key: SubSpaceKey,

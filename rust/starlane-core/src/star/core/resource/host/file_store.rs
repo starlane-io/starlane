@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-
+use std::convert::TryInto;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::fs;
@@ -10,22 +10,21 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
-use starlane_resources::ResourceIdentifier;
+use starlane_resources::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, RemoteDataSrc, Resource, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceIdentifier, ResourceStub};
+use starlane_resources::data::{BinSrc, DataSet};
+use starlane_resources::message::Fail;
 
-use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
 use crate::file_access::{FileAccess, FileEvent};
-use crate::message::Fail;
-use crate::resource::ResourceKey;
 use crate::resource::{
-    AddressCreationSrc, AssignResourceStateSrc, FileKind, FileSystemKey, KeyCreationSrc, Path,
-    RemoteDataSrc, Resource, ResourceAddress, ResourceArchetype, ResourceAssign, ResourceCreate,
-    ResourceCreateStrategy, ResourceCreationChamber, ResourceKind, ResourceStub, ResourceType,
+    FileKind, FileSystemKey, Path,
+    ResourceAddress,
+    ResourceCreationChamber, ResourceKind, ResourceType,
 };
+use crate::resource::ResourceKey;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util;
-use std::convert::TryInto;
 
 /*
 pub struct FileStoreHost {

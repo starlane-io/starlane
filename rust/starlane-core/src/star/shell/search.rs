@@ -5,15 +5,16 @@ use std::iter::FromIterator;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
 
+use starlane_resources::message::{Fail, MessageId, ProtoMessage};
+
 use crate::error::Error;
-use crate::frame::{Frame, Reply, ReplyKind, SearchResults, SearchTraversal, SearchWindDown, SearchWindUp, StarMessage, StarPattern, TraversalAction, SearchHit};
-use crate::lane::{LaneCommand, UltimaLaneKey, LaneWrapper, LaneKey};
-use crate::message::{Fail, MessageId, ProtoStarMessage, ProtoStarMessageTo};
-use crate::message::resource::ProtoMessage;
-use crate::star::{StarCommand, StarKey, StarSkel, StarKind};
+use crate::frame::{Frame, Reply, ReplyKind, SearchHit, SearchResults, SearchTraversal, SearchWindDown, SearchWindUp, StarMessage, StarPattern, TraversalAction};
+use crate::lane::{LaneCommand, LaneKey, LaneWrapper, UltimaLaneKey};
+use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
+use crate::star::{StarCommand, StarKey, StarKind, StarSkel};
 use crate::star::core::message::CoreMessageCall;
-use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::star::shell::lanes::LanePattern;
+use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
 pub static MAX_HOPS: usize = 32;
 

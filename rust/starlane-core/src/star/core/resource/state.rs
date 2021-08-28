@@ -1,25 +1,24 @@
+use std::convert::TryInto;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use rusqlite::{Connection, params, Row};
 use rusqlite::types::ValueRef;
-use rusqlite::{params, Connection, Row};
 use tokio::sync::{mpsc, oneshot};
 
-use starlane_resources::{ResourceIdentifier, ResourceStatePersistenceManager};
+use starlane_resources::{LocalStateSetSrc, Resource, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceIdentifier, ResourceStatePersistenceManager};
+use starlane_resources::data::{BinSrc, DataSet};
+use starlane_resources::message::Fail;
 
-use crate::app::ConfigSrc;
+use starlane_resources::ConfigSrc;
 use crate::error::Error;
-
-use crate::data::{BinSrc, DataSet};
 use crate::file_access::FileAccess;
-use crate::message::Fail;
 use crate::resource::{
-    LocalStateSetSrc, Path, Resource, ResourceAddress, ResourceArchetype, ResourceAssign,
-    ResourceCreate, ResourceKey, ResourceKind, Specific,
+    Path, ResourceAddress,
+    ResourceKey, ResourceKind, Specific,
 };
 use crate::star::StarSkel;
 use crate::starlane::files::MachineFileSystem;
-use std::convert::TryInto;
 
 #[derive(Clone, Debug)]
 pub struct StateStore {
@@ -44,7 +43,7 @@ impl StateStore {
     pub async fn put(
         &self,
         assign: ResourceAssign<DataSet<BinSrc>>,
-    ) -> Result<DataSet<BinSrc>, Fail> {
+    ) -> Result<DataSet<BinSrc>, Error> {
         let (tx, rx) = oneshot::channel();
 
         self.tx
@@ -54,7 +53,7 @@ impl StateStore {
         Ok(rx.await??)
     }
 
-    pub async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Fail> {
+    pub async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(ResourceStoreCommand::Get {
@@ -139,7 +138,7 @@ impl StateStoreFS {
         let mut data_access = machine_filesystem.data_access();
         data_access.mkdir(&state_path).await?;
 
-        let mut rxs = vec![];
+//        let mut rxs = vec![];
         for (aspect, data) in &assign.state_src {
             let state_aspect_file = Path::from_str(
                 format!(
@@ -150,15 +149,18 @@ impl StateStoreFS {
                 )
                 .as_str(),
             )?;
-            let (tx, rx) = oneshot::channel();
             let bin_context = self.skel.machine.bin_context();
-            data.mv(bin_context, state_aspect_file, tx).await;
-            rxs.push(rx);
+            let bin = data.to_bin(bin_context)?;
+
+            let data_access = self.skel.machine.machine_filesystem().data_access();
+            data_access.write(&state_aspect_file,bin).await?;
         }
 
-        for rx in rxs {
+/*        for rx in rxs {
             rx.await?;
         }
+
+ */
 
         Ok(assign.state_src)
     }

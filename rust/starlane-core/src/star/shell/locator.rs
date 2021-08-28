@@ -1,26 +1,25 @@
-use async_trait::async_trait;
 use core::option::Option;
 use core::option::Option::{None, Some};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
 use core::time::Duration;
 
+use async_trait::async_trait;
 use lru::LruCache;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
-use starlane_resources::ResourceIdentifier;
+use starlane_resources::{ResourceArchetype, ResourceIdentifier, ResourceStub};
+use starlane_resources::message::Fail;
 
 use crate::frame::{RegistryAction, Reply, ReplyKind, SimpleReply, StarMessagePayload};
-use crate::message::{Fail, ProtoStarMessage};
-use crate::resource::{
-    ResourceAddress, ResourceArchetype, ResourceKey, ResourceKind, ResourceRecord, ResourceStub,
-    ResourceType,
-};
+use crate::message::ProtoStarMessage;
+use crate::resource::{ResourceAddress, ResourceKey, ResourceKind, ResourceRecord, ResourceType};
 use crate::star::{
     LogId, Request, ResourceRegistryBacking, Set, Star, StarCommand, StarKey, StarKind, StarSkel,
 };
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
+use crate::error::Error;
 
 #[derive(Clone)]
 pub struct ResourceLocatorApi {
@@ -38,7 +37,7 @@ impl ResourceLocatorApi {
     ) -> Result<ResourceKey, Fail> {
         match self.locate(identifier).await {
             Ok(record) => Ok(record.stub.key),
-            Err(fail) => Err(fail),
+            Err(fail) => Err(fail.into()),
         }
     }
 
@@ -48,11 +47,11 @@ impl ResourceLocatorApi {
     ) -> Result<ResourceAddress, Fail> {
         match self.locate(identifier).await {
             Ok(record) => Ok(record.stub.address),
-            Err(fail) => Err(fail),
+            Err(fail) => Err(fail.into()),
         }
     }
 
-    pub async fn locate(&self, identifier: ResourceIdentifier) -> Result<ResourceRecord, Fail> {
+    pub async fn locate(&self, identifier: ResourceIdentifier) -> Result<ResourceRecord, Error> {
         let (tx, mut rx) = oneshot::channel();
         self.tx
             .send(ResourceLocateCall::Locate { identifier, tx })
@@ -64,7 +63,7 @@ impl ResourceLocatorApi {
         Ok(rtn)
     }
 
-    pub async fn as_key(&self, identifier: ResourceIdentifier) -> Result<ResourceKey, Fail> {
+    pub async fn as_key(&self, identifier: ResourceIdentifier) -> Result<ResourceKey, Error> {
         match identifier{
             ResourceIdentifier::Key(key) => {
                 Ok(key)
@@ -76,7 +75,7 @@ impl ResourceLocatorApi {
         }
     }
 
-    pub async fn as_address(&self, identifier: ResourceIdentifier) -> Result<ResourceAddress, Fail> {
+    pub async fn as_address(&self, identifier: ResourceIdentifier) -> Result<ResourceAddress, Error> {
         match identifier{
             ResourceIdentifier::Key(key) => {
                 let record = self.locate(key.into()).await?;
@@ -94,7 +93,7 @@ impl ResourceLocatorApi {
         &self,
         identifier: ResourceIdentifier,
         star: StarKey,
-    ) -> Result<ResourceRecord, Fail> {
+    ) -> Result<ResourceRecord, Error> {
         let (tx, mut rx) = oneshot::channel();
         self.tx
             .send(ResourceLocateCall::ExternalLocate {
@@ -117,7 +116,8 @@ impl ResourceLocatorApi {
         });
     }
 
-    pub fn filter(&self, result: Result<ResourceRecord, Fail>) -> Result<ResourceRecord, Fail> {
+    pub fn filter(&self, result: Result<ResourceRecord, Error>) -> Result<ResourceRecord, Error> {
+
         if let Result::Ok(record) = &result {
             self.found(record.clone());
         }
@@ -128,12 +128,12 @@ impl ResourceLocatorApi {
 pub enum ResourceLocateCall {
     Locate {
         identifier: ResourceIdentifier,
-        tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
+        tx: oneshot::Sender<Result<ResourceRecord, Error>>,
     },
     ExternalLocate {
         identifier: ResourceIdentifier,
         star: StarKey,
-        tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
+        tx: oneshot::Sender<Result<ResourceRecord, Error>>,
     },
     Found(ResourceRecord),
 }
@@ -188,7 +188,7 @@ impl ResourceLocatorComponent {
     fn locate(
         &mut self,
         identifier: ResourceIdentifier,
-        tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
+        tx: oneshot::Sender<Result<ResourceRecord, Error>>,
     ) {
         if self.has_cached_record(&identifier) {
             let result = match self
@@ -196,7 +196,7 @@ impl ResourceLocatorComponent {
                 .ok_or("expected resource record")
             {
                 Ok(record) => Ok(record),
-                Err(s) => Err(Fail::Error(s.to_string())),
+                Err(s) => Err(Fail::Error(s.to_string()).into()),
             };
 
             tx.send(result).unwrap_or_default();
@@ -206,7 +206,7 @@ impl ResourceLocatorComponent {
                 async fn locate(
                     locator_api: ResourceLocatorApi,
                     identifier: ResourceIdentifier,
-                ) -> Result<ResourceRecord, Fail> {
+                ) -> Result<ResourceRecord, Error> {
                     let parent_record = locator_api.filter(
                         locator_api
                             .locate(
@@ -248,15 +248,15 @@ impl ResourceLocatorComponent {
         &mut self,
         identifier: ResourceIdentifier,
         star: StarKey,
-        tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
+        tx: oneshot::Sender<Result<ResourceRecord, Error>>,
     ) {
         let (request, rx) = Request::new((identifier, star));
         self.request_resource_record_from_star(request).await;
         tokio::spawn(async move {
             async fn timeout(
-                rx: oneshot::Receiver<Result<ResourceRecord, Fail>>,
-            ) -> Result<ResourceRecord, Fail> {
-                tokio::time::timeout(Duration::from_secs(15), rx).await??
+                rx: oneshot::Receiver<Result<ResourceRecord, Error>>,
+            ) -> Result<ResourceRecord, Error> {
+                Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
             }
             tx.send(timeout(rx).await).unwrap_or_default();
         });

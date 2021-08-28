@@ -1,18 +1,22 @@
-use crate::data::{BinSrc, DataSet};
+use std::collections::hash_map::RandomState;
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use tokio::sync::{mpsc, oneshot};
+
+use starlane_resources::{AssignKind, AssignResourceStateSrc, Resource, ResourceAssign};
+use starlane_resources::data::{BinSrc, DataSet};
+use starlane_resources::message::Fail;
+
 use crate::error::Error;
-use crate::message::Fail;
-use crate::resource::{AssignResourceStateSrc, Resource, ResourceAssign, ResourceKey, ResourceType, AssignKind};
+use crate::resource::{ResourceKey, ResourceType};
+use crate::star::core::resource::host::app::AppHost;
+use crate::star::core::resource::host::artifact::ArtifactBundleHost;
 use crate::star::core::resource::host::default::StatelessHost;
+use crate::star::core::resource::host::mechtron::MechtronHost;
 use crate::star::core::resource::host::space::SpaceHost;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use std::collections::hash_map::RandomState;
-use std::collections::HashMap;
-use tokio::sync::{mpsc, oneshot};
-use crate::star::core::resource::host::artifact::ArtifactBundleHost;
-use crate::star::core::resource::host::app::AppHost;
-use crate::star::core::resource::host::mechtron::MechtronHost;
-use std::sync::Arc;
 
 pub mod artifact;
 mod default;
@@ -25,15 +29,15 @@ mod app;
 pub enum HostCall {
     Assign {
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-        tx: oneshot::Sender<Result<Resource, Fail>>,
+        tx: oneshot::Sender<Result<Resource, Error>>,
     },
     Init{
         key: ResourceKey,
-        tx: oneshot::Sender<Result<(), Fail>>,
+        tx: oneshot::Sender<Result<(), Error>>,
     },
     Get {
         key: ResourceKey,
-        tx: oneshot::Sender<Result<Option<DataSet<BinSrc>>, Fail>>,
+        tx: oneshot::Sender<Result<Option<DataSet<BinSrc>>, Error>>,
     },
     Has {
         key: ResourceKey,
@@ -124,15 +128,15 @@ pub trait Host: Send + Sync {
     async fn assign(
         &self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<DataSet<BinSrc>, Fail>;
+    ) -> Result<DataSet<BinSrc>, Error>;
 
 
-    async fn init(&self, key: ResourceKey ) -> Result<(),Fail> {
+    async fn init(&self, key: ResourceKey ) -> Result<(),Error> {
         Ok(())
     }
 
     async fn has(&self, key: ResourceKey) -> bool;
-    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Fail>;
-    async fn delete(&self, key: ResourceKey) -> Result<(), Fail>;
+    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error>;
+    async fn delete(&self, key: ResourceKey) -> Result<(), Error>;
     fn shutdown(&self) {}
 }

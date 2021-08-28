@@ -1,21 +1,17 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use tokio::sync::{oneshot, mpsc};
+use tokio::sync::{mpsc, oneshot};
+
+use starlane_resources::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceStub};
 
 use crate::error::Error;
-
+use crate::resource::{create_args, ResourceAddress, ResourceKind, ResourceRecord, ResourceRegistration, ResourceLocation};
 use crate::resource::ResourceKey;
-use crate::resource::{
-    create_args, AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceAddress,
-    ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceKind, ResourceLocation,
-    ResourceRecord, ResourceRegistration, ResourceStub,
-};
-use crate::star::variant::{ VariantCall, FrameVerdict};
 use crate::star::{StarKey, StarSkel};
+use crate::star::variant::{FrameVerdict, VariantCall};
 use crate::starlane::api::StarlaneApi;
 use crate::util::{AsyncProcessor, AsyncRunner};
-
 
 pub struct CentralVariant {
     skel: StarSkel,
@@ -86,18 +82,18 @@ impl CentralVariant {
 
 impl CentralVariant {
     async fn ensure(starlane_api: StarlaneApi) -> Result<(), Error> {
-        println!("ensuring hyperspace...");
+        info!("ensuring hyperspace...");
         let mut creation = starlane_api.create_space("hyperspace", "Hyper Space")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         let space_api = creation.submit().await?;
-        println!("hyperspace ensured.");
+        info!("hyperspace ensured.");
 
 
-        println!("ensuring subspace...");
+        info!("ensuring subspace...");
         let mut creation = space_api.create_sub_space("starlane", "Starlane")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         let subspace_api = creation.submit().await?;
-        println!("subspace ensured.");
+        info!("subspace ensured.");
 
 
         /*
@@ -121,7 +117,7 @@ println!("BEFORE");
 
 
         {
-            println!(
+            info!(
                 "ensuring artifact: {}",
                 create_args::artifact_bundle_address().to_string()
             );
@@ -139,7 +135,7 @@ println!("BEFORE");
             creation.set_strategy(ResourceCreateStrategy::Ensure);
             creation.submit().await?;
         }
-        println!("created artifact bundle.");
+        info!("created artifact bundle.");
 
         Ok(())
     }

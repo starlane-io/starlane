@@ -1,8 +1,12 @@
+#[macro_use]
+extern crate strum_macros;
+
 use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 use std::sync::Arc;
 
+use nom::{AsChar, InputTakeAtPosition, IResult};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
 use nom::character::complete::{alpha0, alpha1, anychar, digit0, digit1, one_of};
@@ -10,18 +14,22 @@ use nom::combinator::{not, opt};
 use nom::error::{context, ErrorKind, VerboseError};
 use nom::multi::{many1, many_m_n, separated_list0, separated_list1};
 use nom::sequence::{delimited, preceded, terminated, tuple};
-use nom::{AsChar, IResult, InputTakeAtPosition};
+use rusqlite::ToSql;
+use rusqlite::types::{ToSqlOutput, Value};
 use serde::Deserialize;
 use serde::Serialize;
 
 use starlane_macros::resources;
 
+use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
+use crate::message::Fail;
+use semver::SemVerError;
 
 pub mod data;
 pub mod error;
 pub mod parse;
-
+pub mod message;
 
 pub enum Galaxy{
     Local,
@@ -990,15 +998,15 @@ mod tests {
     use std::convert::TryInto;
     use std::str::FromStr;
 
-    use crate::error::Error;
     use crate::{
-        domain, parse_resource_path, path, version, DomainCase, KeyBits, ResourceAddress,
-        ResourceAddressKind, ResourcePathSegment, SkewerCase, Specific,
+        domain, DomainCase, KeyBits, parse_resource_path, path, ResourceAddress, ResourceAddressKind,
+        ResourcePathSegment, SkewerCase, Specific, version,
     };
     use crate::{
         AppKey, DatabaseKey, DatabaseKind, ResourceKey, ResourceKind, ResourcePath, ResourceType,
         RootKey, SpaceKey, SubSpaceKey,
     };
+    use crate::error::Error;
 
     #[test]
     fn test_kind() -> Result<(), Error> {
@@ -1465,5 +1473,646 @@ impl ArtifactPath {
         } else {
             panic!("expected last segment to be a path")
         }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MetaSelector {
+    None,
+    Name(String),
+    Label(LabelSelector),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LabelSelector {
+    pub labels: HashSet<LabelSelection>,
+}
+
+impl ResourceSelector {
+    pub fn new() -> Self {
+        let fields = HashSet::new();
+        ResourceSelector {
+            meta: MetaSelector::None,
+            fields: fields,
+        }
+    }
+
+    pub fn resource_types(&self) -> HashSet<ResourceType> {
+        let mut rtn = HashSet::new();
+        for field in &self.fields {
+            if let FieldSelection::Type(resource_type) = field {
+                rtn.insert(resource_type.clone());
+            }
+        }
+        rtn
+    }
+
+    pub fn add(&mut self, field: FieldSelection) {
+        self.fields.retain(|f| !f.is_matching_kind(&field));
+        self.fields.insert(field);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        if !self.fields.is_empty() {
+            return false;
+        }
+
+        match &self.meta {
+            MetaSelector::None => {
+                return true;
+            }
+            MetaSelector::Name(_) => {
+                return false;
+            }
+            MetaSelector::Label(labels) => {
+                return labels.labels.is_empty();
+            }
+        };
+    }
+
+    pub fn name(&mut self, name: String) -> Result<(), Error> {
+        match &mut self.meta {
+            MetaSelector::None => {
+                self.meta = MetaSelector::Name(name.clone());
+                Ok(())
+            }
+            MetaSelector::Name(_) => {
+                self.meta = MetaSelector::Name(name.clone());
+                Ok(())
+            }
+            MetaSelector::Label(_selector) => {
+                Err("Selector is already set to a LABEL meta selector".into())
+            }
+        }
+    }
+
+    pub fn add_label(&mut self, label: LabelSelection) -> Result<(), Error> {
+        match &mut self.meta {
+            MetaSelector::None => {
+                self.meta = MetaSelector::Label(LabelSelector {
+                    labels: HashSet::new(),
+                });
+                self.add_label(label)
+            }
+            MetaSelector::Name(_) => Err("Selector is already set to a NAME meta selector".into()),
+            MetaSelector::Label(selector) => {
+                selector.labels.insert(label);
+                Ok(())
+            }
+        }
+    }
+
+    pub fn add_field(&mut self, field: FieldSelection) {
+        self.fields.insert(field);
+    }
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum LabelSelection {
+    Exact(Label),
+}
+
+impl LabelSelection {
+    pub fn exact(name: &str, value: &str) -> Self {
+        LabelSelection::Exact(Label {
+            name: name.to_string(),
+            value: value.to_string(),
+        })
+    }
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum FieldSelection {
+    Identifier(ResourceIdentifier),
+    Type(ResourceType),
+    Kind(ResourceKind),
+    Specific(Specific),
+    Owner(UserKey),
+    Parent(ResourceIdentifier),
+}
+
+
+
+impl ToString for FieldSelection {
+    fn to_string(&self) -> String {
+        match self {
+            FieldSelection::Identifier(id) => id.to_string(),
+            FieldSelection::Type(rt) => rt.to_string(),
+            FieldSelection::Kind(kind) => kind.to_string(),
+            FieldSelection::Specific(specific) => specific.to_string(),
+            FieldSelection::Owner(owner) => owner.to_string(),
+            FieldSelection::Parent(parent) => parent.to_string(),
+        }
+    }
+}
+
+impl FieldSelection {
+    pub fn is_matching_kind(&self, field: &FieldSelection) -> bool {
+        match self {
+            FieldSelection::Identifier(_) => {
+                if let FieldSelection::Identifier(_) = field {
+                    return true;
+                }
+            }
+            FieldSelection::Type(_) => {
+                if let FieldSelection::Type(_) = field {
+                    return true;
+                }
+            }
+            FieldSelection::Kind(_) => {
+                if let FieldSelection::Kind(_) = field {
+                    return true;
+                }
+            }
+            FieldSelection::Specific(_) => {
+                if let FieldSelection::Specific(_) = field {
+                    return true;
+                }
+            }
+            FieldSelection::Owner(_) => {
+                if let FieldSelection::Owner(_) = field {
+                    return true;
+                }
+            }
+            FieldSelection::Parent(_) => {
+                if let FieldSelection::Parent(_) = field {
+                    return true;
+                }
+            }
+        };
+        return false;
+    }
+}
+
+impl ToSql for FieldSelection {
+    fn to_sql(&self) -> Result<ToSqlOutput<'_>, rusqlite::Error> {
+        match self.to_sql_error() {
+            Ok(ok) => Ok(ok),
+            Err(err) => {
+                eprintln!("{}", err.to_string());
+                Err(rusqlite::Error::InvalidQuery)
+            }
+        }
+    }
+}
+
+impl FieldSelection {
+    fn to_sql_error(&self) -> Result<ToSqlOutput<'_>, error::Error> {
+        match self {
+            FieldSelection::Identifier(id) => Ok(ToSqlOutput::Owned(Value::Blob(id.clone().key_or("(Identifier) selection fields must be turned into ResourceKeys before they can be used by the ResourceRegistry")?.bin()?))),
+            FieldSelection::Type(resource_type) => {
+                Ok(ToSqlOutput::Owned(Value::Text(resource_type.to_string())))
+            }
+            FieldSelection::Kind(kind) => Ok(ToSqlOutput::Owned(Value::Text(kind.to_string()))),
+            FieldSelection::Specific(specific) => {
+                Ok(ToSqlOutput::Owned(Value::Text(specific.to_string())))
+            }
+            FieldSelection::Owner(owner) => {
+                Ok(ToSqlOutput::Owned(Value::Blob(owner.clone().bin()?)))
+            }
+            FieldSelection::Parent(parent_id) => Ok(ToSqlOutput::Owned(Value::Blob(parent_id.clone().key_or("(Parent) selection fields must be turned into ResourceKeys before they can be used by the ResourceRegistry")?.bin()?))),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceArchetype {
+    pub kind: ResourceKind,
+    pub specific: Option<Specific>,
+    pub config: Option<ConfigSrc>,
+}
+
+impl ResourceArchetype {
+    pub fn from_resource_type(kind: ResourceKind) -> Self {
+        ResourceArchetype {
+            kind: kind,
+            specific: Option::None,
+            config: Option::None,
+        }
+    }
+
+    pub fn root() -> ResourceArchetype {
+        ResourceArchetype {
+            kind: ResourceKind::Root,
+            specific: Option::None,
+            config: Option::None,
+        }
+    }
+
+    pub fn valid(&self) -> Result<(), Fail> {
+        if self.kind.resource_type() == ResourceType::Root {
+            return Err(Fail::CannotCreateNothingResourceTypeItIsThereAsAPlaceholderDummy);
+        }
+        Ok(())
+    }
+}
+
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceCreate {
+    pub parent: ResourceIdentifier,
+    pub key: KeyCreationSrc,
+    pub address: AddressCreationSrc,
+    pub archetype: ResourceArchetype,
+    pub state_src: AssignResourceStateSrc<DataSet<BinSrc>>,
+    pub registry_info: Option<ResourceRegistryInfo>,
+    pub owner: Option<UserKey>,
+    pub strategy: ResourceCreateStrategy,
+}
+
+impl ResourceCreate {
+    pub fn create(
+        archetype: ResourceArchetype,
+        state_src: AssignResourceStateSrc<DataSet<BinSrc>>,
+    ) -> Self {
+        ResourceCreate {
+            parent: ResourceKey::Root.into(),
+            key: KeyCreationSrc::None,
+            address: AddressCreationSrc::None,
+            archetype: archetype,
+            state_src: state_src,
+            registry_info: Option::None,
+            owner: Option::None,
+            strategy: ResourceCreateStrategy::Create,
+        }
+    }
+
+    pub fn ensure_address(
+        archetype: ResourceArchetype,
+        src: AssignResourceStateSrc<DataSet<BinSrc>>,
+    ) -> Self {
+        ResourceCreate {
+            parent: ResourceKey::Root.into(),
+            key: KeyCreationSrc::None,
+            address: AddressCreationSrc::None,
+            archetype: archetype,
+            state_src: src,
+            registry_info: Option::None,
+            owner: Option::None,
+            strategy: ResourceCreateStrategy::Ensure,
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), Fail> {
+        let resource_type = self.archetype.kind.resource_type();
+
+        self.archetype.valid()?;
+
+        if let KeyCreationSrc::Key(key) = &self.key {
+            if key.resource_type() != resource_type {
+                return Err(Fail::ResourceTypeMismatch("ResourceCreate: key: KeyCreationSrc::Key(key) resource type != init.archetype.kind.resource_type()".into()));
+            }
+        }
+
+        Ok(())
+    }
+
+
+
+    pub fn keyed_or(self, message: &str) -> Result<Self, Error> {
+        if self.parent.is_key() {
+            return Ok(self);
+        } else {
+            Err(message.into())
+        }
+    }
+}
+
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ResourceStatus {
+    Unknown,
+    Preparing,
+    Ready,
+}
+
+impl ToString for ResourceStatus {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Unknown => "Unknown".to_string(),
+            Self::Preparing => "Preparing".to_string(),
+            Self::Ready => "Ready".to_string(),
+        }
+    }
+}
+
+impl FromStr for ResourceStatus {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Unknown" => Ok(Self::Unknown),
+            "Preparing" => Ok(Self::Preparing),
+            "Ready" => Ok(Self::Ready),
+            what => Err(format!("not recognized: {}", what).into()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AddressCreationSrc {
+    None,
+    Append(String),
+    Appends(Vec<String>),
+    Just(String),
+    Exact(ResourceAddress),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum KeyCreationSrc {
+    None,
+    Key(ResourceKey),
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub enum KeySrc {
+    None,
+    Key(ResourceKey),
+    Address(ResourceAddress),
+}
+
+/// can have other options like to Initialize the state data
+#[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
+pub enum AssignResourceStateSrc<DATASET> {
+    Stateless,
+    Direct(DATASET),
+    CreateArgs(String),
+}
+
+impl TryInto<LocalStateSetSrc> for AssignResourceStateSrc<DataSet<BinSrc>> {
+    type Error = Error;
+
+    fn try_into(self) -> Result<LocalStateSetSrc, Self::Error> {
+        match self {
+            AssignResourceStateSrc::Direct(state) => Ok(LocalStateSetSrc::Some(state.try_into()?)),
+            AssignResourceStateSrc::Stateless => Ok(LocalStateSetSrc::None),
+            _ => Err(format!("cannot turn {}", self.to_string()).into()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceStub {
+    pub key: ResourceKey,
+    pub address: ResourceAddress,
+    pub archetype: ResourceArchetype,
+    pub owner: Option<UserKey>,
+}
+
+impl ResourceStub {
+    pub fn root() -> ResourceStub {
+        ResourceStub {
+            key: ResourceKey::Root,
+            address: ResourceAddress::root(),
+            archetype: ResourceArchetype::root(),
+            owner: Option::None,
+        }
+    }
+}
+
+
+
+impl From<Resource> for ResourceStub {
+    fn from(resource: Resource) -> Self {
+        ResourceStub {
+            key: resource.key,
+            address: resource.address,
+            archetype: resource.archetype,
+            owner: resource.owner,
+        }
+    }
+}
+
+impl ResourceStub {
+    pub fn validate(&self, resource_type: ResourceType) -> bool {
+        self.key.resource_type() == resource_type
+            && self.address.resource_type() == resource_type
+            && self.archetype.kind.resource_type() == resource_type
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AssignKind {
+    Create,
+    // eventually we want to allow for Assignments where things are 'Moved' as well
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceAssign<S> {
+    pub kind: AssignKind,
+    pub stub: ResourceStub,
+    pub state_src: S,
+}
+
+impl<S> ResourceAssign<S> {
+    pub fn key(&self) -> ResourceKey {
+        self.stub.key.clone()
+    }
+
+    pub fn archetype(&self) -> ResourceArchetype {
+        self.stub.archetype.clone()
+    }
+}
+
+#[derive(Clone)]
+pub struct Resource {
+    key: ResourceKey,
+    address: ResourceAddress,
+    archetype: ResourceArchetype,
+    state_src: DataSet<BinSrc>,
+    owner: Option<UserKey>,
+}
+
+impl Resource {
+    pub fn new(
+        key: ResourceKey,
+        address: ResourceAddress,
+        archetype: ResourceArchetype,
+        state_src: DataSet<BinSrc>,
+    ) -> Resource {
+        Resource {
+            key: key,
+            address: address,
+            state_src: state_src,
+            archetype: archetype,
+            owner: Option::None, // fix later
+        }
+    }
+
+    pub fn key(&self) -> ResourceKey {
+        self.key.clone()
+    }
+
+    pub fn address(&self) -> ResourceAddress {
+        self.address.clone()
+    }
+
+    pub fn resource_type(&self) -> ResourceType {
+        self.key.resource_type()
+    }
+
+    pub fn state_src(&self) -> DataSet<BinSrc> {
+        self.state_src.clone()
+    }
+}
+
+impl From<DataSet<BinSrc>> for LocalStateSetSrc {
+    fn from(src: DataSet<BinSrc>) -> Self {
+        LocalStateSetSrc::Some(src)
+    }
+}
+
+#[derive(Clone)]
+pub enum LocalStateSetSrc {
+    None,
+    Some(DataSet<BinSrc>),
+    AlreadyHosted,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub enum RemoteDataSrc {
+    None,
+    Memory(Arc<Vec<u8>>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ResourceCreateStrategy {
+    Create,
+    Ensure,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Unique {
+    Sequence,
+    Index,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceSelector {
+    pub meta: MetaSelector,
+    pub fields: HashSet<FieldSelection>,
+}
+
+impl ResourceSelector {
+
+    pub fn children_selector(parent: ResourceIdentifier) -> Self {
+        let mut selector = Self::new();
+        selector.add_field(FieldSelection::Parent(parent));
+        selector
+    }
+
+    pub fn children_of_type_selector(parent: ResourceIdentifier, child_type: ResourceType) -> Self {
+        let mut selector = Self::new();
+        selector.add_field(FieldSelection::Parent(parent));
+        selector.add_field(FieldSelection::Type(child_type));
+        selector
+    }
+
+    pub fn app_selector() -> Self {
+        let mut selector = Self::new();
+        selector.add_field(FieldSelection::Type(ResourceType::App));
+        selector
+    }
+
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ConfigSrc {
+    None,
+    Artifact(ArtifactPath)
+}
+
+impl ToString for ConfigSrc {
+    fn to_string(&self) -> String {
+        match self {
+            ConfigSrc::None => {
+                "None".to_string()
+            }
+            ConfigSrc::Artifact(address) => {
+                let address: ResourceAddress = address.clone().into();
+                address.to_string()
+            }
+        }
+    }
+}
+
+impl FromStr for ConfigSrc {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if "None" == s {
+            Ok(Self::None)
+        } else {
+            let address = ResourceAddress::from_str(s)?;
+            let address: ArtifactPath = address.try_into()?;
+            Ok(Self::Artifact(address))
+        }
+    }
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Label {
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct LabelConfig {
+    pub name: String,
+    pub index: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceRegistryInfo {
+    pub names: Names,
+    pub labels: Labels,
+}
+
+impl ResourceRegistryInfo {
+    pub fn new() -> Self {
+        ResourceRegistryInfo {
+            names: Names::new(),
+            labels: Labels::new(),
+        }
+    }
+}
+
+pub type Labels = HashMap<String, String>;
+pub type Names = Vec<String>;
+
+impl From<&str> for Fail {
+    fn from(str: &str) -> Self {
+        Fail::Error(str.to_string())
+    }
+}
+impl From<String> for Fail {
+    fn from(str: String) -> Self {
+        Fail::Error(str)
+    }
+}
+
+impl From<rusqlite::Error> for Fail {
+    fn from(error: rusqlite::Error) -> Self {
+        Fail::SqlError(error.to_string())
+    }
+}
+
+impl From<()> for Fail {
+    fn from(_error: ()) -> Self {
+        Fail::Error("() From Error".to_string())
+    }
+}
+
+impl From<std::io::Error> for Fail {
+    fn from(error: std::io::Error) -> Self {
+        Fail::Error(error.to_string())
+    }
+}
+
+impl From<SemVerError> for Fail {
+    fn from(error: SemVerError) -> Self {
+        Fail::Error(error.to_string())
     }
 }

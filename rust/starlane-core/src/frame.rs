@@ -4,28 +4,20 @@ use std::fmt::{Debug, Formatter};
 use semver::SemVerError;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
-
 use tokio::time::error::Elapsed;
 
-use starlane_resources::ResourceIdentifier;
+use starlane_resources::{AssignResourceStateSrc, ResourceAssign, ResourceCreate, ResourceIdentifier, ResourceSelector, ResourceStatus, ResourceStub, ResourceAddress, Labels};
+use starlane_resources::data::{BinSrc, DataSet};
+use starlane_resources::message::{Fail, Message, MessageId, MessageReply, RawState, ResourceRequestMessage, ResourceResponseMessage};
 
 use crate::error::Error;
 use crate::id::Id;
 use crate::logger::Flags;
-use crate::message::resource::{
-    ActorMessage, Message, MessageReply, RawState, ResourceRequestMessage, ResourceResponseMessage,
-};
-use crate::message::{Fail, MessageExpect, MessageId, MessageUpdate, ProtoStarMessage};
-
-use crate::data::{BinSrc, DataSet};
-use crate::resource::{
-    ActorKey, AppKey, AssignResourceStateSrc, Labels, ResourceAddress, ResourceAssign,
-    ResourceBinding, ResourceCreate, ResourceId, ResourceKey, ResourceRecord, ResourceRegistration,
-    ResourceSelector, ResourceSliceAssign, ResourceSliceStatus, ResourceStatus, ResourceStub,
-    ResourceType, SubSpaceKey, UserKey,
-};
+use crate::message::{MessageExpect, MessageUpdate, ProtoStarMessage};
+use crate::message::resource::ActorMessage;
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey};
 use crate::watch::{Notification, Watch, WatchKey};
+use crate::resource::{ResourceId, ResourceRegistration, ResourceRecord, ResourceType, ResourceKey, ResourceSliceStatus, SubSpaceKey, UserKey, AppKey, ActorKey};
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum Frame {
@@ -682,79 +674,5 @@ impl fmt::Display for ProtoFrame {
     }
 }
 
-impl From<Error> for Fail {
-    fn from(e: Error) -> Self {
-        Fail::Error(format!("{}", e.to_string()))
-    }
-}
 
-impl From<Elapsed> for Fail {
-    fn from(_e: Elapsed) -> Self {
-        Fail::Timeout
-    }
-}
 
-pub trait FromReply<T, E>: Sized {
-    fn from_result(t: Result<T, E>) -> Result<Self, Fail>;
-}
-
-impl FromReply<(), Fail> for Reply {
-    fn from_result(t: Result<(), Fail>) -> Result<Self, Fail> {
-        match t {
-            Ok(_ok) => Ok(Reply::Empty),
-            Err(e) => Err(e),
-        }
-    }
-}
-
-impl FromReply<Vec<ResourceRecord>, Fail> for Reply {
-    fn from_result(t: Result<Vec<ResourceRecord>, Fail>) -> Result<Self, Fail> {
-        match t {
-            Ok(ok) => Ok(Reply::Records(ok)),
-            Err(e) => Err(e),
-        }
-    }
-}
-
-impl From<&str> for Fail {
-    fn from(str: &str) -> Self {
-        Fail::Error(str.to_string())
-    }
-}
-impl From<String> for Fail {
-    fn from(str: String) -> Self {
-        Fail::Error(str)
-    }
-}
-
-impl From<rusqlite::Error> for Fail {
-    fn from(error: rusqlite::Error) -> Self {
-        Fail::SqlError(error.to_string())
-    }
-}
-
-impl From<()> for Fail {
-    fn from(_error: ()) -> Self {
-        Fail::Error("() From Error".to_string())
-    }
-}
-
-/*
-impl <A> From<A> for Fail where A: ToString{
-    fn from(some: A) -> Self {
-        Fail::Error(some)
-    }
-}
- */
-
-impl From<std::io::Error> for Fail {
-    fn from(error: std::io::Error) -> Self {
-        Fail::Error(error.to_string())
-    }
-}
-
-impl From<SemVerError> for Fail {
-    fn from(error: SemVerError) -> Self {
-        Fail::Error(error.to_string())
-    }
-}

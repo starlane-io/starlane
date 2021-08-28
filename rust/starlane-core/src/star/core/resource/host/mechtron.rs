@@ -1,15 +1,17 @@
+use std::collections::HashMap;
 
-use crate::data::{BinSrc, DataSet};
+use starlane_resources::{AssignResourceStateSrc, Resource, ResourceAssign};
+use starlane_resources::data::{BinSrc, DataSet};
+use starlane_resources::message::Fail;
+
+use starlane_resources::ConfigSrc;
+use crate::artifact::ArtifactRef;
 use crate::error::Error;
-use crate::message::Fail;
-use crate::resource::{AssignResourceStateSrc, Resource, ResourceAssign, ResourceKey, ArtifactKind};
+use crate::mechtron::Mechtron;
+use crate::resource::{ArtifactKind, ResourceKey};
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
-use crate::mechtron::Mechtron;
-use std::collections::HashMap;
-use crate::app::ConfigSrc;
-use crate::artifact::ArtifactRef;
 use crate::util::AsyncHashMap;
 
 pub struct MechtronHost {
@@ -32,7 +34,7 @@ impl Host for MechtronHost {
     async fn assign(
         &self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<DataSet<BinSrc>, Fail> {
+    ) -> Result<DataSet<BinSrc>, Error> {
         match assign.state_src {
             AssignResourceStateSrc::Stateless => {}
             _ => {
@@ -73,12 +75,12 @@ impl Host for MechtronHost {
         }
     }
 
-    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Fail> {
+    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
         // since we only support stateless for now
         Ok(Option::None)
     }
 
-    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Fail> {
+    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Error> {
         unimplemented!()
     }
 }

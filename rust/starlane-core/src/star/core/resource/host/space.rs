@@ -1,17 +1,20 @@
-use crate::data::{BinSrc, DataSet};
+use std::convert::TryInto;
+use std::sync::Arc;
+
+use clap::{App, AppSettings};
+use yaml_rust::Yaml;
+
+use starlane_resources::{AssignKind, AssignResourceStateSrc, Resource, ResourceAssign};
+use starlane_resources::data::{BinSrc, DataSet, Meta};
+use starlane_resources::message::Fail;
+
+use crate::artifact::ArtifactRef;
 use crate::error::Error;
-use crate::message::Fail;
-use crate::resource::{AssignResourceStateSrc, Resource, ResourceAssign, ResourceKey, ResourceAddress, ResourceType, ArtifactKind, AssignKind};
+use crate::resource::{ArtifactKind, ResourceAddress, ResourceKey, ResourceType};
+use crate::resource::create_args::{artifact_bundle_address, create_args_artifact_bundle, space_address};
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
-use crate::resource::create_args::{create_args_artifact_bundle, artifact_bundle_address, space_address};
-use crate::artifact::ArtifactRef;
-use clap::{App, AppSettings};
-use yaml_rust::Yaml;
-use starlane_resources::data::Meta;
-use std::convert::TryInto;
-use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct SpaceHost {
@@ -33,7 +36,7 @@ impl Host for SpaceHost {
     async fn assign(
         &self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<DataSet<BinSrc>, Fail> {
+    ) -> Result<DataSet<BinSrc>, Error> {
         let state = match assign.state_src {
             AssignResourceStateSrc::Direct(data) => data,
             AssignResourceStateSrc::Stateless => return Err("space cannot be stateless".into()),
@@ -58,11 +61,11 @@ impl Host for SpaceHost {
         }
     }
 
-    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Fail> {
+    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
         self.store.get(key).await
     }
 
-    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Fail> {
+    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Error> {
         unimplemented!()
     }
 }
