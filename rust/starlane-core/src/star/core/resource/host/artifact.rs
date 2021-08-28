@@ -9,15 +9,17 @@ use std::sync::Arc;
 use tempdir::TempDir;
 use tokio::sync::Mutex;
 
-use starlane_resources::ResourceIdentifier;
+use starlane_resources::{AssignKind, AssignResourceStateSrc, ResourceAssign, ResourceIdentifier};
+use starlane_resources::data::{BinSrc, DataSet};
+use starlane_resources::message::Fail;
 
+use crate::resource::ResourceKey;
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util;
-use crate::resource::{ResourceAssign, AssignResourceStateSrc, ResourceKey, AssignKind};
-use crate::data::{DataSet, BinSrc};
-use crate::message::Fail;
+use crate::error::Error;
+
 /*
 =======
 use crate::resource::state_store::StateStore;
@@ -327,7 +329,7 @@ impl Host for ArtifactBundleHost {
     async fn assign(
         &self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<DataSet<BinSrc>, Fail> {
+    ) -> Result<DataSet<BinSrc>, Error> {
         let state = match assign.state_src {
             AssignResourceStateSrc::Direct(data) => data,
             AssignResourceStateSrc::Stateless => return Err("ArtifactBundle cannot be stateless".into()),
@@ -352,11 +354,11 @@ impl Host for ArtifactBundleHost {
         }
     }
 
-    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Fail> {
+    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
         self.store.get(key).await
     }
 
-    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Fail> {
+    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Error> {
         unimplemented!()
     }
 }

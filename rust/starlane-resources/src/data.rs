@@ -1,15 +1,14 @@
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
-
-use serde::{Deserialize, Serialize};
-
-use crate::error::Error;
-use crate::{Path, ResourcePathSegment};
-
-use bincode::deserialize;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::ops::Deref;
 use std::ops::DerefMut;
+use std::sync::Arc;
+
+use bincode::deserialize;
+use serde::{Deserialize, Serialize};
+
+use crate::{Path, ResourcePathSegment};
+use crate::error::Error;
 
 pub type Meta = MetaDeref<HashMap<String, String>>;
 
@@ -59,5 +58,42 @@ impl TryInto<Vec<u8>> for Meta {
 
     fn try_into(self) -> Result<Vec<u8>, Self::Error> {
         Ok(self.bin()?)
+    }
+}
+
+pub type Binary = Arc<Vec<u8>>;
+pub type DataSet<B> = HashMap<String, B>;
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum BinSrc {
+    Memory(Binary),
+}
+
+impl BinSrc {
+    pub fn new(bin: Binary) -> Self {
+        Self::Memory(bin)
+    }
+}
+
+pub trait BinContext: Sync + Send {
+
+}
+
+
+impl BinSrc {
+
+    pub fn to_bin(&self, ctx: Arc<dyn BinContext>) -> Result<Binary, Error> {
+        match self {
+            BinSrc::Memory(bin) => Ok(bin.clone()),
+        }
+    }
+}
+
+impl TryFrom<Meta> for BinSrc {
+    type Error = Error;
+
+    fn try_from(meta: Meta) -> Result<Self, Self::Error> {
+        Ok(BinSrc::Memory(Arc::new(bincode::serialize(&meta)?)))
     }
 }

@@ -3,10 +3,10 @@ use std::str::FromStr;
 use nom::error::VerboseError;
 use nom::IResult;
 
-use starlane_resources::parse_kind;
+use starlane_resources::{FieldSelection, parse_kind, ResourceSelector};
 
 use crate::error::Error;
-use crate::resource::{FieldSelection, ResourceSelector, ResourceType};
+use crate::resource::ResourceType;
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
 

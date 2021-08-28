@@ -4,19 +4,19 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use futures::TryFutureExt;
+use rusqlite::{Connection, params, params_from_iter, ToSql};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
-use rusqlite::{params, params_from_iter, Connection, ToSql};
 use tokio::sync::{mpsc, oneshot};
-
 use tokio::time::Duration;
 
-use crate::error::Error;
+use starlane_resources::message::Fail;
+use starlane_resources::ResourceAssign;
 
-use crate::message::Fail;
+use crate::error::Error;
 use crate::resource::{
-    RemoteResourceHost, ResourceAssign, ResourceHost, ResourceLocationAffinity, ResourceType,
+    RemoteResourceHost, ResourceHost, ResourceLocationAffinity, ResourceType,
 };
-use crate::star::{StarCommand, StarInfo, StarKey, StarKind, StarSkel, StarConscriptKind};
+use crate::star::{StarCommand, StarConscriptKind, StarInfo, StarKey, StarKind, StarSkel};
 
 #[derive(Clone)]
 pub struct StarWranglerBacking {
@@ -32,7 +32,7 @@ impl StarWranglerBacking {
         }
     }
 
-    pub async fn add_star_handle(&self, handle: StarConscript) -> Result<(), Fail> {
+    pub async fn add_star_handle(&self, handle: StarConscript) -> Result<(), Error> {
         let (action, rx) = StarHandleAction::new(StarConscriptCall::SetStar(handle));
         self.tx.send(action).await?;
         tokio::time::timeout(Duration::from_secs(5), rx).await??;
@@ -40,34 +40,34 @@ impl StarWranglerBacking {
         Ok(())
     }
 
-    pub async fn select(&self, selector: StarSelector) -> Result<Vec<StarConscript>, Fail> {
+    pub async fn select(&self, selector: StarSelector) -> Result<Vec<StarConscript>, Error> {
         let (action, rx) = StarHandleAction::new(StarConscriptCall::Select(selector));
         self.tx.send(action).await?;
         let result = tokio::time::timeout(Duration::from_secs(5), rx).await??;
         match result {
             StarConscriptResult::StarConscripts(handles) => Ok(handles),
-            _what => Err(Fail::expected("StarHandleResult::StarHandles(handles)")),
+            _what => Err(Fail::expected("StarHandleResult::StarHandles(handles)").into()),
         }
     }
 
-    pub async fn next(&self, selector: StarSelector) -> Result<StarConscript, Fail> {
+    pub async fn next(&self, selector: StarSelector) -> Result<StarConscript, Error> {
         let (action, rx) = StarHandleAction::new(StarConscriptCall::Next(selector));
         self.tx.send(action).await?;
         let result = tokio::time::timeout(Duration::from_secs(5), rx).await??;
         match result {
             StarConscriptResult::StarConscript(handle) => Ok(handle),
-            _what => Err(Fail::expected("StarHandleResult::StarHandle(handle)")),
+            _what => Err(Fail::expected("StarHandleResult::StarHandle(handle)").into()),
         }
     }
 
     // must have at least one of each StarKind
-    pub async fn satisfied(&self, set: HashSet<StarConscriptKind>) -> Result<StarConscriptionSatisfaction, Fail> {
+    pub async fn satisfied(&self, set: HashSet<StarConscriptKind>) -> Result<StarConscriptionSatisfaction, Error> {
         let (action, rx) = StarHandleAction::new(StarConscriptCall::CheckSatisfaction(set));
         self.tx.send(action).await?;
         let result = tokio::time::timeout(Duration::from_secs(5), rx).await??;
         match result {
             StarConscriptResult::Satisfaction(satisfaction) => Ok(satisfaction),
-            _what => Err(Fail::expected("StarHandleResult::Satisfaction(_)")),
+            _what => Err(Fail::expected("StarHandleResult::Satisfaction(_)").into()),
         }
     }
 }
@@ -82,7 +82,7 @@ impl ResourceHostSelector {
         ResourceHostSelector { skel: skel }
     }
 
-    pub async fn select(&self, resource_type: ResourceType) -> Result<Arc<dyn ResourceHost>, Fail> {
+    pub async fn select(&self, resource_type: ResourceType) -> Result<Arc<dyn ResourceHost>, Error> {
         if StarKind::hosts(&resource_type) == self.skel.info.kind {
             let handle = StarConscript {
                 key: self.skel.info.key.clone(),
@@ -263,14 +263,14 @@ impl StarConscriptDB {
                 }
                 Err(fail) => {
                     eprintln!("{}", fail.to_string());
-                    request.tx.send(StarConscriptResult::Fail(fail));
+                    request.tx.send(StarConscriptResult::Fail(fail.into()));
                 }
             }
         }
         Ok(())
     }
 
-    async fn process(&mut self, command: StarConscriptCall) -> Result<StarConscriptResult, Fail> {
+    async fn process(&mut self, command: StarConscriptCall) -> Result<StarConscriptResult, Error> {
         match command {
             StarConscriptCall::Close => {
                 // this is handle in the run() method
@@ -439,7 +439,7 @@ impl StarConscriptDB {
                                 return Err(Fail::SuitableHostNotAvailable(format!(
                                     "could not select for: {}",
                                     selector.to_string()
-                                )));
+                                )).into());
                             }
                             _ => {
                                 return Err(err.to_string().into());

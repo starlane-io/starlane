@@ -1,16 +1,20 @@
+use std::sync::Arc;
+
+use tokio::sync::{mpsc, oneshot};
+use tokio::time::Duration;
+
+use starlane_resources::message::Fail;
+use starlane_resources::ResourceIdentifier;
+
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
 use crate::frame::{Reply, ReplyKind};
-use crate::message::{Fail, ProtoStarMessage};
+use crate::message::ProtoStarMessage;
 use crate::resource::ResourceRecord;
-use crate::star::shell::message::MessagingCall;
 use crate::star::{StarCommand, StarSkel};
-use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use starlane_resources::ResourceIdentifier;
-use std::sync::Arc;
-use tokio::sync::{mpsc, oneshot};
-use tokio::time::Duration;
 use crate::star::shell::locator::ResourceLocateCall;
+use crate::star::shell::message::MessagingCall;
+use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
 #[derive(Clone)]
 pub struct SurfaceApi {
@@ -27,10 +31,10 @@ impl SurfaceApi {
         Ok(())
     }
 
-    pub async fn locate(&self, identifier: ResourceIdentifier) -> Result<ResourceRecord, Fail> {
+    pub async fn locate(&self, identifier: ResourceIdentifier) -> Result<ResourceRecord, Error> {
         let (tx, rx) = oneshot::channel();
         self.tx.try_send(SurfaceCall::Locate { identifier, tx })?;
-        tokio::time::timeout(Duration::from_secs(15), rx).await??
+        Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
     }
 
     pub async fn exchange(
@@ -38,7 +42,7 @@ impl SurfaceApi {
         proto: ProtoStarMessage,
         expect: ReplyKind,
         description: &str,
-    ) -> Result<Reply, Fail> {
+    ) -> Result<Reply, Error> {
         let (tx, rx) = oneshot::channel();
         self.tx.try_send(SurfaceCall::Exchange {
             proto,
@@ -46,10 +50,10 @@ impl SurfaceApi {
             tx,
             description: description.to_string(),
         })?;
-        tokio::time::timeout(Duration::from_secs(15), rx).await??
+        Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
     }
 
-    pub async fn get_caches(&self) -> Result<Arc<ProtoArtifactCachesFactory>, Fail> {
+    pub async fn get_caches(&self) -> Result<Arc<ProtoArtifactCachesFactory>, Error> {
         let (tx, rx) = oneshot::channel();
         self.tx.try_send(SurfaceCall::GetCaches(tx))?;
         Ok(tokio::time::timeout(Duration::from_secs(15), rx).await??)
@@ -61,12 +65,12 @@ pub enum SurfaceCall {
     GetCaches(oneshot::Sender<Arc<ProtoArtifactCachesFactory>>),
     Locate {
         identifier: ResourceIdentifier,
-        tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
+        tx: oneshot::Sender<Result<ResourceRecord, Error>>,
     },
     Exchange {
         proto: ProtoStarMessage,
         expect: ReplyKind,
-        tx: oneshot::Sender<Result<Reply, Fail>>,
+        tx: oneshot::Sender<Result<Reply, Error>>,
         description: String,
     },
 }

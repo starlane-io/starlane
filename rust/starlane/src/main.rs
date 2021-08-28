@@ -9,27 +9,27 @@ use std::sync::Arc;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 use tokio::runtime::Runtime;
-
 use tracing::dispatcher::set_global_default;
 use tracing_subscriber::FmtSubscriber;
 
 use starlane_core::error::Error;
-use starlane_core::resource::selector::MultiResourceSelector;
-use starlane_core::resource::ResourceAddressKind;
 use starlane_core::resource::{
-    AddressCreationSrc, ArtifactBundlePath, AssignResourceStateSrc, KeyCreationSrc,
-    ResourceAddress, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceSelector,
+    ArtifactBundlePath,
+    ResourceAddress,
 };
-
-use starlane_core::starlane::api::StarlaneApi;
+use starlane_core::resource::ResourceAddressKind;
+use starlane_core::resource::selector::MultiResourceSelector;
 use starlane_core::starlane::{
     ConstellationCreate, StarlaneCommand, StarlaneMachine, StarlaneMachineRunner,
 };
+use starlane_core::starlane::api::StarlaneApi;
 use starlane_core::template::{ConstellationData, ConstellationLayout, ConstellationTemplate};
 use starlane_core::util;
 use starlane_core::util::shutdown;
+use starlane_resources::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceSelector};
 
 mod cli;
+mod resource;
 
 fn main() -> Result<(), Error> {
     let subscriber = FmtSubscriber::default();

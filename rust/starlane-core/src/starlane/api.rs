@@ -5,25 +5,24 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
+use futures::FutureExt;
 use semver::Version;
 use tokio::runtime::Handle;
 use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 
-use starlane_resources::data::Meta;
-use starlane_resources::ResourceIdentifier;
+use starlane_resources::{AddressCreationSrc, AssignResourceStateSrc, FieldSelection, KeyCreationSrc, LocalStateSetSrc, RemoteDataSrc, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceIdentifier, ResourceRegistryInfo, ResourceSelector, ResourceStub};
+use starlane_resources::ConfigSrc;
+use starlane_resources::data::{BinSrc, DataSet, Meta};
+use starlane_resources::data::Binary;
+use starlane_resources::message::{MessageFrom, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage};
+use starlane_resources::message::Fail;
 
 use crate::cache::ProtoArtifactCachesFactory;
-use crate::data::{BinSrc, DataSet};
-use crate::data::Binary;
 use crate::error::Error;
 use crate::frame::{Reply, ReplyKind, StarPattern, TraversalAction};
-use crate::message::Fail;
-use crate::message::resource::{
-    MessageFrom, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage,
-};
-use crate::resource::{AddressCreationSrc, ArtifactBundleKind, ArtifactBundlePath, AssignResourceStateSrc, FieldSelection, KeyCreationSrc, LocalStateSetSrc, Path, RemoteDataSrc, ResourceAddress, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceKind, ResourceRecord, ResourceRegistryInfo, ResourceSelector, ResourceStub, ResourceType, ArtifactAddress};
+use crate::resource::{ArtifactAddress, ArtifactBundleKind, ArtifactBundlePath, Path, ResourceAddress, ResourceKind, ResourceRecord, ResourceType, to_keyed_for_reasource_create, to_keyed_for_resource_selector};
 use crate::resource::ArtifactBundleAddress;
 use crate::resource::file_system::FileSystemState;
 use crate::resource::FileKind;
@@ -34,8 +33,6 @@ use crate::star::{Request, StarCommand, StarKind, StarSkel};
 use crate::star::shell::search::SearchInit;
 use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
-use futures::FutureExt;
-use crate::app::ConfigSrc;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -48,7 +45,7 @@ impl StarlaneApi {
         &self,
         path: &ArtifactBundlePath,
         data: Arc<Vec<u8>>,
-    ) -> Result<ArtifactBundleApi, Fail> {
+    ) -> Result<ArtifactBundleApi, Error> {
         let address: ResourceAddress = path.clone().into();
 
         let subspace_address = address
@@ -91,7 +88,7 @@ impl StarlaneApi {
         Self::new_with_options(surface_api, Option::Some(starlane_tx))
     }
 
-    pub async fn to_key(&self, identifier: ResourceIdentifier) -> Result<ResourceKey, Fail> {
+    pub async fn to_key(&self, identifier: ResourceIdentifier) -> Result<ResourceKey, Error> {
         match identifier {
             ResourceIdentifier::Key(key) => Ok(key),
             ResourceIdentifier::Address(address) => self.fetch_resource_key(address).await,
@@ -104,16 +101,16 @@ impl StarlaneApi {
     }
 
     pub async fn timeout<T>(
-        rx: tokio::sync::oneshot::Receiver<Result<T, Fail>>,
-    ) -> Result<T, Fail> {
+        rx: tokio::sync::oneshot::Receiver<Result<T, Error>>,
+    ) -> Result<T, Error> {
         match tokio::time::timeout(Duration::from_secs(15), rx).await {
             Ok(result) => match result {
                 Ok(result) => result,
-                Err(_err) => Err(Fail::ChannelRecvErr),
+                Err(_err) => Err(Fail::ChannelRecvErr.into()),
             },
             Err(err) => {
                 eprintln!("elapsed error: {}", err);
-                Err(Fail::Timeout)
+                Err(Fail::Timeout.into())
             }
         }
     }
@@ -130,29 +127,29 @@ impl StarlaneApi {
     }
      */
 
-    pub async fn fetch_resource_address(&self, key: ResourceKey) -> Result<ResourceAddress, Fail> {
+    pub async fn fetch_resource_address(&self, key: ResourceKey) -> Result<ResourceAddress, Error> {
         match self.fetch_resource_record(key.into()).await {
             Ok(record) => Ok(record.stub.address),
-            Err(fail) => Err(fail),
+            Err(fail) => Err(fail.into()),
         }
     }
 
-    pub async fn fetch_resource_key(&self, address: ResourceAddress) -> Result<ResourceKey, Fail> {
+    pub async fn fetch_resource_key(&self, address: ResourceAddress) -> Result<ResourceKey, Error> {
         match self.fetch_resource_record(address.into()).await {
             Ok(record) => Ok(record.stub.key),
-            Err(fail) => Err(fail),
+            Err(fail) => Err(fail.into()),
         }
     }
 
     pub async fn fetch_resource_record(
         &self,
         identifier: ResourceIdentifier,
-    ) -> Result<ResourceRecord, Fail> {
+    ) -> Result<ResourceRecord, Error> {
         self.surface_api.locate(identifier).await
     }
 
-    pub async fn get_caches(&self) -> Result<Arc<ProtoArtifactCachesFactory>, Fail> {
-        self.surface_api.get_caches().await
+    pub async fn get_caches(&self) -> Result<Arc<ProtoArtifactCachesFactory>, Error> {
+        Ok(self.surface_api.get_caches().await?)
     }
 
     /*
@@ -164,14 +161,15 @@ impl StarlaneApi {
 
      */
 
-    pub async fn create_resource(&self, create: ResourceCreate) -> Result<ResourceRecord, Fail> {
-        let create = create.to_keyed(self.clone()).await?;
+    pub async fn create_resource(&self, create: ResourceCreate) -> Result<ResourceRecord, Error> {
+        let create = to_keyed_for_reasource_create(create, self.clone()).await?;
+
 
         let mut proto = ProtoMessage::new();
         proto.to(create.parent.clone().into());
         proto.from(MessageFrom::Inject);
         proto.payload = Option::Some(ResourceRequestMessage::Create(create));
-        let proto = proto.to_proto_star_message().await?;
+        let proto = proto.try_into()?;
 
         let reply = self
             .surface_api
@@ -188,19 +186,19 @@ impl StarlaneApi {
         &self,
         parent_resource: &ResourceIdentifier,
         mut selector: ResourceSelector,
-    ) -> Result<Vec<ResourceRecord>, Fail> {
+    ) -> Result<Vec<ResourceRecord>, Error> {
         let resource = parent_resource.clone();
 
         selector.add_field(FieldSelection::Parent(resource.clone()));
 
         // before sending
-        let selector = selector.to_keyed(self.clone()).await?;
+        let selector = to_keyed_for_resource_selector(selector,self.clone()).await?;
 
         let mut proto = ProtoMessage::new();
         proto.to(resource);
         proto.from(MessageFrom::Inject);
         proto.payload = Option::Some(ResourceRequestMessage::Select(selector));
-        let proto = proto.to_proto_star_message().await?;
+        let proto = proto.try_into()?;
 
         let reply = self
             .surface_api
@@ -213,12 +211,12 @@ impl StarlaneApi {
         }
     }
 
-    pub async fn list(&self, identifier: &ResourceIdentifier) -> Result<Vec<ResourceRecord>, Fail> {
+    pub async fn list(&self, identifier: &ResourceIdentifier) -> Result<Vec<ResourceRecord>, Error> {
         let selector = ResourceSelector::new();
         self.select(identifier, selector).await
     }
 
-    pub async fn create_api<API>(&self, create: ResourceCreate) -> Result<API, Fail>
+    pub async fn create_api<API>(&self, create: ResourceCreate) -> Result<API, Error>
     where
         API: TryFrom<ResourceApi>,
     {
@@ -231,7 +229,7 @@ impl StarlaneApi {
 
         match api {
             Ok(api) => Ok(api),
-            Err(error) => Err(Fail::Error(format!("catastrophic conversion error when attempting to try_convert api").into())),
+            Err(error) => Err(Fail::Error(format!("catastrophic conversion error when attempting to try_convert api").into()).into()),
         }
     }
 
@@ -254,7 +252,7 @@ impl StarlaneApi {
     pub async fn get_resource_state(
         &self,
         identifier: ResourceIdentifier,
-    ) -> Result<DataSet<BinSrc>, Fail> {
+    ) -> Result<DataSet<BinSrc>, Error> {
         let state_src = self.get_resource_state_src(identifier).await?;
         Ok(state_src)
     }
@@ -262,14 +260,14 @@ impl StarlaneApi {
     pub async fn get_resource_state_src(
         &self,
         identifier: ResourceIdentifier,
-    ) -> Result<DataSet<BinSrc>, Fail> {
+    ) -> Result<DataSet<BinSrc>, Error> {
         let surface_api = self.surface_api.clone();
 
             let mut proto = ProtoMessage::new();
             proto.payload = Option::Some(ResourceRequestMessage::State);
             proto.to = Option::Some(identifier);
             proto.from = Option::Some(MessageFrom::Inject);
-            let proto = proto.to_proto_star_message().await?;
+            let proto = proto.try_into()?;
             let result = surface_api
                 .exchange(
                     proto,
@@ -279,13 +277,13 @@ impl StarlaneApi {
                 .await;
             match result {
                 Ok(Reply::State(state)) => Ok(state),
-                Err(fail) => Err(fail),
+                Err(fail) => Err(fail.into()),
                 _ => unimplemented!("StarlaneApi::get_resource_state_src() IMPOSSIBLE!"),
             }
 
     }
 
-    pub fn create_space(&self, name: &str, display_name: &str) -> Result<Creation<SpaceApi>, Fail> {
+    pub fn create_space(&self, name: &str, display_name: &str) -> Result<Creation<SpaceApi>, Error> {
         let mut meta = Meta::single("display-name", display_name);
         let mut state: DataSet<BinSrc> = DataSet::new();
         state.insert("meta".to_string(), meta.try_into()?);
@@ -308,7 +306,7 @@ impl StarlaneApi {
         Ok(Creation::new(self.clone(), create))
     }
 
-    pub fn create_domain(&self, domain: &str) -> Result<Creation<DomainApi>, Fail> {
+    pub fn create_domain(&self, domain: &str) -> Result<Creation<DomainApi>, Error> {
         let state= AssignResourceStateSrc::Stateless;
         let create = ResourceCreate {
             parent: ResourceKey::Root.into(),
@@ -327,12 +325,12 @@ impl StarlaneApi {
         Ok(Creation::new(self.clone(), create))
     }
 
-    pub async fn get_space(&self, identifier: ResourceIdentifier) -> Result<SpaceApi, Fail> {
+    pub async fn get_space(&self, identifier: ResourceIdentifier) -> Result<SpaceApi, Error> {
         let record = self.fetch_resource_record(identifier).await?;
         Ok(SpaceApi::new(self.surface_api.clone(), record.stub)?)
     }
 
-    pub async fn get_sub_space(&self, identifier: ResourceIdentifier) -> Result<SubSpaceApi, Fail> {
+    pub async fn get_sub_space(&self, identifier: ResourceIdentifier) -> Result<SubSpaceApi, Error> {
         let record = self.fetch_resource_record(identifier).await?;
         Ok(SubSpaceApi::new(self.surface_api.clone(), record.stub)?)
     }
@@ -375,7 +373,7 @@ impl SpaceApi {
         StarlaneApi::new(self.surface_api.clone())
     }
 
-    pub fn create_user(&self, email: &str) -> Result<Creation<UserApi>, Fail> {
+    pub fn create_user(&self, email: &str) -> Result<Creation<UserApi>, Error> {
         let mut meta = Meta::single("email", email);
         let mut state_data: DataSet<BinSrc> = DataSet::new();
         state_data.insert("meta".to_string(), meta.try_into()?);
@@ -401,7 +399,7 @@ impl SpaceApi {
         &self,
         sub_space: &str,
         display_name: &str,
-    ) -> Result<Creation<SubSpaceApi>, Fail> {
+    ) -> Result<Creation<SubSpaceApi>, Error> {
         let mut meta = Meta::single("display-name", display_name);
         let mut state_data: DataSet<BinSrc> = DataSet::new();
         state_data.insert("meta".to_string(), meta.try_into()?);
@@ -467,7 +465,7 @@ impl SubSpaceApi {
         StarlaneApi::new(self.surface_api.clone())
     }
 
-    pub fn create_app(&self, name: &str, app_config: ArtifactAddress ) -> Result<Creation<AppApi>, Fail> {
+    pub fn create_app(&self, name: &str, app_config: ArtifactAddress ) -> Result<Creation<AppApi>, Error> {
         let resource_src = AssignResourceStateSrc::Stateless;
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
@@ -487,7 +485,7 @@ impl SubSpaceApi {
     }
 
 
-    pub fn create_file_system(&self, name: &str) -> Result<Creation<FileSystemApi>, Fail> {
+    pub fn create_file_system(&self, name: &str) -> Result<Creation<FileSystemApi>, Error> {
         let resource_src = AssignResourceStateSrc::Stateless;
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
@@ -509,7 +507,7 @@ impl SubSpaceApi {
     pub fn create_artifact_bundle_versions(
         &self,
         name: &str,
-    ) -> Result<Creation<ArtifactBundleVersionsApi>, Fail> {
+    ) -> Result<Creation<ArtifactBundleVersionsApi>, Error> {
         let resource_src = AssignResourceStateSrc::Stateless;
 
         let create = ResourceCreate {
@@ -566,7 +564,7 @@ impl AppApi {
         })
     }
 
-    pub fn create_mechtron(&self, name: &str, config: ArtifactAddress ) -> Result<Creation<MechtronApi>, Fail> {
+    pub fn create_mechtron(&self, name: &str, config: ArtifactAddress ) -> Result<Creation<MechtronApi>, Error> {
         let resource_src = AssignResourceStateSrc::Stateless;
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
@@ -673,11 +671,11 @@ impl FileSystemApi {
         &self,
         path: &Path,
         string: String,
-    ) -> Result<Creation<FileApi>, Fail> {
+    ) -> Result<Creation<FileApi>, Error> {
         self.create_file(path, Arc::new(string.into_bytes()))
     }
 
-    pub fn create_file(&self, path: &Path, data: Binary) -> Result<Creation<FileApi>, Fail> {
+    pub fn create_file(&self, path: &Path, data: Binary) -> Result<Creation<FileApi>, Error> {
         let content = BinSrc::Memory(data);
         let mut state: DataSet<BinSrc> = DataSet::new();
         state.insert("content".to_string(), content);
@@ -903,7 +901,7 @@ where
         }
     }
 
-    pub async fn submit(self) -> Result<API, Fail> {
+    pub async fn submit(self) -> Result<API, Error> {
         self.api.create_api(self.create).await
     }
 
@@ -933,7 +931,7 @@ pub struct ResourceApi {
 }
 
 impl TryFrom<ResourceApi> for FileSystemApi {
-    type Error = Fail;
+    type Error = Error;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
         Ok(Self::new(value.surface_api, value.stub)?)
@@ -941,7 +939,7 @@ impl TryFrom<ResourceApi> for FileSystemApi {
 }
 
 impl TryFrom<ResourceApi> for FileApi {
-    type Error = Fail;
+    type Error = Error;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
         Ok(Self::new(value.surface_api, value.stub)?)
@@ -949,7 +947,7 @@ impl TryFrom<ResourceApi> for FileApi {
 }
 
 impl TryFrom<ResourceApi> for AppApi{
-    type Error = Fail;
+    type Error = Error;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
         Ok(Self::new(value.surface_api, value.stub)?)
@@ -957,7 +955,7 @@ impl TryFrom<ResourceApi> for AppApi{
 }
 
 impl TryFrom<ResourceApi> for MechtronApi {
-    type Error = Fail;
+    type Error = Error;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
         Ok(Self::new(value.surface_api, value.stub)?)
@@ -965,7 +963,7 @@ impl TryFrom<ResourceApi> for MechtronApi {
 }
 
 impl TryFrom<ResourceApi> for ArtifactBundleApi {
-    type Error = Fail;
+    type Error = Error;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
         Ok(Self::new(value.surface_api, value.stub)?)
@@ -973,7 +971,7 @@ impl TryFrom<ResourceApi> for ArtifactBundleApi {
 }
 
 impl TryFrom<ResourceApi> for ArtifactBundleVersionsApi {
-    type Error = Fail;
+    type Error = Error;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
         Ok(Self::new(value.surface_api, value.stub)?)
@@ -981,7 +979,7 @@ impl TryFrom<ResourceApi> for ArtifactBundleVersionsApi {
 }
 
 impl TryFrom<ResourceApi> for SubSpaceApi {
-    type Error = Fail;
+    type Error = Error;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
         Ok(Self::new(value.surface_api, value.stub)?)
@@ -989,7 +987,7 @@ impl TryFrom<ResourceApi> for SubSpaceApi {
 }
 
 impl TryFrom<ResourceApi> for SpaceApi {
-    type Error = Fail;
+    type Error = Error;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
         Ok(Self::new(value.surface_api, value.stub)?)
@@ -997,7 +995,7 @@ impl TryFrom<ResourceApi> for SpaceApi {
 }
 
 impl TryFrom<ResourceApi> for UserApi {
-    type Error = Fail;
+    type Error = Error;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
         Ok(Self::new(value.surface_api, value.stub)?)
@@ -1005,7 +1003,7 @@ impl TryFrom<ResourceApi> for UserApi {
 }
 
 impl TryFrom<ResourceApi> for DomainApi {
-    type Error = Fail;
+    type Error = Error;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
         Ok(Self::new(value.surface_api, value.stub)?)
@@ -1016,7 +1014,7 @@ impl TryFrom<ResourceApi> for DomainApi {
 pub enum StarlaneAction {
     GetState {
         identifier: ResourceIdentifier,
-        tx: tokio::sync::oneshot::Sender<Result<DataSet<BinSrc>, Fail>>,
+        tx: tokio::sync::oneshot::Sender<Result<DataSet<BinSrc>, Error>>,
     },
 }
 
@@ -1068,7 +1066,7 @@ impl StarlaneApiRelay {
     pub async fn get_resource_state(
         &self,
         identifier: ResourceIdentifier,
-    ) -> Result<DataSet<BinSrc>, Fail> {
+    ) -> Result<DataSet<BinSrc>, Error> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.tx
             .send(StarlaneAction::GetState {

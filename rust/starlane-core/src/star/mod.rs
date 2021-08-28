@@ -16,35 +16,31 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
-use shell::pledge::{StarConscriptionSatisfaction, StarConscript, StarWranglerBacking};
-use shell::search::{SearchHits, SearchInit, StarSearchTransaction, TransactionResult, SearchCommit};
-use starlane_resources::ResourceIdentifier;
+use shell::pledge::{StarConscript, StarConscriptionSatisfaction, StarWranglerBacking};
+use shell::search::{SearchCommit, SearchHits, SearchInit, StarSearchTransaction, TransactionResult};
+use starlane_resources::{Resource, ResourceIdentifier, ResourceSelector};
+use starlane_resources::message::{Fail, MessageId};
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::constellation::ConstellationStatus;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::{
-    ActorLookup, Frame, ProtoFrame, RegistryAction, Reply, SearchResults, SearchTraversal,
-    SearchWindDown, SearchWindUp, SimpleReply, StarMessage, StarMessagePayload, StarPattern, TraversalAction,
-    WatchInfo, SearchHit,
+    ActorLookup, Frame, ProtoFrame, RegistryAction, Reply, SearchHit, SearchResults,
+    SearchTraversal, SearchWindDown, SearchWindUp, SimpleReply, StarMessage, StarMessagePayload, StarPattern,
+    TraversalAction, WatchInfo,
 };
 use crate::id::Id;
 use crate::lane::{
-    ConnectorController, LaneCommand, LaneEnd, LaneIndex, UltimaLaneKey, LaneMeta, LaneWrapper,
-    ProtoLaneEnd,
+    ConnectorController, LaneCommand, LaneEnd, LaneIndex, LaneMeta, LaneWrapper, ProtoLaneEnd,
+    UltimaLaneKey,
 };
 use crate::logger::{Flags, Logger, LogInfo};
 use crate::message::{
-    Fail, MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage,
+    MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage,
     ProtoStarMessageTo, TrackerJob,
 };
-use crate::resource::{
-    ActorKey, Registry, RegistryReservation, RegistryUniqueSrc, Resource, ResourceAddress,
-    ResourceKey, ResourceNamesReservationRequest, ResourceRecord, ResourceRegistration,
-    ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryResult, ResourceSelector,
-    ResourceType, UniqueSrc,
-};
+use crate::resource::{ActorKey, Registry, RegistryReservation, RegistryUniqueSrc, ResourceAddress, ResourceKey, ResourceNamesReservationRequest, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryResult, ResourceType, UniqueSrc};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::shell::golden::GoldenPathApi;
 use crate::star::shell::lanes::LaneMuxerApi;
@@ -52,13 +48,13 @@ use crate::star::shell::locator::ResourceLocatorApi;
 use crate::star::shell::message::MessagingApi;
 use crate::star::shell::router::RouterApi;
 use crate::star::shell::search::{StarSearchApi, StarSearchCall};
+use crate::star::shell::watch::WatchApi;
 use crate::star::surface::SurfaceApi;
 use crate::star::variant::{FrameVerdict, VariantApi};
 use crate::starlane::StarlaneMachine;
-use crate::template::StarTemplateHandle;
-use crate::star::shell::watch::WatchApi;
-use crate::watch::{Notification, WatchSelection, Property, Topic, Change};
 use crate::status::Status;
+use crate::template::StarTemplateHandle;
+use crate::watch::{Change, Notification, Property, Topic, WatchSelection};
 
 pub mod core;
 pub mod shell;
@@ -796,7 +792,7 @@ pub struct AddResourceLocation {
 
 pub struct Request<P: Debug, R> {
     pub payload: P,
-    pub tx: oneshot::Sender<Result<R, Fail>>,
+    pub tx: oneshot::Sender<Result<R, Error>>,
     pub log: bool,
 }
 
@@ -807,7 +803,7 @@ impl<P: Debug, R> Debug for Request<P, R> {
 }
 
 impl<P: Debug, R> Request<P, R> {
-    pub fn new(payload: P) -> (Self, oneshot::Receiver<Result<R, Fail>>) {
+    pub fn new(payload: P) -> (Self, oneshot::Receiver<Result<R, Error>>) {
         let (tx, rx) = oneshot::channel();
         (
             Request {
@@ -1205,11 +1201,11 @@ pub trait ResourceRegistryBacking: Sync + Send {
     async fn reserve(
         &self,
         request: ResourceNamesReservationRequest,
-    ) -> Result<RegistryReservation, Fail>;
-    async fn register(&self, registration: ResourceRegistration) -> Result<(), Fail>;
-    async fn select(&self, select: ResourceSelector) -> Result<Vec<ResourceRecord>, Fail>;
-    async fn set_location(&self, location: ResourceRecord) -> Result<(), Fail>;
-    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<ResourceRecord>, Fail>;
+    ) -> Result<RegistryReservation, Error>;
+    async fn register(&self, registration: ResourceRegistration) -> Result<(), Error>;
+    async fn select(&self, select: ResourceSelector) -> Result<Vec<ResourceRecord>, Error>;
+    async fn set_location(&self, location: ResourceRecord) -> Result<(), Error>;
+    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<ResourceRecord>, Error>;
     async fn unique_src(&self, key: ResourceIdentifier) -> Box<dyn UniqueSrc>;
 }
 
@@ -1226,7 +1222,7 @@ impl ResourceRegistryBackingSqLite {
         Ok(rtn)
     }
 
-    async fn timeout<X>(rx: oneshot::Receiver<X>) -> Result<X, Fail> {
+    async fn timeout<X>(rx: oneshot::Receiver<X>) -> Result<X, Error> {
         Ok(tokio::time::timeout(Duration::from_secs(25), rx).await??)
     }
 }
@@ -1236,13 +1232,13 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
     async fn reserve(
         &self,
         request: ResourceNamesReservationRequest,
-    ) -> Result<RegistryReservation, Fail> {
+    ) -> Result<RegistryReservation, Error> {
         let (action, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Reserve(request));
         self.registry.send(action).await?;
 
         match Self::timeout(rx).await? {
             ResourceRegistryResult::Reservation(reservation) => Result::Ok(reservation),
-            _ => Result::Err(Fail::expected("ResourceRegistryResult::Reservation(_)")),
+            _ => Result::Err(Fail::expected("ResourceRegistryResult::Reservation(_)").into()),
         }
 
         /*        match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
@@ -1252,7 +1248,7 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
         */
     }
 
-    async fn register(&self, registration: ResourceRegistration) -> Result<(), Fail> {
+    async fn register(&self, registration: ResourceRegistration) -> Result<(), Error> {
         let (request, rx) =
             ResourceRegistryAction::new(ResourceRegistryCommand::Commit(registration));
         self.registry.send(request).await?;
@@ -1261,17 +1257,17 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
         Ok(())
     }
 
-    async fn select(&self, selector: ResourceSelector) -> Result<Vec<ResourceRecord>, Fail> {
+    async fn select(&self, selector: ResourceSelector) -> Result<Vec<ResourceRecord>, Error> {
         let (request, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Select(selector));
         self.registry.send(request).await?;
         // match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
         match Self::timeout(rx).await? {
             ResourceRegistryResult::Resources(resources) => Result::Ok(resources),
-            _ => Result::Err(Fail::Timeout),
+            _ => Result::Err(Fail::Timeout.into()),
         }
     }
 
-    async fn set_location(&self, location: ResourceRecord) -> Result<(), Fail> {
+    async fn set_location(&self, location: ResourceRecord) -> Result<(), Error> {
         let (request, rx) =
             ResourceRegistryAction::new(ResourceRegistryCommand::SetLocation(location));
         self.registry.send(request).await;
@@ -1280,7 +1276,7 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
         Ok(())
     }
 
-    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<ResourceRecord>, Fail> {
+    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<ResourceRecord>, Error> {
         let (request, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Get(identifier));
         self.registry.send(request).await;
         //match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
@@ -1288,7 +1284,7 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
             ResourceRegistryResult::Resource(resource) => {
                 Ok(resource)
             }
-            _ => Err(Fail::expected("ResourceRegistryResult::Resource(_)")),
+            _ => Err(Fail::expected("ResourceRegistryResult::Resource(_)").into()),
         }
     }
 
