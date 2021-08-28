@@ -6,17 +6,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/rust.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/rust.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mechtron/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/mechtron/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mechtron/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/mechtron/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/config/wasm.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/config/wasm.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/error.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/error.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/mechtron.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/mechtron.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../wasm/appy/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/../wasm/appy/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../wasm/appy/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/../wasm/appy/Makefile" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -162,7 +153,7 @@
       <workItem from="1629548233485" duration="10310000" />
       <workItem from="1629789716878" duration="46517000" />
       <workItem from="1629962671918" duration="1565000" />
-      <workItem from="1630005530501" duration="30203000" />
+      <workItem from="1630005530501" duration="33096000" />
     </task>
     <servers />
   </component>
