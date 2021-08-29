@@ -3,6 +3,8 @@ use crate::data::BinSrc;
 use std::str::FromStr;
 use crate::error::Error;
 use serde::{Serialize,Deserialize};
+use std::convert::{TryInto, TryFrom};
+use std::sync::Arc;
 
 pub type Headers = HashMap<String,String>;
 
@@ -12,6 +14,26 @@ pub struct HttpRequest{
    pub method: HttpMethod,
    pub headers: Headers,
    pub body: BinSrc
+}
+
+impl TryInto<BinSrc> for HttpRequest {
+    type Error = Error;
+
+    fn try_into(self) -> Result<BinSrc, Self::Error> {
+        Ok(BinSrc::Memory(Arc::new(bincode::serialize(&self)?)))
+    }
+}
+
+impl TryFrom<BinSrc> for HttpRequest {
+    type Error = Error;
+
+    fn try_from(bin_src: BinSrc) -> Result<Self, Self::Error> {
+        if let BinSrc::Memory(bin) = bin_src {
+            Ok(bincode::deserialize(bin.as_slice() )?)
+        } else {
+            Err(format!("cannot try_from BinSrc of type: {}", bin_src.to_string()).into() )
+        }
+    }
 }
 
 #[derive(Debug,Clone,Serialize,Deserialize)]

@@ -8,7 +8,7 @@ use tokio::time::error::Elapsed;
 
 use starlane_resources::{AssignResourceStateSrc, ResourceAssign, ResourceCreate, ResourceIdentifier, ResourceSelector, ResourceStatus, ResourceStub, ResourceAddress, Labels};
 use starlane_resources::data::{BinSrc, DataSet};
-use starlane_resources::message::{Fail, Message, MessageId, MessageReply, RawState, ResourceRequestMessage, ResourceResponseMessage};
+use starlane_resources::message::{Fail, Message, MessageId, MessageReply, RawState, ResourceRequestMessage, ResourceResponseMessage, ResourcePortMessage};
 
 use crate::error::Error;
 use crate::id::Id;
@@ -359,7 +359,7 @@ impl Debug for StarMessagePayload {
 pub enum MessagePayload {
     Request(Message<ResourceRequestMessage>),
     Response(MessageReply<ResourceResponseMessage>),
-    Actor(Message<ActorMessage>),
+    PortRequest(Message<ResourcePortMessage>),
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -445,6 +445,7 @@ pub enum Reply {
     Id(ResourceId),
     State(DataSet<BinSrc>),
     Seq(u64),
+    Port(DataSet<BinSrc>)
 }
 
 #[derive(Clone, Eq, PartialEq, strum_macros::Display)]
@@ -458,6 +459,7 @@ pub enum ReplyKind {
     Id,
     Seq,
     State,
+    Port
 }
 
 impl ReplyKind {
@@ -472,6 +474,7 @@ impl ReplyKind {
             Reply::Id(_) => *self == Self::Id,
             Reply::Seq(_) => *self == Self::Seq,
             Reply::State(_) => *self == Self::State,
+            Reply::Port(_) => *self == Self::Port,
         }
     }
 }

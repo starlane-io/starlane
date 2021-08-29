@@ -6,7 +6,7 @@ use tokio::sync::{mpsc, oneshot};
 
 use starlane_resources::{AssignKind, AssignResourceStateSrc, Resource, ResourceAssign};
 use starlane_resources::data::{BinSrc, DataSet};
-use starlane_resources::message::Fail;
+use starlane_resources::message::{Fail, ResourcePortMessage, Message};
 
 use crate::error::Error;
 use crate::resource::{ResourceKey, ResourceType};
@@ -17,6 +17,7 @@ use crate::star::core::resource::host::mechtron::MechtronHost;
 use crate::star::core::resource::host::space::SpaceHost;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
+use crate::message::resource::Delivery;
 
 pub mod artifact;
 mod default;
@@ -43,6 +44,8 @@ pub enum HostCall {
         key: ResourceKey,
         tx: oneshot::Sender<bool>,
     },
+    Deliver(Delivery<Message<ResourcePortMessage>>)
+
 }
 
 impl Call for HostCall {}
@@ -93,6 +96,20 @@ impl AsyncProcessor<HostCall> for HostComponent {
                 let host = self.host(key.resource_type()).await;
                 tx.send(host.has(key).await);
             }
+            HostCall::Deliver(delivery) => {
+                match self.skel.resource_locator_api.as_key( delivery.payload.to.clone() ).await
+                {
+                    Ok(key) => {
+                        let host = self.host(key.resource_type()).await;
+                        host.deliver(key,delivery);
+                    }
+                    Err(_) => {
+                        error!("could not find key for: {}", delivery.payload.to.to_string() );
+                    }
+
+                }
+
+            }
         }
     }
 }
@@ -134,9 +151,13 @@ pub trait Host: Send + Sync {
     async fn init(&self, key: ResourceKey ) -> Result<(),Error> {
         Ok(())
     }
-
     async fn has(&self, key: ResourceKey) -> bool;
     async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error>;
     async fn delete(&self, key: ResourceKey) -> Result<(), Error>;
+
+    fn deliver(&self, key: ResourceKey, delivery: Delivery<Message<ResourcePortMessage>>){
+        info!("ignoring delivery");
+    }
+
     fn shutdown(&self) {}
 }

@@ -18,8 +18,10 @@ use crate::error::Error;
 use bytes::BytesMut;
 use httparse::{Request, Header};
 use starlane_resources::http::{HttpRequest, Headers, HttpMethod};
-use starlane_resources::data::BinSrc;
+use starlane_resources::data::{BinSrc, DataSet};
 use std::sync::Arc;
+use starlane_resources::message::{ProtoMessage, ResourcePortMessage,MessageFrom};
+use std::convert::TryInto;
 
 
 pub struct WebVariant {
@@ -53,7 +55,7 @@ impl AsyncProcessor<VariantCall> for WebVariant {
 
 impl WebVariant {
     fn init(&self, tx: tokio::sync::oneshot::Sender<Result<(), crate::error::Error>>) {
-        let api = StarlaneApi::new(self.skel.surface_api.clone()).into();
+        let api = StarlaneApi::new(self.skel.surface_api.clone());
 
         start(api);
 
@@ -61,7 +63,7 @@ impl WebVariant {
     }
 }
 
-fn start(api: StarlaneApiRelay) {
+fn start(api: StarlaneApi) {
     thread::spawn(move || {
 
         let runtime = Runtime::new().unwrap();
@@ -72,7 +74,7 @@ fn start(api: StarlaneApiRelay) {
 info!("LISTENING to 8080");
                     let listener = TcpListener::from_std(std_listener).unwrap();
                     while let Ok((mut stream, _)) = listener.accept().await {
-                        match process_request(stream).await {
+                        match process_request(stream, api.clone()).await {
                             Ok(_) => {
                                 info!("ok");
                             }
@@ -90,7 +92,7 @@ info!("LISTENING to 8080");
     });
 }
 
-async fn process_request( mut stream: TcpStream ) -> Result<(),Error>{
+async fn process_request( mut stream: TcpStream, api: StarlaneApi ) -> Result<(),Error>{
     info!("received HTTP Stream...");
 
     let mut request_buf: Vec<u8> = vec![];
@@ -140,6 +142,29 @@ info!("body offset: {}", body_offset);
     for (k,v) in &request.headers {
         info!("... header {}={}", k,v );
     }
+
+    let mut payload = DataSet::new();
+    payload.insert("request".to_string(), request.try_into()? );
+
+
+    let mut proto = ProtoMessage::new();
+    proto.to = Option::Some(ResourceAddress::from_str("hyperspace:starlane:appy:main<Mechtron>")?.into());
+    proto.from = Option::Some(MessageFrom::Inject);
+    proto.payload = Option::Some(ResourcePortMessage {
+        port: "web".to_string(),
+        payload
+    });
+
+    proto.validate()?;
+    let message = proto.create()?;
+
+    info!("SENDING MESSAGE");
+
+    let reply = api.send(message, "sending http request").await?;
+
+    info!("Received Reply!");
+
+
 
     stream.write(b"Hello World").await?;
 

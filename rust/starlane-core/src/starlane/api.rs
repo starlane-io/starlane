@@ -16,7 +16,7 @@ use starlane_resources::{AddressCreationSrc, AssignResourceStateSrc, FieldSelect
 use starlane_resources::ConfigSrc;
 use starlane_resources::data::{BinSrc, DataSet, Meta};
 use starlane_resources::data::Binary;
-use starlane_resources::message::{MessageFrom, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage};
+use starlane_resources::message::{MessageFrom, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage, ResourcePortMessage, Message, MessageReply};
 use starlane_resources::message::Fail;
 
 use crate::cache::ProtoArtifactCachesFactory;
@@ -99,6 +99,22 @@ impl StarlaneApi {
         self.starlane_tx.as_ref().ok_or("this api does not have access to the StarlaneMachine and therefore cannot do a shutdown")?.try_send(StarlaneCommand::Shutdown);
         Ok(())
     }
+
+    pub async fn send( &self, message: Message<ResourcePortMessage>, description: &str ) -> Result<Reply,Error> {
+        let proto = message.try_into()?;
+info!("staring message exchange for {}",description);
+        let reply = self.surface_api.exchange(proto, ReplyKind::Port, description ).await?;
+info!("received reply for {}",description);
+
+        if ReplyKind::Port.is_match(&reply) {
+            Ok(reply)
+        } else {
+            Err(format!("unexpected reply: {}", reply.to_string()).into())
+        }
+
+
+    }
+
 
     pub async fn timeout<T>(
         rx: tokio::sync::oneshot::Receiver<Result<T, Error>>,
