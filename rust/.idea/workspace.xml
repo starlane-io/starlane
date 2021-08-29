@@ -7,7 +7,11 @@
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant/web.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/web.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/config/bind.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/config/bind.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/config/mechtron.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/config/mechtron.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../wasm/appy/conf/bind/appy.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../wasm/appy/conf/bind/appy.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../wasm/appy/conf/mechtron/appy.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../wasm/appy/conf/mechtron/appy.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../wasm/appy/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/../wasm/appy/src/lib.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -153,7 +157,8 @@
       <workItem from="1629548233485" duration="10310000" />
       <workItem from="1629789716878" duration="46517000" />
       <workItem from="1629962671918" duration="1565000" />
-      <workItem from="1630005530501" duration="59613000" />
+      <workItem from="1630005530501" duration="63875000" />
+      <workItem from="1630230602205" duration="1725000" />
     </task>
     <servers />
   </component>

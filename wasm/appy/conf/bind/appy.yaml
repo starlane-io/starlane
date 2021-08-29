@@ -3,12 +3,13 @@ spec:
   name: main
   state: 
     kind: Stateless
+  web: 
   message:
     inbound:
       ports:
-      - name: main
+      - name: web
         payload:
           aspects:
-          - name: args
-            schema: json 
-            artifact: "starlane.io:core:1.0.0:/schemas/args.schema"
+          - name: web
+            schema: 
+              kind: http_request
