@@ -44,6 +44,23 @@ impl Mechtron {
 info!("{}",string);
         let call = self.membrane.write_string(string.as_str())?;
         info!("message delivery to mechtron complete...{}", call);
+        match self.membrane.instance.exports.get_native_function::<i32,()>("mechtron_call"){
+
+            Ok(func) => {
+                match func.call(call)
+                {
+                    Ok(_) => {
+                    }
+                    Err(error) => {
+                        error!("wasm runtime error: {}",error );
+                    }
+                }
+
+            }
+            Err(error) => {
+                error!("error when exporting function: mechtron_call" );
+            }
+        }
         Ok(())
     }
 }

@@ -14,8 +14,6 @@ use nom::combinator::{not, opt};
 use nom::error::{context, ErrorKind, VerboseError};
 use nom::multi::{many1, many_m_n, separated_list0, separated_list1};
 use nom::sequence::{delimited, preceded, terminated, tuple};
-use rusqlite::ToSql;
-use rusqlite::types::{ToSqlOutput, Value};
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -1645,36 +1643,7 @@ impl FieldSelection {
     }
 }
 
-impl ToSql for FieldSelection {
-    fn to_sql(&self) -> Result<ToSqlOutput<'_>, rusqlite::Error> {
-        match self.to_sql_error() {
-            Ok(ok) => Ok(ok),
-            Err(err) => {
-                eprintln!("{}", err.to_string());
-                Err(rusqlite::Error::InvalidQuery)
-            }
-        }
-    }
-}
 
-impl FieldSelection {
-    fn to_sql_error(&self) -> Result<ToSqlOutput<'_>, error::Error> {
-        match self {
-            FieldSelection::Identifier(id) => Ok(ToSqlOutput::Owned(Value::Blob(id.clone().key_or("(Identifier) selection fields must be turned into ResourceKeys before they can be used by the ResourceRegistry")?.bin()?))),
-            FieldSelection::Type(resource_type) => {
-                Ok(ToSqlOutput::Owned(Value::Text(resource_type.to_string())))
-            }
-            FieldSelection::Kind(kind) => Ok(ToSqlOutput::Owned(Value::Text(kind.to_string()))),
-            FieldSelection::Specific(specific) => {
-                Ok(ToSqlOutput::Owned(Value::Text(specific.to_string())))
-            }
-            FieldSelection::Owner(owner) => {
-                Ok(ToSqlOutput::Owned(Value::Blob(owner.clone().bin()?)))
-            }
-            FieldSelection::Parent(parent_id) => Ok(ToSqlOutput::Owned(Value::Blob(parent_id.clone().key_or("(Parent) selection fields must be turned into ResourceKeys before they can be used by the ResourceRegistry")?.bin()?))),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceArchetype {
@@ -2094,11 +2063,6 @@ impl From<String> for Fail {
     }
 }
 
-impl From<rusqlite::Error> for Fail {
-    fn from(error: rusqlite::Error) -> Self {
-        Fail::SqlError(error.to_string())
-    }
-}
 
 impl From<()> for Fail {
     fn from(_error: ()) -> Self {

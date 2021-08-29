@@ -13,14 +13,12 @@ extern crate wasm_bindgen;
 extern crate lazy_static;
 
 
+
+
 lazy_static! {
     pub static ref MECHTRONS : RwLock<HashMap<String,Arc<dyn Mechtron>>> = RwLock::new(HashMap::new());
 }
 
-extern "C"
-{
-    //pub fn membrane_host_panic(buffer: i32);
-}
 
 pub fn mechtron_register( mechtron: Arc<dyn Mechtron> ) {
     let mut lock = MECHTRONS.write().unwrap();
@@ -30,11 +28,13 @@ pub fn mechtron_register( mechtron: Arc<dyn Mechtron> ) {
 pub fn mechtron_get(name: String) -> Arc<dyn Mechtron> {
     let lock = MECHTRONS.read().unwrap();
     lock.get(&name).cloned().expect(format!("failed to get mechtron named: {}",name).as_str() )
+
 }
 
 #[wasm_bindgen]
 pub fn mechtron_call( call: i32 ) {
-    let call = match membrane_consume_string(call) {
+    log("received mechtron call");
+    match membrane_consume_string(call) {
         Ok(json) => {
             let call: MechtronCall = match serde_json::from_str(json.as_str()) {
                 Ok(call) => call,
@@ -56,7 +56,7 @@ pub fn mechtron_call( call: i32 ) {
                     };
 
                     log("delivered message to mechtron within Wasm");
-                    mechtron.message(delivery);
+                    mechtron.deliver(delivery);
 
                 }
             }
@@ -66,6 +66,7 @@ pub fn mechtron_call( call: i32 ) {
     };
 }
 
+
 pub struct Delivery {
     pub message: Message<ResourcePortMessage>
 }
@@ -73,10 +74,11 @@ pub struct Delivery {
 impl Delivery {
 }
 
+
 pub trait Mechtron: Sync+Send+'static {
     fn name(&self) -> String;
 
-    fn message( &self, delivery: Delivery ) {
+    fn deliver( &self, delivery: Delivery ) {
 
     }
 }

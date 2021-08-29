@@ -329,7 +329,19 @@ impl WasmMembrane {
     pub fn new(module: Arc<Module>) -> Result<Arc<Self>, Error> {
         let host = Arc::new(RwLock::new(WasmHost::new()));
 
-        let imports = imports! { "env"=>{
+        let imports = imports! {
+
+
+            "__wbindgen_placeholder__" => {
+               "__wbindgen_throw"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env,a:i32,b:i32| {
+                // do nothing
+           }),
+            },
+
+            "env"=>{
+
+
+
         "membrane_host_log"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env,buffer:i32| {
                 match env.unwrap()
                 {
