@@ -101,7 +101,7 @@ impl AsyncProcessor<HostCall> for HostComponent {
                 {
                     Ok(key) => {
                         let host = self.host(key.resource_type()).await;
-                        host.deliver(key,delivery);
+                        host.deliver(key,delivery).await;
                     }
                     Err(_) => {
                         error!("could not find key for: {}", delivery.payload.to.to_string() );
@@ -155,8 +155,9 @@ pub trait Host: Send + Sync {
     async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error>;
     async fn delete(&self, key: ResourceKey) -> Result<(), Error>;
 
-    fn deliver(&self, key: ResourceKey, delivery: Delivery<Message<ResourcePortMessage>>){
+    async fn deliver(&self, key: ResourceKey, delivery: Delivery<Message<ResourcePortMessage>>) -> Result<(),Error>{
         info!("ignoring delivery");
+        Ok(())
     }
 
     fn shutdown(&self) {}
