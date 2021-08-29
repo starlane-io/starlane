@@ -2,6 +2,7 @@
 extern crate wasm_bindgen;
 
 use wasm_membrane_guest::membrane::log;
+use mechtron::Mechtron;
 
 #[no_mangle]
 pub extern "C" fn mechtron_init()
@@ -9,16 +10,16 @@ pub extern "C" fn mechtron_init()
     log("Hello World! From: Wasm!");
 }
 
-#[no_mangle]
-pub extern "C" fn appy_init()
-{
-    log("Hello World! This is APPY init!");
+
+pub struct Appy {
+
 }
 
+impl Mechtron for Appy  {
+    fn name(&self) -> String {
+        "appy".to_string()
+    }
 
-#[no_mangle]
-pub extern "C" fn appy_web( )
-{
-    log("Hello World! This is APPY init!");
+
 }
 

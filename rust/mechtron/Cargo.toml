@@ -19,6 +19,9 @@ lazy_static = "1.4.0"
 wasm_membrane_guest = { path = "../wasm_membrane_guest"}
 starlane-resources= { path = "../starlane-resources"}
 
+serde_json = "1.0.61"
+serde = { version="1.0.69", features=['derive','rc'] }
+
 getrandom = { version = "0.2.3", features = ["js"] }
 
 # The `console_error_panic_hook` crate provides better debugging of panics by

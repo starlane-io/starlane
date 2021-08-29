@@ -90,6 +90,7 @@ impl Host for MechtronHost {
         info!("MECHTRON HOST RECEIVED DELIVERY");
         let mechtron = self.mechtrons.get(key.clone()).await?.ok_or(format!("could not deliver mechtron to {}",key.to_string()))?;
         info!("GOT MECHTRON");
+        mechtron.message(delivery.payload.clone()).await?;
 
         Ok(())
     }

@@ -5,6 +5,8 @@ use crate::config::bind::BindConfig;
 use crate::error::Error;
 use wasm_membrane_host::membrane::WasmMembrane;
 use std::sync::Arc;
+use starlane_resources::message::{ResourcePortMessage, Message};
+use mechtron_common::{MechtronCall, MechtronCommand};
 
 #[derive(Clone)]
 pub struct Mechtron {
@@ -30,5 +32,18 @@ impl Mechtron {
             bind_config,
             membrane
         })
+    }
+
+    pub async fn message( &self, message: Message<ResourcePortMessage>) -> Result<(),Error> {
+        let call = MechtronCall {
+            mechtron: self.config.name.clone(),
+            command: MechtronCommand::Message(message)
+        };
+
+        let string = serde_json::to_string(&call)?;
+info!("{}",string);
+        let call = self.membrane.write_string(string.as_str())?;
+        info!("message delivery to mechtron complete...{}", call);
+        Ok(())
     }
 }
