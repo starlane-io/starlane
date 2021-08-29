@@ -116,6 +116,7 @@ async fn process_request( mut stream: TcpStream ) -> Result<(),Error>{
                 let method = HttpMethod::from_str(req.method.expect("expected method"))?;
 
                 let body_offset = status.unwrap();
+info!("body offset: {}", body_offset);
                 let mut body:Vec<u8> = vec![];
                 for index in body_offset..request_buf.len() {
                     body.push( request_buf.get(index).unwrap().clone() );
@@ -135,6 +136,10 @@ async fn process_request( mut stream: TcpStream ) -> Result<(),Error>{
     info!("PATH: {}",request.path);
     info!("method: {}",request.method.to_string() );
     info!("headers: {}",request.headers.len());
+
+    for (k,v) in &request.headers {
+        info!("... header {}={}", k,v );
+    }
 
     stream.write(b"Hello World").await?;
 
