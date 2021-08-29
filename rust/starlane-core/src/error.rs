@@ -17,6 +17,7 @@ use zip::result::ZipError;
 
 use starlane_resources::message::Fail;
 use wasmer::CompileError;
+use actix_web::ResponseError;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Error {
@@ -215,6 +216,15 @@ impl From<()> for Error {
         }
     }
 }
+
+impl From<httparse::Error> for Error {
+    fn from(e: httparse::Error) -> Self {
+        Error {
+            error: e.to_string()
+        }
+    }
+}
+
 
 impl From<bincode::ErrorKind> for Error {
     fn from(e: bincode::ErrorKind) -> Self {

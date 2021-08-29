@@ -65,3 +65,5 @@ json-patch = "0.2.6"
 
 wasm_membrane_host = { path = "../wasm_membrane_host"}
 wasmer = "2.0"
+httparse = "1.5.1"
+bytes = "1.1.0"

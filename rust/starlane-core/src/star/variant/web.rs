@@ -2,18 +2,24 @@ use std::str::FromStr;
 
 use std::thread;
 
-use actix_web::client::Client;
-use actix_web::{middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer};
 
-use actix_web::web::Data;
 use url::Url;
 
 use crate::resource::ResourceAddress;
-use crate::star::StarSkel;
+use crate::star::{StarSkel};
 use crate::starlane::api::{StarlaneApi, StarlaneApiRelay};
 use tokio::sync::{oneshot, mpsc};
 use crate::star::variant::{VariantCall, FrameVerdict};
 use crate::util::{AsyncRunner, AsyncProcessor};
+use tokio::net::{TcpListener, TcpStream};
+use tokio::runtime::Runtime;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use crate::error::Error;
+use bytes::BytesMut;
+use httparse::{Request, Header};
+use starlane_resources::http::{HttpRequest, Headers, HttpMethod};
+use starlane_resources::data::BinSrc;
+use std::sync::Arc;
 
 
 pub struct WebVariant {
@@ -57,84 +63,83 @@ impl WebVariant {
 
 fn start(api: StarlaneApiRelay) {
     thread::spawn(move || {
-        web_server(api);
+
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on( async move {
+
+            match std::net::TcpListener::bind("127.0.0.1:8080") {
+                Ok(std_listener) => {
+info!("LISTENING to 8080");
+                    let listener = TcpListener::from_std(std_listener).unwrap();
+                    while let Ok((mut stream, _)) = listener.accept().await {
+                        match process_request(stream).await {
+                            Ok(_) => {
+                                info!("ok");
+                            }
+                            Err(error) => {
+                                error!("{}",error);
+                            }
+                        }
+                    }
+                }
+                Err(error) => {
+                    error!("FATAL: could not setup TcpListener {}", error);
+                }
+            }
+        });
     });
 }
 
-async fn forward(
-    req: HttpRequest,
-    _body: web::Bytes,
-    api: web::Data<StarlaneApiRelay>,
-    _client: web::Data<Client>,
-) -> Result<HttpResponse, Error> {
-    let address = ResourceAddress::from_str(
-        format!("hyperspace:default:*:website:{}::<File>", req.path()).as_str(),
-    )
-    .unwrap();
+async fn process_request( mut stream: TcpStream ) -> Result<(),Error>{
+    info!("received HTTP Stream...");
 
-    unimplemented!("switched to BinSrc");
-    /*    let responder = match api.get_resource_state(address.into()).await {
-           Ok(state) => match state {
-               None => "404".to_string(),
-               Some(state) => String::from_utf8((*state).clone()).unwrap(),
-           },
-           Err(_err) => "500".to_string(),
-       };
+    let mut request_buf: Vec<u8> = vec![];
+    let mut buf = [0 as u8; 16384]; // 16k read buffer
 
-       Ok(responder.into())
-    */
-}
+    let request = loop {
+        match stream.read(&mut buf).await {
+            Ok(size) => request_buf.extend(&buf[0..size]),
+            Err(_) => {} // handle err,
+        }
+        let mut headers = [httparse::EMPTY_HEADER; 16];
+        let mut req = Request::new(&mut headers);
+        if let Ok(status) = req.parse(&request_buf) {
 
-async fn proxy(
-    req: HttpRequest,
-    body: web::Bytes,
-    _api: web::Data<StarlaneApi>,
-    client: web::Data<Client>,
-) -> Result<HttpResponse, Error> {
-    println!("Hello");
-    let url = Data::new(Url::parse("http://starlane-core.io").unwrap());
-    let mut new_url = url.get_ref().clone();
-    new_url.set_path(req.uri().path());
-    new_url.set_query(req.uri().query());
+            if status.is_complete() {
+                info!("path is {}", req.path.expect("expected path "));
 
-    // TODO: This forwarded implementation is incomplete as it only handles the inofficial
-    // X-Forwarded-For header but not the official Forwarded one.
-    let forwarded_req = client
-        .request_from(new_url.as_str(), req.head())
-        .no_decompress();
-    let forwarded_req = if let Some(addr) = req.head().peer_addr {
-        forwarded_req.header("x-forwarded-for", format!("{}", addr.ip()))
-    } else {
-        forwarded_req
+                let mut http_headers = Headers::new();
+                for header in req.headers {
+                    http_headers.insert(header.name.to_string(), String::from_utf8(header.value.to_vec())?);
+                }
+
+                let method = HttpMethod::from_str(req.method.expect("expected method"))?;
+
+                let body_offset = status.unwrap();
+                let mut body:Vec<u8> = vec![];
+                for index in body_offset..request_buf.len() {
+                    body.push( request_buf.get(index).unwrap().clone() );
+                }
+                let body = BinSrc::Memory( Arc::new(body) );
+
+                break HttpRequest {
+                    path: req.path.expect("expected path").to_string(),
+                    method: method,
+                    headers: http_headers,
+                    body
+                };
+            }
+        }
     };
 
-    let mut res = forwarded_req.send_body(body).await.map_err(Error::from)?;
+    info!("PATH: {}",request.path);
+    info!("method: {}",request.method.to_string() );
+    info!("headers: {}",request.headers.len());
 
-    let mut client_resp = HttpResponse::build(res.status());
-    // Remove `Connection` as per
-    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Connection#Directives
-    for (header_name, header_value) in res.headers().iter().filter(|(h, _)| *h != "connection") {
-        client_resp.header(header_name.clone(), header_value.clone());
-    }
+    stream.write(b"Hello World").await?;
 
-    Ok(client_resp.body(res.body().await?))
+    Ok(())
 }
 
-#[actix_web::main]
-async fn web_server(api: StarlaneApiRelay) -> std::io::Result<()> {
-    let forward_url = Url::parse("http://starlane-core.io").unwrap();
 
-    HttpServer::new(move || {
-        App::new()
-            .data(Client::new())
-            .data(api.clone())
-            .data(forward_url.clone())
-            .wrap(middleware::Logger::default())
-            .default_service(web::route().to(forward))
-    })
-    .client_timeout(100_000)
-    .bind("127.0.0.1:8080")?
-    .system_exit()
-    .run()
-    .await
-}
+
