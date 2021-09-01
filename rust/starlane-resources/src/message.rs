@@ -206,6 +206,11 @@ pub struct ResourcePortMessage{
     pub payload: DataSet<BinSrc>
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ResourcePortReply{
+    pub payload: DataSet<BinSrc>
+}
+
 pub type Raw = Vec<u8>;
 pub type RawPayload = Vec<u8>;
 pub type RawState = Vec<u8>;

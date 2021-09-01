@@ -8,10 +8,11 @@ pub static VERSION: i32 = 1;
 
 pub struct WasmMembrane {
     pub instance: Instance,
-    //host: Arc<RwLock<WasmHost>>,
+    init: String
 }
 
 impl WasmMembrane {
+
 
     pub fn init(&self)->Result<(),Error>
     {
@@ -94,21 +95,18 @@ error!("WASM MEMBRANE INIT CALLED");
             }
         }
 
-        match self.instance.exports.get_native_function::<(),()>("membrane_guest_init"){
+        match self.instance.exports.get_native_function::<(),()>(self.init.as_str() ){
 
             Ok(func) => {
-info!("FOUND membrane_guest_init()");
                 self.log("wasm", "verified: membrane_guest_init()");
 
                 match func.call()
                 {
                     Ok(_) => {
-info!("OK membrane_guest_init()");
                         self.log("wasm", "passed: membrane_guest_init()");
                     }
                     Err(error) => {
 
-info!("ERR membrane_guest_init()");
                         self.log("wasm", format!("failed: membrane_guest_init() ERROR: {:?}",error).as_str());
                         pass = false;
                     }
@@ -116,7 +114,6 @@ info!("ERR membrane_guest_init()");
 
             }
             Err(_) => {
-info!("NOT FOUND membrane_guest_init()");
                 self.log("wasm", "failed: membrane_guest_init() [NOT REQUIRED]");
             }
         }
@@ -332,6 +329,10 @@ impl Env
 
 impl WasmMembrane {
     pub fn new(module: Arc<Module>) -> Result<Arc<Self>, Error> {
+        Self::new_with_init(module, "membrane_guest_init".to_string() )
+    }
+
+    pub fn new_with_init(module: Arc<Module>, init: String) -> Result<Arc<Self>, Error> {
         let host = Arc::new(RwLock::new(WasmHost::new()));
 
         let imports = imports! {
@@ -370,6 +371,24 @@ impl WasmMembrane {
                    }
                 }
             }),
+         "mechtron_message_reply"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env,call_id:i32,reply:i32| {
+
+                match env.unwrap()
+                {
+                   Ok(membrane)=>{
+info!("RECEIVED REPLY...");
+println!("RECEIVED REPLY");
+                      let reply_json = membrane.consume_string(reply).unwrap();
+info!("REPLY ::::>    {}",reply_json);
+println!("REPLY ::::>    {}",reply_json);
+                   },
+                   Err(_)=>{
+
+                   error!("error in reply");
+                   }
+                }
+            }),
+
         } };
 
 
@@ -377,7 +396,7 @@ impl WasmMembrane {
 
         let membrane = Arc::new(WasmMembrane {
             instance: instance,
-            //host: host.clone()
+            init
         });
 
         {

@@ -1,7 +1,7 @@
 use std::sync::{RwLock, Arc};
 use std::collections::HashMap;
-use starlane_resources::message::{Message, ResourcePortMessage};
-use wasm_membrane_guest::membrane::{membrane_consume_string, log};
+use starlane_resources::message::{Message, ResourcePortMessage, ResourcePortReply};
+use wasm_membrane_guest::membrane::{membrane_consume_string, log, membrane_guest_alloc_buffer, membrane_write_str};
 use mechtron_common::{MechtronCall, MechtronCommand};
 use lazy_static::lazy_static;
 use wasm_bindgen::prelude::*;
@@ -20,6 +20,11 @@ lazy_static! {
 }
 
 
+extern "C"
+{
+    pub fn mechtron_message_reply(call_id: i32, reply: i32);
+}
+
 pub fn mechtron_register( mechtron: Arc<dyn Mechtron> ) {
 log(format!("REGISTERED MECHTRON: {}", mechtron.name()).as_str());
     let mut lock = MECHTRONS.write().unwrap();
@@ -33,9 +38,9 @@ pub fn mechtron_get(name: String) -> Arc<dyn Mechtron> {
 }
 
 #[wasm_bindgen]
-pub fn mechtron_call( call: i32 ) {
+pub fn mechtron_call(call_id: i32 ) {
     log("received mechtron call");
-    match membrane_consume_string(call) {
+    match membrane_consume_string(call_id) {
         Ok(json) => {
 log("String consumed");
             let call: MechtronCall = match serde_json::from_str(json.as_str()) {
@@ -56,6 +61,7 @@ log("GOT MECHTRON ");
             match call.command {
                 MechtronCommand::Message(message) => {
                     let delivery = Delivery{
+                        call_id,
                         message
                     };
 
@@ -73,10 +79,20 @@ log("GOT MECHTRON ");
 
 
 pub struct Delivery {
+    pub call_id: i32,
     pub message: Message<ResourcePortMessage>
 }
 
 impl Delivery {
+    pub fn reply( &self, reply: ResourcePortReply ) {
+log("REplying to message...");
+        let reply = serde_json::to_string(&reply).expect("expected resource port reply to be able to serialize into a string");
+        let reply = membrane_write_str(reply.as_str() );
+        unsafe {
+            mechtron_message_reply(self.call_id, reply);
+        }
+        log("WASM message reply COMPLETE...");
+    }
 }
 
 
@@ -84,6 +100,5 @@ pub trait Mechtron: Sync+Send+'static {
     fn name(&self) -> String;
 
     fn deliver( &self, delivery: Delivery ) {
-
     }
 }

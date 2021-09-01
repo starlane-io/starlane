@@ -22,7 +22,7 @@ impl Mechtron {
         let wasm = caches.wasms.get(&config.wasm.address ).ok_or(format!("could not get referenced Wasm: {}", config.wasm.address.to_string()) )?;
         let bind_config = caches.bind_configs.get(&config.bind.address ).ok_or::<Error>(format!("could not get referenced BindConfig: {}", config.wasm.address.to_string()).into() )?;
 
-        let membrane = WasmMembrane::new(wasm.module.clone())?;
+        let membrane = WasmMembrane::new_with_init(wasm.module.clone(), "mechtron_init".to_string() )?;
 
         membrane.init()?;
 
