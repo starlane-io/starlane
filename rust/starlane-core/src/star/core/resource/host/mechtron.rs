@@ -14,6 +14,7 @@ use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util::AsyncHashMap;
 use crate::message::resource::Delivery;
+use crate::frame::Reply;
 
 pub struct MechtronHost {
     skel: StarSkel,
@@ -90,7 +91,12 @@ impl Host for MechtronHost {
         info!("MECHTRON HOST RECEIVED DELIVERY");
         let mechtron = self.mechtrons.get(key.clone()).await?.ok_or(format!("could not deliver mechtron to {}",key.to_string()))?;
         info!("GOT MECHTRON");
-        mechtron.message(delivery.payload.clone()).await?;
+        let reply = mechtron.message(delivery.payload.clone()).await?;
+
+        if let Option::Some(reply) = reply {
+            delivery.reply(Reply::Port(reply.payload));
+info!("=====>> MECHTRON SENT REPLY");
+        }
 
         Ok(())
     }

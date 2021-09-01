@@ -206,7 +206,7 @@ error!("WASM MEMBRANE INIT CALLED");
         Ok(rtn)
     }
 
-    fn consume_string(&self, buffer_id: i32 ) ->Result<String,Error>
+    pub fn consume_string(&self, buffer_id: i32 ) ->Result<String,Error>
     {
         let raw = self.read_buffer(buffer_id)?;
         let rtn = String::from_utf8(raw)?;

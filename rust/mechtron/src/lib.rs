@@ -38,7 +38,7 @@ pub fn mechtron_get(name: String) -> Arc<dyn Mechtron> {
 }
 
 #[wasm_bindgen]
-pub fn mechtron_call(call_id: i32 ) {
+pub fn mechtron_call(call_id: i32 ) -> i32 {
     log("received mechtron call");
     match membrane_consume_string(call_id) {
         Ok(json) => {
@@ -47,7 +47,7 @@ log("String consumed");
                 Ok(call) => call,
                 Err(error) => {
                     log(format!("mechtron call serialization error: {}",error.to_string()).as_str());
-                    return;
+                    return -1;
                 }
             };
 log(format!("got mechtron call {}", call.mechtron ).as_str());
@@ -60,45 +60,38 @@ log("GOT MECHTRON ");
 
             match call.command {
                 MechtronCommand::Message(message) => {
-                    let delivery = Delivery{
-                        call_id,
-                        message
-                    };
 
                     log("delivered message to mechtron within Wasm");
-                    mechtron.deliver(delivery);
+                    let reply = mechtron.deliver(message);
                     log("delivery complete");
 
+                    match reply {
+                        None => {
+                            0
+                        }
+                        Some(reply) => {
+                            let reply = serde_json::to_string(&reply).expect("expected resource port reply to be able to serialize into a string");
+                            let reply = membrane_write_str(reply.as_str() );
+                            log("WASM message reply COMPLETE...");
+                            reply
+                        }
+                    }
                 }
             }
 
         }
-        Err(_) => {}
-    };
-}
-
-
-pub struct Delivery {
-    pub call_id: i32,
-    pub message: Message<ResourcePortMessage>
-}
-
-impl Delivery {
-    pub fn reply( &self, reply: ResourcePortReply ) {
-log("REplying to message...");
-        let reply = serde_json::to_string(&reply).expect("expected resource port reply to be able to serialize into a string");
-        let reply = membrane_write_str(reply.as_str() );
-        unsafe {
-            mechtron_message_reply(self.call_id, reply);
+        Err(_) => {
+            -1
         }
-        log("WASM message reply COMPLETE...");
     }
 }
+
 
 
 pub trait Mechtron: Sync+Send+'static {
     fn name(&self) -> String;
 
-    fn deliver( &self, delivery: Delivery ) {
+    fn deliver( &self, message: Message<ResourcePortMessage>) -> Option<ResourcePortReply> {
+        Option::None
     }
 }

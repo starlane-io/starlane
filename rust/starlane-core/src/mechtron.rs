@@ -5,7 +5,7 @@ use crate::config::bind::BindConfig;
 use crate::error::Error;
 use wasm_membrane_host::membrane::WasmMembrane;
 use std::sync::Arc;
-use starlane_resources::message::{ResourcePortMessage, Message};
+use starlane_resources::message::{ResourcePortMessage, Message, ResourcePortReply};
 use mechtron_common::{MechtronCall, MechtronCommand};
 
 #[derive(Clone)]
@@ -34,7 +34,7 @@ impl Mechtron {
         })
     }
 
-    pub async fn message( &self, message: Message<ResourcePortMessage>) -> Result<(),Error> {
+    pub async fn message( &self, message: Message<ResourcePortMessage>) -> Result<Option<ResourcePortReply>,Error> {
         let call = MechtronCall {
             mechtron: self.config.name.clone(),
             command: MechtronCommand::Message(message)
@@ -44,23 +44,35 @@ impl Mechtron {
 info!("{}",string);
         let call = self.membrane.write_string(string.as_str())?;
         info!("message delivery to mechtron complete...{}", call);
-        match self.membrane.instance.exports.get_native_function::<i32,()>("mechtron_call"){
+        match self.membrane.instance.exports.get_native_function::<i32,i32>("mechtron_call"){
 
             Ok(func) => {
                 match func.call(call)
                 {
-                    Ok(_) => {
+                    Ok(reply) => {
+
+                        if reply > 0 {
+                            let reply_json = self.membrane.consume_string(reply).unwrap();
+                            let reply:ResourcePortReply = serde_json::from_str(reply_json.as_str())?;
+info!("... HOST .... SENDING REPLY......");
+                            Ok(Option::Some(reply))
+                        }
+                        else {
+                            Ok(Option::None)
+                        }
+
                     }
                     Err(error) => {
                         error!("wasm runtime error: {}",error );
+                        Err("wasm runtime error".into())
                     }
                 }
-
             }
             Err(error) => {
                 error!("error when exporting function: mechtron_call" );
+                Err("wasm export error".into())
             }
         }
-        Ok(())
+
     }
 }

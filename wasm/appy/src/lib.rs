@@ -2,12 +2,12 @@
 extern crate wasm_bindgen;
 
 use wasm_membrane_guest::membrane::log;
-use mechtron::{Mechtron, mechtron_register, Delivery};
+use mechtron::{Mechtron, mechtron_register};
 use std::sync::Arc;
 use starlane_resources::data::BinSrc;
 use starlane_resources::http::{HttpRequest, HttpResponse, Headers};
 use std::convert::TryInto;
-use starlane_resources::message::ResourcePortReply;
+use starlane_resources::message::{ResourcePortReply, ResourcePortMessage, Message};
 use std::collections::HashMap;
 
 
@@ -34,9 +34,9 @@ impl Mechtron for Appy  {
         "appy".to_string()
     }
 
-    fn deliver( &self, delivery: Delivery ) {
+    fn deliver( &self, message: Message<ResourcePortMessage>) -> Option<ResourcePortReply>{
         log("Delivery of Message to Appy mechtron");
-        let request = delivery.message.payload.payload.get("request").cloned().expect("expected request");
+        let request = message.payload.payload.get("request").cloned().expect("expected request");
         let request : HttpRequest = request.try_into().expect("expect to be able to change to HttpRequest");
 
         log(format!("request path: {}",request.path).as_str() );
@@ -54,7 +54,7 @@ impl Mechtron for Appy  {
         let reply = ResourcePortReply {
             payload: payload
         };
-        delivery.reply(reply);
+        Option::Some(reply)
     }
 
 }

@@ -8,7 +8,7 @@ use tokio::time::error::Elapsed;
 
 use starlane_resources::{AssignResourceStateSrc, ResourceAssign, ResourceCreate, ResourceIdentifier, ResourceSelector, ResourceStatus, ResourceStub, ResourceAddress, Labels};
 use starlane_resources::data::{BinSrc, DataSet};
-use starlane_resources::message::{Fail, Message, MessageId, MessageReply, RawState, ResourceRequestMessage, ResourceResponseMessage, ResourcePortMessage};
+use starlane_resources::message::{Fail, Message, MessageId, MessageReply, RawState, ResourceRequestMessage, ResourceResponseMessage, ResourcePortMessage, ResourcePortReply};
 
 use crate::error::Error;
 use crate::id::Id;
