@@ -5,11 +5,14 @@ use wasm_membrane_guest::membrane::log;
 use mechtron::{Mechtron, mechtron_register, Delivery};
 use std::sync::Arc;
 
+
+
+
 #[no_mangle]
-pub extern "C" fn mechtron_init()
+pub extern "C" fn membrane_guest_init()
 {
     log("Hello World! From: Wasm!");
-    mechtron_register(Arc::new(Appy::new()))
+    mechtron_register(Arc::new(Appy::new()));
 }
 
 

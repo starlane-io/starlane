@@ -15,6 +15,7 @@ impl WasmMembrane {
 
     pub fn init(&self)->Result<(),Error>
     {
+error!("WASM MEMBRANE INIT CALLED");
         let mut pass = true;
         match self.instance.exports.get_memory("memory")
         {
@@ -96,15 +97,18 @@ impl WasmMembrane {
         match self.instance.exports.get_native_function::<(),()>("membrane_guest_init"){
 
             Ok(func) => {
+info!("FOUND membrane_guest_init()");
                 self.log("wasm", "verified: membrane_guest_init()");
 
                 match func.call()
                 {
                     Ok(_) => {
+info!("OK membrane_guest_init()");
                         self.log("wasm", "passed: membrane_guest_init()");
                     }
                     Err(error) => {
 
+info!("ERR membrane_guest_init()");
                         self.log("wasm", format!("failed: membrane_guest_init() ERROR: {:?}",error).as_str());
                         pass = false;
                     }
@@ -112,6 +116,7 @@ impl WasmMembrane {
 
             }
             Err(_) => {
+info!("NOT FOUND membrane_guest_init()");
                 self.log("wasm", "failed: membrane_guest_init() [NOT REQUIRED]");
             }
         }

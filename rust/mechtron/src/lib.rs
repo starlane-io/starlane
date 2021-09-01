@@ -21,6 +21,7 @@ lazy_static! {
 
 
 pub fn mechtron_register( mechtron: Arc<dyn Mechtron> ) {
+log(format!("REGISTERED MECHTRON: {}", mechtron.name()).as_str());
     let mut lock = MECHTRONS.write().unwrap();
     lock.insert( mechtron.name(), mechtron );
 }
@@ -36,6 +37,7 @@ pub fn mechtron_call( call: i32 ) {
     log("received mechtron call");
     match membrane_consume_string(call) {
         Ok(json) => {
+log("String consumed");
             let call: MechtronCall = match serde_json::from_str(json.as_str()) {
                 Ok(call) => call,
                 Err(error) => {
@@ -43,11 +45,13 @@ pub fn mechtron_call( call: i32 ) {
                     return;
                 }
             };
+log(format!("got mechtron call {}", call.mechtron ).as_str());
 
             let mechtron: Arc<dyn Mechtron> = {
                 let read = MECHTRONS.read().unwrap();
                 read.get(&call.mechtron).cloned().expect(format!("expected mechtron: {}",call.mechtron).as_str() )
             };
+log("GOT MECHTRON ");
 
             match call.command {
                 MechtronCommand::Message(message) => {
@@ -57,6 +61,7 @@ pub fn mechtron_call( call: i32 ) {
 
                     log("delivered message to mechtron within Wasm");
                     mechtron.deliver(delivery);
+                    log("delivery complete");
 
                 }
             }

@@ -22,6 +22,7 @@ use starlane_core::resource::address::ResourceKindParts;
 use starlane_core::resource::address::Specific;
 use starlane_core::star::StarKind;
 use starlane_macros::resources;
+use starlane_core::resource::ResourceAddressPart;
 
 pub fn parse_address_part(string: &str) -> Result<(&str, Vec<ResourceAddressPart>), Error> {
     unimplemented!()

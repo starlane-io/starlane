@@ -24,7 +24,7 @@ impl Mechtron {
 
         let membrane = WasmMembrane::new(wasm.module.clone())?;
 
-        membrane.test_log()?;
+        membrane.init()?;
 
         Ok(Self{
             config,
