@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
 
-use starlane_resources::message::Fail;
+use starlane_resources::message::{Fail, ResourcePortMessage, Message, MessageReply};
 use starlane_resources::ResourceIdentifier;
 
 use crate::cache::ProtoArtifactCachesFactory;
@@ -58,6 +58,7 @@ impl SurfaceApi {
         self.tx.try_send(SurfaceCall::GetCaches(tx))?;
         Ok(tokio::time::timeout(Duration::from_secs(15), rx).await??)
     }
+
 }
 
 pub enum SurfaceCall {

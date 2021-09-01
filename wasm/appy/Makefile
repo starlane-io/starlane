@@ -6,7 +6,7 @@ clean:
 
 
 all: clean
-	wasm-pack --verbose build
+	wasm-pack --verbose build --release  --target nodejs --mode normal
 	mkdir -p bundle/wasm
 	cp pkg/appy_bg.wasm bundle/wasm/appy.wasm
 	cp -r conf/* bundle

@@ -9,9 +9,11 @@ use std::str::FromStr;
 use std::convert::TryInto;
 
 pub struct MechtronConfig {
+    pub name: String,
+    pub prefix: String,
     pub artifact: ArtifactAddress,
     pub bind: ArtifactRef,
-    pub wasm: ArtifactRef
+    pub wasm: ArtifactRef,
 }
 
 impl Cacheable for MechtronConfig {
@@ -61,7 +63,9 @@ impl Parser<MechtronConfig> for MechtronConfigParser {
         Ok(Arc::new(MechtronConfig {
             artifact: artifact.address,
             bind,
-            wasm
+            wasm,
+            name: yaml.spec.name,
+            prefix: yaml.spec.prefix
         }))
     }
 }
@@ -77,6 +81,8 @@ mod yaml {
 
     #[derive(Clone, Serialize, Deserialize)]
     pub struct SpecYaml {
+        pub name: String,
+        pub prefix: String,
         pub bind: String,
         pub wasm: String
     }

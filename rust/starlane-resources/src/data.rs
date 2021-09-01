@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{Path, ResourcePathSegment};
 use crate::error::Error;
+use crate::http::HttpRequest;
 
 pub type Meta = MetaDeref<HashMap<String, String>>;
 
@@ -65,7 +66,7 @@ pub type Binary = Arc<Vec<u8>>;
 pub type DataSet<B> = HashMap<String, B>;
 
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum BinSrc {
     Memory(Binary),
 }
@@ -98,3 +99,19 @@ impl TryFrom<Meta> for BinSrc {
         Ok(BinSrc::Memory(Arc::new(bincode::serialize(&meta)?)))
     }
 }
+
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq)]
+pub enum DataKind {
+    Meta,
+    HttpRequest
+}
+
+#[derive(Debug,Clone,Serialize,Deserialize)]
+pub enum Data {
+    Meta(Meta),
+    HttpRequest(HttpRequest)
+}
+
+
+
+

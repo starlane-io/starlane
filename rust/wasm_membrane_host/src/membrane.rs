@@ -8,13 +8,15 @@ pub static VERSION: i32 = 1;
 
 pub struct WasmMembrane {
     pub instance: Instance,
-    //host: Arc<RwLock<WasmHost>>,
+    init: String
 }
 
 impl WasmMembrane {
 
+
     pub fn init(&self)->Result<(),Error>
     {
+error!("WASM MEMBRANE INIT CALLED");
         let mut pass = true;
         match self.instance.exports.get_memory("memory")
         {
@@ -93,7 +95,7 @@ impl WasmMembrane {
             }
         }
 
-        match self.instance.exports.get_native_function::<(),()>("membrane_guest_init"){
+        match self.instance.exports.get_native_function::<(),()>(self.init.as_str() ){
 
             Ok(func) => {
                 self.log("wasm", "verified: membrane_guest_init()");
@@ -204,7 +206,7 @@ impl WasmMembrane {
         Ok(rtn)
     }
 
-    fn consume_string(&self, buffer_id: i32 ) ->Result<String,Error>
+    pub fn consume_string(&self, buffer_id: i32 ) ->Result<String,Error>
     {
         let raw = self.read_buffer(buffer_id)?;
         let rtn = String::from_utf8(raw)?;
@@ -327,9 +329,25 @@ impl Env
 
 impl WasmMembrane {
     pub fn new(module: Arc<Module>) -> Result<Arc<Self>, Error> {
+        Self::new_with_init(module, "membrane_guest_init".to_string() )
+    }
+
+    pub fn new_with_init(module: Arc<Module>, init: String) -> Result<Arc<Self>, Error> {
         let host = Arc::new(RwLock::new(WasmHost::new()));
 
-        let imports = imports! { "env"=>{
+        let imports = imports! {
+
+
+            "__wbindgen_placeholder__" => {
+               "__wbindgen_throw"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env,a:i32,b:i32| {
+                // do nothing
+           }),
+            },
+
+            "env"=>{
+
+
+
         "membrane_host_log"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env,buffer:i32| {
                 match env.unwrap()
                 {
@@ -353,6 +371,24 @@ impl WasmMembrane {
                    }
                 }
             }),
+         "mechtron_message_reply"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env,call_id:i32,reply:i32| {
+
+                match env.unwrap()
+                {
+                   Ok(membrane)=>{
+info!("RECEIVED REPLY...");
+println!("RECEIVED REPLY");
+                      let reply_json = membrane.consume_string(reply).unwrap();
+info!("REPLY ::::>    {}",reply_json);
+println!("REPLY ::::>    {}",reply_json);
+                   },
+                   Err(_)=>{
+
+                   error!("error in reply");
+                   }
+                }
+            }),
+
         } };
 
 
@@ -360,7 +396,7 @@ impl WasmMembrane {
 
         let membrane = Arc::new(WasmMembrane {
             instance: instance,
-            //host: host.clone()
+            init
         });
 
         {
@@ -407,83 +443,5 @@ impl Drop for BufferLock
 }
 
 
-#[cfg(test)]
-mod test
-{
-    use std::fs::File;
-    use std::io::Read;
-    use std::sync::Arc;
-    use crate::membrane::WasmMembrane;
-    use crate::error::Error;
-    use wasmer::{Store, JIT, Cranelift, Module};
-    use std::env;
-    use tokio::runtime::Runtime;
 
-
-    fn membrane() -> Result<Arc<WasmMembrane>, Error>
-    {
-        println!("CURRENT DIR {:?}", env::current_dir()? );
-        let path = "../../../guest/rust/wasm_membrane_guest_example/pkg/wasm_membrane_bg.wasm";
-
-        let mut file = File::open(path)?;
-        let mut data = Vec::new();
-        file.read_to_end(&mut data)?;
-
-        let store = Store::new(&JIT::new(Cranelift::default()).engine());
-        let module = Module::new(&store, data)?;
-        let membrane = WasmMembrane::new(Arc::new(module)).unwrap();
-
-        membrane.init()?;
-
-        Ok(membrane)
-    }
-
-
-    #[test]
-    pub fn test_wasm() -> Result<(), Error>
-    {
-        let membrane = membrane()?;
-
-        let buffer_id = membrane.write_string("Hello From MEMBRANE!")?;
-
-        membrane.membrane_guest_dealloc_buffer(buffer_id)?;
-
-        Ok(())
-    }
-
-
-    #[test]
-    pub fn test_log() -> Result<(), Error>
-    {
-        let membrane = membrane()?;
-        membrane.test_log()?;
-
-        Ok(())
-    }
-
-    /*
-
-    #[test]
-    pub fn test_endless_loop() -> Result<(), Error>
-    {
-        let membrane = membrane()?;
-        let rt = Runtime::new().unwrap();
-        rt.block_on(async {
-//            membrane.test_endless_loop().await.unwrap();
-            tokio::spawn(async{println!("Hello Tokio!")});
-
-            let handle = tokio::spawn(async move {membrane.test_endless_loop().await;});
-            handle.abort();
-        });
-//        let handle = tokio::spawn( async move {membrane.test_endless_loop(); } );
-
-        //handle.await.unwrap();
-
-        Ok(())
-    }
-
-     */
-
-
-}
 

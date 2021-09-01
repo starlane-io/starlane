@@ -5,6 +5,8 @@ use crate::config::bind::BindConfig;
 use crate::error::Error;
 use wasm_membrane_host::membrane::WasmMembrane;
 use std::sync::Arc;
+use starlane_resources::message::{ResourcePortMessage, Message, ResourcePortReply};
+use mechtron_common::{MechtronCall, MechtronCommand};
 
 #[derive(Clone)]
 pub struct Mechtron {
@@ -20,9 +22,9 @@ impl Mechtron {
         let wasm = caches.wasms.get(&config.wasm.address ).ok_or(format!("could not get referenced Wasm: {}", config.wasm.address.to_string()) )?;
         let bind_config = caches.bind_configs.get(&config.bind.address ).ok_or::<Error>(format!("could not get referenced BindConfig: {}", config.wasm.address.to_string()).into() )?;
 
-        let membrane = WasmMembrane::new(wasm.module.clone())?;
+        let membrane = WasmMembrane::new_with_init(wasm.module.clone(), "mechtron_init".to_string() )?;
 
-        membrane.test_log()?;
+        membrane.init()?;
 
         Ok(Self{
             config,
@@ -30,5 +32,47 @@ impl Mechtron {
             bind_config,
             membrane
         })
+    }
+
+    pub async fn message( &self, message: Message<ResourcePortMessage>) -> Result<Option<ResourcePortReply>,Error> {
+        let call = MechtronCall {
+            mechtron: self.config.name.clone(),
+            command: MechtronCommand::Message(message)
+        };
+
+        let string = serde_json::to_string(&call)?;
+info!("{}",string);
+        let call = self.membrane.write_string(string.as_str())?;
+        info!("message delivery to mechtron complete...{}", call);
+        match self.membrane.instance.exports.get_native_function::<i32,i32>("mechtron_call"){
+
+            Ok(func) => {
+                match func.call(call)
+                {
+                    Ok(reply) => {
+
+                        if reply > 0 {
+                            let reply_json = self.membrane.consume_string(reply).unwrap();
+                            let reply:ResourcePortReply = serde_json::from_str(reply_json.as_str())?;
+info!("... HOST .... SENDING REPLY......");
+                            Ok(Option::Some(reply))
+                        }
+                        else {
+                            Ok(Option::None)
+                        }
+
+                    }
+                    Err(error) => {
+                        error!("wasm runtime error: {}",error );
+                        Err("wasm runtime error".into())
+                    }
+                }
+            }
+            Err(error) => {
+                error!("error when exporting function: mechtron_call" );
+                Err("wasm export error".into())
+            }
+        }
+
     }
 }

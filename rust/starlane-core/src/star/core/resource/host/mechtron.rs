@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use starlane_resources::{AssignResourceStateSrc, Resource, ResourceAssign};
 use starlane_resources::data::{BinSrc, DataSet};
-use starlane_resources::message::Fail;
+use starlane_resources::message::{Fail, ResourcePortMessage, Message};
 
 use starlane_resources::ConfigSrc;
 use crate::artifact::ArtifactRef;
@@ -13,6 +13,8 @@ use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util::AsyncHashMap;
+use crate::message::resource::Delivery;
+use crate::frame::Reply;
 
 pub struct MechtronHost {
     skel: StarSkel,
@@ -83,4 +85,20 @@ impl Host for MechtronHost {
     async fn delete(&self, _identifier: ResourceKey) -> Result<(), Error> {
         unimplemented!()
     }
+
+    async fn deliver(&self, key: ResourceKey, delivery: Delivery<Message<ResourcePortMessage>>) -> Result<(),Error>{
+
+        info!("MECHTRON HOST RECEIVED DELIVERY");
+        let mechtron = self.mechtrons.get(key.clone()).await?.ok_or(format!("could not deliver mechtron to {}",key.to_string()))?;
+        info!("GOT MECHTRON");
+        let reply = mechtron.message(delivery.payload.clone()).await?;
+
+        if let Option::Some(reply) = reply {
+            delivery.reply(Reply::Port(reply.payload));
+info!("=====>> MECHTRON SENT REPLY");
+        }
+
+        Ok(())
+    }
+
 }

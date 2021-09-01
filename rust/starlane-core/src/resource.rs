@@ -385,7 +385,7 @@ impl Registry {
                 Ok(ResourceRegistryResult::Ok)
             }
             ResourceRegistryCommand::Select(selector) => {
-                let mut params = vec![];
+                let mut params: Vec<FieldSelectionSql> = vec![];
                 let mut where_clause = String::new();
 
                 for (index, field) in Vec::from_iter(selector.fields.clone())
@@ -418,7 +418,7 @@ impl Registry {
                         }
                     };
                     where_clause.push_str(f.as_str());
-                    params.push(field);
+                    params.push(field.into());
                 }
 
                 /*
@@ -1336,6 +1336,51 @@ impl RegistryReservation {
 
     pub fn empty() -> Self {
         RegistryReservation { tx: Option::None }
+    }
+}
+
+
+
+pub struct FieldSelectionSql{
+    selection: FieldSelection
+}
+
+impl From<FieldSelection> for FieldSelectionSql {
+    fn from(selection: FieldSelection) -> Self {
+        Self{
+            selection
+        }
+    }
+}
+
+impl ToSql for FieldSelectionSql {
+    fn to_sql(&self) -> Result<ToSqlOutput<'_>, rusqlite::Error> {
+        match self.to_sql_error() {
+            Ok(ok) => Ok(ok),
+            Err(err) => {
+                eprintln!("{}", err.to_string());
+                Err(rusqlite::Error::InvalidQuery)
+            }
+        }
+    }
+}
+
+impl FieldSelectionSql {
+    fn to_sql_error(&self) -> Result<ToSqlOutput<'_>, error::Error> {
+        match &self.selection {
+            FieldSelection::Identifier(id) => Ok(ToSqlOutput::Owned(Value::Blob(id.clone().key_or("(Identifier) selection fields must be turned into ResourceKeys before they can be used by the ResourceRegistry")?.bin()?))),
+            FieldSelection::Type(resource_type) => {
+                Ok(ToSqlOutput::Owned(Value::Text(resource_type.to_string())))
+            }
+            FieldSelection::Kind(kind) => Ok(ToSqlOutput::Owned(Value::Text(kind.to_string()))),
+            FieldSelection::Specific(specific) => {
+                Ok(ToSqlOutput::Owned(Value::Text(specific.to_string())))
+            }
+            FieldSelection::Owner(owner) => {
+                Ok(ToSqlOutput::Owned(Value::Blob(owner.clone().bin()?)))
+            }
+            FieldSelection::Parent(parent_id) => Ok(ToSqlOutput::Owned(Value::Blob(parent_id.clone().key_or("(Parent) selection fields must be turned into ResourceKeys before they can be used by the ResourceRegistry")?.bin()?))),
+        }
     }
 }
 

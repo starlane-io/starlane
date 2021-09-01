@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use tokio::sync::{mpsc, oneshot};
 
 use starlane_resources::{Resource, ResourceArchetype};
-use starlane_resources::message::{Message, ResourceRequestMessage, ResourceResponseMessage};
+use starlane_resources::message::{Message, ResourceRequestMessage, ResourceResponseMessage, ResourcePortMessage};
 use starlane_resources::message::Fail;
 
 use starlane_resources::data::DataSet;
@@ -67,6 +67,11 @@ impl MessagingEndpointComponent {
                 MessagePayload::Request(request) => {
                     let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
                     self.process_resource_request(delivery).await?;
+                }
+                MessagePayload::PortRequest(request) => {
+info!("Received PORT request!");
+                    let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
+                    self.process_resource_port_request(delivery).await?;
                 }
                 _ => {}
             },
@@ -170,6 +175,32 @@ impl MessagingEndpointComponent {
                         }
                     }
                 }
+                Ok(())
+            }
+
+            match process(skel, host_tx, delivery).await {
+                Ok(_) => {}
+                Err(err) => {
+                    error!("{}", err.to_string());
+                }
+            }
+        });
+        Ok(())
+    }
+
+    async fn process_resource_port_request(
+        &mut self,
+        delivery: Delivery<Message<ResourcePortMessage>>,
+    ) -> Result<(), Error> {
+        let skel = self.skel.clone();
+        let host_tx = self.host_tx.clone();
+        tokio::spawn(async move {
+            async fn process(
+                skel: StarSkel,
+                host_tx: mpsc::Sender<HostCall>,
+                delivery: Delivery<Message<ResourcePortMessage>>,
+            ) -> Result<(), Error> {
+                host_tx.try_send( HostCall::Deliver(delivery)).unwrap_or_default();
                 Ok(())
             }
 

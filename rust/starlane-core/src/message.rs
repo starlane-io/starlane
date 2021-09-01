@@ -1,12 +1,12 @@
 use std::collections::HashSet;
-use std::convert::{Infallible, TryFrom};
+use std::convert::{Infallible, TryFrom, TryInto};
 use std::string::FromUtf8Error;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, oneshot};
 use uuid::Uuid;
 
-use starlane_resources::message::{Message, MessageId, MessageReply, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage};
+use starlane_resources::message::{Message, MessageId, MessageReply, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage, ResourcePortMessage};
 use starlane_resources::ResourceIdentifier;
 
 use crate::error::Error;
@@ -129,6 +129,31 @@ impl TryFrom<ProtoMessage<ResourceRequestMessage>> for ProtoStarMessage {
         proto.trace = message.trace;
         proto.log = message.log;
         proto.payload = StarMessagePayload::MessagePayload(MessagePayload::Request(message));
+        Ok(proto)
+    }
+}
+
+impl TryFrom<ProtoMessage<ResourcePortMessage>> for ProtoStarMessage {
+
+    type Error = Error;
+
+    fn try_from(proto: ProtoMessage<ResourcePortMessage>) -> Result<Self, Self::Error> {
+        proto.validate()?;
+        let message = proto.create()?;
+        message.try_into()
+    }
+}
+
+impl TryFrom<Message<ResourcePortMessage>> for ProtoStarMessage {
+
+    type Error = Error;
+
+    fn try_from(message: Message<ResourcePortMessage>) -> Result<Self, Self::Error> {
+        let mut proto = ProtoStarMessage::new();
+        proto.to = message.to.clone().into();
+        proto.trace = message.trace;
+        proto.log = message.log;
+        proto.payload = StarMessagePayload::MessagePayload(MessagePayload::PortRequest(message));
         Ok(proto)
     }
 }

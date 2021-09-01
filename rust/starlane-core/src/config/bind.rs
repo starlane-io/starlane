@@ -10,6 +10,7 @@ use std::convert::TryInto;
 
 pub struct BindConfig {
     pub artifact: ArtifactAddress,
+    pub message: Message
 }
 
 impl Cacheable for BindConfig {
@@ -25,6 +26,43 @@ impl Cacheable for BindConfig {
     }
 }
 
+pub struct Message {
+    pub inbound: Inbound
+}
+
+pub struct Inbound {
+    pub ports: Vec<Port>
+}
+
+pub struct Port {
+    pub name: String,
+    pub payload: Payload
+}
+
+pub struct Payload {
+    pub aspects: Vec<Aspect>
+}
+
+pub struct Aspect {
+    pub name: String,
+    pub schema: Schema
+}
+
+
+pub enum Schema {
+    HttpRequest
+}
+
+impl FromStr for Schema {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "http_request" => Ok(Schema::HttpRequest),
+            _ => Err(format!("not a known data schema {}",s).into())
+        }
+    }
+}
 
 pub struct BindConfigParser;
 
@@ -43,8 +81,28 @@ impl Parser<BindConfig> for BindConfigParser {
         let address: ResourceAddress  = artifact.address.clone().into();
         let bundle_address = address.parent().ok_or::<Error>("expected artifact to have bundle parent".into())?;
 
+        // validate
+        for p in &yaml.spec.message.inbound.ports {
+            for a in &p.payload.aspects {
+                Schema::from_str(a.schema.kind.as_str() )?;
+            }
+        }
+
         Ok(Arc::new(BindConfig {
             artifact: artifact.address,
+            message: Message {
+                inbound: Inbound {
+                    ports: yaml.spec.message.inbound.ports.iter().map( |p| Port {
+                        name: p.name.clone(),
+                        payload: Payload {
+                            aspects: p.payload.aspects.iter().map( |a| Aspect{
+                                name: a.name.clone(),
+                                schema: Schema::from_str(a.schema.kind.as_str()).expect("expected valid schema kind")
+                            }).collect()
+                        }
+                    }).collect()
+                }
+            }
         }))
     }
 }
@@ -101,9 +159,16 @@ mod yaml {
     #[derive(Clone, Serialize, Deserialize)]
     pub struct AspectYaml{
         pub name: String,
-        pub schema: String,
-        pub artifact: String
+        pub schema: SchemaYaml,
     }
+
+    #[derive(Clone, Serialize, Deserialize)]
+    pub struct SchemaYaml{
+        pub kind: String,
+        pub artifact: Option<String>
+    }
+
+
 
 
 

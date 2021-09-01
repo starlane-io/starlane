@@ -64,4 +64,7 @@ schemars = "0.8.0"
 json-patch = "0.2.6"
 
 wasm_membrane_host = { path = "../wasm_membrane_host"}
+mechtron-common = { path = "../mechtron-common"}
 wasmer = "2.0"
+httparse = "1.5.1"
+bytes = "1.1.0"

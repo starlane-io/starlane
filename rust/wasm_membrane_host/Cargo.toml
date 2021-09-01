@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 wasmer="2.0.0"
+log = "0.4.14"

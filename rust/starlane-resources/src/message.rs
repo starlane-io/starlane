@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::{ResourceAddress, ResourceCreate, ResourceIdentifier, ResourceKey, ResourceKind, ResourceSelector, ResourceStub, ResourceType, SkewerCase, Specific,ResourceId};
 use crate::error::Error;
-use crate::data::{DataSet, BinSrc};
+use crate::data::{DataSet, BinSrc, Meta};
 
 pub struct ProtoMessage<P> {
     pub id: MessageId,
@@ -198,6 +198,17 @@ pub enum ResourceResponseMessage {
     Unique(ResourceId),
     State(DataSet<BinSrc>),
     Fail(Fail),
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ResourcePortMessage{
+    pub port: String,
+    pub payload: DataSet<BinSrc>
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ResourcePortReply{
+    pub payload: DataSet<BinSrc>
 }
 
 pub type Raw = Vec<u8>;
