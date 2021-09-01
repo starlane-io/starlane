@@ -17,11 +17,12 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use crate::error::Error;
 use bytes::BytesMut;
 use httparse::{Request, Header};
-use starlane_resources::http::{HttpRequest, Headers, HttpMethod};
+use starlane_resources::http::{HttpRequest, Headers, HttpMethod, HttpResponse};
 use starlane_resources::data::{BinSrc, DataSet};
 use std::sync::Arc;
 use starlane_resources::message::{ProtoMessage, ResourcePortMessage,MessageFrom};
 use std::convert::TryInto;
+use crate::frame::Reply;
 
 
 pub struct WebVariant {
@@ -163,10 +164,20 @@ info!("body offset: {}", body_offset);
     let reply = api.send(message, "sending http request").await?;
 
     info!("Received Reply!");
+    if let Reply::Port(payload) = reply {
+        let response = payload.get("response").cloned().ok_or("expected 'response'")?;
+        let response : HttpResponse = response.try_into()?;
 
+        match response.body {
+            BinSrc::Memory(bin) => {
+                stream.write( bin.as_slice() ).await?;
+                return Ok(());
+            }
+        }
 
+    }
 
-    stream.write(b"Hello World").await?;
+    stream.write(b"ERROR").await?;
 
     Ok(())
 }
