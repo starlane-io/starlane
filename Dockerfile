@@ -1,4 +1,6 @@
-FROM rust:1.48 as builder
+FROM rust:1.55 as builder
+
+RUN rustup update nightly && rustup default nightly
 
 RUN mkdir -p /usr/src/starlane
 
