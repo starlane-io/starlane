@@ -1,3 +1,6 @@
+use starlane_core::star::StarKey;
+use serde::{Serialize,Deserialize};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceLocation {
     pub star: StarKey,

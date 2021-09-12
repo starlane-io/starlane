@@ -45,7 +45,6 @@ pub mod frame;
 pub mod id;
 pub mod lane;
 pub mod logger;
-pub mod main;
 pub mod message;
 pub mod names;
 pub mod permissions;

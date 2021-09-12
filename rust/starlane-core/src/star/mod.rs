@@ -196,12 +196,13 @@ impl StarKind {
             ResourceType::FileSystem => Self::Space,
             ResourceType::File => Self::Space,
             ResourceType::Database => Self::K8s,
-            ResourceType::Auth=> Self::K8s,
+            ResourceType::Authenticator=> Self::K8s,
             ResourceType::ArtifactBundleVersions => Self::Space,
             ResourceType::ArtifactBundle => Self::ArtifactStore,
             ResourceType::Artifact => Self::ArtifactStore,
             ResourceType::Proxy => Self::Space,
             ResourceType::Domain => Self::Central,
+            ResourceType::Credentials=> Self::Space,
         }
     }
 
@@ -216,13 +217,14 @@ impl StarKind {
             ResourceType::FileSystem => Self::FileStore,
             ResourceType::File => Self::FileStore,
             ResourceType::Database => Self::K8s,
-            ResourceType::Auth=> Self::K8s,
+            ResourceType::Authenticator=> Self::K8s,
             ResourceType::UserBase => Self::Space,
             ResourceType::ArtifactBundleVersions => Self::ArtifactStore,
             ResourceType::ArtifactBundle => Self::ArtifactStore,
             ResourceType::Artifact => Self::ArtifactStore,
             ResourceType::Proxy => Self::Space,
             ResourceType::Domain => Self::Space,
+            ResourceType::Credentials => Self::Space,
         }
     }
 
@@ -234,6 +236,7 @@ impl StarKind {
                     ResourceType::Space,
                     ResourceType::SubSpace,
                     ResourceType::User,
+                    ResourceType::UserBase,
                     ResourceType::Domain,
                     ResourceType::Proxy,
                 ],

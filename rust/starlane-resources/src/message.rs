@@ -114,6 +114,7 @@ impl<P> ProtoMessageReply<P> {
             return Err("ResourceMessagePayload cannot be None".into());
         }
 
+
         Ok(MessageReply {
             id: self.id,
             from: self.from.ok_or("need to set 'from' in ProtoMessageReply")?,

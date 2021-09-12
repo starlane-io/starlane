@@ -6,7 +6,17 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant/web.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/web.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/main.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/kube.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/kube.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-macros-test/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-macros-test/src/main.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/src/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/message.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/main.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/resource.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -45,6 +55,7 @@
     <property name="WebServerToolWindowFactoryState" value="false" />
     <property name="last_opened_file_path" value="$PROJECT_DIR$/starlane-core/src/star/core/resource/host" />
     <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
+    <property name="settings.editor.selected.configurable" value="language.rust" />
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
@@ -54,11 +65,11 @@
       <recent name="$PROJECT_DIR$/starlane-core/src/config" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test starlane::test::mechtron">
+  <component name="RunManager" selected="Cargo.Run">
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
-      <option name="command" value="run  -- serve" />
-      <option name="workingDirectory" value="file://$PROJECT_DIR$/starlane" />
-      <option name="channel" value="DEFAULT" />
+      <option name="command" value="run  --bin starlane -- serve --with-external" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <option name="channel" value="NIGHTLY" />
       <option name="requiredFeatures" value="true" />
       <option name="allFeatures" value="false" />
       <option name="emulateTerminal" value="false" />
@@ -156,7 +167,7 @@
       <workItem from="1630230602205" duration="6385000" />
       <workItem from="1630247537849" duration="16379000" />
       <workItem from="1630425338598" duration="532000" />
-      <workItem from="1630446426365" duration="10062000" />
+      <workItem from="1630446426365" duration="19446000" />
     </task>
     <servers />
   </component>
@@ -171,5 +182,9 @@
       </map>
     </option>
     <option name="oldMeFiltersMigrated" value="true" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
   </component>
 </project>

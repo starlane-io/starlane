@@ -26,7 +26,8 @@ use starlane_core::starlane::api::StarlaneApi;
 use starlane_core::template::{ConstellationData, ConstellationLayout, ConstellationTemplate};
 use starlane_core::util;
 use starlane_core::util::shutdown;
-use starlane_resources::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceSelector};
+
+use starlane_resources::{ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceArchetype, AssignResourceStateSrc, ResourceCreateStrategy, ResourceSelector};
 
 mod cli;
 mod resource;

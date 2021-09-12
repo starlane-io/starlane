@@ -17,8 +17,8 @@ use crate::resource::{
     ResourceCreationChamber, ResourceKey, ResourceKind,
 };
 use crate::star::StarSkel;
+use crate::star::core::resource::host::Host;
 
-/*
 
 pub struct KubeCore {
     skel: StarSkel,
@@ -75,12 +75,11 @@ impl KubeCore {
 
 #[async_trait]
 impl Host for KubeCore {
-    async fn assign(
-        &self,
-        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<(), Fail> {
 
-
+     async fn assign(
+            &self,
+            assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
+        ) -> Result<DataSet<BinSrc>, Error> {
         let provisioners: Api<StarlaneProvisioner> = Api::default_namespaced(self.client.clone() );
         let parts:ResourceKindParts = assign.archetype().kind.into();
         let mut list_params = ListParams::default();
@@ -100,7 +99,7 @@ impl Host for KubeCore {
         //let provisioner:StarlaneProvisioner  = provisioners.items.get_mut(0).ok_or_else(||)?;
 
         if provisioners.items.is_empty() {
-           return Err(Fail::NoProvisioner(assign.stub.archetype.kind.clone()));
+           return Err(format!("no provisioner for: {} ", assign.stub.archetype.kind.to_string()).into() );
         }
 
         let provisioner:StarlaneProvisioner  = provisioners.items.remove(0);
@@ -126,30 +125,19 @@ impl Host for KubeCore {
 
         println!("STARLANE RESOURCE CREATED!");
 
-        Ok(())
+        Ok(DataSet::new())
     }
 
     async fn has(&self, key: ResourceKey) -> bool {
         todo!()
     }
 
-<<<<<<< HEAD:rust/starlane-core/src/star/core/resource/host/kube.rs
-    async fn get(&self, _identifier: ResourceKey ) -> Result<Option<DataSet<BinSrc>>, Fail> {
-=======
-    async fn get(&self, _identifier: ResourceKey ) -> Result<DataSet<BinSrc>, Fail> {
->>>>>>> f2361a20ec5930eab8327e64fbc6e3b3d95d08d0:rust/starlane-core/src/core/kube.rs
-        unimplemented!()
-//        self.store.get(identifier).await
+    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
+        todo!()
     }
 
-<<<<<<< HEAD:rust/starlane-core/src/star/core/resource/host/kube.rs
-
-=======
->>>>>>> f2361a20ec5930eab8327e64fbc6e3b3d95d08d0:rust/starlane-core/src/core/kube.rs
-
-    async fn delete(&self, _identifier: ResourceKey ) -> Result<(), Fail> {
-        unimplemented!("I don't know how to DELETE yet.");
-        Ok(())
+    async fn delete(&self, key: ResourceKey) -> Result<(), Error> {
+        todo!()
     }
 }
 
@@ -199,4 +187,3 @@ struct StarlaneProvisionerSpec{
 
 
 
- */
