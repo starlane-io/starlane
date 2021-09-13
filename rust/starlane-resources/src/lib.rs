@@ -1367,7 +1367,7 @@ resources! {
     #[resource(state(content::Binary))]
     pub struct File();
 
-    #[resource(parents(SubSpace,App))]
+    #[resource(parents(SubSpace))]
     #[resource(prefix="db")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
     #[resource(ResourceStatePersistenceManager::Host)]
