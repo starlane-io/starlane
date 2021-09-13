@@ -20,7 +20,7 @@ use crate::star::StarSkel;
 use crate::star::core::resource::host::Host;
 
 
-pub struct KubeCore {
+pub struct KubeHost {
     skel: StarSkel,
     client: kube::Client,
     starlane_meta: ObjectMeta,
@@ -28,7 +28,7 @@ pub struct KubeCore {
     api_version: String
 }
 
-impl KubeCore {
+impl KubeHost {
     pub async fn new(skel: StarSkel) -> Result<Self, Error> {
 
         let client = kube::Client::try_default().await?;
@@ -60,7 +60,7 @@ impl KubeCore {
         };
         let starlane_meta: ObjectMeta = starlane.metadata.clone();
 
-        let rtn = KubeCore {
+        let rtn = KubeHost {
             skel: skel,
             client: client,
             namespace: namespace,
@@ -74,12 +74,13 @@ impl KubeCore {
 
 
 #[async_trait]
-impl Host for KubeCore {
+impl Host for KubeHost {
 
      async fn assign(
             &self,
             assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
         ) -> Result<DataSet<BinSrc>, Error> {
+println!("Assigning Kube Resource Host....");
         let provisioners: Api<StarlaneProvisioner> = Api::default_namespaced(self.client.clone() );
         let parts:ResourceKindParts = assign.archetype().kind.into();
         let mut list_params = ListParams::default();

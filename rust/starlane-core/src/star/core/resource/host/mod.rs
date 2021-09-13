@@ -18,6 +18,7 @@ use crate::star::core::resource::host::space::SpaceHost;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::message::resource::Delivery;
+use crate::star::core::resource::host::kube::KubeHost;
 
 pub mod artifact;
 mod default;
@@ -129,6 +130,7 @@ impl HostComponent {
             ResourceType::Domain => Arc::new(StatelessHost::new(self.skel.clone()).await),
             ResourceType::App=> Arc::new(AppHost::new(self.skel.clone()).await),
             ResourceType::Mechtron => Arc::new(MechtronHost::new(self.skel.clone()).await),
+            ResourceType::Database => Arc::new(KubeHost::new(self.skel.clone()).await.expect("KubeHost must be created without error")),
 
             t => unimplemented!("no HOST implementation for type {}", t.to_string()),
         };
