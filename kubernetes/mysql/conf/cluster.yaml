@@ -4,7 +4,7 @@ metadata:
   name: my-cluster
 spec:
   replicas: 1
-  secretName: my-secret
+  secretName: mysql-root-secret
 
   ## For setting custom docker image or specifying mysql version
   ## the image field has priority over mysqlVersion.

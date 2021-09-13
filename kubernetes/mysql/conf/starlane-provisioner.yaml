@@ -4,11 +4,10 @@ metadata:
   name: mysql
 spec:
   image: "starlane/mysql-provisioner:latest"
-  typeKindSpecific: "<Database<Relational<mysql.org:mysql:innodb:7.0.0>>>"
-  createArgsArtifact: "starlane.io:database:mysql:1.0.0:/mysql/innodb/7.1.3/init-args.yaml"
+  typeKindSpecific: "<Database<Relational<mysql.org:mysql:innodb:8.0.0>>>"
   env:
   - name: HOST
-    value: my-cluster-mysql
+    value: mysql
   - name: PORT
     value: "3306"
   - name: ROOT_USER
@@ -16,5 +15,5 @@ spec:
   - name: ROOT_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: my-cluster-secret
+        name: mysql-secrets
         key: ROOT_PASSWORD 
