@@ -3,7 +3,7 @@ kind: StarlaneProvisioner
 metadata:
   name: mysql
 spec:
-  image: "starlane/mysql-provisioner:latest"
+  image: "starlane/mysql-ctrl:latest"
   typeKindSpecific: "<Database<Relational<mysql.org:mysql:innodb:8.0.0>>>"
   env:
   - name: HOST

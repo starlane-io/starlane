@@ -140,6 +140,7 @@ async fn publish(args: ArgMatches<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+
 async fn list(args: ArgMatches<'_>) -> Result<(), Error> {
     let address = ResourceAddress::from_str(
         args.value_of("address")

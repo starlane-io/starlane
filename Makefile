@@ -1,23 +1,23 @@
-docker:
+build-docker:
 	docker build . --tag starlane/starlane:latest
 	docker push starlane/starlane:latest
 
-operator:
+build-ctrl:
+	$(MAKE) -C kubernetes/ctrl
+
+build: build-docker build-ctrl
+
+kube-install-operator:
 	cd go/starlane-operator && ./build.sh && ./deploy.sh
 
-starlane: operator
-	kubectl apply -f kubernetes/starlane/starlane.yaml
-	kubectl apply -f kubernetes/mysql/conf/starlane-provisioner.yaml
+kube-install-basics:
+	$(MAKE) -C kubernetes/basics
 
-mysql: 
-	cd kubernetes/mysql && helm install mysql chart
+kube-install-starlane: kube-install-operator
+	kubectl apply -f kubernetes/starlane.yaml
 
-kube: mysql starlane
+kube-install: kube-install-starlane kube-install-basics 
 
-mysql-provisioner:
-	cd kubernetes/mysql/provisioner/ && docker build . --tag starlane/mysql-provisioner:latest
-	docker push starlane/mysql-provisioner:latest
 
-delete:
-	cd kubernetes/mysql && helm delete mysql chart
-	
+
+
