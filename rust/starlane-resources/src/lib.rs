@@ -133,6 +133,41 @@ impl From<ResourcePath> for ResourceAddress {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub enum ResourcePropertyCategory {
+    State
+}
+
+impl ToString for ResourcePropertyCategory {
+    fn to_string(&self) -> String {
+        match self {
+            ResourcePropertyCategory::State => "state".to_string()
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub struct ResourcePropertyAddress{
+  pub resource_address: ResourceAddress,
+  pub category: ResourcePropertyCategory,
+  pub aspect: Option<SkewerCase>,
+  pub meta_key: Option<String>
+}
+
+impl ToString for ResourcePropertyAddress {
+    fn to_string(&self) -> String {
+        let mut rtn = format!("{}::{}",self.resource_address.to_string(), self.category.to_string() );
+        if self.aspect.is_some() {
+           rtn.push_str( format!(".{}", self.aspect.as_ref().expect("aspect").to_string() ).as_str() );
+            if self.meta_key.is_some() {
+                rtn.push_str( format!("['{}']", self.meta_key.as_ref().expect("meta_key").clone() ).as_str() );
+            }
+        }
+
+        rtn
+    }
+}
+
 impl ResourceKey {
     pub fn ancestor_of_type(&self, resource_type: ResourceType) -> Result<ResourceKey, Error> {
         if self.resource_type() == resource_type {
@@ -458,6 +493,18 @@ pub fn parse_resource_path(input: &str) -> Res<&str, Vec<ResourcePathSegment>> {
 
 pub fn parse_path(input: &str) -> Res<&str, (Vec<ResourcePathSegment>, ResourceKindParts)> {
     context("address", tuple((parse_resource_path, parse_kind)))(input)
+}
+
+/*
+pub fn parse_resource_address(input: &str) -> Res<&str, ResourceAddress > {
+    context("address", tuple((parse_resource_path, parse_kind)))(input)
+}
+
+
+ */
+
+pub fn parse_resource_property(input: &str) -> Res<&str, (Vec<ResourcePathSegment>, ResourceKindParts)> {
+    context("resource_property", tuple((parse_resource_path, parse_kind)))(input)
 }
 
 fn skewer(input: &str) -> Res<&str, SkewerCase> {

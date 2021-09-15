@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "chart.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "chart.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: wordpress
+          image: wordpress:5.8.1-apache
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          env:
+          - name: WORDPRESS_DB_HOST
+            value: {{ .Values.WORDPRESS_DB_HOST }}
+          - name: WORDPRESS_DB_USER
+            value: {{ .Values.WORDPRESS_DB_USER }}
+          - name: WORDPRESS_DB_NAME
+            value: {{ .Values.WORDPRESS_DB_NAME }}
+          - name: WORDPRESS_DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.database_secrets }}
+                key: password
+
+
+
+

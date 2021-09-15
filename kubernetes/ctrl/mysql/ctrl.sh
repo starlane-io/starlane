@@ -17,15 +17,15 @@ fi
 set -e
 
 USER=$DATABASE_NAME
-PASSWORD=`openssl rand -base64 32`
+PASSWORD=`openssl rand -base64 8`
 
-ENCODED_PASSWORD=`echo -n $PASSWORD | base64`
+#ENCODED_PASSWORD=`echo -n $PASSWORD | base64`
 
 SECRET_YAML="
 apiVersion: v1
 kind: Secret
 metadata:
-  generateName: $STARLANE_RESOURCE_NAME-
+  name: $STARLANE_RESOURCE_NAME
   ownerReferences:
   - apiVersion: $STARLANE_RESOURCE_API_VERSION
     blockOwnerDeletion: true
@@ -35,16 +35,16 @@ metadata:
     uid: $STARLANE_RESOURCE_UID
 type: kubernetes.io/basic-auth
 stringData:
-  password: \"$ENCODED_PASSWORD\"
+  password: \"$PASSWORD\"
 "
 
-SECRET_NAME=`echo "$SECRET_YAML" | kubectl create -o name -f -`
+echo "$SECRET_YAML" | kubectl create -f -
 
 CREATE_DB="
 CREATE DATABASE $DATABASE_NAME;
 USE $DATABASE_NAME;
-CREATE USER '$USER'@'localhost' IDENTIFIED BY '$PASSWORD';
-GRANT ALL PRIVILEGES ON $DATABASE_NAME . * TO '$USER'@'localhost';
+CREATE USER '$USER'@'%' IDENTIFIED BY '$PASSWORD';
+GRANT ALL PRIVILEGES ON $DATABASE_NAME . * TO '$USER'@'%';
 FLUSH PRIVILEGES;
 "
 
@@ -55,6 +55,7 @@ echo "quit" | mysql --host=$HOST --port $PORT --user=$ROOT_USER --password=$ROOT
 
 # annotate the starlaneresource
 kubectl annotate starlaneresource $STARLANE_RESOURCE_NAME url="$HOST:$PORT/$DATABASE_NAME"
-kubectl annotate starlaneresource $STARLANE_RESOURCE_NAME secret="$SECRET_NAME"
+kubectl annotate starlaneresource $STARLANE_RESOURCE_NAME host="$HOST"
+kubectl annotate starlaneresource $STARLANE_RESOURCE_NAME secret="$STARLANE_RESOURCE_NAME"
 
 exit 0

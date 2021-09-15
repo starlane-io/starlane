@@ -1,7 +1,5 @@
 
-blah:
-	cd mysql && docker build . --tag starlane/mysql-ctrl:latest
-	docker push starlane/mysql-ctrl:latest
-
-all: blah
+all: 
+	$(MAKE) -C mysql
+	$(MAKE) -C wordpress
 
