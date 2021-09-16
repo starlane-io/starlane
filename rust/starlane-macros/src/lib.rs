@@ -261,6 +261,7 @@ fn to_idents(list: &MetaList) -> Vec<Ident> {
     idents
 }
 
+
 #[proc_macro]
 pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let parsed = parse_macro_input!(input as ResourceParser);
@@ -271,6 +272,13 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         .map(|resource| resource.get_ident())
         .collect();
 
+    let requires_kind: Vec<Ident> = parsed
+        .resources
+        .iter()
+        .map(|resource| Ident::new(format!("{}",parsed.kind_for(resource).is_some()).as_str(), resource.get_ident().span())  )
+        .collect();
+
+
     let resource_type_enum_def = quote! {
         #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
         pub enum ResourceType {
@@ -279,6 +287,13 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
          }
 
         impl ResourceType {
+            pub fn requires_kind(&self) -> bool {
+                match self {
+                    Self::Root => false,
+                    #(Self::#rts => #requires_kind),*
+                }
+            }
+
             pub fn to_resource_id( &self, id: u64 ) -> ResourceId {
                 match self {
                     Self::Root => ResourceId::Root,
@@ -453,12 +468,12 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     println!("resources_def.len() {}", resources_def.len());
 
     let keys = keys(&parsed);
-    let identifiers = identifiers(&parsed);
+//    let identifiers = identifiers(&parsed);
     let ids = ids(&parsed);
 
     let kinds = kinds(&parsed);
 
-    let paths = paths(&parsed);
+//    let paths = paths(&parsed);
     /*
     proc_macro::TokenStream::from( quote!{
        #extras
@@ -475,15 +490,14 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     proc_macro::TokenStream::from(quote! {
        #resource_type_enum_def
        #(#resources_def)*
-       #identifiers
        #ids
        #kinds
        #keys
-       #paths
 
        #resource_impl_def
     })
 }
+/*
 fn paths(parsed: &ResourceParser) -> TokenStream {
     let mut paths = vec![];
     for resource in &parsed.resources {
@@ -565,12 +579,6 @@ fn paths(parsed: &ResourceParser) -> TokenStream {
 
         }
 
-        impl Into<ResourcePath> for RootPath{
-            fn into(self) -> ResourcePath {
-                ResourcePath::Root
-            }
-        }
-
         impl TryFrom<Vec<ResourcePathSegment>> for RootPath{
             type Error=Error;
             fn try_from( parts: Vec<ResourcePathSegment> ) -> Result<RootPath,Self::Error> {
@@ -605,28 +613,11 @@ fn paths(parsed: &ResourceParser) -> TokenStream {
            }
         }
 
-          impl Into<ResourcePath> for #path_idents3 {
-                fn into(self) -> ResourcePath{
-                    ResourcePath::#idents2(self)
-                }
-           }
-
           impl Into<Vec<ResourcePathSegment>> for #path_idents3 {
                 fn into(self) -> Vec<ResourcePathSegment> {
                   self.parts
                 }
           }
-
-          impl TryFrom<ResourcePath> for #path_idents3 {
-                type Error=Error;
-                fn try_from( path: ResourcePath ) -> Result<Self,Self::Error> {
-                    if let ResourcePath::#idents( rtn ) = path {
-                        Ok(rtn)
-                    } else {
-                        Err("could not convert ResourcePath to #ident".into())
-                    }
-                }
-            }
 
             impl Into<ResourceIdentifier> for #path_idents{
                 fn into(self) -> ResourceIdentifier {
@@ -789,6 +780,8 @@ fn paths(parsed: &ResourceParser) -> TokenStream {
     }
     //#(ResourceType::#idents => Ok(Option::Some(#path_idents::parent()?.unwrap().into())) ),*
 }
+
+ */
 
 fn kinds(parsed: &ResourceParser) -> TokenStream {
     let mut kind_stuff = vec![];
@@ -1507,6 +1500,7 @@ fn extras() -> TokenStream {
         }
 }
 
+/*
 fn identifiers(parsed: &ResourceParser) -> TokenStream {
     let _idents: Vec<Ident> = parsed
         .resources
@@ -1591,6 +1585,7 @@ fn identifiers(parsed: &ResourceParser) -> TokenStream {
 
     }
 }
+ */
 
 fn ids(parsed: &ResourceParser) -> TokenStream {
     let idents: Vec<Ident> = parsed

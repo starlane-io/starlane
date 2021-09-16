@@ -1,16 +1,17 @@
-use nom::error::{context, ErrorKind};
-use nom::{InputTakeAtPosition, AsChar};
-use crate::{Res, ResourceKindParts, Specific, DomainCase, SkewerCase, Version, ResourceType, ResourceKind, ResourcePathSegmentKind};
-use nom::character::complete::{alpha0, alpha1, anychar, digit0, digit1, one_of};
-use nom::combinator::{not, opt};
-use nom::multi::{many1, many_m_n, separated_list0, separated_list1};
-use nom::sequence::{delimited, preceded, terminated, tuple};
-use nom::bytes::complete::{tag, take};
-use crate::error::Error;
 use std::convert::TryInto;
-use serde::{Deserialize,Serialize};
 use std::str::FromStr;
 
+use nom::{AsChar, InputTakeAtPosition};
+use nom::bytes::complete::{tag, take};
+use nom::character::complete::{alpha0, alpha1, anychar, digit0, digit1, one_of};
+use nom::combinator::{not, opt};
+use nom::error::{context, ErrorKind};
+use nom::multi::{many1, many_m_n, separated_list0, separated_list1};
+use nom::sequence::{delimited, preceded, terminated, tuple};
+use serde::{Deserialize, Serialize};
+
+use crate::{DomainCase, Res, ResourceKind, ResourceKindParts, ResourcePath, ResourcePathAndKind, ResourcePathAndType, ResourcePathSegmentKind, ResourceType, SkewerCase, Specific, Version};
+use crate::error::Error;
 
 fn any_resource_path_segment<T>(i: T) -> Res<T, T>
     where
@@ -121,6 +122,23 @@ fn parse_specific(input: &str) -> Res<&str, Specific> {
 }
 
 
+pub fn parse_resource_type(input: &str) -> Res<&str, Result<ResourceType,Error>> {
+    context(
+        "resource_type",
+        delimited(
+            tag("<"),
+            tuple((
+                alpha1,
+                opt(tag("<?>")),
+            )),
+            tag(">"),
+        ),
+    )(input)
+        .map(|(input, (rt, _))| {
+            (input, ResourceType::from_str(rt))
+        })
+}
+
 pub fn parse_resource_kind(input: &str) -> Res<&str, Result<ResourceKind,Error>> {
     context(
         "kind",
@@ -166,7 +184,7 @@ pub fn parse_resource_path(input: &str) -> Res<&str, ResourcePath> {
         ),
     )(input).map( |(next_input, segments) | {
         let segments : Vec<String> = segments.iter().map(|s|s.to_string()).collect();
-        (next_input,ResourcePath {
+        (next_input, ResourcePath {
             segments
         })
     } )
@@ -199,6 +217,36 @@ pub fn parse_resource_path_and_kind(input: &str) -> Res<&str, Result<ResourcePat
     } )
 }
 
+pub fn parse_resource_path_and_type(input: &str) -> Res<&str, Result<ResourcePathAndType,Error>> {
+    context(
+        "parse_resource_path_and_type",
+        tuple(
+            (parse_resource_path,
+             parse_resource_type)
+        ),
+    )(input).map( |(next_input, (path, resource_type)) | {
+
+        (next_input,
+
+         {
+             match resource_type{
+                 Ok(resource_type) => {
+                     Ok(ResourcePathAndType {
+                         path,
+                         resource_type
+                     })
+                 }
+                 Err(error) => {
+                     Err(error.into())
+                 }
+             }
+         }
+
+
+        )
+    } )
+}
+
 
 /*
 pub fn parse_resource_path_with_type_kind_specific_and_property(input: &str) -> Res<&str, (Vec<&str>,Option<ResourceTypeKindSpecificParts>)> {
@@ -216,91 +264,14 @@ pub enum ResourceExpression {
     Kind(ResourcePathAndKind)
 }
 
-#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
-pub struct ResourcePath {
-  pub segments: Vec<String>
-}
-
-impl ResourcePath {
-    pub fn new( segments: Vec<String> ) -> Self {
-        Self{
-            segments
-        }
-    }
-}
-
-impl ToString for ResourcePath {
-    fn to_string(&self) -> String {
-            let mut rtn = String::new();
-            for i in 0..self.segments.len() {
-                let segment = self.segments.get(i).unwrap();
-                rtn.push_str( segment.to_string().as_str() );
-                if i < self.segments.len()-1 {
-                    rtn.push_str(":");
-                }
-            }
-            rtn
-    }
-}
-
-impl FromStr for ResourcePath {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (leftover,path) = parse_resource_path(s)?;
-        if !leftover.is_empty() {
-            return Err(format!("illegal resource path: '{}' unrecognized portion: '{}'",s, leftover).into());
-        }
-        Ok(path)
-    }
-}
-
-#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
-pub struct ResourcePathAndKind {
-    pub path: ResourcePath,
-    pub kind: ResourceKind,
-}
-
-impl ResourcePathAndKind {
-    pub fn new(path: ResourcePath, kind: ResourceKind) -> Result<Self,Error> {
-        let path_segment_kind: ResourcePathSegmentKind = kind.resource_type().path_segment_kind();
-        // if the path segment is illegal then there will be a Result::Err returned
-        path_segment_kind.from_str(path.segments.last().ok_or("expected at least one resource path segment" )?.as_str() )?;
-
-        Ok(ResourcePathAndKind{
-            path,
-            kind
-        })
-    }
-}
-
-impl FromStr for ResourcePathAndKind {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (leftover,result) = parse_resource_path_and_kind(s)?;
-
-        if !leftover.is_empty() {
-            return Err(format!("illegal resource path with kind: '{}' unrecognized portion: '{}'",s, leftover).into());
-        }
-
-        Ok(result?)
-    }
-}
-
-impl ToString for ResourcePathAndKind {
-    fn to_string(&self) -> String {
-        format!("{}{}",self.path.to_string(),self.kind.to_string())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::convert::TryInto;
     use std::str::FromStr;
 
+    use crate::{ResourcePath, ResourcePathAndKind};
     use crate::error::Error;
-    use crate::parse::{parse_resource_path, parse_resource_path_and_kind, ResourcePath, ResourcePathAndKind};
+    use crate::parse::{parse_resource_path, parse_resource_path_and_kind};
 
     #[test]
     fn test_parse_resource_path() -> Result<(), Error> {

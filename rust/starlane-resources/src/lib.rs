@@ -14,6 +14,7 @@ use nom::combinator::{not, opt};
 use nom::error::{context, ErrorKind, VerboseError};
 use nom::multi::{many1, many_m_n, separated_list0, separated_list1};
 use nom::sequence::{delimited, preceded, terminated, tuple};
+use semver::SemVerError;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -22,7 +23,6 @@ use starlane_macros::resources;
 use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
 use crate::message::Fail;
-use semver::SemVerError;
 
 pub mod data;
 pub mod error;
@@ -36,40 +36,42 @@ pub enum Galaxy{
     Exact(DomainCase)
 }
 
-
+//pub type ResourcePath=crate::parse::ParsedResourcePath;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct ResourceAddress {
-    path: ResourcePath,
+    path: ResourcePathAndType,
 }
 
 impl ResourceAddress {
     pub fn root() -> Self {
-        ResourcePath::Root.into()
+        ResourcePathAndType::root().into()
     }
 
-    pub fn new(path: ResourcePath) -> Self {
+    pub fn new(path: ResourcePathAndType ) -> Self {
         Self { path: path }
     }
 
+    /*
     pub fn append(&self, string: String, resource_type: ResourceType) -> Result<Self, Error> {
-        let address = format!(
-            "{}:{}<{}>",
+        let path = format!(
+            "{}:{}",
             self.path.to_string(),
-            string,
-            resource_type.to_string()
+            string
         );
-        let path = ResourcePath::from_str(address.as_str())?;
+        let path = ResourcePath::from_str(path.as_str())?;
+        let path_and_kind = ResourcePathAndKind::new( path )
         Ok(Self { path: path })
-    }
+    }*/
 
-    pub fn parent(&self) -> Option<ResourceAddress> {
+    pub fn parent(&self) -> Option<ResourcePath> {
         match self.path.parent() {
             Option::None => Option::None,
             Option::Some(parent) => Option::Some(parent.into()),
         }
     }
 
+    /*
     pub fn ancestor_of_type(&self, resource_type: ResourceType) -> Result<ResourceAddress, Error> {
         if self.resource_type() == resource_type {
             return Ok(self.clone());
@@ -83,17 +85,10 @@ impl ResourceAddress {
             .into())
         }
     }
-
-    pub fn sub_space(&self) -> Result<ResourceAddress, Error> {
-        self.ancestor_of_type(ResourceType::SubSpace)
-    }
-
-    pub fn space(&self) -> Result<ResourceAddress, Error> {
-        self.ancestor_of_type(ResourceType::Space)
-    }
+     */
 
     pub fn resource_type(&self) -> ResourceType {
-        self.path.resource_type()
+        self.path.resource_type.clone()
     }
 
     pub fn to_parts_string(&self) -> String {
@@ -123,12 +118,12 @@ impl FromStr for ResourceAddress {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(ResourcePath::from_str(s)?.into())
+        Ok(ResourcePathAndType::from_str(s)?.into())
     }
 }
 
-impl From<ResourcePath> for ResourceAddress {
-    fn from(path: ResourcePath) -> Self {
+impl From<ResourcePathAndType> for ResourceAddress {
+    fn from(path: ResourcePathAndType ) -> Self {
         Self { path: path }
     }
 }
@@ -184,22 +179,17 @@ impl ResourceKey {
     }
 }
 
-impl ResourceKind {
-    pub fn init_clap_config(&self) -> Option<ArtifactPath> {
-        Option::None
-    }
-}
 
+/*
 pub struct ResourceAddressKind {
-    path: ResourcePath,
-    kind: ResourceKind,
+    path: ResourcePathAndKind,
 }
 
 impl ResourceAddressKind {
-    pub fn new(path: ResourcePath, kind: ResourceKind) -> Self {
+    pub fn new(path: ParsedResourcePath, kind: ResourceKind) -> Self {
+        let path = ResourcePathAndKind::new(path,kind);
         Self {
             path: path,
-            kind: kind,
         }
     }
 
@@ -218,7 +208,7 @@ impl FromStr for ResourceAddressKind {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let path = ResourcePath::from_str(s)?;
+        let path = ResourcePathAndKind::from_str(s)?;
         let (_leftover, (_, kind)) = parse_path(s)?;
         Ok(Self {
             path: path,
@@ -226,6 +216,8 @@ impl FromStr for ResourceAddressKind {
         })
     }
 }
+j
+ */
 
 pub type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
@@ -620,11 +612,7 @@ impl FromStr for ResourceKindParts {
     }
 }
 
-impl Into<ResourceAddress> for ResourceAddressKind {
-    fn into(self) -> ResourceAddress {
-        self.path.into()
-    }
-}
+
 
 /*
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -1060,14 +1048,15 @@ mod tests {
     use std::str::FromStr;
 
     use crate::{
-        domain, DomainCase, KeyBits, parse_resource_path, path, ResourceAddress, ResourceAddressKind,
+        domain, DomainCase, KeyBits, parse_resource_path, path, ResourceAddress,
         ResourcePathSegment, SkewerCase, Specific, version,
     };
     use crate::{
-        AppKey, DatabaseKey, DatabaseKind, ResourceKey, ResourceKind, ResourcePath, ResourceType,
+        AppKey, DatabaseKey, DatabaseKind, ResourceKey, ResourceKind, ResourceType,
         RootKey, SpaceKey, SubSpaceKey,
     };
     use crate::error::Error;
+    use crate::ResourcePath;
 
     #[test]
     fn test_kind() -> Result<(), Error> {
@@ -1213,35 +1202,7 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_address_parent_resolution() -> Result<(), Error> {
-        let path = ResourcePath::from_str(
-            "space:sub-space:some-app:database<Database<Relational<mysql.org:mysql:innodb:1.0.0>>>",
-        )?;
-        let parent = path.parent().unwrap();
-        assert_eq!(parent.resource_type(), ResourceType::App);
 
-        let path = ResourcePath::from_str("space:sub-space:database<Database<Relational>>")?;
-        let parent = path.parent().unwrap();
-
-        assert_eq!(parent.resource_type(), ResourceType::SubSpace);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_address_kind() -> Result<(), Error> {
-        let address = ResourceAddressKind::from_str(
-            "space:sub-space:some-app:database<Database<Relational<mysql.org:mysql:innodb:1.0.0>>>",
-        )?;
-        assert_eq!(
-            "space:sub-space:some-app:database<Database<Relational<mysql.org:mysql:innodb:1.0.0>>>"
-                .to_string(),
-            address.to_string()
-        );
-
-        Ok(())
-    }
 
     #[test]
     fn test_resource_address() -> Result<(), Error> {
@@ -1321,6 +1282,7 @@ impl ResourceIdentifier {
 }
 
 impl ResourceIdentifier {
+    /*
     pub fn parent(&self) -> Option<ResourceIdentifier> {
         match self {
             ResourceIdentifier::Key(key) => match key.parent() {
@@ -1333,6 +1295,7 @@ impl ResourceIdentifier {
             },
         }
     }
+     */
 
     pub fn resource_type(&self) -> ResourceType {
         match self {
@@ -1533,15 +1496,6 @@ resources! {
 
 }
 
-impl ArtifactPath {
-    pub fn path(&self) -> Path {
-        if let ResourcePathSegment::Path(path) = self.parts.last().unwrap() {
-            path.clone()
-        } else {
-            panic!("expected last segment to be a path")
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MetaSelector {
@@ -2059,7 +2013,7 @@ impl ResourceSelector {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ConfigSrc {
     None,
-    Artifact(ArtifactPath)
+    Artifact(ResourcePath)
 }
 
 impl ToString for ConfigSrc {
@@ -2069,7 +2023,6 @@ impl ToString for ConfigSrc {
                 "None".to_string()
             }
             ConfigSrc::Artifact(address) => {
-                let address: ResourceAddress = address.clone().into();
                 address.to_string()
             }
         }
@@ -2083,9 +2036,8 @@ impl FromStr for ConfigSrc {
         if "None" == s {
             Ok(Self::None)
         } else {
-            let address = ResourceAddress::from_str(s)?;
-            let address: ArtifactPath = address.try_into()?;
-            Ok(Self::Artifact(address))
+            let path= ResourcePath::from_str(s)?;
+            Ok(Self::Artifact(path))
         }
     }
 }
@@ -2147,5 +2099,160 @@ impl From<std::io::Error> for Fail {
 impl From<SemVerError> for Fail {
     fn from(error: SemVerError) -> Self {
         Fail::Error(error.to_string())
+    }
+}
+
+impl ResourcePath {
+    pub fn new( segments: Vec<String> ) -> Self {
+        Self{
+            segments
+        }
+    }
+
+    pub fn parent(&self) -> Option<Self> {
+        if self.segments.is_empty() {
+            Option::None
+        } else {
+            let mut segments = self.segments.clone();
+            segments.remove( segments.len() -1 );
+            Option::Some( ResourcePath::new(segments) )
+        }
+    }
+
+    pub fn name(&self)->String {
+        if self.segments.is_empty() {
+            "".to_string()
+        } else {
+            self.segments.last().unwrap().to_string()
+        }
+    }
+}
+
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub struct ResourcePathAndType {
+    pub path: ResourcePath,
+    pub resource_type: ResourceType,
+}
+
+impl ResourcePathAndType {
+    pub fn root()-> Self {
+        Self {
+            path: ResourcePath::new(vec![]),
+            resource_type: ResourceType::Root
+        }
+    }
+
+    pub fn parent(&self) -> Option<ResourcePath> {
+        self.path.parent()
+    }
+
+    pub fn name(&self) -> String {
+        self.path.name()
+    }
+
+    pub fn resource_type(&self) -> ResourceType {
+        self.resource_type.clone()
+    }
+}
+
+impl FromStr for ResourcePathAndType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (leftover,result) = parse::parse_resource_path_and_type(s)?;
+
+        if !leftover.is_empty() {
+            return Err(format!("illegal resource path with type: '{}' unrecognized portion: '{}'",s, leftover).into());
+        }
+
+        Ok(result?)
+    }
+}
+
+impl ToString for ResourcePathAndType{
+    fn to_string(&self) -> String {
+        match self.resource_type.requires_kind() {
+            true => {
+                format!("{}<{}<?>>",self.path.to_string(),self.resource_type.to_string())
+            },
+            false => {
+
+                format!("{}<{}>",self.path.to_string(),self.resource_type.to_string())
+            }
+        }
+    }
+}
+
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub struct ResourcePathAndKind {
+    pub path: ResourcePath,
+    pub kind: ResourceKind,
+}
+
+impl ResourcePathAndKind {
+    pub fn new(path: ResourcePath, kind: ResourceKind) -> Result<Self,Error> {
+        let path_segment_kind: ResourcePathSegmentKind = kind.resource_type().path_segment_kind();
+        // if the path segment is illegal then there will be a Result::Err returned
+        path_segment_kind.from_str(path.segments.last().ok_or("expected at least one resource path segment" )?.as_str() )?;
+
+        Ok(ResourcePathAndKind{
+            path,
+            kind
+        })
+    }
+
+    pub fn parent(&self) -> Option<ResourcePath> {
+        self.path.parent()
+    }
+}
+
+impl FromStr for ResourcePathAndKind {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (leftover,result) = parse::parse_resource_path_and_kind(s)?;
+
+        if !leftover.is_empty() {
+            return Err(format!("illegal resource path with kind: '{}' unrecognized portion: '{}'",s, leftover).into());
+        }
+
+        Ok(result?)
+    }
+}
+
+impl ToString for ResourcePathAndKind {
+    fn to_string(&self) -> String {
+        format!("{}{}",self.path.to_string(),self.kind.to_string())
+    }
+}
+
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub struct ResourcePath {
+  pub segments: Vec<String>
+}
+
+impl ToString for ResourcePath {
+    fn to_string(&self) -> String {
+            let mut rtn = String::new();
+            for i in 0..self.segments.len() {
+                let segment = self.segments.get(i).unwrap();
+                rtn.push_str( segment.to_string().as_str() );
+                if i < self.segments.len()-1 {
+                    rtn.push_str(":");
+                }
+            }
+            rtn
+    }
+}
+
+impl FromStr for ResourcePath {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (leftover,path) = parse::parse_resource_path(s)?;
+        if !leftover.is_empty() {
+            return Err(format!("illegal resource path: '{}' unrecognized portion: '{}'",s, leftover).into());
+        }
+        Ok(path)
     }
 }
