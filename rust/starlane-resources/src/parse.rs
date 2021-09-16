@@ -58,7 +58,7 @@ fn parse_domain(input: &str) -> Res<&str, DomainCase> {
             if !res.1.is_empty() {
                 res.0.push(res.1);
             }
-            (next_input, DomainCase::new(res.0.join(".").as_str()))
+            (next_input, DomainCase::new( res.0.join(".").as_str()))
         })
 }
 

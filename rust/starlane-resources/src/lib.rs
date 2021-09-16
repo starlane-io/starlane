@@ -312,15 +312,56 @@ fn host(input: &str) -> Res<&str, String> {
     })
 }
 
+impl From<DomainCase> for DomainOrSkewerCase {
+    fn from(domain: DomainCase) -> Self {
+        Self {
+            string: domain.to_string()
+        }
+    }
+}
+
+impl From<SkewerCase> for DomainOrSkewerCase {
+    fn from(skewer: SkewerCase) -> Self {
+        Self {
+            string: skewer.to_string()
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub struct DomainOrSkewerCase {
+    string: String,
+}
+
+impl FromStr for DomainOrSkewerCase {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (remaining, domain_or_skewer) = domain_or_skewer(s)?;
+        if remaining.len() > 0 {
+            Err(format!("remainig text '{}' when parsing domain-or-skewer-case: '{}'", remaining, s).into())
+        } else {
+            Ok(domain_or_skewer)
+        }
+    }
+}
+
+impl ToString for DomainOrSkewerCase {
+    fn to_string(&self) -> String {
+        self.string.clone()
+    }
+}
+
+
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct DomainCase {
     string: String,
 }
 
 impl DomainCase {
-    fn new(string: &str) -> Self {
-        Self {
-            string: string.to_string(),
+    pub fn new( string: &str ) -> Self {
+        DomainCase{
+            string: string.to_string()
         }
     }
 }
@@ -343,6 +384,18 @@ impl ToString for DomainCase {
         self.string.clone()
     }
 }
+
+fn domain_or_skewer(input: &str) -> Res<&str, DomainOrSkewerCase> {
+    context(
+        "domain_or_skewer",
+        alt( ( skewer_segment, domain_segment ) ),
+    )(input)
+        .map(|(next_input, mut res)| {
+            let domain_or_skewer = DomainOrSkewerCase{ string: res.to_string() };
+            (next_input,domain_or_skewer)
+        })
+}
+
 
 fn domain(input: &str) -> Res<&str, DomainCase> {
     context(
@@ -695,6 +748,7 @@ impl FromStr for SkewerCase {
 pub enum ResourcePathSegmentKind {
     Domain,
     SkewerCase,
+    DomainOrSkewerCase,
     Email,
     Version,
     Path,
@@ -709,7 +763,8 @@ impl ToString for ResourcePathSegmentKind {
             ResourcePathSegmentKind::Version => "Version".to_string(),
             ResourcePathSegmentKind::Path => "Path".to_string(),
             ResourcePathSegmentKind::Email => "Email".to_string(),
-            ResourcePathSegmentKind::Root => "Root".to_string()
+            ResourcePathSegmentKind::Root => "Root".to_string(),
+            ResourcePathSegmentKind::DomainOrSkewerCase => "DomainOrSkewerCase".to_string()
         }
     }
 }
@@ -722,6 +777,7 @@ impl ResourcePathSegmentKind {
             ResourcePathSegment::Version(_) => *self == Self::Version,
             ResourcePathSegment::Email(_) => *self == Self::Email,
             ResourcePathSegment::Domain(_) => *self == Self::Domain,
+            ResourcePathSegment::DomainOrSkewerCase(_) => *self == Self::DomainOrSkewerCase
         }
     }
 
@@ -748,6 +804,7 @@ impl ResourcePathSegmentKind {
 pub enum ResourcePathSegment {
     SkewerCase(SkewerCase),
     Domain(DomainCase),
+    DomainOrSkewerCase(DomainOrSkewerCase),
     Path(Path),
     Version(Version),
     Email(String),
@@ -761,6 +818,7 @@ impl ResourcePathSegment {
             ResourcePathSegment::Path(_) => ResourcePathSegmentKind::Path,
             ResourcePathSegment::Version(_) => ResourcePathSegmentKind::Version,
             ResourcePathSegment::Email(_) => ResourcePathSegmentKind::Email,
+            ResourcePathSegment::DomainOrSkewerCase(_) => ResourcePathSegmentKind::DomainOrSkewerCase
         }
     }
 }
@@ -773,6 +831,7 @@ impl ToString for ResourcePathSegment {
             ResourcePathSegment::Version(version) => version.to_string(),
             ResourcePathSegment::Email(email) => email.to_string(),
             ResourcePathSegment::Domain(domain) => domain.to_string(),
+            ResourcePathSegment::DomainOrSkewerCase(domain_or_skewer) => domain_or_skewer.to_string()
         }
     }
 }
