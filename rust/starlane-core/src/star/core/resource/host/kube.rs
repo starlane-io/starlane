@@ -82,7 +82,7 @@ impl Host for KubeHost {
         ) -> Result<DataSet<BinSrc>, Error> {
 println!("Assigning Kube Resource Host....");
         let provisioners: Api<StarlaneProvisioner> = Api::default_namespaced(self.client.clone() );
-        let parts:ResourceKindParts = assign.archetype().kind.into();
+        let parts: ResourceKindParts = assign.archetype().kind.into();
         let mut list_params = ListParams::default();
         list_params = list_params.labels(format!("type={}",parts.resource_type).as_str() );
         if let Option::Some(kind) = parts.kind {

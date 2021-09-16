@@ -476,7 +476,7 @@ pub fn parse_key(input: &str) -> Res<&str, Vec<ResourcePathSegment>> {
         "key",
         separated_list1(
             nom::character::complete::char(':'),
-            alt((path_part, version_part, domain_part, skewer_part)),
+            alt((path_segment, version_segment, domain_segment, skewer_segment)),
         ),
     )(input)
 }
@@ -486,10 +486,18 @@ pub fn parse_resource_path(input: &str) -> Res<&str, Vec<ResourcePathSegment>> {
         "address-path",
         separated_list0(
             nom::character::complete::char(':'),
-            alt((path_part, version_part, domain_part, skewer_part)),
+            alt((path_segment, version_segment, domain_segment, skewer_segment)),
         ),
     )(input)
 }
+
+pub fn parse_path_segment(input: &str) -> Res<&str, ResourcePathSegment> {
+    context(
+        "parse_path_segment",
+            alt((path_segment, version_segment, domain_segment, skewer_segment)),
+    )(input)
+}
+
 
 pub fn parse_path(input: &str) -> Res<&str, (Vec<ResourcePathSegment>, ResourceKindParts)> {
     context("address", tuple((parse_resource_path, parse_kind)))(input)
@@ -512,22 +520,22 @@ fn skewer(input: &str) -> Res<&str, SkewerCase> {
         .map(|(input, skewer)| (input, SkewerCase::new(skewer)))
 }
 
-fn skewer_part(input: &str) -> Res<&str, ResourcePathSegment> {
+fn skewer_segment(input: &str) -> Res<&str, ResourcePathSegment> {
     context("skewer-case-part", skewer)(input)
         .map(|(input, skewer)| (input, ResourcePathSegment::SkewerCase(skewer)))
 }
 
-fn version_part(input: &str) -> Res<&str, ResourcePathSegment> {
+fn version_segment(input: &str) -> Res<&str, ResourcePathSegment> {
     context("version-part", version)(input)
         .map(|(input, version)| (input, ResourcePathSegment::Version(version)))
 }
 
-fn domain_part(input: &str) -> Res<&str, ResourcePathSegment> {
+fn domain_segment(input: &str) -> Res<&str, ResourcePathSegment> {
     context("domain-part", domain)(input)
         .map(|(input, domain)| (input, ResourcePathSegment::Domain(domain)))
 }
 
-fn path_part(input: &str) -> Res<&str, ResourcePathSegment> {
+fn path_segment(input: &str) -> Res<&str, ResourcePathSegment> {
     context("path-part", path)(input).map(|(input, path)| (input, ResourcePathSegment::Path(path)))
 }
 
@@ -702,6 +710,7 @@ pub enum ResourcePathSegmentKind {
     Email,
     Version,
     Path,
+    Root,
 }
 
 impl ToString for ResourcePathSegmentKind {
@@ -712,6 +721,7 @@ impl ToString for ResourcePathSegmentKind {
             ResourcePathSegmentKind::Version => "Version".to_string(),
             ResourcePathSegmentKind::Path => "Path".to_string(),
             ResourcePathSegmentKind::Email => "Email".to_string(),
+            ResourcePathSegmentKind::Root => "Root".to_string()
         }
     }
 }
@@ -728,15 +738,20 @@ impl ResourcePathSegmentKind {
     }
 
     pub fn from_str(&self, s: &str) -> Result<ResourcePathSegment, Error> {
-        let (leftover, part) = path_part(s)?;
+        let (leftover, segment) = parse_path_segment(s)?;
         if leftover.len() > 0 {
             Err(format!(
                 "could not parse entire path string: leftover: '{}' from '{}'",
                 leftover, s
             )
             .into())
+        } else if self.matches(&segment){
+            Ok(segment)
         } else {
-            Ok(part)
+            Err(format!(
+                "path segment mismatch. expected: {}, got: {}",
+                self.to_string(), segment.to_kind().to_string() ).into()
+            )
         }
     }
 }
@@ -1455,7 +1470,7 @@ resources! {
 
     #[resource(parents(ArtifactBundleVersions))]
     #[resource(prefix="ab")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourcePathSegmentKind::Version)]
     #[resource(ResourceStatePersistenceManager::Host)]
     #[resource(state(content::Binary))]
     pub struct ArtifactBundle();
@@ -1511,18 +1526,10 @@ resources! {
     }
 
     #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
-    pub enum ArtifactBundleKind{
-        Final,
-        Volatile
-    }
-
-    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
     pub enum CredsKind{
         Token,
         UsernamePassword
     }
-
-
 
 }
 

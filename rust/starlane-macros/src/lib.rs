@@ -319,6 +319,22 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     // vector matchin doesn't actually seem to work as expected
     let mut pathways = String::new();
     pathways.push_str("impl ResourceType {");
+    pathways.push_str("pub fn path_segment_kind( &self ) -> ResourcePathSegmentKind {");
+
+    pathways.push_str("match self {");
+    pathways.push_str("Self::Root => ResourcePathSegmentKind::Root,");
+    for resource in &parsed.resources {
+        let _ident = resource.get_ident();
+        pathways.push_str(format!("Self::{} => {{", resource.get_ident().to_string()).as_str());
+        pathways.push_str("ResourcePathSegmentKind::");
+        pathways.push_str(resource.path_part.as_ref().expect("expected a path part").to_string().as_str());
+        pathways.push_str("}");
+    }
+    pathways.push_str("}");
+
+
+
+        pathways.push_str("}");
     pathways.push_str("pub fn parent_path_matcher( &self, path: Vec<ResourcePathSegmentKind> ) -> Result<ResourceType,Error> {");
     pathways.push_str("match self { ");
     pathways.push_str("Self::Root => Err(\"Root does not have a parent to match\".into()),");
@@ -875,7 +891,15 @@ fn kinds(parsed: &ResourceParser) -> TokenStream {
             );
             from_parts.push_str("type Error=Error;");
             from_parts.push_str("fn try_from(parts: ResourceKindParts)->Result<Self,Self::Error>{");
-            from_parts.push_str("match parts.kind.ok_or(\"expected kind\")?.as_str() {");
+            if parsed.kind_for(resource).is_some() {
+                from_parts.push_str(format!("match parts.kind.ok_or(\"kind must be specified for {}. i.e.: <Type<Kind>>\")?.as_str() {{", resource.get_ident().to_string()).as_str());
+            } else {
+                from_parts.push_str(format!("if parts.kind.is_some() {{  return Err(\"resource type <{}> does not have a kind\".into());}}", resource.get_ident().to_string() ).as_str() );
+
+                from_parts.push_str(format!("Self::{}",resource.get_ident().to_string()).as_str() );
+
+
+            }
 
             let mut into_parts = String::new();
             into_parts.push_str(
