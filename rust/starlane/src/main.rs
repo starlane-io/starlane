@@ -14,10 +14,8 @@ use tracing_subscriber::FmtSubscriber;
 
 use starlane_core::error::Error;
 use starlane_core::resource::{
-    ArtifactBundlePath,
     ResourceAddress,
 };
-use starlane_core::resource::ResourceAddressKind;
 use starlane_core::resource::selector::MultiResourceSelector;
 use starlane_core::starlane::{
     ConstellationCreate, StarlaneCommand, StarlaneMachine, StarlaneMachineRunner,
@@ -27,7 +25,7 @@ use starlane_core::template::{ConstellationData, ConstellationLayout, Constellat
 use starlane_core::util;
 use starlane_core::util::shutdown;
 
-use starlane_resources::{ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceArchetype, AssignResourceStateSrc, ResourceCreateStrategy, ResourceSelector};
+use starlane_resources::{ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceArchetype, AssignResourceStateSrc, ResourceCreateStrategy, ResourceSelector, ResourcePath, ResourcePathAndKind};
 
 mod cli;
 mod resource;
@@ -111,7 +109,7 @@ fn main() -> Result<(), Error> {
 }
 
 async fn publish(args: ArgMatches<'_>) -> Result<(), Error> {
-    let bundle = ArtifactBundlePath::from_str(args.value_of("address").ok_or("expected address")?)?;
+    let bundle = ResourcePath::from_str(args.value_of("address").ok_or("expected address")?)?;
 
     let input = Path::new(args.value_of("dir").ok_or("expected directory")?);
 
@@ -142,7 +140,7 @@ async fn publish(args: ArgMatches<'_>) -> Result<(), Error> {
 
 
 async fn list(args: ArgMatches<'_>) -> Result<(), Error> {
-    let address = ResourceAddress::from_str(
+    let address = ResourcePath::from_str(
         args.value_of("address")
             .ok_or("expected resource address")?,
     )?;
@@ -170,12 +168,12 @@ async fn list(args: ArgMatches<'_>) -> Result<(), Error> {
 
 async fn create(args: ArgMatches<'_>) -> Result<(), Error> {
 println!("CREATE...");
-    let address = ResourceAddressKind::from_str(
+    let address = ResourcePathAndKind::from_str(
         args.value_of("address")
             .ok_or("expected resource address")?,
     )?;
-    let kind = address.kind().clone();
-    let address: ResourceAddress = address.into();
+    let kind = address.kind.clone();
+    let address: ResourcePath = address.into();
 
     let create_args = match args.values_of("create-args") {
         None => "".to_string(),

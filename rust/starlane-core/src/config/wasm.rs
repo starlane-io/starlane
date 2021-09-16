@@ -1,4 +1,4 @@
-use crate::resource::{ArtifactAddress, ResourceKind, ResourceAddress, ArtifactKind};
+use crate::resource::{ResourceKind, ResourceAddress, ArtifactKind};
 use crate::artifact::ArtifactRef;
 use crate::cache::{Cacheable, Data};
 use crate::resource::config::{ResourceConfig, Parser};
@@ -7,16 +7,17 @@ use crate::error::Error;
 use std::str::FromStr;
 use std::convert::TryInto;
 use wasmer::{Cranelift, Universal, Store, Module};
+use starlane_resources::ResourcePath;
 
 pub struct Wasm {
-    pub artifact: ArtifactAddress,
+    pub artifact: ResourcePath,
     pub module: Arc<Module>
 }
 
 impl Cacheable for Wasm {
     fn artifact(&self) -> ArtifactRef {
         ArtifactRef {
-            address: self.artifact.clone(),
+            path: self.artifact.clone(),
             kind: ArtifactKind::Wasm,
         }
     }
@@ -43,7 +44,7 @@ impl Parser<Wasm> for WasmCompiler{
 
        let module = Arc::new(Module::new( &self.store, data.as_ref() )?);
        Ok(Arc::new(Wasm{
-            artifact: artifact.address,
+            artifact: artifact.path,
             module
         }))
     }

@@ -1286,10 +1286,35 @@ pub enum ResourceStatePersistenceManager {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum ResourceIdentifier {
     Key(ResourceKey),
-    Address(ResourceAddress),
+    Address(ResourcePath),
 }
 
 impl ResourceIdentifier {
+
+    pub fn is_root(&self) -> bool {
+        match self {
+            ResourceIdentifier::Key(key) => *key == ResourceKey::Root,
+            ResourceIdentifier::Address(address) => address.is_root()
+        }
+    }
+
+    pub fn parent(&self) -> Option<ResourceIdentifier> {
+        match self {
+            ResourceIdentifier::Key(key) => {
+                match key.parent() {
+                    Some(parent) => Option::Some(parent.into()),
+                    None => None
+                }
+            },
+            ResourceIdentifier::Address(address) => {
+                match address.parent() {
+                    Some(parent) => Option::Some(parent.into()),
+                    None => None
+                }
+            }
+        }
+    }
+
     pub fn is_key(&self) -> bool {
         match self {
             ResourceIdentifier::Key(_) => true,
@@ -1311,7 +1336,7 @@ impl ResourceIdentifier {
         }
     }
 
-    pub fn address_or(self, error_message: &str) -> Result<ResourceAddress, Error> {
+    pub fn address_or(self, error_message: &str) -> Result<ResourcePath, Error> {
         match self {
             ResourceIdentifier::Key(_) => Err(error_message.into()),
             ResourceIdentifier::Address(address) => Ok(address),
@@ -1356,16 +1381,10 @@ impl ResourceIdentifier {
     }
      */
 
-    pub fn resource_type(&self) -> ResourceType {
-        match self {
-            ResourceIdentifier::Key(key) => key.resource_type(),
-            ResourceIdentifier::Address(address) => address.resource_type(),
-        }
-    }
 }
 
-impl From<ResourceAddress> for ResourceIdentifier {
-    fn from(address: ResourceAddress) -> Self {
+impl From<ResourcePath> for ResourceIdentifier {
+    fn from(address: ResourcePath) -> Self {
         ResourceIdentifier::Address(address)
     }
 }
@@ -1390,10 +1409,10 @@ impl TryInto<ResourceKey> for ResourceIdentifier {
 
  */
 
-impl TryInto<ResourceAddress> for ResourceIdentifier {
+impl TryInto<ResourcePath> for ResourceIdentifier {
     type Error = Error;
 
-    fn try_into(self) -> Result<ResourceAddress, Self::Error> {
+    fn try_into(self) -> Result<ResourcePath, Self::Error> {
         match self {
             ResourceIdentifier::Key(_) => Err("resource identifier is not an address".into()),
             ResourceIdentifier::Address(address) => Ok(address),
@@ -1866,9 +1885,8 @@ impl FromStr for ResourceStatus {
 pub enum AddressCreationSrc {
     None,
     Append(String),
-    Appends(Vec<String>),
     Just(String),
-    Exact(ResourceAddress),
+    Exact(ResourcePath),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1907,7 +1925,7 @@ impl TryInto<LocalStateSetSrc> for AssignResourceStateSrc<DataSet<BinSrc>> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceStub {
     pub key: ResourceKey,
-    pub address: ResourceAddress,
+    pub address: ResourcePath,
     pub archetype: ResourceArchetype,
     pub owner: Option<UserKey>,
 }
@@ -1916,7 +1934,7 @@ impl ResourceStub {
     pub fn root() -> ResourceStub {
         ResourceStub {
             key: ResourceKey::Root,
-            address: ResourceAddress::root(),
+            address: ResourcePath::root(),
             archetype: ResourceArchetype::root(),
             owner: Option::None,
         }
@@ -1939,8 +1957,7 @@ impl From<Resource> for ResourceStub {
 impl ResourceStub {
     pub fn validate(&self, resource_type: ResourceType) -> bool {
         self.key.resource_type() == resource_type
-            && self.address.resource_type() == resource_type
-            && self.archetype.kind.resource_type() == resource_type
+        && self.archetype.kind.resource_type() == resource_type
     }
 }
 
@@ -1970,7 +1987,7 @@ impl<S> ResourceAssign<S> {
 #[derive(Clone)]
 pub struct Resource {
     key: ResourceKey,
-    address: ResourceAddress,
+    address: ResourcePath,
     archetype: ResourceArchetype,
     state_src: DataSet<BinSrc>,
     owner: Option<UserKey>,
@@ -1979,7 +1996,7 @@ pub struct Resource {
 impl Resource {
     pub fn new(
         key: ResourceKey,
-        address: ResourceAddress,
+        address: ResourcePath,
         archetype: ResourceArchetype,
         state_src: DataSet<BinSrc>,
     ) -> Resource {
@@ -1996,7 +2013,7 @@ impl Resource {
         self.key.clone()
     }
 
-    pub fn address(&self) -> ResourceAddress {
+    pub fn address(&self) -> ResourcePath {
         self.address.clone()
     }
 
@@ -2290,6 +2307,21 @@ pub struct ResourcePath {
   pub segments: Vec<String>
 }
 
+impl ResourcePath {
+    pub fn root() -> Self {
+        ResourcePath {
+            segments: vec!()
+        }
+    }
+
+    pub fn is_root(&self) -> bool {
+        self.segments.is_empty()
+    }
+    pub fn append(&self, s: &str) -> Result<ResourcePath,Error> {
+        ResourcePath::from_str(format!("{}:{}", self.to_string(), s).as_str())
+    }
+}
+
 impl ToString for ResourcePath {
     fn to_string(&self) -> String {
             let mut rtn = String::new();
@@ -2313,5 +2345,11 @@ impl FromStr for ResourcePath {
             return Err(format!("illegal resource path: '{}' unrecognized portion: '{}'",s, leftover).into());
         }
         Ok(path)
+    }
+}
+
+impl Into<ResourcePath> for ResourcePathAndKind {
+    fn into(self) -> ResourcePath {
+        self.path
     }
 }

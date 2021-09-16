@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::Receiver;
 
-use starlane_resources::{AddressCreationSrc, AssignKind, AssignResourceStateSrc, FieldSelection, KeyCreationSrc, LabelSelection, MetaSelector, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceIdentifier, ResourceRegistryInfo, ResourceSelector, ResourceStub, Unique, Names};
+use starlane_resources::{AddressCreationSrc, AssignKind, AssignResourceStateSrc, FieldSelection, KeyCreationSrc, LabelSelection, MetaSelector, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceIdentifier, ResourceRegistryInfo, ResourceSelector, ResourceStub, Unique, Names, ResourcePath};
 use starlane_resources::ConfigSrc;
 use starlane_resources::data::{BinSrc, DataSet};
 use starlane_resources::message::{Fail, MessageFrom, MessageReply, MessageTo, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage};
@@ -43,7 +43,6 @@ pub mod user;
 
 pub type ResourceType = starlane_resources::ResourceType;
 pub type ResourceAddress = starlane_resources::ResourceAddress;
-pub type ResourceAddressKind = starlane_resources::ResourceAddressKind;
 pub type Path = starlane_resources::Path;
 pub type DomainCase = starlane_resources::DomainCase;
 pub type SkwerCase = starlane_resources::SkewerCase;
@@ -52,7 +51,6 @@ pub type ResourceKind = starlane_resources::ResourceKind;
 pub type DatabaseKind = starlane_resources::DatabaseKind;
 pub type FileKind = starlane_resources::FileKind;
 pub type ArtifactKind = starlane_resources::ArtifactKind;
-pub type ArtifactBundleKind = starlane_resources::ArtifactBundleKind;
 
 pub type ResourceKey = starlane_resources::ResourceKey;
 pub type ResourceAddressPart = starlane_resources::ResourcePathSegment;
@@ -73,13 +71,7 @@ pub type FileKey = starlane_resources::FileKey;
 
 pub type ResourceId = starlane_resources::ResourceId;
 
-pub type ArtifactBundlePath = starlane_resources::ArtifactBundlePath;
-
-pub type ArtifactAddress = starlane_resources::ArtifactPath;
 pub type ArtifactBundleKey = starlane_resources::ArtifactBundleKey;
-pub type ArtifactBundleAddress = starlane_resources::ArtifactBundlePath;
-
-pub type ArtifactBundleIdentifier = starlane_resources::ArtifactBundleIdentifier;
 
 pub type Specific = starlane_resources::Specific;
 
@@ -199,7 +191,7 @@ impl RegistryParams {
         parent: Option<ResourceKey>,
         key: Option<ResourceKey>,
         owner: Option<UserKey>,
-        address: Option<ResourceAddress>,
+        address: Option<ResourcePath>,
         host: Option<StarKey>,
     ) -> Result<Self, Error> {
         let key = if let Option::Some(key) = key {
@@ -501,7 +493,7 @@ impl Registry {
             }
             ResourceRegistryCommand::Get(identifier) => {
 
-                if identifier.resource_type() == ResourceType::Root {
+                if identifier.is_root() {
                     return Ok(ResourceRegistryResult::Resource(Option::Some(
                         ResourceRecord::root(),
                     )));
@@ -656,7 +648,7 @@ impl Registry {
         let key = ResourceKey::from_bin(key)?;
 
         let address: String = row.get(1)?;
-        let address = ResourceAddress::from_str(address.as_str())?;
+        let address = ResourcePath::from_str(address.as_str())?;
 
         let kind: String = row.get(2)?;
         let kind = ResourceKind::from_str(kind.as_str())?;
@@ -1144,7 +1136,7 @@ impl ResourceCreationChamber {
                 .kind
                 .resource_type()
                 .parents()
-                .contains(&self.parent.key.resource_type())
+                .contains(&self.parent.archetype.kind.resource_type())
             {
                 println!("!!! -> Throwing Fail::WrongParentResourceType for kind {} & ResourceType {} <- !!!", self.create.archetype.kind.to_string(), self.create.archetype.kind.resource_type().to_string() );
 
@@ -1152,7 +1144,7 @@ impl ResourceCreationChamber {
                     expected: HashSet::from_iter(
                         self.create.archetype.kind.resource_type().parents(),
                     ),
-                    received: Option::Some(self.create.parent.resource_type()),
+                    received: Option::None,
                 }));
                 return;
             };
@@ -1229,47 +1221,18 @@ impl ResourceCreationChamber {
             AddressCreationSrc::None => {
                 let mut address = format!(
                     "{}:{}",
-                    self.parent.address.to_parts_string(),
+                    self.parent.address.to_string(),
                     key.generate_address_tail()
                 );
-                address.push_str("<");
-                address.push_str(key.resource_type().to_string().as_str());
-                address.push_str(">");
 
                 println!("1 Address: {}", address);
-                ResourceAddress::from_str(address.as_str())?
+                ResourcePath::from_str(address.as_str())?
             }
             AddressCreationSrc::Append(tail) => {
-                let mut address = format!("{}:{}", self.parent.address.to_parts_string(), tail);
-                address.push_str("<");
-                address.push_str(key.resource_type().to_string().as_str());
-                address.push_str(">");
-                ResourceAddress::from_str(address.as_str())?
-            }
-            AddressCreationSrc::Appends(tails) => {
-                let mut address = self.parent.address.to_parts_string();
-                for tail in tails {
-                    address.push_str(":");
-                    address.push_str(tail.as_str());
-                }
-
-                address.push_str("<");
-                address.push_str(key.resource_type().to_string().as_str());
-                address.push_str(">");
-                println!("Address: {}", address);
-
-                ResourceAddress::from_str(address.as_str())?
+                self.parent.address.append(tail.as_str() )?
             }
             AddressCreationSrc::Just(space_name) => {
-                if self.parent.key.resource_type() != ResourceType::Root {
-                    return Err(format!(
-                        "Space creation can only be used at top level (Root) not by {}",
-                        self.parent.key.resource_type().to_string()
-                    )
-                    .into());
-                }
-                let address = format!("{}<Space>", space_name);
-                ResourceAddress::from_str(address.as_str())?
+               ResourcePath::from_str(space_name.as_str())?
             }
 
             AddressCreationSrc::Exact(address) => address.clone(),
@@ -1385,13 +1348,15 @@ impl FieldSelectionSql {
 }
 
 pub struct RegistryUniqueSrc {
+    parent_resource_type: ResourceType,
     parent_key: ResourceIdentifier,
     tx: mpsc::Sender<ResourceRegistryAction>,
 }
 
 impl RegistryUniqueSrc {
-    pub fn new(parent_key: ResourceIdentifier, tx: mpsc::Sender<ResourceRegistryAction>) -> Self {
+    pub fn new(parent_resource_type: ResourceType, parent_key: ResourceIdentifier, tx: mpsc::Sender<ResourceRegistryAction>) -> Self {
         RegistryUniqueSrc {
+            parent_resource_type,
             parent_key: parent_key,
             tx: tx,
         }
@@ -1403,7 +1368,7 @@ impl UniqueSrc for RegistryUniqueSrc {
     async fn next(&self, resource_type: &ResourceType) -> Result<ResourceId, Error> {
         if !resource_type
             .parents()
-            .contains(&self.parent_key.resource_type())
+            .contains(&self.parent_resource_type)
         {
             eprintln!("WRONG RESOURCE TYPE IN UNIQUE SRC");
             return Err(Fail::WrongResourceType {
@@ -1480,11 +1445,7 @@ impl From<ResourceRecord> for ResourceKey {
     }
 }
 
-impl From<ResourceRecord> for ResourceAddress {
-    fn from(record: ResourceRecord) -> Self {
-        record.stub.address
-    }
-}
+
 
 pub enum ResourceManagerKey {
     Central,

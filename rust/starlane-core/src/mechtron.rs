@@ -19,8 +19,8 @@ pub struct Mechtron {
 impl Mechtron {
     pub fn new( config: ArtifactItem<MechtronConfig>, caches: &ArtifactCaches ) -> Result<Self,Error> {
 
-        let wasm = caches.wasms.get(&config.wasm.address ).ok_or(format!("could not get referenced Wasm: {}", config.wasm.address.to_string()) )?;
-        let bind_config = caches.bind_configs.get(&config.bind.address ).ok_or::<Error>(format!("could not get referenced BindConfig: {}", config.wasm.address.to_string()).into() )?;
+        let wasm = caches.wasms.get(&config.wasm.path).ok_or(format!("could not get referenced Wasm: {}", config.wasm.path.to_string()) )?;
+        let bind_config = caches.bind_configs.get(&config.bind.path).ok_or::<Error>(format!("could not get referenced BindConfig: {}", config.wasm.path.to_string()).into() )?;
 
         let membrane = WasmMembrane::new_with_init(wasm.module.clone(), "mechtron_init".to_string() )?;
 

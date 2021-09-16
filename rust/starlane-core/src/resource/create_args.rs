@@ -7,11 +7,12 @@ use zip::write::FileOptions;
 use zip::{CompressionMethod, ZipWriter};
 
 use crate::error::Error;
-use crate::resource::{ArtifactBundleAddress, ArtifactAddress, ResourceAddress,ResourceType,ResourceKind};
+use crate::resource::{ResourceAddress,ResourceType,ResourceKind};
 use std::convert::TryInto;
+use starlane_resources::ResourcePath;
 
 lazy_static! {
-    pub static ref ARTIFACT_BUNDLE: ArtifactBundleAddress = artifact_bundle_address();
+    pub static ref ARTIFACT_BUNDLE: ResourcePath = artifact_bundle_address();
     pub static ref SPACE: &'static str = r#"
 name: Space
 args:
@@ -28,9 +29,9 @@ args:
    "#;
 }
 
-pub fn artifact_bundle_address() -> ArtifactBundleAddress {
+pub fn artifact_bundle_address() -> ResourcePath {
     let address = format!("hyperspace:starlane:core:{}", crate::VERSION.to_string());
-    ArtifactBundleAddress::from_str(address.as_str()).expect(
+    ResourcePath::from_str(address.as_str()).expect(
         format!(
             "FATAL: expected artifact_bundle_address '{}' to be parse-able",
             address
@@ -39,10 +40,9 @@ pub fn artifact_bundle_address() -> ArtifactBundleAddress {
     )
 }
 
-pub fn space_address() -> Result<ArtifactAddress,Error> {
-   let address: ResourceAddress = artifact_bundle_address().into();
-   let address = address.append("/create-args/space.yaml".to_string(), ResourceType::Artifact )?;
-   let address : ArtifactAddress = address.try_into()?;
+pub fn space_address() -> Result<ResourcePath,Error> {
+   let path  = artifact_bundle_address();
+   let address = path.append("/create-args/space.yaml" )?;
    Ok(address)
 }
 

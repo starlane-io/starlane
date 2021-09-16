@@ -12,7 +12,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 
-use starlane_resources::{AddressCreationSrc, AssignResourceStateSrc, FieldSelection, KeyCreationSrc, LocalStateSetSrc, RemoteDataSrc, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceIdentifier, ResourceRegistryInfo, ResourceSelector, ResourceStub};
+use starlane_resources::{AddressCreationSrc, AssignResourceStateSrc, FieldSelection, KeyCreationSrc, LocalStateSetSrc, RemoteDataSrc, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceIdentifier, ResourceRegistryInfo, ResourceSelector, ResourceStub, ResourcePath};
 use starlane_resources::ConfigSrc;
 use starlane_resources::data::{BinSrc, DataSet, Meta};
 use starlane_resources::data::Binary;
@@ -22,8 +22,7 @@ use starlane_resources::message::Fail;
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
 use crate::frame::{Reply, ReplyKind, StarPattern, TraversalAction};
-use crate::resource::{ArtifactAddress, ArtifactBundleKind, ArtifactBundlePath, Path, ResourceAddress, ResourceKind, ResourceRecord, ResourceType, to_keyed_for_reasource_create, to_keyed_for_resource_selector};
-use crate::resource::ArtifactBundleAddress;
+use crate::resource::{Path, ResourceKind, ResourceRecord, ResourceType, to_keyed_for_reasource_create, to_keyed_for_resource_selector};
 use crate::resource::file_system::FileSystemState;
 use crate::resource::FileKind;
 use crate::resource::ResourceKey;
@@ -43,10 +42,10 @@ pub struct StarlaneApi {
 impl StarlaneApi {
     pub async fn create_artifact_bundle(
         &self,
-        path: &ArtifactBundlePath,
+        path: &ResourcePath,
         data: Arc<Vec<u8>>,
     ) -> Result<ArtifactBundleApi, Error> {
-        let address: ResourceAddress = path.clone().into();
+        let address: ResourcePath = path.clone().into();
 
         let subspace_address = address
             .parent()
@@ -143,14 +142,14 @@ info!("received reply for {}",description);
     }
      */
 
-    pub async fn fetch_resource_address(&self, key: ResourceKey) -> Result<ResourceAddress, Error> {
+    pub async fn fetch_resource_address(&self, key: ResourceKey) -> Result<ResourcePath, Error> {
         match self.fetch_resource_record(key.into()).await {
             Ok(record) => Ok(record.stub.address),
             Err(fail) => Err(fail.into()),
         }
     }
 
-    pub async fn fetch_resource_key(&self, address: ResourceAddress) -> Result<ResourceKey, Error> {
+    pub async fn fetch_resource_key(&self, address: ResourcePath ) -> Result<ResourceKey, Error> {
         match self.fetch_resource_record(address.into()).await {
             Ok(record) => Ok(record.stub.key),
             Err(fail) => Err(fail.into()),
@@ -362,7 +361,7 @@ impl SpaceApi {
         self.stub.key.clone()
     }
 
-    pub fn address(&self) -> ResourceAddress {
+    pub fn address(&self) -> ResourcePath {
         self.stub.address.clone()
     }
 
@@ -374,10 +373,10 @@ impl SpaceApi {
             )
             .into());
         }
-        if stub.address.resource_type() != ResourceType::Space {
+        if stub.archetype.kind.resource_type() != ResourceType::Space {
             return Err(format!(
                 "wrong address resource type for SpaceApi: {}",
-                stub.address.resource_type().to_string()
+                stub.archetype.kind.resource_type().to_string()
             )
             .into());
         }
@@ -451,7 +450,7 @@ impl SubSpaceApi {
         self.stub.key.clone()
     }
 
-    pub fn address(&self) -> ResourceAddress {
+    pub fn address(&self) -> ResourcePath {
         self.stub.address.clone()
     }
 
@@ -463,10 +462,10 @@ impl SubSpaceApi {
             )
             .into());
         }
-        if stub.address.resource_type() != ResourceType::SubSpace {
+        if stub.archetype.kind.resource_type() != ResourceType::SubSpace {
             return Err(format!(
                 "wrong address resource type for SubSpaceApi: {}",
-                stub.address.resource_type().to_string()
+                stub.archetype.kind.resource_type().to_string()
             )
             .into());
         }
@@ -481,7 +480,7 @@ impl SubSpaceApi {
         StarlaneApi::new(self.surface_api.clone())
     }
 
-    pub fn create_app(&self, name: &str, app_config: ArtifactAddress ) -> Result<Creation<AppApi>, Error> {
+    pub fn create_app(&self, name: &str, app_config: ResourcePath ) -> Result<Creation<AppApi>, Error> {
         let resource_src = AssignResourceStateSrc::Stateless;
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
@@ -523,7 +522,7 @@ impl SubSpaceApi {
     pub fn create_artifact_bundle_versions(
         &self,
         name: &str,
-    ) -> Result<Creation<ArtifactBundleVersionsApi>, Error> {
+    ) -> Result<Creation<ArtifactBundleSeriesApi>, Error> {
         let resource_src = AssignResourceStateSrc::Stateless;
 
         let create = ResourceCreate {
@@ -531,7 +530,7 @@ impl SubSpaceApi {
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Append(name.to_string()),
             archetype: ResourceArchetype {
-                kind: ResourceKind::ArtifactBundleVersions,
+                kind: ResourceKind::ArtifactBundleSeries,
                 specific: None,
                 config: None,
             },
@@ -554,7 +553,7 @@ impl AppApi {
         self.stub.key.clone()
     }
 
-    pub fn address(&self) -> ResourceAddress {
+    pub fn address(&self) -> ResourcePath {
         self.stub.address.clone()
     }
 
@@ -566,10 +565,10 @@ impl AppApi {
             )
                 .into());
         }
-        if stub.address.resource_type() != ResourceType::App{
+        if stub.archetype.kind.resource_type() != ResourceType::App{
             return Err(format!(
                 "wrong address resource type for AppApi: {}",
-                stub.address.resource_type().to_string()
+                stub.archetype.kind.resource_type().to_string()
             )
                 .into());
         }
@@ -580,7 +579,7 @@ impl AppApi {
         })
     }
 
-    pub fn create_mechtron(&self, name: &str, config: ArtifactAddress ) -> Result<Creation<MechtronApi>, Error> {
+    pub fn create_mechtron(&self, name: &str, config: ResourcePath ) -> Result<Creation<MechtronApi>, Error> {
         let resource_src = AssignResourceStateSrc::Stateless;
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
@@ -614,7 +613,7 @@ impl MechtronApi{
         self.stub.key.clone()
     }
 
-    pub fn address(&self) -> ResourceAddress {
+    pub fn address(&self) -> ResourcePath {
         self.stub.address.clone()
     }
 
@@ -626,10 +625,10 @@ impl MechtronApi{
             )
                 .into());
         }
-        if stub.address.resource_type() != ResourceType::App{
+        if stub.archetype.kind.resource_type() != ResourceType::App{
             return Err(format!(
                 "wrong address resource type for AppApi: {}",
-                stub.address.resource_type().to_string()
+                stub.archetype.kind.resource_type().to_string()
             )
                 .into());
         }
@@ -654,7 +653,7 @@ impl FileSystemApi {
         self.stub.key.clone()
     }
 
-    pub fn address(&self) -> ResourceAddress {
+    pub fn address(&self) -> ResourcePath {
         self.stub.address.clone()
     }
 
@@ -666,10 +665,10 @@ impl FileSystemApi {
             )
             .into());
         }
-        if stub.address.resource_type() != ResourceType::FileSystem {
+        if stub.archetype.kind.resource_type() != ResourceType::FileSystem {
             return Err(format!(
                 "wrong address resource type for FileSystemApi: {}",
-                stub.address.resource_type().to_string()
+                stub.archetype.kind.resource_type().to_string()
             )
             .into());
         }
@@ -732,10 +731,10 @@ impl FileApi {
             )
             .into());
         }
-        if stub.address.resource_type() != ResourceType::File {
+        if stub.archetype.kind.resource_type() != ResourceType::File {
             return Err(format!(
                 "wrong address resource type for FileApi: {}",
-                stub.address.resource_type().to_string()
+                stub.archetype.kind.resource_type().to_string()
             )
             .into());
         }
@@ -747,24 +746,24 @@ impl FileApi {
     }
 }
 
-pub struct ArtifactBundleVersionsApi {
+pub struct ArtifactBundleSeriesApi {
     stub: ResourceStub,
     surface_api: SurfaceApi,
 }
 
-impl ArtifactBundleVersionsApi {
+impl ArtifactBundleSeriesApi {
     pub fn new(surface_api: SurfaceApi, stub: ResourceStub) -> Result<Self, Error> {
-        if stub.key.resource_type() != ResourceType::ArtifactBundleVersions {
+        if stub.key.resource_type() != ResourceType::ArtifactBundleSeries {
             return Err(format!(
                 "wrong key resource type for ArtifactVersionsBundleApi: {}",
                 stub.key.resource_type().to_string()
             )
             .into());
         }
-        if stub.address.resource_type() != ResourceType::ArtifactBundleVersions {
+        if stub.archetype.kind.resource_type() != ResourceType::ArtifactBundleSeries {
             return Err(format!(
-                "wrong address resource type for ArtifactBundleVersionsApi: {}",
-                stub.address.resource_type().to_string()
+                "wrong address resource type for ArtifactBundleSeriesApi: {}",
+                stub.archetype.kind.resource_type().to_string()
             )
             .into());
         }
@@ -786,14 +785,14 @@ impl ArtifactBundleVersionsApi {
 
         let resource_src = AssignResourceStateSrc::Direct(state);
         // hacked to FINAL
-        let kind: ArtifactBundleKind = ArtifactBundleKind::Final;
+//        let kind: ArtifactBundleKind = ArtifactBundleKind::Final;
 
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Append(version.to_string()),
             archetype: ResourceArchetype {
-                kind: ResourceKind::ArtifactBundle(kind),
+                kind: ResourceKind::ArtifactBundle,
                 specific: None,
                 config: None,
             },
@@ -824,10 +823,10 @@ impl ArtifactBundleApi {
             )
             .into());
         }
-        if stub.address.resource_type() != ResourceType::ArtifactBundle {
+        if stub.archetype.kind.resource_type() != ResourceType::ArtifactBundle {
             return Err(format!(
                 "wrong address resource type for ArtifactBundleApi: {}",
-                stub.address.resource_type().to_string()
+                stub.archetype.kind.resource_type().to_string()
             )
             .into());
         }
@@ -852,10 +851,10 @@ impl UserApi {
             )
             .into());
         }
-        if stub.address.resource_type() != ResourceType::User {
+        if stub.archetype.kind.resource_type() != ResourceType::User {
             return Err(format!(
                 "wrong address resource type for UserApi: {}",
-                stub.address.resource_type().to_string()
+                stub.archetype.kind.resource_type().to_string()
             )
             .into());
         }
@@ -881,10 +880,10 @@ impl DomainApi {
             )
             .into());
         }
-        if stub.address.resource_type() != ResourceType::Domain {
+        if stub.archetype.kind.resource_type() != ResourceType::Domain {
             return Err(format!(
                 "wrong address resource type for DomainApi: {}",
-                stub.address.resource_type().to_string()
+                stub.archetype.kind.resource_type().to_string()
             )
             .into());
         }
@@ -986,7 +985,7 @@ impl TryFrom<ResourceApi> for ArtifactBundleApi {
     }
 }
 
-impl TryFrom<ResourceApi> for ArtifactBundleVersionsApi {
+impl TryFrom<ResourceApi> for ArtifactBundleSeriesApi {
     type Error = Error;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {

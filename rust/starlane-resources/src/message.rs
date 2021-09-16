@@ -159,16 +159,7 @@ pub struct MessageReply<P> {
 }
 
 impl<P> Message<P> {
-    pub fn verify_type(&self, resource_type: ResourceType) -> Result<(), Fail> {
-        if self.to.resource_type() == resource_type {
-            Ok(())
-        } else {
-            Err(Fail::WrongResourceType {
-                received: resource_type,
-                expected: HashSet::from_iter(vec![self.to.resource_type().clone()]),
-            })
-        }
-    }
+
 }
 
 

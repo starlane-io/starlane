@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use tokio::sync::{mpsc, oneshot};
 
-use starlane_resources::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceStub};
+use starlane_resources::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceStub, ResourcePath};
 
 use crate::error::Error;
 use crate::resource::{create_args, ResourceAddress, ResourceKind, ResourceRecord, ResourceRegistration, ResourceLocation};
@@ -47,7 +47,7 @@ impl CentralVariant {
         let root_resource = ResourceRecord {
             stub: ResourceStub {
                 key: ResourceKey::Root,
-                address: ResourceAddress::from_str("<Root>").unwrap(),
+                address: ResourcePath::root(),
                 archetype: ResourceArchetype {
                     kind: ResourceKind::Root,
                     specific: None,
@@ -121,7 +121,7 @@ println!("BEFORE");
                 "ensuring artifact: {}",
                 create_args::artifact_bundle_address().to_string()
             );
-            let address: ResourceAddress = create_args::artifact_bundle_address().into();
+            let address = create_args::artifact_bundle_address();
             let mut creation = subspace_api
                 .create_artifact_bundle_versions(address.parent().unwrap().name().as_str())?;
             creation.set_strategy(ResourceCreateStrategy::Ensure);

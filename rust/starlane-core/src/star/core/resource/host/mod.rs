@@ -125,7 +125,7 @@ impl HostComponent {
         let host: Arc<dyn Host> = match rt {
             ResourceType::Space => Arc::new(SpaceHost::new(self.skel.clone()).await),
             ResourceType::SubSpace => Arc::new(SpaceHost::new(self.skel.clone()).await),
-            ResourceType::ArtifactBundleVersions => Arc::new(StatelessHost::new(self.skel.clone()).await),
+            ResourceType::ArtifactBundleSeries => Arc::new(StatelessHost::new(self.skel.clone()).await),
             ResourceType::ArtifactBundle=> Arc::new(ArtifactBundleHost::new(self.skel.clone()).await),
             ResourceType::Domain => Arc::new(StatelessHost::new(self.skel.clone()).await),
             ResourceType::App=> Arc::new(AppHost::new(self.skel.clone()).await),
