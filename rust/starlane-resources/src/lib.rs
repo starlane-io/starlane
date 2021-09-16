@@ -1466,9 +1466,9 @@ resources! {
     #[resource(ResourcePathSegmentKind::SkewerCase)]
     #[resource(ResourceStatePersistenceManager::None)]
     #[resource(state(content::Binary))]
-    pub struct ArtifactBundleVersions();
+    pub struct ArtifactBundleSeries();
 
-    #[resource(parents(ArtifactBundleVersions))]
+    #[resource(parents(ArtifactBundleSeries))]
     #[resource(prefix="ab")]
     #[resource(ResourcePathSegmentKind::Version)]
     #[resource(ResourceStatePersistenceManager::Host)]

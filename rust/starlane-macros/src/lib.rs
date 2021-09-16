@@ -929,7 +929,7 @@ fn kinds(parsed: &ResourceParser) -> TokenStream {
                 }
 
                 if !variant.fields.is_empty() {
-                    from_parts.push_str(format!("\"{}\" => Ok(Self::{}(parts.specific.ok_or(\"expected a specific\")?)),", variant.ident.to_string(), variant.ident.to_string()).as_str());
+                    from_parts.push_str(format!("\"{}\" => Ok(Self::{}(parts.specific.ok_or(\"<{}> Kind expected a Specific: <Type<Kind<Specific>>>\")?)),", variant.ident.to_string(), variant.ident.to_string(), resource.get_ident().to_string(), ).as_str());
                 } else {
                     from_parts.push_str(
                         format!(

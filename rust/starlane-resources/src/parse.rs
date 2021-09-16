@@ -9,6 +9,7 @@ use nom::bytes::complete::{tag, take};
 use crate::error::Error;
 use std::convert::TryInto;
 use serde::{Deserialize,Serialize};
+use std::str::FromStr;
 
 
 fn any_resource_path_segment<T>(i: T) -> Res<T, T>
@@ -228,6 +229,32 @@ impl ResourcePath {
     }
 }
 
+impl ToString for ResourcePath {
+    fn to_string(&self) -> String {
+            let mut rtn = String::new();
+            for i in 0..self.segments.len() {
+                let segment = self.segments.get(i).unwrap();
+                rtn.push_str( segment.to_string().as_str() );
+                if i < self.segments.len()-1 {
+                    rtn.push_str(":");
+                }
+            }
+            rtn
+    }
+}
+
+impl FromStr for ResourcePath {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (leftover,path) = parse_resource_path(s)?;
+        if !leftover.is_empty() {
+            return Err(format!("illegal resource path: '{}' unrecognized portion: '{}'",s, leftover).into());
+        }
+        Ok(path)
+    }
+}
+
 #[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub struct ResourcePathAndKind {
     pub path: ResourcePath,
@@ -247,13 +274,33 @@ impl ResourcePathAndKind {
     }
 }
 
+impl FromStr for ResourcePathAndKind {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (leftover,result) = parse_resource_path_and_kind(s)?;
+
+        if !leftover.is_empty() {
+            return Err(format!("illegal resource path with kind: '{}' unrecognized portion: '{}'",s, leftover).into());
+        }
+
+        Ok(result?)
+    }
+}
+
+impl ToString for ResourcePathAndKind {
+    fn to_string(&self) -> String {
+        format!("{}{}",self.path.to_string(),self.kind.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::convert::TryInto;
     use std::str::FromStr;
 
     use crate::error::Error;
-    use crate::parse::{parse_resource_path, parse_resource_path_and_kind};
+    use crate::parse::{parse_resource_path, parse_resource_path_and_kind, ResourcePath, ResourcePathAndKind};
 
     #[test]
     fn test_parse_resource_path() -> Result<(), Error> {
@@ -272,6 +319,25 @@ mod tests {
     }
 
     #[test]
+    fn test_resource_path_from_str() -> Result<(), Error> {
+        let p = "that.bi-zi:ba_tiko:/NOW_HE_DEAD";
+        let path = ResourcePath::from_str(p)?;
+        assert!( path.to_string().as_str() == p);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_resource_path_and_kind_from_str() -> Result<(), Error> {
+        let p = "hello:my:db<Database<Relational<mysql.org:mysql:innodb:7.0.0>>>";
+        let path = ResourcePathAndKind::from_str(p)?;
+        assert!( path.to_string().as_str() == p);
+
+        Ok(())
+    }
+
+
+    #[test]
     fn test_parse_resource_path_and_kind() -> Result<(), Error> {
         let (leftover, result)= parse_resource_path_and_kind("hello:my<SubSpace>")?;
         let path = result?;
@@ -283,6 +349,12 @@ mod tests {
         assert!(leftover.len()==0);
         assert!(path.path.segments.len()==4);
 
+        let (leftover, result)= parse_resource_path_and_kind("hello:my:db<Database<Relational>>")?;
+        assert!(result.is_err());
+        let (leftover, result)= parse_resource_path_and_kind("hello:my:db<Database<Relational<mysql.org:mysql:innodb:7.0.0>>>")?;
+        let path = result?;
+        assert!(leftover.len()==0);
+        assert!(path.path.segments.len()==3);
 
         Ok(())
     }
