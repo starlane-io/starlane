@@ -19,6 +19,7 @@ use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::message::resource::Delivery;
 use crate::star::core::resource::host::kube::KubeHost;
+use crate::star::core::resource::host::file::FileHost;
 
 pub mod artifact;
 mod default;

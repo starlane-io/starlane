@@ -2048,6 +2048,7 @@ pub enum RemoteDataSrc {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResourceCreateStrategy {
     Create,
+    CreateOrUpdate,
     Ensure,
 }
 
