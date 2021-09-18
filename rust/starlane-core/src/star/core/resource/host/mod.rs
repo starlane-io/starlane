@@ -27,6 +27,7 @@ pub mod kube;
 mod space;
 mod mechtron;
 mod app;
+mod file;
 
 pub enum HostCall {
     Assign {
@@ -131,6 +132,8 @@ impl HostComponent {
             ResourceType::App=> Arc::new(AppHost::new(self.skel.clone()).await),
             ResourceType::Mechtron => Arc::new(MechtronHost::new(self.skel.clone()).await),
             ResourceType::Database => Arc::new(KubeHost::new(self.skel.clone()).await.expect("KubeHost must be created without error")),
+            ResourceType::FileSystem => Arc::new(StatelessHost::new(self.skel.clone()).await),
+            ResourceType::File => Arc::new(FileHost::new(self.skel.clone()).await),
 
             t => unimplemented!("no HOST implementation for type {}", t.to_string()),
         };
