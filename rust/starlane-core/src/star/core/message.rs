@@ -103,6 +103,7 @@ info!("Received PORT request!");
             ) -> Result<(), Error> {
                 match delivery.payload.payload.clone() {
                     ResourceRequestMessage::Create(create) => {
+println!("Create...{}", create.archetype.kind.to_string() );
                         let parent_key = match create
                             .parent
                             .clone()

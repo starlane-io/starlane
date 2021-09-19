@@ -27,6 +27,7 @@ impl StatelessHost {
 
 #[async_trait]
 impl Host for StatelessHost {
+
     async fn assign(
         &self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
@@ -38,6 +39,7 @@ impl Host for StatelessHost {
                 return Err("must be stateless or empty create args".into());
             }
         };
+println!("StatelessHost: create {}", assign.stub.archetype.kind.to_string() );
 
         Ok(DataSet::new())
     }
@@ -56,4 +58,5 @@ impl Host for StatelessHost {
     async fn delete(&self, _identifier: ResourceKey) -> Result<(), Error> {
         unimplemented!()
     }
+
 }

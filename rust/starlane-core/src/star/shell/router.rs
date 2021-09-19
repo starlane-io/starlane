@@ -23,6 +23,7 @@ impl RouterApi {
     }
 
     pub fn route(&self, message: StarMessage) -> Result<(), Error> {
+println!("RouterApi: message.payload: {}", message.payload.to_string() );
         Ok(self.tx.try_send(RouterCall::Route(message))?)
     }
 
