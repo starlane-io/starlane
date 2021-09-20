@@ -29,6 +29,7 @@ pub mod error;
 pub mod parse;
 pub mod message;
 pub mod http;
+pub mod property;
 
 pub enum Galaxy{
     Local,
@@ -1984,7 +1985,7 @@ impl<S> ResourceAssign<S> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Resource {
     key: ResourceKey,
     address: ResourcePath,
