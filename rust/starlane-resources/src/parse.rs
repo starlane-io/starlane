@@ -10,9 +10,9 @@ use nom::multi::{many1, many_m_n, separated_list0, separated_list1};
 use nom::sequence::{delimited, preceded, terminated, tuple};
 use serde::{Deserialize, Serialize};
 
-use crate::{DomainCase, Res, ResourceKind, ResourceKindParts, ResourcePath, ResourcePathAndKind, ResourcePathAndType, ResourcePathSegmentKind, ResourceType, SkewerCase, Specific, Version};
+use crate::{DomainCase, Res, ResourceKind, ResourceKindParts, ResourcePath, ResourcePathAndKind, ResourcePathAndType, ResourcePathSegmentKind, ResourceType, SkewerCase, Specific, Version, ResourceSelector, FieldSelection};
 use crate::error::Error;
-use crate::property::{ResourcePropertyValueSelector, DataSetValueSelector};
+use crate::property::{ResourcePropertyValueSelector, DataSetValueSelector, ResourceValueSelector};
 use nom::branch::alt;
 
 fn any_resource_path_segment<T>(i: T) -> Res<T, T>
@@ -315,45 +315,30 @@ pub fn parse_resource_property_value_selector(input: &str) -> Res<&str, Result<R
     })
 }
 
-/*pub fn parse_resource_property_value_selector(input: &str) -> Res<&str, Result<ResourcePropertyValueSelector,Error>> {
+pub fn parse_resource_value_selector(input: &str) -> Res<&str, Result<ResourceValueSelector,Error>> {
     context(
-        "parse_resource_property_value_selector",
+        "parse_resource_value_selector",
         tuple(
-            (parse_resource_path,
-             parse_resource_type)
+            (terminated(parse_resource_path, tag("::")), parse_resource_property_value_selector )
+
         ),
-    )(input).map( |(next_input, (path, resource_type)) | {
-
-        (next_input,
-
-         {
-             match resource_type{
-                 Ok(resource_type) => {
-                     Ok(ResourcePathAndType {
-                         path,
-                         resource_type
-                     })
-                 }
-                 Err(error) => {
-                     Err(error.into())
-                 }
-             }
-         }
-
-
-        )
-    } )
-}*/
-/*
-pub fn parse_resource_path_with_type_kind_specific_and_property(input: &str) -> Res<&str, (Vec<&str>,Option<ResourceTypeKindSpecificParts>)> {
-    context(
-        "parse_resource_path_with_type_kind_specific_and_property",
-        tuple(
-            (terminated(parse_resource_path_with_type_kind_specific, tag("::") ),
-             parse_resource_type_kind_specific))
-    )(input)
+    )(input).map( |(next_input, (path, property )) | {
+        match property {
+            Ok(property) => {
+                let mut resource = ResourceSelector::new();
+                resource.add( FieldSelection::Identifier( path.into() ));
+                (next_input, Ok(ResourceValueSelector {
+                    resource,
+                    property
+                }))
+            }
+            Err(err) => {
+                (next_input, Err(err))
+            }
+        }
+    })
 }
- */
+
 #[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub enum ResourceExpression {
     Path(ResourcePath),
