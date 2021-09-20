@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use nom::{AsChar, InputTakeAtPosition};
 use nom::bytes::complete::{tag, take};
-use nom::character::complete::{alpha0, alpha1, anychar, digit0, digit1, one_of};
+use nom::character::complete::{alpha0, alpha1, anychar, digit0, digit1, one_of, alphanumeric1};
 use nom::combinator::{not, opt};
 use nom::error::{context, ErrorKind};
 use nom::multi::{many1, many_m_n, separated_list0, separated_list1};
@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{DomainCase, Res, ResourceKind, ResourceKindParts, ResourcePath, ResourcePathAndKind, ResourcePathAndType, ResourcePathSegmentKind, ResourceType, SkewerCase, Specific, Version};
 use crate::error::Error;
+use crate::property::{ResourcePropertyValueSelector, DataSetValueSelector};
+use nom::branch::alt;
 
 fn any_resource_path_segment<T>(i: T) -> Res<T, T>
     where
@@ -41,6 +43,21 @@ fn loweralphanumerichyphen1<T>(i: T) -> Res<T, T>
             let char_item = item.as_char();
             !(char_item == '-')
                 && !((char_item.is_alpha() && char_item.is_lowercase()) || char_item.is_dec_digit())
+        },
+        ErrorKind::AlphaNumeric,
+    )
+}
+
+
+fn anything_but_single_quote<T>(i: T) -> Res<T, T>
+    where
+        T: InputTakeAtPosition,
+        <T as InputTakeAtPosition>::Item: AsChar,
+{
+    i.split_at_position1_complete(
+        |item| {
+            let char_item = item.as_char();
+            char_item == '\''
         },
         ErrorKind::AlphaNumeric,
     )
@@ -247,7 +264,86 @@ pub fn parse_resource_path_and_type(input: &str) -> Res<&str, Result<ResourcePat
     } )
 }
 
+pub fn parse_mapping(input: &str) -> Res<&str, &str> {
+        context( "parse_mapping",
+        delimited(
+            tag("['"),
+                anything_but_single_quote,
+            tag("']"),
+        )  ) (input)
+}
 
+pub fn parse_aspect_mapping(input: &str) -> Res<&str, SkewerCase> {
+    context(
+        "parse_aspect_mapping",
+        delimited(
+            tag("['"),
+            parse_skewer,
+            tag("']"),
+        ) ) (input)
+}
+
+pub fn parse_resource_property_value_selector(input: &str) -> Res<&str, Result<ResourcePropertyValueSelector,Error>> {
+    context(
+        "parse_resource_property_value_selector",
+        tuple(
+            (parse_skewer,opt(tuple( (alt( (parse_skewer,parse_aspect_mapping) ), opt(parse_mapping)) ) )
+        ),
+    ))(input) .map( |(next_input, (property,aspect))|  {
+
+       match property.to_string().as_str() {
+           "state" => {
+               match aspect {
+                   None => {
+                       (next_input,Ok(ResourcePropertyValueSelector::state()))
+                   }
+                   Some((aspect, field) ) => {
+                       match field {
+                           None => {
+                               (next_input,Ok(ResourcePropertyValueSelector::state_aspect(aspect.to_string().as_str())))
+                           }
+                           Some(field) => {
+                               (next_input,Ok(ResourcePropertyValueSelector::state_aspect_field(aspect.to_string().as_str(), field )))
+                               }
+                           }
+                   }
+               }
+           },
+           property => return (next_input, Err(format!("cannot match a selector for resource property '{}'",property).into()))
+       }
+
+    })
+}
+
+/*pub fn parse_resource_property_value_selector(input: &str) -> Res<&str, Result<ResourcePropertyValueSelector,Error>> {
+    context(
+        "parse_resource_property_value_selector",
+        tuple(
+            (parse_resource_path,
+             parse_resource_type)
+        ),
+    )(input).map( |(next_input, (path, resource_type)) | {
+
+        (next_input,
+
+         {
+             match resource_type{
+                 Ok(resource_type) => {
+                     Ok(ResourcePathAndType {
+                         path,
+                         resource_type
+                     })
+                 }
+                 Err(error) => {
+                     Err(error.into())
+                 }
+             }
+         }
+
+
+        )
+    } )
+}*/
 /*
 pub fn parse_resource_path_with_type_kind_specific_and_property(input: &str) -> Res<&str, (Vec<&str>,Option<ResourceTypeKindSpecificParts>)> {
     context(
