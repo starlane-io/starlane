@@ -2,7 +2,7 @@
 extern crate lazy_static;
 
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -153,7 +153,8 @@ async fn cp(args: ArgMatches<'_>) -> Result<(), Error> {
     let src = args.value_of("src").ok_or("expected src")?;
     let dst = args.value_of("dst").ok_or( "expected dst")?;
 
-    if ResourcePath::from_str(dst ).is_ok() {
+    if dst.contains(":") {
+println!("Resource Path is VALID");
         let dst = ResourcePath::from_str(dst)?;
         let src = Path::new(src );
         // copying from src to dst
@@ -192,6 +193,18 @@ async fn cp(args: ArgMatches<'_>) -> Result<(), Error> {
 
         starlane_api.shutdown();
 
+    } else  if src.contains(":") {
+println!("COPYING FILE to LOCAL!");
+      let src = ResourcePath::from_str(src)?;
+      let content = starlane_api.get_resource_state(src.into()).await?.remove("content").expect("expected 'content' state aspect");
+      let filename = dst.clone();
+      let dst = Path::new(dst );
+      let mut dst = File::create(dst).expect(format!("could not open file for writing: {}", filename ).as_str() );
+      match content {
+          BinSrc::Memory(bin) => {
+              dst.write_all(bin.as_slice() ).expect(format!("could not write to file: {}", filename ).as_str() )
+          }
+      }
     } else {
         unimplemented!("copy from starlane to local not yet supported")
     }
