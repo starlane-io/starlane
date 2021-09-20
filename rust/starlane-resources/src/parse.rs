@@ -325,10 +325,8 @@ pub fn parse_resource_value_selector(input: &str) -> Res<&str, Result<ResourceVa
     )(input).map( |(next_input, (path, property )) | {
         match property {
             Ok(property) => {
-                let mut resource = ResourceSelector::new();
-                resource.add( FieldSelection::Identifier( path.into() ));
                 (next_input, Ok(ResourceValueSelector {
-                    resource,
+                    resource: path,
                     property
                 }))
             }

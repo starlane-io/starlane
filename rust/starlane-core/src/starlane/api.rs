@@ -32,7 +32,7 @@ use crate::star::{Request, StarCommand, StarKind, StarSkel};
 use crate::star::shell::search::SearchInit;
 use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
-use starlane_resources::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, ResourceValue};
+use starlane_resources::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, ResourceValue, ResourceValueSelector, ResourceValues};
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -224,6 +224,30 @@ info!("received reply for {}",description);
         match reply{
             Reply::Records(records) => Ok(records),
             _ => unimplemented!("StarlaneApi::create_resource() did not receive the expected reply from surface_api")
+        }
+    }
+
+
+    pub async fn select_values(
+        &self,
+        path: ResourcePath,
+        selector: ResourcePropertyValueSelector
+    ) -> Result<ResourceValues<ResourceStub>, Error> {
+
+        let mut proto = ProtoMessage::new();
+        proto.to(path.into());
+        proto.from(MessageFrom::Inject);
+        proto.payload = Option::Some(ResourceRequestMessage::SelectValues(selector));
+        let proto = proto.try_into()?;
+
+        let reply = self
+            .surface_api
+            .exchange(proto, ReplyKind::ResourceValues, "StarlaneApi: select_values ")
+            .await?;
+
+        match reply{
+            Reply::ResourceValues(values) => Ok(values),
+            _ => unimplemented!("StarlaneApi::select_values() did not receive the expected reply from surface_api")
         }
     }
 

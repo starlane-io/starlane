@@ -1,35 +1,41 @@
-use crate::{SkewerCase, Resource, ResourceIdentifier, ResourceSelector, ResourceStub, FieldSelection};
+use crate::{SkewerCase, Resource, ResourceIdentifier, ResourceSelector, ResourceStub, FieldSelection, ResourcePath};
 use std::str::FromStr;
 use crate::error::Error;
 use crate::data::{DataSet, BinSrc, Meta};
 use serde::{Serialize,Deserialize};
 use std::collections::HashMap;
+use crate::parse::{parse_resource_property_value_selector, parse_resource_value_selector};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceValueSelector {
-    pub resource: ResourceSelector,
+    pub resource: ResourcePath,
     pub property: ResourcePropertyValueSelector,
 }
 
 impl ResourceValueSelector {
-    pub fn new( resource: ResourceSelector, property: ResourcePropertyValueSelector ) -> Self {
+    pub fn new( resource: ResourcePath, property: ResourcePropertyValueSelector ) -> Self {
         Self{
             resource,
             property
         }
     }
+}
 
-    pub fn from_id( identifier: ResourceIdentifier ) -> Self {
-        let mut resource = ResourceSelector::new();
-        resource.add_field(FieldSelection::Identifier(identifier));
-        Self {
-            resource,
-            property: ResourcePropertyValueSelector::None
+impl FromStr for ResourceValueSelector {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (leftover, selector ) = parse_resource_value_selector(s)?;
+
+        if !leftover.is_empty() {
+            return Err(format!("could not parse ResourceValueSelector: '{}' trailing portion '{}'", s, leftover).into() );
+        } else {
+            return Ok(selector?);
         }
     }
-
-
 }
+
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum DataSetAspectSelector {
@@ -91,6 +97,19 @@ impl ResourcePropertyValueSelector {
             ResourcePropertyValueSelector::None => {
                 ResourceValue::None
             }
+        }
+    }
+}
+
+impl FromStr for ResourcePropertyValueSelector {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (leftover,selector) = parse_resource_property_value_selector(s)?;
+        if !leftover.is_empty() {
+            Err(format!("could not parse entire ResourcePropertyValueSelector: {} because of remaining string: {}", s, leftover ).into())
+        } else {
+            Ok(selector?)
         }
     }
 }
@@ -159,6 +178,44 @@ pub enum ResourceValue {
     Resource(Resource)
 }
 
+impl ToString for ResourceValue {
+    fn to_string(&self) -> String {
+        match self {
+            ResourceValue::None => {
+                "".to_string()
+            }
+            ResourceValue::DataSet(data) => {
+                let mut rtn = String::new();
+                for (k,v) in data {
+                    match v {
+                        BinSrc::Memory(bin) => {
+                            rtn.push_str( String::from_utf8(bin.to_vec()).unwrap_or("UTF ERROR!".to_string() ).as_str() )
+                        }
+                    }
+                }
+                rtn
+            }
+            ResourceValue::BinSrc(v) => {
+                match v {
+                    BinSrc::Memory(bin) => {
+                        String::from_utf8(bin.to_vec()).unwrap_or("UTF ERROR!".to_string() )
+                    }
+                }
+
+            }
+            ResourceValue::String(string) => {
+                string.clone()
+            }
+            ResourceValue::Meta(_) => {
+                "Meta printing not supported yet.".to_string()
+            }
+            ResourceValue::Resource(_) => {
+                "Resource string printing not supported yet.".to_string()
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceValues<R> {
     pub resource: R,
@@ -188,3 +245,5 @@ impl <R> ResourceValues <R> {
        }
   }
 }
+
+
