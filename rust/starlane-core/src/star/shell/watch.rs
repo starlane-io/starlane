@@ -18,7 +18,7 @@ use crate::star::{StarKey, StarSkel};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::variant::FrameVerdict;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use crate::watch::{Notification, Topic, Watch, WatchKey, WatchListener, WatchSelection, WatchStub};
+use crate::watch::{Notification, Topic, Watch, WatchKey, WatchListener, WatchSelector, WatchStub};
 
 #[derive(Clone)]
 pub struct WatchApi {
@@ -46,9 +46,9 @@ impl WatchApi {
         self.tx.try_send(WatchCall::Notify(notification) ).unwrap_or_default();
     }
 
-    pub async fn listen( &self, selection: WatchSelection ) -> Result<WatchListener,Error> {
+    pub async fn listen(&self, selector: WatchSelector) -> Result<WatchListener,Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.try_send(WatchCall::Listen{selection,tx} ).unwrap_or_default();
+        self.tx.try_send(WatchCall::Listen{ selection: selector,tx} ).unwrap_or_default();
         Ok(tokio::time::timeout( Duration::from_secs(15), rx).await??)
     }
 
@@ -61,9 +61,9 @@ pub enum WatchCall {
     Fire(Notification),
     Watch{watch: Watch, session: LaneSession},
     UnWatch(WatchKey),
-    Listen{selection: WatchSelection, tx: oneshot::Sender<WatchListener>},
+    Listen{selection: WatchSelector, tx: oneshot::Sender<WatchListener>},
     UnListen(WatchStub),
-    Next{selection:WatchSelection, next: NextKind },
+    Next{selection: WatchSelector, next: NextKind },
     Notify(Notification)
 }
 
@@ -72,9 +72,9 @@ impl Call for WatchCall {}
 pub struct WatchComponent {
     skel: StarSkel,
     key_to_lane: HashMap<WatchKey,WatchLane>,
-    selection_to_lane: HashMap<WatchSelection,Vec<WatchLane>>,
-    selection_to_next: HashMap<WatchSelection, NextWatch>,
-    listeners: HashMap<WatchSelection,HashMap<WatchKey,mpsc::Sender<Notification>>>,
+    selection_to_lane: HashMap<WatchSelector,Vec<WatchLane>>,
+    selection_to_next: HashMap<WatchSelector, NextWatch>,
+    listeners: HashMap<WatchSelector,HashMap<WatchKey,mpsc::Sender<Notification>>>,
 }
 
 impl WatchComponent {
@@ -125,7 +125,7 @@ impl WatchComponent {
             let watch = WatchLane {
                 key: watch.key,
                 lane,
-                selection: watch.selection
+                selection: watch.selector
             };
 
             self.key_to_lane.insert(watch.key.clone(), watch.clone() );
@@ -181,7 +181,7 @@ impl WatchComponent {
 
 
 
-    fn next( &mut self, selection: WatchSelection, next: NextKind ) {
+    fn next(&mut self, selection: WatchSelector, next: NextKind ) {
         if !self.selection_to_next.contains_key(&selection ) {
             let next = NextWatch::new(next, selection.clone() );
             self.selection_to_next.insert(selection.clone(), next.clone() );
@@ -213,7 +213,7 @@ impl WatchComponent {
     }
 
 
-    fn listen( &mut self, selection: WatchSelection, result_tx: oneshot::Sender<WatchListener> )  {
+    fn listen(&mut self, selection: WatchSelector, result_tx: oneshot::Sender<WatchListener> )  {
         let stub = WatchStub{
             key: WatchKey::new_v4(),
             selection
@@ -282,11 +282,11 @@ impl WatchComponent {
 pub struct NextWatch {
     pub key: WatchKey,
     pub kind: NextKind,
-    pub selection: WatchSelection
+    pub selection: WatchSelector
 }
 
 impl NextWatch {
-    pub fn new(kind: NextKind, selection: WatchSelection) -> Self {
+    pub fn new(kind: NextKind, selection: WatchSelector) -> Self {
         Self{
             key: WatchKey::new_v4(),
             kind,
@@ -299,7 +299,7 @@ impl Into<Watch> for NextWatch {
     fn into(self) -> Watch {
         Watch {
             key: self.key,
-            selection: self.selection
+            selector: self.selection
         }
     }
 }
@@ -315,5 +315,5 @@ pub enum NextKind {
 pub struct WatchLane{
     pub key: WatchKey,
     pub lane: UltimaLaneKey,
-    pub selection: WatchSelection
+    pub selection: WatchSelector
 }

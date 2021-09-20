@@ -21,7 +21,7 @@ use crate::star::StarSkel;
 use crate::starlane::api::{AppApi, MechtronApi, StarlaneApi};
 use starlane_resources::property::{ResourceValueSelector, ResourceValues, ResourcePropertyValueSelector};
 use std::collections::HashMap;
-use crate::status::Status;
+use starlane_resources::status::Status;
 use crate::util::AsyncHashMap;
 
 pub struct AppHost {

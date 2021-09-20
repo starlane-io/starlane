@@ -52,9 +52,9 @@ use crate::star::shell::watch::WatchApi;
 use crate::star::surface::SurfaceApi;
 use crate::star::variant::{FrameVerdict, VariantApi};
 use crate::starlane::StarlaneMachine;
-use crate::status::Status;
+use starlane_resources::status::Status;
 use crate::template::StarTemplateHandle;
-use crate::watch::{Change, Notification, Property, Topic, WatchSelection};
+use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 
 pub mod core;
 pub mod shell;
@@ -559,7 +559,7 @@ impl Star {
         self.status_broadcast.send(status.clone() );
 
         let notification = Notification{
-            selection: WatchSelection { topic: Topic::Star(self.skel.info.key.clone()), property: Property::Status },
+            selection: WatchSelector { topic: Topic::Star(self.skel.info.key.clone()), property: Property::Status },
             changes: vec![Change::Status(status)]
         };
         self.skel.watch_api.fire(notification);

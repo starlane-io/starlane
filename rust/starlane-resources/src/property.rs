@@ -5,6 +5,7 @@ use crate::data::{DataSet, BinSrc, Meta};
 use serde::{Serialize,Deserialize};
 use std::collections::HashMap;
 use crate::parse::{parse_resource_property_value_selector, parse_resource_value_selector};
+use crate::status::Status;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceValueSelector {
@@ -63,7 +64,8 @@ impl DataSetAspectSelector {
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum ResourcePropertyValueSelector {
     None,
-    State{ aspect: DataSetAspectSelector, field: FieldValueSelector }
+    State{ aspect: DataSetAspectSelector, field: FieldValueSelector },
+    Status
 }
 
 impl ResourcePropertyValueSelector {
@@ -95,6 +97,9 @@ impl ResourcePropertyValueSelector {
                 field.filter( selector.filter(resource.state) )
             }
             ResourcePropertyValueSelector::None => {
+                ResourceValue::None
+            }
+            ResourcePropertyValueSelector::Status => {
                 ResourceValue::None
             }
         }
@@ -175,7 +180,8 @@ pub enum ResourceValue {
     BinSrc(BinSrc),
     String(String),
     Meta(Meta),
-    Resource(Resource)
+    Resource(Resource),
+    Status(Status)
 }
 
 impl ToString for ResourceValue {
@@ -211,6 +217,9 @@ impl ToString for ResourceValue {
             }
             ResourceValue::Resource(_) => {
                 "Resource string printing not supported yet.".to_string()
+            }
+            ResourceValue::Status(status) => {
+                status.to_string()
             }
         }
     }

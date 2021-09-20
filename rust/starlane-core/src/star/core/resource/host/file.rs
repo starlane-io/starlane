@@ -43,7 +43,6 @@ impl Host for FileHost {
             _ => {
                 return Err("File must specify Direct state".into() )
             }
-
         };
 
         let assign = ResourceAssign {

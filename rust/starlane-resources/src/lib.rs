@@ -30,6 +30,7 @@ pub mod parse;
 pub mod message;
 pub mod http;
 pub mod property;
+pub mod status;
 
 pub enum Galaxy{
     Local,

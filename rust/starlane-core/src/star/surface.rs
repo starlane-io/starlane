@@ -10,11 +10,12 @@ use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
 use crate::frame::{Reply, ReplyKind};
 use crate::message::ProtoStarMessage;
-use crate::resource::ResourceRecord;
+use crate::resource::{ResourceRecord, ResourceKey};
 use crate::star::{StarCommand, StarSkel};
 use crate::star::shell::locator::ResourceLocateCall;
 use crate::star::shell::message::MessagingCall;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
+use crate::watch::{WatchSelector, Notification, Topic, Watch, WatchResourceSelector, WatchListener};
 
 #[derive(Clone)]
 pub struct SurfaceApi {
@@ -53,6 +54,12 @@ impl SurfaceApi {
         Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
     }
 
+    pub async fn watch( &self, selector: WatchResourceSelector) -> Result<WatchListener, Error> {
+        let (tx, rx) = oneshot::channel();
+        self.tx.try_send(SurfaceCall::Watch{selector, tx})?;
+        tokio::time::timeout(Duration::from_secs(15), rx).await??
+    }
+
     pub async fn get_caches(&self) -> Result<Arc<ProtoArtifactCachesFactory>, Error> {
         let (tx, rx) = oneshot::channel();
         self.tx.try_send(SurfaceCall::GetCaches(tx))?;
@@ -74,6 +81,8 @@ pub enum SurfaceCall {
         tx: oneshot::Sender<Result<Reply, Error>>,
         description: String,
     },
+    Watch{ selector: WatchResourceSelector, tx: oneshot::Sender<Result<WatchListener,Error>> }
+
 }
 
 impl Call for SurfaceCall {}
@@ -131,6 +140,23 @@ impl AsyncProcessor<SurfaceCall> for SurfaceComponent {
                     .tx
                     .try_send(ResourceLocateCall::Locate { identifier, tx })
                     .unwrap_or_default();
+            }
+            SurfaceCall::Watch { selector, tx } => {
+                        let selector = match self.skel.resource_locator_api.fetch_resource_key(selector.resource.clone()).await
+                        {
+                            Ok(key) => {
+                                WatchSelector{
+                                    topic: Topic::Resource(key),
+                                    property: selector.property
+                                }
+                            }
+                            Err(err) => {
+                                tx.send( Result::Err(err.into()) );
+                                return;
+                            }
+                        };
+
+                tx.send(self.skel.watch_api.listen( selector ).await);
             }
         }
     }

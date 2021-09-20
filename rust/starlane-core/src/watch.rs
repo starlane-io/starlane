@@ -10,33 +10,41 @@ use starlane_resources::ResourceIdentifier;
 use crate::resource::ResourceKey;
 use crate::star::shell::watch::WatchApi;
 use crate::star::StarKey;
-use crate::status::Status;
+use starlane_resources::status::Status;
+use std::hash::Hash;
 
 pub type WatchKey = Uuid;
 
 #[derive(Debug,Clone,Serialize,Deserialize)]
 pub struct Watch{
     pub key: WatchKey,
-    pub selection: WatchSelection
+    pub selector: WatchSelector
 }
 
 impl Watch {
-    pub fn new(selection: WatchSelection) -> Self {
+    pub fn new(selection: WatchSelector) -> Self {
         Self {
             key: WatchKey::new_v4(),
-            selection
+            selector: selection
         }
     }
 }
 
 #[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
-pub struct WatchSelection {
+pub struct WatchResourceSelector {
+    pub resource: ResourceIdentifier,
+    pub property: Property
+}
+
+
+#[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
+pub struct WatchSelector {
   pub topic: Topic,
   pub property: Property
 }
 
 #[derive(Debug,Clone,Serialize,Deserialize,strum_macros::Display,Hash,Eq,PartialEq)]
-pub enum Topic {
+pub enum Topic{
     Resource(ResourceKey),
     Star(StarKey),
 }
@@ -50,7 +58,7 @@ pub enum Property {
 
 #[derive(Debug,Clone,Serialize,Deserialize)]
 pub struct Notification{
-    pub selection: WatchSelection,
+    pub selection: WatchSelector,
     pub changes: Vec<Change>
 }
 
@@ -70,7 +78,7 @@ pub enum ChildChange{
 #[derive(Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct WatchStub{
     pub key: WatchKey,
-    pub selection: WatchSelection
+    pub selection: WatchSelector
 }
 
 pub struct WatchListener {

@@ -58,7 +58,6 @@ pub mod starlane;
 pub mod template;
 pub mod util;
 pub mod watch;
-pub mod status;
 pub mod mechtron;
 mod wasm;
 

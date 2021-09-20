@@ -51,7 +51,8 @@ fn main() -> Result<(), Error> {
                                                             SubCommand::with_name("cp").usage("copy a file").args(vec![Arg::with_name("src").takes_value(true).index(1).required(true).help("the source file [local file or starlane resource address]"),Arg::with_name("dst").takes_value(true).index(2).required(true).help("the  destination [local file or starlane resource address]")].as_slice()),
                                                             SubCommand::with_name("create").usage("create a resource").setting(clap::AppSettings::TrailingVarArg).args(vec![Arg::with_name("address").required(true).help("address of your new resource"),Arg::with_name("create-args").multiple(true).required(false)].as_slice()),
                                                             SubCommand::with_name("ls").usage("list resources").args(vec![Arg::with_name("address").required(true).help("the resource address to list"),Arg::with_name("child-pattern").required(false).help("a pattern describing the children to be listed .i.e '<File>' for returning resource type File")].as_slice()),
-                                                            SubCommand::with_name("get").usage("get resources property value").args(vec![Arg::with_name("address").required(true).help("the resource property value")].as_slice())
+                                                            SubCommand::with_name("get").usage("get resources property value").args(vec![Arg::with_name("address").required(true).help("the resource property value")].as_slice()),
+                                                            SubCommand::with_name("watch").usage("watch resources property value for changes").args(vec![Arg::with_name("address").required(true).help("the resource property value to watch")].as_slice())
     ]);
 
     let matches = clap_app.clone().get_matches();
@@ -313,6 +314,21 @@ async fn get(args: ArgMatches<'_>) -> Result<(), Error> {
 
     Ok(())
 }
+
+async fn watch(args: ArgMatches<'_>) -> Result<(), Error> {
+    let address = ResourceValueSelector::from_str(
+        args.value_of("address")
+            .ok_or("expected resource property value address")?,
+    )?;
+    let starlane_api = starlane_api().await?;
+
+
+    starlane_api.shutdown();
+
+    Ok(())
+}
+
+
 pub async fn starlane_api() -> Result<StarlaneApi, Error> {
     let starlane = StarlaneMachine::new("client".to_string()).unwrap();
     let mut layout = ConstellationLayout::client("host".to_string())?;

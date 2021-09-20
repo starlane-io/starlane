@@ -20,7 +20,8 @@ use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::message::resource::Delivery;
 use crate::star::core::resource::host::kube::KubeHost;
 use crate::star::core::resource::host::file::FileHost;
-use starlane_resources::property::{ResourceValueSelector, ResourceValues, ResourcePropertyValueSelector};
+use starlane_resources::property::{ResourceValueSelector, ResourceValues, ResourcePropertyValueSelector, ResourceValue};
+use starlane_resources::status::Status;
 
 pub mod artifact;
 mod default;
@@ -186,6 +187,11 @@ pub trait Host: Send + Sync {
             }
             ResourcePropertyValueSelector::None => {
                 Ok(Option::Some(ResourceValues::empty(key)))
+            }
+            ResourcePropertyValueSelector::Status => {
+                let mut values = HashMap::new();
+                values.insert(selector, ResourceValue::Status(Status::Unknown));
+                Ok(Option::Some(ResourceValues::new( key, values )))
             }
         }
     }
