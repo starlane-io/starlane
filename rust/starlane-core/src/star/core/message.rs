@@ -103,6 +103,7 @@ info!("Received PORT request!");
             ) -> Result<(), Error> {
                 match delivery.payload.payload.clone() {
                     ResourceRequestMessage::Create(create) => {
+println!("Create...{}", create.archetype.kind.to_string() );
                         let parent_key = match create
                             .parent
                             .clone()
@@ -144,11 +145,12 @@ info!("Received PORT request!");
                         delivery.reply(Reply::Records(resources))
                     }
                     ResourceRequestMessage::Unique(resource_type) => {
+                        let resource = skel.resource_locator_api.locate(delivery.payload.to.clone() ).await?;
                         let unique_src = skel
                             .registry
                             .as_ref()
                             .unwrap()
-                            .unique_src(delivery.payload.to.clone().into())
+                            .unique_src(resource.stub.archetype.kind.resource_type(), delivery.payload.to.clone().into())
                             .await;
                         delivery.reply(Reply::Id(unique_src.next(&resource_type).await?));
                     }
@@ -251,21 +253,29 @@ info!("Received PORT request!");
                         unimplemented!()
                     }
                     RegistryAction::UniqueResourceId { parent, child_type } => {
-                        let unique_src = skel
-                            .registry
-                            .as_ref()
-                            .unwrap()
-                            .unique_src(parent.clone())
-                            .await;
-                        let result: Result<ResourceId, Error> = unique_src.next(child_type).await;
-                        match result {
-                            Ok(id) => {
-                                delivery.reply(Reply::Id(id));
+                        match skel.resource_locator_api.locate(parent.clone() ).await {
+                            Ok(parent) => {
+                                let unique_src = skel
+                                    .registry
+                                    .as_ref()
+                                    .unwrap()
+                                    .unique_src(parent.stub.archetype.kind.resource_type(), parent.stub.key.into() )
+                                    .await;
+                                let result: Result<ResourceId, Error> = unique_src.next(child_type).await;
+                                match result {
+                                    Ok(id) => {
+                                        delivery.reply(Reply::Id(id));
+                                    }
+                                    Err(fail) => {
+                                        delivery.fail(fail.into());
+                                    }
+                                }
                             }
                             Err(fail) => {
                                 delivery.fail(fail.into());
                             }
                         }
+
                     }
                 }
             }

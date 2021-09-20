@@ -68,7 +68,7 @@ println!("artifact : {}", artifact.to_string());
 
         println!("App config loaded!");
 
-        println!("main: {}", app_config.main.address.to_string() );
+        println!("main: {}", app_config.main.path.to_string() );
 
 
 
@@ -92,7 +92,7 @@ println!("CREATE APP create()");
             let app_config = caches.app_configs.get(&app_config_artifact).ok_or::<Error>(format!("expected app_config").into())?;
 println!("SO FAR SO GOOD");
             let app_api = AppApi::new( self.skel.surface_api.clone(), record.stub.clone() )?;
-            match app_api.create_mechtron("main", app_config.main.address.clone() )?.submit().await {
+            match app_api.create_mechtron("main", app_config.main.path.clone() )?.submit().await {
                 Ok(_) => {}
                 Err(err) => {
                     eprintln!("potential non-fatal error when creating mechtron: {}", err.to_string());

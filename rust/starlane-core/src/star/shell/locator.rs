@@ -9,7 +9,7 @@ use lru::LruCache;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
-use starlane_resources::{ResourceArchetype, ResourceIdentifier, ResourceStub};
+use starlane_resources::{ResourceArchetype, ResourceIdentifier, ResourceStub, ResourcePath};
 use starlane_resources::message::Fail;
 
 use crate::frame::{RegistryAction, Reply, ReplyKind, SimpleReply, StarMessagePayload};
@@ -44,7 +44,7 @@ impl ResourceLocatorApi {
     pub async fn fetch_resource_address(
         &self,
         identifier: ResourceIdentifier,
-    ) -> Result<ResourceAddress, Fail> {
+    ) -> Result<ResourcePath, Fail> {
         match self.locate(identifier).await {
             Ok(record) => Ok(record.stub.address),
             Err(fail) => Err(fail.into()),
@@ -75,7 +75,7 @@ impl ResourceLocatorApi {
         }
     }
 
-    pub async fn as_address(&self, identifier: ResourceIdentifier) -> Result<ResourceAddress, Error> {
+    pub async fn as_address(&self, identifier: ResourceIdentifier) -> Result<ResourcePath, Error> {
         match identifier{
             ResourceIdentifier::Key(key) => {
                 let record = self.locate(key.into()).await?;
@@ -143,7 +143,7 @@ impl Call for ResourceLocateCall {}
 pub struct ResourceLocatorComponent {
     skel: StarSkel,
     resource_record_cache: LruCache<ResourceKey, ResourceRecord>,
-    resource_address_to_key: LruCache<ResourceAddress, ResourceKey>,
+    resource_address_to_key: LruCache<ResourcePath, ResourceKey>,
 }
 
 impl ResourceLocatorComponent {
@@ -230,7 +230,7 @@ impl ResourceLocatorComponent {
             let record = ResourceRecord::new(
                 ResourceStub {
                     key: ResourceKey::Root,
-                    address: ResourceAddress::root(),
+                    address: ResourcePath::root(),
                     archetype: ResourceArchetype {
                         kind: ResourceKind::Root,
                         specific: None,

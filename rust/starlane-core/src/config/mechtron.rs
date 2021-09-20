@@ -1,4 +1,4 @@
-use crate::resource::{ArtifactAddress, ResourceKind, ResourceAddress,ArtifactKind};
+use crate::resource::{ResourceKind, ResourceAddress,ArtifactKind};
 use crate::artifact::ArtifactRef;
 use crate::cache::{Cacheable, Data};
 use crate::resource::config::{ResourceConfig, Parser};
@@ -7,11 +7,12 @@ use std::sync::Arc;
 use crate::error::Error;
 use std::str::FromStr;
 use std::convert::TryInto;
+use starlane_resources::ResourcePath;
 
 pub struct MechtronConfig {
     pub name: String,
     pub prefix: String,
-    pub artifact: ArtifactAddress,
+    pub artifact: ResourcePath,
     pub bind: ArtifactRef,
     pub wasm: ArtifactRef,
 }
@@ -19,7 +20,7 @@ pub struct MechtronConfig {
 impl Cacheable for MechtronConfig {
     fn artifact(&self) -> ArtifactRef {
         ArtifactRef {
-            address: self.artifact.clone(),
+            path: self.artifact.clone(),
             kind: ArtifactKind::MechtronConfig,
         }
     }
@@ -49,19 +50,19 @@ impl Parser<MechtronConfig> for MechtronConfigParser {
         let data = String::from_utf8((*_data).clone() )?;
         let yaml: MechtronConfigYaml = serde_yaml::from_str( data.as_str() )?;
 
-        let address: ResourceAddress  = artifact.address.clone().into();
+        let address = artifact.path.clone();
         let bundle_address = address.parent().ok_or::<Error>("expected artifact to have bundle parent".into())?;
 
-        let bind = yaml.spec.bind.replace("{bundle}", bundle_address.to_parts_string().as_str() );
-        let bind= ResourceAddress::from_str(format!("{}<Artifact>",bind).as_str() )?;
+        let bind = yaml.spec.bind.replace("{bundle}", bundle_address.to_string().as_str() );
+        let bind= ResourcePath::from_str(bind.as_str() )?;
         let bind = ArtifactRef::new(bind.try_into()?,ArtifactKind::BindConfig);
 
-        let wasm = yaml.spec.wasm.replace("{bundle}", bundle_address.to_parts_string().as_str() );
-        let wasm= ResourceAddress::from_str(format!("{}<Artifact>",wasm).as_str() )?;
+        let wasm = yaml.spec.wasm.replace("{bundle}", bundle_address.to_string().as_str() );
+        let wasm= ResourcePath::from_str(wasm.as_str() )?;
         let wasm = ArtifactRef::new(wasm.try_into()?,ArtifactKind::Wasm);
 
         Ok(Arc::new(MechtronConfig {
-            artifact: artifact.address,
+            artifact: artifact.path,
             bind,
             wasm,
             name: yaml.spec.name,

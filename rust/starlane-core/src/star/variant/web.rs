@@ -23,6 +23,7 @@ use std::sync::Arc;
 use starlane_resources::message::{ProtoMessage, ResourcePortMessage,MessageFrom};
 use std::convert::TryInto;
 use crate::frame::Reply;
+use starlane_resources::ResourcePath;
 
 
 pub struct WebVariant {
@@ -149,7 +150,7 @@ info!("body offset: {}", body_offset);
 
 
     let mut proto = ProtoMessage::new();
-    proto.to = Option::Some(ResourceAddress::from_str("hyperspace:starlane:appy:main<Mechtron>")?.into());
+    proto.to = Option::Some(ResourcePath::from_str("hyperspace:starlane:appy:main")?.into());
     proto.from = Option::Some(MessageFrom::Inject);
     proto.payload = Option::Some(ResourcePortMessage {
         port: "web".to_string(),

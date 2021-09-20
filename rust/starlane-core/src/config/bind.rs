@@ -1,4 +1,4 @@
-use crate::resource::{ArtifactAddress, ResourceKind, ResourceAddress,ArtifactKind};
+use crate::resource::{ResourceKind, ResourceAddress,ArtifactKind};
 use crate::artifact::ArtifactRef;
 use crate::cache::{Cacheable, Data};
 use crate::resource::config::{ResourceConfig, Parser};
@@ -7,16 +7,17 @@ use std::sync::Arc;
 use crate::error::Error;
 use std::str::FromStr;
 use std::convert::TryInto;
+use starlane_resources::ResourcePath;
 
 pub struct BindConfig {
-    pub artifact: ArtifactAddress,
+    pub artifact: ResourcePath,
     pub message: Message
 }
 
 impl Cacheable for BindConfig {
     fn artifact(&self) -> ArtifactRef {
         ArtifactRef {
-            address: self.artifact.clone(),
+            path: self.artifact.clone(),
             kind: ArtifactKind::BindConfig
         }
     }
@@ -78,7 +79,7 @@ impl Parser<BindConfig> for BindConfigParser {
         let data = String::from_utf8((*_data).clone() )?;
         let yaml: BindConfigYaml = serde_yaml::from_str( data.as_str() )?;
 
-        let address: ResourceAddress  = artifact.address.clone().into();
+        let address = artifact.path.clone();
         let bundle_address = address.parent().ok_or::<Error>("expected artifact to have bundle parent".into())?;
 
         // validate
@@ -89,7 +90,7 @@ impl Parser<BindConfig> for BindConfigParser {
         }
 
         Ok(Arc::new(BindConfig {
-            artifact: artifact.address,
+            artifact: artifact.path,
             message: Message {
                 inbound: Inbound {
                     ports: yaml.spec.message.inbound.ports.iter().map( |p| Port {

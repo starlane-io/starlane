@@ -261,6 +261,7 @@ fn to_idents(list: &MetaList) -> Vec<Ident> {
     idents
 }
 
+
 #[proc_macro]
 pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let parsed = parse_macro_input!(input as ResourceParser);
@@ -271,6 +272,13 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         .map(|resource| resource.get_ident())
         .collect();
 
+    let requires_kind: Vec<Ident> = parsed
+        .resources
+        .iter()
+        .map(|resource| Ident::new(format!("{}",parsed.kind_for(resource).is_some()).as_str(), resource.get_ident().span())  )
+        .collect();
+
+
     let resource_type_enum_def = quote! {
         #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
         pub enum ResourceType {
@@ -279,6 +287,13 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
          }
 
         impl ResourceType {
+            pub fn requires_kind(&self) -> bool {
+                match self {
+                    Self::Root => false,
+                    #(Self::#rts => #requires_kind),*
+                }
+            }
+
             pub fn to_resource_id( &self, id: u64 ) -> ResourceId {
                 match self {
                     Self::Root => ResourceId::Root,
@@ -319,6 +334,22 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     // vector matchin doesn't actually seem to work as expected
     let mut pathways = String::new();
     pathways.push_str("impl ResourceType {");
+    pathways.push_str("pub fn path_segment_kind( &self ) -> ResourcePathSegmentKind {");
+
+    pathways.push_str("match self {");
+    pathways.push_str("Self::Root => ResourcePathSegmentKind::Root,");
+    for resource in &parsed.resources {
+        let _ident = resource.get_ident();
+        pathways.push_str(format!("Self::{} => {{", resource.get_ident().to_string()).as_str());
+        pathways.push_str("ResourcePathSegmentKind::");
+        pathways.push_str(resource.path_part.as_ref().expect("expected a path part").to_string().as_str());
+        pathways.push_str("}");
+    }
+    pathways.push_str("}");
+
+
+
+        pathways.push_str("}");
     pathways.push_str("pub fn parent_path_matcher( &self, path: Vec<ResourcePathSegmentKind> ) -> Result<ResourceType,Error> {");
     pathways.push_str("match self { ");
     pathways.push_str("Self::Root => Err(\"Root does not have a parent to match\".into()),");
@@ -437,12 +468,12 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     println!("resources_def.len() {}", resources_def.len());
 
     let keys = keys(&parsed);
-    let identifiers = identifiers(&parsed);
+//    let identifiers = identifiers(&parsed);
     let ids = ids(&parsed);
 
     let kinds = kinds(&parsed);
 
-    let paths = paths(&parsed);
+//    let paths = paths(&parsed);
     /*
     proc_macro::TokenStream::from( quote!{
        #extras
@@ -459,15 +490,14 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     proc_macro::TokenStream::from(quote! {
        #resource_type_enum_def
        #(#resources_def)*
-       #identifiers
        #ids
        #kinds
        #keys
-       #paths
 
        #resource_impl_def
     })
 }
+/*
 fn paths(parsed: &ResourceParser) -> TokenStream {
     let mut paths = vec![];
     for resource in &parsed.resources {
@@ -549,12 +579,6 @@ fn paths(parsed: &ResourceParser) -> TokenStream {
 
         }
 
-        impl Into<ResourcePath> for RootPath{
-            fn into(self) -> ResourcePath {
-                ResourcePath::Root
-            }
-        }
-
         impl TryFrom<Vec<ResourcePathSegment>> for RootPath{
             type Error=Error;
             fn try_from( parts: Vec<ResourcePathSegment> ) -> Result<RootPath,Self::Error> {
@@ -589,28 +613,11 @@ fn paths(parsed: &ResourceParser) -> TokenStream {
            }
         }
 
-          impl Into<ResourcePath> for #path_idents3 {
-                fn into(self) -> ResourcePath{
-                    ResourcePath::#idents2(self)
-                }
-           }
-
           impl Into<Vec<ResourcePathSegment>> for #path_idents3 {
                 fn into(self) -> Vec<ResourcePathSegment> {
                   self.parts
                 }
           }
-
-          impl TryFrom<ResourcePath> for #path_idents3 {
-                type Error=Error;
-                fn try_from( path: ResourcePath ) -> Result<Self,Self::Error> {
-                    if let ResourcePath::#idents( rtn ) = path {
-                        Ok(rtn)
-                    } else {
-                        Err("could not convert ResourcePath to #ident".into())
-                    }
-                }
-            }
 
             impl Into<ResourceIdentifier> for #path_idents{
                 fn into(self) -> ResourceIdentifier {
@@ -774,6 +781,8 @@ fn paths(parsed: &ResourceParser) -> TokenStream {
     //#(ResourceType::#idents => Ok(Option::Some(#path_idents::parent()?.unwrap().into())) ),*
 }
 
+ */
+
 fn kinds(parsed: &ResourceParser) -> TokenStream {
     let mut kind_stuff = vec![];
 
@@ -875,7 +884,15 @@ fn kinds(parsed: &ResourceParser) -> TokenStream {
             );
             from_parts.push_str("type Error=Error;");
             from_parts.push_str("fn try_from(parts: ResourceKindParts)->Result<Self,Self::Error>{");
-            from_parts.push_str("match parts.kind.ok_or(\"expected kind\")?.as_str() {");
+            if parsed.kind_for(resource).is_some() {
+                from_parts.push_str(format!("match parts.kind.ok_or(\"kind must be specified for {}. i.e.: <Type<Kind>>\")?.as_str() {{", resource.get_ident().to_string()).as_str());
+            } else {
+                from_parts.push_str(format!("if parts.kind.is_some() {{  return Err(\"resource type <{}> does not have a kind\".into());}}", resource.get_ident().to_string() ).as_str() );
+
+                from_parts.push_str(format!("Self::{}",resource.get_ident().to_string()).as_str() );
+
+
+            }
 
             let mut into_parts = String::new();
             into_parts.push_str(
@@ -905,7 +922,7 @@ fn kinds(parsed: &ResourceParser) -> TokenStream {
                 }
 
                 if !variant.fields.is_empty() {
-                    from_parts.push_str(format!("\"{}\" => Ok(Self::{}(parts.specific.ok_or(\"expected a specific\")?)),", variant.ident.to_string(), variant.ident.to_string()).as_str());
+                    from_parts.push_str(format!("\"{}\" => Ok(Self::{}(parts.specific.ok_or(\"<{}> Kind expected a Specific: <Type<Kind<Specific>>>\")?)),", variant.ident.to_string(), variant.ident.to_string(), resource.get_ident().to_string(), ).as_str());
                 } else {
                     from_parts.push_str(
                         format!(
@@ -1483,6 +1500,7 @@ fn extras() -> TokenStream {
         }
 }
 
+/*
 fn identifiers(parsed: &ResourceParser) -> TokenStream {
     let _idents: Vec<Ident> = parsed
         .resources
@@ -1567,6 +1585,7 @@ fn identifiers(parsed: &ResourceParser) -> TokenStream {
 
     }
 }
+ */
 
 fn ids(parsed: &ResourceParser) -> TokenStream {
     let idents: Vec<Ident> = parsed

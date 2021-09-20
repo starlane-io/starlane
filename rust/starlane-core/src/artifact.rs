@@ -5,14 +5,11 @@ use serde::{Deserialize, Serialize};
 use crate::error::Error;
 
 use crate::resource::{
-    ArtifactAddress, ArtifactBundleAddress, ArtifactBundleKey, ArtifactKey, ArtifactKind, Path,
+    ArtifactBundleKey, ArtifactKey, ArtifactKind, Path,
     ResourceAddress, ResourceAddressPart, ResourceKey, ResourceType, SubSpaceKey,
 };
+use starlane_resources::ResourcePath;
 
-pub enum ArtifactIdentifier {
-    Key(ArtifactKey),
-    Address(ArtifactAddress),
-}
 
 #[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct ArtifactBundle {
@@ -189,17 +186,22 @@ impl SubSpaceName {
     }
 }
 
+
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct ArtifactRef {
-    pub address: ArtifactAddress,
+    pub path: ResourcePath,
     pub kind: ArtifactKind,
 }
 
 impl ArtifactRef {
-    pub fn new(address: ArtifactAddress, kind: ArtifactKind) -> Self {
+    pub fn new(path: ResourcePath, kind: ArtifactKind) -> Self {
         Self {
-            address: address,
-            kind: kind,
+            path,
+            kind,
         }
+    }
+
+    pub fn trailing_path(&self) -> Result<Path,Error> {
+        Ok(Path::from_str(self.path.segments.last().as_ref().ok_or("expected one ResourcePath segment")?.as_str())?)
     }
 }

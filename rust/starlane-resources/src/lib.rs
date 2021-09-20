@@ -14,6 +14,7 @@ use nom::combinator::{not, opt};
 use nom::error::{context, ErrorKind, VerboseError};
 use nom::multi::{many1, many_m_n, separated_list0, separated_list1};
 use nom::sequence::{delimited, preceded, terminated, tuple};
+use semver::SemVerError;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -22,7 +23,6 @@ use starlane_macros::resources;
 use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
 use crate::message::Fail;
-use semver::SemVerError;
 
 pub mod data;
 pub mod error;
@@ -36,40 +36,42 @@ pub enum Galaxy{
     Exact(DomainCase)
 }
 
-
+//pub type ResourcePath=crate::parse::ParsedResourcePath;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct ResourceAddress {
-    path: ResourcePath,
+    path: ResourcePathAndType,
 }
 
 impl ResourceAddress {
     pub fn root() -> Self {
-        ResourcePath::Root.into()
+        ResourcePathAndType::root().into()
     }
 
-    pub fn new(path: ResourcePath) -> Self {
+    pub fn new(path: ResourcePathAndType ) -> Self {
         Self { path: path }
     }
 
+    /*
     pub fn append(&self, string: String, resource_type: ResourceType) -> Result<Self, Error> {
-        let address = format!(
-            "{}:{}<{}>",
+        let path = format!(
+            "{}:{}",
             self.path.to_string(),
-            string,
-            resource_type.to_string()
+            string
         );
-        let path = ResourcePath::from_str(address.as_str())?;
+        let path = ResourcePath::from_str(path.as_str())?;
+        let path_and_kind = ResourcePathAndKind::new( path )
         Ok(Self { path: path })
-    }
+    }*/
 
-    pub fn parent(&self) -> Option<ResourceAddress> {
+    pub fn parent(&self) -> Option<ResourcePath> {
         match self.path.parent() {
             Option::None => Option::None,
             Option::Some(parent) => Option::Some(parent.into()),
         }
     }
 
+    /*
     pub fn ancestor_of_type(&self, resource_type: ResourceType) -> Result<ResourceAddress, Error> {
         if self.resource_type() == resource_type {
             return Ok(self.clone());
@@ -83,17 +85,10 @@ impl ResourceAddress {
             .into())
         }
     }
-
-    pub fn sub_space(&self) -> Result<ResourceAddress, Error> {
-        self.ancestor_of_type(ResourceType::SubSpace)
-    }
-
-    pub fn space(&self) -> Result<ResourceAddress, Error> {
-        self.ancestor_of_type(ResourceType::Space)
-    }
+     */
 
     pub fn resource_type(&self) -> ResourceType {
-        self.path.resource_type()
+        self.path.resource_type.clone()
     }
 
     pub fn to_parts_string(&self) -> String {
@@ -123,12 +118,12 @@ impl FromStr for ResourceAddress {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(ResourcePath::from_str(s)?.into())
+        Ok(ResourcePathAndType::from_str(s)?.into())
     }
 }
 
-impl From<ResourcePath> for ResourceAddress {
-    fn from(path: ResourcePath) -> Self {
+impl From<ResourcePathAndType> for ResourceAddress {
+    fn from(path: ResourcePathAndType ) -> Self {
         Self { path: path }
     }
 }
@@ -184,22 +179,17 @@ impl ResourceKey {
     }
 }
 
-impl ResourceKind {
-    pub fn init_clap_config(&self) -> Option<ArtifactPath> {
-        Option::None
-    }
-}
 
+/*
 pub struct ResourceAddressKind {
-    path: ResourcePath,
-    kind: ResourceKind,
+    path: ResourcePathAndKind,
 }
 
 impl ResourceAddressKind {
-    pub fn new(path: ResourcePath, kind: ResourceKind) -> Self {
+    pub fn new(path: ParsedResourcePath, kind: ResourceKind) -> Self {
+        let path = ResourcePathAndKind::new(path,kind);
         Self {
             path: path,
-            kind: kind,
         }
     }
 
@@ -218,7 +208,7 @@ impl FromStr for ResourceAddressKind {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let path = ResourcePath::from_str(s)?;
+        let path = ResourcePathAndKind::from_str(s)?;
         let (_leftover, (_, kind)) = parse_path(s)?;
         Ok(Self {
             path: path,
@@ -226,6 +216,8 @@ impl FromStr for ResourceAddressKind {
         })
     }
 }
+j
+ */
 
 pub type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
@@ -320,15 +312,56 @@ fn host(input: &str) -> Res<&str, String> {
     })
 }
 
+impl From<DomainCase> for DomainOrSkewerCase {
+    fn from(domain: DomainCase) -> Self {
+        Self {
+            string: domain.to_string()
+        }
+    }
+}
+
+impl From<SkewerCase> for DomainOrSkewerCase {
+    fn from(skewer: SkewerCase) -> Self {
+        Self {
+            string: skewer.to_string()
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub struct DomainOrSkewerCase {
+    string: String,
+}
+
+impl FromStr for DomainOrSkewerCase {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (remaining, domain_or_skewer) = domain_or_skewer(s)?;
+        if remaining.len() > 0 {
+            Err(format!("remainig text '{}' when parsing domain-or-skewer-case: '{}'", remaining, s).into())
+        } else {
+            Ok(domain_or_skewer)
+        }
+    }
+}
+
+impl ToString for DomainOrSkewerCase {
+    fn to_string(&self) -> String {
+        self.string.clone()
+    }
+}
+
+
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct DomainCase {
     string: String,
 }
 
 impl DomainCase {
-    fn new(string: &str) -> Self {
-        Self {
-            string: string.to_string(),
+    pub fn new( string: &str ) -> Self {
+        DomainCase{
+            string: string.to_string()
         }
     }
 }
@@ -351,6 +384,18 @@ impl ToString for DomainCase {
         self.string.clone()
     }
 }
+
+fn domain_or_skewer(input: &str) -> Res<&str, DomainOrSkewerCase> {
+    context(
+        "domain_or_skewer",
+        alt( ( skewer_segment, domain_segment ) ),
+    )(input)
+        .map(|(next_input, mut res)| {
+            let domain_or_skewer = DomainOrSkewerCase{ string: res.to_string() };
+            (next_input,domain_or_skewer)
+        })
+}
+
 
 fn domain(input: &str) -> Res<&str, DomainCase> {
     context(
@@ -476,7 +521,7 @@ pub fn parse_key(input: &str) -> Res<&str, Vec<ResourcePathSegment>> {
         "key",
         separated_list1(
             nom::character::complete::char(':'),
-            alt((path_part, version_part, domain_part, skewer_part)),
+            alt((path_segment, version_segment, domain_segment, skewer_segment)),
         ),
     )(input)
 }
@@ -486,10 +531,18 @@ pub fn parse_resource_path(input: &str) -> Res<&str, Vec<ResourcePathSegment>> {
         "address-path",
         separated_list0(
             nom::character::complete::char(':'),
-            alt((path_part, version_part, domain_part, skewer_part)),
+            alt((path_segment, version_segment, domain_segment, skewer_segment)),
         ),
     )(input)
 }
+
+pub fn parse_path_segment(input: &str) -> Res<&str, ResourcePathSegment> {
+    context(
+        "parse_path_segment",
+            alt((path_segment, version_segment, domain_segment, skewer_segment)),
+    )(input)
+}
+
 
 pub fn parse_path(input: &str) -> Res<&str, (Vec<ResourcePathSegment>, ResourceKindParts)> {
     context("address", tuple((parse_resource_path, parse_kind)))(input)
@@ -512,22 +565,22 @@ fn skewer(input: &str) -> Res<&str, SkewerCase> {
         .map(|(input, skewer)| (input, SkewerCase::new(skewer)))
 }
 
-fn skewer_part(input: &str) -> Res<&str, ResourcePathSegment> {
+fn skewer_segment(input: &str) -> Res<&str, ResourcePathSegment> {
     context("skewer-case-part", skewer)(input)
         .map(|(input, skewer)| (input, ResourcePathSegment::SkewerCase(skewer)))
 }
 
-fn version_part(input: &str) -> Res<&str, ResourcePathSegment> {
+fn version_segment(input: &str) -> Res<&str, ResourcePathSegment> {
     context("version-part", version)(input)
         .map(|(input, version)| (input, ResourcePathSegment::Version(version)))
 }
 
-fn domain_part(input: &str) -> Res<&str, ResourcePathSegment> {
+fn domain_segment(input: &str) -> Res<&str, ResourcePathSegment> {
     context("domain-part", domain)(input)
         .map(|(input, domain)| (input, ResourcePathSegment::Domain(domain)))
 }
 
-fn path_part(input: &str) -> Res<&str, ResourcePathSegment> {
+fn path_segment(input: &str) -> Res<&str, ResourcePathSegment> {
     context("path-part", path)(input).map(|(input, path)| (input, ResourcePathSegment::Path(path)))
 }
 
@@ -612,11 +665,7 @@ impl FromStr for ResourceKindParts {
     }
 }
 
-impl Into<ResourceAddress> for ResourceAddressKind {
-    fn into(self) -> ResourceAddress {
-        self.path.into()
-    }
-}
+
 
 /*
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -699,9 +748,11 @@ impl FromStr for SkewerCase {
 pub enum ResourcePathSegmentKind {
     Domain,
     SkewerCase,
+    DomainOrSkewerCase,
     Email,
     Version,
     Path,
+    Root,
 }
 
 impl ToString for ResourcePathSegmentKind {
@@ -712,6 +763,8 @@ impl ToString for ResourcePathSegmentKind {
             ResourcePathSegmentKind::Version => "Version".to_string(),
             ResourcePathSegmentKind::Path => "Path".to_string(),
             ResourcePathSegmentKind::Email => "Email".to_string(),
+            ResourcePathSegmentKind::Root => "Root".to_string(),
+            ResourcePathSegmentKind::DomainOrSkewerCase => "DomainOrSkewerCase".to_string()
         }
     }
 }
@@ -724,19 +777,25 @@ impl ResourcePathSegmentKind {
             ResourcePathSegment::Version(_) => *self == Self::Version,
             ResourcePathSegment::Email(_) => *self == Self::Email,
             ResourcePathSegment::Domain(_) => *self == Self::Domain,
+            ResourcePathSegment::DomainOrSkewerCase(_) => *self == Self::DomainOrSkewerCase
         }
     }
 
     pub fn from_str(&self, s: &str) -> Result<ResourcePathSegment, Error> {
-        let (leftover, part) = path_part(s)?;
+        let (leftover, segment) = parse_path_segment(s)?;
         if leftover.len() > 0 {
             Err(format!(
                 "could not parse entire path string: leftover: '{}' from '{}'",
                 leftover, s
             )
             .into())
+        } else if self.matches(&segment){
+            Ok(segment)
         } else {
-            Ok(part)
+            Err(format!(
+                "path segment mismatch. expected: {}, got: {}",
+                self.to_string(), segment.to_kind().to_string() ).into()
+            )
         }
     }
 }
@@ -745,6 +804,7 @@ impl ResourcePathSegmentKind {
 pub enum ResourcePathSegment {
     SkewerCase(SkewerCase),
     Domain(DomainCase),
+    DomainOrSkewerCase(DomainOrSkewerCase),
     Path(Path),
     Version(Version),
     Email(String),
@@ -758,6 +818,7 @@ impl ResourcePathSegment {
             ResourcePathSegment::Path(_) => ResourcePathSegmentKind::Path,
             ResourcePathSegment::Version(_) => ResourcePathSegmentKind::Version,
             ResourcePathSegment::Email(_) => ResourcePathSegmentKind::Email,
+            ResourcePathSegment::DomainOrSkewerCase(_) => ResourcePathSegmentKind::DomainOrSkewerCase
         }
     }
 }
@@ -770,6 +831,7 @@ impl ToString for ResourcePathSegment {
             ResourcePathSegment::Version(version) => version.to_string(),
             ResourcePathSegment::Email(email) => email.to_string(),
             ResourcePathSegment::Domain(domain) => domain.to_string(),
+            ResourcePathSegment::DomainOrSkewerCase(domain_or_skewer) => domain_or_skewer.to_string()
         }
     }
 }
@@ -1045,14 +1107,15 @@ mod tests {
     use std::str::FromStr;
 
     use crate::{
-        domain, DomainCase, KeyBits, parse_resource_path, path, ResourceAddress, ResourceAddressKind,
+        domain, DomainCase, KeyBits, parse_resource_path, path, ResourceAddress,
         ResourcePathSegment, SkewerCase, Specific, version,
     };
     use crate::{
-        AppKey, DatabaseKey, DatabaseKind, ResourceKey, ResourceKind, ResourcePath, ResourceType,
+        AppKey, DatabaseKey, DatabaseKind, ResourceKey, ResourceKind, ResourceType,
         RootKey, SpaceKey, SubSpaceKey,
     };
     use crate::error::Error;
+    use crate::ResourcePath;
 
     #[test]
     fn test_kind() -> Result<(), Error> {
@@ -1198,35 +1261,7 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_address_parent_resolution() -> Result<(), Error> {
-        let path = ResourcePath::from_str(
-            "space:sub-space:some-app:database<Database<Relational<mysql.org:mysql:innodb:1.0.0>>>",
-        )?;
-        let parent = path.parent().unwrap();
-        assert_eq!(parent.resource_type(), ResourceType::App);
 
-        let path = ResourcePath::from_str("space:sub-space:database<Database<Relational>>")?;
-        let parent = path.parent().unwrap();
-
-        assert_eq!(parent.resource_type(), ResourceType::SubSpace);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_address_kind() -> Result<(), Error> {
-        let address = ResourceAddressKind::from_str(
-            "space:sub-space:some-app:database<Database<Relational<mysql.org:mysql:innodb:1.0.0>>>",
-        )?;
-        assert_eq!(
-            "space:sub-space:some-app:database<Database<Relational<mysql.org:mysql:innodb:1.0.0>>>"
-                .to_string(),
-            address.to_string()
-        );
-
-        Ok(())
-    }
 
     #[test]
     fn test_resource_address() -> Result<(), Error> {
@@ -1251,10 +1286,35 @@ pub enum ResourceStatePersistenceManager {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum ResourceIdentifier {
     Key(ResourceKey),
-    Address(ResourceAddress),
+    Address(ResourcePath),
 }
 
 impl ResourceIdentifier {
+
+    pub fn is_root(&self) -> bool {
+        match self {
+            ResourceIdentifier::Key(key) => *key == ResourceKey::Root,
+            ResourceIdentifier::Address(address) => address.is_root()
+        }
+    }
+
+    pub fn parent(&self) -> Option<ResourceIdentifier> {
+        match self {
+            ResourceIdentifier::Key(key) => {
+                match key.parent() {
+                    Some(parent) => Option::Some(parent.into()),
+                    None => None
+                }
+            },
+            ResourceIdentifier::Address(address) => {
+                match address.parent() {
+                    Some(parent) => Option::Some(parent.into()),
+                    None => None
+                }
+            }
+        }
+    }
+
     pub fn is_key(&self) -> bool {
         match self {
             ResourceIdentifier::Key(_) => true,
@@ -1276,7 +1336,7 @@ impl ResourceIdentifier {
         }
     }
 
-    pub fn address_or(self, error_message: &str) -> Result<ResourceAddress, Error> {
+    pub fn address_or(self, error_message: &str) -> Result<ResourcePath, Error> {
         match self {
             ResourceIdentifier::Key(_) => Err(error_message.into()),
             ResourceIdentifier::Address(address) => Ok(address),
@@ -1306,6 +1366,7 @@ impl ResourceIdentifier {
 }
 
 impl ResourceIdentifier {
+    /*
     pub fn parent(&self) -> Option<ResourceIdentifier> {
         match self {
             ResourceIdentifier::Key(key) => match key.parent() {
@@ -1318,17 +1379,12 @@ impl ResourceIdentifier {
             },
         }
     }
+     */
 
-    pub fn resource_type(&self) -> ResourceType {
-        match self {
-            ResourceIdentifier::Key(key) => key.resource_type(),
-            ResourceIdentifier::Address(address) => address.resource_type(),
-        }
-    }
 }
 
-impl From<ResourceAddress> for ResourceIdentifier {
-    fn from(address: ResourceAddress) -> Self {
+impl From<ResourcePath> for ResourceIdentifier {
+    fn from(address: ResourcePath) -> Self {
         ResourceIdentifier::Address(address)
     }
 }
@@ -1353,10 +1409,10 @@ impl TryInto<ResourceKey> for ResourceIdentifier {
 
  */
 
-impl TryInto<ResourceAddress> for ResourceIdentifier {
+impl TryInto<ResourcePath> for ResourceIdentifier {
     type Error = Error;
 
-    fn try_into(self) -> Result<ResourceAddress, Self::Error> {
+    fn try_into(self) -> Result<ResourcePath, Self::Error> {
         match self {
             ResourceIdentifier::Key(_) => Err("resource identifier is not an address".into()),
             ResourceIdentifier::Address(address) => Ok(address),
@@ -1451,11 +1507,11 @@ resources! {
     #[resource(ResourcePathSegmentKind::SkewerCase)]
     #[resource(ResourceStatePersistenceManager::None)]
     #[resource(state(content::Binary))]
-    pub struct ArtifactBundleVersions();
+    pub struct ArtifactBundleSeries();
 
-    #[resource(parents(ArtifactBundleVersions))]
+    #[resource(parents(ArtifactBundleSeries))]
     #[resource(prefix="ab")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
+    #[resource(ResourcePathSegmentKind::Version)]
     #[resource(ResourceStatePersistenceManager::Host)]
     #[resource(state(content::Binary))]
     pub struct ArtifactBundle();
@@ -1511,30 +1567,13 @@ resources! {
     }
 
     #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
-    pub enum ArtifactBundleKind{
-        Final,
-        Volatile
-    }
-
-    #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
     pub enum CredsKind{
         Token,
         UsernamePassword
     }
 
-
-
 }
 
-impl ArtifactPath {
-    pub fn path(&self) -> Path {
-        if let ResourcePathSegment::Path(path) = self.parts.last().unwrap() {
-            path.clone()
-        } else {
-            panic!("expected last segment to be a path")
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MetaSelector {
@@ -1846,9 +1885,8 @@ impl FromStr for ResourceStatus {
 pub enum AddressCreationSrc {
     None,
     Append(String),
-    Appends(Vec<String>),
     Just(String),
-    Exact(ResourceAddress),
+    Exact(ResourcePath),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1887,7 +1925,7 @@ impl TryInto<LocalStateSetSrc> for AssignResourceStateSrc<DataSet<BinSrc>> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceStub {
     pub key: ResourceKey,
-    pub address: ResourceAddress,
+    pub address: ResourcePath,
     pub archetype: ResourceArchetype,
     pub owner: Option<UserKey>,
 }
@@ -1896,7 +1934,7 @@ impl ResourceStub {
     pub fn root() -> ResourceStub {
         ResourceStub {
             key: ResourceKey::Root,
-            address: ResourceAddress::root(),
+            address: ResourcePath::root(),
             archetype: ResourceArchetype::root(),
             owner: Option::None,
         }
@@ -1919,8 +1957,7 @@ impl From<Resource> for ResourceStub {
 impl ResourceStub {
     pub fn validate(&self, resource_type: ResourceType) -> bool {
         self.key.resource_type() == resource_type
-            && self.address.resource_type() == resource_type
-            && self.archetype.kind.resource_type() == resource_type
+        && self.archetype.kind.resource_type() == resource_type
     }
 }
 
@@ -1950,7 +1987,7 @@ impl<S> ResourceAssign<S> {
 #[derive(Clone)]
 pub struct Resource {
     key: ResourceKey,
-    address: ResourceAddress,
+    address: ResourcePath,
     archetype: ResourceArchetype,
     state_src: DataSet<BinSrc>,
     owner: Option<UserKey>,
@@ -1959,7 +1996,7 @@ pub struct Resource {
 impl Resource {
     pub fn new(
         key: ResourceKey,
-        address: ResourceAddress,
+        address: ResourcePath,
         archetype: ResourceArchetype,
         state_src: DataSet<BinSrc>,
     ) -> Resource {
@@ -1976,7 +2013,7 @@ impl Resource {
         self.key.clone()
     }
 
-    pub fn address(&self) -> ResourceAddress {
+    pub fn address(&self) -> ResourcePath {
         self.address.clone()
     }
 
@@ -2011,6 +2048,7 @@ pub enum RemoteDataSrc {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResourceCreateStrategy {
     Create,
+    CreateOrUpdate,
     Ensure,
 }
 
@@ -2052,7 +2090,7 @@ impl ResourceSelector {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ConfigSrc {
     None,
-    Artifact(ArtifactPath)
+    Artifact(ResourcePath)
 }
 
 impl ToString for ConfigSrc {
@@ -2062,7 +2100,6 @@ impl ToString for ConfigSrc {
                 "None".to_string()
             }
             ConfigSrc::Artifact(address) => {
-                let address: ResourceAddress = address.clone().into();
                 address.to_string()
             }
         }
@@ -2076,9 +2113,8 @@ impl FromStr for ConfigSrc {
         if "None" == s {
             Ok(Self::None)
         } else {
-            let address = ResourceAddress::from_str(s)?;
-            let address: ArtifactPath = address.try_into()?;
-            Ok(Self::Artifact(address))
+            let path= ResourcePath::from_str(s)?;
+            Ok(Self::Artifact(path))
         }
     }
 }
@@ -2140,5 +2176,181 @@ impl From<std::io::Error> for Fail {
 impl From<SemVerError> for Fail {
     fn from(error: SemVerError) -> Self {
         Fail::Error(error.to_string())
+    }
+}
+
+impl ResourcePath {
+    pub fn new( segments: Vec<String> ) -> Self {
+        Self{
+            segments
+        }
+    }
+
+    pub fn parent(&self) -> Option<Self> {
+        if self.segments.is_empty() {
+            Option::None
+        } else {
+            let mut segments = self.segments.clone();
+            segments.remove( segments.len() -1 );
+            Option::Some( ResourcePath::new(segments) )
+        }
+    }
+
+    pub fn name(&self)->String {
+        if self.segments.is_empty() {
+            "".to_string()
+        } else {
+            self.segments.last().unwrap().to_string()
+        }
+    }
+}
+
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub struct ResourcePathAndType {
+    pub path: ResourcePath,
+    pub resource_type: ResourceType,
+}
+
+impl ResourcePathAndType {
+    pub fn root()-> Self {
+        Self {
+            path: ResourcePath::new(vec![]),
+            resource_type: ResourceType::Root
+        }
+    }
+
+    pub fn parent(&self) -> Option<ResourcePath> {
+        self.path.parent()
+    }
+
+    pub fn name(&self) -> String {
+        self.path.name()
+    }
+
+    pub fn resource_type(&self) -> ResourceType {
+        self.resource_type.clone()
+    }
+}
+
+impl FromStr for ResourcePathAndType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (leftover,result) = parse::parse_resource_path_and_type(s)?;
+
+        if !leftover.is_empty() {
+            return Err(format!("illegal resource path with type: '{}' unrecognized portion: '{}'",s, leftover).into());
+        }
+
+        Ok(result?)
+    }
+}
+
+impl ToString for ResourcePathAndType{
+    fn to_string(&self) -> String {
+        match self.resource_type.requires_kind() {
+            true => {
+                format!("{}<{}<?>>",self.path.to_string(),self.resource_type.to_string())
+            },
+            false => {
+
+                format!("{}<{}>",self.path.to_string(),self.resource_type.to_string())
+            }
+        }
+    }
+}
+
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub struct ResourcePathAndKind {
+    pub path: ResourcePath,
+    pub kind: ResourceKind,
+}
+
+impl ResourcePathAndKind {
+    pub fn new(path: ResourcePath, kind: ResourceKind) -> Result<Self,Error> {
+        let path_segment_kind: ResourcePathSegmentKind = kind.resource_type().path_segment_kind();
+        // if the path segment is illegal then there will be a Result::Err returned
+        path_segment_kind.from_str(path.segments.last().ok_or("expected at least one resource path segment" )?.as_str() )?;
+
+        Ok(ResourcePathAndKind{
+            path,
+            kind
+        })
+    }
+
+    pub fn parent(&self) -> Option<ResourcePath> {
+        self.path.parent()
+    }
+}
+
+impl FromStr for ResourcePathAndKind {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (leftover,result) = parse::parse_resource_path_and_kind(s)?;
+
+        if !leftover.is_empty() {
+            return Err(format!("illegal resource path with kind: '{}' unrecognized portion: '{}'",s, leftover).into());
+        }
+
+        Ok(result?)
+    }
+}
+
+impl ToString for ResourcePathAndKind {
+    fn to_string(&self) -> String {
+        format!("{}{}",self.path.to_string(),self.kind.to_string())
+    }
+}
+
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+pub struct ResourcePath {
+  pub segments: Vec<String>
+}
+
+impl ResourcePath {
+    pub fn root() -> Self {
+        ResourcePath {
+            segments: vec!()
+        }
+    }
+
+    pub fn is_root(&self) -> bool {
+        self.segments.is_empty()
+    }
+    pub fn append(&self, s: &str) -> Result<ResourcePath,Error> {
+        ResourcePath::from_str(format!("{}:{}", self.to_string(), s).as_str())
+    }
+}
+
+impl ToString for ResourcePath {
+    fn to_string(&self) -> String {
+            let mut rtn = String::new();
+            for i in 0..self.segments.len() {
+                let segment = self.segments.get(i).unwrap();
+                rtn.push_str( segment.to_string().as_str() );
+                if i < self.segments.len()-1 {
+                    rtn.push_str(":");
+                }
+            }
+            rtn
+    }
+}
+
+impl FromStr for ResourcePath {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (leftover,path) = parse::parse_resource_path(s)?;
+        if !leftover.is_empty() {
+            return Err(format!("illegal resource path: '{}' unrecognized portion: '{}'",s, leftover).into());
+        }
+        Ok(path)
+    }
+}
+
+impl Into<ResourcePath> for ResourcePathAndKind {
+    fn into(self) -> ResourcePath {
+        self.path
     }
 }

@@ -197,7 +197,7 @@ impl StarKind {
             ResourceType::File => Self::Space,
             ResourceType::Database => Self::K8s,
             ResourceType::Authenticator=> Self::K8s,
-            ResourceType::ArtifactBundleVersions => Self::Space,
+            ResourceType::ArtifactBundleSeries => Self::Space,
             ResourceType::ArtifactBundle => Self::ArtifactStore,
             ResourceType::Artifact => Self::ArtifactStore,
             ResourceType::Proxy => Self::Space,
@@ -219,7 +219,7 @@ impl StarKind {
             ResourceType::Database => Self::K8s,
             ResourceType::Authenticator=> Self::K8s,
             ResourceType::UserBase => Self::Space,
-            ResourceType::ArtifactBundleVersions => Self::ArtifactStore,
+            ResourceType::ArtifactBundleSeries => Self::ArtifactStore,
             ResourceType::ArtifactBundle => Self::ArtifactStore,
             ResourceType::Artifact => Self::ArtifactStore,
             ResourceType::Proxy => Self::Space,
@@ -250,7 +250,7 @@ impl StarKind {
                 StarKind::FileStore => vec![ResourceType::FileSystem, ResourceType::File],
                 StarKind::ArtifactStore => {
                     vec![
-                        ResourceType::ArtifactBundleVersions,
+                        ResourceType::ArtifactBundleSeries,
                         ResourceType::ArtifactBundle,
                         ResourceType::Artifact,
                     ]
@@ -1209,7 +1209,7 @@ pub trait ResourceRegistryBacking: Sync + Send {
     async fn select(&self, select: ResourceSelector) -> Result<Vec<ResourceRecord>, Error>;
     async fn set_location(&self, location: ResourceRecord) -> Result<(), Error>;
     async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<ResourceRecord>, Error>;
-    async fn unique_src(&self, key: ResourceIdentifier) -> Box<dyn UniqueSrc>;
+    async fn unique_src(&self, resource_type: ResourceType, key: ResourceIdentifier) -> Box<dyn UniqueSrc>;
 }
 
 pub struct ResourceRegistryBackingSqLite {
@@ -1291,8 +1291,8 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
         }
     }
 
-    async fn unique_src(&self, id: ResourceIdentifier) -> Box<dyn UniqueSrc> {
-        Box::new(RegistryUniqueSrc::new(id, self.registry.clone()))
+    async fn unique_src(&self, resource_type: ResourceType, id: ResourceIdentifier) -> Box<dyn UniqueSrc> {
+        Box::new(RegistryUniqueSrc::new(resource_type, id, self.registry.clone()))
     }
 }
 

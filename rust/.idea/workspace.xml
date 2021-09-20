@@ -6,22 +6,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/../kubernetes/ctrl/mysql/Makefile" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../kubernetes/ctrl/wordpress/Makefile" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../kubernetes/ctrl/wordpress/chart/.helmignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../kubernetes/ctrl/wordpress/chart/Chart.yaml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../kubernetes/ctrl/wordpress/chart/templates/NOTES.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../kubernetes/ctrl/wordpress/chart/templates/_helpers.tpl" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../kubernetes/ctrl/wordpress/chart/templates/deployment.yaml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../kubernetes/ctrl/wordpress/chart/templates/service.yaml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../kubernetes/ctrl/wordpress/chart/values.yaml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../kubernetes/ctrl/wordpress/docker/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../kubernetes/ctrl/wordpress/docker/Dockerfile" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../kubernetes/ctrl/wordpress/docker/ctrl.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../kubernetes/ctrl/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/../kubernetes/ctrl/Makefile" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../kubernetes/ctrl/mysql/ctrl.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../kubernetes/ctrl/mysql/ctrl.sh" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-resources/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/main.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -37,6 +23,14 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="GitSEFilterConfiguration">
+    <file-type-list>
+      <filtered-out-file-type name="LOCAL_BRANCH" />
+      <filtered-out-file-type name="REMOTE_BRANCH" />
+      <filtered-out-file-type name="TAG" />
+      <filtered-out-file-type name="COMMIT_BY_MESSAGE" />
+    </file-type-list>
   </component>
   <component name="KotlinMultiplatform">
     <allAvailableExecutables />
@@ -89,8 +83,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test data::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib data::test" />
+    <configuration name="Test parse::tests" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib parse::tests" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -105,8 +99,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test data::test::buffer" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib data::test::buffer -- --exact" />
+    <configuration name="Test parse::tests::test_parse_resource_path_and_kind" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib parse::tests::test_parse_resource_path_and_kind -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -121,8 +115,40 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test starlane::test::mechtron" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib starlane::test::mechtron -- --exact" />
+    <configuration name="Test parse::tests::test_resource_path_and_kind_from_str" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib parse::tests::test_resource_path_and_kind_from_str -- --exact" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <envs />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test parse::tests::test_resource_path_from_str" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib parse::tests::test_resource_path_from_str -- --exact" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <envs />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test tests::test_resource_address" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib tests::test_resource_address -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -139,15 +165,19 @@
     </configuration>
     <list>
       <item itemvalue="Cargo.Run" />
-      <item itemvalue="Cargo.Test data::test::buffer" />
-      <item itemvalue="Cargo.Test data::test" />
-      <item itemvalue="Cargo.Test starlane::test::mechtron" />
+      <item itemvalue="Cargo.Test parse::tests::test_parse_resource_path_and_kind" />
+      <item itemvalue="Cargo.Test parse::tests::test_resource_path_from_str" />
+      <item itemvalue="Cargo.Test parse::tests::test_resource_path_and_kind_from_str" />
+      <item itemvalue="Cargo.Test tests::test_resource_address" />
+      <item itemvalue="Cargo.Test parse::tests" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Cargo.Test starlane::test::mechtron" />
-        <item itemvalue="Cargo.Test data::test::buffer" />
-        <item itemvalue="Cargo.Test data::test" />
+        <item itemvalue="Cargo.Test parse::tests" />
+        <item itemvalue="Cargo.Test tests::test_resource_address" />
+        <item itemvalue="Cargo.Test parse::tests::test_resource_path_and_kind_from_str" />
+        <item itemvalue="Cargo.Test parse::tests::test_resource_path_from_str" />
+        <item itemvalue="Cargo.Test parse::tests::test_parse_resource_path_and_kind" />
       </list>
     </recent_temporary>
   </component>
@@ -173,7 +203,7 @@
       <workItem from="1630247537849" duration="16379000" />
       <workItem from="1630425338598" duration="532000" />
       <workItem from="1630446426365" duration="31484000" />
-      <workItem from="1631559262142" duration="10062000" />
+      <workItem from="1631559262142" duration="94314000" />
     </task>
     <servers />
   </component>

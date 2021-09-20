@@ -36,6 +36,13 @@ pub struct OutgoingSide {
     pub out_tx: Sender<LaneCommand>,
 }
 
+#[derive(Clone)]
+pub enum OnCloseAction
+{
+    Reestablish,
+    Remove
+}
+
 pub struct IncomingSide {
     rx: Receiver<Frame>,
     tunnel_receiver_rx: Receiver<TunnelInState>,
@@ -49,6 +56,7 @@ impl IncomingSide {
             match &mut self.tunnel {
                 TunnelInState::None => match self.tunnel_receiver_rx.recv().await {
                     None => {
+println!("IncomingSide: Tunnel is None");
                         return Option::Some(LaneMuxerCall::Frame(Frame::Close));
                     }
                     Some(tunnel) => {
@@ -57,10 +65,12 @@ impl IncomingSide {
                 },
                 TunnelInState::In(tunnel) => match tunnel.rx.recv().await {
                     None => {
+println!("IncomingSide: 2 Tunnel is None");
                         self.tunnel = TunnelInState::None;
                         return Option::Some(LaneMuxerCall::Frame(Frame::Close));
                     }
                     Some(frame) => {
+println!("lanes::IncomingSide FRAME: {}",frame.to_string() );
                         return Option::Some(LaneMuxerCall::Frame(frame));
                     }
                 },
@@ -145,6 +155,18 @@ pub enum LaneWrapper {
 }
 
 impl LaneWrapper {
+
+    pub fn on_close_action(&self) -> OnCloseAction{
+        match self {
+            LaneWrapper::Proto(proto) => {
+                proto.on_close_action.clone()
+            }
+            LaneWrapper::Lane(lane) => {
+                lane.on_close_action.clone()
+            }
+        }
+    }
+
     pub fn pattern(&self) -> StarPattern{
         match self {
             LaneWrapper::Proto(meta) => {
@@ -225,10 +247,11 @@ pub struct ProtoLaneEnd {
     tunnel_receiver_tx: Sender<TunnelInState>,
     evolution_tx: broadcast::Sender<Result<(), Error>>,
     pub key_requestor: bool,
+    pub on_close_action: OnCloseAction
 }
 
 impl ProtoLaneEnd {
-    pub fn new(star_key: Option<StarKey>) -> Self {
+    pub fn new(star_key: Option<StarKey>, on_close_action: OnCloseAction) -> Self {
         let (mid_tx, mid_rx) = mpsc::channel(LANE_QUEUE_SIZE);
         let (in_tx, in_rx) = mpsc::channel(LANE_QUEUE_SIZE);
         let (tunnel_receiver_tx, tunnel_receiver_rx) = mpsc::channel(1);
@@ -256,6 +279,7 @@ impl ProtoLaneEnd {
             outgoing: OutgoingSide { out_tx: mid_tx },
             evolution_tx,
             key_requestor: false,
+            on_close_action
         }
     }
 
@@ -289,6 +313,7 @@ impl TryInto<LaneEnd> for ProtoLaneEnd {
                 incoming: self.incoming,
                 outgoing: self.outgoing,
                 tunnel_receiver_tx: self.tunnel_receiver_tx,
+                on_close_action: self.on_close_action
             })
         } else {
             self.evolution_tx.send(Err(
@@ -308,6 +333,7 @@ pub struct LaneEnd {
     pub incoming: IncomingSide,
     pub outgoing: OutgoingSide,
     tunnel_receiver_tx: Sender<TunnelInState>,
+    pub on_close_action: OnCloseAction
 }
 
 impl LaneEnd {

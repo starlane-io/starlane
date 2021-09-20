@@ -9,7 +9,8 @@ use crate::cache::{Cacheable, Data};
 use crate::error::Error;
 use crate::resource::config::{Parser, ResourceConfig};
 use crate::resource::ArtifactKind;
-use crate::resource::{ArtifactAddress, DomainKey, ResourceAddress, ResourceKind};
+use crate::resource::{DomainKey, ResourceAddress, ResourceKind};
+use starlane_resources::ResourcePath;
 
 pub struct Domain {
     key: DomainKey,
@@ -60,14 +61,14 @@ impl TryFrom<Vec<u8>> for DomainState {
 pub struct HttpResourceSelector {}
 
 pub struct DomainConfig {
-    artifact: ArtifactAddress,
+    artifact: ResourcePath,
     routes: HashMap<String, HttpResourceSelector>,
 }
 
 impl Cacheable for DomainConfig {
     fn artifact(&self) -> ArtifactRef {
         ArtifactRef {
-            address: self.artifact.clone(),
+            path: self.artifact.clone(),
             kind: ArtifactKind::DomainConfig,
         }
     }
@@ -94,7 +95,7 @@ impl DomainConfigParser {
 impl Parser<DomainConfig> for DomainConfigParser {
     fn parse(&self, artifact: ArtifactRef, _data: Data) -> Result<Arc<DomainConfig>, Error> {
         Ok(Arc::new(DomainConfig {
-            artifact: artifact.address,
+            artifact: artifact.path,
             routes: HashMap::new(),
         }))
     }

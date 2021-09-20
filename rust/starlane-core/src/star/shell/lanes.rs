@@ -14,7 +14,7 @@ use starlane_resources::message::{Fail, MessageId, ProtoMessage};
 
 use crate::error::Error;
 use crate::frame::{Frame, ProtoFrame, Reply, ReplyKind, StarMessage, StarPattern};
-use crate::lane::{AbstractLaneEndpoint, LaneCommand, LaneEnd, LaneIndex, LaneKey, LaneMeta, LaneSession, LaneWrapper, ProtoLaneEnd, UltimaLaneKey};
+use crate::lane::{AbstractLaneEndpoint, LaneCommand, LaneEnd, LaneIndex, LaneKey, LaneMeta, LaneSession, LaneWrapper, ProtoLaneEnd, UltimaLaneKey, OnCloseAction};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
 use crate::star::{ForwardFrame, StarCommand, StarKey, StarSkel};
 use crate::star::core::message::CoreMessageCall;
@@ -48,9 +48,12 @@ impl LaneMuxerApi {
       Ok(tokio::time::timeout(Duration::from_secs(15), rx).await??)
     }
 
-
     pub fn add_proto_lane( &self, proto: ProtoLaneEnd, pattern: StarPattern) {
         self.tx.try_send(LaneMuxerCall::AddProtoLane{proto,pattern}).unwrap_or_default();
+    }
+
+    pub fn remove_lane( &self, key: LaneKey) {
+        self.tx.try_send(LaneMuxerCall::RemoveLane(key)).unwrap_or_default();
     }
 }
 
@@ -67,6 +70,7 @@ pub enum LaneMuxerCall {
     },
     Frame(Frame),
     AddProtoLane{proto:ProtoLaneEnd, pattern: StarPattern},
+    RemoveLane(LaneKey)
 }
 
 impl Call for LaneMuxerCall {}
@@ -132,13 +136,13 @@ impl LaneMuxer {
                     LaneMuxerCall::Frame(frame)  => {
 
                         if lane_key.is_some() {
-                            let lane_key = lane_key.expect("expected a lane id lane_key");
+                            let lane_key = lane_key.expect("expected a LaneKey");
                             if let Frame::Proto(ProtoFrame::ReportStarKey(remote_star)) = &frame {
                                 if lane_key.is_proto() {
                                     let mut lane = self
                                         .lanes
                                         .remove(&lane_key)
-                                        .expect("expected lane wreapper");
+                                        .expect("expected LaneWrapper");
 
                                     let mut lane = lane.expect_proto_lane();
 
@@ -156,6 +160,22 @@ impl LaneMuxer {
                                 } else {
                                     eprintln!("received a ReportStarKey on a lane that is not proto");
                                 }
+                            } else if let Frame::Close = &frame {
+println!("received Frame::Close");
+
+                                let mut lane = self
+                                    .lanes
+                                    .get(&lane_key)
+                                    .expect("expected LaneWrapper");
+
+                               if let OnCloseAction::Remove = lane.on_close_action() {
+                                   match self.lanes.remove(&lane_key) {
+                                       None => {
+                                           eprintln!("Frame::Close could not find LaneKey: {}", lane_key.to_string());
+                                       }
+                                       Some(_) => {}
+                                   }
+                               }
                             } else {
                                 let lane = self.lanes.get(&lane_key).expect("expected a lane");
                                 let session = LaneSession::new(lane_key.clone(), lane.pattern(), lane.outgoing().out_tx.clone() );
@@ -182,6 +202,10 @@ impl LaneMuxer {
 
                          */
 //                        unimplemented!("not sure how to handle adding protolanes yet");
+                    }
+                    LaneMuxerCall::RemoveLane(lane_key) => {
+println!("LaneMuxer: removing lane {}", lane_key.to_string() );
+                        self.lanes.remove(&lane_key);
                     }
                 }
             }

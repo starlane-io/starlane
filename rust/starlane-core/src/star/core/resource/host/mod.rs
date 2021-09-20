@@ -19,6 +19,7 @@ use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::message::resource::Delivery;
 use crate::star::core::resource::host::kube::KubeHost;
+use crate::star::core::resource::host::file::FileHost;
 
 pub mod artifact;
 mod default;
@@ -27,6 +28,7 @@ pub mod kube;
 mod space;
 mod mechtron;
 mod app;
+mod file;
 
 pub enum HostCall {
     Assign {
@@ -125,12 +127,14 @@ impl HostComponent {
         let host: Arc<dyn Host> = match rt {
             ResourceType::Space => Arc::new(SpaceHost::new(self.skel.clone()).await),
             ResourceType::SubSpace => Arc::new(SpaceHost::new(self.skel.clone()).await),
-            ResourceType::ArtifactBundleVersions => Arc::new(StatelessHost::new(self.skel.clone()).await),
+            ResourceType::ArtifactBundleSeries => Arc::new(StatelessHost::new(self.skel.clone()).await),
             ResourceType::ArtifactBundle=> Arc::new(ArtifactBundleHost::new(self.skel.clone()).await),
             ResourceType::Domain => Arc::new(StatelessHost::new(self.skel.clone()).await),
             ResourceType::App=> Arc::new(AppHost::new(self.skel.clone()).await),
             ResourceType::Mechtron => Arc::new(MechtronHost::new(self.skel.clone()).await),
             ResourceType::Database => Arc::new(KubeHost::new(self.skel.clone()).await.expect("KubeHost must be created without error")),
+            ResourceType::FileSystem => Arc::new(StatelessHost::new(self.skel.clone()).await),
+            ResourceType::File => Arc::new(FileHost::new(self.skel.clone()).await),
 
             t => unimplemented!("no HOST implementation for type {}", t.to_string()),
         };
