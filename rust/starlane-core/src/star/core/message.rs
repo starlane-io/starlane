@@ -154,26 +154,17 @@ println!("Create...{}", create.archetype.kind.to_string() );
                             .await;
                         delivery.reply(Reply::Id(unique_src.next(&resource_type).await?));
                     }
-                    ResourceRequestMessage::State => {
+                    ResourceRequestMessage::SelectValues(selector) => {
+                        let stub = skel.resource_locator_api.locate(delivery.payload.to.clone()).await?.stub;
                         let key: ResourceKey = skel.resource_locator_api.as_key(delivery.payload.to.clone()).await?;
                         let (tx, rx) = oneshot::channel();
-                        host_tx.send(HostCall::Get { key, tx }).await?;
+                        host_tx.send(HostCall::Select { key, selector, tx }).await?;
                         let result = rx.await;
-                        if let Ok(Ok(Option::Some(state))) = result {
-                            let state = match state.try_into() {
-                                Ok(state) => state,
-                                Err(_) => {
-                                    error!("error when try_into from BinSrc to NetworkBinSrc");
-                                    delivery.fail(Fail::expected(
-                                        "Ok(Ok(StarCoreResult::State(state)))",
-                                    ));
-                                    return Err("error when try_into from BinSrc to NetworkBinSrc".into());
-                                }
-                            };
-
-                            delivery.reply(Reply::State(state));
+                        if let Ok(Ok(Option::Some(values))) = result {
+                            let values = values.with(stub);
+                            delivery.reply(Reply::ResourceValues(values));
                         } else {
-                            delivery.fail(Fail::expected("Ok(Ok(StarCoreResult::State(state)))"));
+                            delivery.fail(Fail::expected("Ok(Ok(ResourceValues(values)))"));
                         }
                     }
                 }

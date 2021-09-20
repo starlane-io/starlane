@@ -1985,12 +1985,22 @@ impl<S> ResourceAssign<S> {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub enum ResourcePropertyKey {
+    State
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ResourceProperty{
+    State(DataSet<BinSrc>)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Resource {
     key: ResourceKey,
     address: ResourcePath,
     archetype: ResourceArchetype,
-    state_src: DataSet<BinSrc>,
+    state: DataSet<BinSrc>,
     owner: Option<UserKey>,
 }
 
@@ -2004,7 +2014,7 @@ impl Resource {
         Resource {
             key: key,
             address: address,
-            state_src: state_src,
+            state: state_src,
             archetype: archetype,
             owner: Option::None, // fix later
         }
@@ -2023,7 +2033,7 @@ impl Resource {
     }
 
     pub fn state_src(&self) -> DataSet<BinSrc> {
-        self.state_src.clone()
+        self.state.clone()
     }
 }
 
@@ -2066,7 +2076,6 @@ pub struct ResourceSelector {
 }
 
 impl ResourceSelector {
-
     pub fn children_selector(parent: ResourceIdentifier) -> Self {
         let mut selector = Self::new();
         selector.add_field(FieldSelection::Parent(parent));
@@ -2085,7 +2094,6 @@ impl ResourceSelector {
         selector.add_field(FieldSelection::Type(ResourceType::App));
         selector
     }
-
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

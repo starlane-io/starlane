@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::convert::TryInto;
 use std::fs::File;
 use std::io::Write;
@@ -19,6 +19,7 @@ use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util;
 use crate::error::Error;
+use starlane_resources::property::{ResourcePropertyValueSelector, ResourceValues};
 
 /*
 =======
@@ -354,11 +355,11 @@ impl Host for ArtifactBundleHost {
         }
     }
 
-    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
-        self.store.get(key).await
-    }
-
     async fn delete(&self, _identifier: ResourceKey) -> Result<(), Error> {
         unimplemented!()
+    }
+
+    async fn get_state(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
+        self.store.get(key).await
     }
 }

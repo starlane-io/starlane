@@ -20,6 +20,7 @@ use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::message::resource::Delivery;
 use crate::star::core::resource::host::kube::KubeHost;
 use crate::star::core::resource::host::file::FileHost;
+use starlane_resources::property::{ResourceValueSelector, ResourceValues, ResourcePropertyValueSelector};
 
 pub mod artifact;
 mod default;
@@ -39,9 +40,10 @@ pub enum HostCall {
         key: ResourceKey,
         tx: oneshot::Sender<Result<(), Error>>,
     },
-    Get {
+    Select {
         key: ResourceKey,
-        tx: oneshot::Sender<Result<Option<DataSet<BinSrc>>, Error>>,
+        selector: ResourcePropertyValueSelector,
+        tx: oneshot::Sender<Result<Option<ResourceValues<ResourceKey>>, Error>>,
     },
     Has {
         key: ResourceKey,
@@ -70,9 +72,9 @@ impl HostComponent {
 impl AsyncProcessor<HostCall> for HostComponent {
     async fn process(&mut self, call: HostCall) {
         match call {
-            HostCall::Get { key, tx } => {
+            HostCall::Select { key, selector, tx } => {
                 let host = self.host(key.resource_type()).await;
-                tx.send(host.get(key).await);
+                tx.send(host.select( key, selector).await);
             }
             HostCall::Assign { assign, tx } => {
                 let host = self.host(assign.stub.key.resource_type()).await;
@@ -158,8 +160,10 @@ pub trait Host: Send + Sync {
         Ok(())
     }
     async fn has(&self, key: ResourceKey) -> bool;
-    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error>;
+//    async fn select(&self, key: ResourceKey, selector: ResourcePropertyValueSelector ) -> Result<Option<ResourceValues<ResourceKey>>, Error>;
     async fn delete(&self, key: ResourceKey) -> Result<(), Error>;
+
+    async fn get_state(&self,key: ResourceKey) -> Result<Option<DataSet<BinSrc>>,Error>;
 
     async fn deliver(&self, key: ResourceKey, delivery: Delivery<Message<ResourcePortMessage>>) -> Result<(),Error>{
         info!("ignoring delivery");
@@ -167,4 +171,23 @@ pub trait Host: Send + Sync {
     }
 
     fn shutdown(&self) {}
+
+    async fn select(&self, key: ResourceKey, selector: ResourcePropertyValueSelector) -> Result<Option<ResourceValues<ResourceKey>>, Error> {
+        match &selector {
+            ResourcePropertyValueSelector::State { aspect, field } => {
+                let state = self.get_state(key.clone()).await?.unwrap_or(DataSet::new());
+                let state = aspect.filter(state);
+                let mut values = HashMap::new();
+                values.insert(selector, state );
+                Ok(Option::Some(ResourceValues{
+                    resource: key,
+                    values
+                }))
+            }
+            ResourcePropertyValueSelector::None => {
+                Ok(Option::Some(ResourceValues::empty(key)))
+            }
+        }
+    }
+
 }

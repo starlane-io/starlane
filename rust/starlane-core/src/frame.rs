@@ -18,6 +18,7 @@ use crate::message::resource::ActorMessage;
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey};
 use crate::watch::{Notification, Watch, WatchKey};
 use crate::resource::{ResourceId, ResourceRegistration, ResourceRecord, ResourceType, ResourceKey, ResourceSliceStatus, SubSpaceKey, UserKey, AppKey, ActorKey};
+use starlane_resources::property::ResourceValues;
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum Frame {
@@ -444,6 +445,7 @@ pub enum Reply {
     Message(MessageReply<ResourceResponseMessage>),
     Id(ResourceId),
     State(DataSet<BinSrc>),
+    ResourceValues(ResourceValues<ResourceStub>),
     Seq(u64),
     Port(DataSet<BinSrc>)
 }
@@ -459,7 +461,8 @@ pub enum ReplyKind {
     Id,
     Seq,
     State,
-    Port
+    Port,
+    ResourceValues
 }
 
 impl ReplyKind {
@@ -475,6 +478,7 @@ impl ReplyKind {
             Reply::Seq(_) => *self == Self::Seq,
             Reply::State(_) => *self == Self::State,
             Reply::Port(_) => *self == Self::Port,
+            Reply::ResourceValues(_) => *self == Self::ResourceValues
         }
     }
 }

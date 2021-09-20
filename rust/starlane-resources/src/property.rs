@@ -1,4 +1,4 @@
-use crate::{SkewerCase, Resource, ResourceIdentifier, ResourceSelector, ResourceStub};
+use crate::{SkewerCase, Resource, ResourceIdentifier, ResourceSelector, ResourceStub, FieldSelection};
 use std::str::FromStr;
 use crate::error::Error;
 use crate::data::{DataSet, BinSrc, Meta};
@@ -9,6 +9,26 @@ use std::collections::HashMap;
 pub struct ResourceValueSelector {
     pub resource: ResourceSelector,
     pub property: ResourcePropertyValueSelector,
+}
+
+impl ResourceValueSelector {
+    pub fn new( resource: ResourceSelector, property: ResourcePropertyValueSelector ) -> Self {
+        Self{
+            resource,
+            property
+        }
+    }
+
+    pub fn from_id( identifier: ResourceIdentifier ) -> Self {
+        let mut resource = ResourceSelector::new();
+        resource.add_field(FieldSelection::Identifier(identifier));
+        Self {
+            resource,
+            property: ResourcePropertyValueSelector::None
+        }
+    }
+
+
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
@@ -36,6 +56,7 @@ impl DataSetAspectSelector {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum ResourcePropertyValueSelector {
+    None,
     State{ aspect: DataSetAspectSelector, field: FieldValueSelector }
 }
 
@@ -65,7 +86,10 @@ impl ResourcePropertyValueSelector {
     pub fn filter( &self, resource: Resource ) -> ResourceValue {
         match self {
             ResourcePropertyValueSelector::State { aspect: selector, field } => {
-                field.filter( selector.filter(resource.state_src ) )
+                field.filter( selector.filter(resource.state) )
+            }
+            ResourcePropertyValueSelector::None => {
+                ResourceValue::None
             }
         }
     }
@@ -136,7 +160,31 @@ pub enum ResourceValue {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourcePropertyValuesSelection {
-    pub resource: ResourceStub,
+pub struct ResourceValues<R> {
+    pub resource: R,
     pub values: HashMap<ResourcePropertyValueSelector,ResourceValue>
+}
+
+impl <R> ResourceValues <R> {
+
+  pub fn empty(resource: R ) -> Self {
+      Self {
+          resource,
+          values: HashMap::new()
+      }
+  }
+
+  pub fn new(resource: R, values: HashMap<ResourcePropertyValueSelector,ResourceValue>) -> Self {
+      Self {
+          resource,
+          values
+      }
+  }
+
+  pub fn with<T>(self, resource: T) -> ResourceValues<T> {
+      ResourceValues{
+          resource,
+          values: self.values
+       }
+  }
 }

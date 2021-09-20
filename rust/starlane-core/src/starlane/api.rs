@@ -32,6 +32,7 @@ use crate::star::{Request, StarCommand, StarKind, StarSkel};
 use crate::star::shell::search::SearchInit;
 use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
+use starlane_resources::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, ResourceValue};
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -279,19 +280,33 @@ info!("received reply for {}",description);
         let surface_api = self.surface_api.clone();
 
             let mut proto = ProtoMessage::new();
-            proto.payload = Option::Some(ResourceRequestMessage::State);
+            let selector = ResourcePropertyValueSelector::State{
+                aspect: DataSetAspectSelector::All,
+                field: FieldValueSelector::All
+            };
+            proto.payload = Option::Some(ResourceRequestMessage::SelectValues(selector.clone()));
             proto.to = Option::Some(identifier);
             proto.from = Option::Some(MessageFrom::Inject);
             let proto = proto.try_into()?;
             let result = surface_api
                 .exchange(
                     proto,
-                    ReplyKind::State,
+                    ReplyKind::ResourceValues,
                     "StarlaneApi::get_resource_state_src()",
                 )
                 .await;
             match result {
-                Ok(Reply::State(state)) => Ok(state),
+                Ok(Reply::ResourceValues(values)) => {
+                   let state = values.values.get(&selector ).ok_or("expected state value")?.clone();
+                   match state {
+                       ResourceValue::DataSet(state) => {
+                           Ok(state)
+                       }
+                       _ => {
+                           Err("expected state to be a DataSet".into())
+                       }
+                   }
+                },
                 Err(fail) => Err(fail.into()),
                 _ => unimplemented!("StarlaneApi::get_resource_state_src() IMPOSSIBLE!"),
             }

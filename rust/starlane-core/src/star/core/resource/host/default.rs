@@ -51,7 +51,7 @@ println!("StatelessHost: create {}", assign.stub.archetype.kind.to_string() );
         }
     }
 
-    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
+    async fn get_state(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
         self.store.get(key).await
     }
 

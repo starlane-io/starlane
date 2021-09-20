@@ -422,6 +422,7 @@ mod tests {
                 assert!(selector== DataSetAspectSelector::All);
                 assert!(field==FieldValueSelector::All);
             }
+            _ => { assert!(false) }
         }
 
         let (leftover, result)= parse_resource_value_selector("hello:my::state['content']")?;
@@ -432,6 +433,7 @@ mod tests {
                 assert!(aspect== DataSetAspectSelector::Exact("content".to_string()));
                 assert!(field==FieldValueSelector::All);
             }
+            _ => { assert!(false) }
         }
 
         let (leftover, result)= parse_resource_value_selector("hello:my::state['content']['Content-Type']")?;
@@ -442,6 +444,7 @@ mod tests {
                 assert!(aspect== DataSetAspectSelector::Exact("content".to_string()));
                 assert!(field==FieldValueSelector::Meta(MetaFieldValueSelector::Exact("Content-Type".to_string())));
             }
+            _ => { assert!(false) }
         }
 
         let result = parse_resource_value_selector("hello:my:state['content']['Content-Type']");

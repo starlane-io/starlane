@@ -133,7 +133,7 @@ println!("Assigning Kube Resource Host....");
         todo!()
     }
 
-    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
+    async fn get_state(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
         todo!()
     }
 

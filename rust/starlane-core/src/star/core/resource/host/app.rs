@@ -19,18 +19,21 @@ use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::starlane::api::{AppApi, MechtronApi, StarlaneApi};
+use starlane_resources::property::{ResourceValueSelector, ResourceValues, ResourcePropertyValueSelector};
+use std::collections::HashMap;
+use crate::status::Status;
+use crate::util::AsyncHashMap;
 
-#[derive(Debug)]
 pub struct AppHost {
     skel: StarSkel,
-    store: StateStore,
+    apps: AsyncHashMap<ResourceKey,Status>
 }
 
 impl AppHost {
     pub async fn new(skel: StarSkel) -> Self {
         AppHost {
             skel: skel.clone(),
-            store: StateStore::new(skel).await,
+            apps: AsyncHashMap::new()
         }
     }
 }
@@ -69,8 +72,7 @@ println!("artifact : {}", artifact.to_string());
         println!("App config loaded!");
 
         println!("main: {}", app_config.main.path.to_string() );
-
-
+        self.apps.put( assign.stub.key.clone(), Status::Ready ).await;
 
         Ok(DataSet::new())
     }
@@ -108,18 +110,17 @@ println!("MECHTRON CREATED");
     }
 
     async fn has(&self, key: ResourceKey) -> bool {
-        match self.store.has(key).await {
-            Ok(v) => v,
-            Err(_) => false,
-        }
+        self.apps.contains( key ).await.unwrap_or(false)
     }
 
-    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
-        self.store.get(key).await
-    }
 
     async fn delete(&self, _identifier: ResourceKey) -> Result<(), Error> {
-        unimplemented!()
+        self.apps.remove(_identifier).await.unwrap_or_default();
+        Ok(())
+    }
+
+    async fn get_state(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
+        todo!()
     }
 }
 
