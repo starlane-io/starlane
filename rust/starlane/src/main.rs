@@ -154,7 +154,6 @@ async fn cp(args: ArgMatches<'_>) -> Result<(), Error> {
     let dst = args.value_of("dst").ok_or( "expected dst")?;
 
     if dst.contains(":") {
-println!("Resource Path is VALID");
         let dst = ResourcePath::from_str(dst)?;
         let src = Path::new(src );
         // copying from src to dst
@@ -194,7 +193,6 @@ println!("Resource Path is VALID");
         starlane_api.shutdown();
 
     } else  if src.contains(":") {
-println!("COPYING FILE to LOCAL!");
       let src = ResourcePath::from_str(src)?;
       let content = starlane_api.get_resource_state(src.into()).await?.remove("content").expect("expected 'content' state aspect");
       let filename = dst.clone();
