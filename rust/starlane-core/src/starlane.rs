@@ -19,9 +19,7 @@ use crate::constellation::{Constellation, ConstellationStatus};
 use crate::error::Error;
 use crate::file_access::FileAccess;
 
-use crate::lane::{
-    ClientSideTunnelConnector, LocalTunnelConnector, ProtoLaneEnd, ServerSideTunnelConnector,
-};
+use crate::lane::{ClientSideTunnelConnector, LocalTunnelConnector, ProtoLaneEnd, ServerSideTunnelConnector, OnCloseAction};
 use crate::logger::{Flags, Logger};
 
 use crate::proto::{
@@ -298,7 +296,7 @@ impl StarlaneMachineRunner {
                     StarlaneCommand::AddStream(stream) => {
                         match self.select_star_kind(&StarKind::Gateway).await {
                             Ok(Option::Some(star_ctrl)) => {
-                                match self.add_server_side_lane_ctrl(star_ctrl, stream).await {
+                                match self.add_server_side_lane_ctrl(star_ctrl, stream,OnCloseAction::Remove).await {
                                     Ok(_result) => {}
                                     Err(error) => {
                                         error!("{}", error);
@@ -522,6 +520,7 @@ impl StarlaneMachineRunner {
                                     host_address,
                                     lane.star_selector.clone(),
                                     true,
+                                    OnCloseAction::Remove
                                 )
                                 .await?;
                             proto_lane_evolution_rxs.push(proto_lane_evolution_rx);
@@ -707,8 +706,8 @@ println!("received TCP Stream...");
         high_star_ctrl: StarController,
         low_star_ctrl: StarController,
     ) -> Result<Vec<broadcast::Receiver<Result<(), Error>>>, Error> {
-        let high_lane = ProtoLaneEnd::new(Option::None);
-        let low_lane = ProtoLaneEnd::new(Option::None);
+        let high_lane = ProtoLaneEnd::new(Option::None, OnCloseAction::Remove );
+        let low_lane = ProtoLaneEnd::new(Option::None, OnCloseAction::Remove );
         let rtn = vec![high_lane.get_evoltion_rx(), low_lane.get_evoltion_rx()];
         let connector = LocalTunnelConnector::new(&high_lane, &low_lane).await?;
         high_star_ctrl
@@ -731,8 +730,9 @@ println!("received TCP Stream...");
         &mut self,
         low_star_ctrl: StarController,
         stream: TcpStream,
+        on_close_action: OnCloseAction
     ) -> Result<broadcast::Receiver<Result<(), Error>>, Error> {
-        let low_lane = ProtoLaneEnd::new(Option::None);
+        let low_lane = ProtoLaneEnd::new(Option::None, on_close_action  );
         let rtn = low_lane.get_evoltion_rx();
 
         let connector_ctrl = ServerSideTunnelConnector::new(&low_lane, stream).await?;
@@ -756,8 +756,10 @@ println!("received TCP Stream...");
         host_address: String,
         selector: StarInConstellationTemplateSelector,
         key_requestor: bool,
+        on_close_action: OnCloseAction
+
     ) -> Result<broadcast::Receiver<Result<(), Error>>, Error> {
-        let mut lane = ProtoLaneEnd::new(Option::None);
+        let mut lane = ProtoLaneEnd::new(Option::None, on_close_action);
         lane.key_requestor = key_requestor;
 
         let rtn = lane.get_evoltion_rx();
