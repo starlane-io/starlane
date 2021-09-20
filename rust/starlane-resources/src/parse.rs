@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{DomainCase, Res, ResourceKind, ResourceKindParts, ResourcePath, ResourcePathAndKind, ResourcePathAndType, ResourcePathSegmentKind, ResourceType, SkewerCase, Specific, Version, ResourceSelector, FieldSelection};
 use crate::error::Error;
-use crate::property::{ResourcePropertyValueSelector, DataSetValueSelector, ResourceValueSelector};
+use crate::property::{ResourcePropertyValueSelector, DataSetAspectSelector, ResourceValueSelector};
 use nom::branch::alt;
 
 fn any_resource_path_segment<T>(i: T) -> Res<T, T>
@@ -352,7 +352,8 @@ mod tests {
 
     use crate::{ResourcePath, ResourcePathAndKind};
     use crate::error::Error;
-    use crate::parse::{parse_resource_path, parse_resource_path_and_kind};
+    use crate::parse::{parse_resource_path, parse_resource_path_and_kind, parse_resource_value_selector};
+    use crate::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, MetaFieldValueSelector};
 
     #[test]
     fn test_parse_resource_path() -> Result<(), Error> {
@@ -407,6 +408,44 @@ mod tests {
         let path = result?;
         assert!(leftover.len()==0);
         assert!(path.path.segments.len()==3);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_resource_value_selector() -> Result<(), Error> {
+        let (leftover, result)= parse_resource_value_selector("hello:my::state")?;
+        let selector = result?;
+        assert!(leftover.len()==0);
+        match selector.property {
+            ResourcePropertyValueSelector::State { aspect: selector, field } => {
+                assert!(selector== DataSetAspectSelector::All);
+                assert!(field==FieldValueSelector::All);
+            }
+        }
+
+        let (leftover, result)= parse_resource_value_selector("hello:my::state['content']")?;
+        let selector = result?;
+        assert!(leftover.len()==0);
+        match selector.property {
+            ResourcePropertyValueSelector::State { aspect , field } => {
+                assert!(aspect== DataSetAspectSelector::Exact("content".to_string()));
+                assert!(field==FieldValueSelector::All);
+            }
+        }
+
+        let (leftover, result)= parse_resource_value_selector("hello:my::state['content']['Content-Type']")?;
+        let selector = result?;
+        assert!(leftover.len()==0);
+        match selector.property {
+            ResourcePropertyValueSelector::State { aspect , field } => {
+                assert!(aspect== DataSetAspectSelector::Exact("content".to_string()));
+                assert!(field==FieldValueSelector::Meta(MetaFieldValueSelector::Exact("Content-Type".to_string())));
+            }
+        }
+
+        let result = parse_resource_value_selector("hello:my:state['content']['Content-Type']");
+        assert!(result.is_err());
 
         Ok(())
     }

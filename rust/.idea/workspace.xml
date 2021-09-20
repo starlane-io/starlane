@@ -8,6 +8,7 @@
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-resources/src/parse.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/parse.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/src/property.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/property.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -64,7 +65,7 @@
       <recent name="$PROJECT_DIR$/starlane-core/src/config" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Run">
+  <component name="RunManager" selected="Cargo.Test parse::tests::test_parse_resource_value_selector">
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
       <option name="command" value="run  --bin starlane -- serve --with-external" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -99,8 +100,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test parse::tests::test_parse_resource_path_and_kind" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-resources --lib parse::tests::test_parse_resource_path_and_kind -- --exact" />
+    <configuration name="Test parse::tests::test_parse_resource_value_selector" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib parse::tests::test_parse_resource_value_selector -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -165,19 +166,19 @@
     </configuration>
     <list>
       <item itemvalue="Cargo.Run" />
-      <item itemvalue="Cargo.Test parse::tests::test_parse_resource_path_and_kind" />
       <item itemvalue="Cargo.Test parse::tests::test_resource_path_from_str" />
       <item itemvalue="Cargo.Test parse::tests::test_resource_path_and_kind_from_str" />
       <item itemvalue="Cargo.Test tests::test_resource_address" />
       <item itemvalue="Cargo.Test parse::tests" />
+      <item itemvalue="Cargo.Test parse::tests::test_parse_resource_value_selector" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Test parse::tests::test_parse_resource_value_selector" />
         <item itemvalue="Cargo.Test parse::tests" />
         <item itemvalue="Cargo.Test tests::test_resource_address" />
         <item itemvalue="Cargo.Test parse::tests::test_resource_path_and_kind_from_str" />
         <item itemvalue="Cargo.Test parse::tests::test_resource_path_from_str" />
-        <item itemvalue="Cargo.Test parse::tests::test_parse_resource_path_and_kind" />
       </list>
     </recent_temporary>
   </component>
@@ -203,7 +204,7 @@
       <workItem from="1630247537849" duration="16379000" />
       <workItem from="1630425338598" duration="532000" />
       <workItem from="1630446426365" duration="31484000" />
-      <workItem from="1631559262142" duration="107738000" />
+      <workItem from="1631559262142" duration="108480000" />
     </task>
     <servers />
   </component>

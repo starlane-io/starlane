@@ -12,22 +12,22 @@ pub struct ResourceValueSelector {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
-pub enum DataSetValueSelector {
+pub enum DataSetAspectSelector {
     All,
     Exact(String)
 }
 
-impl DataSetValueSelector {
+impl DataSetAspectSelector {
     pub fn filter( &self, set: DataSet<BinSrc> ) -> ResourceValue {
         match self {
-            DataSetValueSelector::Exact(aspect) => {
+            DataSetAspectSelector::Exact(aspect) => {
                 let mut rtn = DataSet::new();
                 if set.contains_key(aspect) {
                     rtn.insert( aspect.clone(), set.get(aspect).expect(format!("expected aspect: {}", aspect).as_str() ).clone());
                 }
                 ResourceValue::DataSet(rtn)
             }
-            DataSetValueSelector::All => {
+            DataSetAspectSelector::All => {
                 ResourceValue::DataSet(set)
             }
         }
@@ -36,35 +36,35 @@ impl DataSetValueSelector {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum ResourcePropertyValueSelector {
-    State{ selector: DataSetValueSelector, field: FieldValueSelector }
+    State{ aspect: DataSetAspectSelector, field: FieldValueSelector }
 }
 
 impl ResourcePropertyValueSelector {
 
     pub fn state() -> Self {
         Self::State {
-            selector: DataSetValueSelector::All,
+            aspect: DataSetAspectSelector::All,
             field: FieldValueSelector::All
         }
     }
 
     pub fn state_aspect(aspect: &str) -> Self {
         Self::State {
-            selector: DataSetValueSelector::Exact(aspect.to_string()),
+            aspect: DataSetAspectSelector::Exact(aspect.to_string()),
             field: FieldValueSelector::All
         }
     }
 
     pub fn state_aspect_field(aspect: &str, field: &str) -> Self {
         Self::State {
-            selector: DataSetValueSelector::Exact(aspect.to_string()),
+            aspect: DataSetAspectSelector::Exact(aspect.to_string()),
             field: FieldValueSelector::Meta(MetaFieldValueSelector::Exact(field.to_string()))
         }
     }
 
     pub fn filter( &self, resource: Resource ) -> ResourceValue {
         match self {
-            ResourcePropertyValueSelector::State { selector, field } => {
+            ResourcePropertyValueSelector::State { aspect: selector, field } => {
                 field.filter( selector.filter(resource.state_src ) )
             }
         }
