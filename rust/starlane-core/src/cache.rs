@@ -19,7 +19,6 @@ use starlane_resources::message::Fail;
 use crate::artifact::ArtifactRef;
 use crate::config::app::{AppConfig, AppConfigParser};
 use crate::config::bind::{BindConfig, BindConfigParser};
-use crate::config::domain::{DomainConfig, DomainConfigParser};
 use crate::config::mechtron::{MechtronConfig, MechtronConfigParser};
 use crate::config::wasm::{Wasm, WasmCompiler};
 use crate::error::Error;
@@ -62,7 +61,6 @@ impl ProtoArtifactCachesFactory {
 
 pub struct ArtifactCaches {
     pub raw: ArtifactItemCache<Raw>,
-    pub domain_configs: ArtifactItemCache<DomainConfig>,
     pub app_configs: ArtifactItemCache<AppConfig>,
     pub mechtron_configs: ArtifactItemCache<MechtronConfig>,
     pub bind_configs: ArtifactItemCache<BindConfig>,
@@ -73,7 +71,6 @@ impl ArtifactCaches {
     fn new() -> Self {
         ArtifactCaches {
             raw: ArtifactItemCache::new(),
-            domain_configs: ArtifactItemCache::new(),
             app_configs: ArtifactItemCache::new(),
             mechtron_configs: ArtifactItemCache::new(),
             bind_configs: ArtifactItemCache::new(),
@@ -143,11 +140,6 @@ impl ProtoArtifactCaches {
 
         for (artifact, _claim) in claims {
             match artifact.kind {
-                ArtifactKind::DomainConfig => {
-                    caches
-                        .domain_configs
-                        .add(self.root_caches.domain_configs.get(artifact).await?);
-                }
                 ArtifactKind::AppConfig => {
                     caches
                         .app_configs
@@ -935,7 +927,6 @@ impl<C: Cacheable> RootItemCacheProc<C> {
 struct RootArtifactCaches {
     bundle_cache: ArtifactBundleCache,
     raw: RootItemCache<Raw>,
-    domain_configs: RootItemCache<DomainConfig>,
     app_configs: RootItemCache<AppConfig>,
     mechtron_configs: RootItemCache<MechtronConfig>,
     bind_configs: RootItemCache<BindConfig>,
@@ -948,7 +939,6 @@ impl RootArtifactCaches {
         Self {
             bundle_cache: bundle_cache.clone(),
             raw: RootItemCache::new(bundle_cache.clone(), Arc::new(RawParser::new())),
-            domain_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(DomainConfigParser::new())),
             app_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(AppConfigParser::new())),
             mechtron_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(MechtronConfigParser::new())),
             bind_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(BindConfigParser::new())),
@@ -958,7 +948,6 @@ impl RootArtifactCaches {
 
     async fn claim(&self, artifact: ArtifactRef) -> Result<Claim, Error> {
         let claim = match artifact.kind {
-            ArtifactKind::DomainConfig => self.domain_configs.cache(artifact).await?.into(),
             ArtifactKind::AppConfig=> self.app_configs.cache(artifact).await?.into(),
             ArtifactKind::MechtronConfig=> self.mechtron_configs.cache(artifact).await?.into(),
             ArtifactKind::BindConfig=> self.bind_configs.cache(artifact).await?.into(),

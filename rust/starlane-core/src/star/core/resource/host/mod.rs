@@ -139,7 +139,6 @@ impl HostComponent {
             ResourceType::Space => Arc::new(SpaceHost::new(self.skel.clone()).await),
             ResourceType::ArtifactBundleSeries => Arc::new(StatelessHost::new(self.skel.clone()).await),
             ResourceType::ArtifactBundle=> Arc::new(ArtifactBundleHost::new(self.skel.clone()).await),
-            ResourceType::Domain => Arc::new(StatelessHost::new(self.skel.clone()).await),
             ResourceType::App=> Arc::new(AppHost::new(self.skel.clone()).await),
             ResourceType::Mechtron => Arc::new(MechtronHost::new(self.skel.clone()).await),
             ResourceType::Database => Arc::new(KubeHost::new(self.skel.clone()).await.expect("KubeHost must be created without error")),

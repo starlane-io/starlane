@@ -156,7 +156,7 @@ impl StarKind {
     pub fn manages(&self) -> HashSet<ResourceType> {
         HashSet::from_iter(
             match self {
-                StarKind::Central => vec![ResourceType::Space,ResourceType::Domain],
+                StarKind::Central => vec![ResourceType::Space],
                 StarKind::Space => vec![
                     ResourceType::App,
                     ResourceType::FileSystem,
@@ -173,7 +173,7 @@ impl StarKind {
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
                 StarKind::Client => vec![],
-                StarKind::Web => vec![ResourceType::Domain],
+                StarKind::Web => vec![],
                 StarKind::FileStore => vec![ResourceType::File],
                 StarKind::ArtifactStore => vec![ResourceType::Artifact],
                 StarKind::K8s => vec![ResourceType::Database],
@@ -199,7 +199,6 @@ impl StarKind {
             ResourceType::ArtifactBundle => Self::ArtifactStore,
             ResourceType::Artifact => Self::ArtifactStore,
             ResourceType::Proxy => Self::Space,
-            ResourceType::Domain => Self::Central,
             ResourceType::Credentials=> Self::Space,
         }
     }
@@ -220,7 +219,6 @@ impl StarKind {
             ResourceType::ArtifactBundle => Self::ArtifactStore,
             ResourceType::Artifact => Self::ArtifactStore,
             ResourceType::Proxy => Self::Space,
-            ResourceType::Domain => Self::Space,
             ResourceType::Credentials => Self::Space,
         }
     }
@@ -233,7 +231,6 @@ impl StarKind {
                     ResourceType::Space,
                     ResourceType::User,
                     ResourceType::UserBase,
-                    ResourceType::Domain,
                     ResourceType::Proxy,
                 ],
                 StarKind::Mesh => vec![],

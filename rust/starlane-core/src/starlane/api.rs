@@ -368,25 +368,6 @@ info!("received reply for {}",description);
         Ok(Creation::new(self.clone(), create))
     }
 
-    pub fn create_domain(&self, domain: &str) -> Result<Creation<DomainApi>, Error> {
-        let state= AssignResourceStateSrc::Stateless;
-        let create = ResourceCreate {
-            parent: ResourceKey::Root.into(),
-            key: KeyCreationSrc::None,
-            address: AddressCreationSrc::Just(domain.to_string()),
-            archetype: ResourceArchetype {
-                kind: ResourceKind::Domain,
-                specific: None,
-                config: None,
-            },
-            state_src: state,
-            registry_info: None,
-            owner: None,
-            strategy: ResourceCreateStrategy::Create,
-            from: MessageFrom::Inject
-        };
-        Ok(Creation::new(self.clone(), create))
-    }
 
     pub async fn get_space(&self, identifier: ResourceIdentifier) -> Result<SpaceApi, Error> {
         let record = self.fetch_resource_record(identifier).await?;
@@ -848,34 +829,6 @@ impl UserApi {
     }
 }
 
-pub struct DomainApi {
-    stub: ResourceStub,
-    surface_api: SurfaceApi,
-}
-
-impl DomainApi {
-    pub fn new(surface_api: SurfaceApi, stub: ResourceStub) -> Result<Self, Error> {
-        if stub.key.resource_type() != ResourceType::Domain {
-            return Err(format!(
-                "wrong key resource type for DomainApi: {}",
-                stub.key.resource_type().to_string()
-            )
-            .into());
-        }
-        if stub.archetype.kind.resource_type() != ResourceType::Domain {
-            return Err(format!(
-                "wrong address resource type for DomainApi: {}",
-                stub.archetype.kind.resource_type().to_string()
-            )
-            .into());
-        }
-
-        Ok(DomainApi {
-            surface_api: surface_api,
-            stub: stub,
-        })
-    }
-}
 
 pub struct Creation<API>
 where
@@ -992,13 +945,6 @@ impl TryFrom<ResourceApi> for UserApi {
     }
 }
 
-impl TryFrom<ResourceApi> for DomainApi {
-    type Error = Error;
-
-    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
-        Ok(Self::new(value.surface_api, value.stub)?)
-    }
-}
 
 #[derive(Debug)]
 pub enum StarlaneAction {

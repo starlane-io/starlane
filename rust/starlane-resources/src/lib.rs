@@ -1483,14 +1483,6 @@ resources! {
     #[resource(ResourceStatePersistenceManager::Host)]
     pub struct Credentials();
 
-
-
-    #[resource(parents(Root))]
-    #[resource(prefix="d")]
-    #[resource(ResourcePathSegmentKind::Domain)]
-    #[resource(ResourceStatePersistenceManager::None)]
-    pub struct Domain();
-
     #[resource(parents(Space))]
     #[resource(prefix="p")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
@@ -1554,7 +1546,6 @@ resources! {
     #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
     pub enum ArtifactKind{
         Raw,
-        DomainConfig,
         AppConfig,
         MechtronConfig,
         BindConfig,

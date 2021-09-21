@@ -62,7 +62,6 @@ pub type AppKey = starlane_resources::AppKey;
 pub type DatabaseKey = starlane_resources::DatabaseKey;
 pub type ActorKey = starlane_resources::MechtronKey;
 pub type ProxyKey = starlane_resources::ProxyKey;
-pub type DomainKey = starlane_resources::DomainKey;
 pub type UserKey = starlane_resources::UserKey;
 pub type ArtifactKey = starlane_resources::ArtifactKey;
 pub type FileSystemKey = starlane_resources::FileSystemKey;
