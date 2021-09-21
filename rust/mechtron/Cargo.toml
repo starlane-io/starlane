@@ -3,10 +3,10 @@ name = "mechtron"
 version = "0.1.0"
 authors = ["Scott Williams <scott@mightydevco.com>"]
 edition = "2018"
-description = ""
 homepage = "http://starlane.io"
 repository = "https://github.com/mechtronium/starlane"
-license = "MIT OR Apache-2.0"
+license = "MIT"
+description = "The Wasm Package to help easily create a Mechtron"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
@@ -17,10 +17,10 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen = "0.2.76"
-mechtron-common = { path = "../mechtron-common"}
+mechtron-common = { path = "../mechtron-common", version="0.1.0"}
 lazy_static = "1.4.0"
-wasm_membrane_guest = { path = "../wasm_membrane_guest"}
-starlane-resources= { path = "../starlane-resources"}
+wasm_membrane_guest = { path = "../wasm_membrane_guest", version="0.1.0"}
+starlane-resources= { path = "../starlane-resources", version="0.1.0"}
 
 serde_json = "1.0.61"
 serde = { version="1.0.69", features=['derive','rc'] }
