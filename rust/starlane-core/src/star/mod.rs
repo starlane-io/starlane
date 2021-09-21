@@ -158,7 +158,6 @@ impl StarKind {
             match self {
                 StarKind::Central => vec![ResourceType::Space,ResourceType::Domain],
                 StarKind::Space => vec![
-                    ResourceType::SubSpace,
                     ResourceType::App,
                     ResourceType::FileSystem,
                     ResourceType::Proxy,
@@ -188,7 +187,6 @@ impl StarKind {
         match rt {
             ResourceType::Root => Self::Central,
             ResourceType::Space => Self::Central,
-            ResourceType::SubSpace => Self::Space,
             ResourceType::User => Self::Space,
             ResourceType::UserBase => Self::Space,
             ResourceType::App => Self::Space,
@@ -210,7 +208,6 @@ impl StarKind {
         match rt {
             ResourceType::Root => Self::Central,
             ResourceType::Space => Self::Space,
-            ResourceType::SubSpace => Self::Space,
             ResourceType::User => Self::Space,
             ResourceType::App => Self::App,
             ResourceType::Mechtron => Self::Mechtron,
@@ -234,7 +231,6 @@ impl StarKind {
                 StarKind::Central => vec![ResourceType::Root],
                 StarKind::Space => vec![
                     ResourceType::Space,
-                    ResourceType::SubSpace,
                     ResourceType::User,
                     ResourceType::UserBase,
                     ResourceType::Domain,

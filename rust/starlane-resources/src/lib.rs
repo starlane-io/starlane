@@ -1439,14 +1439,6 @@ resources! {
     #[resource(state(meta::Meta))]
     pub struct Space();
 
-
-    #[resource(parents(Space))]
-    #[resource(prefix="ss")]
-    #[resource(ResourcePathSegmentKind::SkewerCase)]
-    #[resource(ResourceStatePersistenceManager::Store)]
-    #[resource(state(meta::Meta))]
-    pub struct SubSpace();
-
     #[resource(parents(Space))]
     #[resource(prefix="app")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
