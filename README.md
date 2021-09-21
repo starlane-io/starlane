@@ -1,5 +1,5 @@
 # STARLANE
-Starlane is the world's first *RESOURCE MESH*. 
+Starlane is the world's first **RESOURCE MESH**. 
 
 A large amount of the complexity of your enterprise can be transferred from the application level to Starlane.  Less complexity means: faster development, easier to understand and fewer bugs.
 
@@ -9,7 +9,7 @@ But first...
 
 We'll explain what a Resource Mesh is shortly. First it's important for you to know that: 
 
-An enterprise is nothing more than *Services*, *Resources* and the *Mesh* that binds them all togheter.  
+An enterprise is nothing more than **Services**, **Resources** and the **Mesh** that binds them all togheter.  
 
 For anyone who doesn't know: Resources are nouns, they are 'things', Services are 'verbs' they act upon Resources and Meshes are the universe... the medium through which all interactions take place. A primitive mesh would be your local area network and The largest mesh  would be the internet. 
 
