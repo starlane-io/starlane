@@ -19,6 +19,7 @@ use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::star::core::resource::host::{HostCall, HostComponent};
 use crate::star::shell::pledge::ResourceHostSelector;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
+use tokio::sync::oneshot::error::RecvError;
 
 pub enum CoreMessageCall {
     Message(StarMessage),
@@ -172,11 +173,21 @@ println!("Create...{}", create.archetype.kind.to_string() );
                         let (tx, rx) = oneshot::channel();
                         host_tx.send(HostCall::UpdateState{ key, state, tx }).await?;
                         let result = rx.await;
-                        if let Ok(Ok(())) = result {
-                            delivery.reply(Reply::Empty);
-                        } else {
-                            delivery.fail(Fail::expected("Ok(Ok(()))"));
+
+                        match result {
+                            Ok(Ok(())) => {
+                                delivery.reply(Reply::Empty);
+                            }
+                            Ok(Err(error)) => {
+                                eprintln!("result error: {}", error.to_string() );
+                                delivery.fail(Fail::expected("Ok(Ok(()))"));
+                            }
+                            Err(error) => {
+                                eprintln!("Recv Error");
+                                delivery.fail(Fail::expected("Ok(Ok(()))"));
+                            }
                         }
+
                     }
                 }
                 Ok(())

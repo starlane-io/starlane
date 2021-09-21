@@ -81,7 +81,6 @@ impl Host for FileHost {
 
         self.skel.watch_api.fire( Notification::new(selector, Change::State(state.clone()) ));
 
-
         Ok(())
     }
 

@@ -105,7 +105,7 @@ impl AsyncProcessor<HostCall> for HostComponent {
             }
             HostCall::UpdateState { key, state, tx }  => {
                 let host = self.host(key.resource_type()).await;
-                host.update_state(key, state);
+                tx.send(host.update_state(key, state).await);
             }
             HostCall::Has { key, tx } => {
                 let host = self.host(key.resource_type()).await;
