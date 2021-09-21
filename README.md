@@ -1,5 +1,5 @@
 # STARLANE
-Starlane is the world's first Resource Mesh. 
+Starlane is the world's first *RESOURCE MESH*. 
 
 A large amount of the complexity of your enterprise can be transferred from the application level to Starlane.  Less complexity means: faster development, easier to understand and fewer bugs.
 
@@ -7,23 +7,23 @@ But first...
 
 ## WHAT IS A RESOURCE MESH?
 
-But what is a Resource Mesh?  We'll get into that shortly. First it's important for you to know that: 
+We'll explain what a Resource Mesh is shortly. First it's important for you to know that: 
 
-An enterprise is nothing more than Services, Resources and the Mesh that binds them all togheter.  
+An enterprise is nothing more than *Services*, *Resources* and the *Mesh* that binds them all togheter.  
 
 For anyone who doesn't know: Resources are nouns, they are 'things', Services are 'verbs' they act upon Resources and Meshes are the universe... the medium through which all interactions take place. A primitive mesh would be your local area network and The largest mesh  would be the internet. 
 
-You may have heard of Service Meshes before. Whereas the raw network was just a medium of information transmition the innovation of Service Meshes was that knowledge could be enshrined between things instead of in things. For example, the credentials for the database didn't need to be known by the rest service. The trusted rest service could connect directly to the mesh which in turn provided the credintials to the database... This made things HUGELY easier to configure since multiple services used the same databases.  
+You may have heard of Service Meshes before. Whereas the raw network was just a mindless medium of information transmition the innovation of Service Meshes was that knowledge could be enshrined between things instead of in things. For example, the credentials for the database didn't need to be known by the rest service. The trusted rest service could connect directly to the mesh which in turn provided the credintials to the database... This made things HUGELY easier to configure since multiple services used the same databases.  
 
-Service meshes are amazing in many other ways, but at their core they moved complexity from Services--which there are many of--to a single Mesh which there is one of and as a rule complexity is easier to manage in one place.
+Service meshes are amazing in many other ways, but at their core they moved complexity from Services--which there are many of--to a single Mesh which there is one of. As a rule complexity is easier to manage in one place.
 
-Now let's consider a the developer creating an application composed of services. We'll write his code in plain english... He codes: "Send a save request message to the file service 'xyz' for file '123' and to save it in bucket 'ABC'." 
+Now let's consider a the developer creating an application composed of services. We'll write his code in plain english: He codes: "Send a save request message to the file service 'xyz' for file '123' and to save it in bucket 'ABC'." 
 
-It's weird because as programmers it's like we spend all day telling verbs what to do to nouns.  
+It's weird because as developers it's like we spend all day telling verbs what to do to nouns.  
 
-As a developer I have always wanted to write my code like this: "save this file."  Can you see the difference?  When i'm talking directly to the resources some things are understood "(You, the bucket) save this file (the file I'm holding in my hand)."  Speaking directly in a clear context reduces what needs to be said which makes the meaning easier to understand while it also reduces what can go wrong.
+I have always wanted to write my code like this: "save this file."  Can you see the difference?  When I'm talking directly to the resources some things are understood "(You, the bucket) save this file (the file I'm holding in my hand)."  Speaking directly in a clear context reduces what needs to be said which makes the meaning easier to understand while it also reduces what can go wrong.
 
-Now, back to the technology: Of course, Resources aren't supposed to do anything, so how exactly are we going to talk to things that don't do anything? The answer is that a Resource Mesh is a facade that takes what the developer is saying to the resources and with its knowledge converts to instructions that the Services can act upon. 
+Now, back to the technology: Of course, Resources aren't supposed to do anything, so how exactly are we going to talk to things that don't do anything? The answer is that a Resource Mesh is a facade that takes what the developer is saying to the resources and with its knowledge converts to instructions that the Services can act upon.  
 
 ## EXAMPLE
 Say you have an application with a service that lets a user upload a profile picture to a mounted persistent store, and another service that sizes that image file correctly and copies the resized file to an S3 bucket.  We will call these services the 'upload' service and the 'profile-processor' service. 
