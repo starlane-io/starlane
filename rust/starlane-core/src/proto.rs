@@ -297,7 +297,6 @@ impl ProtoStar {
                             self.lane_muxer_api.broadcast(Frame::Proto(
                                 ProtoFrame::GatewayAssign(subgraph),
                             ), LanePattern::Protos );
-println!("RECEIVED GATEWAY ASSIGN!");
                             self.check_ready();
                         } else {
                             eprintln!("not expecting a GatewayAssign for this ProtoStarKey which is already assigned.")

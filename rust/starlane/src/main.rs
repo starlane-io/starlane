@@ -356,8 +356,6 @@ pub async fn starlane_api() -> Result<StarlaneApi, Error> {
         config.hostname.clone()
     };
     layout.set_machine_host_address("host".to_string(), host);
-    println!("getting ready to create constellation...");
     starlane.create_constellation("client", layout).await?;
-    println!("client constellation created.");
     Ok(starlane.get_starlane_api().await?)
 }

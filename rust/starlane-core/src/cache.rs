@@ -300,7 +300,6 @@ impl ArtifactBundleCacheRunner {
                 .build()
                 .expect("<ArtifactBundleCacheRunner> FATAL: could not get tokio runtime");
             rt.block_on(async move {
-println!("Staring ArtifactBundleCacheRunner...");
                 runner.run().await;
             });
         });
@@ -312,7 +311,6 @@ println!("Staring ArtifactBundleCacheRunner...");
             match command {
                 ArtifactBundleCacheCommand::Cache { bundle, tx } => {
                     let bundle_identifier: ResourceIdentifier = bundle.clone().into();
-                    println!("fetching resource record...");
                     let record = match self.src.fetch_resource_record(bundle_identifier).await {
                         Ok(record) => record,
                         Err(err) => {

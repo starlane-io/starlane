@@ -82,18 +82,13 @@ impl CentralVariant {
 
 impl CentralVariant {
     async fn ensure(starlane_api: StarlaneApi) -> Result<(), Error> {
-        info!("ensuring space...");
 
         let mut creation = starlane_api.create_space("space", "Space")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         let space_api = creation.submit().await?;
-        info!("space ensured.");
 
         {
-            info!(
-                "ensuring artifact: {}",
-                create_args::artifact_bundle_address().to_string()
-            );
+
             let address = create_args::artifact_bundle_address();
             let mut creation = space_api
                 .create_artifact_bundle_versions(address.parent().unwrap().name().as_str())?;
@@ -108,7 +103,6 @@ impl CentralVariant {
             creation.set_strategy(ResourceCreateStrategy::Ensure);
             creation.submit().await?;
         }
-        info!("created artifact bundle.");
 
         Ok(())
     }

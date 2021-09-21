@@ -73,7 +73,6 @@ fn start(api: StarlaneApi) {
 
             match std::net::TcpListener::bind("127.0.0.1:8080") {
                 Ok(std_listener) => {
-info!("LISTENING to 8080");
                     let listener = TcpListener::from_std(std_listener).unwrap();
                     while let Ok((mut stream, _)) = listener.accept().await {
                         match process_request(stream, api.clone()).await {

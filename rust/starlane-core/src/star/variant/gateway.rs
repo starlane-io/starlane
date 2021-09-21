@@ -45,7 +45,6 @@ impl GatewayVariant {
     ) -> FrameVerdict {
         match frame{
             Frame::Proto(ProtoFrame::GatewaySelect) => {
-println!("RECEIVED GATEWAY SELECT");
                 let mut subgraph = self.skel.info.key.child_subgraph();
                 subgraph.push(StarSubGraphKey::Big(
                     self.skel.sequence.fetch_add(1, Ordering::Relaxed),

@@ -39,7 +39,6 @@ impl Host for StatelessHost {
                 return Err("must be stateless or empty create args".into());
             }
         };
-println!("StatelessHost: create {}", assign.stub.archetype.kind.to_string() );
 
         Ok(DataSet::new())
     }

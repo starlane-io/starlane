@@ -31,12 +31,10 @@ impl WatchApi {
     }
 
     pub fn fire(&self, notification: Notification ){
-println!("WatchApi: FIRE NOTIFICATION!");
         self.tx.try_send(WatchCall::Fire(notification)).unwrap_or_default();
     }
 
     pub fn watch(&self, watch: Watch, session: LaneSession) {
-println!("WatchApi: Watching: {}", session.lane.to_string() );
         self.tx.try_send(WatchCall::WatchForLane {watch,session} ).unwrap_or_default();
     }
 
@@ -121,7 +119,6 @@ impl AsyncProcessor<WatchCall> for WatchComponent {
 impl WatchComponent {
 
     fn watch_for_lane(&mut self, watch: Watch, session: LaneSession) {
-println!("WatchApi: WATCHING on star {} for lane: {}",  self.skel.info.key.to_string(), session.lane.to_string() );
         if let LaneKey::Ultima(lane) = session.lane
 
         {
@@ -140,7 +137,6 @@ println!("WatchApi: WATCHING on star {} for lane: {}",  self.skel.info.key.to_st
             };
 
             watches.push(watch.clone());
-println!("WatchApi::watch_for_lane inserting selector: {:?}", watch.selector );
             self.selection_to_lane.insert(watch.selector.clone(), watches );
 
             let skel = self.skel.clone();
@@ -154,11 +150,9 @@ println!("WatchApi::watch_for_lane inserting selector: {:?}", watch.selector );
     }
 
     async fn watch_next(skel: StarSkel, selector: WatchSelector) {
-println!("WatchApi::watch_next");
             match Self::find_next(&skel,&selector).await {
                 Ok(next) => {
 
-println!("WatchApi ... found next: {}", next.to_string() );
                     skel.watch_api.tx.try_send( WatchCall::Next { selector: selector, next }).unwrap_or_default();
                 }
                 Err(error) => {
@@ -191,7 +185,6 @@ println!("WatchApi ... found next: {}", next.to_string() );
 
     fn next(&mut self, selection: WatchSelector, next: NextKind ) {
 
-println!("WatchApi::next( {} )", self.skel.info.key.to_string() );
         if !self.selection_to_next.contains_key(&selection ) {
             let next = NextWatch::new(next, selection.clone() );
             self.selection_to_next.insert(selection.clone(), next.clone() );
@@ -224,9 +217,6 @@ println!("WatchApi::next( {} )", self.skel.info.key.to_string() );
 
 
     fn watch(&mut self, selector: WatchSelector, result_tx: oneshot::Sender<Watcher> )  {
-println!("WatchApi: adding listener on star {}",  self.skel.info.key.to_string() );
-
-
         {
             let skel = self.skel.clone();
             let selector_cp = selector.clone();
@@ -274,25 +264,15 @@ println!("WatchApi: adding listener on star {}",  self.skel.info.key.to_string()
     }
 
     fn notify(&self, notification: Notification ) {
-println!("WatchApi: notify({}) selectors: {}", self.skel.info.key.to_string(), self.selection_to_lane.len() );
-println!("WatchApi: notify() notification.selector: {:?}", notification.selector );
-
-for (k,v) in &self.selection_to_lane {
-    println!("WatchApi: k {:?}", k );
-    println!("WatchApi: notify() selector == k {}", notification.selector == *k );
-}
         let mut lanes = HashSet::new();
         if let Option::Some(watch_lanes) = self.selection_to_lane.get(&notification.selector) {
 
-println!("WatchApi: found a selector watchlane list : {}", watch_lanes.len() );
             for watch_lane in watch_lanes {
-println!("WatchApi adding watch lane: {}", watch_lane.key);
                 lanes.insert( watch_lane.lane.clone() );
             }
         }
 
         for lane in lanes {
-println!("WatchApi:: forwarding frame: {}", lane.to_string() );
             self.skel.lane_muxer_api.forward_frame(LaneKey::Ultima(lane), Frame::Watch(WatchFrame::Notify(notification.clone())));
         }
 
