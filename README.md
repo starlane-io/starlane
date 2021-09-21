@@ -1,13 +1,13 @@
 # STARLANE
 Starlane is the world's first **RESOURCE MESH**. 
 
-A large amount of the complexity of your enterprise can be transferred from the application level to Starlane.  Less complexity means: faster development, easier to understand and fewer bugs.
+A large amount of the complexity of your enterprise can be transferred from the application level to the Starlane Resource Mesh.  Less complexity means: faster development, easier to understand and fewer bugs.
 
 But first...
 
 ## WHAT IS A RESOURCE MESH?
 
-We'll explain what a Resource Mesh is shortly. First it's important for you to know that: 
+First, it's important for you to know that: 
 
 An enterprise is nothing more than **Services**, **Resources** and the **Mesh** that binds them all togheter.  
 
@@ -21,9 +21,9 @@ Now let's consider a the developer creating an application composed of services.
 
 It's weird because as developers it's like we spend all day telling verbs what to do to nouns.  
 
-I have always wanted to write my code like this: "save this file."  Can you see the difference?  When I'm talking directly to the resources some things are understood "(You, the bucket) save this file (the file I'm holding in my hand)."  Speaking directly in a clear context reduces what needs to be said which makes the meaning easier to understand while it also reduces what can go wrong.
+I have always wanted to write my code like this: "save this file."  Can you see the difference?  When I'm talking directly to the resources some things are understood: "(You, the bucket) save this file (the file I'm holding in my hand)."  Speaking directly in a clear context reduces what needs to be said which makes the meaning easier to understand while it also reduces what can go wrong.
 
-Now, back to the technology: Of course, Resources aren't supposed to do anything, so how exactly are we going to talk to things that don't do anything? The answer is that a Resource Mesh is a facade that takes what the developer is saying to the resources and with its knowledge converts to instructions that the Services can act upon.  
+Now, back to the technology: Of course, Resources aren't supposed to do anything, so how exactly are we going to talk to things that don't do anything? The answer is that a Resource Mesh is a facade that takes what the developer is saying to the resources and with its knowledge converts to instructions that the Services can act upon.
 
 ## EXAMPLE
 Say you have an application with a service that lets a user upload a profile picture to a mounted persistent store, and another service that sizes that image file correctly and copies the resized file to an S3 bucket.  We will call these services the 'upload' service and the 'profile-processor' service. 
@@ -125,30 +125,5 @@ It's not the best way to implement this solution in Spring, but to make things f
 The startWatch() method begings to watch the children of the main:uploads filesystem for changes. When a new file is added to uploads a notification is pushed via the starlane connection to the profile-processor service.  
 
 The profile-processor service resizes the image and then copies the newly resized image to the S3 bucket by creating a new file.  
-
-## VS THE TRADITONAL SERVICES BASED APPROACH
-
-
-// this is only pseudo code for example's sake, don't try to run it!
-
-@Service
-public class UploadService {
-
-  @Autowired
-  private S3Bucket bucket;
-
-  public void upload( String username, byte[] image ) {
-     // create by specifying an address and providing the raw image bytes as the state
-     var path = String.format("main:uploads:/%s<File>",username);
-     starlane.create( path, image );   
-  }
-
-}
-
-
-
-Some hidden advantages to this approach which are not seen in the code: each service only one external service connection configuration had to be supplied which was that of Starlane itself.  The developer didn't need to wrangle with, learn and configure as many APIs, without Starlane he would have had to ensure that the uploads service was being hosted on a deployment with a persistent disk, and configure the uploads directory to write to. For profile-processor he would have had to learn how to use an S3 API as well as configure the connection to the bucket and setup the bucket.  
-
-Lastly without Starlane the two services would have needed some method of communicating with each other (uploads needs to tell profile-processor that there is a new image ready to be processed.)  This inter service communication traditionally would be handled through a message queue (like Kafka or RabbitMQ.) Both applications would have had to have libraries to facilitate communication with the message broker software and they would require configuration to connect to the service as well as coordination to make sure they were publishing and subscribing to the same queue.
 
 
