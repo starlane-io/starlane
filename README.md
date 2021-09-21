@@ -1,11 +1,21 @@
 # starlane
-Starlane is the world's first Micro Resource Mesh.  You may have already heard of a Service Mesh which helps your micro services find and communicate to each other in a secure and centrally configurable manner among many other things.  A Resource Mesh helps your applications communicate directly to Resources.  Examples of micro resources inlcude: Files, Users, Database Tables, Message Queues, Schedulers, Oauth Providers, Artifacts, Configurations, Credentials and more! 
+Starlane is the world's first Micro Resource Mesh.  
+
+You may have already heard of a Service Mesh which helps your micro services find and communicate to each other in a secure and centrally configurable manner among many other things.  
+
+A Resource Mesh helps your applications communicate directly to Resources.  Examples of micro resources inlcude: Files, Users, Database Tables, Message Queues, Schedulers, Oauth Providers, Artifacts, Configurations, Credentials and more! 
 
 ## WHAT'S THE ADVANTANGE?
-In a pure service oriented archetecture the application is making requests to services to handle resources on it's behalf.  A Resource Mesh provides a facade that allows the application to handle resources directly.  Underneath the resource mesh is still utilizing the services however a great deal of complexity involved in locating, creating, moving, sharding and manipulating the resources has now been moved into the resource mesh and out of the application.  Less complex applications means faster development, easier to understand code and fewer bugs.
+In a pure service oriented archetecture the application is making requests to services to handle resources on it's behalf.  
+
+A Resource Mesh provides a facade that allows the application to handle resources directly.  
+
+Underneath the resource mesh is still utilizing the services however a great deal of complexity involved in locating, creating, moving, sharding and manipulating the resources has now been moved into the resource mesh and out of the application.  Less complex applications means faster development, easier to understand code and fewer bugs.
 
 ## EXAMPLE
-Let's give a simple example.  Say you have an application with a service that lets a user upload a profile picture to a mounted persistent store, and another service that sizes that image file correctly and copies the resized file to an S3 bucket.  We will call these services the 'upload' service and the 'profile-processor' service. 
+Let's give a simple example.  
+
+Say you have an application with a service that lets a user upload a profile picture to a mounted persistent store, and another service that sizes that image file correctly and copies the resized file to an S3 bucket.  We will call these services the 'upload' service and the 'profile-processor' service. 
 
 In the starlane CLI we would create two filesystems resources:
 
