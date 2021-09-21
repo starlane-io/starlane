@@ -1439,6 +1439,7 @@ resources! {
     #[resource(state(meta::Meta))]
     pub struct Space();
 
+
     #[resource(parents(Space))]
     #[resource(prefix="ss")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
@@ -1446,7 +1447,7 @@ resources! {
     #[resource(state(meta::Meta))]
     pub struct SubSpace();
 
-    #[resource(parents(SubSpace))]
+    #[resource(parents(Space))]
     #[resource(prefix="app")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
     #[resource(ResourceStatePersistenceManager::None)]
@@ -1458,7 +1459,7 @@ resources! {
     #[resource(ResourceStatePersistenceManager::None)]
     pub struct Mechtron();
 
-    #[resource(parents(SubSpace,App))]
+    #[resource(parents(Space,App))]
     #[resource(prefix="fs")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
     #[resource(ResourceStatePersistenceManager::Host)]
@@ -1472,13 +1473,13 @@ resources! {
     #[resource(state(content::Binary))]
     pub struct File();
 
-    #[resource(parents(SubSpace))]
+    #[resource(parents(Space))]
     #[resource(prefix="db")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
     #[resource(ResourceStatePersistenceManager::Host)]
     pub struct Database();
 
-    #[resource(parents(Space,SubSpace,App))]
+    #[resource(parents(Space,App))]
     #[resource(prefix="auth")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
     #[resource(ResourceStatePersistenceManager::Host)]
@@ -1498,13 +1499,13 @@ resources! {
     #[resource(ResourceStatePersistenceManager::None)]
     pub struct Domain();
 
-    #[resource(parents(SubSpace))]
+    #[resource(parents(Space))]
     #[resource(prefix="p")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
     #[resource(ResourceStatePersistenceManager::None)]
     pub struct Proxy();
 
-    #[resource(parents(SubSpace))]
+    #[resource(parents(Space))]
     #[resource(prefix="abv")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
     #[resource(ResourceStatePersistenceManager::None)]
@@ -1525,7 +1526,7 @@ resources! {
     #[resource(state(content::Binary))]
     pub struct Artifact();
 
-    #[resource(parents(Space,SubSpace,App))]
+    #[resource(parents(Space,App))]
     #[resource(prefix="ub")]
     #[resource(ResourcePathSegmentKind::SkewerCase)]
     #[resource(ResourceStatePersistenceManager::Host)]

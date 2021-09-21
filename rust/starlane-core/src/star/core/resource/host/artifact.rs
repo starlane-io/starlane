@@ -332,10 +332,14 @@ impl Host for ArtifactBundleHost {
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
     ) -> Result<DataSet<BinSrc>, Error> {
         let state = match assign.state_src {
-            AssignResourceStateSrc::Direct(data) => data,
-            AssignResourceStateSrc::Stateless => return Err("ArtifactBundle cannot be stateless".into()),
+            AssignResourceStateSrc::Direct(data) => {
+                data
+            },
+            AssignResourceStateSrc::Stateless => {
+                return Err("ArtifactBundle cannot be stateless".into())
+            },
             AssignResourceStateSrc::CreateArgs(ref args) => {
-                unimplemented!()
+                return Err("ArtifactBundle does not accept create-args".into())
            }
         };
 

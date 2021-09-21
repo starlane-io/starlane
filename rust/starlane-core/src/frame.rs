@@ -17,7 +17,7 @@ use crate::message::{MessageExpect, MessageUpdate, ProtoStarMessage};
 use crate::message::resource::ActorMessage;
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey};
 use crate::watch::{Notification, Watch, WatchKey};
-use crate::resource::{ResourceId, ResourceRegistration, ResourceRecord, ResourceType, ResourceKey, ResourceSliceStatus, SubSpaceKey, UserKey, AppKey, ActorKey};
+use crate::resource::{ResourceId, ResourceRegistration, ResourceRecord, ResourceType, ResourceKey, ResourceSliceStatus,  UserKey, AppKey, ActorKey};
 use starlane_resources::property::ResourceValues;
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
@@ -504,7 +504,6 @@ pub enum MessageAckKind {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SpaceMessage {
-    pub sub_space: SubSpaceKey,
     pub user: UserKey,
     pub payload: SpacePayload,
 }
@@ -512,7 +511,6 @@ pub struct SpaceMessage {
 impl SpaceMessage {
     pub fn with_payload(&self, payload: SpacePayload) -> Self {
         SpaceMessage {
-            sub_space: self.sub_space.clone(),
             user: self.user.clone(),
             payload: payload,
         }

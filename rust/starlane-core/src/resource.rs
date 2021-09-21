@@ -39,7 +39,6 @@ pub mod create_args;
 pub mod file;
 pub mod file_system;
 pub mod selector;
-pub mod sub_space;
 pub mod user;
 
 pub type ResourceType = starlane_resources::ResourceType;
@@ -59,7 +58,6 @@ pub type ResourceAddressPartKind = starlane_resources::ResourcePathSegmentKind;
 
 pub type RootKey = starlane_resources::RootKey;
 pub type SpaceKey = starlane_resources::SpaceKey;
-pub type SubSpaceKey = starlane_resources::SubSpaceKey;
 pub type AppKey = starlane_resources::AppKey;
 pub type DatabaseKey = starlane_resources::DatabaseKey;
 pub type ActorKey = starlane_resources::MechtronKey;

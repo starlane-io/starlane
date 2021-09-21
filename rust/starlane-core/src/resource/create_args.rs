@@ -30,7 +30,7 @@ args:
 }
 
 pub fn artifact_bundle_address() -> ResourcePath {
-    let address = format!("hyperspace:starlane:core:{}", crate::VERSION.to_string());
+    let address = format!("space:core:{}", crate::VERSION.to_string());
     ResourcePath::from_str(address.as_str()).expect(
         format!(
             "FATAL: expected artifact_bundle_address '{}' to be parse-able",

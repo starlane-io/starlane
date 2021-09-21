@@ -82,39 +82,12 @@ impl CentralVariant {
 
 impl CentralVariant {
     async fn ensure(starlane_api: StarlaneApi) -> Result<(), Error> {
-        info!("ensuring hyperspace...");
-        let mut creation = starlane_api.create_space("hyperspace", "Hyper Space")?;
+        info!("ensuring space...");
+
+        let mut creation = starlane_api.create_space("space", "Space")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         let space_api = creation.submit().await?;
-        info!("hyperspace ensured.");
-
-
-        info!("ensuring subspace...");
-        let mut creation = space_api.create_sub_space("starlane", "Starlane")?;
-        creation.set_strategy(ResourceCreateStrategy::Ensure);
-        let subspace_api = creation.submit().await?;
-        info!("subspace ensured.");
-
-
-        /*
-                let mut creation = space_api.create_user("hyperuser@starlane.io")?;
-                creation.set_strategy(ResourceCreateStrategy::Ensure);
-                creation.submit().await?;
-        println!("hyperuser ensured.");
-
-                 */
-
-        /*
-        let mut creation = starlane_api.create_domain("localhost")?;
-
-        creation.set_strategy(ResourceCreateStrategy::Ensure);
-println!("BEFORE");
-        creation.submit().await?;
-        println!("localhost ensured.");
-
-         */
-
-
+        info!("space ensured.");
 
         {
             info!(
@@ -122,7 +95,7 @@ println!("BEFORE");
                 create_args::artifact_bundle_address().to_string()
             );
             let address = create_args::artifact_bundle_address();
-            let mut creation = subspace_api
+            let mut creation = space_api
                 .create_artifact_bundle_versions(address.parent().unwrap().name().as_str())?;
             creation.set_strategy(ResourceCreateStrategy::Ensure);
             let artifact_bundle_versions_api = creation.submit().await?;

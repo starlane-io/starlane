@@ -26,7 +26,6 @@ use crate::resource::{Path, ResourceKind, ResourceRecord, ResourceType, to_keyed
 use crate::resource::file_system::FileSystemState;
 use crate::resource::FileKind;
 use crate::resource::ResourceKey;
-use crate::resource::sub_space::SubSpaceState;
 use crate::resource::user::UserState;
 use crate::star::{Request, StarCommand, StarKind, StarSkel};
 use crate::star::shell::search::SearchInit;
@@ -51,12 +50,10 @@ impl StarlaneApi {
 
         let subspace_address = address
             .parent()
-            .ok_or("expected parent")?
-            .parent()
             .ok_or("expected parent")?;
-        let subspace_api = self.get_sub_space(subspace_address.into()).await?;
+        let space_api = self.get_space(subspace_address.into()).await?;
 
-        let mut creation = subspace_api
+        let mut creation = space_api
             .create_artifact_bundle_versions(address.parent().unwrap().name().as_str())?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         let artifact_bundle_versions_api = creation.submit().await?;
@@ -490,49 +487,6 @@ impl SpaceApi {
         Ok(Creation::new(self.starlane_api(), create))
     }
 
-
-}
-
-pub struct SubSpaceApi {
-    stub: ResourceStub,
-    surface_api: SurfaceApi,
-}
-
-impl SubSpaceApi {
-    pub fn key(&self) -> ResourceKey {
-        self.stub.key.clone()
-    }
-
-    pub fn address(&self) -> ResourcePath {
-        self.stub.address.clone()
-    }
-
-    pub fn new(surface_api: SurfaceApi, stub: ResourceStub) -> Result<Self, Error> {
-        if stub.key.resource_type() != ResourceType::SubSpace {
-            return Err(format!(
-                "wrong key resource type for SubSpaceApi: {}",
-                stub.key.resource_type().to_string()
-            )
-            .into());
-        }
-        if stub.archetype.kind.resource_type() != ResourceType::SubSpace {
-            return Err(format!(
-                "wrong address resource type for SubSpaceApi: {}",
-                stub.archetype.kind.resource_type().to_string()
-            )
-            .into());
-        }
-
-        Ok(SubSpaceApi {
-            stub: stub,
-            surface_api: surface_api,
-        })
-    }
-
-    pub fn starlane_api(&self) -> StarlaneApi {
-        StarlaneApi::new(self.surface_api.clone())
-    }
-
     pub fn create_app(&self, name: &str, app_config: ResourcePath ) -> Result<Creation<AppApi>, Error> {
         let resource_src = AssignResourceStateSrc::Stateless;
         let create = ResourceCreate {
@@ -597,6 +551,49 @@ impl SubSpaceApi {
         };
         Ok(Creation::new(self.starlane_api(), create))
     }
+}
+
+pub struct SubSpaceApi {
+    stub: ResourceStub,
+    surface_api: SurfaceApi,
+}
+
+impl SubSpaceApi {
+    pub fn key(&self) -> ResourceKey {
+        self.stub.key.clone()
+    }
+
+    pub fn address(&self) -> ResourcePath {
+        self.stub.address.clone()
+    }
+
+    pub fn new(surface_api: SurfaceApi, stub: ResourceStub) -> Result<Self, Error> {
+        if stub.key.resource_type() != ResourceType::SubSpace {
+            return Err(format!(
+                "wrong key resource type for SubSpaceApi: {}",
+                stub.key.resource_type().to_string()
+            )
+            .into());
+        }
+        if stub.archetype.kind.resource_type() != ResourceType::SubSpace {
+            return Err(format!(
+                "wrong address resource type for SubSpaceApi: {}",
+                stub.archetype.kind.resource_type().to_string()
+            )
+            .into());
+        }
+
+        Ok(SubSpaceApi {
+            stub: stub,
+            surface_api: surface_api,
+        })
+    }
+
+    pub fn starlane_api(&self) -> StarlaneApi {
+        StarlaneApi::new(self.surface_api.clone())
+    }
+
+
 }
 
 pub struct AppApi{

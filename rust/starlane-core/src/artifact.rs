@@ -6,7 +6,7 @@ use crate::error::Error;
 
 use crate::resource::{
     ArtifactBundleKey, ArtifactKey, ArtifactKind, Path,
-    ResourceAddress, ResourceAddressPart, ResourceKey, ResourceType, SubSpaceKey,
+    ResourceAddress, ResourceAddressPart, ResourceKey, ResourceType,
 };
 use starlane_resources::ResourcePath;
 
