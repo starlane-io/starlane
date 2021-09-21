@@ -1,0 +1,37 @@
+domain: starlane.io
+layout:
+- go.kubebuilder.io/v3
+plugins:
+  manifests.sdk.operatorframework.io/v2: {}
+  scorecard.sdk.operatorframework.io/v2: {}
+projectName: starlane-operator
+repo: github.com/mechtronium/starlane
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: starlane.io
+  group: starlane
+  kind: Starlane
+  path: github.com/mechtronium/starlane/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: starlane.io
+  group: starlane
+  kind: StarlaneProvisioner
+  path: github.com/mechtronium/starlane/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: starlane.io
+  group: starlane
+  kind: StarlaneResource
+  path: github.com/mechtronium/starlane/api/v1alpha1
+  version: v1alpha1
+version: "3"

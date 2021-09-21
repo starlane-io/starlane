@@ -1,0 +1,15 @@
+[package]
+name = "starlane-macros"
+version = "0.1.0"
+authors = ["Scott Williams <scott@mightydevco.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = {version="1.0.57",features=["full","fold","parsing"]}
+quote = "1.0.8"
+nom = "7"

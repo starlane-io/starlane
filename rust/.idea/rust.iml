@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/starlane-core/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/starlane-macros-test/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/starlane-macros/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/starlane-resources-test/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/starlane-resources/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/starlane/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/mechtron-common/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/mechtron/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/wasm_membrane_guest/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/wasm_membrane_host/src" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/target" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>

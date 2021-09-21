@@ -1,0 +1,15 @@
+kind: Bind
+spec:
+  name: main
+  state: 
+    kind: Stateless
+  web: 
+  message:
+    inbound:
+      ports:
+      - name: web
+        payload:
+          aspects:
+          - name: web
+            schema: 
+              kind: http_request

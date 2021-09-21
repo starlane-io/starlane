@@ -1,0 +1,19 @@
+apiVersion: starlane.starlane.io/v1alpha1
+kind: StarlaneProvisioner
+metadata:
+  name: mysql
+spec:
+  image: "starlane/mysql-ctrl:latest"
+  typeKindSpecific: "<Database<Relational<mysql.org:mysql:innodb:8.0.0>>>"
+  env:
+  - name: HOST
+    value: mysql
+  - name: PORT
+    value: "3306"
+  - name: ROOT_USER
+    value: root
+  - name: ROOT_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: mysql-secrets
+        key: ROOT_PASSWORD 

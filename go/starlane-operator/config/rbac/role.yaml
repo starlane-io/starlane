@@ -1,0 +1,141 @@
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - starlaneprovisioners
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - starlaneprovisioners/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - starlaneprovisioners/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - starlaneresources
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - starlaneresources/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - starlaneresources/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - starlanes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - starlanes/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - starlanes/status
+  verbs:
+  - get
+  - patch
+  - update
