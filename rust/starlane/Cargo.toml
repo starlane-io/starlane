@@ -4,14 +4,19 @@ version = "0.1.0"
 authors = ["Scott Williams <scott@mightydevco.com>"]
 edition = "2018"
 
+description = "Starlane - a Resource Mesh"
+homepage = "http://starlane.io"
+repository = "https://github.com/mechtronium/starlane"
+license = "MIT OR Apache-2.0"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[bin]]
 name = "starlane"
 
 [dependencies]
-starlane-core = { path = "../starlane-core" }
-starlane-resources = { path = "../starlane-resources" }
+starlane-core = { path = "../starlane-core", version="0.1.0" }
+starlane-resources = { path = "../starlane-resources", version="0.1.0" }
 tokio = { version = "1.4.0", features = ["full"] }
 dirs = "3.0.2"
 serde_json = "1.0"

@@ -14,7 +14,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 
-starlane-resources= { path = "../starlane-resources" }
+starlane-resources= { path = "../starlane-resources", version="0.1.0" }
 tokio = { version = "1.4.0", features = ["full"] }
 serde = { version="1.0.69", features=['derive','rc'] }
 serde_yaml = "0.8.19"
@@ -63,8 +63,8 @@ k8s-openapi = { version = "0.12.0", default-features = false, features = ["v1_20
 schemars = "0.8.0"
 json-patch = "0.2.6"
 
-wasm_membrane_host = { path = "../wasm_membrane_host"}
-mechtron-common = { path = "../mechtron-common"}
+wasm_membrane_host = { path = "../wasm_membrane_host" , version="0.1.0"}
+mechtron-common = { path = "../mechtron-common", version="0.1.0"}
 wasmer = "2.0"
 httparse = "1.5.1"
 bytes = "1.1.0"
