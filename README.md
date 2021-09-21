@@ -1,7 +1,10 @@
 # STARLANE
-Starlane is the world's first Resource Mesh. A large amount of the complexity of your enterprise can be transferred from the application level to Starlane.  Less complexity means: faster development, easier to understand and fewer bugs.
+Starlane is the world's first Resource Mesh. 
+
 
 ## WHAT IS A RESOURCE MESH?
+A large amount of the complexity of your enterprise can be transferred from the application level to Starlane.  Less complexity means: faster development, easier to understand and fewer bugs.
+
 But what is a Resource Mesh?  We'll get into that shortly. First it's important for you to know that: 
 
 An enterprise is nothing more than Services, Resources and the Mesh that binds them all togheter.  
