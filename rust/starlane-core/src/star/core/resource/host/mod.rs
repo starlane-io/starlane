@@ -41,6 +41,11 @@ pub enum HostCall {
         key: ResourceKey,
         tx: oneshot::Sender<Result<(), Error>>,
     },
+    UpdateState {
+        key: ResourceKey,
+        state: DataSet<BinSrc>,
+        tx: oneshot::Sender<Result<(),Error>>
+    },
     Select {
         key: ResourceKey,
         selector: ResourcePropertyValueSelector,
@@ -98,6 +103,10 @@ impl AsyncProcessor<HostCall> for HostComponent {
                 let host = self.host(key.resource_type()).await;
                 tx.send(host.init(key).await);
             }
+            HostCall::UpdateState { key, state, tx }  => {
+                let host = self.host(key.resource_type()).await;
+                host.update_state(key, state);
+            }
             HostCall::Has { key, tx } => {
                 let host = self.host(key.resource_type()).await;
                 tx.send(host.has(key).await);
@@ -114,7 +123,6 @@ impl AsyncProcessor<HostCall> for HostComponent {
                     }
 
                 }
-
             }
         }
     }
@@ -165,6 +173,10 @@ pub trait Host: Send + Sync {
     async fn delete(&self, key: ResourceKey) -> Result<(), Error>;
 
     async fn get_state(&self,key: ResourceKey) -> Result<Option<DataSet<BinSrc>>,Error>;
+
+    async fn update_state(&self,key: ResourceKey, state: DataSet<BinSrc> ) -> Result<(),Error> {
+        Err(format!("resource type: {} does not allow state updates", key.resource_type().to_string()).into() )
+    }
 
     async fn deliver(&self, key: ResourceKey, delivery: Delivery<Message<ResourcePortMessage>>) -> Result<(),Error>{
         info!("ignoring delivery");

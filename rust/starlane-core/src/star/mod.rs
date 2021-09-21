@@ -559,7 +559,7 @@ impl Star {
         self.status_broadcast.send(status.clone() );
 
         let notification = Notification{
-            selection: WatchSelector { topic: Topic::Star(self.skel.info.key.clone()), property: Property::Status },
+            selector: WatchSelector { topic: Topic::Star(self.skel.info.key.clone()), property: Property::Status },
             changes: vec![Change::Status(status)]
         };
         self.skel.watch_api.fire(notification);

@@ -15,7 +15,7 @@ use crate::star::{StarCommand, StarSkel};
 use crate::star::shell::locator::ResourceLocateCall;
 use crate::star::shell::message::MessagingCall;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use crate::watch::{WatchSelector, Notification, Topic, Watch, WatchResourceSelector, WatchListener};
+use crate::watch::{WatchSelector, Notification, Topic, Watch, WatchResourceSelector, Watcher};
 
 #[derive(Clone)]
 pub struct SurfaceApi {
@@ -54,7 +54,8 @@ impl SurfaceApi {
         Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
     }
 
-    pub async fn watch( &self, selector: WatchResourceSelector) -> Result<WatchListener, Error> {
+    pub async fn watch( &self, selector: WatchResourceSelector) -> Result<Watcher, Error> {
+println!("SurfaceApi::watch()");
         let (tx, rx) = oneshot::channel();
         self.tx.try_send(SurfaceCall::Watch{selector, tx})?;
         tokio::time::timeout(Duration::from_secs(15), rx).await??
@@ -81,7 +82,7 @@ pub enum SurfaceCall {
         tx: oneshot::Sender<Result<Reply, Error>>,
         description: String,
     },
-    Watch{ selector: WatchResourceSelector, tx: oneshot::Sender<Result<WatchListener,Error>> }
+    Watch{ selector: WatchResourceSelector, tx: oneshot::Sender<Result<Watcher,Error>> }
 
 }
 
@@ -156,7 +157,9 @@ impl AsyncProcessor<SurfaceCall> for SurfaceComponent {
                             }
                         };
 
-                tx.send(self.skel.watch_api.listen( selector ).await);
+                let listener = self.skel.watch_api.listen( selector ).await;
+println!("SurfaceApi: go watch listener {}",listener.is_ok());
+                tx.send(listener);
             }
         }
     }

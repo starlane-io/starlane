@@ -36,6 +36,14 @@ pub struct WatchResourceSelector {
     pub property: Property
 }
 
+impl WatchResourceSelector {
+    pub fn new( resource: ResourceIdentifier, property: Property ) -> Self {
+        Self {
+            resource,
+            property
+        }
+    }
+}
 
 #[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct WatchSelector {
@@ -58,8 +66,17 @@ pub enum Property {
 
 #[derive(Debug,Clone,Serialize,Deserialize)]
 pub struct Notification{
-    pub selection: WatchSelector,
+    pub selector: WatchSelector,
     pub changes: Vec<Change>
+}
+
+impl Notification {
+    pub fn new( selector: WatchSelector, change: Change ) -> Self {
+        Self {
+            selector,
+            changes: vec![change]
+        }
+    }
 }
 
 #[derive(Debug,Clone,Serialize,Deserialize,strum_macros::Display)]
@@ -81,13 +98,13 @@ pub struct WatchStub{
     pub selection: WatchSelector
 }
 
-pub struct WatchListener {
+pub struct Watcher {
     stub: WatchStub,
     watch_api: WatchApi,
     pub rx: mpsc::Receiver<Notification>
 }
 
-impl WatchListener {
+impl Watcher {
     pub fn new( stub: WatchStub, watch_api: WatchApi, rx: mpsc::Receiver<Notification> ) -> Self {
         Self{
             stub,
@@ -98,7 +115,7 @@ impl WatchListener {
 }
 
 
-impl Drop for WatchListener {
+impl Drop for Watcher {
     fn drop(&mut self) {
         self.watch_api.un_listen(self.stub.clone());
         self.rx.close();

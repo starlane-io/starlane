@@ -15,6 +15,7 @@ use crate::resource::create_args::{artifact_bundle_address, create_args_artifact
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
+use crate::watch::{Notification, Change, Topic, WatchSelector, Property};
 
 #[derive(Debug)]
 pub struct FileHost {
@@ -45,13 +46,16 @@ impl Host for FileHost {
             }
         };
 
-        let assign = ResourceAssign {
-            kind: assign.kind,
-            stub: assign.stub,
-            state_src: state,
+        let state= self.store.put(assign.stub.key.clone(), state ).await?;
+
+        let selector = WatchSelector{
+            topic: Topic::Resource(assign.stub.key),
+            property: Property::State
         };
 
-        Ok(self.store.put(assign).await?)
+        self.skel.watch_api.fire( Notification::new(selector, Change::State(state.clone()) ));
+
+        Ok(state)
     }
 
     async fn has(&self, key: ResourceKey) -> bool {
@@ -64,6 +68,23 @@ impl Host for FileHost {
     async fn get_state(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
         self.store.get(key).await
     }
+
+
+    async fn update_state(&self,key: ResourceKey, state: DataSet<BinSrc> ) -> Result<(),Error> {
+
+        self.store.put( key.clone(), state.clone() ).await?;
+
+        let selector = WatchSelector{
+            topic: Topic::Resource(key),
+            property: Property::State
+        };
+
+        self.skel.watch_api.fire( Notification::new(selector, Change::State(state.clone()) ));
+
+
+        Ok(())
+    }
+
 
     async fn delete(&self, _identifier: ResourceKey) -> Result<(), Error> {
         unimplemented!()

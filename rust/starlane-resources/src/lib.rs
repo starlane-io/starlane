@@ -22,7 +22,7 @@ use starlane_macros::resources;
 
 use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
-use crate::message::Fail;
+use crate::message::{Fail, MessageFrom};
 
 pub mod data;
 pub mod error;
@@ -1747,7 +1747,7 @@ impl FieldSelection {
 
 
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct ResourceArchetype {
     pub kind: ResourceKind,
     pub specific: Option<Specific>,
@@ -1791,9 +1791,11 @@ pub struct ResourceCreate {
     pub registry_info: Option<ResourceRegistryInfo>,
     pub owner: Option<UserKey>,
     pub strategy: ResourceCreateStrategy,
+    pub from: MessageFrom
 }
 
 impl ResourceCreate {
+    /*
     pub fn create(
         archetype: ResourceArchetype,
         state_src: AssignResourceStateSrc<DataSet<BinSrc>>,
@@ -1809,7 +1811,9 @@ impl ResourceCreate {
             strategy: ResourceCreateStrategy::Create,
         }
     }
+     */
 
+    /*
     pub fn ensure_address(
         archetype: ResourceArchetype,
         src: AssignResourceStateSrc<DataSet<BinSrc>>,
@@ -1825,6 +1829,7 @@ impl ResourceCreate {
             strategy: ResourceCreateStrategy::Ensure,
         }
     }
+     */
 
     pub fn validate(&self) -> Result<(), Fail> {
         let resource_type = self.archetype.kind.resource_type();
@@ -1885,7 +1890,6 @@ impl FromStr for ResourceStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AddressCreationSrc {
-    None,
     Append(String),
     Just(String),
     Exact(ResourcePath),
@@ -1970,6 +1974,12 @@ pub enum AssignKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ResourceAction<S> {
+    Create(ResourceAssign<S>),
+    Update(Resource)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceAssign<S> {
     pub kind: AssignKind,
     pub stub: ResourceStub,
@@ -1998,11 +2008,11 @@ pub enum ResourceProperty{
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Resource {
-    key: ResourceKey,
-    address: ResourcePath,
-    archetype: ResourceArchetype,
-    state: DataSet<BinSrc>,
-    owner: Option<UserKey>,
+    pub key: ResourceKey,
+    pub address: ResourcePath,
+    pub archetype: ResourceArchetype,
+    pub state: DataSet<BinSrc>,
+    pub owner: Option<UserKey>,
 }
 
 impl Resource {
@@ -2097,7 +2107,7 @@ impl ResourceSelector {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum ConfigSrc {
     None,
     Artifact(ResourcePath)

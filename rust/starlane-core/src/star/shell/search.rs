@@ -95,11 +95,9 @@ impl StarSearchComponent {
 
         match traversal {
             SearchTraversal::Up(up) => {
-println!("StarSearchComponent::SearchTraversal::Up");
                 self.land_windup_hop(up, lane_key).await;
             }
             SearchTraversal::Down(down) => {
-println!("StarSearchComponent::SearchTraversal::Down");
                 self.process_search_transaction(down,lane_key)
             }
             _ => {
@@ -334,7 +332,6 @@ println!("StarSearchComponent::SearchTraversal::Down");
                         let transaction = self.transactions.remove(&tid);
                         let mut transaction = transaction.unwrap();
                         transaction.commit();
-                        println!("search transaction committed.");
                     }
                 }
 

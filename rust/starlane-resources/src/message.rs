@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 
-use crate::{ResourceAddress, ResourceCreate, ResourceIdentifier, ResourceKey, ResourceKind, ResourceSelector, ResourceStub, ResourceType, SkewerCase, Specific,ResourceId};
+use crate::{ResourceAddress, ResourceCreate, ResourceIdentifier, ResourceKey, ResourceKind, ResourceSelector, ResourceStub, ResourceType, SkewerCase, Specific, ResourceId, Resource};
 use crate::error::Error;
 use crate::data::{DataSet, BinSrc, Meta};
 use crate::property::{ResourcePropertyValueSelector, ResourceValueSelector};
@@ -170,7 +170,7 @@ impl<P> Message<P> {
 
 pub type MessageTo = ResourceIdentifier;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MessageFrom {
     Inject,
     Resource(ResourceIdentifier),
@@ -181,7 +181,8 @@ pub enum ResourceRequestMessage {
     Create(ResourceCreate),
     Select(ResourceSelector),
     Unique(ResourceType),
-    SelectValues(ResourcePropertyValueSelector)
+    SelectValues(ResourcePropertyValueSelector),
+    UpdateState(DataSet<BinSrc>)
 }
 
 #[derive(Clone, Serialize, Deserialize)]

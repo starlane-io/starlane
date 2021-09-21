@@ -56,7 +56,6 @@ impl IncomingSide {
             match &mut self.tunnel {
                 TunnelInState::None => match self.tunnel_receiver_rx.recv().await {
                     None => {
-println!("IncomingSide: Tunnel is None");
                         return Option::Some(LaneMuxerCall::Frame(Frame::Close));
                     }
                     Some(tunnel) => {
@@ -65,12 +64,10 @@ println!("IncomingSide: Tunnel is None");
                 },
                 TunnelInState::In(tunnel) => match tunnel.rx.recv().await {
                     None => {
-println!("IncomingSide: 2 Tunnel is None");
                         self.tunnel = TunnelInState::None;
                         return Option::Some(LaneMuxerCall::Frame(Frame::Close));
                     }
                     Some(frame) => {
-println!("lanes::IncomingSide FRAME: {}",frame.to_string() );
                         return Option::Some(LaneMuxerCall::Frame(frame));
                     }
                 },
@@ -821,6 +818,8 @@ pub enum LaneKey {
     Proto(u64),
     Ultima(UltimaLaneKey)
 }
+
+
 
 impl LaneKey {
     pub fn is_proto(&self) -> bool {

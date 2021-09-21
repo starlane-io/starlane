@@ -7,16 +7,25 @@
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/app.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/app.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/lane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lane.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/artifact.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/artifact.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/file.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/file.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/space.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/space.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/state.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/state.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/shell/lanes.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/shell/lanes.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/shell/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/shell/message.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/shell/router.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/shell/router.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/shell/search.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/shell/search.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/star/shell/watch.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/shell/watch.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/star/surface.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/surface.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/status.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/status.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/watch.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/watch.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-resources/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-resources/src/property.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/property.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/src/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/message.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/main.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -214,7 +223,7 @@
       <workItem from="1630247537849" duration="16379000" />
       <workItem from="1630425338598" duration="532000" />
       <workItem from="1630446426365" duration="31484000" />
-      <workItem from="1631559262142" duration="125824000" />
+      <workItem from="1631559262142" duration="139358000" />
     </task>
     <servers />
   </component>

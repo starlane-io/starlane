@@ -28,6 +28,8 @@ use starlane_core::util::shutdown;
 use starlane_resources::{ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceArchetype, AssignResourceStateSrc, ResourceCreateStrategy, ResourceSelector, ResourcePath, ResourcePathAndKind, ResourceKind, FileKind };
 use starlane_resources::data::{DataSet, BinSrc, Meta};
 use starlane_resources::property::{ResourcePropertyValueSelector, ResourceValueSelector};
+use starlane_core::watch::{WatchResourceSelector, Property};
+use starlane_resources::message::MessageFrom;
 
 mod cli;
 mod resource;
@@ -118,6 +120,12 @@ fn main() -> Result<(), Error> {
             get(args.clone()).await.unwrap();
         });
         shutdown();
+    } else if let Option::Some(args) = matches.subcommand_matches("watch") {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            watch(args.clone()).await.unwrap();
+        });
+        shutdown();
     } else {
         clap_app.print_long_help().unwrap_or_default();
     }
@@ -194,6 +202,7 @@ async fn cp(args: ArgMatches<'_>) -> Result<(), Error> {
             registry_info: Option::None,
             owner: Option::None,
             strategy: ResourceCreateStrategy::CreateOrUpdate,
+            from: MessageFrom::Inject
         };
 
         starlane_api.create_resource(create).await?;
@@ -284,6 +293,7 @@ println!("starlane api created.");
         registry_info: Option::None,
         owner: Option::None,
         strategy: ResourceCreateStrategy::Create,
+        from: MessageFrom::Inject
     };
 
 println!("SENDING CREATE REQUEST...");
@@ -316,12 +326,21 @@ async fn get(args: ArgMatches<'_>) -> Result<(), Error> {
 }
 
 async fn watch(args: ArgMatches<'_>) -> Result<(), Error> {
-    let address = ResourceValueSelector::from_str(
+    let address = ResourcePath::from_str(
         args.value_of("address")
             .ok_or("expected resource property value address")?,
     )?;
     let starlane_api = starlane_api().await?;
 
+    let selector = WatchResourceSelector::new( address.into(), Property::State );
+
+    let mut listener = starlane_api.watch(selector).await?;
+
+    while let Option::Some(notification)  = listener.rx.recv().await {
+        for change in notification.changes {
+            println!("received notification: {}", change.to_string() );
+        }
+    }
 
     starlane_api.shutdown();
 

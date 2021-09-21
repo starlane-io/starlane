@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::Receiver;
 
-use starlane_resources::{AddressCreationSrc, AssignKind, AssignResourceStateSrc, FieldSelection, KeyCreationSrc, LabelSelection, MetaSelector, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceIdentifier, ResourceRegistryInfo, ResourceSelector, ResourceStub, Unique, Names, ResourcePath};
+use starlane_resources::{AddressCreationSrc, AssignKind, AssignResourceStateSrc, FieldSelection, KeyCreationSrc, LabelSelection, MetaSelector, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceIdentifier, ResourceRegistryInfo, ResourceSelector, ResourceStub, Unique, Names, ResourcePath, ResourceCreateStrategy, ResourceAction};
 use starlane_resources::ConfigSrc;
 use starlane_resources::data::{BinSrc, DataSet};
 use starlane_resources::message::{Fail, MessageFrom, MessageReply, MessageTo, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage};
@@ -31,6 +31,7 @@ use crate::star::{ResourceRegistryBacking, StarInfo, StarKey, StarSkel};
 use crate::star::shell::pledge::{ResourceHostSelector, StarConscript};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
+use std::collections::hash_map::RandomState;
 
 pub mod artifact;
 pub mod config;
@@ -68,6 +69,7 @@ pub type UserKey = starlane_resources::UserKey;
 pub type ArtifactKey = starlane_resources::ArtifactKey;
 pub type FileSystemKey = starlane_resources::FileSystemKey;
 pub type FileKey = starlane_resources::FileKey;
+pub type Resource = starlane_resources::Resource;
 
 pub type ResourceId = starlane_resources::ResourceId;
 
@@ -922,7 +924,7 @@ impl Parent {
 
             tokio::spawn(async move {
 
-                match Self::process_create(core.clone(), create.clone(), reservation, rx).await {
+                match Self::process_action(core.clone(), create.clone(), reservation, rx).await {
                     Ok(resource) => {
                         tx.send(Ok(resource));
                     }
@@ -939,25 +941,51 @@ impl Parent {
         }
     }
 
-    async fn process_create(
+    async fn process_action(
         core: ParentCore,
         create: ResourceCreate,
         reservation: RegistryReservation,
         rx: oneshot::Receiver<
-            Result<ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>, Fail>,
+            Result<ResourceAction<AssignResourceStateSrc<DataSet<BinSrc>>>, Fail>,
         >,
     ) -> Result<ResourceRecord, Error> {
-        let assign = rx.await??;
-        let host = core
-            .selector
-            .select(create.archetype.kind.resource_type())
-            .await?;
-        let record = ResourceRecord::new(assign.stub.clone(), host.star_key());
-        host.assign(assign.clone().try_into()?).await?;
-        let (commit_tx, _commit_rx) = oneshot::channel();
-        reservation.commit(record.clone(), commit_tx)?;
-        host.init(assign.stub.key).await?;
-        Ok(record)
+        let action = rx.await??;
+
+        match action {
+            ResourceAction::Create(assign) => {
+                let host = core
+                    .selector
+                    .select(create.archetype.kind.resource_type())
+                    .await?;
+                let record = ResourceRecord::new(assign.stub.clone(), host.star_key());
+                host.assign(assign.clone().try_into()?).await?;
+                let (commit_tx, _commit_rx) = oneshot::channel();
+                reservation.commit(record.clone(), commit_tx)?;
+                host.init(assign.stub.key).await?;
+                Ok(record)
+            }
+            ResourceAction::Update(resource) => {
+               // save resource state...
+               let mut proto = ProtoMessage::new();
+               proto.payload(ResourceRequestMessage::UpdateState(resource.state_src()));
+               proto.to(resource.key.clone().into());
+               proto.from(create.from.clone());
+               let reply  = core.skel.messaging_api.exchange(proto.try_into()?, ReplyKind::Empty, "updating the state of a record " ).await;
+               match reply {
+                   Ok(reply) => {
+                       let record = core.skel.resource_locator_api.locate(resource.key.into()).await;
+                       record
+                   }
+                   Err(err) => {
+                       Err(err.into())
+                   }
+               }
+
+//               reservation.cancel();
+
+            }
+        }
+
     }
 
     /*
@@ -1102,7 +1130,7 @@ pub struct ResourceCreationChamber {
     parent: ResourceStub,
     create: ResourceCreate,
     skel: StarSkel,
-    tx: oneshot::Sender<Result<ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>, Fail>>,
+    tx: oneshot::Sender<Result<ResourceAction<AssignResourceStateSrc<DataSet<BinSrc>>>, Fail>>,
 }
 
 impl ResourceCreationChamber {
@@ -1110,7 +1138,7 @@ impl ResourceCreationChamber {
         parent: ResourceStub,
         create: ResourceCreate,
         skel: StarSkel,
-    ) -> oneshot::Receiver<Result<ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>, Fail>>
+    ) -> oneshot::Receiver<Result<ResourceAction<AssignResourceStateSrc<DataSet<BinSrc>>>, Fail>>
     {
         let (tx, rx) = oneshot::channel();
         let chamber = ResourceCreationChamber {
@@ -1157,57 +1185,118 @@ impl ResourceCreationChamber {
                 }
             }
 
-            let _key = match &self.create.key {
-                KeyCreationSrc::None => {
-                    let mut proto = ProtoMessage::new();
-                    proto.to(MessageTo::from(self.parent.key.clone()));
-                    proto.from(MessageFrom::Resource(self.parent.key.clone().into()));
-                    proto.payload = Option::Some(ResourceRequestMessage::Unique(
-                        self.create.archetype.kind.resource_type(),
-                    ));
+            fn create_address( src: &AddressCreationSrc, parent: &ResourcePath ) -> Result<ResourcePath,Error>{
+                match src {
+                    AddressCreationSrc::Append(tail) => {
+                        Ok(parent.append(tail.as_str() )?)
+                    }
+                    AddressCreationSrc::Just(space_name) => {
+                        Ok(ResourcePath::from_str(space_name.as_str())?)
+                    }
+                    AddressCreationSrc::Exact(address) =>
+                        Ok(address.clone()),
+                }
+            }
 
-                    let mut proto_star_message = match proto.try_into() {
-                        Ok(proto_star_message) => proto_star_message,
-                        Err(error) => {
-                            eprintln!(
-                                "ERROR when process proto_star_message from ProtoMessage: {}",
-                                error
-                            );
+            let address = match create_address( &self.create.address, &self.parent.address ) {
+                Ok(address) => {address}
+                Err(err) => {
+                    self.tx.send(Err(err.into()));
+                    return;
+                }
+            };
+
+            let record = self.skel.resource_locator_api.locate(address.clone().into() ).await;
+
+            let key = match record{
+                Ok(record) => {
+                    match self.create.strategy {
+                        ResourceCreateStrategy::Create => {
+                            self.tx.send(Err(format!("resource with address already exists: '{}'",address.to_string()).into()));
                             return;
                         }
-                    };
-
-                    let skel = self.skel.clone();
-
-                    tokio::spawn(async move {
-                        match skel.messaging_api.exchange(proto_star_message, ReplyKind::Id, "ResourceCreationChamber requesting unique id from parent to create unique ResourceKey" ).await
-                        {
-                            Ok(Reply::Id(id)) => {
-                                match ResourceKey::new(self.parent.key.clone(), id.clone()) {
-                                    Ok(key) => {
-                                        let final_create = self.finalize_create(key.clone()).await;
-                                        self.tx.send(final_create);
-                                        return;
-                                    }
-                                    Err(error) => {
-                                        self.tx.send(Err(error.into()));
-                                        return;
-                                    }
+                        ResourceCreateStrategy::Ensure => {
+                            // we've proven it's here, now we can go home
+                            return;
+                        }
+                        ResourceCreateStrategy::CreateOrUpdate => {
+                            if record.stub.archetype != self.create.archetype {
+                                self.tx.send(Err("cannot update a resource with a different archetype (Type,Kind,Specific & ConfigSrc)".into()));
+                                return;
+                            }
+                            match self.create.state_src {
+                                AssignResourceStateSrc::Stateless => {
+                                    self.tx.send(Err("cannot update a stateless resource".into()));
+                                    return;
+                                }
+                                AssignResourceStateSrc::CreateArgs(_) => {
+                                    self.tx.send(Err("cannot execute create-args on an existing resource".into()));
+                                    return;
+                                }
+                                AssignResourceStateSrc::Direct(state) => {
+                                    let resource = Resource::new(record.stub.key, record.stub.address, record.stub.archetype,state );
+                                    self.tx.send(Ok(ResourceAction::Update(resource)) );
+                                    return;
                                 }
                             }
-                            Err(fail) => self.tx.send(Err(fail.into())).unwrap_or_default(),
-                            _ => {
-                                unimplemented!("ResourceCreationChamber: it should not be possible to get any other message Result other than a Result::Ok(Reply::Id(_)) or Result::Err(Fail) when expecting ReplyKind::Id" )
+
+                        }
+                    }
+                }
+                Err(_) => {
+                    let _key = match &self.create.key {
+                        KeyCreationSrc::None => {
+                            let mut proto = ProtoMessage::new();
+                            proto.to(MessageTo::from(self.parent.key.clone()));
+                            proto.from(MessageFrom::Resource(self.parent.key.clone().into()));
+                            proto.payload = Option::Some(ResourceRequestMessage::Unique(
+                                self.create.archetype.kind.resource_type(),
+                            ));
+
+                            let mut proto_star_message = match proto.try_into() {
+                                Ok(proto_star_message) => proto_star_message,
+                                Err(error) => {
+                                    eprintln!(
+                                        "ERROR when process proto_star_message from ProtoMessage: {}",
+                                        error
+                                    );
+                                    return;
+                                }
+                            };
+
+                            let skel = self.skel.clone();
+
+                            tokio::spawn(async move {
+                                match skel.messaging_api.exchange(proto_star_message, ReplyKind::Id, "ResourceCreationChamber requesting unique id from parent to create unique ResourceKey" ).await
+                                {
+                                    Ok(Reply::Id(id)) => {
+                                        match ResourceKey::new(self.parent.key.clone(), id.clone()) {
+                                            Ok(key) => {
+                                                let final_create = self.finalize_create(key.clone(), address.clone() ).await;
+                                                self.tx.send(final_create);
+                                                return;
+                                            }
+                                            Err(error) => {
+                                                self.tx.send(Err(error.into()));
+                                                return;
+                                            }
+                                        }
+                                    }
+                                    Err(fail) => self.tx.send(Err(fail.into())).unwrap_or_default(),
+                                    _ => {
+                                        unimplemented!("ResourceCreationChamber: it should not be possible to get any other message Result other than a Result::Ok(Reply::Id(_)) or Result::Err(Fail) when expecting ReplyKind::Id" )
+                                    }
+                                }
+                            });
+                        }
+                        KeyCreationSrc::Key(key) => {
+                            if key.parent() != Option::Some(self.parent.key.clone()) {
+                                let final_create = self.finalize_create(key.clone(), address.clone() ).await;
+                                self.tx.send(final_create);
+                                return;
                             }
                         }
-                    });
-                }
-                KeyCreationSrc::Key(key) => {
-                    if key.parent() != Option::Some(self.parent.key.clone()) {
-                        let final_create = self.finalize_create(key.clone()).await;
-                        self.tx.send(final_create);
-                        return;
-                    }
+                    };
                 }
             };
         });
@@ -1216,27 +1305,9 @@ impl ResourceCreationChamber {
     async fn finalize_create(
         &self,
         key: ResourceKey,
-    ) -> Result<ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>, Fail> {
-        let address = match &self.create.address {
-            AddressCreationSrc::None => {
-                let mut address = format!(
-                    "{}:{}",
-                    self.parent.address.to_string(),
-                    key.generate_address_tail()
-                );
+        address: ResourcePath,
+    ) -> Result<ResourceAction<AssignResourceStateSrc<DataSet<BinSrc>>>, Fail> {
 
-                println!("1 Address: {}", address);
-                ResourcePath::from_str(address.as_str())?
-            }
-            AddressCreationSrc::Append(tail) => {
-                self.parent.address.append(tail.as_str() )?
-            }
-            AddressCreationSrc::Just(space_name) => {
-               ResourcePath::from_str(space_name.as_str())?
-            }
-
-            AddressCreationSrc::Exact(address) => address.clone(),
-        };
 
         let stub = ResourceStub {
             key: key,
@@ -1250,7 +1321,7 @@ impl ResourceCreationChamber {
             stub: stub,
             state_src: self.create.state_src.clone(),
         };
-        Ok(assign)
+        Ok(ResourceAction::Create(assign))
     }
 }
 
@@ -2121,6 +2192,7 @@ pub async fn to_keyed_for_reasource_create(create: ResourceCreate, starlane_api:
         registry_info: create.registry_info,
         owner: create.owner,
         strategy: create.strategy,
+        from: create.from
     })
 }
 

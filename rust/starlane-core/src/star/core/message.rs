@@ -167,6 +167,17 @@ println!("Create...{}", create.archetype.kind.to_string() );
                             delivery.fail(Fail::expected("Ok(Ok(ResourceValues(values)))"));
                         }
                     }
+                    ResourceRequestMessage::UpdateState(state) => {
+                        let key: ResourceKey = skel.resource_locator_api.as_key(delivery.payload.to.clone()).await?;
+                        let (tx, rx) = oneshot::channel();
+                        host_tx.send(HostCall::UpdateState{ key, state, tx }).await?;
+                        let result = rx.await;
+                        if let Ok(Ok(())) = result {
+                            delivery.reply(Reply::Empty);
+                        } else {
+                            delivery.fail(Fail::expected("Ok(Ok(()))"));
+                        }
+                    }
                 }
                 Ok(())
             }

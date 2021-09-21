@@ -42,12 +42,13 @@ impl StateStore {
 
     pub async fn put(
         &self,
-        assign: ResourceAssign<DataSet<BinSrc>>,
+        key: ResourceKey,
+        state : DataSet<BinSrc>,
     ) -> Result<DataSet<BinSrc>, Error> {
         let (tx, rx) = oneshot::channel();
 
         self.tx
-            .send(ResourceStoreCommand::Save { assign, tx })
+            .send(ResourceStoreCommand::Save { key, state, tx })
             .await?;
 
         Ok(rx.await??)
@@ -76,7 +77,8 @@ impl StateStore {
 pub enum ResourceStoreCommand {
     Close,
     Save {
-        assign: ResourceAssign<DataSet<BinSrc>>,
+        key: ResourceKey,
+        state: DataSet<BinSrc>,
         tx: oneshot::Sender<Result<DataSet<BinSrc>, Error>>,
     },
     Get {
@@ -127,9 +129,10 @@ impl StateStoreFS {
 
     async fn save(
         &mut self,
-        assign: ResourceAssign<DataSet<BinSrc>>,
+        key: ResourceKey,
+        state: DataSet<BinSrc>,
     ) -> Result<DataSet<BinSrc>, Error> {
-        let key = assign.stub.key.to_snake_case();
+        let key = key.to_snake_case();
 
         let state_path = Path::from_str(
             format!("/stars/{}/states/{}", self.skel.info.key.to_string(), key).as_str(),
@@ -139,7 +142,7 @@ impl StateStoreFS {
         data_access.mkdir(&state_path).await?;
 
 //        let mut rxs = vec![];
-        for (aspect, data) in &assign.state_src {
+        for (aspect, data) in &state {
             let state_aspect_file = Path::from_str(
                 format!(
                     "/stars/{}/states/{}/{}",
@@ -162,7 +165,7 @@ impl StateStoreFS {
 
  */
 
-        Ok(assign.state_src)
+        Ok(state)
     }
 
     async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
@@ -209,8 +212,8 @@ impl StateStoreFS {
 
     async fn process(&mut self, command: ResourceStoreCommand) {
         match command {
-            ResourceStoreCommand::Save { assign, tx } => {
-                tx.send(self.save(assign).await).unwrap_or_default();
+            ResourceStoreCommand::Save { key, state, tx } => {
+                tx.send(self.save(key, state).await).unwrap_or_default();
             }
             ResourceStoreCommand::Get { key, tx } => {
                 tx.send(self.get(key).await).unwrap_or_default();

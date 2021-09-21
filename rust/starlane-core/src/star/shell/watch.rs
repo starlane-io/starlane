@@ -18,7 +18,7 @@ use crate::star::{StarKey, StarSkel};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::variant::FrameVerdict;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use crate::watch::{Notification, Topic, Watch, WatchKey, WatchListener, WatchSelector, WatchStub};
+use crate::watch::{Notification, Topic, Watch, WatchKey, Watcher, WatchSelector, WatchStub};
 
 #[derive(Clone)]
 pub struct WatchApi {
@@ -31,39 +31,41 @@ impl WatchApi {
     }
 
     pub fn fire(&self, notification: Notification ){
+println!("WatchApi: FIRE NOTIFICATION!");
         self.tx.try_send(WatchCall::Fire(notification)).unwrap_or_default();
     }
 
     pub fn watch(&self, watch: Watch, session: LaneSession) {
-        self.tx.try_send(WatchCall::Watch{watch,session} ).unwrap_or_default();
+println!("WatchApi: Watching: {}", session.lane.to_string() );
+        self.tx.try_send(WatchCall::WatchForLane {watch,session} ).unwrap_or_default();
     }
 
     pub fn un_watch(&self, key: WatchKey ) {
-        self.tx.try_send(WatchCall::UnWatch(key) ).unwrap_or_default();
+        self.tx.try_send(WatchCall::UnWatchForLane(key) ).unwrap_or_default();
     }
 
     pub fn notify(&self, notification: Notification ) {
         self.tx.try_send(WatchCall::Notify(notification) ).unwrap_or_default();
     }
 
-    pub async fn listen(&self, selector: WatchSelector) -> Result<WatchListener,Error> {
+    pub async fn listen(&self, selector: WatchSelector) -> Result<Watcher,Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.try_send(WatchCall::Listen{ selection: selector,tx} ).unwrap_or_default();
+        self.tx.try_send(WatchCall::Watch { selection: selector,tx} ).unwrap_or_default();
         Ok(tokio::time::timeout( Duration::from_secs(15), rx).await??)
     }
 
     pub fn un_listen( &self, stub: WatchStub ) {
-        self.tx.try_send(WatchCall::UnListen(stub) ).unwrap_or_default();
+        self.tx.try_send(WatchCall::UnWatch(stub) ).unwrap_or_default();
     }
 }
 
 pub enum WatchCall {
     Fire(Notification),
-    Watch{watch: Watch, session: LaneSession},
-    UnWatch(WatchKey),
-    Listen{selection: WatchSelector, tx: oneshot::Sender<WatchListener>},
-    UnListen(WatchStub),
-    Next{selection: WatchSelector, next: NextKind },
+    WatchForLane {watch: Watch, session: LaneSession},
+    UnWatchForLane(WatchKey),
+    Watch {selection: WatchSelector, tx: oneshot::Sender<Watcher>},
+    UnWatch(WatchStub),
+    Next{ selector: WatchSelector, next: NextKind },
     Notify(Notification)
 }
 
@@ -94,19 +96,19 @@ impl AsyncProcessor<WatchCall> for WatchComponent {
             WatchCall::Fire(notification) => {
                 self.notify(notification);
             }
-            WatchCall::Watch { watch, session } => {
-                self.watch(watch,session);
+            WatchCall::WatchForLane { watch, session } => {
+                self.watch_for_lane(watch, session);
             }
-            WatchCall::UnWatch(key) => {
-                self.un_watch(key);
+            WatchCall::UnWatchForLane(key) => {
+                self.un_watch_for_lane(key);
             }
-            WatchCall::Listen { selection, tx } => {
-                self.listen(selection,tx);
+            WatchCall::Watch { selection, tx } => {
+                self.watch(selection, tx);
             }
-            WatchCall::UnListen(stub) => {
-                self.un_listen(stub);
+            WatchCall::UnWatch(stub) => {
+                self.un_watch(stub);
             }
-            WatchCall::Next { selection, next } => {
+            WatchCall::Next { selector: selection, next } => {
                 self.next(selection,next);
             }
             WatchCall::Notify(notification) => {
@@ -118,18 +120,19 @@ impl AsyncProcessor<WatchCall> for WatchComponent {
 
 impl WatchComponent {
 
-    fn watch(&mut self, watch: Watch, session: LaneSession) {
+    fn watch_for_lane(&mut self, watch: Watch, session: LaneSession) {
+println!("WatchApi: WATCHING on star {} for lane: {}",  self.skel.info.key.to_string(), session.lane.to_string() );
         if let LaneKey::Ultima(lane) = session.lane
 
         {
             let watch = WatchLane {
                 key: watch.key,
                 lane,
-                selection: watch.selector
+                selector: watch.selector
             };
 
             self.key_to_lane.insert(watch.key.clone(), watch.clone() );
-            let mut watches = if let Option::Some( mut watches) = self.selection_to_lane.remove(&watch.selection )
+            let mut watches = if let Option::Some( mut watches) = self.selection_to_lane.remove(&watch.selector)
             {
                 watches
             } else {
@@ -137,51 +140,58 @@ impl WatchComponent {
             };
 
             watches.push(watch.clone());
-            self.selection_to_lane.insert( watch.selection.clone(), watches );
+println!("WatchApi::watch_for_lane inserting selector: {:?}", watch.selector );
+            self.selection_to_lane.insert(watch.selector.clone(), watches );
 
             let skel = self.skel.clone();
-
             tokio::spawn(async move {
-
-                async fn find_next(skel: &StarSkel, watch: &WatchLane ) -> Result<NextKind,Error> {
-                    match &watch.selection.topic {
-                        Topic::Resource(resource_key) => {
-                            let record = skel.resource_locator_api.locate(resource_key.clone().into()).await?;
-                            if skel.info.key == record.location.star {
-                                Ok(NextKind::Core)
-                            } else {
-                                let lane = skel.golden_path_api.golden_lane_leading_to_star(record.location.star).await?;
-                                Ok(NextKind::Lane(lane))
-                            }
-                        }
-                        Topic::Star(star) => {
-                            if *star == skel.info.key {
-                                Ok(NextKind::Shell)
-                            } else {
-                                let lane = skel.golden_path_api.golden_lane_leading_to_star(star.clone()).await?;
-                                Ok(NextKind::Lane(lane))
-                            }
-                        }
-                    }
-                } // find_next()
-
-                match find_next(&skel,&watch).await {
-                    Ok(next) => {
-                        skel.watch_api.tx.try_send( WatchCall::Next { selection: watch.selection, next }).unwrap_or_default();
-                    }
-                    Err(error) => {
-                        error!("Watch Error: {}", error.to_string() );
-                    }
-                }
+                Self::watch_next(skel, watch.selector).await;
             });
+
         } else {
             error!("proto lanes cannot Watch");
         }
     }
 
+    async fn watch_next(skel: StarSkel, selector: WatchSelector) {
+println!("WatchApi::watch_next");
+            match Self::find_next(&skel,&selector).await {
+                Ok(next) => {
 
+println!("WatchApi ... found next: {}", next.to_string() );
+                    skel.watch_api.tx.try_send( WatchCall::Next { selector: selector, next }).unwrap_or_default();
+                }
+                Err(error) => {
+                    error!("Watch Error: {}", error.to_string() );
+                }
+           }
+    }
+
+    async fn find_next(skel: &StarSkel, selector: &WatchSelector ) -> Result<NextKind,Error> {
+        match &selector.topic {
+            Topic::Resource(resource_key) => {
+                let record = skel.resource_locator_api.locate(resource_key.clone().into()).await?;
+                if skel.info.key == record.location.star {
+                    Ok(NextKind::Core)
+                } else {
+                    let lane = skel.golden_path_api.golden_lane_leading_to_star(record.location.star).await?;
+                    Ok(NextKind::Lane(lane))
+                }
+            }
+            Topic::Star(star) => {
+                if *star == skel.info.key {
+                    Ok(NextKind::Shell)
+                } else {
+                    let lane = skel.golden_path_api.golden_lane_leading_to_star(star.clone()).await?;
+                    Ok(NextKind::Lane(lane))
+                }
+            }
+        }
+    }
 
     fn next(&mut self, selection: WatchSelector, next: NextKind ) {
+
+println!("WatchApi::next( {} )", self.skel.info.key.to_string() );
         if !self.selection_to_next.contains_key(&selection ) {
             let next = NextWatch::new(next, selection.clone() );
             self.selection_to_next.insert(selection.clone(), next.clone() );
@@ -193,35 +203,46 @@ impl WatchComponent {
         }
     }
 
-    fn un_watch( &mut self, key: WatchKey)  {
+    fn un_watch_for_lane(&mut self, key: WatchKey)  {
         if let Option::Some(watch) = self.key_to_lane.remove(&key) {
-            if let Option::Some( mut watches) = self.selection_to_lane.remove(&watch.selection )
+            if let Option::Some( mut watches) = self.selection_to_lane.remove(&watch.selector)
             {
                 watches.retain( |w| w.key != watch.key );
                 if watches.is_empty() {
-                    if let Option::Some(next ) = self.selection_to_next.remove(&watch.selection ) {
+                    if let Option::Some(next ) = self.selection_to_next.remove(&watch.selector) {
                         if let NextKind::Lane(lane) = next.kind {
                             self.skel.lane_muxer_api.forward_frame(LaneKey::Ultima(lane.clone()), Frame::Watch(WatchFrame::UnWatch(next.key)) ).unwrap_or_default();
                         }
                     }
 
                 } else {
-                    self.selection_to_lane.insert( watch.selection.clone(), watches );
+                    self.selection_to_lane.insert(watch.selector.clone(), watches );
                 }
             }
         }
     }
 
 
-    fn listen(&mut self, selection: WatchSelector, result_tx: oneshot::Sender<WatchListener> )  {
+    fn watch(&mut self, selector: WatchSelector, result_tx: oneshot::Sender<Watcher> )  {
+println!("WatchApi: adding listener on star {}",  self.skel.info.key.to_string() );
+
+
+        {
+            let skel = self.skel.clone();
+            let selector_cp = selector.clone();
+            tokio::spawn(async move {
+                Self::watch_next(skel, selector_cp).await;
+            });
+        }
+
         let stub = WatchStub{
             key: WatchKey::new_v4(),
-            selection
+            selection: selector
         };
 
         let (tx,rx) = mpsc::channel(256);
 
-        let listener = WatchListener::new(stub.clone(),self.skel.watch_api.clone(), rx );
+        let listener = Watcher::new(stub.clone(), self.skel.watch_api.clone(), rx );
 
         let mut map = match self.listeners.remove(&stub.selection ) {
             None => HashMap::new(),
@@ -237,7 +258,7 @@ impl WatchComponent {
 
 
 
-    fn un_listen( &mut self, stub: WatchStub )  {
+    fn un_watch(&mut self, stub: WatchStub )  {
 
         match self.listeners.remove(&stub.selection ) {
             None => {}
@@ -249,27 +270,39 @@ impl WatchComponent {
             }
         };
 
-        self.un_watch(stub.key);
+        self.un_watch_for_lane(stub.key);
     }
 
     fn notify(&self, notification: Notification ) {
+println!("WatchApi: notify({}) selectors: {}", self.skel.info.key.to_string(), self.selection_to_lane.len() );
+println!("WatchApi: notify() notification.selector: {:?}", notification.selector );
+
+for (k,v) in &self.selection_to_lane {
+    println!("WatchApi: k {:?}", k );
+    println!("WatchApi: notify() selector == k {}", notification.selector == *k );
+}
         let mut lanes = HashSet::new();
-        if let Option::Some(watch_lanes) = self.selection_to_lane.get(&notification.selection) {
+        if let Option::Some(watch_lanes) = self.selection_to_lane.get(&notification.selector) {
+
+println!("WatchApi: found a selector watchlane list : {}", watch_lanes.len() );
             for watch_lane in watch_lanes {
+println!("WatchApi adding watch lane: {}", watch_lane.key);
                 lanes.insert( watch_lane.lane.clone() );
             }
         }
 
         for lane in lanes {
+println!("WatchApi:: forwarding frame: {}", lane.to_string() );
             self.skel.lane_muxer_api.forward_frame(LaneKey::Ultima(lane), Frame::Watch(WatchFrame::Notify(notification.clone())));
         }
 
-        if let Option::Some(listeners) = self.listeners.get(&notification.selection ) {
+        if let Option::Some(listeners) = self.listeners.get(&notification.selector) {
             for (k,tx) in listeners {
+
                 if !tx.is_closed() {
                     tx.try_send(notification.clone()).unwrap_or_default();
                 } else {
-                    self.skel.watch_api.un_listen( WatchStub{key:k.clone(),selection: notification.selection.clone() });
+                    self.skel.watch_api.un_listen( WatchStub{key:k.clone(),selection: notification.selector.clone() });
                 }
             }
         }
@@ -315,5 +348,5 @@ pub enum NextKind {
 pub struct WatchLane{
     pub key: WatchKey,
     pub lane: UltimaLaneKey,
-    pub selection: WatchSelector
+    pub selector: WatchSelector
 }

@@ -45,13 +45,8 @@ impl Host for SpaceHost {
             }
         };
 
-        let assign = ResourceAssign {
-            kind: assign.kind,
-            stub: assign.stub,
-            state_src: state,
-        };
 
-        Ok(self.store.put(assign).await?)
+        Ok(self.store.put(assign.stub.key, state).await?)
     }
 
     async fn has(&self, key: ResourceKey) -> bool {

@@ -339,13 +339,7 @@ impl Host for ArtifactBundleHost {
            }
         };
 
-        let assign = ResourceAssign {
-            kind: AssignKind::Create,
-            stub: assign.stub,
-            state_src: state,
-        };
-
-        Ok(self.store.put(assign).await?)
+        Ok(self.store.put( assign.stub.key, state ).await?)
     }
 
     async fn has(&self, key: ResourceKey) -> bool {

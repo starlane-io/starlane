@@ -161,8 +161,6 @@ impl LaneMuxer {
                                     eprintln!("received a ReportStarKey on a lane that is not proto");
                                 }
                             } else if let Frame::Close = &frame {
-println!("received Frame::Close");
-
                                 let mut lane = self
                                     .lanes
                                     .get(&lane_key)

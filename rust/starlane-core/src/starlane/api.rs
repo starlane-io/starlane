@@ -33,6 +33,7 @@ use crate::star::shell::search::SearchInit;
 use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
 use starlane_resources::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, ResourceValue, ResourceValueSelector, ResourceValues};
+use crate::watch::{WatchResourceSelector, Watcher};
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -251,6 +252,15 @@ info!("received reply for {}",description);
         }
     }
 
+
+    pub async fn watch(
+        &self,
+        selector: WatchResourceSelector,
+    ) -> Result<Watcher, Error> {
+        self.surface_api.watch( selector ).await
+    }
+
+
     pub async fn list(&self, identifier: &ResourceIdentifier) -> Result<Vec<ResourceRecord>, Error> {
         let selector = ResourceSelector::new();
         self.select(identifier, selector).await
@@ -356,6 +366,7 @@ info!("received reply for {}",description);
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
+            from: MessageFrom::Inject
         };
         Ok(Creation::new(self.clone(), create))
     }
@@ -375,6 +386,7 @@ info!("received reply for {}",description);
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
+            from: MessageFrom::Inject
         };
         Ok(Creation::new(self.clone(), create))
     }
@@ -445,6 +457,7 @@ impl SpaceApi {
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
+            from: MessageFrom::Inject
         };
         Ok(Creation::new(self.starlane_api(), create))
     }
@@ -472,6 +485,7 @@ impl SpaceApi {
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
+            from: MessageFrom::Inject
         };
         Ok(Creation::new(self.starlane_api(), create))
     }
@@ -534,6 +548,7 @@ impl SubSpaceApi {
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
+            from: MessageFrom::Inject
         };
         Ok(Creation::new(self.starlane_api(), create))
     }
@@ -554,6 +569,7 @@ impl SubSpaceApi {
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
+            from: MessageFrom::Inject
         };
         Ok(Creation::new(self.starlane_api(), create))
     }
@@ -577,6 +593,7 @@ impl SubSpaceApi {
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
+            from: MessageFrom::Inject
         };
         Ok(Creation::new(self.starlane_api(), create))
     }
@@ -633,6 +650,7 @@ impl AppApi {
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
+            from: MessageFrom::Inject
         };
         Ok(Creation::new(self.starlane_api(), create))
     }
@@ -751,6 +769,7 @@ impl FileSystemApi {
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
+            from: MessageFrom::Inject
         };
         Ok(Creation::new(self.starlane_api(), create))
     }
@@ -839,6 +858,7 @@ impl ArtifactBundleSeriesApi {
             registry_info: None,
             owner: None,
             strategy: ResourceCreateStrategy::Create,
+            from: MessageFrom::Inject
         };
         Ok(Creation::new(self.starlane_api(), create))
     }

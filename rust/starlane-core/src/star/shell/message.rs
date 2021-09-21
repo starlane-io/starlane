@@ -37,7 +37,6 @@ impl MessagingApi {
         expect: ReplyKind,
         description: &str,
     ) -> Result<Reply, Error> {
-println!("MessagingApi: Exchanging message: {}", proto.payload.to_string() );
         let (tx, rx) = oneshot::channel();
         let call = MessagingCall::Exchange {
             proto,
