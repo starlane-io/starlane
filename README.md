@@ -1,16 +1,18 @@
-#starlane
+# starlane
 Starlane is the world's first Micro Resource Mesh.  You may have already heard of a Service Mesh which helps your micro services find and communicate to each other in a secure and centrally configurable manner among many other things.  A Resource Mesh helps your applications communicate directly to Resources.  Examples of micro resources inlcude: Files, Users, Database Tables, Message Queues, Schedulers, Oauth Providers, Artifacts, Configurations, Credentials and more! 
 
-##WHAT'S THE ADVANTANGE?
+## WHAT'S THE ADVANTANGE?
 In a pure service oriented archetecture the application is making requests to services to handle resources on it's behalf.  A Resource Mesh provides a facade that allows the application to handle resources directly.  Underneath the resource mesh is still utilizing the services however a great deal of complexity involved in locating, creating, moving, sharding and manipulating the resources has now been moved into the resource mesh and out of the application.  Less complex applications means faster development, easier to understand code and fewer bugs.
 
-##EXAMPLE
+## EXAMPLE
 Let's give a simple example.  Say you have an application with a service that lets a user upload a profile picture to a mounted persistent store, and another service that sizes that image file correctly and copies the resized file to an S3 bucket.  We will call these services the 'upload' service and the 'profile-processor' service. 
 
 In the starlane CLI we would create two filesystems resources:
 
+```
 starlane create "main:uploads<FileSystem<Standard>>"
 starlane create "main:profiles<FileSystem<S3>>"
+```
 
 Above we have created two filesystems under the 'main' space.  We provide an address with a type of <FileSystem> and a kind associated with it, uploads is a <Standard> mounted filesystem kind and profiles is an <S3> bucket kind.  
 
@@ -20,6 +22,7 @@ The only configuration we need for each services is a connection to Starlane and
 
 Here's the upload service:
 
+```java
 // this is only pseudo code for example's sake, don't try to run it
 
 @Service
@@ -40,12 +43,14 @@ public class UploadService {
   }
 
 }
+```
 
 That's it for the upload example.  Of course there are some problems with this simple example, what if the user uploads two profile pictures at once and there's a collision with the username being used to identify his file?  And It would be nice to use an InputStream for the image instead of holding it all in a byte buffer, we could work around these problems if this was a real application but for now this code example will serve us for illustration purposes.
 
 Next let's dive into the profiler-processor service:
 
 
+```java
 @Service
 public class  ProfileProcessorService{
 
@@ -90,6 +95,7 @@ public class  ProfileProcessorService{
     }); 
   }
 }
+```
 
 
 

@@ -5,10 +5,7 @@
     <cargoProject FILE="$PROJECT_DIR$/mechtron-core/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mechtron/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/mechtron/Cargo.toml" afterDir="false" />
-    </list>
+    <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -204,7 +201,7 @@
       <workItem from="1630247537849" duration="16379000" />
       <workItem from="1630425338598" duration="532000" />
       <workItem from="1630446426365" duration="31484000" />
-      <workItem from="1631559262142" duration="146852000" />
+      <workItem from="1631559262142" duration="147069000" />
     </task>
     <servers />
   </component>
