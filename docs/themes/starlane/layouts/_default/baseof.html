@@ -12,22 +12,21 @@
 </div>-->
 
 <div id="plate">
-<div id='stars'></div>
-<div id='stars2'></div>
-<div id='stars3'></div>
-
+  <div id='stars'></div>
+  <div id='stars2'></div>
+  <div id='stars3'></div>
 </div>
 
 
-  <div id="stack">
     {{- partial "header.html" . -}}
     <section id="content">
+    <div>
       {{- block "main" .}}{{- end }}
+    </div>
     </section>
 
     {{- partial "footer.html" . -}}
 
-  </div>
 
   </body>
 </html>
