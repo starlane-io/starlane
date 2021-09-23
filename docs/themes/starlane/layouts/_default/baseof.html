@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+  {{- partial "head.html" . -}}
+
+<body>
+
+<!--<body style="background-image: url('background.png');background-repeat: repeat-x;">
+<div>
+<div id='stars'></div>
+<div id='stars2'></div>
+<div id='stars3'></div>
+</div>-->
+
+<div id="plate">
+<div id='stars'></div>
+<div id='stars2'></div>
+<div id='stars3'></div>
+
+</div>
+
+
+  <div id="stack">
+    {{- partial "header.html" . -}}
+    <section id="content">
+      {{- block "main" .}}{{- end }}
+    </section>
+
+    {{- partial "footer.html" . -}}
+
+  </div>
+
+  </body>
+</html>

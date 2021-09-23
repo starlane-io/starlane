@@ -1,0 +1,133 @@
+
+body {
+  margin: 0px;
+  background: black;
+}
+
+
+#tagline {
+  font-size: 25px;
+  font-family: "Stick No Bills", sans-serif;
+  background: -webkit-linear-gradient(white, #5a5a5a);
+  background: -webkit-linear-gradient(black , #ccaa5a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+header {
+  width: 1000px;
+  padding-bottom: 8px;
+  padding-top: 16px;
+}
+
+#stack {
+ display: block;
+ margin-left: auto;
+ margin-right: auto;
+ width: 1000px;
+ height: 100vh;
+}
+
+#content {
+ display: flex;
+ flex-direction: column;
+ position: relative;
+ background-color: #000000cc;
+ width: 1000px;
+ margin: auto;
+ height: 100%; 
+ z-index: 0;
+ padding: 16px;
+}
+
+h1 {
+  color: grey;
+  font-family: "Josefin Sans", sans-serif;
+  font-size: x-large;
+  background: -webkit-linear-gradient(white, #38495a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+h2 {
+  color: grey;
+  font-family: "Josefin Sans", sans-serif;
+  background: -webkit-linear-gradient(white, #38495a);
+  font-size: large;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+
+}
+
+p {
+  color: #999999;
+  font-family: "Roboto", sans-serif;
+}
+
+
+pre {
+ padding: 16px;
+ background-color: #333333;
+}
+
+code {
+  color: #999999;
+  font-family: "Roboto Mono", sans-serif;
+}
+
+footer{
+  position: fixed;
+  bottom: 0;
+  display: block;
+  background-color: #000000;
+  padding-top: 8px;
+  width: 1000px;
+  z-index: 1;
+}
+
+footer small {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+nav{
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+a{
+  text-decoration: none;
+  color: #cccccc;
+  margin: 0 40px;
+  font-size: 100%;
+  font-family: "Josefin Sans", sans-serif;
+  font-family: "Stick No Bills", sans-serif;
+  font-family: "Jura", sans-serif;
+}
+
+a i {
+  background: -webkit-linear-gradient(white, #38495a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+#logo{
+  text-decoration: none;
+  width: 200px;
+  height: 100%;
+  font-size: xx-large;
+  font-family: "Josefin Sans", sans-serif;
+  text-align: center;
+  background: -webkit-linear-gradient(white, #38495a);
+  background: -webkit-linear-gradient(white, #eeaa5a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-left: auto;
+  margin-right: auto;
+
+}
+
+
+

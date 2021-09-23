@@ -1,0 +1,34 @@
+
+<!DOCTYPE html>
+<html lang="en-US">
+
+
+   
+<head>
+<meta charset="utf-8">
+<title>{{ .Site.Title }}</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@1,300&family=Jura&family=Stick+No+Bills:wght@200&display=swap" rel="stylesheet">
+
+
+{{ $css := resources.Get "css/stars.css" }}
+{{ $css := resources.Get "css/style.css" }}
+<link rel="stylesheet" href="{{"css/stars.css" | relURL }}">
+<link rel="stylesheet" href="{{"css/style.css" | relURL }}">
+
+<script src="https://kit.fontawesome.com/e63e797fac.js" crossorigin="anonymous"></script>
+
+</head>
+<body style="background-image: url('background.png');background-repeat: repeat-x;">
+<div id='stars'></div>
+<div id='stars2'></div>
+<div id='stars3'></div>
+<div id='title'>
+  <span>STARLANE</span><br>
+  <span id="tagline">A RESOURCE MESH FOR KUBERNETES</span>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,24 @@
+apiVersion: skaffold/v1
+kind: Config
+build:
+  tagPolicy:
+    gitCommit: {}
+
+  artifacts:
+  - image: docker.io/starlane/docs
+    context: docs
+
+
+
+deploy:
+  helm:
+    flags:
+
+    releases:
+    - name: starlane
+      namespace: scott
+      chartPath: charts/docs 
+      values:
+        starlane: docker.io/starlane/docs
+
+

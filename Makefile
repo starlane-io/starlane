@@ -18,6 +18,10 @@ kube-install-starlane: kube-install-operator
 
 kube-install: kube-install-starlane kube-install-basics 
 
+the-docs:
+	cd docs && hugo -D 
+	skaffold -f skaffold-docs.yaml run 
+
 
 
 
