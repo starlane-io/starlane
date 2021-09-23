@@ -1,126 +1,103 @@
 # STARLANE
-Starlane is the world's first **RESOURCE MESH**. 
+Starlane is a RESOURCE MESH which can also execute client and server side WebAssembly. You can read more about what Starlane is and what it does on Starlane's [about page](http://starlane.io/about/).
 
-A large amount of the complexity of your enterprise can be transferred from the application level to the Starlane Resource Mesh.  Less complexity means: faster development, easier to understand and fewer bugs.
+## A WORK IN PROGRESS 
+Right now Starlane is little more that a toy since there is no way to connect an external service to it--althought that is being worked on and will be availble next.  For now you can do the following with Starlane: 
 
-But first...
+* Run a local Starlane server instance
+* Connect to the server instance via the Starline CLI
+* Create a FileSystem
+* Upload and/or download a File
+* Watch a file for changes
 
-## WHAT IS A RESOURCE MESH?
-An enterprise is nothing more than **Services**, **Resources** and the **Mesh** that binds them all togheter.  
+## GETTING STARTED
+To build starlane you will need to have rust and make installed.  Follow the official Rust instructions to [install Rust](https://www.rust-lang.org/tools/install).
 
-For anyone who doesn't know: Resources are nouns, they are 'things', Services are 'verbs' they act upon Resources and Meshes are the universe... the medium through which all interactions take place. A primitive mesh would be your local area network and The largest mesh  would be the internet. 
+You will need **Make** installed to execute the Makefile.  Sorry, you will have to figure that out yourself!
 
-You may have heard of Service Meshes before. Whereas the raw network was just a mindless medium of information transmition the innovation of Service Meshes was that knowledge could be enshrined between things instead of in things. For example, the credentials for the database didn't need to be known by the rest service. The trusted rest service could connect directly to the mesh which in turn provided the credintials to the database... This made things HUGELY easier to configure since multiple services used the same databases.  
+## INSTALLING
+to install Starlane run this in the directory where you checked out this repository:
 
-Service meshes are amazing in many other ways, but at their core they moved complexity from Services--which there are many of--to a single Mesh which there is one of. As a rule complexity is easier to manage in one place.
-
-Now let's consider a the developer creating an application composed of services. We'll write his code in plain english: He codes: "Send a save request message to the file service 'xyz' for file '123' and to save it in bucket 'ABC'." 
-
-It's weird because as developers it's like we spend all day telling verbs what to do to nouns.  
-
-I have always wanted to write my code like this: "save this file."  Can you see the difference?  When I'm talking directly to the resources some things are understood: "(You, the bucket) save this file (the file I'm holding in my hand)."  Speaking directly in a clear context reduces what needs to be said which makes the meaning easier to understand while it also reduces what can go wrong.
-
-Now, back to the technology: Of course, Resources aren't supposed to do anything, so how exactly are we going to talk to things that don't do anything? The answer is that a Resource Mesh is a facade that takes what the developer is saying to the resources and with its knowledge converts to instructions that the Services can act upon.
-
-## EXAMPLE
-Say you have an application with a service that lets a user upload a profile picture to a mounted persistent store, and another service that sizes that image file correctly and copies the resized file to an S3 bucket.  We will call these services the 'upload' service and the 'profile-processor' service. 
-
-In the starlane CLI we would create two filesystems resources:
-
-```
-starlane create "main:uploads<FileSystem<Standard>>"
-starlane create "main:profiles<FileSystem<S3>>"
+```bash
+make install
 ```
 
-Above we have created two filesystems under the 'main' space.  We provide an address with a type of <FileSystem> and a kind associated with it, uploads is a <Standard> mounted filesystem kind and profiles is an <S3> bucket kind.  
+## RUNNING
+So here's the fun part when you actually get to play with Starlane.  
 
-Although Starlane itself is written in Rust, you can connect to a starlane instance API using a library.  We are going to write this example in Java Spring Boot.  
+Let's run it in the same directory where you checked out the Starlane source code.  (NOTE: when the starlane server runs, it will automatically create a new local directory called 'data' You can delete this directory aftter it is finished running)
 
-The only configuration we need for each services is a connection to Starlane and references to the various FileSystems they will be using (upload and profiles)
+First start a Starlane server instance:
 
-Here's the upload service:
-
-```java
-// this is only pseudo code for example's sake, don't try to run it
-
-@Service
-public class UploadService {
-
-  @Autowired
-  private Starlane starlane;
-
-  // this value is overridden in configuration
-  @Autowired
-  private String uploadFileSystem = "main:uploads";
-
-
-  public void upload( String username, byte[] image ) {
-     // create by specifying an address and providing the raw image bytes as the state
-     var path = String.format("%s:/%s<File>",uploadFileSystem,username);
-     starlane.create( path, image );   
-  }
-
-}
+```bash
+starlane serve
 ```
 
-That's it for the upload example.  Of course there are some problems with this simple example, what if the user uploads two profile pictures at once and there's a collision with the username being used to identify his file?  And It would be nice to use an InputStream for the image instead of holding it all in a byte buffer, we could work around these problems if this was a real application but for now this code example will serve us for illustration purposes.
+The command should appear to do nothing (no output is printed, it's just waiting for connections.)
 
-Next let's dive into the profiler-processor service:
+Next, we are doing to create a new FileSystem under the default space called creatively 'space'.  You must open up a brand new terminal so as not to terminate the running starlane server.  In your new terminal run:
 
-
-```java
-@Service
-public class  ProfileProcessorService{
-
-  @Autowired
-  private Starlane starlane;
-
-
-  // this value is overridden in configuration
-  @Autowired 
-  private String uploadFileSystem = "main:uploads";
- 
-  // this value is overridden in configuration
-  @Autowired
-  private String profileFileSystem= "main:profiles";
- 
-
-  @PostConstruct
-  public void startWatch(){
-
-    // watch the children of the main:uploads FileSystem for changes (CREATE & DELETE)
-    starlane.watch(uploadFileSystem, ResourceProperty.CHILDREN, (notification)-> {
-
-     // we only want to respond to CREATE or UPDATE events, not DELETE
-     if notifcation.change.kind == ResourcePropertyChange.CHILD.CREATE {
-
-       // get the State data of the child that has changed
-       State state = starlane.get( notifcation.change.getChild(), ResourceProperty.STATE );
-
-       // grab the 'content' aspect of the state which holds the image content
-       byte[] originalImage = state.get("content"); 
-       
-       // do some resizing work and produce a new image
-       byte[] resizedImage = processImageSomehow(originalImage);
-
-       // create the actual resizedFilePath which should exist on S3 bucket
-       var username = someRegexToExtractUsername( notification.from );
-       var resizedFilePath = String.format("%s:/%s<File>",profileFileSystem,username);
-
-       // create the resized image on the S3 bucket
-       starlane.create( resizedFilePath, resizedImage );
-     }
-    }); 
-  }
-}
+```bash
+starlane create "space:filesystem<FileSystem>"
 ```
 
+It should print some output and exit.  Notice we pass the name we want 'filesystem' and the type <FileSystem>.
+
+Let's check to see if that filesystem was actually created by listing the contents of 'space':
+
+```bash
+starlane ls space
+```
+
+You should expect to see that space has one child resource, the FileSystem you just created.
+
+Okay, now how about uploading a file!  Since you are in the repository directory lets upload this very README.md file:
+
+```bash
+starlane cp README.md "space:filesystem:/README.md"
+```
+
+So that is the 'cp' command or copy command.  You can also download files in the way you would expect:
+
+```bash
+starlane cp "space:filesystem:/README.md" README.md.copy
+```
+
+Now we have come to the fun part and the part that makes Starlane really special.  Let's Watch the file for changes.  To do so we run:
+
+```bash
+starlane watch "space:filesystem:/README.md"
+```
+
+And like when we ran the server we sacrifice this terminal as it now is just listening for changes.  
+
+To test watch open up a new terminal and run:
+
+```bash
+starlane cp README.md "space:filesystem:/README.md"
+```
+
+Of course the file is already there, but it will be written to again and will therefore trigger a state change event.
+
+If you observe you the watching terminal you should see that it prints out a message: **received notification: State**
 
 
-It's not the best way to implement this solution in Spring, but to make things fit nicely into one class file we are using a @PostConstruct which will execute the startWatch() method after the ProfileProcessorService has been created.
 
-The startWatch() method begings to watch the children of the main:uploads filesystem for changes. When a new file is added to uploads a notification is pushed via the starlane connection to the profile-processor service.  
 
-The profile-processor service resizes the image and then copies the newly resized image to the S3 bucket by creating a new file.  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
