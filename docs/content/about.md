@@ -1,26 +1,33 @@
 # ABOUT STARLANE
-Starlane is the world's first **RESOURCE MESH**. 
+Starlane is a **RESOURCE MESH** which can also execute client and server side WebAssembly.  It's still a work in progress and not ready for production.
 
-A large amount of the complexity of your enterprise can be transferred from the application level to the Starlane Resource Mesh.  Less complexity means: faster development, easier to understand and fewer bugs.
+Understanding what Starlane is and does can be a bit confusing because of the duality of its missions of Resource Mesh AND WebAssembly executor.  A little history clears it up somewhat:  The origin of the Starlane project was an attempt to create an environment for client and server side WebAssembly programs to deploy themselves, to securly access network resources, observe network resources for changes and message other WebAssembly programs.  
 
-But first...
+In the journey to enable WebAssembly it became apparent that Starlane's proposition would be useful to traditional microservices as well and that is when the second concept of the Resource Mesh became a first class feature in Starlane.  
+
+Let's start by explaining what a Resource Mesh is:
 
 ## WHAT IS A RESOURCE MESH?
-An enterprise is nothing more than **Services**, **Resources** and the **Mesh** that binds them all togheter.  
+An enterprise is composed of **Services**, **Resources** and the **Mesh** that binds them all togheter.  
 
-For anyone who doesn't know: Resources are nouns, they are 'things', Services are 'verbs' they act upon Resources and Meshes are the universe... the medium through which all interactions take place. A primitive mesh would be your local area network and The largest mesh  would be the internet. 
+For anyone who doesn't know: Resources are nouns, they are 'things', Services are 'verbs' they act upon Resources and Meshes are the medium for the nouns and verbs to interact with each other. A primitive mesh would be your local area network and The largest mesh would be the internet. 
 
-You may have heard of Service Meshes before. Whereas the raw network was just a mindless medium of information transmition the innovation of Service Meshes was that knowledge could be enshrined between things instead of in things. For example, the credentials for the database didn't need to be known by the rest service. The trusted rest service could connect directly to the mesh which in turn provided the credintials to the database... This made things HUGELY easier to configure since multiple services used the same databases.  
+You may have heard of Service Meshes before. Whereas the raw network is just a mindless mechanism of information transmition the innovation of Service Mesh was that knowledge could be enshrined between things instead of in things. For example, the credentials for the database didn't need to be known by services. Trusted services can connect directly to the mesh which in turn provides the credintials to the database... This makes things HUGELY easier to configure since multiple services that use the same database.
 
-Service meshes are amazing in many other ways, but at their core they moved complexity from Services--which there are many of--to a single Mesh which there is one of. As a rule complexity is easier to manage in one place.
+Service meshes are amazing in many other ways, but at their core they moved complexity from Services--which there are many of--to a single Mesh which there is one of. As a rule complexity is easier to manage in one place. Like the Service Mesh the goal of a Resource Mesh is to move complexity from the application to the Resource Mesh.  Less complexity means faster development time, easier to understand code and fewer bugs.
 
-Now let's consider a the developer creating an application composed of services. We'll write his code in plain english: He codes: "Send a save request message to the file service 'xyz' for file '123' and to save it in bucket 'ABC'." 
+Now let's consider a the developer creating an application composed of services. We'll write his code in plain english: He codes: "Messaging Service: Send a save request message to the file service 'xyz' for file '123' and to save it in bucket 'ABC'." 
 
-It's weird because as developers it's like we spend all day telling verbs what to do to nouns.  
+It's weird because as developers it's like we spend all day talking to elusive "verb processing machines"  telling them what we want them to do to the nouns on our behalf.
 
-I have always wanted to write my code like this: "save this file."  Can you see the difference?  When I'm talking directly to the resources some things are understood: "(You, the bucket) save this file (the file I'm holding in my hand)."  Speaking directly in a clear context reduces what needs to be said which makes the meaning easier to understand while it also reduces what can go wrong.
+Service architectures feel like the old days--before object oriented programming--where we called functions, passing references to the data we wanted to modify instead of invoking an object method to modify the data directly.
 
+And it is somewhat that object oriented encapsulation that I miss when I'm working with microservices.  I want to write my code like this: "Bucket,save this file."  Can you see the difference?  When I'm talking directly to the resource some things are understood: "(You, the bucket) save this file (the file I'm handing to you)."  Speaking directly in a clear context reduces what needs to be said which makes the meaning easier to understand while it also reduces what can go wrong.
+ 
 Now, back to the technology: Of course, Resources aren't supposed to do anything, so how exactly are we going to talk to things that don't do anything? The answer is that a Resource Mesh is a facade that takes what the developer is saying to the resources and with its knowledge converts to instructions that the Services can act upon.
+
+## WEB ASSEMBLY
+TODO: Still working on the description of how WebAssembly works inside of Starlane. STAY TUNED!
 
 ## EXAMPLE
 Say you have an application with a service that lets a user upload a profile picture to a mounted persistent store, and another service that sizes that image file correctly and copies the resized file to an S3 bucket.  We will call these services the 'upload' service and the 'profile-processor' service. 
