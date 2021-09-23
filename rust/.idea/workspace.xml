@@ -6,8 +6,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/../docs/content/contact.md" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/content/contact.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../docs/static/css/style.css" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/static/css/style.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../docs/themes/starlane/layouts/_default/baseof.html" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/themes/starlane/layouts/_default/baseof.html" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />

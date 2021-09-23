@@ -2,6 +2,8 @@
 body {
   margin: 0px;
   background: black;
+  color: grey;
+  font-family: "Roboto", sans-serif;
 }
 
 
@@ -39,6 +41,7 @@ header {
  height: 100%;
  margin-left: auto;
  margin-right: auto;
+ margin-bottom: 64px;
  z-index: 0;
  background-color: #000000cc;
  min-height: 100vh;
@@ -62,11 +65,10 @@ h1 {
 h2 {
   color: grey;
   font-family: "Josefin Sans", sans-serif;
-  background: -webkit-linear-gradient(white, #38495a);
   font-size: large;
+  background: -webkit-linear-gradient(white, #38495a);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-
 }
 
 p {
@@ -92,22 +94,27 @@ footer {
   transform: translateX(-50%);
 
   display: block;
-  background-color: #000000;
+  background-color: black;
   padding-top: 8px;
   width: 960px;
   z-index: 1;
   margin-left: auto;
   margin-right: auto;
+  font-size: xx-large;
 }
 
 footer small {
   margin-left: auto;
   margin-right: auto;
   color: #cccccc;
+  font-size: small;
+}
+
+footer nav{
+  display: block;
   margin-left: auto;
   margin-right: auto;
-
-
+  width: 100%;
 }
 
 nav{
@@ -115,9 +122,10 @@ nav{
   width: 100%;
   align-items: center;
   justify-content: center;
+
 }
 
-a{
+nav a{
   text-decoration: none;
   color: #cccccc;
   margin: 0 40px;
@@ -127,8 +135,14 @@ a{
   font-family: "Jura", sans-serif;
 }
 
-a i {
+nav a i {
   background: -webkit-linear-gradient(white, #38495a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+a:hover {
+  background: -webkit-linear-gradient(white, #eeaa5a);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -146,8 +160,71 @@ a i {
   -webkit-text-fill-color: transparent;
   margin-left: auto;
   margin-right: auto;
-
 }
 
 
+label {
+  display: block;
+  font-family: "Josefin Sans", sans-serif;
+  background: -webkit-linear-gradient(white, #38495a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
 
+input[type=email], select, textarea {
+  background: #000000;
+  color: #cccccc;
+  width: 100%; /* Full width */
+  padding: 12px; /* Some padding */ 
+  border: 1px solid #ccc; /* Gray border */
+  border-radius: 4px; /* Rounded borders */
+  box-sizing: border-box; /* Make sure that padding and width stays in place */
+  margin-top: 6px; /* Add a top margin */
+  margin-bottom: 16px; /* Bottom margin */
+}
+
+input[type=text], select, textarea {
+  width: 100%; /* Full width */
+  color: #cccccc;
+  padding: 12px; /* Some padding */ 
+  border: 1px solid #ccc; /* Gray border */
+  border-radius: 4px; /* Rounded borders */
+  box-sizing: border-box; /* Make sure that padding and width stays in place */
+  margin-top: 6px; /* Add a top margin */
+  margin-bottom: 16px; /* Bottom margin */
+  resize: vertical /* Allow the user to vertically resize the textarea (not horizontally) */
+}
+
+/* Style the submit button with a specific background color etc */
+input[type=submit] {
+  color: black;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: x-large;
+  font-weight: bold;
+  background: -webkit-linear-gradient(white, #38495a);
+
+  background: -moz-linear-gradient(top, white 0%, #38495a 100%);
+  background: -webkit-linear-gradient(top, white 0%,  #38495a 100%);
+  background: linear-gradient(to bottom, white 0%,  #38495a 100%);
+  font-family: "Josefin Sans", sans-serif;
+}
+
+/* When moving the mouse over the submit button, add a darker green color */
+input[type=submit]:hover {
+  background-color: #45a049;
+  background: -webkit-linear-gradient(white, #eeaa5a);
+}
+
+/* Add a background color and some padding around the form */
+.container {
+  border-radius: 5px;
+  padding: 20px;
+}
+
+p a {
+  color: white;
+
+}
