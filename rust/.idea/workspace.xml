@@ -5,7 +5,16 @@
     <cargoProject FILE="$PROJECT_DIR$/mechtron-core/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="" />
+    <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/../docs/static/css/stars.css" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/static/css/stars.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../docs/static/css/style.css" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/static/css/style.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../docs/themes/starlane/layouts/_default/baseof.html" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/themes/starlane/layouts/_default/baseof.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../docs/themes/starlane/layouts/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/themes/starlane/layouts/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../docs/themes/starlane/layouts/partials/footer.html" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/themes/starlane/layouts/partials/footer.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../docs/themes/starlane/layouts/partials/head.html" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/themes/starlane/layouts/partials/head.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../docs/themes/starlane/layouts/partials/header.html" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/themes/starlane/layouts/partials/header.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />

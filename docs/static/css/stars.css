@@ -62,29 +62,6 @@ html {
   box-shadow: 1733px 2027px #FFF , 233px 2696px #FFF , 1723px 444px #FFF , 359px 2856px #FFF , 2008px 2489px #FFF , 1684px 1782px #FFF , 223px 2878px #FFF , 1537px 424px #FFF , 1960px 1982px #FFF , 2314px 222px #FFF , 2948px 615px #FFF , 2598px 2469px #FFF , 2600px 420px #FFF , 12px 1834px #FFF , 2536px 2041px #FFF , 2915px 1996px #FFF , 857px 2315px #FFF , 2097px 1249px #FFF , 829px 1809px #FFF , 2075px 499px #FFF , 1475px 1770px #FFF , 2878px 2240px #FFF , 242px 470px #FFF , 839px 1081px #FFF , 508px 1924px #FFF , 1139px 1181px #FFF , 512px 2588px #FFF , 92px 499px #FFF , 2512px 1380px #FFF , 2056px 1480px #FFF , 1185px 2948px #FFF , 960px 867px #FFF , 1109px 1011px #FFF , 2075px 2571px #FFF , 701px 853px #FFF , 387px 2893px #FFF , 678px 1294px #FFF , 766px 463px #FFF , 1678px 1450px #FFF , 2347px 1294px #FFF , 323px 1498px #FFF , 1582px 744px #FFF , 743px 2777px #FFF , 2066px 44px #FFF , 2367px 141px #FFF , 1798px 514px #FFF , 2544px 1220px #FFF , 884px 1208px #FFF , 1967px 2332px #FFF , 689px 1618px #FFF , 2488px 2205px #FFF , 1861px 2051px #FFF , 63px 106px #FFF , 1218px 2812px #FFF , 2286px 2522px #FFF , 938px 494px #FFF , 2662px 1141px #FFF , 2392px 35px #FFF , 89px 1340px #FFF , 1421px 376px #FFF , 2439px 1909px #FFF , 604px 2486px #FFF , 522px 414px #FFF , 851px 166px #FFF , 2698px 2245px #FFF , 484px 613px #FFF , 1148px 2242px #FFF , 418px 2851px #FFF , 1639px 1437px #FFF , 1792px 1094px #FFF , 2747px 2403px #FFF , 2374px 2551px #FFF , 2077px 2423px #FFF , 1352px 498px #FFF , 2316px 1148px #FFF , 1600px 1275px #FFF , 2725px 2239px #FFF , 1039px 27px #FFF , 2735px 1179px #FFF , 2966px 2690px #FFF , 1704px 1465px #FFF , 1208px 1268px #FFF , 1146px 1416px #FFF , 2239px 2913px #FFF , 2269px 1696px #FFF , 1163px 1237px #FFF , 1148px 2388px #FFF , 2643px 1632px #FFF , 2595px 737px #FFF , 571px 656px #FFF , 2257px 687px #FFF , 907px 1758px #FFF , 576px 948px #FFF , 1633px 2117px #FFF , 779px 2684px #FFF , 160px 1831px #FFF , 2498px 831px #FFF , 879px 2913px #FFF , 1392px 190px #FFF , 1411px 1622px #FFF;
 }
 
-#title {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  color: #FFF;
-  text-align: center;
-  font-family: "jura", sans-serif;
-  font-family: "Stick No Bills", sans-serif;
-  font-family: "Josefin Sans", sans-serif;
-  font-weight: 300;
-  font-size: 120px;
-  letter-spacing: 10px;
-  margin-top: -60px;
-  padding-left: 10px;
-}
-#title span {
-  background: -webkit-linear-gradient(white, #38495a);
-  background: -webkit-linear-gradient(white, #eeaa5a);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
 
 @keyframes animStar {
   from {

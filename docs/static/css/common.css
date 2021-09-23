@@ -1,0 +1,44 @@
+body {
+  margin: 0px;
+  background: black;
+  color: grey;
+  font-family: "Roboto", sans-serif;
+}
+
+
+
+h1 {
+  color: grey;
+  font-family: "Josefin Sans", sans-serif;
+  font-size: x-large;
+  background: -webkit-linear-gradient(white, #38495a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+h2 {
+  color: grey;
+  font-family: "Josefin Sans", sans-serif;
+  font-size: large;
+  background: -webkit-linear-gradient(white, #38495a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+p {
+  color: #999999;
+  font-family: "Roboto", sans-serif;
+}
+
+
+pre {
+ padding: 16px;
+ background-color: #333333;
+}
+
+code {
+  color: #999999;
+  font-family: "Roboto Mono", sans-serif;
+}
+
+

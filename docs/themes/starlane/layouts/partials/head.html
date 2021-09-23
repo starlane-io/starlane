@@ -10,8 +10,10 @@
 
 
   {{ $css := resources.Get "css/stars.css" }}
+  {{ $css := resources.Get "css/common.css" }}
   {{ $css := resources.Get "css/style.css" }}
- <link rel="stylesheet" href="{{"css/stars.css" | relURL }}">
+  <link rel="stylesheet" href="{{"css/stars.css" | relURL }}">
+  <link rel="stylesheet" href="{{"css/common.css" | relURL }}">
   <link rel="stylesheet" href="{{"css/style.css" | relURL }}">
 
   <script src="https://kit.fontawesome.com/e63e797fac.js" crossorigin="anonymous"></script>
