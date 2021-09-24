@@ -86,6 +86,18 @@ info!("Received PORT request!");
                 let delivery = Delivery::new(action.clone(), star_message, self.skel.clone());
                 self.process_resource_host_action(delivery).await?;
             }
+            StarMessagePayload::Select(selector) => {
+                let delivery = Delivery::new(selector.clone(), star_message.clone(), self.skel.clone());
+                let results = self.skel.registry.as_ref().unwrap().select(selector.clone()).await;
+                match results {
+                    Ok(records) => {
+                        delivery.reply(Reply::Records(records))
+                    }
+                    Err(error) => {
+                        delivery.fail(Fail::Error("could not select records".to_string()))
+                    }
+                }
+            }
 
             _ => {}
         }

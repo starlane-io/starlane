@@ -151,6 +151,7 @@ impl MessagingComponent {
                         }
                     }
                     StarMessagePayload::Reply(SimpleReply::Fail(fail)) => Err(fail.into()),
+
                     _ => {
                         error!(
                             "unexpected response for message exchange with description: {}",

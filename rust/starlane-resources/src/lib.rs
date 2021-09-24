@@ -667,6 +667,13 @@ impl FromStr for ResourceKindParts {
     }
 }
 
+#[derive(Debug,Clone,Serialize,Deserialize)]
+pub enum ResourcePropertiesKind {
+    Registry,
+    Host
+}
+
+
 
 
 /*

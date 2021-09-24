@@ -4,13 +4,13 @@ use std::str::FromStr;
 use nom::{AsChar, InputTakeAtPosition};
 use nom::bytes::complete::{tag, take};
 use nom::character::complete::{alpha0, alpha1, anychar, digit0, digit1, one_of, alphanumeric1, multispace0};
-use nom::combinator::{not, opt};
-use nom::error::{context, ErrorKind};
+use nom::combinator::{not, opt, all_consuming};
+use nom::error::{context, ErrorKind, VerboseError};
 use nom::multi::{many1, many_m_n, separated_list0, separated_list1};
 use nom::sequence::{delimited, preceded, terminated, tuple};
 use serde::{Deserialize, Serialize};
 
-use crate::{DomainCase, Res, ResourceKind, ResourceKindParts, ResourcePath, ResourcePathAndKind, ResourcePathAndType, ResourcePathSegmentKind, ResourceType, SkewerCase, Specific, Version, ResourceSelector, FieldSelection, parse_resource_property, ConfigSrc};
+use crate::{DomainCase, Res, ResourceKind, ResourceKindParts, ResourcePath, ResourcePathAndKind, ResourcePathAndType, ResourcePathSegmentKind, ResourceType, SkewerCase, Specific, Version, ResourceSelector, FieldSelection, parse_resource_property, ConfigSrc, ResourcePropertiesKind};
 use crate::error::Error;
 use crate::property::{ResourcePropertyValueSelector, DataSetAspectSelector, ResourceValueSelector, ResourceProperty, ResourcePropertyAssignment};
 use nom::branch::alt;
@@ -276,6 +276,22 @@ pub fn parse_resource_path_and_type(input: &str) -> Res<&str, Result<ResourcePat
         )
     } )
 }
+
+pub fn parse_resource_properties_kind(input: &str) -> Res<&str, ResourcePropertiesKind> {
+    context( "parse_resource_properties_kind",
+            alpha1
+               ) (input).map(|(input_next,kind)| {
+
+        let kind = if kind == "reg" {
+            ResourcePropertiesKind::Registry
+        } else {
+            // a dirty hack here:
+            ResourcePropertiesKind::Host
+        };
+        (input_next,kind)
+    })
+}
+
 
 pub fn parse_mapping(input: &str) -> Res<&str, &str> {
         context( "parse_mapping",

@@ -17,9 +17,7 @@ use tracing::dispatcher::set_global_default;
 use tracing_subscriber::FmtSubscriber;
 
 use starlane_core::error::Error;
-use starlane_core::resource::{
-    ResourceAddress,
-};
+use starlane_core::resource::{ResourceAddress, ResourceRecord};
 use starlane_core::resource::selector::MultiResourceSelector;
 use starlane_core::starlane::{
     ConstellationCreate, StarlaneCommand, StarlaneMachine, StarlaneMachineRunner,
@@ -39,6 +37,7 @@ use std::io;
 use tablestream::{Stream, Column};
 use starlane_core::star::StarKey;
 use starlane_core::parse::parse_star_pattern;
+use starlane_resources::parse::parse_resource_properties_kind;
 
 mod cli;
 mod resource;
@@ -64,7 +63,7 @@ fn main() -> Result<(), Error> {
                                                             SubCommand::with_name("ls").usage("list resources").args(vec![Arg::with_name("address").required(true).help("the resource address to list"),Arg::with_name("child-pattern").required(false).help("a pattern describing the children to be listed .i.e '<File>' for returning resource type File")].as_slice()),
                                                             SubCommand::with_name("get").usage("get a resource property value").args(vec![Arg::with_name("address").required(true).help("the resource property value")].as_slice()),
                                                             SubCommand::with_name("set").usage("set a resource property value").args(vec![Arg::with_name("address").required(true).help("the resource property value")].as_slice()),
-                                                            SubCommand::with_name("stars").usage("stars subcommand").args(vec![Arg::with_name("star-pattern").required(false).help("the star pattern to list")].as_slice()),
+                                                            SubCommand::with_name("stars").usage("stars subcommand").args(vec![Arg::with_name("star-pattern").index(1).required(false).help("the star pattern to list"),Arg::with_name("resource-properties").index(2).required(false)].as_slice()),
                                                             SubCommand::with_name("watch").usage("watch resources property value for changes").args(vec![Arg::with_name("address").required(true).help("the resource property value to watch")].as_slice())
     ]);
 
@@ -390,21 +389,48 @@ async fn stars(args: ArgMatches<'_>) -> Result<(), Error> {
 
     let starlane_api = starlane_api().await?;
 
+
+
     let hits = starlane_api.star_search(star_pattern).await?;
+    match args.value_of("resource-properties") {
+        None => {
+            let mut out = io::stdout();
 
-    let mut out = io::stdout();
+            let mut stream = Stream::new( &mut out, vec![
+                Column::new(  |f, k:&(StarKey,usize)| write!(f, "{}", k.0.to_string() )).header("star"),
+                Column::new(  |f, k:&(StarKey,usize)| write!(f, "{}", k.1 )).header("hops"),
+            ] );
+
+            for (star,hops) in hits.hits {
+                stream.row((star,hops));
+            }
+            stream.finish();
+        }
+        Some(kind) => {
+            let (_,kind) = parse_resource_properties_kind(kind.trim())?;
 
 
-    let mut stream = Stream::new( &mut out, vec![
-        Column::new(  |f, k:&(StarKey,usize)| write!(f, "{}", k.0.to_string() )).header("star"),
-        Column::new(  |f, k:&(StarKey,usize)| write!(f, "{}", k.1 )).header("hops"),
-    ] );
+            let mut out = io::stdout();
 
-    for (star,hops) in hits.hits {
-        stream.row((star,hops));
+
+            let mut stream = Stream::new( &mut out, vec![
+                Column::new(  |f, r:&ResourceRecord| write!(f, "{}", r.stub.key.to_string() )).header("key"),
+                Column::new(  |f, r:&ResourceRecord| write!(f, "{}", r.stub.address.to_string() )).header("address"),
+                Column::new(  |f, r:&ResourceRecord| write!(f, "{}", r.stub.archetype.kind.to_string() )).header("kind"),
+                Column::new(  |f, r:&ResourceRecord| write!(f, "{}", r.stub.archetype.config.to_string() )).header("config"),
+            ] );
+
+            for (star,hops) in hits.hits {
+                let selector = ResourceSelector::new();
+                let records = starlane_api.select_from_star(star, selector).await?;
+                for record in records {
+                    stream.row(record);
+                }
+            }
+            stream.finish();
+        }
     }
 
-    stream.finish();
 
     starlane_api.shutdown();
 

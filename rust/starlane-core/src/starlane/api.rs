@@ -27,7 +27,7 @@ use crate::resource::file_system::FileSystemState;
 use crate::resource::FileKind;
 use crate::resource::ResourceKey;
 use crate::resource::user::UserState;
-use crate::star::{Request, StarCommand, StarKind, StarSkel};
+use crate::star::{Request, StarCommand, StarKind, StarSkel, StarKey};
 use crate::star::shell::search::{SearchInit, SearchHits};
 use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
@@ -194,6 +194,31 @@ info!("received reply for {}",description);
         match reply{
             Reply::Record(record) => Ok(record),
             _ => unimplemented!("StarlaneApi::create_resource() did not receive the expected reply from surface_api")
+        }
+    }
+
+
+    pub async fn select_from_star(
+        &self,
+        star: StarKey,
+        mut selector: ResourceSelector,
+    ) -> Result<Vec<ResourceRecord>, Error> {
+
+        // before sending
+        let selector = to_keyed_for_resource_selector(selector,self.clone()).await?;
+
+        let mut proto = ProtoStarMessage::new();
+        proto.to = ProtoStarMessageTo::Star(star);
+        proto.payload = StarMessagePayload::Select(selector);
+
+        let reply = self
+            .surface_api
+            .exchange(proto, ReplyKind::Records, "StarlaneApi: select_from_star()")
+            .await?;
+
+        match reply{
+            Reply::Records(records) => Ok(records),
+            _ => unimplemented!("StarlaneApi::select_from_star() did not receive the expected reply from surface_api")
         }
     }
 

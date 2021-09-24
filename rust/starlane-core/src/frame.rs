@@ -339,6 +339,7 @@ pub enum StarMessagePayload {
     Space(SpaceMessage),
     Reply(SimpleReply),
     UniqueId(ResourceId),
+    Select(ResourceSelector)
 }
 
 impl Debug for StarMessagePayload {
@@ -351,6 +352,7 @@ impl Debug for StarMessagePayload {
             StarMessagePayload::Space(_) => "Space",
             StarMessagePayload::Reply(_) => "Reply",
             StarMessagePayload::UniqueId(_) => "UniqueId",
+            StarMessagePayload::Select(_) => "Select"
         });
         Ok(())
     }
@@ -647,6 +649,7 @@ impl fmt::Display for StarMessagePayload {
             StarMessagePayload::ResourceHost(_) => "ResourceHost".to_string(),
             StarMessagePayload::UniqueId(_) => "UniqueId".to_string(),
             StarMessagePayload::MessagePayload(_) => "MessagePayload".to_string(),
+            StarMessagePayload::Select(_) => "Select".to_string()
         };
         write!(f, "{}", r)
     }
