@@ -32,7 +32,7 @@ use crate::star::shell::pledge::{ResourceHostSelector, StarConscript};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
 use std::collections::hash_map::RandomState;
-use starlane_resources::property::{ResourcePropertyAssignment, ResourceProperty};
+use starlane_resources::property::{ResourcePropertyAssignment, ResourceProperty, ResourceRegistryPropertyAssignment, ResourceRegistryProperty};
 
 pub mod artifact;
 pub mod config;
@@ -114,7 +114,7 @@ pub enum ResourceRegistryCommand {
     SetLocation(ResourceRecord),
     Get(ResourceIdentifier),
     Next { key: ResourceKey, unique: Unique },
-    Update(ResourcePropertyAssignment)
+    Update(ResourceRegistryPropertyAssignment)
 }
 
 pub enum ResourceRegistryResult {
@@ -169,7 +169,7 @@ impl RegistryParams {
             Option::Some(registration.resource.stub.key),
             registration.resource.stub.owner,
             Option::Some(registration.resource.stub.address),
-            Option::Some(registration.resource.location.star),
+            Option::Some(registration.resource.location.host),
         )
     }
 
@@ -489,7 +489,7 @@ println!("INSERTING params.config.is_some() {} and kind {}", params.config.is_so
             }
             ResourceRegistryCommand::SetLocation(location_record) => {
                 let key = location_record.stub.key.bin()?;
-                let host = location_record.location.star.bin()?;
+                let host = location_record.location.host.bin()?;
                 let trans = self.conn.transaction()?;
                 trans.execute(
                     "UPDATE resources SET host=?1 WHERE key=?3",
@@ -644,7 +644,7 @@ println!("MAKING RESERVARTION WITH CONFIG: space:core:1.0.0:/some-path.tx FOR {}
             ResourceRegistryCommand::Update(assignment)=> {
 
                 let set = match assignment.property{
-                    ResourceProperty::Config(config) => {
+                    ResourceRegistryProperty::Config(config) => {
                             match config {
                                 ConfigSrc::None => {
                                     Option::None
@@ -685,11 +685,11 @@ println!("*************QUERY******************");
 
                             let address : String = row.get(0).unwrap();
                             if let ValueRef::Null = row.get_ref(1).unwrap()  {
-                                println!("{} CONFIG STILL NULL", address);
+                                println!("'{}' CONFIG STILL NULL", address);
                             }
                              else {
                                  let c : String = row.get(1).unwrap();
-                                 println!("{} CONFIG  {} ", address, c );
+                                 println!("'{}' CONFIG  {} ", address, c );
                              }
 
                             Ok(())
@@ -776,7 +776,7 @@ println!("host: {} ", host.to_string());
 
         let record = ResourceRecord {
             stub: stub,
-            location: ResourceLocation { star: host },
+            location: ResourceLocation { host: host },
         };
 
         Ok(record)
@@ -2037,18 +2037,18 @@ pub struct ResourceBinding {
 
 #[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct ResourceLocation {
-    pub star: StarKey
+    pub host: StarKey
 }
 
 impl ResourceLocation {
     pub fn new(star: StarKey) -> Self {
         Self{
-            star
+            host: star
         }
     }
     pub fn root()-> Self {
         Self{
-            star: StarKey::central()
+            host: StarKey::central()
         }
     }
 }

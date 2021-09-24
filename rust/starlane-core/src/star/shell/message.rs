@@ -253,7 +253,7 @@ impl MessagingComponent {
                             return;
                         }
                     };
-                    record.location.star
+                    record.location.host
                 }
                 ProtoStarMessageTo::Star(star) => star.clone(),
             };

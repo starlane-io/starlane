@@ -6,8 +6,7 @@ use serde::{Serialize,Deserialize};
 use std::collections::HashMap;
 use crate::parse::{parse_resource_property_value_selector, parse_resource_value_selector, parse_resource_property_assignment};
 use crate::status::Status;
-
-
+use std::convert::TryInto;
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -265,11 +264,34 @@ impl <R> ResourceValues <R> {
   }
 }
 
+#[derive(Debug,Clone, Serialize, Deserialize)]
+pub struct ResourceRegistryPropertyAssignment {
+    pub resource: ResourceIdentifier,
+    pub property: ResourceRegistryProperty
+}
 
-#[derive(Clone, Serialize, Deserialize)]
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourcePropertyAssignment {
     pub resource: ResourceIdentifier,
     pub property: ResourceProperty
+}
+
+impl ToString for ResourcePropertyAssignment {
+    fn to_string(&self) -> String {
+        return format!( "{}::{}", self.resource.to_string(), self.property.to_string() )
+    }
+}
+
+impl TryInto<ResourceRegistryPropertyAssignment> for ResourcePropertyAssignment {
+    type Error = Error;
+
+    fn try_into(self) -> Result<ResourceRegistryPropertyAssignment, Self::Error> {
+        Ok(ResourceRegistryPropertyAssignment {
+            resource: self.resource,
+            property: self.property.try_into()?
+        })
+    }
 }
 
 impl FromStr for ResourcePropertyAssignment {
@@ -286,10 +308,47 @@ impl FromStr for ResourcePropertyAssignment {
 }
 
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub enum ResourceProperty {
   Config(ConfigSrc)
 }
 
+#[derive(Debug,Clone, Serialize, Deserialize)]
+pub enum ResourceRegistryProperty {
+    Config(ConfigSrc)
+}
+
+impl ToString for ResourceProperty {
+    fn to_string(&self) -> String {
+        match self {
+            ResourceProperty::Config(_) => {
+                return "config".to_string()
+            }
+        }
+    }
+}
+
+
+impl ResourceProperty {
+    pub fn is_registry_property(&self) -> bool {
+      match self {
+          ResourceProperty::Config(_) => {
+              true
+          }
+      }
+    }
+}
+
+impl TryInto<ResourceRegistryProperty> for ResourceProperty {
+    type Error = Error;
+
+    fn try_into(self) -> Result<ResourceRegistryProperty, Self::Error> {
+        match self {
+            ResourceProperty::Config(config) => {
+                Ok(ResourceRegistryProperty::Config(config))
+            }
+        }
+    }
+}
 
 

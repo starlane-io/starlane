@@ -165,10 +165,10 @@ impl WatchComponent {
         match &selector.topic {
             Topic::Resource(resource_key) => {
                 let record = skel.resource_locator_api.locate(resource_key.clone().into()).await?;
-                if skel.info.key == record.location.star {
+                if skel.info.key == record.location.host {
                     Ok(NextKind::Core)
                 } else {
-                    let lane = skel.golden_path_api.golden_lane_leading_to_star(record.location.star).await?;
+                    let lane = skel.golden_path_api.golden_lane_leading_to_star(record.location.host).await?;
                     Ok(NextKind::Lane(lane))
                 }
             }

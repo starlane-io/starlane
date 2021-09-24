@@ -26,7 +26,7 @@ use crate::constellation::ConstellationStatus;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::frame::{
-    ActorLookup, Frame, ProtoFrame, RegistryAction, Reply, SearchHit, SearchResults,
+    ActorLookup, Frame, ProtoFrame, ResourceRegistryRequest, Reply, SearchHit, SearchResults,
     SearchTraversal, SearchWindDown, SearchWindUp, SimpleReply, StarMessage, StarMessagePayload, StarPattern,
     TraversalAction, WatchInfo,
 };
@@ -55,7 +55,7 @@ use crate::starlane::StarlaneMachine;
 use starlane_resources::status::Status;
 use crate::template::StarTemplateHandle;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
-use starlane_resources::property::ResourcePropertyAssignment;
+use starlane_resources::property::{ResourcePropertyAssignment, ResourceRegistryPropertyAssignment};
 
 pub mod core;
 pub mod shell;
@@ -1204,7 +1204,7 @@ pub trait ResourceRegistryBacking: Sync + Send {
     async fn set_location(&self, location: ResourceRecord) -> Result<(), Error>;
     async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<ResourceRecord>, Error>;
     async fn unique_src(&self, resource_type: ResourceType, key: ResourceIdentifier) -> Box<dyn UniqueSrc>;
-    async fn update(&self, assignment: ResourcePropertyAssignment ) -> Result<(),Error>;
+    async fn update(&self, assignment: ResourceRegistryPropertyAssignment ) -> Result<(),Error>;
 }
 
 pub struct ResourceRegistryBackingSqLite {
@@ -1290,7 +1290,7 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
         Box::new(RegistryUniqueSrc::new(resource_type, id, self.registry.clone()))
     }
 
-    async fn update(&self, assignment: ResourcePropertyAssignment ) -> Result<(),Error>
+    async fn update(&self, assignment: ResourceRegistryPropertyAssignment ) -> Result<(),Error>
     {
         let (request, rx) =
             ResourceRegistryAction::new(ResourceRegistryCommand::Update(assignment));

@@ -21,7 +21,7 @@ use starlane_resources::message::Fail;
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
-use crate::frame::{Reply, ReplyKind, StarPattern, TraversalAction};
+use crate::frame::{Reply, ReplyKind, StarPattern, TraversalAction, ResourceRegistryRequest, StarMessagePayload};
 use crate::resource::{Path, ResourceKind, ResourceRecord, ResourceType, to_keyed_for_reasource_create, to_keyed_for_resource_selector};
 use crate::resource::file_system::FileSystemState;
 use crate::resource::FileKind;
@@ -31,8 +31,9 @@ use crate::star::{Request, StarCommand, StarKind, StarSkel};
 use crate::star::shell::search::SearchInit;
 use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
-use starlane_resources::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, ResourceValue, ResourceValueSelector, ResourceValues, ResourceProperty, ResourcePropertyAssignment};
+use starlane_resources::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, ResourceValue, ResourceValueSelector, ResourceValues, ResourceProperty, ResourcePropertyAssignment, ResourceRegistryPropertyAssignment};
 use crate::watch::{WatchResourceSelector, Watcher};
+use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -231,21 +232,31 @@ info!("received reply for {}",description);
         assignment: ResourcePropertyAssignment
     ) -> Result<(), Error> {
 
-        let mut proto = ProtoMessage::new();
-        proto.to(assignment.resource.into());
-        proto.from(MessageFrom::Inject);
-        proto.payload = Option::Some(ResourceRequestMessage::Set(assignment.property));
-        let proto = proto.try_into()?;
+        if assignment.property.is_registry_property() {
+            let parent = assignment.resource.parent().ok_or("expected resource to have a parent")?;
+            let parent = self.fetch_resource_record(parent).await?;
+            let assignment:ResourceRegistryPropertyAssignment = assignment.try_into()?;
+            let mut proto = ProtoStarMessage::new();
+            proto.to = ProtoStarMessageTo::Star(parent.location.host);
+            proto.payload = StarMessagePayload::ResourceRegistry(ResourceRegistryRequest::Set(assignment));
+            let proto = proto.try_into()?;
 
-        let reply = self
-            .surface_api
-            .exchange(proto, ReplyKind::Empty, "StarlaneApi: set_property")
-            .await?;
+            let reply = self
+                .surface_api
+                .exchange(proto, ReplyKind::Empty, "StarlaneApi: set_property")
+                .await?;
 
-        match reply{
-            Reply::Empty => Ok(()),
-            _ => unimplemented!("StarlaneApi::set_property() did not receive the expected reply from surface_api")
+            match reply{
+                Reply::Empty => Ok(()),
+                _ => unimplemented!("StarlaneApi::set_property() did not receive the expected reply from surface_api")
+            }
+        } else {
+            Err(format!("not sure how to handle property: {}", assignment.property.to_string()).into() )
         }
+
+
+
+
     }
 
 
