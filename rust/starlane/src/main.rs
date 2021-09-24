@@ -25,9 +25,9 @@ use starlane_core::template::{ConstellationData, ConstellationLayout, Constellat
 use starlane_core::util;
 use starlane_core::util::shutdown;
 
-use starlane_resources::{ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceArchetype, AssignResourceStateSrc, ResourceCreateStrategy, ResourceSelector, ResourcePath, ResourcePathAndKind, ResourceKind, FileKind };
+use starlane_resources::{ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceArchetype, AssignResourceStateSrc, ResourceCreateStrategy, ResourceSelector, ResourcePath, ResourcePathAndKind, ResourceKind, FileKind, ConfigSrc};
 use starlane_resources::data::{DataSet, BinSrc, Meta};
-use starlane_resources::property::{ResourcePropertyValueSelector, ResourceValueSelector};
+use starlane_resources::property::{ResourcePropertyValueSelector, ResourceValueSelector, ResourcePropertyAssignment};
 use starlane_core::watch::{WatchResourceSelector, Property};
 use starlane_resources::message::MessageFrom;
 
@@ -53,7 +53,8 @@ fn main() -> Result<(), Error> {
                                                             SubCommand::with_name("cp").usage("copy a file").args(vec![Arg::with_name("src").takes_value(true).index(1).required(true).help("the source file [local file or starlane resource address]"),Arg::with_name("dst").takes_value(true).index(2).required(true).help("the  destination [local file or starlane resource address]")].as_slice()),
                                                             SubCommand::with_name("create").usage("create a resource").setting(clap::AppSettings::TrailingVarArg).args(vec![Arg::with_name("address").required(true).help("address of your new resource"),Arg::with_name("create-args").multiple(true).required(false)].as_slice()),
                                                             SubCommand::with_name("ls").usage("list resources").args(vec![Arg::with_name("address").required(true).help("the resource address to list"),Arg::with_name("child-pattern").required(false).help("a pattern describing the children to be listed .i.e '<File>' for returning resource type File")].as_slice()),
-                                                            SubCommand::with_name("get").usage("get resources property value").args(vec![Arg::with_name("address").required(true).help("the resource property value")].as_slice()),
+                                                            SubCommand::with_name("get").usage("get a resource property value").args(vec![Arg::with_name("address").required(true).help("the resource property value")].as_slice()),
+                                                            SubCommand::with_name("set").usage("set a resource property value").args(vec![Arg::with_name("address").required(true).help("the resource property value")].as_slice()),
                                                             SubCommand::with_name("watch").usage("watch resources property value for changes").args(vec![Arg::with_name("address").required(true).help("the resource property value to watch")].as_slice())
     ]);
 
@@ -112,6 +113,12 @@ fn main() -> Result<(), Error> {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
             list(args.clone()).await.unwrap();
+        });
+        shutdown();
+    } else if let Option::Some(args) = matches.subcommand_matches("set") {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            set(args.clone()).await.unwrap();
         });
         shutdown();
     } else if let Option::Some(args) = matches.subcommand_matches("get") {
@@ -196,7 +203,7 @@ async fn cp(args: ArgMatches<'_>) -> Result<(), Error> {
             archetype: ResourceArchetype {
                 kind: ResourceKind::File(FileKind::File),
                 specific: None,
-                config: None,
+                config: ConfigSrc::None,
             },
             state_src: AssignResourceStateSrc::Direct(state),
             registry_info: Option::None,
@@ -206,7 +213,6 @@ async fn cp(args: ArgMatches<'_>) -> Result<(), Error> {
         };
 
         starlane_api.create_resource(create).await?;
-        println!("CP DONE.");
 
         starlane_api.shutdown();
 
@@ -244,11 +250,9 @@ async fn list(args: ArgMatches<'_>) -> Result<(), Error> {
 
     let resources = starlane_api.select(&address.into(), selector).await?;
 
-    println!();
     for resource in resources {
         println!("{}", resource.stub.address.to_string());
     }
-    println!();
 
     starlane_api.shutdown();
 
@@ -256,7 +260,6 @@ async fn list(args: ArgMatches<'_>) -> Result<(), Error> {
 }
 
 async fn create(args: ArgMatches<'_>) -> Result<(), Error> {
-println!("CREATE...");
     let address = ResourcePathAndKind::from_str(
         args.value_of("address")
             .ok_or("expected resource address")?,
@@ -273,9 +276,7 @@ println!("CREATE...");
         }
     };
 
-println!("creating starlane api...");
     let starlane_api = starlane_api().await?;
-println!("starlane api created.");
 
     let create = ResourceCreate {
         parent: address
@@ -287,7 +288,7 @@ println!("starlane api created.");
         archetype: ResourceArchetype {
             kind: kind,
             specific: None,
-            config: None,
+            config: ConfigSrc::None,
         },
         state_src: AssignResourceStateSrc::CreateArgs(create_args),
         registry_info: Option::None,
@@ -296,9 +297,7 @@ println!("starlane api created.");
         from: MessageFrom::Inject
     };
 
-println!("SENDING CREATE REQUEST...");
     starlane_api.create_resource(create).await?;
-println!("CREATE DONE.");
 
     starlane_api.shutdown();
 
@@ -314,11 +313,24 @@ async fn get(args: ArgMatches<'_>) -> Result<(), Error> {
 
     let values = starlane_api.select_values(address.resource, address.property).await?;
 
-    println!();
     for (k,v) in values.values {
         println!("{}",v.to_string());
     }
-    println!();
+
+    starlane_api.shutdown();
+
+    Ok(())
+}
+
+async fn set(args: ArgMatches<'_>) -> Result<(), Error> {
+
+    let assignment = ResourcePropertyAssignment::from_str(
+        args.value_of("address").ok_or("expected resource property assignment")?,
+    )?;
+
+    let starlane_api = starlane_api().await?;
+
+    starlane_api.set_property(assignment).await?;
 
     starlane_api.shutdown();
 

@@ -20,6 +20,8 @@ use crate::star::core::resource::host::{HostCall, HostComponent};
 use crate::star::shell::pledge::ResourceHostSelector;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use tokio::sync::oneshot::error::RecvError;
+use starlane_resources::property::{ResourcePropertyAssignment, ResourcePropertyValueSelector, ResourceValue, ResourceValues};
+use std::collections::HashMap;
 
 pub enum CoreMessageCall {
     Message(StarMessage),
@@ -147,8 +149,8 @@ info!("Received PORT request!");
                     ResourceRequestMessage::Unique(resource_type) => {
                         let resource = skel.resource_locator_api.locate(delivery.payload.to.clone() ).await?;
                         let unique_src = skel
-                            .registry
-                            .as_ref()
+                                .registry
+                                .as_ref()
                             .unwrap()
                             .unique_src(resource.stub.archetype.kind.resource_type(), delivery.payload.to.clone().into())
                             .await;
@@ -156,8 +158,28 @@ info!("Received PORT request!");
                     }
                     ResourceRequestMessage::SelectValues(selector) => {
                         let stub = skel.resource_locator_api.locate(delivery.payload.to.clone()).await?.stub;
+
+println!("{:?}",stub);
+
+                        match selector {
+                            ResourcePropertyValueSelector::Config => {
+                                let value = ResourceValue::Config(stub.archetype.config.clone());
+                                let mut values = HashMap::new();
+                                values.insert( selector, value );
+                                let mut values = ResourceValues::new(stub, values);
+                                delivery.reply(Reply::ResourceValues(values));
+                                return Ok(())
+                            }
+                            _ => {
+                                // handle at the host level below
+                            }
+                        }
+
+
                         let key: ResourceKey = skel.resource_locator_api.as_key(delivery.payload.to.clone()).await?;
                         let (tx, rx) = oneshot::channel();
+
+
                         host_tx.send(HostCall::Select { key, selector, tx }).await?;
                         let result = rx.await;
                         if let Ok(Ok(Option::Some(values))) = result {
@@ -187,6 +209,21 @@ info!("Received PORT request!");
                             }
                         }
 
+                    }
+                    ResourceRequestMessage::Set(property) => {
+
+                        let assignment = ResourcePropertyAssignment {
+                            resource: delivery.payload.to.clone(),
+                            property
+                        };
+println!("assigning : {} on star: {}", assignment.resource.to_string(), skel.info.kind.to_string() );
+                        skel
+                            .registry
+                            .as_ref()
+                            .unwrap()
+                            .update(assignment)
+                            .await?;
+                        delivery.reply(Reply::Empty)
                     }
                 }
                 Ok(())

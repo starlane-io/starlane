@@ -6,14 +6,22 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/starlane-core/src/config/reverse_proxy.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../docs/content/about.md" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/content/about.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/cache.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/cache.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/config.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/config.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-resources/src/http.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/http.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/message/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/message/resource.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/app.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/app.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/mechtron.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/mechtron.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/shell/locator.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/shell/locator.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant/central.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/central.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-resources/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/src/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/message.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/src/parse.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/parse.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/src/property.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/property.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/main.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -72,7 +80,7 @@
       <recent name="$PROJECT_DIR$/starlane-core/src/config" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test config::reverse_proxy::tests::test_reverse_proxy_config">
+  <component name="RunManager" selected="Cargo.Run">
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
       <option name="command" value="run  --bin starlane -- serve --with-external" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -139,8 +147,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test parse::tests::test_parse_resource_value_selector" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-resources --lib parse::tests::test_parse_resource_value_selector -- --exact" />
+    <configuration name="Test parse::tests::test_parse_resource_property_assignment" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib parse::tests::test_parse_resource_property_assignment -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -155,8 +163,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test tests::test_resource_address" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-resources --lib tests::test_resource_address -- --exact" />
+    <configuration name="Test parse::tests::test_parse_resource_value_selector" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib parse::tests::test_parse_resource_value_selector -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -190,19 +198,19 @@
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test" />
-      <item itemvalue="Cargo.Test tests::test_resource_address" />
       <item itemvalue="Cargo.Test parse::tests" />
       <item itemvalue="Cargo.Test parse::tests::test_parse_resource_value_selector" />
       <item itemvalue="Cargo.Test config::reverse_proxy::tests::test_parse_resource_path" />
       <item itemvalue="Cargo.Test config::reverse_proxy::tests::test_reverse_proxy_config" />
+      <item itemvalue="Cargo.Test parse::tests::test_parse_resource_property_assignment" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Test parse::tests::test_parse_resource_property_assignment" />
         <item itemvalue="Cargo.Test config::reverse_proxy::tests::test_reverse_proxy_config" />
         <item itemvalue="Cargo.Test config::reverse_proxy::tests::test_parse_resource_path" />
         <item itemvalue="Cargo.Test parse::tests::test_parse_resource_value_selector" />
         <item itemvalue="Cargo.Test parse::tests" />
-        <item itemvalue="Cargo.Test tests::test_resource_address" />
       </list>
     </recent_temporary>
   </component>

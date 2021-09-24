@@ -54,12 +54,11 @@ impl Host for AppHost {
         }
 
         let app_config_artifact = match &assign.stub.archetype.config {
-            None => return Err("App requires a config".into() ),
-            Some(ConfigSrc::Artifact(artifact)) => {
+            ConfigSrc::None => return Err("App requires a config".into() ),
+            ConfigSrc::Artifact(artifact) => {
 println!("artifact : {}", artifact.to_string());
                 artifact.clone()
             }
-            _ => return Err("App requires a config referencing an artifact".into() ),
         };
 
         let factory = self.skel.machine.get_proto_artifact_caches_factory().await?;
@@ -85,7 +84,7 @@ println!("CREATE APP create()");
             return Err("expected AppHost.init() ResourceType to be ResourceType::App".into());
         }
         let record = self.skel.resource_locator_api.locate(key.into() ).await?;
-        if let Option::Some(ConfigSrc::Artifact(app_config_artifact)) = record.stub.archetype.config.clone() {
+        if let ConfigSrc::Artifact(app_config_artifact) = record.stub.archetype.config.clone() {
             let factory = self.skel.machine.get_proto_artifact_caches_factory().await?;
             let mut proto = factory.create();
             let app_config_artifact_ref = ArtifactRef::new(app_config_artifact.clone(), ArtifactKind::AppConfig );

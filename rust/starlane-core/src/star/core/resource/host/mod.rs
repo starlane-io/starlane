@@ -203,6 +203,9 @@ pub trait Host: Send + Sync {
                 values.insert(selector, ResourceValue::Status(Status::Unknown));
                 Ok(Option::Some(ResourceValues::new( key, values )))
             }
+            ResourcePropertyValueSelector::Config => {
+                Err("the resource host cannot select the config property, that is a job for the registry".into())
+            }
         }
     }
 

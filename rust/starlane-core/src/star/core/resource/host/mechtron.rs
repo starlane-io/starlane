@@ -45,8 +45,8 @@ impl Host for MechtronHost {
         };
 
         let mechtron_config_artifact = match &assign.stub.archetype.config {
-            None => return Err("Mechtron requires a config".into() ),
-            Some(ConfigSrc::Artifact(artifact)) => {
+            ConfigSrc::None => return Err("Mechtron requires a config".into() ),
+            ConfigSrc::Artifact(artifact) => {
                 println!("artifact : {}", artifact.to_string());
                 artifact.clone()
             }

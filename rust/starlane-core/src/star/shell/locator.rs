@@ -9,7 +9,7 @@ use lru::LruCache;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
-use starlane_resources::{ResourceArchetype, ResourceIdentifier, ResourceStub, ResourcePath};
+use starlane_resources::{ResourceArchetype, ResourceIdentifier, ResourceStub, ResourcePath, ConfigSrc};
 use starlane_resources::message::Fail;
 
 use crate::frame::{RegistryAction, Reply, ReplyKind, SimpleReply, StarMessagePayload};
@@ -234,7 +234,7 @@ impl ResourceLocatorComponent {
                     archetype: ResourceArchetype {
                         kind: ResourceKind::Root,
                         specific: None,
-                        config: None,
+                        config: ConfigSrc::None,
                     },
                     owner: None,
                 },

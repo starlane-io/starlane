@@ -1,11 +1,14 @@
-use crate::{SkewerCase, Resource, ResourceIdentifier, ResourceSelector, ResourceStub, FieldSelection, ResourcePath};
+use crate::{SkewerCase, Resource, ResourceIdentifier, ResourceSelector, ResourceStub, FieldSelection, ResourcePath, ConfigSrc};
 use std::str::FromStr;
 use crate::error::Error;
 use crate::data::{DataSet, BinSrc, Meta};
 use serde::{Serialize,Deserialize};
 use std::collections::HashMap;
-use crate::parse::{parse_resource_property_value_selector, parse_resource_value_selector};
+use crate::parse::{parse_resource_property_value_selector, parse_resource_value_selector, parse_resource_property_assignment};
 use crate::status::Status;
+
+
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceValueSelector {
@@ -65,7 +68,8 @@ impl DataSetAspectSelector {
 pub enum ResourcePropertyValueSelector {
     None,
     State{ aspect: DataSetAspectSelector, field: FieldValueSelector },
-    Status
+    Status,
+    Config
 }
 
 impl ResourcePropertyValueSelector {
@@ -101,6 +105,9 @@ impl ResourcePropertyValueSelector {
             }
             ResourcePropertyValueSelector::Status => {
                 ResourceValue::None
+            }
+            ResourcePropertyValueSelector::Config => {
+                ResourceValue::Config(resource.archetype.config)
             }
         }
     }
@@ -181,7 +188,8 @@ pub enum ResourceValue {
     String(String),
     Meta(Meta),
     Resource(Resource),
-    Status(Status)
+    Status(Status),
+    Config(ConfigSrc)
 }
 
 impl ToString for ResourceValue {
@@ -207,7 +215,6 @@ impl ToString for ResourceValue {
                         String::from_utf8(bin.to_vec()).unwrap_or("UTF ERROR!".to_string() )
                     }
                 }
-
             }
             ResourceValue::String(string) => {
                 string.clone()
@@ -220,6 +227,9 @@ impl ToString for ResourceValue {
             }
             ResourceValue::Status(status) => {
                 status.to_string()
+            }
+            ResourceValue::Config(config) => {
+                config.to_string()
             }
         }
     }
@@ -254,5 +264,32 @@ impl <R> ResourceValues <R> {
        }
   }
 }
+
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ResourcePropertyAssignment {
+    pub resource: ResourceIdentifier,
+    pub property: ResourceProperty
+}
+
+impl FromStr for ResourcePropertyAssignment {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (leftover,result) = parse_resource_property_assignment(s)?;
+        if leftover.len() > 0 {
+            Err(format!("could not parse part of resource property assignment: '{}' unprocessed portion: '{}'", s,leftover ).into())
+        } else {
+           result
+        }
+    }
+}
+
+
+#[derive(Clone, Serialize, Deserialize)]
+pub enum ResourceProperty {
+  Config(ConfigSrc)
+}
+
 
 

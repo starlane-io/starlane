@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use tokio::sync::{mpsc, oneshot};
 
-use starlane_resources::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceStub, ResourcePath};
+use starlane_resources::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceStub, ResourcePath, ConfigSrc};
 
 use crate::error::Error;
 use crate::resource::{create_args, ResourceAddress, ResourceKind, ResourceRecord, ResourceRegistration, ResourceLocation};
@@ -51,7 +51,7 @@ impl CentralVariant {
                 archetype: ResourceArchetype {
                     kind: ResourceKind::Root,
                     specific: None,
-                    config: None,
+                    config: ConfigSrc::None,
                 },
                 owner: None,
             },

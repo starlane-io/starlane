@@ -31,7 +31,7 @@ use crate::star::{Request, StarCommand, StarKind, StarSkel};
 use crate::star::shell::search::SearchInit;
 use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
-use starlane_resources::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, ResourceValue, ResourceValueSelector, ResourceValues};
+use starlane_resources::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, ResourceValue, ResourceValueSelector, ResourceValues, ResourceProperty, ResourcePropertyAssignment};
 use crate::watch::{WatchResourceSelector, Watcher};
 
 #[derive(Clone)]
@@ -226,6 +226,29 @@ info!("received reply for {}",description);
     }
 
 
+    pub async fn set_property(
+        &self,
+        assignment: ResourcePropertyAssignment
+    ) -> Result<(), Error> {
+
+        let mut proto = ProtoMessage::new();
+        proto.to(assignment.resource.into());
+        proto.from(MessageFrom::Inject);
+        proto.payload = Option::Some(ResourceRequestMessage::Set(assignment.property));
+        let proto = proto.try_into()?;
+
+        let reply = self
+            .surface_api
+            .exchange(proto, ReplyKind::Empty, "StarlaneApi: set_property")
+            .await?;
+
+        match reply{
+            Reply::Empty => Ok(()),
+            _ => unimplemented!("StarlaneApi::set_property() did not receive the expected reply from surface_api")
+        }
+    }
+
+
     pub async fn select_values(
         &self,
         path: ResourcePath,
@@ -357,7 +380,7 @@ info!("received reply for {}",description);
             archetype: ResourceArchetype {
                 kind: ResourceKind::Space,
                 specific: None,
-                config: None,
+                config: ConfigSrc::None,
             },
             state_src: state,
             registry_info: None,
@@ -424,7 +447,7 @@ impl SpaceApi {
             archetype: ResourceArchetype {
                 kind: ResourceKind::User,
                 specific: None,
-                config: None,
+                config: ConfigSrc::None,
             },
             state_src: resource_src,
             registry_info: None,
@@ -445,7 +468,7 @@ impl SpaceApi {
             archetype: ResourceArchetype {
                 kind: ResourceKind::App,
                 specific: None,
-                config: Option::Some(ConfigSrc::Artifact(app_config)),
+                config: ConfigSrc::Artifact(app_config),
             },
             state_src: resource_src,
             registry_info: None,
@@ -466,7 +489,7 @@ impl SpaceApi {
             archetype: ResourceArchetype {
                 kind: ResourceKind::FileSystem,
                 specific: None,
-                config: None,
+                config: ConfigSrc::None,
             },
             state_src: resource_src,
             registry_info: None,
@@ -490,7 +513,7 @@ impl SpaceApi {
             archetype: ResourceArchetype {
                 kind: ResourceKind::ArtifactBundleSeries,
                 specific: None,
-                config: None,
+                config: ConfigSrc::None,
             },
             state_src: resource_src,
             registry_info: None,
@@ -548,7 +571,7 @@ impl AppApi {
             archetype: ResourceArchetype {
                 kind: ResourceKind::Mechtron,
                 specific: None,
-                config: Option::Some(ConfigSrc::Artifact(config)),
+                config: ConfigSrc::Artifact(config),
             },
             state_src: resource_src,
             registry_info: None,
@@ -667,7 +690,7 @@ impl FileSystemApi {
             archetype: ResourceArchetype {
                 kind: ResourceKind::File(FileKind::File),
                 specific: None,
-                config: None,
+                config: ConfigSrc::None,
             },
             state_src: resource_src,
             registry_info: None,
@@ -756,7 +779,7 @@ impl ArtifactBundleSeriesApi {
             archetype: ResourceArchetype {
                 kind: ResourceKind::ArtifactBundle,
                 specific: None,
-                config: None,
+                config: ConfigSrc::None,
             },
             state_src: resource_src,
             registry_info: None,

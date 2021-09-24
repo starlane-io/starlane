@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::{ResourceAddress, ResourceCreate, ResourceIdentifier, ResourceKey, ResourceKind, ResourceSelector, ResourceStub, ResourceType, SkewerCase, Specific, ResourceId, Resource};
 use crate::error::Error;
 use crate::data::{DataSet, BinSrc, Meta};
-use crate::property::{ResourcePropertyValueSelector, ResourceValueSelector};
+use crate::property::{ResourcePropertyValueSelector, ResourceValueSelector, ResourceProperty};
 
 pub struct ProtoMessage<P> {
     pub id: MessageId,
@@ -182,7 +182,8 @@ pub enum ResourceRequestMessage {
     Select(ResourceSelector),
     Unique(ResourceType),
     SelectValues(ResourcePropertyValueSelector),
-    UpdateState(DataSet<BinSrc>)
+    UpdateState(DataSet<BinSrc>),
+    Set(ResourceProperty)
 }
 
 #[derive(Clone, Serialize, Deserialize)]

@@ -3,16 +3,16 @@ use std::str::FromStr;
 
 use nom::{AsChar, InputTakeAtPosition};
 use nom::bytes::complete::{tag, take};
-use nom::character::complete::{alpha0, alpha1, anychar, digit0, digit1, one_of, alphanumeric1};
+use nom::character::complete::{alpha0, alpha1, anychar, digit0, digit1, one_of, alphanumeric1, multispace0};
 use nom::combinator::{not, opt};
 use nom::error::{context, ErrorKind};
 use nom::multi::{many1, many_m_n, separated_list0, separated_list1};
 use nom::sequence::{delimited, preceded, terminated, tuple};
 use serde::{Deserialize, Serialize};
 
-use crate::{DomainCase, Res, ResourceKind, ResourceKindParts, ResourcePath, ResourcePathAndKind, ResourcePathAndType, ResourcePathSegmentKind, ResourceType, SkewerCase, Specific, Version, ResourceSelector, FieldSelection};
+use crate::{DomainCase, Res, ResourceKind, ResourceKindParts, ResourcePath, ResourcePathAndKind, ResourcePathAndType, ResourcePathSegmentKind, ResourceType, SkewerCase, Specific, Version, ResourceSelector, FieldSelection, parse_resource_property, ConfigSrc};
 use crate::error::Error;
-use crate::property::{ResourcePropertyValueSelector, DataSetAspectSelector, ResourceValueSelector};
+use crate::property::{ResourcePropertyValueSelector, DataSetAspectSelector, ResourceValueSelector, ResourceProperty, ResourcePropertyAssignment};
 use nom::branch::alt;
 
 fn any_resource_path_segment<T>(i: T) -> Res<T, T>
@@ -48,6 +48,19 @@ fn loweralphanumerichyphen1<T>(i: T) -> Res<T, T>
     )
 }
 
+fn not_whitespace<T>(i: T) -> Res<T, T>
+    where
+        T: InputTakeAtPosition,
+        <T as InputTakeAtPosition>::Item: AsChar,
+{
+    i.split_at_position1_complete(
+        |item| {
+            let char_item = item.as_char();
+            (char_item == ' ')
+        },
+        ErrorKind::AlphaNumeric,
+    )
+}
 
 fn anything_but_single_quote<T>(i: T) -> Res<T, T>
     where
@@ -309,6 +322,9 @@ pub fn parse_resource_property_value_selector(input: &str) -> Res<&str, Result<R
                    }
                }
            },
+           "config" => {
+               (next_input,Ok(ResourcePropertyValueSelector::Config))
+           }
            property => return (next_input, Err(format!("cannot match a selector for resource property '{}'",property).into()))
        }
 
@@ -337,6 +353,47 @@ pub fn parse_resource_value_selector(input: &str) -> Res<&str, Result<ResourceVa
     })
 }
 
+pub fn parse_resource_property_assignment( input: &str ) -> Res<&str, Result<ResourcePropertyAssignment,Error>> {
+     context ("parse_resource_property_assignment",
+       tuple((parse_resource_value_selector,multispace0,tag("="),multispace0,not_whitespace,multispace0))
+    )(input).map( |(input_next,(resource_value_selector, _, _, _, value, _))| {
+         match resource_value_selector {
+             Ok(resource_value_selector ) => {
+                 match resource_value_selector.property {
+                     ResourcePropertyValueSelector::None => {
+                         (input_next, Err("invalid Resource property selected: None".into()))
+                     }
+                     ResourcePropertyValueSelector::State { .. } => {
+                         ( input_next, Err("cannot set Resource State via the assignment operator".into()) )
+                     }
+                     ResourcePropertyValueSelector::Status => {
+                         ( input_next, Err("cannot set Resource Status via the assignment operator".into()) )
+                     }
+                     ResourcePropertyValueSelector::Config => {
+                         let config = ResourcePath::from_str(value);
+                         match config {
+                             Ok(config) => {
+                                 let assignment = ResourcePropertyAssignment {
+                                     resource: resource_value_selector.resource.into(),
+                                     property: ResourceProperty::Config( ConfigSrc::Artifact(config) )
+                                 };
+                                 (input_next,Ok(assignment))
+                             }
+                             Err(error) => {
+                                 ( input_next, Err(error.into()) )
+                             }
+                         }
+                     }
+                 }
+             }
+             Err(error) => {
+                 (input_next, Err(error.into()) )
+             }
+         }
+
+     })
+}
+
 #[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub enum ResourceExpression {
     Path(ResourcePath),
@@ -348,10 +405,10 @@ mod tests {
     use std::convert::TryInto;
     use std::str::FromStr;
 
-    use crate::{ResourcePath, ResourcePathAndKind};
+    use crate::{ResourcePath, ResourcePathAndKind, ConfigSrc};
     use crate::error::Error;
-    use crate::parse::{parse_resource_path, parse_resource_path_and_kind, parse_resource_value_selector};
-    use crate::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, MetaFieldValueSelector};
+    use crate::parse::{parse_resource_path, parse_resource_path_and_kind, parse_resource_value_selector, parse_resource_property_assignment};
+    use crate::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, MetaFieldValueSelector, ResourceProperty};
 
     #[test]
     fn test_parse_resource_path() -> Result<(), Error> {
@@ -450,4 +507,36 @@ mod tests {
 
         Ok(())
     }
+
+
+    #[test]
+    fn test_parse_resource_property_assignment() -> Result<(), Error> {
+        let (leftover, result)= parse_resource_property_assignment("hello:my::config=future:friend")?;
+        let assignment = result?;
+        assert!(leftover.len()==0);
+        assert!(assignment.resource.to_string().as_str() == "hello:my");
+        if let ResourceProperty::Config(config) = assignment.property {
+            if let ConfigSrc::Artifact(artifact) = config {
+                assert!( artifact.to_string().as_str() == "future:friend")
+            }
+        } else {
+            assert!(false)
+        }
+
+
+        let (leftover, result)= parse_resource_property_assignment("hello:my::config =  future:friend  ")?;
+        let assignment = result?;
+        assert!(leftover.len()==0);
+        assert!(assignment.resource.to_string().as_str() == "hello:my");
+        if let ResourceProperty::Config(config) = assignment.property {
+            if let ConfigSrc::Artifact(artifact) = config {
+                assert!( artifact.to_string().as_str() == "future:friend")
+            }
+        } else {
+            assert!(false)
+        }
+
+        Ok(())
+    }
+
 }
