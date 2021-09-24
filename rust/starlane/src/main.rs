@@ -1,6 +1,10 @@
 #[macro_use]
 extern crate lazy_static;
 
+#[macro_use]
+extern crate tablestream;
+
+
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
@@ -30,6 +34,11 @@ use starlane_resources::data::{DataSet, BinSrc, Meta};
 use starlane_resources::property::{ResourcePropertyValueSelector, ResourceValueSelector, ResourcePropertyAssignment};
 use starlane_core::watch::{WatchResourceSelector, Property};
 use starlane_resources::message::MessageFrom;
+use starlane_core::frame::StarPattern;
+use std::io;
+use tablestream::{Stream, Column};
+use starlane_core::star::StarKey;
+use starlane_core::parse::parse_star_pattern;
 
 mod cli;
 mod resource;
@@ -55,6 +64,7 @@ fn main() -> Result<(), Error> {
                                                             SubCommand::with_name("ls").usage("list resources").args(vec![Arg::with_name("address").required(true).help("the resource address to list"),Arg::with_name("child-pattern").required(false).help("a pattern describing the children to be listed .i.e '<File>' for returning resource type File")].as_slice()),
                                                             SubCommand::with_name("get").usage("get a resource property value").args(vec![Arg::with_name("address").required(true).help("the resource property value")].as_slice()),
                                                             SubCommand::with_name("set").usage("set a resource property value").args(vec![Arg::with_name("address").required(true).help("the resource property value")].as_slice()),
+                                                            SubCommand::with_name("stars").usage("stars subcommand").args(vec![Arg::with_name("star-pattern").required(false).help("the star pattern to list")].as_slice()),
                                                             SubCommand::with_name("watch").usage("watch resources property value for changes").args(vec![Arg::with_name("address").required(true).help("the resource property value to watch")].as_slice())
     ]);
 
@@ -121,7 +131,8 @@ fn main() -> Result<(), Error> {
             set(args.clone()).await.unwrap();
         });
         shutdown();
-    } else if let Option::Some(args) = matches.subcommand_matches("get") {
+    }
+ else if let Option::Some(args) = matches.subcommand_matches("get") {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
             get(args.clone()).await.unwrap();
@@ -131,6 +142,13 @@ fn main() -> Result<(), Error> {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
             watch(args.clone()).await.unwrap();
+        });
+        shutdown();
+    }
+     else if let Option::Some(args) = matches.subcommand_matches("stars") {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+        stars(args.clone()).await.unwrap();
         });
         shutdown();
     } else {
@@ -359,7 +377,39 @@ async fn watch(args: ArgMatches<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+async fn stars(args: ArgMatches<'_>) -> Result<(), Error> {
 
+    let star_pattern = if args.is_present("star-pattern") {
+        let star_pattern = args.value_of("star-pattern")
+            .ok_or("expected star_pattern")?;
+        parse_star_pattern(star_pattern.trim())?.1?
+    } else {
+        StarPattern::Any
+    };
+
+
+    let starlane_api = starlane_api().await?;
+
+    let hits = starlane_api.star_search(star_pattern).await?;
+
+    let mut out = io::stdout();
+
+
+    let mut stream = Stream::new( &mut out, vec![
+        Column::new(  |f, k:&(StarKey,usize)| write!(f, "{}", k.0.to_string() )).header("star"),
+        Column::new(  |f, k:&(StarKey,usize)| write!(f, "{}", k.1 )).header("hops"),
+    ] );
+
+    for (star,hops) in hits.hits {
+        stream.row((star,hops));
+    }
+
+    stream.finish();
+
+    starlane_api.shutdown();
+
+    Ok(())
+}
 pub async fn starlane_api() -> Result<StarlaneApi, Error> {
     let starlane = StarlaneMachine::new("client".to_string()).unwrap();
     let mut layout = ConstellationLayout::client("host".to_string())?;

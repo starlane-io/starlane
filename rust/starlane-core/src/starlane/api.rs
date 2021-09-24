@@ -28,7 +28,7 @@ use crate::resource::FileKind;
 use crate::resource::ResourceKey;
 use crate::resource::user::UserState;
 use crate::star::{Request, StarCommand, StarKind, StarSkel};
-use crate::star::shell::search::SearchInit;
+use crate::star::shell::search::{SearchInit, SearchHits};
 use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
 use starlane_resources::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, ResourceValue, ResourceValueSelector, ResourceValues, ResourceProperty, ResourcePropertyAssignment, ResourceRegistryPropertyAssignment};
@@ -258,6 +258,18 @@ info!("received reply for {}",description);
 
 
     }
+
+    pub async fn star_search(
+        &self,
+        star_pattern: StarPattern
+    ) -> Result<SearchHits, Error> {
+
+        let hits = self.surface_api.star_search(star_pattern).await?;
+        println!("STAR HITS: {}", hits.hits.len() );
+        Ok(hits)
+    }
+
+
 
 
     pub async fn select_values(
