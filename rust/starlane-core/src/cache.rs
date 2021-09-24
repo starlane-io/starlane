@@ -29,6 +29,7 @@ use crate::resource::config::Parser;
 use crate::starlane::api::StarlaneApi;
 use crate::starlane::StarlaneMachine;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
+use crate::config::reverse_proxy::{ReverseProxyConfig, ReverseProxyConfigParser};
 
 pub type Data = Arc<Vec<u8>>;
 pub type ZipFile = Path;
@@ -65,6 +66,7 @@ pub struct ArtifactCaches {
     pub mechtron_configs: ArtifactItemCache<MechtronConfig>,
     pub bind_configs: ArtifactItemCache<BindConfig>,
     pub wasms: ArtifactItemCache<Wasm>,
+    pub reverse_proxy_configs: ArtifactItemCache<ReverseProxyConfig>,
 }
 
 impl ArtifactCaches {
@@ -74,7 +76,8 @@ impl ArtifactCaches {
             app_configs: ArtifactItemCache::new(),
             mechtron_configs: ArtifactItemCache::new(),
             bind_configs: ArtifactItemCache::new(),
-            wasms: ArtifactItemCache::new()
+            wasms: ArtifactItemCache::new(),
+            reverse_proxy_configs: ArtifactItemCache::new()
         }
     }
 }
@@ -156,6 +159,9 @@ impl ProtoArtifactCaches {
                 }
                 ArtifactKind::Wasm=> {
                     caches.wasms.add( self.root_caches.wasms.get(artifact).await? );
+                }
+                ArtifactKind::ReverseProxy => {
+                    caches.reverse_proxy_configs.add( self.root_caches.reverse_proxy_cache.get(artifact).await? );
                 }
             }
         }
@@ -929,6 +935,7 @@ struct RootArtifactCaches {
     mechtron_configs: RootItemCache<MechtronConfig>,
     bind_configs: RootItemCache<BindConfig>,
     wasms: RootItemCache<Wasm>,
+    reverse_proxy_cache: RootItemCache<ReverseProxyConfig>
 }
 
 impl RootArtifactCaches {
@@ -941,6 +948,8 @@ impl RootArtifactCaches {
             mechtron_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(MechtronConfigParser::new())),
             bind_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(BindConfigParser::new())),
             wasms: RootItemCache::new(bundle_cache.clone(), Arc::new(WasmCompiler::new())),
+            reverse_proxy_cache: RootItemCache::new(bundle_cache.clone(), Arc::new(ReverseProxyConfigParser::new())),
+
         }
     }
 
@@ -951,6 +960,7 @@ impl RootArtifactCaches {
             ArtifactKind::BindConfig=> self.bind_configs.cache(artifact).await?.into(),
             ArtifactKind::Raw => self.raw.cache(artifact).await?.into(),
             ArtifactKind::Wasm=> self.wasms.cache(artifact).await?.into(),
+            ArtifactKind::ReverseProxy => self.reverse_proxy_cache.cache(artifact).await?.into(),
         };
 
         Ok(claim)

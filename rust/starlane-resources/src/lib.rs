@@ -1550,6 +1550,7 @@ resources! {
         MechtronConfig,
         BindConfig,
         Wasm,
+        ReverseProxy
     }
 
     #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]

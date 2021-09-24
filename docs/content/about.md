@@ -1,9 +1,9 @@
 # ABOUT STARLANE
-Starlane is a **RESOURCE MESH** which can also execute client and server side WebAssembly.  It's still a work in progress and not ready for production.
+Starlane is a **RESOURCE MESH** which can also execute client and server side WebAssembly using an actor model framework.  It's still a work in progress and not ready for production.
 
-Understanding what Starlane is and does can be a bit confusing because of the duality of its missions of Resource Mesh AND WebAssembly executor.  A little history clears it up somewhat:  The origin of the Starlane project was an attempt to create an environment for client and server side WebAssembly programs to deploy themselves, to securely access network resources, observe network resources for changes and message other WebAssembly programs.  
+Understanding what Starlane is and does can be a bit confusing because of the duality of its missions of Resource Mesh AND WebAssembly executor.  A little history clears it up somewhat:  The origin of the Starlane project was an attempt to create an environment for client and server side WebAssembly actors to deploy themselves, to securely access network resources, observe network resources for changes and message other WebAssembly actors.  
 
-In the journey to enable WebAssembly it became apparent that Starlane's proposition would be useful to traditional microservices as well and that is when the second concept of the Resource Mesh became a first class feature in Starlane.  
+In the journey to enable WebAssembly actors it became apparent that Starlane's proposition would be useful to traditional microservices as well and that is when the second concept of the Resource Mesh became a first class feature in Starlane.  
 
 Let's start by explaining what a Resource Mesh is:
 

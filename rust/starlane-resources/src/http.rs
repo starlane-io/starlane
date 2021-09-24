@@ -65,7 +65,7 @@ impl TryFrom<BinSrc> for HttpRequest {
     }
 }
 
-#[derive(Debug,Clone,Serialize,Deserialize)]
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub enum HttpMethod {
     Get,
     Put,
