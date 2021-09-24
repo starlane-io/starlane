@@ -413,12 +413,15 @@ println!("Pre FileAccess");
             Arc::new(record.stub.key.to_string().as_bytes().to_vec()),
         );
 
-println!("WRITING...");
+println!("WRITING...{}", bundle_zip.to_string());
         file_access.write(&bundle_zip, stream).await?;
+println!("DONE WRITING...");
 
+println!("extracting files...");
         file_access
             .unzip("bundle.zip".to_string(), "files".to_string())
             .await?;
+println!("done extracting files......");
 
         let ready_file = Path::from_str("/.ready")?;
         file_access

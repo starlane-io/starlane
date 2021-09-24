@@ -251,6 +251,7 @@ where
                 && !(char_item == '.')
                 && !(char_item == '_')
                 && !(char_item == '-')
+                && !(char_item == ':')
                 && !(char_item.is_alpha() || char_item.is_dec_digit())
         },
         ErrorKind::AlphaNumeric,
@@ -944,30 +945,29 @@ impl Path {
     }
 
     pub fn parent(&self) -> Option<Path> {
-        let mut copy = self.string.clone();
-        if copy.len() <= 1 {
-            return Option::None;
-        }
-        copy.remove(0);
-        let split = self.string.split("/");
-        if split.count() <= 1 {
-            Option::None
-        } else {
-            let mut segments = vec![];
-            let mut split = copy.split("/");
-            while let Option::Some(segment) = split.next() {
-                segments.push(segment);
+        let s = self.to_string();
+        let parent = std::path::Path::new(s.as_str()).parent();
+        match parent {
+            None => {
+                Option::None
             }
-            if segments.len() <= 1 {
-                return Option::None;
-            } else {
-                segments.pop();
-                let mut string = String::new();
-                for segment in segments {
-                    string.push_str("/");
-                    string.push_str(segment);
+            Some(path) => {
+                match path.to_str() {
+                    None => {
+                        Option::None
+                    }
+                    Some(some) => {
+                        match Self::from_str(some) {
+                            Ok(parent) => {
+                                Option::Some(parent)
+                            }
+                            Err(error) => {
+                                eprintln!("{}",error.to_string() );
+                                Option::None
+                            }
+                        }
+                    }
                 }
-                Option::Some(Path::new(string.as_str()))
             }
         }
     }
