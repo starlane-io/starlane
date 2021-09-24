@@ -18,7 +18,7 @@ use crate::message::resource::ActorMessage;
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey};
 use crate::watch::{Notification, Watch, WatchKey};
 use crate::resource::{ResourceId, ResourceRegistration, ResourceRecord, ResourceType, ResourceKey, ResourceSliceStatus,  UserKey, AppKey, ActorKey};
-use starlane_resources::property::{ResourceValues, ResourceRegistryProperty, ResourceRegistryPropertyAssignment};
+use starlane_resources::property::{ResourceValues, ResourceRegistryProperty, ResourceRegistryPropertyAssignment, ResourceRegistryPropertyValueSelector, ResourcePropertyOp};
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum Frame {
@@ -382,7 +382,8 @@ pub enum ResourceRegistryRequest {
         parent: ResourceIdentifier,
         child_type: ResourceType,
     },
-    Set(ResourceRegistryPropertyAssignment)
+    Set(ResourceRegistryPropertyAssignment),
+    SelectValues(ResourcePropertyOp<ResourceRegistryPropertyValueSelector>)
 }
 
 impl ToString for ResourceRegistryRequest {
@@ -393,7 +394,8 @@ impl ToString for ResourceRegistryRequest {
             ResourceRegistryRequest::Find(_) => "Find".to_string(),
             ResourceRegistryRequest::Status(_) => "Status".to_string(),
             ResourceRegistryRequest::UniqueResourceId { .. } => "UniqueResourceId".to_string(),
-            ResourceRegistryRequest::Set(_) => "Set".to_string()
+            ResourceRegistryRequest::Set(_) => "Set".to_string(),
+            ResourceRegistryRequest::SelectValues(_) => "SelectValues".to_string()
         }
     }
 }

@@ -31,7 +31,7 @@ use crate::star::{Request, StarCommand, StarKind, StarSkel, StarKey};
 use crate::star::shell::search::{SearchInit, SearchHits};
 use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
-use starlane_resources::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, ResourceValue, ResourceValueSelector, ResourceValues, ResourceProperty, ResourcePropertyAssignment, ResourceRegistryPropertyAssignment};
+use starlane_resources::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, ResourceValue, ResourceValueSelector, ResourceValues, ResourceProperty, ResourcePropertyAssignment, ResourceRegistryPropertyAssignment, ResourceHostPropertyValueSelector, ResourcePropertyOp};
 use crate::watch::{WatchResourceSelector, Watcher};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
 
@@ -290,7 +290,6 @@ info!("received reply for {}",description);
     ) -> Result<SearchHits, Error> {
 
         let hits = self.surface_api.star_search(star_pattern).await?;
-        println!("STAR HITS: {}", hits.hits.len() );
         Ok(hits)
     }
 
@@ -303,21 +302,49 @@ info!("received reply for {}",description);
         selector: ResourcePropertyValueSelector
     ) -> Result<ResourceValues<ResourceStub>, Error> {
 
-        let mut proto = ProtoMessage::new();
-        proto.to(path.into());
-        proto.from(MessageFrom::Inject);
-        proto.payload = Option::Some(ResourceRequestMessage::SelectValues(selector));
-        let proto = proto.try_into()?;
+        match selector {
+            ResourcePropertyValueSelector::Registry(selector) => {
 
-        let reply = self
-            .surface_api
-            .exchange(proto, ReplyKind::ResourceValues, "StarlaneApi: select_values ")
-            .await?;
+                let parent = path.parent().ok_or("expected resource to have a parent")?;
+                let parent = self.fetch_resource_record(parent.into() ).await?;
+                let op = ResourcePropertyOp{
+                    resource: path.into(),
+                    property: selector
+                };
+                let mut proto = ProtoStarMessage::new();
+                proto.to = ProtoStarMessageTo::Star(parent.location.host);
+                proto.payload = StarMessagePayload::ResourceRegistry(ResourceRegistryRequest::SelectValues(op));
 
-        match reply{
-            Reply::ResourceValues(values) => Ok(values),
-            _ => unimplemented!("StarlaneApi::select_values() did not receive the expected reply from surface_api")
+                let reply = self
+                    .surface_api
+                    .exchange(proto, ReplyKind::ResourceValues, "StarlaneApi: select_values ")
+                    .await?;
+
+                match reply{
+                    Reply::ResourceValues(values) => Ok(values),
+                    _ => unimplemented!("StarlaneApi::select_values() did not receive the expected reply from surface_api")
+                }
+            }
+            ResourcePropertyValueSelector::Host(selector) => {
+                let mut proto = ProtoMessage::new();
+                proto.to(path.into());
+                proto.from(MessageFrom::Inject);
+                proto.payload = Option::Some(ResourceRequestMessage::SelectValues(selector));
+                let proto = proto.try_into()?;
+
+                let reply = self
+                    .surface_api
+                    .exchange(proto, ReplyKind::ResourceValues, "StarlaneApi: select_values ")
+                    .await?;
+
+                match reply{
+                    Reply::ResourceValues(values) => Ok(values),
+                    _ => unimplemented!("StarlaneApi::select_values() did not receive the expected reply from surface_api")
+                }
+            }
         }
+
+
     }
 
 
@@ -382,7 +409,7 @@ info!("received reply for {}",description);
         let surface_api = self.surface_api.clone();
 
             let mut proto = ProtoMessage::new();
-            let selector = ResourcePropertyValueSelector::State{
+            let selector = ResourceHostPropertyValueSelector::State{
                 aspect: DataSetAspectSelector::All,
                 field: FieldValueSelector::All
             };
@@ -399,7 +426,7 @@ info!("received reply for {}",description);
                 .await;
             match result {
                 Ok(Reply::ResourceValues(values)) => {
-                   let state = values.values.get(&selector ).ok_or("expected state value")?.clone();
+                   let state = values.values.get(&(selector.clone().into()) ).ok_or("expected state value")?.clone();
                    match state {
                        ResourceValue::DataSet(state) => {
                            Ok(state)

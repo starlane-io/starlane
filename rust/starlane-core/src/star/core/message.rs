@@ -20,7 +20,7 @@ use crate::star::core::resource::host::{HostCall, HostComponent};
 use crate::star::shell::pledge::ResourceHostSelector;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use tokio::sync::oneshot::error::RecvError;
-use starlane_resources::property::{ResourcePropertyAssignment, ResourcePropertyValueSelector, ResourceValue, ResourceValues, ResourceRegistryPropertyAssignment};
+use starlane_resources::property::{ResourcePropertyAssignment, ResourcePropertyValueSelector, ResourceValue, ResourceValues, ResourceRegistryPropertyAssignment, ResourceRegistryPropertyValueSelector};
 use std::collections::HashMap;
 
 pub enum CoreMessageCall {
@@ -72,7 +72,6 @@ impl MessagingEndpointComponent {
                     self.process_resource_request(delivery).await?;
                 }
                 MessagePayload::PortRequest(request) => {
-info!("Received PORT request!");
                     let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
                     self.process_resource_port_request(delivery).await?;
                 }
@@ -150,7 +149,6 @@ info!("Received PORT request!");
                         }
                     }
                     ResourceRequestMessage::Select(selector) => {
-println!("SElecting on StarKind: {}", skel.info.kind.to_string() );
                         let resources = skel
                             .registry
                             .as_ref()
@@ -170,23 +168,14 @@ println!("SElecting on StarKind: {}", skel.info.kind.to_string() );
                         delivery.reply(Reply::Id(unique_src.next(&resource_type).await?));
                     }
                     ResourceRequestMessage::SelectValues(selector) => {
-                        let stub = skel.resource_locator_api.locate(delivery.payload.to.clone()).await?.stub;
 
-println!("{:?}",stub);
+                        let resource = skel
+                            .registry
+                            .as_ref()
+                            .unwrap()
+                            .get(delivery.payload.to.clone() )
+                            .await?.ok_or("expected resource: ")?;
 
-                        match selector {
-                            ResourcePropertyValueSelector::Config => {
-                                let value = ResourceValue::Config(stub.archetype.config.clone());
-                                let mut values = HashMap::new();
-                                values.insert( selector, value );
-                                let mut values = ResourceValues::new(stub, values);
-                                delivery.reply(Reply::ResourceValues(values));
-                                return Ok(())
-                            }
-                            _ => {
-                                // handle at the host level below
-                            }
-                        }
 
 
                         let key: ResourceKey = skel.resource_locator_api.as_key(delivery.payload.to.clone()).await?;
@@ -196,7 +185,7 @@ println!("{:?}",stub);
                         host_tx.send(HostCall::Select { key, selector, tx }).await?;
                         let result = rx.await;
                         if let Ok(Ok(Option::Some(values))) = result {
-                            let values = values.with(stub);
+                            let values = values.with(resource.stub);
                             delivery.reply(Reply::ResourceValues(values));
                         } else {
                             delivery.fail(Fail::expected("Ok(Ok(ResourceValues(values)))"));
@@ -325,7 +314,7 @@ println!("{:?}",stub);
                             }
                         }
                         ResourceRegistryRequest::Set(assignment) => {
-println!("Registry property assignment resource: {} star_kind: {}", assignment.resource.to_string(), skel.info.kind.to_string() );
+
                             skel
                                 .registry
                                 .as_ref()
@@ -333,6 +322,32 @@ println!("Registry property assignment resource: {} star_kind: {}", assignment.r
                                 .update(assignment.clone())
                                 .await?;
                             delivery.reply(Reply::Empty);
+                        }
+                        ResourceRegistryRequest::SelectValues(op) => {
+
+println!("Select Property Ops... op.resource: {}", op.resource.to_string());
+
+                            let resource = skel
+                                .registry
+                                .as_ref()
+                                .unwrap()
+                                .get(op.resource.clone() )
+                                .await?.ok_or("expected resource: ")?;
+
+                            match op.property {
+                                ResourceRegistryPropertyValueSelector::Config => {
+                                    let value = ResourceValue::Config(resource.stub.archetype.config.clone());
+                                    let mut values = HashMap::new();
+                                    values.insert( op.property.clone().into(), value );
+                                    let mut values = ResourceValues::new(resource.stub, values);
+                                    delivery.reply(Reply::ResourceValues(values));
+                                    return Ok(())
+                                }
+                                _ => {
+                                    // handle at the host level below
+                                }
+                            }
+
                         }
                     }
                 }

@@ -20,7 +20,7 @@ use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::message::resource::Delivery;
 use crate::star::core::resource::host::kube::KubeHost;
 use crate::star::core::resource::host::file::FileHost;
-use starlane_resources::property::{ResourceValueSelector, ResourceValues, ResourcePropertyValueSelector, ResourceValue};
+use starlane_resources::property::{ResourceValueSelector, ResourceValues, ResourcePropertyValueSelector, ResourceValue, ResourceHostPropertyValueSelector};
 use starlane_resources::status::Status;
 
 pub mod artifact;
@@ -48,7 +48,7 @@ pub enum HostCall {
     },
     Select {
         key: ResourceKey,
-        selector: ResourcePropertyValueSelector,
+        selector: ResourceHostPropertyValueSelector,
         tx: oneshot::Sender<Result<Option<ResourceValues<ResourceKey>>, Error>>,
     },
     Has {
@@ -183,28 +183,17 @@ pub trait Host: Send + Sync {
 
     fn shutdown(&self) {}
 
-    async fn select(&self, key: ResourceKey, selector: ResourcePropertyValueSelector) -> Result<Option<ResourceValues<ResourceKey>>, Error> {
+    async fn select(&self, key: ResourceKey, selector: ResourceHostPropertyValueSelector) -> Result<Option<ResourceValues<ResourceKey>>, Error> {
         match &selector {
-            ResourcePropertyValueSelector::State { aspect, field } => {
+            ResourceHostPropertyValueSelector::State { aspect, field } => {
                 let state = self.get_state(key.clone()).await?.unwrap_or(DataSet::new());
                 let state = aspect.filter(state);
                 let mut values = HashMap::new();
-                values.insert(selector, state );
+                values.insert(selector.into(), state );
                 Ok(Option::Some(ResourceValues{
                     resource: key,
                     values
                 }))
-            }
-            ResourcePropertyValueSelector::None => {
-                Ok(Option::Some(ResourceValues::empty(key)))
-            }
-            ResourcePropertyValueSelector::Status => {
-                let mut values = HashMap::new();
-                values.insert(selector, ResourceValue::Status(Status::Unknown));
-                Ok(Option::Some(ResourceValues::new( key, values )))
-            }
-            ResourcePropertyValueSelector::Config => {
-                Err("the resource host cannot select the config property, that is a job for the registry".into())
             }
         }
     }

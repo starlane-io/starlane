@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{DomainCase, Res, ResourceKind, ResourceKindParts, ResourcePath, ResourcePathAndKind, ResourcePathAndType, ResourcePathSegmentKind, ResourceType, SkewerCase, Specific, Version, ResourceSelector, FieldSelection, parse_resource_property, ConfigSrc, ResourcePropertiesKind};
 use crate::error::Error;
-use crate::property::{ResourcePropertyValueSelector, DataSetAspectSelector, ResourceValueSelector, ResourceProperty, ResourcePropertyAssignment};
+use crate::property::{ResourcePropertyValueSelector, DataSetAspectSelector, ResourceValueSelector, ResourceProperty, ResourcePropertyAssignment, ResourceRegistryPropertyValueSelector, ResourceHostPropertyValueSelector, ResourceRegistryProperty};
 use nom::branch::alt;
 
 fn any_resource_path_segment<T>(i: T) -> Res<T, T>
@@ -339,7 +339,7 @@ pub fn parse_resource_property_value_selector(input: &str) -> Res<&str, Result<R
                }
            },
            "config" => {
-               (next_input,Ok(ResourcePropertyValueSelector::Config))
+               (next_input,Ok(ResourcePropertyValueSelector::Registry(ResourceRegistryPropertyValueSelector::Config)))
            }
            property => return (next_input, Err(format!("cannot match a selector for resource property '{}'",property).into()))
        }
@@ -376,27 +376,29 @@ pub fn parse_resource_property_assignment( input: &str ) -> Res<&str, Result<Res
          match resource_value_selector {
              Ok(resource_value_selector ) => {
                  match resource_value_selector.property {
-                     ResourcePropertyValueSelector::None => {
-                         (input_next, Err("invalid Resource property selected: None".into()))
-                     }
-                     ResourcePropertyValueSelector::State { .. } => {
+                     ResourcePropertyValueSelector::Host(ResourceHostPropertyValueSelector::State{..} ) => {
                          ( input_next, Err("cannot set Resource State via the assignment operator".into()) )
                      }
-                     ResourcePropertyValueSelector::Status => {
-                         ( input_next, Err("cannot set Resource Status via the assignment operator".into()) )
-                     }
-                     ResourcePropertyValueSelector::Config => {
-                         let config = ResourcePath::from_str(value);
-                         match config {
-                             Ok(config) => {
-                                 let assignment = ResourcePropertyAssignment {
-                                     resource: resource_value_selector.resource.into(),
-                                     property: ResourceProperty::Config( ConfigSrc::Artifact(config) )
-                                 };
-                                 (input_next,Ok(assignment))
+                     ResourcePropertyValueSelector::Registry(selector)=> {
+                         match selector {
+                             ResourceRegistryPropertyValueSelector::Status => {
+
+                                 ( input_next, Err("cannot set Resource Status via the assignment operator".into()) )
                              }
-                             Err(error) => {
-                                 ( input_next, Err(error.into()) )
+                             ResourceRegistryPropertyValueSelector::Config => {
+                                 let config = ResourcePath::from_str(value);
+                                 match config {
+                                     Ok(config) => {
+                                         let assignment = ResourcePropertyAssignment {
+                                             resource: resource_value_selector.resource.into(),
+                                             property: ResourceProperty::Registry( ResourceRegistryProperty::Config(ConfigSrc::Artifact(config)) )
+                                         };
+                                         (input_next,Ok(assignment))
+                                     }
+                                     Err(error) => {
+                                         ( input_next, Err(error.into()) )
+                                     }
+                                 }
                              }
                          }
                      }

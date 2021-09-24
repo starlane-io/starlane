@@ -8,7 +8,7 @@ In the journey to enable WebAssembly actors it became apparent that Starlane's p
 Let's start by explaining what a Resource Mesh is:
 
 ## WHAT IS A RESOURCE MESH?
-An enterprise is composed of **Services**, **Resources** and the **Mesh** that binds them all togheter.  
+An enterprise is composed of **Services**, **Resources** and the **Mesh** that binds them all together.  
 
 For anyone who doesn't know: Resources are nouns, they are 'things', Services are 'verbs' they act upon Resources and Meshes are the medium for the nouns and verbs to interact with each other. A primitive mesh would be your local area network and The largest mesh would be the internet. 
 

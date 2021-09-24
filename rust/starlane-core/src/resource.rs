@@ -33,6 +33,7 @@ use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
 use std::collections::hash_map::RandomState;
 use starlane_resources::property::{ResourcePropertyAssignment, ResourceProperty, ResourceRegistryPropertyAssignment, ResourceRegistryProperty};
+use tracing_futures::WithSubscriber;
 
 pub mod artifact;
 pub mod config;
@@ -226,11 +227,7 @@ impl RegistryParams {
             ConfigSrc::Artifact(config) => Option::Some(config.to_string()),
         };
 
-if address.is_some() {
-    println!("{} --> MAKING CONFIG.is_some(): {} ", address.as_ref().unwrap(), config.is_some());
-} else {
-    println!("? --> MAKING CONFIG.is_some(): {} ", config.is_some());
-}
+
         let parent = match parent {
             None => Option::None,
             Some(parent) => Option::Some(parent.bin()?),
@@ -365,7 +362,6 @@ impl Registry {
                     );
                     trans.execute("DELETE FROM resources WHERE key=?1", [params.key.clone()])?;
                 }
-println!("INSERTING params.config.is_some() {} and kind {}", params.config.is_some(), params.kind.to_string() );
 
                 trans.execute("INSERT INTO resources (key,address,resource_type,kind,specific,parent,owner,config,host) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)", params![params.key,params.address,params.resource_type,params.kind,params.specific,params.parent,params.owner,params.config,params.host])?;
                 if let Option::Some(info) = registration.info {
@@ -485,6 +481,7 @@ println!("INSERTING params.config.is_some() {} and kind {}", params.config.is_so
                 while let Option::Some(row) = rows.next()? {
                     resources.push(Self::process_resource_row_catch(row)?);
                 }
+
                 Ok(ResourceRegistryResult::Resources(resources))
             }
             ResourceRegistryCommand::SetLocation(location_record) => {
@@ -526,7 +523,9 @@ println!("INSERTING params.config.is_some() {} and kind {}", params.config.is_so
                         );
                         let mut statement = self.conn.prepare(statement.as_str())?;
                         statement.query_row(params![address], |row| {
-                            Ok(Self::process_resource_row_catch(row)?)
+                            let record = Self::process_resource_row_catch(row)?;
+println!("return record: {} with config {}", record.stub.address.to_string(), record.stub.archetype.config.to_string() );
+                            Ok(record)
                         })
                     }
                 };
@@ -555,12 +554,9 @@ println!("INSERTING params.config.is_some() {} and kind {}", params.config.is_so
             ResourceRegistryCommand::Reserve(request) => {
                 let trans = self.conn.transaction()?;
                 trans.execute("DELETE FROM names WHERE key IS NULL AND datetime(reservation_timestamp) < datetime('now')", [] )?;
-let mut archetype = request.archetype.clone();
-archetype.config = ConfigSrc::Artifact(ResourcePath::from_str("space:core:1.0.0:/some-path.txt")?);
-println!("MAKING RESERVARTION WITH CONFIG: space:core:1.0.0:/some-path.tx FOR {}", archetype.kind.to_string());
+
                 let params = RegistryParams::new(
-                    //request.archetype.clone(),
-                    archetype,
+                    request.archetype.clone(),
                     Option::Some(request.parent.clone()),
                     Option::None,
                     Option::None,
@@ -650,7 +646,6 @@ println!("MAKING RESERVARTION WITH CONFIG: space:core:1.0.0:/some-path.tx FOR {}
                                     Option::None
                                 }
                                 ConfigSrc::Artifact(artifact) => {
-println!("VALUE IS: {}", artifact.to_string() );
                                     Option::Some(artifact.to_string())
                                 }
                             }
@@ -663,45 +658,18 @@ println!("VALUE IS: {}", artifact.to_string() );
                     ResourceIdentifier::Key(key) => {
                         let key = key.bin()?;
                         let statement = format!( "UPDATE resources SET {} WHERE key=?1", set.unwrap());
-println!("{}",statement);
                         trans.execute(statement.as_str(), params![key])?;
                     }
                     ResourceIdentifier::Address(address) => {
                         let address = address.to_string();
-                        let statement = format!( "UPDATE resources SET config=? WHERE address=?"  );
-println!("{}",statement);
-println!("address: '{}'",address.to_string());
-println!("set: '{}'",set.is_some());
+                        let statement = format!( "UPDATE resources SET config=?1 WHERE address=?2"  );
 
-                         trans.execute(statement.as_str(), params![set,address] )?;
-
-
-                        let statement = format!(
-                            "SELECT address,config FROM resources",
-                        );
-
-println!("*************QUERY******************");
-                        trans.query_row(statement.as_str(), params![], |row| {
-
-                            let address : String = row.get(0).unwrap();
-                            if let ValueRef::Null = row.get_ref(1).unwrap()  {
-                                println!("'{}' CONFIG STILL NULL", address);
-                            }
-                             else {
-                                 let c : String = row.get(1).unwrap();
-                                 println!("'{}' CONFIG  {} ", address, c );
-                             }
-
-                            Ok(())
-                        })?;
-println!("***************************************");
-
+                         let count = trans.execute(statement.as_str(), params![set,address] )?;
 
 
                     }
                 };
                 trans.commit()?;
-println!("commited.... ");
 
                         Ok(ResourceRegistryResult::Ok)
                 }
@@ -725,18 +693,15 @@ println!("commited.... ");
         let key = ResourceKey::from_bin(key)?;
 
         let address: String = row.get(1)?;
-println!("..address: '{}' ", address);
         let address = ResourcePath::from_str(address.as_str())?;
 
         let kind: String = row.get(2)?;
-println!("kind: '{}' ", kind);
         let kind = ResourceKind::from_str(kind.as_str())?;
 
         let specific = if let ValueRef::Null = row.get_ref(3)? {
             Option::None
         } else {
             let specific: String = row.get(3)?;
-println!("specific: {} ", specific);
             let specific = Specific::from_str(specific.as_str())?;
             Option::Some(specific)
         };
@@ -750,18 +715,15 @@ println!("specific: {} ", specific);
         };
 
         let config = if let ValueRef::Null = row.get_ref(5)? {
-println!("config: == Null");
             ConfigSrc::None
         } else {
             let config: String = row.get(5)?;
-println!("config: {}", config );
             let config = ConfigSrc::from_str(config.as_str())?;
             config
         };
 
         let host: Vec<u8> = row.get(6)?;
         let host = StarKey::from_bin(host)?;
-println!("host: {} ", host.to_string());
 
         let stub = ResourceStub {
             key: key,
