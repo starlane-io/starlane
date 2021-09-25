@@ -35,6 +35,7 @@ use starlane_resources::property::{ResourcePropertyValueSelector, DataSetAspectS
 use crate::watch::{WatchResourceSelector, Watcher};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
 use crate::artifact::ArtifactBundle;
+use starlane_resources::http::HttpRequest;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -133,8 +134,22 @@ info!("received reply for {}",description);
             Err(format!("unexpected reply: {}", reply.to_string()).into())
         }
 
+    }
+
+    pub async fn send_http_message( &self, proto: ProtoMessage<HttpRequest>, expect: ReplyKind, description: &str ) -> Result<Reply,Error> {
+        let proto = proto.try_into()?;
+        info!("staring message exchange for {}",description);
+        let reply = self.surface_api.exchange(proto, expect, description ).await?;
+        info!("received reply for {}",description);
+
+        if ReplyKind::Port.is_match(&reply) {
+            Ok(reply)
+        } else {
+            Err(format!("unexpected reply: {}", reply.to_string()).into())
+        }
 
     }
+
 
 
     pub async fn timeout<T>(

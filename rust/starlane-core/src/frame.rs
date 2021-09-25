@@ -19,6 +19,7 @@ use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, St
 use crate::watch::{Notification, Watch, WatchKey};
 use crate::resource::{ResourceId, ResourceRegistration, ResourceRecord, ResourceType, ResourceKey, ResourceSliceStatus,  UserKey, AppKey, ActorKey};
 use starlane_resources::property::{ResourceValues, ResourceRegistryProperty, ResourceRegistryPropertyAssignment, ResourceRegistryPropertyValueSelector, ResourcePropertyOp};
+use starlane_resources::http::{HttpResponse, HttpRequest};
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum Frame {
@@ -363,6 +364,7 @@ pub enum MessagePayload {
     Request(Message<ResourceRequestMessage>),
     Response(MessageReply<ResourceResponseMessage>),
     PortRequest(Message<ResourcePortMessage>),
+    HttpRequest(Message<HttpRequest>),
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -453,7 +455,8 @@ pub enum Reply {
     State(DataSet<BinSrc>),
     ResourceValues(ResourceValues<ResourceStub>),
     Seq(u64),
-    Port(DataSet<BinSrc>)
+    Port(DataSet<BinSrc>),
+    HttpResponse(HttpResponse)
 }
 
 #[derive(Clone, Eq, PartialEq, strum_macros::Display)]
@@ -468,7 +471,8 @@ pub enum ReplyKind {
     Seq,
     State,
     Port,
-    ResourceValues
+    ResourceValues,
+    HttpResponse
 }
 
 impl ReplyKind {
@@ -484,7 +488,8 @@ impl ReplyKind {
             Reply::Seq(_) => *self == Self::Seq,
             Reply::State(_) => *self == Self::State,
             Reply::Port(_) => *self == Self::Port,
-            Reply::ResourceValues(_) => *self == Self::ResourceValues
+            Reply::ResourceValues(_) => *self == Self::ResourceValues,
+            Reply::HttpResponse(_) => *self == Self::HttpResponse
         }
     }
 }

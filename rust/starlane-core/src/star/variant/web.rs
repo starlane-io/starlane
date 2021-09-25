@@ -22,7 +22,7 @@ use starlane_resources::data::{BinSrc, DataSet};
 use std::sync::Arc;
 use starlane_resources::message::{ProtoMessage, ResourcePortMessage,MessageFrom};
 use std::convert::TryInto;
-use crate::frame::Reply;
+use crate::frame::{Reply, ReplyKind};
 use starlane_resources::{ResourcePath, ResourceStub, ConfigSrc,ArtifactKind};
 use crate::parse::parse_host;
 use handlebars::Handlebars;
@@ -254,6 +254,35 @@ eprintln!("Error: {}",err.to_string());
                             }
                         };
 
+
+                        for mapping in &config.mappings {
+
+                            if request.path.starts_with(&mapping.path_pattern ) {
+                                let mut proto = ProtoMessage::new();
+                                proto.payload( request.clone() );
+                                proto.to( mapping.resource.clone().into() ) ;
+                                proto.from(MessageFrom::Inject);
+                                match api.send_http_message(proto, ReplyKind::HttpResponse, "sending an HttpRequest").await {
+                                    Ok(reply) => {
+                                        if let Reply::HttpResponse(response ) = reply {
+                                            return Ok(response)
+                                        } else {
+                                           return Err("unexpected reply".into() );
+                                        }
+                                    }
+                                    Err(error) => {
+                                        let mut response = HttpResponse::new();
+                                        response.status = 404;
+                                        let error = format!("error forwarding traffic to '{}', error: {}",  mapping.resource.to_string(), error.to_string() );
+                                        let messages = json!({"title": "ROUTING ERROR", "message": error});
+                                        response.body = Option::Some(BinSrc::Memory(Arc::new(TEMPLATES.render("page", &messages)?.as_bytes().to_vec())));
+                                        return Ok(response);
+                                    }
+                                }
+                            }
+                        }
+
+
                         let mut response = HttpResponse::new();
                         response.status = 200;
                         let error = format!("your domain '{}' is using reverse proxy config '{}'", host, artifact.to_string());
@@ -316,7 +345,7 @@ section{
 #title{
   display: block;
   font-weight: 300;
-  font-size: 196px;
+  font-size: 128px;
   text-align: center;
 
   font-family: "Josefin Sans", sans-serif;

@@ -16,6 +16,7 @@ use crate::frame::{
 use crate::resource::{ResourceAddress, ResourceKind, ResourceType, Specific};
 use crate::star::{StarCommand, StarKey};
 use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
+use starlane_resources::http::HttpRequest;
 
 pub mod resource;
 
@@ -129,6 +130,22 @@ impl TryFrom<ProtoMessage<ResourceRequestMessage>> for ProtoStarMessage {
         proto.trace = message.trace;
         proto.log = message.log;
         proto.payload = StarMessagePayload::MessagePayload(MessagePayload::Request(message));
+        Ok(proto)
+    }
+}
+
+impl TryFrom<ProtoMessage<HttpRequest>> for ProtoStarMessage {
+
+    type Error = Error;
+
+    fn try_from(proto: ProtoMessage<HttpRequest>) -> Result<Self, Self::Error> {
+        proto.validate()?;
+        let message = proto.create()?;
+        let mut proto = ProtoStarMessage::new();
+        proto.to = message.to.clone().into();
+        proto.trace = message.trace;
+        proto.log = message.log;
+        proto.payload = StarMessagePayload::MessagePayload(MessagePayload::HttpRequest(message));
         Ok(proto)
     }
 }
