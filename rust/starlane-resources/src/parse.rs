@@ -76,7 +76,7 @@ fn anything_but_single_quote<T>(i: T) -> Res<T, T>
     )
 }
 
-fn parse_domain(input: &str) -> Res<&str, DomainCase> {
+pub fn parse_domain(input: &str) -> Res<&str, DomainCase> {
     context(
         "domain",
         tuple((

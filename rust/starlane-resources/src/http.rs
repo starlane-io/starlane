@@ -5,6 +5,7 @@ use crate::error::Error;
 use serde::{Serialize,Deserialize};
 use std::convert::{TryInto, TryFrom};
 use std::sync::Arc;
+use crate::DomainCase;
 
 pub type Headers = HashMap<String,String>;
 
@@ -13,7 +14,17 @@ pub type Headers = HashMap<String,String>;
 pub struct HttpResponse{
     pub status: usize,
     pub headers: Headers,
-    pub body: BinSrc
+    pub body: Option<BinSrc>
+}
+
+impl HttpResponse {
+    pub fn new( ) -> HttpResponse {
+        Self {
+            status: 200,
+            headers: Headers::new(),
+            body: Option::None
+        }
+    }
 }
 
 

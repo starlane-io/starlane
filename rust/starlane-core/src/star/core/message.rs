@@ -332,7 +332,18 @@ println!("Select Property Ops... op.resource: {}", op.resource.to_string());
                                 .as_ref()
                                 .unwrap()
                                 .get(op.resource.clone() )
-                                .await?.ok_or("expected resource: ")?;
+                                .await?.ok_or("expected resource: ");
+
+                            let resource = match resource {
+                                Ok(record) => {
+                                    record
+                                }
+                                Err(err) => {
+                                    eprintln!("{}",err);
+                                    delivery.fail(Fail::ResourceNotFound(op.resource.clone()));
+                                    return Ok(());
+                                }
+                            };
 
                             match op.property {
                                 ResourceRegistryPropertyValueSelector::Config => {
