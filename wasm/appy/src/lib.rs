@@ -7,14 +7,14 @@ use std::sync::Arc;
 use starlane_resources::data::BinSrc;
 use starlane_resources::http::{HttpRequest, HttpResponse, Headers};
 use std::convert::TryInto;
-use starlane_resources::message::{ResourcePortReply, ResourcePortMessage, Message};
+use starlane_resources::message::{ResourcePortReply, ResourcePortMessage, Message, MessageReply};
 use std::collections::HashMap;
 
 
 #[no_mangle]
 pub extern "C" fn mechtron_init()
 {
-    log("Hello World! From: Wasm!");
+    log("********F Hello World! From: Wasm!*************** ");
     mechtron_register(Arc::new(Appy::new()));
 }
 
@@ -31,32 +31,29 @@ impl Appy {
 
 impl Mechtron for Appy  {
     fn name(&self) -> String {
-        "appy".to_string()
+        todo!()
     }
 
-    fn deliver( &self, message: Message<ResourcePortMessage>) -> Option<ResourcePortReply>{
-        log("Delivery of Message to Appy mechtron");
-        let request = message.payload.payload.get("request").cloned().expect("expected request");
-        let request : HttpRequest = request.try_into().expect("expect to be able to change to HttpRequest");
-
-        log(format!("request path: {}",request.path).as_str() );
-
-        let response = HttpResponse{
-            status: 200,
-            headers: Headers::new(),
-            body: Option::Some(BinSrc::Memory(Arc::new("Hello from a Mechtron!".to_string().into_bytes())))
-        };
-
-        let response :BinSrc =  response.try_into().expect("expect an httpResponse to be able to turn into a BinSrc");
-        let mut payload = HashMap::new();
-        payload.insert( "response".to_string(), response );
-
-        let reply = ResourcePortReply {
-            payload: payload
-        };
-        Option::Some(reply)
+    fn message(&self, message: Message<HttpRequest>) -> Option<HttpResponse> {
+        todo!()
     }
-
 }
 
 
+/*
+fn http_request(&self, message: Message<HttpRequest>) -> Option<HttpResponse> {
+    log("http_request called on appy ");
+
+//        log(format!("request path: {}",message.payload.path).as_str() );
+
+    let response = HttpResponse{
+        status: 200,
+        headers: Headers::new(),
+        body: Option::Some(BinSrc::Memory(Arc::new("Hello from a Mechtron!".to_string().into_bytes())))
+    };
+
+    Option::Some(response)
+
+}
+
+ */

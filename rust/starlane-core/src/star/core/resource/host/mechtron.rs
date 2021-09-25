@@ -15,6 +15,7 @@ use crate::star::StarSkel;
 use crate::util::AsyncHashMap;
 use crate::message::resource::Delivery;
 use crate::frame::Reply;
+use starlane_resources::http::HttpRequest;
 
 pub struct MechtronHost {
     skel: StarSkel,
@@ -100,6 +101,22 @@ info!("=====>> MECHTRON SENT REPLY");
 
         Ok(())
     }
+
+    async fn http_message(&self, key: ResourceKey, delivery: Delivery<Message<HttpRequest>>) -> Result<(),Error>{
+
+        info!("MECHTRON HOST RECEIVED DELIVERY");
+        let mechtron = self.mechtrons.get(key.clone()).await?.ok_or(format!("could not deliver mechtron to {}",key.to_string()))?;
+        info!("GOT MECHTRON");
+        let reply = mechtron.http_request(delivery.payload.clone()).await?;
+
+        if let Option::Some(reply) = reply {
+            delivery.reply(Reply::HttpResponse(reply));
+            info!("=====>> MECHTRON SENT REPLY");
+        }
+
+        Ok(())
+    }
+
 
     fn resource_type(&self) -> ResourceType {
         ResourceType::Mechtron

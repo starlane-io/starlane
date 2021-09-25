@@ -57,6 +57,21 @@ impl Mechtron for Appy  {
         Option::Some(reply)
     }
 
+    fn http_request(&self, message: Message<HttpRequest>) -> Option<HttpResponse> {
+        log("http_request called on appy ");
+
+        log(format!("request path: {}",message.payload.path).as_str() );
+
+        let response = HttpResponse{
+            status: 200,
+            headers: Headers::new(),
+            body: Option::Some(BinSrc::Memory(Arc::new("Hello from a Mechtron!".to_string().into_bytes())))
+        };
+
+        Option::Some(response)
+
+    }
+
 }
 
 

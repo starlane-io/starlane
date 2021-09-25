@@ -2,9 +2,11 @@ use std::sync::{RwLock, Arc};
 use std::collections::HashMap;
 use starlane_resources::message::{Message, ResourcePortMessage, ResourcePortReply};
 use wasm_membrane_guest::membrane::{membrane_consume_string, log, membrane_guest_alloc_buffer, membrane_write_str};
-use mechtron_common::{MechtronCall, MechtronCommand};
+use mechtron_common::{MechtronCall, MechtronCommand, MechtronResponse};
 use lazy_static::lazy_static;
 use wasm_bindgen::prelude::*;
+use starlane_resources::http::{HttpRequest, HttpResponse, Headers};
+use starlane_resources::data::BinSrc;
 
 #[macro_use]
 extern crate wasm_bindgen;
@@ -70,12 +72,34 @@ log("GOT MECHTRON ");
                             0
                         }
                         Some(reply) => {
+
+                            let reply = MechtronResponse::PortReply(reply);
                             let reply = serde_json::to_string(&reply).expect("expected resource port reply to be able to serialize into a string");
                             let reply = membrane_write_str(reply.as_str() );
                             log("WASM message reply COMPLETE...");
                             reply
                         }
                     }
+                }
+                MechtronCommand::HttpRequest(message) => {
+
+                    log("delivered message to mechtron within Wasm");
+                    let reply = mechtron.http_request(message);
+                    log(format!("delivery complete response: {}", reply.is_some()).as_str() );
+
+                    match reply {
+                        None => {
+                            0
+                        }
+                        Some(reply) => {
+                            let reply = MechtronResponse::HttpResponse(reply);
+                            let reply = serde_json::to_string(&reply).expect("expected resource port reply to be able to serialize into a string");
+                            let reply = membrane_write_str(reply.as_str() );
+                            log("WASM message reply COMPLETE...");
+                            reply
+                        }
+                    }
+
                 }
             }
 
@@ -94,4 +118,16 @@ pub trait Mechtron: Sync+Send+'static {
     fn deliver( &self, message: Message<ResourcePortMessage>) -> Option<ResourcePortReply> {
         Option::None
     }
+
+    fn http_request(&self, message: Message<HttpRequest>) -> Option<HttpResponse> {
+        Option::None
+    }
+
+
+/*    fn message( &self, message: Message<HttpRequest>) -> Option<HttpResponse>;{
+        log("this is the ABSTRACT Mechtron, not the one you wanted to call....");
+        Option::None
+    }
+    */
+
 }
