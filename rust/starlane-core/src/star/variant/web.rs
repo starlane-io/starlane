@@ -23,13 +23,16 @@ use std::sync::Arc;
 use starlane_resources::message::{ProtoMessage, ResourcePortMessage,MessageFrom};
 use std::convert::TryInto;
 use crate::frame::Reply;
-use starlane_resources::{ResourcePath, ResourceStub};
+use starlane_resources::{ResourcePath, ResourceStub, ConfigSrc,ArtifactKind};
 use crate::parse::parse_host;
 use handlebars::Handlebars;
 use serde_json::json;
 use starlane_resources::property::{ResourcePropertyValueSelector, ResourceRegistryPropertyValueSelector, ResourceValue, ResourceValues};
 use std::future::Future;
 use nom::AsBytes;
+use crate::artifact::ArtifactRef;
+use crate::cache::ArtifactItem;
+use crate::config::reverse_proxy::ReverseProxyConfig;
 
 
 pub struct WebVariant {
@@ -65,13 +68,13 @@ impl WebVariant {
     fn init(&self, tx: tokio::sync::oneshot::Sender<Result<(), crate::error::Error>>) {
         let api = StarlaneApi::new(self.skel.surface_api.clone());
 
-        start(api);
+        start(api,self.skel.clone());
 
         tx.send(Ok(())).unwrap_or_default();
     }
 }
 
-fn start(api: StarlaneApi) {
+fn start(api: StarlaneApi,skel: StarSkel) {
     thread::spawn(move || {
 
         let runtime = Runtime::new().unwrap();
@@ -82,8 +85,9 @@ fn start(api: StarlaneApi) {
                     let listener = TcpListener::from_std(std_listener).unwrap();
                     while let Ok((mut stream, _)) = listener.accept().await {
                         let api = api.clone();
+                        let skel = skel.clone();
                         tokio::spawn( async move {
-                            match process_request(stream, api.clone()).await {
+                            match process_request(stream, api.clone(),skel).await {
                                 Ok(_) => {
                                     info!("ok");
                                 }
@@ -102,7 +106,7 @@ fn start(api: StarlaneApi) {
     });
 }
 
-async fn process_request( mut stream: TcpStream, api: StarlaneApi ) -> Result<(),Error>{
+async fn process_request( mut stream: TcpStream, api: StarlaneApi, skel: StarSkel ) -> Result<(),Error>{
     info!("received HTTP Stream...");
 
     let mut request_buf: Vec<u8> = vec![];
@@ -146,7 +150,7 @@ println!("ok...");
         }
     };
 
-    match create_response(request,api).await {
+    match create_response(request,api,skel).await {
         Ok(response) => {
             stream.write(format!("HTTP/1.1 {} OK\r\n\r\n",response.status).as_bytes() ).await?;
 
@@ -171,7 +175,7 @@ async fn error_response( mut stream: TcpStream, code: usize, message: &str)  {
     stream.write(TEMPLATES.render("page", &messages ).unwrap().as_bytes() ).await.unwrap();
 }
 
-async fn create_response( request: HttpRequest, api: StarlaneApi ) -> Result<HttpResponse,Error> {
+async fn create_response( request: HttpRequest, api: StarlaneApi, skel: StarSkel ) -> Result<HttpResponse,Error> {
 
     let (_,host) = parse_host(request.headers.get("Host").ok_or("Missing HOST")?.as_str())?;
 
@@ -204,17 +208,66 @@ println!("RECEIVED VALUES...");
         }
         Some(value) => {
             if let ResourceValue::Config(config) = value {
-                let mut response = HttpResponse::new();
-                response.status = 200;
-                let error = format!("found config '{}' for '{}' domain.", config.to_string(), host);
-                let messages = json!({"title": response.status, "message": error});
-                response.body = Option::Some(BinSrc::Memory(Arc::new(TEMPLATES.render("page", &messages )?.as_bytes().to_vec())));
-                Ok(response)
+                match config {
+                    ConfigSrc::None => {
+                        let mut response = HttpResponse::new();
+                        response.status = 404;
+                        let error = format!("The '{}' Space is there, but it doesn't have a reverse proxy config assigned yet", host);
+                        let messages = json!({"title": host, "message": error});
+                        response.body = Option::Some(BinSrc::Memory(Arc::new(TEMPLATES.render("page", &messages )?.as_bytes().to_vec())));
+                        Ok(response)
+                    }
+                    ConfigSrc::Artifact(artifact) => {
+
+
+                        let factory = skel.machine.get_proto_artifact_caches_factory().await?;
+                        let mut caches = factory.create();
+
+                        let artifact_ref = ArtifactRef {
+                            path: artifact.clone(),
+                            kind: ArtifactKind::ReverseProxy
+                        };
+
+                        if let Result::Err(err) = caches.cache(vec![artifact_ref] ).await {
+eprintln!("Error: {}",err.to_string());
+
+                            let mut response = HttpResponse::new();
+                            response.status = 404;
+                            let error = format!("could not cache reverse proxy config: '{}' Are you sure it's there?", artifact.to_string() );
+                            let messages = json!({"title": "404", "message": error});
+                            response.body = Option::Some(BinSrc::Memory(Arc::new(TEMPLATES.render("page", &messages )?.as_bytes().to_vec())));
+
+                            return Ok(response)
+                        }
+                        let caches = caches.to_caches().await?;
+                        let config = match caches.reverse_proxy_configs.get(artifact) {
+                            None => {
+                                let mut response = HttpResponse::new();
+                                response.status = 404;
+                                let error = format!("cannot locate reverse proxy config: '{}'", artifact.to_string() );
+                                let messages = json!({"title": "404", "message": error});
+                                response.body = Option::Some(BinSrc::Memory(Arc::new(TEMPLATES.render("page", &messages )?.as_bytes().to_vec())));
+                                return Ok(response)
+                            }
+                            Some(config) => {
+                                config
+                            }
+                        };
+
+                        let mut response = HttpResponse::new();
+                        response.status = 200;
+                        let error = format!("your domain '{}' is using reverse proxy config '{}'", host, artifact.to_string());
+                        let messages = json!({"title": "CONFIGURED", "message": error});
+                        response.body = Option::Some(BinSrc::Memory(Arc::new(TEMPLATES.render("page", &messages)?.as_bytes().to_vec())));
+                        Ok(response)
+                    }
+                }
+
             } else {
                 let mut response = HttpResponse::new();
                 response.status = 500;
-                let error = "unexpected response when getting configSrc";
-                let messages = json!({"title": response.status, "message": error});
+                let error = format!("received an unexpected value when trying to get domain config");
+                let messages = json!({"title": "500", "message": error});
                 response.body = Option::Some(BinSrc::Memory(Arc::new(TEMPLATES.render("page", &messages )?.as_bytes().to_vec())));
                 Ok(response)
             }

@@ -34,6 +34,7 @@ use crate::starlane::StarlaneCommand;
 use starlane_resources::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, ResourceValue, ResourceValueSelector, ResourceValues, ResourceProperty, ResourcePropertyAssignment, ResourceRegistryPropertyAssignment, ResourceHostPropertyValueSelector, ResourcePropertyOp};
 use crate::watch::{WatchResourceSelector, Watcher};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
+use crate::artifact::ArtifactBundle;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -44,27 +45,48 @@ pub struct StarlaneApi {
 impl StarlaneApi {
     pub async fn create_artifact_bundle(
         &self,
-        path: &ResourcePath,
+        bundle: ResourcePath,
         data: Arc<Vec<u8>>,
-    ) -> Result<ArtifactBundleApi, Error> {
-        let address: ResourcePath = path.clone().into();
+    ) -> Result<Creation<ArtifactBundleApi>, Error> {
 
-        let subspace_address = address
-            .parent()
-            .ok_or("expected parent")?;
-        let space_api = self.get_space(subspace_address.into()).await?;
+        let series = bundle.parent().ok_or("ArtifactBundle must have an ArtifactBundleSeries as a parent")?;
 
-        let mut creation = space_api
-            .create_artifact_bundle_versions(address.parent().unwrap().name().as_str())?;
-        creation.set_strategy(ResourceCreateStrategy::Ensure);
-        let artifact_bundle_versions_api = creation.submit().await?;
+        // first we have to be sure that ArtifactBundleSeries exists...
+        let mut series = self.create_artifact_bundle_series(series )?;
+        series.create.strategy = ResourceCreateStrategy::Ensure;
+        let series_api = series.submit().await?;
 
-        let version = semver::Version::from_str(address.name().as_str())?;
-        let mut creation = artifact_bundle_versions_api.create_artifact_bundle(version, data)?;
-        creation.set_strategy(ResourceCreateStrategy::Ensure);
-        creation.submit().await
+        let version = semver::Version::from_str(bundle.name().as_str())?;
+        series_api.create_artifact_bundle(version, data)
+    }
+
+    pub fn create_artifact_bundle_series(
+        &self,
+        path: ResourcePath,
+    ) -> Result<Creation<ArtifactBundleSeriesApi>, Error> {
+        let resource_src = AssignResourceStateSrc::Stateless;
+
+        let create = ResourceCreate {
+            parent: path.parent().ok_or("ArtifactBundleSeries must have a parent".to_string() )?.into(),
+            key: KeyCreationSrc::None,
+            address: AddressCreationSrc::Append(path.name().to_string()),
+            archetype: ResourceArchetype {
+                kind: ResourceKind::ArtifactBundleSeries,
+                specific: None,
+                config: ConfigSrc::None,
+            },
+            state_src: resource_src,
+            registry_info: None,
+            owner: None,
+            strategy: ResourceCreateStrategy::Create,
+            from: MessageFrom::Inject
+        };
+        Ok(Creation::new(self.clone(), create))
     }
 }
+
+
+
 
 impl StarlaneApi {
     pub fn new(surface_api: SurfaceApi) -> Self {
@@ -575,29 +597,7 @@ impl SpaceApi {
         Ok(Creation::new(self.starlane_api(), create))
     }
 
-    pub fn create_artifact_bundle_versions(
-        &self,
-        name: &str,
-    ) -> Result<Creation<ArtifactBundleSeriesApi>, Error> {
-        let resource_src = AssignResourceStateSrc::Stateless;
 
-        let create = ResourceCreate {
-            parent: self.stub.key.clone().into(),
-            key: KeyCreationSrc::None,
-            address: AddressCreationSrc::Append(name.to_string()),
-            archetype: ResourceArchetype {
-                kind: ResourceKind::ArtifactBundleSeries,
-                specific: None,
-                config: ConfigSrc::None,
-            },
-            state_src: resource_src,
-            registry_info: None,
-            owner: None,
-            strategy: ResourceCreateStrategy::Create,
-            from: MessageFrom::Inject
-        };
-        Ok(Creation::new(self.starlane_api(), create))
-    }
 }
 
 
@@ -838,7 +838,7 @@ impl ArtifactBundleSeriesApi {
         &self,
         version: Version,
         data: Arc<Vec<u8>>,
-    ) -> Result<Creation<ArtifactBundleApi>, Fail> {
+    ) -> Result<Creation<ArtifactBundleApi>, Error> {
         let content = BinSrc::Memory(data);
         let mut state: DataSet<BinSrc> = DataSet::new();
         state.insert("zip".to_string(), content);

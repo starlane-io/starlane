@@ -85,21 +85,15 @@ impl CentralVariant {
 
         let mut creation = starlane_api.create_space("space", "Space")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
-        let space_api = creation.submit().await?;
+        creation.submit().await?;
 
         {
+            let bundle = create_args::artifact_bundle_address();
 
-            let address = create_args::artifact_bundle_address();
-            let mut creation = space_api
-                .create_artifact_bundle_versions(address.parent().unwrap().name().as_str())?;
-            creation.set_strategy(ResourceCreateStrategy::Ensure);
-            let artifact_bundle_versions_api = creation.submit().await?;
-
-            let version = semver::Version::from_str(address.name().as_str())?;
-            let mut creation = artifact_bundle_versions_api.create_artifact_bundle(
-                version,
+            let mut creation = starlane_api.create_artifact_bundle(
+                bundle,
                 Arc::new(create_args::create_args_artifact_bundle()?),
-            )?;
+            ).await?;
             creation.set_strategy(ResourceCreateStrategy::Ensure);
             creation.submit().await?;
         }
