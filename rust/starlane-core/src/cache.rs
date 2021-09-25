@@ -29,7 +29,7 @@ use crate::resource::config::Parser;
 use crate::starlane::api::StarlaneApi;
 use crate::starlane::StarlaneMachine;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
-use crate::config::reverse_proxy::{HttpRouterConfig, HttpRouterConfigParser};
+use crate::config::http_router::{HttpRouterConfig, HttpRouterConfigParser};
 
 pub type Data = Arc<Vec<u8>>;
 pub type ZipFile = Path;
@@ -66,7 +66,7 @@ pub struct ArtifactCaches {
     pub mechtron_configs: ArtifactItemCache<MechtronConfig>,
     pub bind_configs: ArtifactItemCache<BindConfig>,
     pub wasms: ArtifactItemCache<Wasm>,
-    pub reverse_proxy_configs: ArtifactItemCache<HttpRouterConfig>,
+    pub http_router_config: ArtifactItemCache<HttpRouterConfig>,
 }
 
 impl ArtifactCaches {
@@ -77,7 +77,7 @@ impl ArtifactCaches {
             mechtron_configs: ArtifactItemCache::new(),
             bind_configs: ArtifactItemCache::new(),
             wasms: ArtifactItemCache::new(),
-            reverse_proxy_configs: ArtifactItemCache::new()
+            http_router_config: ArtifactItemCache::new()
         }
     }
 }
@@ -161,7 +161,7 @@ impl ProtoArtifactCaches {
                     caches.wasms.add( self.root_caches.wasms.get(artifact).await? );
                 }
                 ArtifactKind::HttpRouter => {
-                    caches.reverse_proxy_configs.add( self.root_caches.reverse_proxy_cache.get(artifact).await? );
+                    caches.http_router_config.add( self.root_caches.http_router_configs.get(artifact).await? );
                 }
             }
         }
@@ -169,6 +169,7 @@ impl ProtoArtifactCaches {
         Ok(caches)
     }
 }
+
 
 enum ProtoArtifactCall {
     Cache {
@@ -938,7 +939,7 @@ struct RootArtifactCaches {
     mechtron_configs: RootItemCache<MechtronConfig>,
     bind_configs: RootItemCache<BindConfig>,
     wasms: RootItemCache<Wasm>,
-    reverse_proxy_cache: RootItemCache<HttpRouterConfig>
+    http_router_configs: RootItemCache<HttpRouterConfig>
 }
 
 impl RootArtifactCaches {
@@ -951,7 +952,7 @@ impl RootArtifactCaches {
             mechtron_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(MechtronConfigParser::new())),
             bind_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(BindConfigParser::new())),
             wasms: RootItemCache::new(bundle_cache.clone(), Arc::new(WasmCompiler::new())),
-            reverse_proxy_cache: RootItemCache::new(bundle_cache.clone(), Arc::new(HttpRouterConfigParser::new())),
+            http_router_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(HttpRouterConfigParser::new())),
 
         }
     }
@@ -963,7 +964,7 @@ impl RootArtifactCaches {
             ArtifactKind::BindConfig=> self.bind_configs.cache(artifact).await?.into(),
             ArtifactKind::Raw => self.raw.cache(artifact).await?.into(),
             ArtifactKind::Wasm=> self.wasms.cache(artifact).await?.into(),
-            ArtifactKind::HttpRouter => self.reverse_proxy_cache.cache(artifact).await?.into(),
+            ArtifactKind::HttpRouter => self.http_router_configs.cache(artifact).await?.into(),
         };
 
         Ok(claim)

@@ -32,7 +32,7 @@ use std::future::Future;
 use nom::AsBytes;
 use crate::artifact::ArtifactRef;
 use crate::cache::ArtifactItem;
-use crate::config::reverse_proxy::HttpRouterConfig;
+use crate::config::http_router::HttpRouterConfig;
 use crate::html::HTML;
 
 
@@ -241,7 +241,7 @@ eprintln!("Error: {}",err.to_string());
                             return Ok(response)
                         }
                         let caches = caches.to_caches().await?;
-                        let config = match caches.reverse_proxy_configs.get(artifact) {
+                        let config = match caches.http_router_config.get(artifact) {
                             None => {
                                 let mut response = HttpResponse::new();
                                 response.status = 404;

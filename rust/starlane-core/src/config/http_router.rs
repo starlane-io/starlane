@@ -8,7 +8,7 @@ use starlane_resources::http::HttpMethod;
 use starlane_resources::ArtifactKind;
 use std::collections::HashSet;
 use std::iter::FromIterator;
-use crate::config::reverse_proxy::parse::{parse_http_mappings, parse_reverse_proxy_config};
+use crate::config::http_router::parse::{parse_http_mappings, parse_reverse_proxy_config};
 
 pub struct HttpRouterConfig {
     pub artifact: ResourcePath,
@@ -85,7 +85,7 @@ mod parse {
     use nom::{InputTakeAtPosition, AsChar};
     use nom::bytes::complete::{tag, take_until};
     use starlane_resources::parse::parse_resource_path;
-    use crate::config::reverse_proxy::{HttpMapping, HttpRouterConfig};
+    use crate::config::http_router::{HttpMapping, HttpRouterConfig};
     use nom::multi::{separated_list0, many0};
 
 
@@ -179,7 +179,7 @@ mod parse {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::reverse_proxy::parse::{parse_http_mapping, parse_http_methods, parse_http_mappings, parse_reverse_proxy_config};
+    use crate::config::http_router::parse::{parse_http_mapping, parse_http_methods, parse_http_mappings, parse_reverse_proxy_config};
     use crate::error::Error;
     use starlane_resources::http::HttpMethod;
 

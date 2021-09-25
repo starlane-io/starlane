@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CargoProjects">
+    <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="d97dd5a5-150d-413a-bb7e-edf49f59d668" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.appveyor.yml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.cargo-ok" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.travis.yml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/LICENSE_APACHE" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/LICENSE_MIT" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Makefile" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/conf/app/my-app.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/conf/bind/main-app-bind.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/conf/mechtron/my-mechtron.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/example.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/my-app.zip" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/my-mechtron.zip" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/html.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/web.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../install.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../reset.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../reverse-proxy-config/routes.conf" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../websites/simple-site1/index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../rust/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../../rust/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../rust/starlane-core/src/cache.rs" beforeDir="false" afterPath="$PROJECT_DIR$/../../rust/starlane-core/src/cache.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../rust/starlane-core/src/config.rs" beforeDir="false" afterPath="$PROJECT_DIR$/../../rust/starlane-core/src/config.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../rust/starlane-core/src/config/reverse_proxy.rs" beforeDir="false" afterPath="$PROJECT_DIR$/../../rust/starlane-core/src/config/http_router.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../rust/starlane-core/src/star/variant/web.rs" beforeDir="false" afterPath="$PROJECT_DIR$/../../rust/starlane-core/src/star/variant/web.rs" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Rust File" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../.." />
+  </component>
+  <component name="GitSEFilterConfiguration">
+    <file-type-list>
+      <filtered-out-file-type name="LOCAL_BRANCH" />
+      <filtered-out-file-type name="REMOTE_BRANCH" />
+      <filtered-out-file-type name="TAG" />
+      <filtered-out-file-type name="COMMIT_BY_MESSAGE" />
+    </file-type-list>
+  </component>
+  <component name="KotlinMultiplatform">
+    <allAvailableExecutables />
+  </component>
+  <component name="KubernetesApiPersistence">
+    <option name="context" value="gke_williams-heavy-industries_us-central1-a_brainiac" />
+    <option name="namespace" value="prod" />
+  </component>
+  <component name="MacroExpansionManager">
+    <option name="directoryName" value="rtmdwyaz" />
+  </component>
+  <component name="ProjectId" id="1n0UbL1UPZ7PtSPlpBQ5kPesC3V" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+    <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="aspect.path.notification.shown" value="true" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/src" />
+    <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
+    <property name="org.rust.disableDetachedFileInspection/Users/scott/projects/mechtron/wasm/example/src/lib.rs" value="true" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/src" />
+    </key>
+  </component>
+  <component name="RunManager">
+    <configuration name="Build" type="WasmPackCommandRunConfiguration" factoryName="wasm-pack">
+      <option name="command" value="build" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <option name="command" value="build" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <method v="2">
+        <option name="WASM_PACK.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+  </component>
+  <component name="RustProjectSettings">
+    <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
+    <option name="version" value="2" />
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="d97dd5a5-150d-413a-bb7e-edf49f59d668" name="Default Changelist" comment="" />
+      <created>1610526574241</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1610526574241</updated>
+      <workItem from="1610526575989" duration="15249000" />
+      <workItem from="1610825868587" duration="25889000" />
+      <workItem from="1611064864174" duration="20839000" />
+      <workItem from="1611229895623" duration="8594000" />
+      <workItem from="1611449257567" duration="8258000" />
+      <workItem from="1612292561727" duration="324000" />
+      <workItem from="1612355968591" duration="1938000" />
+      <workItem from="1612514853787" duration="17962000" />
+      <workItem from="1613323831037" duration="31000" />
+      <workItem from="1613343820489" duration="968000" />
+      <workItem from="1613445368934" duration="165000" />
+      <workItem from="1614991632380" duration="10000" />
+      <workItem from="1615163508886" duration="23040000" />
+      <workItem from="1615246763748" duration="7212000" />
+      <workItem from="1615287375465" duration="14506000" />
+      <workItem from="1615338789731" duration="3852000" />
+      <workItem from="1615414334661" duration="46000" />
+      <workItem from="1615414394419" duration="598000" />
+      <workItem from="1615415391641" duration="52000" />
+      <workItem from="1615415457793" duration="597000" />
+      <workItem from="1615556878426" duration="5125000" />
+      <workItem from="1615823296361" duration="7000" />
+      <workItem from="1615824590098" duration="543000" />
+      <workItem from="1615836083819" duration="19000" />
+      <workItem from="1615836198437" duration="126000" />
+      <workItem from="1615839676769" duration="3307000" />
+      <workItem from="1616012662373" duration="3467000" />
+      <workItem from="1616498726650" duration="599000" />
+      <workItem from="1629512951121" duration="2931000" />
+      <workItem from="1629548234615" duration="6106000" />
+      <workItem from="1630106820973" duration="1988000" />
+      <workItem from="1630230595094" duration="574000" />
+      <workItem from="1630247529457" duration="5680000" />
+      <workItem from="1630425334306" duration="710000" />
+      <workItem from="1630446421934" duration="15141000" />
+      <workItem from="1632557999455" duration="534000" />
+      <workItem from="1632586304541" duration="4225000" />
+    </task>
+    <servers />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+    <option name="oldMeFiltersMigrated" value="true" />
+  </component>
+</project>
