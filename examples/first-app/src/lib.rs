@@ -1,5 +1,11 @@
+pub mod html;
+
 #[macro_use]
 extern crate wasm_bindgen;
+
+#[macro_use]
+extern crate lazy_static;
+
 
 use wasm_membrane_guest::membrane::log;
 use mechtron::{Mechtron, mechtron_register};
@@ -15,58 +21,34 @@ use std::collections::HashMap;
 pub extern "C" fn mechtron_init()
 {
     log("Hello World! From: Wasm!");
-    mechtron_register(Arc::new(Appy::new()));
+    mechtron_register(Arc::new(MyMechtron::new()));
 }
 
 
-pub struct Appy {
+pub struct MyMechtron {
 
 }
 
-impl Appy {
+impl MyMechtron {
     pub fn new()->Self{
         Self{}
     }
 }
 
-impl Mechtron for Appy  {
+impl Mechtron for MyMechtron {
     fn name(&self) -> String {
-        "appy".to_string()
+        "my-mechtron".to_string()
     }
 
-    fn deliver( &self, message: Message<ResourcePortMessage>) -> Option<ResourcePortReply>{
-        log("Delivery of Message to Appy mechtron");
-        let request = message.payload.payload.get("request").cloned().expect("expected request");
-        let request : HttpRequest = request.try_into().expect("expect to be able to change to HttpRequest");
 
-        log(format!("request path: {}",request.path).as_str() );
-
-        let response = HttpResponse{
-            status: 200,
-            headers: Headers::new(),
-            body: Option::Some(BinSrc::Memory(Arc::new("Hello from a Mechtron!".to_string().into_bytes())))
-        };
-
-        let response :BinSrc =  response.try_into().expect("expect an httpResponse to be able to turn into a BinSrc");
-        let mut payload = HashMap::new();
-        payload.insert( "response".to_string(), response );
-
-        let reply = ResourcePortReply {
-            payload: payload
-        };
-        Option::Some(reply)
-    }
 
     fn http_request(&self, message: Message<HttpRequest>) -> Option<HttpResponse> {
         log("http_request called on appy ");
 
         log(format!("request path: {}",message.payload.path).as_str() );
 
-        let response = HttpResponse{
-            status: 200,
-            headers: Headers::new(),
-            body: Option::Some(BinSrc::Memory(Arc::new("Hello from a Mechtron!".to_string().into_bytes())))
-        };
+
+        let response = html::mechtron_page().unwrap();
 
         Option::Some(response)
 

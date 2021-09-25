@@ -10,16 +10,16 @@ use std::collections::HashSet;
 use std::iter::FromIterator;
 use crate::config::reverse_proxy::parse::{parse_http_mappings, parse_reverse_proxy_config};
 
-pub struct ReverseProxyConfig {
+pub struct HttpRouterConfig {
     pub artifact: ResourcePath,
     pub mappings: Vec<HttpMapping>
 }
 
-impl Cacheable for ReverseProxyConfig {
+impl Cacheable for HttpRouterConfig {
     fn artifact(&self) -> ArtifactRef {
         ArtifactRef {
             path: self.artifact.clone(),
-            kind: ArtifactKind::ReverseProxy
+            kind: ArtifactKind::HttpRouter
         }
     }
 
@@ -28,16 +28,16 @@ impl Cacheable for ReverseProxyConfig {
     }
 }
 
-pub struct ReverseProxyConfigParser;
+pub struct HttpRouterConfigParser;
 
-impl ReverseProxyConfigParser {
+impl HttpRouterConfigParser {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl Parser<ReverseProxyConfig> for ReverseProxyConfigParser {
-    fn parse(&self, artifact: ArtifactRef, _data: Data) -> Result<Arc<ReverseProxyConfig>, Error> {
+impl Parser<HttpRouterConfig> for HttpRouterConfigParser {
+    fn parse(&self, artifact: ArtifactRef, _data: Data) -> Result<Arc<HttpRouterConfig>, Error> {
         let data = String::from_utf8((*_data).clone() )?;
 
         let (leftover,mappings) = parse_reverse_proxy_config(data.as_str())?;
@@ -48,7 +48,7 @@ impl Parser<ReverseProxyConfig> for ReverseProxyConfigParser {
 
         let mappings = mappings?;
 
-        Ok(Arc::new(ReverseProxyConfig{
+        Ok(Arc::new(HttpRouterConfig {
             artifact: artifact.path,
             mappings
         }))
@@ -85,7 +85,7 @@ mod parse {
     use nom::{InputTakeAtPosition, AsChar};
     use nom::bytes::complete::{tag, take_until};
     use starlane_resources::parse::parse_resource_path;
-    use crate::config::reverse_proxy::{HttpMapping, ReverseProxyConfig};
+    use crate::config::reverse_proxy::{HttpMapping, HttpRouterConfig};
     use nom::multi::{separated_list0, many0};
 
 

@@ -32,7 +32,7 @@ use std::future::Future;
 use nom::AsBytes;
 use crate::artifact::ArtifactRef;
 use crate::cache::ArtifactItem;
-use crate::config::reverse_proxy::ReverseProxyConfig;
+use crate::config::reverse_proxy::HttpRouterConfig;
 use crate::html::HTML;
 
 
@@ -226,7 +226,7 @@ println!("RECEIVED VALUES...");
 
                         let artifact_ref = ArtifactRef {
                             path: artifact.clone(),
-                            kind: ArtifactKind::ReverseProxy
+                            kind: ArtifactKind::HttpRouter
                         };
 
                         if let Result::Err(err) = caches.cache(vec![artifact_ref] ).await {
