@@ -53,7 +53,7 @@ impl Host for AppHost {
             AssignResourceStateSrc::Stateless => {
             }
             AssignResourceStateSrc::CreateArgs(args) => {
-                return Err("App doesn't currently accept command line args.".into())
+                //return Err("App doesn't currently accept command line args.".into())
             }
         }
 
