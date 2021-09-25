@@ -64,6 +64,10 @@ impl Host for SpaceHost {
     async fn delete(&self, _identifier: ResourceKey) -> Result<(), Error> {
         unimplemented!()
     }
+
+    fn resource_type(&self) -> ResourceType {
+        ResourceType::Space
+    }
 }
 
 impl SpaceHost {

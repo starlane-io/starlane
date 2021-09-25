@@ -40,6 +40,10 @@ impl AppHost {
 
 #[async_trait]
 impl Host for AppHost {
+    fn resource_type(&self) -> ResourceType {
+        ResourceType::App
+    }
+
     async fn assign(
         &self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,

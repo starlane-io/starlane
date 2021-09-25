@@ -61,6 +61,7 @@ pub mod watch;
 pub mod mechtron;
 mod wasm;
 pub mod parse;
+pub mod html;
 
 lazy_static! {
     static ref VERSION: semver::Version = {

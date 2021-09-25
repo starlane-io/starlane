@@ -33,6 +33,7 @@ use nom::AsBytes;
 use crate::artifact::ArtifactRef;
 use crate::cache::ArtifactItem;
 use crate::config::reverse_proxy::ReverseProxyConfig;
+use crate::html::HTML;
 
 
 pub struct WebVariant {
@@ -172,7 +173,7 @@ eprintln!("ERROR: {}", e.to_string() );
 async fn error_response( mut stream: TcpStream, code: usize, message: &str)  {
     stream.write(format!("HTTP/1.1 {} OK\r\n\r\n",code).as_bytes() ).await.unwrap();
     let messages = json!({"title": code, "message":message});
-    stream.write(TEMPLATES.render("page", &messages ).unwrap().as_bytes() ).await.unwrap();
+    stream.write(HTML.render("error-code-page", &messages ).unwrap().as_bytes() ).await.unwrap();
 }
 
 async fn create_response( request: HttpRequest, api: StarlaneApi, skel: StarSkel ) -> Result<HttpResponse,Error> {
@@ -192,7 +193,7 @@ println!("SENDING FOR VALUES...");
             response.status = 404;
             let error = format!("It looks like you have just installed Starlane and haven't created a space for the '{}' domain yet.", host);
             let messages = json!({"title": "WELCOME", "message": error});
-            response.body = Option::Some(BinSrc::Memory(Arc::new(TEMPLATES.render("page", &messages )?.as_bytes().to_vec())));
+            response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
             return Ok(response);
         }
     };
@@ -203,7 +204,7 @@ println!("RECEIVED VALUES...");
             response.status = 404;
             let error = format!("proxy configuration not found for host: '{}'", host);
             let messages = json!({"title": response.status, "message": error});
-            response.body = Option::Some(BinSrc::Memory(Arc::new(TEMPLATES.render("page", &messages )?.as_bytes().to_vec())));
+            response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
             Ok(response)
         }
         Some(value) => {
@@ -214,7 +215,7 @@ println!("RECEIVED VALUES...");
                         response.status = 404;
                         let error = format!("The '{}' Space is there, but it doesn't have a reverse proxy config assigned yet", host);
                         let messages = json!({"title": host, "message": error});
-                        response.body = Option::Some(BinSrc::Memory(Arc::new(TEMPLATES.render("page", &messages )?.as_bytes().to_vec())));
+                        response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
                         Ok(response)
                     }
                     ConfigSrc::Artifact(artifact) => {
@@ -235,7 +236,7 @@ eprintln!("Error: {}",err.to_string());
                             response.status = 404;
                             let error = format!("could not cache reverse proxy config: '{}' Are you sure it's there?", artifact.to_string() );
                             let messages = json!({"title": "404", "message": error});
-                            response.body = Option::Some(BinSrc::Memory(Arc::new(TEMPLATES.render("page", &messages )?.as_bytes().to_vec())));
+                            response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
 
                             return Ok(response)
                         }
@@ -246,7 +247,7 @@ eprintln!("Error: {}",err.to_string());
                                 response.status = 404;
                                 let error = format!("cannot locate reverse proxy config: '{}'", artifact.to_string() );
                                 let messages = json!({"title": "404", "message": error});
-                                response.body = Option::Some(BinSrc::Memory(Arc::new(TEMPLATES.render("page", &messages )?.as_bytes().to_vec())));
+                                response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
                                 return Ok(response)
                             }
                             Some(config) => {
@@ -273,9 +274,9 @@ eprintln!("Error: {}",err.to_string());
                                     Err(error) => {
                                         let mut response = HttpResponse::new();
                                         response.status = 404;
-                                        let error = format!("error forwarding traffic to '{}', error: {}",  mapping.resource.to_string(), error.to_string() );
-                                        let messages = json!({"title": "ROUTING ERROR", "message": error});
-                                        response.body = Option::Some(BinSrc::Memory(Arc::new(TEMPLATES.render("page", &messages)?.as_bytes().to_vec())));
+                                        let error = "NOT FOUND".to_string();
+                                        let messages = json!({"title": "404", "message": error});
+                                        response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages)?.as_bytes().to_vec())));
                                         return Ok(response);
                                     }
                                 }
@@ -287,7 +288,7 @@ eprintln!("Error: {}",err.to_string());
                         response.status = 200;
                         let error = format!("your domain '{}' is using reverse proxy config '{}'", host, artifact.to_string());
                         let messages = json!({"title": "CONFIGURED", "message": error});
-                        response.body = Option::Some(BinSrc::Memory(Arc::new(TEMPLATES.render("page", &messages)?.as_bytes().to_vec())));
+                        response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages)?.as_bytes().to_vec())));
                         Ok(response)
                     }
                 }
@@ -297,7 +298,7 @@ eprintln!("Error: {}",err.to_string());
                 response.status = 500;
                 let error = format!("received an unexpected value when trying to get domain config");
                 let messages = json!({"title": "500", "message": error});
-                response.body = Option::Some(BinSrc::Memory(Arc::new(TEMPLATES.render("page", &messages )?.as_bytes().to_vec())));
+                response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
                 Ok(response)
             }
         }
@@ -308,89 +309,4 @@ eprintln!("Error: {}",err.to_string());
 }
 
 
-lazy_static! {
-  pub static ref TEMPLATES: Handlebars<'static> = {
-        let mut reg = Handlebars::new();
-        reg.register_template_string("page", r#"
 
-<!DOCTYPE html>
-<html lang="en-US" style="background: black">
-
-<head>
-<meta charset="utf-8">
-<title>STARLANE</title>
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@1,300&family=Jura&family=Stick+No+Bills:wght@200&display=swap" rel="stylesheet">
-<link href="//cdn-images.mailchimp.com/embedcode/horizontal-slim-10_7.css" rel="stylesheet" type="text/css">
-
-<style>
-
-
-
-section{
-  position: fixed;
-  text-align: center;
-  font-family: "jura", sans-serif;
-  font-family: "Stick No Bills", sans-serif;
-  font-family: "Josefin Sans", sans-serif;
-
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%,-50%);
-
-
-}
-#title{
-  display: block;
-  font-weight: 300;
-  font-size: 128px;
-  text-align: center;
-
-  font-family: "Josefin Sans", sans-serif;
-  background: -webkit-linear-gradient(white, #38495a);
-  background: -webkit-linear-gradient(white, #eeaa5a);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: 5px;
-}
-
-#message{
-  font-weight: 200;
-  font-size: 32px;
-
-  font-family: "Josefin Sans", sans-serif;
-  background: -webkit-linear-gradient(white, #38495a);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: 2px;
-}
-
-
-</style>
-
-
-</head>
-<body>
-
-<section>
-<span id="title">{{ title }}</span>
-<span id="message">{{ message }}</span>
-</section>
-
-
-
-</body>
-</html>
-
-
-
-
-
-
-  "#);
-        reg
-    };
-
-}

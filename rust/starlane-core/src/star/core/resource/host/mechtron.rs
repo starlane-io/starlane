@@ -8,7 +8,7 @@ use starlane_resources::ConfigSrc;
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
 use crate::mechtron::Mechtron;
-use crate::resource::{ArtifactKind, ResourceKey};
+use crate::resource::{ArtifactKind, ResourceKey, ResourceType};
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
@@ -86,7 +86,7 @@ impl Host for MechtronHost {
         unimplemented!()
     }
 
-    async fn deliver(&self, key: ResourceKey, delivery: Delivery<Message<ResourcePortMessage>>) -> Result<(),Error>{
+    async fn port_message(&self, key: ResourceKey, delivery: Delivery<Message<ResourcePortMessage>>) -> Result<(),Error>{
 
         info!("MECHTRON HOST RECEIVED DELIVERY");
         let mechtron = self.mechtrons.get(key.clone()).await?.ok_or(format!("could not deliver mechtron to {}",key.to_string()))?;
@@ -101,4 +101,7 @@ info!("=====>> MECHTRON SENT REPLY");
         Ok(())
     }
 
+    fn resource_type(&self) -> ResourceType {
+        ResourceType::Mechtron
+    }
 }

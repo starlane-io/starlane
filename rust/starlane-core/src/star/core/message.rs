@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use tokio::sync::{mpsc, oneshot};
 
-use starlane_resources::{Resource, ResourceArchetype};
+use starlane_resources::{Resource, ResourceArchetype, ResourceIdentifier};
 use starlane_resources::message::{Message, ResourceRequestMessage, ResourceResponseMessage, ResourcePortMessage};
 use starlane_resources::message::Fail;
 
@@ -22,6 +22,7 @@ use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use tokio::sync::oneshot::error::RecvError;
 use starlane_resources::property::{ResourcePropertyAssignment, ResourcePropertyValueSelector, ResourceValue, ResourceValues, ResourceRegistryPropertyAssignment, ResourceRegistryPropertyValueSelector};
 use std::collections::HashMap;
+use starlane_resources::http::HttpRequest;
 
 pub enum CoreMessageCall {
     Message(StarMessage),
@@ -75,7 +76,14 @@ impl MessagingEndpointComponent {
                     let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
                     self.process_resource_port_request(delivery).await?;
                 }
-                _ => {}
+
+                MessagePayload::HttpRequest(request) => {
+                    let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
+                    self.process_resource_http_request(delivery).await?;
+                }
+                MessagePayload::Response(_) => {
+                    // we don't handle responses here...
+                }
             },
             StarMessagePayload::ResourceRegistry(action) => {
                 let delivery = Delivery::new(action.clone(), star_message, self.skel.clone());
@@ -239,7 +247,33 @@ impl MessagingEndpointComponent {
                 host_tx: mpsc::Sender<HostCall>,
                 delivery: Delivery<Message<ResourcePortMessage>>,
             ) -> Result<(), Error> {
-                host_tx.try_send( HostCall::Deliver(delivery)).unwrap_or_default();
+                host_tx.try_send( HostCall::Port(delivery)).unwrap_or_default();
+                Ok(())
+            }
+
+            match process(skel, host_tx, delivery).await {
+                Ok(_) => {}
+                Err(err) => {
+                    error!("{}", err.to_string());
+                }
+            }
+        });
+        Ok(())
+    }
+
+    async fn process_resource_http_request(
+        &mut self,
+        delivery: Delivery<Message<HttpRequest>>,
+    ) -> Result<(), Error> {
+        let skel = self.skel.clone();
+        let host_tx = self.host_tx.clone();
+        tokio::spawn(async move {
+            async fn process(
+                skel: StarSkel,
+                host_tx: mpsc::Sender<HostCall>,
+                delivery: Delivery<Message<HttpRequest>>,
+            ) -> Result<(), Error> {
+                host_tx.try_send( HostCall::Http(delivery)).unwrap_or_default();
                 Ok(())
             }
 
@@ -427,4 +461,10 @@ println!("Select Property Ops... op.resource: {}", op.resource.to_string());
             .await?;
         Ok(rx.await?)
     }
+
+}
+
+pub struct WrappedHttpRequest {
+    pub resource: ResourceIdentifier,
+    pub request: HttpRequest,
 }

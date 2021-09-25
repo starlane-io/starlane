@@ -142,7 +142,7 @@ info!("received reply for {}",description);
         let reply = self.surface_api.exchange(proto, expect, description ).await?;
         info!("received reply for {}",description);
 
-        if ReplyKind::Port.is_match(&reply) {
+        if ReplyKind::HttpResponse.is_match(&reply) {
             Ok(reply)
         } else {
             Err(format!("unexpected reply: {}", reply.to_string()).into())
