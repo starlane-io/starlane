@@ -9,6 +9,7 @@ use starlane_resources::ArtifactKind;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 use crate::config::http_router::parse::{parse_http_mappings, parse_reverse_proxy_config};
+use regex::Regex;
 
 pub struct HttpRouterConfig {
     pub artifact: ResourcePath,
@@ -58,18 +59,19 @@ impl Parser<HttpRouterConfig> for HttpRouterConfigParser {
 #[derive(Clone)]
 pub struct HttpMapping {
     pub methods: HashSet<HttpMethod>,
-    pub path_pattern: String,
-    pub resource: ResourcePath
+    pub path_pattern: Regex,
+    pub resource_pattern: String
 }
 
 impl HttpMapping {
-    pub fn new( methods: Vec<HttpMethod>, path_pattern: String, resource: ResourcePath ) -> Self {
+    pub fn new( methods: Vec<HttpMethod>, path_pattern: String, resource_pattern: String ) -> Result<Self,Error> {
+        let path_pattern = Regex::new(path_pattern.as_str() )?;
         let methods = HashSet::from_iter( methods.iter().map(|m|m.clone()) );
-        Self {
+        Ok(Self {
             methods,
             path_pattern,
-            resource
-        }
+            resource_pattern
+        })
     }
 }
 
@@ -84,7 +86,7 @@ mod parse {
     use nom::branch::alt;
     use nom::{InputTakeAtPosition, AsChar};
     use nom::bytes::complete::{tag, take_until};
-    use starlane_resources::parse::parse_resource_path;
+    use starlane_resources::parse::{parse_resource_path, not_whitespace_or_semi};
     use crate::config::http_router::{HttpMapping, HttpRouterConfig};
     use nom::multi::{separated_list0, many0};
 
@@ -134,13 +136,20 @@ mod parse {
 
             tuple( (delimited( multispace0, parse_http_methods, multispace1 ),
                         terminated( take_until("->"), tag("->")),
-                            preceded( multispace0, parse_resource_path  )
+                            preceded( multispace0, not_whitespace_or_semi )
                          ) ),
 
-        )(input).map( |(input_next, (methods,path_pattern,resource))| {
+        )(input).map( |(input_next, (methods,path_pattern,resource_pattern))| {
                   match methods {
                       Ok(methods) => {
-                          (input_next,Ok(HttpMapping::new( methods, path_pattern.trim().to_string(), resource )))
+                          match HttpMapping::new( methods, path_pattern.trim().to_string(), resource_pattern.to_string() ) {
+                              Ok(mapping) => {
+                                  (input_next,Ok(mapping))
+                              }
+                              Err(error) => {
+                                  (input_next,Err(error.into()))
+                              }
+                          }
                       }
                       Err(error) => {
                           (input_next,Err(error.into()))
@@ -207,8 +216,8 @@ mod tests {
         let mapping = mapping.unwrap();
         assert!(mapping.methods.len()==1);
         assert!(mapping.methods.contains(&HttpMethod::Get));
-        assert!(mapping.path_pattern=="/hello");
-        assert!(mapping.resource.to_string().as_str()=="space:app:mechtron");
+        assert!(mapping.path_pattern.is_match("/hello"));
+        assert!(mapping.resource_pattern.to_string().as_str()=="space:app:mechtron");
 
 
         let (leftover, mapping)= parse_http_mapping("GET /hello -> space:app:mechtron").unwrap();
@@ -216,8 +225,8 @@ mod tests {
         let mapping = mapping.unwrap();
         assert!(mapping.methods.len()==1);
         assert!(mapping.methods.contains(&HttpMethod::Get));
-        assert_eq!(mapping.path_pattern,"/hello");
-        assert!(mapping.resource.to_string().as_str()=="space:app:mechtron");
+        assert!(mapping.path_pattern.is_match("/hello"));
+        assert!(mapping.resource_pattern.to_string().as_str()=="space:app:mechtron");
 
         Ok(())
     }

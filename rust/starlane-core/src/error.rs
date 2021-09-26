@@ -342,3 +342,11 @@ impl From<RenderError> for Error {
         }
     }
 }
+
+impl From<regex::Error> for Error {
+    fn from(e: regex::Error) -> Self {
+        Self {
+            error: e.to_string()
+        }
+    }
+}

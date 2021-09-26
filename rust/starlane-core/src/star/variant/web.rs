@@ -34,6 +34,7 @@ use crate::artifact::ArtifactRef;
 use crate::cache::ArtifactItem;
 use crate::config::http_router::HttpRouterConfig;
 use crate::html::HTML;
+use regex::Regex;
 
 
 pub struct WebVariant {
@@ -258,10 +259,16 @@ eprintln!("Error: {}",err.to_string());
 
                         for mapping in &config.mappings {
 
-                            if request.path.starts_with(&mapping.path_pattern ) {
+
+                            if mapping.path_pattern.is_match(request.path.as_str() ) {
+
+
+                                let resource = mapping.path_pattern.replace( request.path.as_str(), mapping.resource_pattern.as_str()  ).to_string();
+                                let resource = ResourcePath::from_str(resource.as_str() )?;
+
                                 let mut proto = ProtoMessage::new();
                                 proto.payload( request.clone() );
-                                proto.to( mapping.resource.clone().into() ) ;
+                                proto.to( resource.into() ) ;
                                 proto.from(MessageFrom::Inject);
                                 match api.send_http_message(proto, ReplyKind::HttpResponse, "sending an HttpRequest").await {
                                     Ok(reply) => {
@@ -310,3 +317,33 @@ eprintln!("Error: {}",err.to_string());
 
 
 
+mod tests {
+
+}
+#[cfg(test)]
+mod test {
+    use crate::error::Error;
+    use regex::Regex;
+
+    #[test]
+    pub fn path_regex() -> Result<(),Error> {
+        let regex = Regex::new("/files/")?;
+        assert!(regex.is_match("/files/"));
+
+
+        let regex = Regex::new("/files/.*")?;
+        assert!(regex.is_match("/files/"));
+
+        let regex = Regex::new("/files/(.*)")?;
+        assert!(regex.is_match("/files/some-path"));
+        assert_eq!("/some-path".to_string(),regex.replace("/files/some-path", "/$1").to_string());
+
+
+        let regex = Regex::new("/files/(.*)")?;
+        assert!(regex.is_match("/files/some/path.html"));
+        assert_eq!("/some/path.html".to_string(),regex.replace("/files/some/path.html", "/$1").to_string());
+
+
+        Ok(())
+    }
+}

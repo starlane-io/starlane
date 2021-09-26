@@ -62,6 +62,20 @@ fn not_whitespace<T>(i: T) -> Res<T, T>
     )
 }
 
+pub fn not_whitespace_or_semi<T>(i: T) -> Res<T, T>
+    where
+        T: InputTakeAtPosition,
+        <T as InputTakeAtPosition>::Item: AsChar,
+{
+    i.split_at_position1_complete(
+        |item| {
+            let char_item = item.as_char();
+            (char_item == ' ' || char_item == ';')
+        },
+        ErrorKind::AlphaNumeric,
+    )
+}
+
 fn anything_but_single_quote<T>(i: T) -> Res<T, T>
     where
         T: InputTakeAtPosition,

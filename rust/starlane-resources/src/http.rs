@@ -56,6 +56,17 @@ pub struct HttpRequest{
    pub body: BinSrc
 }
 
+impl HttpRequest {
+    pub fn with_path(self, path: String) -> Self {
+        HttpRequest{
+            path,
+            method: self.method,
+            headers: self.headers,
+            body: self.body
+        }
+    }
+}
+
 impl TryInto<BinSrc> for HttpRequest {
     type Error = Error;
 
