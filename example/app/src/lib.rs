@@ -15,6 +15,8 @@ use starlane_resources::http::{HttpRequest, HttpResponse, Headers};
 use std::convert::TryInto;
 use starlane_resources::message::{ResourcePortReply, ResourcePortMessage, Message};
 use std::collections::HashMap;
+use starlane_resources::ResourcePath;
+use std::str::FromStr;
 
 
 #[no_mangle]
@@ -46,7 +48,6 @@ impl Mechtron for MyMechtron {
         log("http_request called on appy ");
 
         log(format!("request path: {}",message.payload.path).as_str() );
-
 
         let response = html::mechtron_page().unwrap();
 

@@ -4,6 +4,7 @@ use std::sync::Arc;
 use serde_json::json;
 use handlebars::Handlebars;
 use handlebars::RenderError;
+use starlane_resources::ResourcePath;
 
 lazy_static! {
   pub static ref HTML: Handlebars<'static> = {
@@ -144,17 +145,21 @@ font-family: 'Zen Dots', cursive;
   margin-bottom: 0;
 
   font-size: 32px;
-
 }
 
-footer {
-
+#title > h2 > span {
+  -webkit-animation: glow 5s ease-in-out infinite alternate;
+  -moz-animation: glow 5s ease-in-out infinite alternate;
+  animation: glow 5s ease-in-out infinite alternate;
 }
+
+
+
+
 
 p {
   text-align: center;
-  font-family: 'Economica', sans-serif;
-font-family: 'Electrolize', sans-serif;
+  font-family: 'Electrolize', sans-serif;
   margin-left: auto;
   margin-right: auto;
   margin-top: 0;
@@ -283,12 +288,33 @@ font-family: 'Electrolize', sans-serif;
     transform: rotateX(90deg) rotateY(-360deg);
   }
 }
+
+@-webkit-keyframes glow {
+  0%, 80%, 100% {
+    text-shadow: 0 0 0 transparent;
+  }
+  90% {
+    text-shadow: 0 0 10px #00099;
+  }
+}
+@keyframes glow{
+  0%, 80%, 100% {
+    text-shadow: 0 0 0 transparent;
+  }
+  90% {
+    text-shadow: 0 0 10px #0003;
+  }
+}
+
+
+
+
 @-webkit-keyframes nucleus_ {
   0%, 100% {
     box-shadow: 0 0 0 transparent;
   }
   50% {
-    box-shadow: 0 0 25px #000;
+    box-shadow: 0 0 5px #00099;
   }
 }
 @keyframes nucleus_ {
@@ -296,8 +322,17 @@ font-family: 'Electrolize', sans-serif;
     box-shadow: 0 0 0 transparent;
   }
   50% {
-    box-shadow: 0 0 25px #000;
+    box-shadow: 0 0 5px #0009;
   }
+}
+
+footer {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 16px;
+
 }
 </style>
 
@@ -306,7 +341,7 @@ font-family: 'Electrolize', sans-serif;
 <!-- partial:index.partial.html -->
 <section id="title">
   <h1>MECHTRON</h1>
-  <h2>Run WebAssembly Everywhere</h2>
+  <h2>Run <span>WebAssembly</span> Everywhere</h2>
 </section>
 
 <section id="atom">
@@ -324,13 +359,13 @@ font-family: 'Electrolize', sans-serif;
 </div>
 </section>
 
-<section>
+<footer>
 <p>This page was served by a Mechtron</p>
-</section>
+</footer>
 
 </body>
 </html>
-            "# );
+"# );
 
     reg
 };
