@@ -1,33 +1,31 @@
-# STARLANE
-Starlane is a RESOURCE MESH which can also execute client and server side WebAssembly. You can read more about what Starlane is and what it does on Starlane's [about page](http://starlane.io/about/).
 
-## A WORK IN PROGRESS 
-Starlane is a work in progress and not ready for production yet, however it is ready for community feedback.
-
+# DOCUMENTATION
 
 ## GETTING STARTED
 
 ### INSTALL RUST
 To build starlane you will need to have **rust** and **make** installed.  Follow the official Rust instructions to [install Rust](https://www.rust-lang.org/tools/install).
 
-### MAKE
-You will need **Make** installed to execute the Makefile.  Sorry, you will have to figure that out yourself!
+### INSTALL MAKE
+You will need **Make** installed to execute the Makefile.  This should be installed by default on Mac and other Unix based OSes. Sorry, if you are a windows user you will have to figure out how to install make yourself!
 
-### WASM PACK
-In order to build executable WebAssembly components knowns as Mechtrons, you will need to install wasm-pack.  Follow the [wasm-pack installation instructions](https://rustwasm.github.io/wasm-pack/installer/) for your platform. 
+### INSTALL WASM PACK
+In order to build executable WebAssembly actors knowns as Mechtrons, you will need to install wasm-pack.  Follow the [wasm-pack installation instructions](https://rustwasm.github.io/wasm-pack/installer/) for your platform. 
 
 
-## INSTALLING STARLANE
-To install Starlane run this in the directory where you checked out this repository:
+### BUILD AND INSTALL STARLANE
+To install Starlane run ```make install``` in the directory where you checked out this repository:
 
 ```bash
 make install
 ```
 
+Congrats! You now have Starlane installed on your machine! Why don't you try running the example next?
+
 ## RUN THE EXAMPLE
 The following is a simple runnable example that illustrates the basic utility of Starlane.  
 
-NOTE: The following example works most of the time, however, about 1 out of every 20 runs Starlane has an initialization failure causing the example to break.  If you notice a problem, maybe try rerunning the example from the start.
+NOTE: Starlane works most of the time, however, this software is still in development and about 1 out of every 20 runs Starlane has a failure causing the example to break.  If you notice a problem, maybe try rerunning the example from the start.
 
 ### START A STARLANE SERVER INSTANCE
 Open a terminal and run the following command to start a server instance of Starlane:
@@ -39,7 +37,7 @@ starlane serve
 At this point starlane should be serving a Http Server on port 8080.  Open a browser and point it to [http://localhost:8080/](http://localhost:8080/).  You should see a "Welcome" message that also indicates that the 'localhost' space has not yet been created.
 
 ### CREATE LOCALHOST SPACE
-Next we need to create the localhost space.  There is a one to one relationshib between the hostname and space.
+The webserver takes the Host directive from an http request header and uses it to determine which Space's router configuration to use.  Since we are doing local development we need to create a Space named 'localhost'.
 
 Open a NEW terminal (since your previous terminal is still running the starlane server.)
 
@@ -47,7 +45,7 @@ Open a NEW terminal (since your previous terminal is still running the starlane 
 starlane create "localhost<Space>"
 ```
 
-You can see that we are naming the resource 'localhost' and we use the <> delimeters to indicate which type we want to create. 
+You can see that we are naming the resource 'localhost' and we use the greater than/less than delimeters to indicate which type we want to create. 
 
 Now refresh your browser pointed to [http://localhost:8080/](http://localhost:8080/)
 
@@ -60,7 +58,7 @@ We want a place where we can upload and serve files, so let's provision a filesy
 starlane create "localhost:my-files<FileSystem>"
 ```
 
-You can see we are creating a filesystem which is a child resource of 'localhost' called 'my-files' and again we pass the type as <FileSystem>.
+You can see we are creating a filesystem which is a child resource of 'localhost' called 'my-files' and again we pass the type as FileSystem.
 
 ### UPLOAD A FILE
 Let's upload a file (which will serve as our entire website)  from the example directory we want to upload 'example/websites/simple-site1/index.html''
@@ -98,7 +96,9 @@ So let's publish version 1.0.0 of our resource bundle by running this command:
 starlane publish ./example/localhost-config "localhost:config:1.0.0"
 ``` 
 
-notice that 'config' is the artifact bundle series name and version 1.0.0 is the version. 
+The 'publish' command takes a directory and resource path as an argument and automatically zips up the contents of the directory and publishes as an ArtifactBundle to the resource path.
+
+Notice that 'config' is the artifact bundle series name and version '1.0.0' is the version. ArtifactBundle path's are required to follow the convension of 'artifact-bundle-series-name:semver'
 
 ### BINDING THE CONFIG TO LOCALHOST
 For the filesystem to be accessable by the Http server the router config must be bound to the localhost space.

@@ -1,8 +1,4 @@
 
-section {
-  width: 640px;
-}
-
 header {
   display: block;
   z-index: 1;
@@ -12,7 +8,6 @@ header {
   font-size: xx-large;
   width: 960px;
 }
-
 
 
 header nav {
@@ -47,20 +42,16 @@ header nav ul li a {
 
 
 #card{
-  position: fixed;
-
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%,-50%);
-
-
-
   color: #FFF;
   text-align: center;
   font-family: "jura", sans-serif;
   font-family: "Stick No Bills", sans-serif;
   font-family: "Josefin Sans", sans-serif;
   padding-left: 10px;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 128px;
+  max-width: 640px;
 }
 
 
@@ -69,17 +60,18 @@ header nav ul li a {
   font-size: 120px;
 
   font-family: "Josefin Sans", sans-serif;
-  background: -webkit-linear-gradient(white, #38495a);
   background: -webkit-linear-gradient(white, #eeaa5a);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   letter-spacing: 5px;
+  margin-top: 0px;
+  margin-bottom: 0px;
 }
 
 #disclaimer{
   color: #cccccc;
-  padding: 32px;
-  max-width: 960px;
+  padding: 16px;
+  max-width: 100%;
 }
 
 #disclaimer p{
@@ -88,8 +80,8 @@ header nav ul li a {
   margin-right: auto;
   color: #cccccc;
   font-size: x-large;
-  font-family: "Roboto", sans-serif;
-  font-family: "Josefin Sans", sans-serif;
+  font-family: "Raleway", sans-serif;
+  font-weight: 50;
 }
 
 
@@ -101,10 +93,9 @@ header nav ul li a {
   background: -webkit-linear-gradient(white, #5a5a5a);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  margin-top: 0px;
+  margin-bottom: 0px;
 }
-
-
-
 
 
 
@@ -205,6 +196,11 @@ input[type=email], select, textarea {
   margin-bottom: 16px; /* Bottom margin */
 }
 
+
+
+
+
+
 input[type=text], select, textarea {
   display: inline;
   width: 100%; /* Full width */
@@ -249,8 +245,11 @@ input[type=submit]:hover {
 
 p a {
   color: white;
+}
 
-	#mc_embed_signup{clear:left; font:14px Roboto,sans-serif; width:100%; }
+
+
+#mc_embed_signup{clear:left; font:14px Roboto,sans-serif; width:100%; }
 
 #mc_embed_signup input[type=email],select, textarea {
 display: inline;
@@ -263,6 +262,55 @@ background-color: black;
 display: inline;
 background-color: black;
 }
+
+footer > #mobile-nav{
+  display: none;
+  margin-bottom: 32px; 
+}
+
+footer > #mobile-nav ul li {
+    list-style: none;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+footer > #mobile-nav ul li a {
+    display: block;
+    text-decoration: underline;
+    padding: 10px 0;
+}
+
+
+
+/* On screens that are 992px or less, set the background color to blue */
+@media screen and (max-width: 992px) {
+ 
+  #card {
+    width: 100%;
+    max-width: 100%;
+    font-size: 150%;
+    margin-top: 32px;
+  }
+
+
+  header {
+    display: none;
+  }
+
+  footer {
+    position: relative;
+  }
+
+  footer > #mobile-nav{
+     display: block
+  }
+
+}
+
+
+
+
+
 
 
 

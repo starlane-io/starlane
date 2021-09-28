@@ -1,8 +1,8 @@
 body {
   margin: 0px;
   background: black;
-  color: grey;
-  font-family: "Roboto", sans-serif;
+  color: #cccccc;
+  font-family: "Raleway", sans-serif;
 }
 
 
@@ -14,6 +14,7 @@ h1 {
   background: -webkit-linear-gradient(white, #38495a);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  margin-bottom: 4px;
 }
 
 h2 {
@@ -23,17 +24,29 @@ h2 {
   background: -webkit-linear-gradient(white, #38495a);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  margin-bottom: 4px;
+}
+
+h3 {
+  color: grey;
+  font-family: "Josefin Sans", sans-serif;
+  font-size: medium;
+  background: -webkit-linear-gradient(white, #38495a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 4px;
 }
 
 p {
   color: #999999;
-  font-family: "Roboto", sans-serif;
+  margin-top: 0px;
 }
 
 
 pre {
  padding: 16px;
  background-color: #333333;
+ overflow-y: scroll;
 }
 
 code {
@@ -42,3 +55,7 @@ code {
 }
 
 
+strong {
+  font-weight: 400%;
+  color: #ffffff;
+}

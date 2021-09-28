@@ -11,6 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@1,300&family=Jura&family=Stick+No+Bills:wght@200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@100;400&display=swap" rel="stylesheet">
 <link href="//cdn-images.mailchimp.com/embedcode/horizontal-slim-10_7.css" rel="stylesheet" type="text/css">
 
 
@@ -24,7 +25,7 @@
 <script src="https://kit.fontawesome.com/e63e797fac.js" crossorigin="anonymous"></script>
 
 </head>
-<body style="background-image: url('background.png');background-repeat: repeat-x;">
+<body>
 
 <div style="background-image: url('background.png');background-repeat: repeat-x;">
 <div id="plate">
@@ -47,19 +48,35 @@
 </header>
 
 
-<section>
-<div id='card'>
-  <span id="title">STARLANE</span><br>
-  <span id="tagline">A RESOURCE MESH FOR RUNNING WEBASSEMBLY EVERYWHERE</span>
-  <div id="disclaimer"><p>Starlane is a work in progress with a growing feature set. It is not ready for production environments, but is ready for community discussion and feedback.</p>
+<section id="card">
+  <h1 id="title">STARLANE</h1>
+  <h2 id="tagline">A RESOURCE MESH FOR WEBASSEMBLY</h2>
+  <div id="disclaimer"><p>Starlane is a Resource Mesh that enables micro services to create, find, watch and use various micro resources accross the enterprise as well as message other micro services.</p>
+
+<p>Starlane also provides mechanisms for deploying, executing and connecting client and server side WebAssembly actors known as Mechtrons.</p>
+
+<p>It can be run as a stand alone instance, within a browser or as a highlty distributed cluster running on top of Kubernetes.</p>
+
+<p>This project is a work in progress with a growing feature set. It is not ready for production environments, but is ready for community discussion and feedback.</p>
+
 <p>Check out the <a href="{{"/about/" | relURL }}">about</a> page for more information and please join the newsletter to get regular updates.</p>
+
 <p>Feel free to join the <a href="https://www.reddit.com/r/starlane/">discussion</a> to help shape Starlane's development.</p>
   
-</div>
 </div>
 </section>
 
 <footer>
+
+ <nav id="mobile-nav">
+  <ul>
+  <li><a href="{{"/about/" | relURL }}">about</a></li>
+  <li><a href="{{"/docs/" | relURL }}">docs</a></li>
+  <li><a href="{{"/roadmap/" | relURL }}">roadmap</a></li>
+  <li><a href="https://github.com/mechtronium/starlane/">github</a></li>
+  <li><a href="{{"/contact/" | relURL }}">contact</a></li>
+  </ul>
+ </nav>
 
 <!-- Begin Mailchimp Signup Form -->
 <div id="mc_embed_signup">
