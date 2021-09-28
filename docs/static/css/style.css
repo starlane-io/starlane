@@ -56,6 +56,18 @@ h2 {
   letter-spacing: 1px;
 }
 
+h3 {
+  color: grey;
+  font-family: "Josefin Sans", sans-serif;
+  font-size: large;
+  background: -webkit-linear-gradient(white, #38495a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: 1px;
+}
+
+
+
 p {
   color: #cccccc;
   font-family: "Roboto", sans-serif;

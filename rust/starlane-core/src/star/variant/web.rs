@@ -192,7 +192,7 @@ println!("SENDING FOR VALUES...");
         Err(fail) => {
             let mut response = HttpResponse::new();
             response.status = 404;
-            let error = format!("It looks like you have just installed Starlane and haven't created a space for the '{}' domain yet.", host);
+            let error = format!("It looks like you have just installed Starlane and haven't created a space for the '{}' host yet.", host);
             let messages = json!({"title": "WELCOME", "message": error});
             response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
             return Ok(response);
@@ -214,7 +214,7 @@ println!("RECEIVED VALUES...");
                     ConfigSrc::None => {
                         let mut response = HttpResponse::new();
                         response.status = 404;
-                        let error = format!("The '{}' Space is there, but it doesn't have a reverse proxy config assigned yet", host);
+                        let error = format!("The '{}' Space is there, but it doesn't have a router config assigned yet.", host);
                         let messages = json!({"title": host, "message": error});
                         response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
                         Ok(response)
@@ -235,7 +235,7 @@ eprintln!("Error: {}",err.to_string());
 
                             let mut response = HttpResponse::new();
                             response.status = 404;
-                            let error = format!("could not cache reverse proxy config: '{}' Are you sure it's there?", artifact.to_string() );
+                            let error = format!("could not cache router config: '{}' Are you sure it's there?", artifact.to_string() );
                             let messages = json!({"title": "404", "message": error});
                             response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
 
@@ -246,7 +246,7 @@ eprintln!("Error: {}",err.to_string());
                             None => {
                                 let mut response = HttpResponse::new();
                                 response.status = 404;
-                                let error = format!("cannot locate reverse proxy config: '{}'", artifact.to_string() );
+                                let error = format!("cannot locate router config: '{}'", artifact.to_string() );
                                 let messages = json!({"title": "404", "message": error});
                                 response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
                                 return Ok(response)
@@ -293,7 +293,7 @@ eprintln!("Error: {}",err.to_string());
 
                         let mut response = HttpResponse::new();
                         response.status = 200;
-                        let error = format!("your domain '{}' is using reverse proxy config '{}'", host, artifact.to_string());
+                        let error = format!("Host: '{}' is using router config: '{}'", host, artifact.to_string());
                         let messages = json!({"title": "CONFIGURED", "message": error});
                         response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages)?.as_bytes().to_vec())));
                         Ok(response)
@@ -303,7 +303,7 @@ eprintln!("Error: {}",err.to_string());
             } else {
                 let mut response = HttpResponse::new();
                 response.status = 500;
-                let error = format!("received an unexpected value when trying to get domain config");
+                let error = format!("received an unexpected value when trying to get router config");
                 let messages = json!({"title": "500", "message": error});
                 response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
                 Ok(response)

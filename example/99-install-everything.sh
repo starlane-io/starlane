@@ -3,7 +3,7 @@
 set -e
 
 export STARLANE_DATA=$HOME/tmp/starlane-cli/data
-export STARLANE_CACHE=$CACHE/tmp/starlane-cli/cache
+export STARLANE_CACHE=$HOME/tmp/starlane-cli/cache
 
 starlane create "localhost<Space>"
 starlane create "localhost:my-files<FileSystem>"
