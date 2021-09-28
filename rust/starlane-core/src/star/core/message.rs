@@ -2,14 +2,14 @@ use std::convert::TryInto;
 
 use tokio::sync::{mpsc, oneshot};
 
-use starlane_resources::{Resource, ResourceArchetype};
+use starlane_resources::{Resource, ResourceArchetype, ResourceIdentifier};
 use starlane_resources::message::{Message, ResourceRequestMessage, ResourceResponseMessage, ResourcePortMessage};
 use starlane_resources::message::Fail;
 
 use starlane_resources::data::DataSet;
 use crate::error::Error;
 use crate::frame::{
-    MessagePayload, RegistryAction, Reply, ResourceHostAction, SimpleReply, StarMessage,
+    MessagePayload, ResourceRegistryRequest, Reply, ResourceHostAction, SimpleReply, StarMessage,
     StarMessagePayload,
 };
 use crate::message::resource::Delivery;
@@ -20,6 +20,9 @@ use crate::star::core::resource::host::{HostCall, HostComponent};
 use crate::star::shell::pledge::ResourceHostSelector;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use tokio::sync::oneshot::error::RecvError;
+use starlane_resources::property::{ResourcePropertyAssignment, ResourcePropertyValueSelector, ResourceValue, ResourceValues, ResourceRegistryPropertyAssignment, ResourceRegistryPropertyValueSelector};
+use std::collections::HashMap;
+use starlane_resources::http::HttpRequest;
 
 pub enum CoreMessageCall {
     Message(StarMessage),
@@ -70,19 +73,37 @@ impl MessagingEndpointComponent {
                     self.process_resource_request(delivery).await?;
                 }
                 MessagePayload::PortRequest(request) => {
-info!("Received PORT request!");
                     let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
                     self.process_resource_port_request(delivery).await?;
                 }
-                _ => {}
+
+                MessagePayload::HttpRequest(request) => {
+                    let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
+                    self.process_resource_http_request(delivery).await?;
+                }
+                MessagePayload::Response(_) => {
+                    // we don't handle responses here...
+                }
             },
-            StarMessagePayload::ResourceManager(action) => {
+            StarMessagePayload::ResourceRegistry(action) => {
                 let delivery = Delivery::new(action.clone(), star_message, self.skel.clone());
                 self.process_registry_action(delivery).await?;
             }
             StarMessagePayload::ResourceHost(action) => {
                 let delivery = Delivery::new(action.clone(), star_message, self.skel.clone());
                 self.process_resource_host_action(delivery).await?;
+            }
+            StarMessagePayload::Select(selector) => {
+                let delivery = Delivery::new(selector.clone(), star_message.clone(), self.skel.clone());
+                let results = self.skel.registry.as_ref().unwrap().select(selector.clone()).await;
+                match results {
+                    Ok(records) => {
+                        delivery.reply(Reply::Records(records))
+                    }
+                    Err(error) => {
+                        delivery.fail(Fail::Error("could not select records".to_string()))
+                    }
+                }
             }
 
             _ => {}
@@ -147,21 +168,32 @@ info!("Received PORT request!");
                     ResourceRequestMessage::Unique(resource_type) => {
                         let resource = skel.resource_locator_api.locate(delivery.payload.to.clone() ).await?;
                         let unique_src = skel
-                            .registry
-                            .as_ref()
+                                .registry
+                                .as_ref()
                             .unwrap()
                             .unique_src(resource.stub.archetype.kind.resource_type(), delivery.payload.to.clone().into())
                             .await;
                         delivery.reply(Reply::Id(unique_src.next(&resource_type).await?));
                     }
                     ResourceRequestMessage::SelectValues(selector) => {
-                        let stub = skel.resource_locator_api.locate(delivery.payload.to.clone()).await?.stub;
+
+                        let resource = skel
+                            .registry
+                            .as_ref()
+                            .unwrap()
+                            .get(delivery.payload.to.clone() )
+                            .await?.ok_or("expected resource: ")?;
+
+
+
                         let key: ResourceKey = skel.resource_locator_api.as_key(delivery.payload.to.clone()).await?;
                         let (tx, rx) = oneshot::channel();
+
+
                         host_tx.send(HostCall::Select { key, selector, tx }).await?;
                         let result = rx.await;
                         if let Ok(Ok(Option::Some(values))) = result {
-                            let values = values.with(stub);
+                            let values = values.with(resource.stub);
                             delivery.reply(Reply::ResourceValues(values));
                         } else {
                             delivery.fail(Fail::expected("Ok(Ok(ResourceValues(values)))"));
@@ -188,6 +220,7 @@ info!("Received PORT request!");
                         }
 
                     }
+
                 }
                 Ok(())
             }
@@ -214,7 +247,33 @@ info!("Received PORT request!");
                 host_tx: mpsc::Sender<HostCall>,
                 delivery: Delivery<Message<ResourcePortMessage>>,
             ) -> Result<(), Error> {
-                host_tx.try_send( HostCall::Deliver(delivery)).unwrap_or_default();
+                host_tx.try_send( HostCall::Port(delivery)).unwrap_or_default();
+                Ok(())
+            }
+
+            match process(skel, host_tx, delivery).await {
+                Ok(_) => {}
+                Err(err) => {
+                    error!("{}", err.to_string());
+                }
+            }
+        });
+        Ok(())
+    }
+
+    async fn process_resource_http_request(
+        &mut self,
+        delivery: Delivery<Message<HttpRequest>>,
+    ) -> Result<(), Error> {
+        let skel = self.skel.clone();
+        let host_tx = self.host_tx.clone();
+        tokio::spawn(async move {
+            async fn process(
+                skel: StarSkel,
+                host_tx: mpsc::Sender<HostCall>,
+                delivery: Delivery<Message<HttpRequest>>,
+            ) -> Result<(), Error> {
+                host_tx.try_send( HostCall::Http(delivery)).unwrap_or_default();
                 Ok(())
             }
 
@@ -230,68 +289,124 @@ info!("Received PORT request!");
 
     async fn process_registry_action(
         &mut self,
-        delivery: Delivery<RegistryAction>,
+        delivery: Delivery<ResourceRegistryRequest>,
     ) -> Result<(), Error> {
         let skel = self.skel.clone();
 
         tokio::spawn(async move {
-            if let Option::Some(registry) = skel.registry.clone() {
-                match &delivery.payload {
-                    RegistryAction::Register(registration) => {
-                        let result = registry.register(registration.clone()).await;
-                        delivery.result_ok(result);
-                    }
-                    RegistryAction::Location(location) => {
-                        let result = registry.set_location(location.clone()).await;
-                        delivery.result_ok(result);
-                    }
-                    RegistryAction::Find(find) => {
-
-                        let result = registry.get(find.to_owned()).await;
-
-                        match result {
-                            Ok(result) => match result {
-                                Some(record) => delivery.reply(Reply::Record(record)),
-                                None => {
-                                    delivery.fail(Fail::ResourceNotFound(find.clone()));
-                                }
-                            },
-                            Err(fail) => {
-                                delivery.fail(fail.into());
-                            }
+            async fn process( skel: StarSkel, delivery: Delivery<ResourceRegistryRequest> ) -> Result<(),Error> {
+                if let Option::Some(registry) = skel.registry.clone() {
+                    match &delivery.payload {
+                        ResourceRegistryRequest::Register(registration) => {
+                            let result = registry.register(registration.clone()).await;
+                            delivery.result_ok(result);
                         }
-                    }
-                    RegistryAction::Status(_report) => {
-                        unimplemented!()
-                    }
-                    RegistryAction::UniqueResourceId { parent, child_type } => {
-                        match skel.resource_locator_api.locate(parent.clone() ).await {
-                            Ok(parent) => {
-                                let unique_src = skel
-                                    .registry
-                                    .as_ref()
-                                    .unwrap()
-                                    .unique_src(parent.stub.archetype.kind.resource_type(), parent.stub.key.into() )
-                                    .await;
-                                let result: Result<ResourceId, Error> = unique_src.next(child_type).await;
-                                match result {
-                                    Ok(id) => {
-                                        delivery.reply(Reply::Id(id));
+                        ResourceRegistryRequest::Location(location) => {
+                            let result = registry.set_location(location.clone()).await;
+                            delivery.result_ok(result);
+                        }
+                        ResourceRegistryRequest::Find(find) => {
+                            let result = registry.get(find.to_owned()).await;
+
+                            match result {
+                                Ok(result) => match result {
+                                    Some(record) => delivery.reply(Reply::Record(record)),
+                                    None => {
+                                        delivery.fail(Fail::ResourceNotFound(find.clone()));
                                     }
-                                    Err(fail) => {
-                                        delivery.fail(fail.into());
-                                    }
+                                },
+                                Err(fail) => {
+                                    delivery.fail(fail.into());
                                 }
                             }
-                            Err(fail) => {
-                                delivery.fail(fail.into());
+                        }
+                        ResourceRegistryRequest::Status(_report) => {
+                            unimplemented!()
+                        }
+                        ResourceRegistryRequest::UniqueResourceId { parent, child_type } => {
+                            match skel.resource_locator_api.locate(parent.clone()).await {
+                                Ok(parent) => {
+                                    let unique_src = skel
+                                        .registry
+                                        .as_ref()
+                                        .unwrap()
+                                        .unique_src(parent.stub.archetype.kind.resource_type(), parent.stub.key.into())
+                                        .await;
+                                    let result: Result<ResourceId, Error> = unique_src.next(child_type).await;
+                                    match result {
+                                        Ok(id) => {
+                                            delivery.reply(Reply::Id(id));
+                                        }
+                                        Err(fail) => {
+                                            delivery.fail(fail.into());
+                                        }
+                                    }
+                                }
+                                Err(fail) => {
+                                    delivery.fail(fail.into());
+                                }
                             }
                         }
+                        ResourceRegistryRequest::Set(assignment) => {
 
+                            skel
+                                .registry
+                                .as_ref()
+                                .unwrap()
+                                .update(assignment.clone())
+                                .await?;
+                            delivery.reply(Reply::Empty);
+                        }
+                        ResourceRegistryRequest::SelectValues(op) => {
+
+println!("Select Property Ops... op.resource: {}", op.resource.to_string());
+
+                            let resource = skel
+                                .registry
+                                .as_ref()
+                                .unwrap()
+                                .get(op.resource.clone() )
+                                .await?.ok_or("expected resource: ");
+
+                            let resource = match resource {
+                                Ok(record) => {
+                                    record
+                                }
+                                Err(err) => {
+                                    eprintln!("{}",err);
+                                    delivery.fail(Fail::ResourceNotFound(op.resource.clone()));
+                                    return Ok(());
+                                }
+                            };
+
+                            match op.property {
+                                ResourceRegistryPropertyValueSelector::Config => {
+                                    let value = ResourceValue::Config(resource.stub.archetype.config.clone());
+                                    let mut values = HashMap::new();
+                                    values.insert( op.property.clone().into(), value );
+                                    let mut values = ResourceValues::new(resource.stub, values);
+                                    delivery.reply(Reply::ResourceValues(values));
+                                    return Ok(())
+                                }
+                                _ => {
+                                    // handle at the host level below
+                                }
+                            }
+
+                        }
                     }
+                }
+                Ok(())
+            }
+
+            match process(skel, delivery).await {
+                Ok(_) => {}
+                Err(error) => {
+                    eprintln!("error when processing registry action: {}", error.to_string() );
                 }
             }
         });
+
 
         Ok(())
     }
@@ -346,4 +461,10 @@ info!("Received PORT request!");
             .await?;
         Ok(rx.await?)
     }
+
+}
+
+pub struct WrappedHttpRequest {
+    pub resource: ResourceIdentifier,
+    pub request: HttpRequest,
 }

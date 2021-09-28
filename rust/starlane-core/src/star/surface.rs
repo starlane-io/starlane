@@ -8,14 +8,15 @@ use starlane_resources::ResourceIdentifier;
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
-use crate::frame::{Reply, ReplyKind};
+use crate::frame::{Reply, ReplyKind, StarPattern};
 use crate::message::ProtoStarMessage;
 use crate::resource::{ResourceRecord, ResourceKey};
-use crate::star::{StarCommand, StarSkel};
+use crate::star::{StarCommand, StarSkel, StarInfo};
 use crate::star::shell::locator::ResourceLocateCall;
 use crate::star::shell::message::MessagingCall;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::watch::{WatchSelector, Notification, Topic, Watch, WatchResourceSelector, Watcher};
+use crate::star::shell::search::SearchHits;
 
 #[derive(Clone)]
 pub struct SurfaceApi {
@@ -67,6 +68,13 @@ println!("SurfaceApi::watch()");
         Ok(tokio::time::timeout(Duration::from_secs(15), rx).await??)
     }
 
+    pub async fn star_search(&self, star_pattern: StarPattern) -> Result<SearchHits,Error> {
+        let (tx, rx) = oneshot::channel();
+        self.tx.try_send(SurfaceCall::StarSearch{star_pattern,tx})?;
+        tokio::time::timeout(Duration::from_secs(15), rx).await??
+    }
+
+
 }
 
 pub enum SurfaceCall {
@@ -82,7 +90,8 @@ pub enum SurfaceCall {
         tx: oneshot::Sender<Result<Reply, Error>>,
         description: String,
     },
-    Watch{ selector: WatchResourceSelector, tx: oneshot::Sender<Result<Watcher,Error>> }
+    Watch{ selector: WatchResourceSelector, tx: oneshot::Sender<Result<Watcher,Error>> },
+    StarSearch{ star_pattern: StarPattern, tx: oneshot::Sender<Result<SearchHits,Error>>}
 
 }
 
@@ -160,6 +169,9 @@ impl AsyncProcessor<SurfaceCall> for SurfaceComponent {
                 let listener = self.skel.watch_api.listen( selector ).await;
 println!("SurfaceApi: go watch listener {}",listener.is_ok());
                 tx.send(listener);
+            }
+            SurfaceCall::StarSearch { star_pattern, tx } => {
+                tx.send(self.skel.star_search_api.search( star_pattern ).await);
             }
         }
     }

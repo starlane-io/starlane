@@ -41,7 +41,8 @@ impl Host for SpaceHost {
             AssignResourceStateSrc::Direct(data) => data,
             AssignResourceStateSrc::Stateless => return Err("space cannot be stateless".into()),
             AssignResourceStateSrc::CreateArgs(args) => {
-                self.create_from_args(args).await?
+//                self.create_from_args(args).await?
+                DataSet::new()
             }
         };
 
@@ -62,6 +63,10 @@ impl Host for SpaceHost {
 
     async fn delete(&self, _identifier: ResourceKey) -> Result<(), Error> {
         unimplemented!()
+    }
+
+    fn resource_type(&self) -> ResourceType {
+        ResourceType::Space
     }
 }
 

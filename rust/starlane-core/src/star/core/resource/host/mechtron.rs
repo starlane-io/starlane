@@ -8,13 +8,14 @@ use starlane_resources::ConfigSrc;
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
 use crate::mechtron::Mechtron;
-use crate::resource::{ArtifactKind, ResourceKey};
+use crate::resource::{ArtifactKind, ResourceKey, ResourceType};
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util::AsyncHashMap;
 use crate::message::resource::Delivery;
 use crate::frame::Reply;
+use starlane_resources::http::HttpRequest;
 
 pub struct MechtronHost {
     skel: StarSkel,
@@ -45,8 +46,8 @@ impl Host for MechtronHost {
         };
 
         let mechtron_config_artifact = match &assign.stub.archetype.config {
-            None => return Err("Mechtron requires a config".into() ),
-            Some(ConfigSrc::Artifact(artifact)) => {
+            ConfigSrc::None => return Err("Mechtron requires a config".into() ),
+            ConfigSrc::Artifact(artifact) => {
                 println!("artifact : {}", artifact.to_string());
                 artifact.clone()
             }
@@ -86,7 +87,7 @@ impl Host for MechtronHost {
         unimplemented!()
     }
 
-    async fn deliver(&self, key: ResourceKey, delivery: Delivery<Message<ResourcePortMessage>>) -> Result<(),Error>{
+    async fn port_message(&self, key: ResourceKey, delivery: Delivery<Message<ResourcePortMessage>>) -> Result<(),Error>{
 
         info!("MECHTRON HOST RECEIVED DELIVERY");
         let mechtron = self.mechtrons.get(key.clone()).await?.ok_or(format!("could not deliver mechtron to {}",key.to_string()))?;
@@ -101,4 +102,23 @@ info!("=====>> MECHTRON SENT REPLY");
         Ok(())
     }
 
+    async fn http_message(&self, key: ResourceKey, delivery: Delivery<Message<HttpRequest>>) -> Result<(),Error>{
+
+        info!("MECHTRON HOST RECEIVED DELIVERY");
+        let mechtron = self.mechtrons.get(key.clone()).await?.ok_or(format!("could not deliver mechtron to {}",key.to_string()))?;
+        info!("GOT MECHTRON");
+        let reply = mechtron.http_request(delivery.payload.clone()).await?;
+
+        if let Option::Some(reply) = reply {
+            delivery.reply(Reply::HttpResponse(reply));
+            info!("=====>> MECHTRON SENT REPLY");
+        }
+
+        Ok(())
+    }
+
+
+    fn resource_type(&self) -> ResourceType {
+        ResourceType::Mechtron
+    }
 }

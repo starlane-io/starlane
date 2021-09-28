@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use tokio::sync::{mpsc, oneshot};
 
-use starlane_resources::{AssignKind, AssignResourceStateSrc, Resource, ResourceAssign};
+use starlane_resources::{AssignKind, AssignResourceStateSrc, Resource, ResourceAssign, ResourcePathAndType};
 use starlane_resources::data::{BinSrc, DataSet};
 use starlane_resources::message::{Fail, ResourcePortMessage, Message};
 
@@ -19,9 +19,13 @@ use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::message::resource::Delivery;
 use crate::star::core::resource::host::kube::KubeHost;
-use crate::star::core::resource::host::file::FileHost;
-use starlane_resources::property::{ResourceValueSelector, ResourceValues, ResourcePropertyValueSelector, ResourceValue};
+use crate::star::core::resource::host::file::{FileHost, FileSystemHost};
+use starlane_resources::property::{ResourceValueSelector, ResourceValues, ResourcePropertyValueSelector, ResourceValue, ResourceHostPropertyValueSelector};
 use starlane_resources::status::Status;
+use starlane_resources::http::HttpRequest;
+use crate::html::{HTML, html_error_code};
+use crate::frame::Reply;
+use crate::star::core::message::WrappedHttpRequest;
 
 pub mod artifact;
 mod default;
@@ -48,15 +52,15 @@ pub enum HostCall {
     },
     Select {
         key: ResourceKey,
-        selector: ResourcePropertyValueSelector,
+        selector: ResourceHostPropertyValueSelector,
         tx: oneshot::Sender<Result<Option<ResourceValues<ResourceKey>>, Error>>,
     },
     Has {
         key: ResourceKey,
         tx: oneshot::Sender<bool>,
     },
-    Deliver(Delivery<Message<ResourcePortMessage>>)
-
+    Port(Delivery<Message<ResourcePortMessage>>),
+    Http(Delivery<Message<HttpRequest>>),
 }
 
 impl Call for HostCall {}
@@ -111,15 +115,29 @@ impl AsyncProcessor<HostCall> for HostComponent {
                 let host = self.host(key.resource_type()).await;
                 tx.send(host.has(key).await);
             }
-            HostCall::Deliver(delivery) => {
+            HostCall::Port(delivery) => {
                 match self.skel.resource_locator_api.as_key( delivery.payload.to.clone() ).await
                 {
                     Ok(key) => {
                         let host = self.host(key.resource_type()).await;
-                        host.deliver(key,delivery).await;
+                        host.port_message(key, delivery).await;
                     }
                     Err(_) => {
                         error!("could not find key for: {}", delivery.payload.to.to_string() );
+                    }
+
+                }
+            }
+            HostCall::Http(delivery) => {
+                match self.skel.resource_locator_api.as_key( delivery.payload.to.clone() ).await
+                {
+                    Ok(key) => {
+                        let host = self.host(key.resource_type()).await;
+                        host.http_message(key, delivery).await;
+                    }
+                    Err(_) => {
+                        error!("could not find key for: {}", delivery.payload.to.to_string() );
+                        delivery.fail( Fail::Error(format!("could not find key for: {}", delivery.payload.to.to_string())));
                     }
 
                 }
@@ -137,12 +155,12 @@ impl HostComponent {
 
         let host: Arc<dyn Host> = match rt {
             ResourceType::Space => Arc::new(SpaceHost::new(self.skel.clone()).await),
-            ResourceType::ArtifactBundleSeries => Arc::new(StatelessHost::new(self.skel.clone()).await),
+            ResourceType::ArtifactBundleSeries => Arc::new(StatelessHost::new(self.skel.clone(), ResourceType::ArtifactBundleSeries).await),
             ResourceType::ArtifactBundle=> Arc::new(ArtifactBundleHost::new(self.skel.clone()).await),
             ResourceType::App=> Arc::new(AppHost::new(self.skel.clone()).await),
             ResourceType::Mechtron => Arc::new(MechtronHost::new(self.skel.clone()).await),
-            ResourceType::Database => Arc::new(KubeHost::new(self.skel.clone()).await.expect("KubeHost must be created without error")),
-            ResourceType::FileSystem => Arc::new(StatelessHost::new(self.skel.clone()).await),
+            ResourceType::Database => Arc::new(KubeHost::new(self.skel.clone(), ResourceType::Database ).await.expect("KubeHost must be created without error")),
+            ResourceType::FileSystem => Arc::new(FileSystemHost::new(self.skel.clone() ).await),
             ResourceType::File => Arc::new(FileHost::new(self.skel.clone()).await),
 
             t => unimplemented!("no HOST implementation for type {}", t.to_string()),
@@ -155,6 +173,8 @@ impl HostComponent {
 
 #[async_trait]
 pub trait Host: Send + Sync {
+
+    fn resource_type(&self) -> ResourceType;
 
 
     async fn assign(
@@ -176,32 +196,33 @@ pub trait Host: Send + Sync {
         Err(format!("resource type: {} does not allow state updates", key.resource_type().to_string()).into() )
     }
 
-    async fn deliver(&self, key: ResourceKey, delivery: Delivery<Message<ResourcePortMessage>>) -> Result<(),Error>{
+    async fn port_message(&self, key: ResourceKey, delivery: Delivery<Message<ResourcePortMessage>>) -> Result<(),Error>{
         info!("ignoring delivery");
         Ok(())
     }
 
+
+    async fn http_message(&self, key: ResourceKey, delivery: Delivery<Message<HttpRequest>>) -> Result<(),Error>{
+        eprintln!("resource does not respond to HttpRequest: <{}>", self.resource_type().to_string() );
+        let response = html_error_code(400, "BAD REQUEST".to_string(), format!("This type of resource: <{}> cannot respond to http requests", self.resource_type().to_string()  ) )?;
+        delivery.reply(Reply::HttpResponse(response));
+        Ok(())
+    }
+
+
     fn shutdown(&self) {}
 
-    async fn select(&self, key: ResourceKey, selector: ResourcePropertyValueSelector) -> Result<Option<ResourceValues<ResourceKey>>, Error> {
+    async fn select(&self, key: ResourceKey, selector: ResourceHostPropertyValueSelector) -> Result<Option<ResourceValues<ResourceKey>>, Error> {
         match &selector {
-            ResourcePropertyValueSelector::State { aspect, field } => {
+            ResourceHostPropertyValueSelector::State { aspect, field } => {
                 let state = self.get_state(key.clone()).await?.unwrap_or(DataSet::new());
                 let state = aspect.filter(state);
                 let mut values = HashMap::new();
-                values.insert(selector, state );
+                values.insert(selector.into(), state );
                 Ok(Option::Some(ResourceValues{
                     resource: key,
                     values
                 }))
-            }
-            ResourcePropertyValueSelector::None => {
-                Ok(Option::Some(ResourceValues::empty(key)))
-            }
-            ResourcePropertyValueSelector::Status => {
-                let mut values = HashMap::new();
-                values.insert(selector, ResourceValue::Status(Status::Unknown));
-                Ok(Option::Some(ResourceValues::new( key, values )))
             }
         }
     }

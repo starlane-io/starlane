@@ -18,6 +18,7 @@ use zip::result::ZipError;
 use starlane_resources::message::Fail;
 use wasmer::CompileError;
 use actix_web::ResponseError;
+use handlebars::RenderError;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Error {
@@ -329,6 +330,22 @@ impl Into<Fail> for Error {
 impl From<strum::ParseError> for Error {
     fn from(e: strum::ParseError) -> Self {
         Self{
+            error: e.to_string()
+        }
+    }
+}
+
+impl From<RenderError> for Error {
+    fn from(e: RenderError) -> Self {
+        Self {
+            error: e.to_string()
+        }
+    }
+}
+
+impl From<regex::Error> for Error {
+    fn from(e: regex::Error) -> Self {
+        Self {
             error: e.to_string()
         }
     }

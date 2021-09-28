@@ -312,8 +312,17 @@ impl LocalFileAccess {
                 let path = Path::from_str(format!("/{}/{}", target, zip_file.name()).as_str())?;
                 self.mkdir(&path)?;
             } else {
-                let path = format!("{}/{}/{}", self.base_dir, target, zip_file.name());
-                let mut file = fs::File::create(path)?;
+
+                let path = Path::from_str(format!("{}/{}/{}", self.base_dir, target, zip_file.name()).as_str())?;
+                let parent = Path::from_str(format!("/{}/{}", target, zip_file.name()).as_str())?.parent();
+                match parent {
+                    None => {}
+                    Some(parent) => {
+                        self.mkdir(&parent )?;
+                    }
+                }
+
+                let mut file = fs::File::create(path.to_string().clone())?;
                 std::io::copy(&mut zip_file, &mut file)?;
             }
         }

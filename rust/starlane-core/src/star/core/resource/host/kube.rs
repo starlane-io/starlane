@@ -11,11 +11,7 @@ use starlane_resources::data::{BinSrc, DataSet};
 use starlane_resources::message::Fail;
 
 use crate::error::Error;
-use crate::resource::{
-    Path,
-    ResourceAddress,
-    ResourceCreationChamber, ResourceKey, ResourceKind,
-};
+use crate::resource::{Path, ResourceAddress, ResourceCreationChamber, ResourceKey, ResourceKind, ResourceType};
 use crate::star::StarSkel;
 use crate::star::core::resource::host::Host;
 
@@ -25,11 +21,12 @@ pub struct KubeHost {
     client: kube::Client,
     starlane_meta: ObjectMeta,
     namespace: String,
-    api_version: String
+    api_version: String,
+    resource_type: ResourceType
 }
 
 impl KubeHost {
-    pub async fn new(skel: StarSkel) -> Result<Self, Error> {
+    pub async fn new(skel: StarSkel, resource_type: ResourceType ) -> Result<Self, Error> {
 
         let client = kube::Client::try_default().await?;
 
@@ -65,7 +62,8 @@ impl KubeHost {
             client: client,
             namespace: namespace,
             starlane_meta: starlane_meta,
-            api_version: starlane.api_version.clone()
+            api_version: starlane.api_version.clone(),
+            resource_type
         };
 
         Ok(rtn)
@@ -139,6 +137,10 @@ println!("Assigning Kube Resource Host....");
 
     async fn delete(&self, key: ResourceKey) -> Result<(), Error> {
         todo!()
+    }
+
+    fn resource_type(&self) -> ResourceType {
+        self.resource_type.clone()
     }
 }
 

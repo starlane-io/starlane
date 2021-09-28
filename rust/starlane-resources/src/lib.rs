@@ -251,6 +251,7 @@ where
                 && !(char_item == '.')
                 && !(char_item == '_')
                 && !(char_item == '-')
+                && !(char_item == ':')
                 && !(char_item.is_alpha() || char_item.is_dec_digit())
         },
         ErrorKind::AlphaNumeric,
@@ -667,6 +668,13 @@ impl FromStr for ResourceKindParts {
     }
 }
 
+#[derive(Debug,Clone,Serialize,Deserialize)]
+pub enum ResourcePropertiesKind {
+    Registry,
+    Host
+}
+
+
 
 
 /*
@@ -937,30 +945,29 @@ impl Path {
     }
 
     pub fn parent(&self) -> Option<Path> {
-        let mut copy = self.string.clone();
-        if copy.len() <= 1 {
-            return Option::None;
-        }
-        copy.remove(0);
-        let split = self.string.split("/");
-        if split.count() <= 1 {
-            Option::None
-        } else {
-            let mut segments = vec![];
-            let mut split = copy.split("/");
-            while let Option::Some(segment) = split.next() {
-                segments.push(segment);
+        let s = self.to_string();
+        let parent = std::path::Path::new(s.as_str()).parent();
+        match parent {
+            None => {
+                Option::None
             }
-            if segments.len() <= 1 {
-                return Option::None;
-            } else {
-                segments.pop();
-                let mut string = String::new();
-                for segment in segments {
-                    string.push_str("/");
-                    string.push_str(segment);
+            Some(path) => {
+                match path.to_str() {
+                    None => {
+                        Option::None
+                    }
+                    Some(some) => {
+                        match Self::from_str(some) {
+                            Ok(parent) => {
+                                Option::Some(parent)
+                            }
+                            Err(error) => {
+                                eprintln!("{}",error.to_string() );
+                                Option::None
+                            }
+                        }
+                    }
                 }
-                Option::Some(Path::new(string.as_str()))
             }
         }
     }
@@ -1114,7 +1121,7 @@ mod tests {
     };
     use crate::{
         AppKey, DatabaseKey, DatabaseKind, ResourceKey, ResourceKind, ResourceType,
-        RootKey, SpaceKey, SubSpaceKey,
+        RootKey, SpaceKey
     };
     use crate::error::Error;
     use crate::ResourcePath;
@@ -1164,6 +1171,7 @@ mod tests {
         Ok(())
     }
 
+    /*
     #[test]
     fn test_key() -> Result<(), Error> {
         let space_key = SpaceKey::new(RootKey::new(), 0);
@@ -1194,6 +1202,8 @@ mod tests {
         Ok(())
     }
 
+
+     */
     #[test]
     fn test_version() -> Result<(), Error> {
         let (leftover, version) = version("1.3.4-beta")?;
@@ -1550,6 +1560,7 @@ resources! {
         MechtronConfig,
         BindConfig,
         Wasm,
+        HttpRouter
     }
 
     #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
@@ -1735,7 +1746,7 @@ impl FieldSelection {
 pub struct ResourceArchetype {
     pub kind: ResourceKind,
     pub specific: Option<Specific>,
-    pub config: Option<ConfigSrc>,
+    pub config: ConfigSrc,
 }
 
 impl ResourceArchetype {
@@ -1743,7 +1754,7 @@ impl ResourceArchetype {
         ResourceArchetype {
             kind: kind,
             specific: Option::None,
-            config: Option::None,
+            config: ConfigSrc::None,
         }
     }
 
@@ -1751,7 +1762,7 @@ impl ResourceArchetype {
         ResourceArchetype {
             kind: ResourceKind::Root,
             specific: Option::None,
-            config: Option::None,
+            config: ConfigSrc::None,
         }
     }
 
@@ -2114,6 +2125,7 @@ impl FromStr for ConfigSrc {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+println!("ConfigSrc:: PARSEING: {}",s);
         if "None" == s {
             Ok(Self::None)
         } else {
@@ -2122,6 +2134,7 @@ impl FromStr for ConfigSrc {
         }
     }
 }
+
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Label {

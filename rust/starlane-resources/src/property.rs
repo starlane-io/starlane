@@ -1,11 +1,13 @@
-use crate::{SkewerCase, Resource, ResourceIdentifier, ResourceSelector, ResourceStub, FieldSelection, ResourcePath};
+use crate::{SkewerCase, Resource, ResourceIdentifier, ResourceSelector, ResourceStub, FieldSelection, ResourcePath, ConfigSrc};
 use std::str::FromStr;
 use crate::error::Error;
 use crate::data::{DataSet, BinSrc, Meta};
 use serde::{Serialize,Deserialize};
 use std::collections::HashMap;
-use crate::parse::{parse_resource_property_value_selector, parse_resource_value_selector};
+use crate::parse::{parse_resource_property_value_selector, parse_resource_value_selector, parse_resource_property_assignment};
 use crate::status::Status;
+use std::convert::TryInto;
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceValueSelector {
@@ -61,48 +63,99 @@ impl DataSetAspectSelector {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourcePropertyOp<P> {
+    pub resource: ResourceIdentifier,
+    pub property: P
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, strum_macros::Display)]
 pub enum ResourcePropertyValueSelector {
-    None,
-    State{ aspect: DataSetAspectSelector, field: FieldValueSelector },
-    Status
+    Registry(ResourceRegistryPropertyValueSelector),
+    Host(ResourceHostPropertyValueSelector),
 }
 
 impl ResourcePropertyValueSelector {
 
+    pub fn is_registry(&self) -> bool {
+        match self {
+            ResourcePropertyValueSelector::Registry(_)=> true,
+            _ => false
+        }
+    }
+
     pub fn state() -> Self {
-        Self::State {
+        Self::Host(ResourceHostPropertyValueSelector::State {
             aspect: DataSetAspectSelector::All,
             field: FieldValueSelector::All
-        }
+        })
     }
 
     pub fn state_aspect(aspect: &str) -> Self {
-        Self::State {
+        Self::Host(ResourceHostPropertyValueSelector::State {
             aspect: DataSetAspectSelector::Exact(aspect.to_string()),
             field: FieldValueSelector::All
-        }
+        })
     }
 
     pub fn state_aspect_field(aspect: &str, field: &str) -> Self {
-        Self::State {
+        Self::Host(ResourceHostPropertyValueSelector::State {
             aspect: DataSetAspectSelector::Exact(aspect.to_string()),
             field: FieldValueSelector::Meta(MetaFieldValueSelector::Exact(field.to_string()))
-        }
+        })
     }
 
     pub fn filter( &self, resource: Resource ) -> ResourceValue {
         match self {
-            ResourcePropertyValueSelector::State { aspect: selector, field } => {
-                field.filter( selector.filter(resource.state) )
+            Self::Host(ResourceHostPropertyValueSelector::State{ aspect, field }) => {
+                field.filter( aspect.filter(resource.state) )
             }
-            ResourcePropertyValueSelector::None => {
-                ResourceValue::None
+            Self::Registry(ResourceRegistryPropertyValueSelector::Config)=> {
+               ResourceValue::Config(resource.archetype.config)
             }
-            ResourcePropertyValueSelector::Status => {
+            Self::Registry(ResourceRegistryPropertyValueSelector::Status) => {
                 ResourceValue::None
             }
         }
+    }
+}
+
+
+impl TryInto<ResourceRegistryPropertyValueSelector> for ResourcePropertyValueSelector {
+    type Error = Error;
+
+    fn try_into(self) -> Result<ResourceRegistryPropertyValueSelector, Self::Error> {
+        match self {
+            Self::Registry(registry) => {
+                Ok(registry)
+            }
+           what => {
+                Err(format!("'{}' is not a Registry Resource Property",what.to_string()).into())
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub enum ResourceHostPropertyValueSelector {
+    State{ aspect: DataSetAspectSelector, field: FieldValueSelector }
+}
+
+impl Into<ResourcePropertyValueSelector> for ResourceHostPropertyValueSelector {
+    fn into(self) -> ResourcePropertyValueSelector {
+        ResourcePropertyValueSelector::Host(self)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub enum ResourceRegistryPropertyValueSelector {
+    Status,
+    Config
+}
+
+impl Into<ResourcePropertyValueSelector> for ResourceRegistryPropertyValueSelector {
+    fn into(self) -> ResourcePropertyValueSelector {
+        ResourcePropertyValueSelector::Registry(self)
     }
 }
 
@@ -181,7 +234,8 @@ pub enum ResourceValue {
     String(String),
     Meta(Meta),
     Resource(Resource),
-    Status(Status)
+    Status(Status),
+    Config(ConfigSrc)
 }
 
 impl ToString for ResourceValue {
@@ -207,7 +261,6 @@ impl ToString for ResourceValue {
                         String::from_utf8(bin.to_vec()).unwrap_or("UTF ERROR!".to_string() )
                     }
                 }
-
             }
             ResourceValue::String(string) => {
                 string.clone()
@@ -220,6 +273,9 @@ impl ToString for ResourceValue {
             }
             ResourceValue::Status(status) => {
                 status.to_string()
+            }
+            ResourceValue::Config(config) => {
+                config.to_string()
             }
         }
     }
@@ -253,6 +309,93 @@ impl <R> ResourceValues <R> {
           values: self.values
        }
   }
+}
+
+#[derive(Debug,Clone, Serialize, Deserialize)]
+pub struct ResourceRegistryPropertyAssignment {
+    pub resource: ResourceIdentifier,
+    pub property: ResourceRegistryProperty
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourcePropertyAssignment {
+    pub resource: ResourceIdentifier,
+    pub property: ResourceProperty
+}
+
+impl ToString for ResourcePropertyAssignment {
+    fn to_string(&self) -> String {
+        return format!( "{}::{}", self.resource.to_string(), self.property.to_string() )
+    }
+}
+
+impl TryInto<ResourceRegistryPropertyAssignment> for ResourcePropertyAssignment {
+    type Error = Error;
+
+    fn try_into(self) -> Result<ResourceRegistryPropertyAssignment, Self::Error> {
+        Ok(ResourceRegistryPropertyAssignment {
+            resource: self.resource,
+            property: self.property.try_into()?
+        })
+    }
+}
+
+impl FromStr for ResourcePropertyAssignment {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (leftover,result) = parse_resource_property_assignment(s)?;
+        if leftover.len() > 0 {
+            Err(format!("could not parse part of resource property assignment: '{}' unprocessed portion: '{}'", s,leftover ).into())
+        } else {
+           result
+        }
+    }
+}
+
+
+#[derive(Debug,Clone, Serialize, Deserialize)]
+pub enum ResourceProperty {
+  Registry(ResourceRegistryProperty)
+}
+
+#[derive(Debug,Clone, Serialize, Deserialize)]
+pub enum ResourceRegistryProperty {
+    Config(ConfigSrc)
+}
+
+impl ToString for ResourceProperty {
+    fn to_string(&self) -> String {
+        match self {
+            ResourceProperty::Registry(ResourceRegistryProperty::Config(_)) => {
+                return "config".to_string()
+            }
+        }
+    }
+}
+
+
+impl ResourceProperty {
+    pub fn is_registry_property(&self) -> bool {
+      match self {
+          ResourceProperty::Registry(_) => {
+              true
+          }
+      }
+    }
+}
+
+impl TryInto<ResourceRegistryProperty> for ResourceProperty {
+    type Error = Error;
+
+    fn try_into(self) -> Result<ResourceRegistryProperty, Self::Error> {
+        match self {
+            ResourceProperty::Registry(property) => {
+                Ok(property)
+            }
+        }
+    }
 }
 
 

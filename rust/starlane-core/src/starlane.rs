@@ -895,7 +895,6 @@ mod test {
     use std::str::FromStr;
     use std::sync::Arc;
 
-    use starlane_resources::ArtifactBundlePath;
     use tokio::runtime::Runtime;
     use tokio::sync::oneshot;
     use tokio::sync::oneshot::error::RecvError;
@@ -913,11 +912,9 @@ mod test {
     use starlane_resources::message::Fail;
     use crate::names::Name;
     use crate::permissions::Authentication;
-    use crate::resource::ArtifactBundleAddress;
     use crate::resource::{ResourceAddress};
     use crate::space::CreateAppControllerFail;
     use crate::star::{StarController, StarInfo, StarKey, StarKind};
-    use crate::starlane::api::SubSpaceApi;
     use crate::starlane::{
         ConstellationCreate, StarlaneApiRequest, StarlaneCommand, StarlaneMachine,
         StarlaneMachineRunner,
@@ -933,6 +930,7 @@ mod test {
     }
 
 
+    /*
     #[test]
     pub fn mechtron() {
 println!("Mechtron..");
@@ -961,7 +959,7 @@ println!("POST CREATE CONSTELLATION");
 
                 let starlane_api = starlane.get_starlane_api().await.unwrap();
 
-                let sub_space_api = starlane_api.get_sub_space( ResourceAddress::from_str("hyperspace:starlane<SubSpace>").unwrap() .into(), ) .await?;
+                let sub_space_api = starlane_api.get_space( ResourceAddress::from_str("space").unwrap() .into(), ) .await?;
 
                 {
                     let mut file =
@@ -1006,6 +1004,8 @@ println!("app created: {}", app_api.key().to_string() );
             }
         });
     }
+
+     */
 
     /*
     #[test]

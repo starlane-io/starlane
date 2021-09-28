@@ -797,6 +797,7 @@ fn kinds(parsed: &ResourceParser) -> TokenStream {
     resource_kind_from_parts
         .push_str("fn try_from( parts: ResourceKindParts ) -> Result<Self,Self::Error> { ");
     resource_kind_from_parts.push_str("match parts.resource_type.as_str() { ");
+    resource_kind_from_parts.push_str("\"Root\" => Ok(Self::Root),");
 
     let mut into_resource_kind_parts = String::new();
     into_resource_kind_parts.push_str("impl Into<ResourceKindParts> for ResourceKind {");

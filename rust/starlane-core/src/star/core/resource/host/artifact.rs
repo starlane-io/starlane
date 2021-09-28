@@ -13,7 +13,7 @@ use starlane_resources::{AssignKind, AssignResourceStateSrc, ResourceAssign, Res
 use starlane_resources::data::{BinSrc, DataSet};
 use starlane_resources::message::Fail;
 
-use crate::resource::ResourceKey;
+use crate::resource::{ResourceKey, ResourceType};
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
@@ -327,6 +327,10 @@ impl ArtifactBundleHost {
 
 #[async_trait]
 impl Host for ArtifactBundleHost {
+    fn resource_type(&self) -> ResourceType {
+        ResourceType::ArtifactBundle
+    }
+
     async fn assign(
         &self,
         assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,

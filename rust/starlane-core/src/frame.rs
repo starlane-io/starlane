@@ -18,7 +18,8 @@ use crate::message::resource::ActorMessage;
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey};
 use crate::watch::{Notification, Watch, WatchKey};
 use crate::resource::{ResourceId, ResourceRegistration, ResourceRecord, ResourceType, ResourceKey, ResourceSliceStatus,  UserKey, AppKey, ActorKey};
-use starlane_resources::property::ResourceValues;
+use starlane_resources::property::{ResourceValues, ResourceRegistryProperty, ResourceRegistryPropertyAssignment, ResourceRegistryPropertyValueSelector, ResourcePropertyOp};
+use starlane_resources::http::{HttpResponse, HttpRequest};
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum Frame {
@@ -334,11 +335,12 @@ impl StarMessage {
 pub enum StarMessagePayload {
     None,
     MessagePayload(MessagePayload),
-    ResourceManager(RegistryAction),
+    ResourceRegistry(ResourceRegistryRequest),
     ResourceHost(ResourceHostAction),
     Space(SpaceMessage),
     Reply(SimpleReply),
     UniqueId(ResourceId),
+    Select(ResourceSelector)
 }
 
 impl Debug for StarMessagePayload {
@@ -346,11 +348,12 @@ impl Debug for StarMessagePayload {
         f.write_str(match self {
             StarMessagePayload::None => "None",
             StarMessagePayload::MessagePayload(_) => "MessagePayload",
-            StarMessagePayload::ResourceManager(_) => "ResourceManager",
+            StarMessagePayload::ResourceRegistry(_) => "ResourceRegistry",
             StarMessagePayload::ResourceHost(_) => "ResourceHost",
             StarMessagePayload::Space(_) => "Space",
             StarMessagePayload::Reply(_) => "Reply",
             StarMessagePayload::UniqueId(_) => "UniqueId",
+            StarMessagePayload::Select(_) => "Select"
         });
         Ok(())
     }
@@ -361,6 +364,7 @@ pub enum MessagePayload {
     Request(Message<ResourceRequestMessage>),
     Response(MessageReply<ResourceResponseMessage>),
     PortRequest(Message<ResourcePortMessage>),
+    HttpRequest(Message<HttpRequest>),
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -371,7 +375,7 @@ pub enum ResourceHostAction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum RegistryAction {
+pub enum ResourceRegistryRequest {
     Register(ResourceRegistration),
     Location(ResourceRecord),
     Find(ResourceIdentifier),
@@ -380,16 +384,20 @@ pub enum RegistryAction {
         parent: ResourceIdentifier,
         child_type: ResourceType,
     },
+    Set(ResourceRegistryPropertyAssignment),
+    SelectValues(ResourcePropertyOp<ResourceRegistryPropertyValueSelector>)
 }
 
-impl ToString for RegistryAction {
+impl ToString for ResourceRegistryRequest {
     fn to_string(&self) -> String {
         match self {
-            RegistryAction::Register(_) => "Register".to_string(),
-            RegistryAction::Location(_) => "Location".to_string(),
-            RegistryAction::Find(_) => "Find".to_string(),
-            RegistryAction::Status(_) => "Status".to_string(),
-            RegistryAction::UniqueResourceId { .. } => "UniqueResourceId".to_string(),
+            ResourceRegistryRequest::Register(_) => "Register".to_string(),
+            ResourceRegistryRequest::Location(_) => "Location".to_string(),
+            ResourceRegistryRequest::Find(_) => "Find".to_string(),
+            ResourceRegistryRequest::Status(_) => "Status".to_string(),
+            ResourceRegistryRequest::UniqueResourceId { .. } => "UniqueResourceId".to_string(),
+            ResourceRegistryRequest::Set(_) => "Set".to_string(),
+            ResourceRegistryRequest::SelectValues(_) => "SelectValues".to_string()
         }
     }
 }
@@ -447,7 +455,8 @@ pub enum Reply {
     State(DataSet<BinSrc>),
     ResourceValues(ResourceValues<ResourceStub>),
     Seq(u64),
-    Port(DataSet<BinSrc>)
+    Port(DataSet<BinSrc>),
+    HttpResponse(HttpResponse)
 }
 
 #[derive(Clone, Eq, PartialEq, strum_macros::Display)]
@@ -462,7 +471,8 @@ pub enum ReplyKind {
     Seq,
     State,
     Port,
-    ResourceValues
+    ResourceValues,
+    HttpResponse
 }
 
 impl ReplyKind {
@@ -478,7 +488,8 @@ impl ReplyKind {
             Reply::Seq(_) => *self == Self::Seq,
             Reply::State(_) => *self == Self::State,
             Reply::Port(_) => *self == Self::Port,
-            Reply::ResourceValues(_) => *self == Self::ResourceValues
+            Reply::ResourceValues(_) => *self == Self::ResourceValues,
+            Reply::HttpResponse(_) => *self == Self::HttpResponse
         }
     }
 }
@@ -641,10 +652,11 @@ impl fmt::Display for StarMessagePayload {
             StarMessagePayload::None => "None".to_string(),
             StarMessagePayload::Space(_) => "Space".to_string(),
             StarMessagePayload::Reply(reply) => format!("Reply({})", reply.to_string()),
-            StarMessagePayload::ResourceManager(_) => "ResourceManager".to_string(),
+            StarMessagePayload::ResourceRegistry(_) => "ResourceManager".to_string(),
             StarMessagePayload::ResourceHost(_) => "ResourceHost".to_string(),
             StarMessagePayload::UniqueId(_) => "UniqueId".to_string(),
             StarMessagePayload::MessagePayload(_) => "MessagePayload".to_string(),
+            StarMessagePayload::Select(_) => "Select".to_string()
         };
         write!(f, "{}", r)
     }

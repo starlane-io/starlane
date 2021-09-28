@@ -21,18 +21,21 @@ use starlane_resources::message::Fail;
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
-use crate::frame::{Reply, ReplyKind, StarPattern, TraversalAction};
+use crate::frame::{Reply, ReplyKind, StarPattern, TraversalAction, ResourceRegistryRequest, StarMessagePayload};
 use crate::resource::{Path, ResourceKind, ResourceRecord, ResourceType, to_keyed_for_reasource_create, to_keyed_for_resource_selector};
 use crate::resource::file_system::FileSystemState;
 use crate::resource::FileKind;
 use crate::resource::ResourceKey;
 use crate::resource::user::UserState;
-use crate::star::{Request, StarCommand, StarKind, StarSkel};
-use crate::star::shell::search::SearchInit;
+use crate::star::{Request, StarCommand, StarKind, StarSkel, StarKey};
+use crate::star::shell::search::{SearchInit, SearchHits};
 use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
-use starlane_resources::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, ResourceValue, ResourceValueSelector, ResourceValues};
+use starlane_resources::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, ResourceValue, ResourceValueSelector, ResourceValues, ResourceProperty, ResourcePropertyAssignment, ResourceRegistryPropertyAssignment, ResourceHostPropertyValueSelector, ResourcePropertyOp};
 use crate::watch::{WatchResourceSelector, Watcher};
+use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
+use crate::artifact::ArtifactBundle;
+use starlane_resources::http::HttpRequest;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -43,27 +46,48 @@ pub struct StarlaneApi {
 impl StarlaneApi {
     pub async fn create_artifact_bundle(
         &self,
-        path: &ResourcePath,
+        bundle: ResourcePath,
         data: Arc<Vec<u8>>,
-    ) -> Result<ArtifactBundleApi, Error> {
-        let address: ResourcePath = path.clone().into();
+    ) -> Result<Creation<ArtifactBundleApi>, Error> {
 
-        let subspace_address = address
-            .parent()
-            .ok_or("expected parent")?;
-        let space_api = self.get_space(subspace_address.into()).await?;
+        let series = bundle.parent().ok_or("ArtifactBundle must have an ArtifactBundleSeries as a parent")?;
 
-        let mut creation = space_api
-            .create_artifact_bundle_versions(address.parent().unwrap().name().as_str())?;
-        creation.set_strategy(ResourceCreateStrategy::Ensure);
-        let artifact_bundle_versions_api = creation.submit().await?;
+        // first we have to be sure that ArtifactBundleSeries exists...
+        let mut series = self.create_artifact_bundle_series(series )?;
+        series.create.strategy = ResourceCreateStrategy::Ensure;
+        let series_api = series.submit().await?;
 
-        let version = semver::Version::from_str(address.name().as_str())?;
-        let mut creation = artifact_bundle_versions_api.create_artifact_bundle(version, data)?;
-        creation.set_strategy(ResourceCreateStrategy::Ensure);
-        creation.submit().await
+        let version = semver::Version::from_str(bundle.name().as_str())?;
+        series_api.create_artifact_bundle(version, data)
+    }
+
+    pub fn create_artifact_bundle_series(
+        &self,
+        path: ResourcePath,
+    ) -> Result<Creation<ArtifactBundleSeriesApi>, Error> {
+        let resource_src = AssignResourceStateSrc::Stateless;
+
+        let create = ResourceCreate {
+            parent: path.parent().ok_or("ArtifactBundleSeries must have a parent".to_string() )?.into(),
+            key: KeyCreationSrc::None,
+            address: AddressCreationSrc::Append(path.name().to_string()),
+            archetype: ResourceArchetype {
+                kind: ResourceKind::ArtifactBundleSeries,
+                specific: None,
+                config: ConfigSrc::None,
+            },
+            state_src: resource_src,
+            registry_info: None,
+            owner: None,
+            strategy: ResourceCreateStrategy::Create,
+            from: MessageFrom::Inject
+        };
+        Ok(Creation::new(self.clone(), create))
     }
 }
+
+
+
 
 impl StarlaneApi {
     pub fn new(surface_api: SurfaceApi) -> Self {
@@ -110,8 +134,22 @@ info!("received reply for {}",description);
             Err(format!("unexpected reply: {}", reply.to_string()).into())
         }
 
+    }
+
+    pub async fn send_http_message( &self, proto: ProtoMessage<HttpRequest>, expect: ReplyKind, description: &str ) -> Result<Reply,Error> {
+        let proto = proto.try_into()?;
+        info!("staring message exchange for {}",description);
+        let reply = self.surface_api.exchange(proto, expect, description ).await?;
+        info!("received reply for {}",description);
+
+        if ReplyKind::HttpResponse.is_match(&reply) {
+            Ok(reply)
+        } else {
+            Err(format!("unexpected reply: {}", reply.to_string()).into())
+        }
 
     }
+
 
 
     pub async fn timeout<T>(
@@ -196,6 +234,31 @@ info!("received reply for {}",description);
         }
     }
 
+
+    pub async fn select_from_star(
+        &self,
+        star: StarKey,
+        mut selector: ResourceSelector,
+    ) -> Result<Vec<ResourceRecord>, Error> {
+
+        // before sending
+        let selector = to_keyed_for_resource_selector(selector,self.clone()).await?;
+
+        let mut proto = ProtoStarMessage::new();
+        proto.to = ProtoStarMessageTo::Star(star);
+        proto.payload = StarMessagePayload::Select(selector);
+
+        let reply = self
+            .surface_api
+            .exchange(proto, ReplyKind::Records, "StarlaneApi: select_from_star()")
+            .await?;
+
+        match reply{
+            Reply::Records(records) => Ok(records),
+            _ => unimplemented!("StarlaneApi::select_from_star() did not receive the expected reply from surface_api")
+        }
+    }
+
     pub async fn select(
         &self,
         parent_resource: &ResourceIdentifier,
@@ -226,27 +289,99 @@ info!("received reply for {}",description);
     }
 
 
+    pub async fn set_property(
+        &self,
+        assignment: ResourcePropertyAssignment
+    ) -> Result<(), Error> {
+
+        if assignment.property.is_registry_property() {
+            let parent = assignment.resource.parent().ok_or("expected resource to have a parent")?;
+            let parent = self.fetch_resource_record(parent).await?;
+            let assignment:ResourceRegistryPropertyAssignment = assignment.try_into()?;
+            let mut proto = ProtoStarMessage::new();
+            proto.to = ProtoStarMessageTo::Star(parent.location.host);
+            proto.payload = StarMessagePayload::ResourceRegistry(ResourceRegistryRequest::Set(assignment));
+            let proto = proto.try_into()?;
+
+            let reply = self
+                .surface_api
+                .exchange(proto, ReplyKind::Empty, "StarlaneApi: set_property")
+                .await?;
+
+            match reply{
+                Reply::Empty => Ok(()),
+                _ => unimplemented!("StarlaneApi::set_property() did not receive the expected reply from surface_api")
+            }
+        } else {
+            Err(format!("not sure how to handle property: {}", assignment.property.to_string()).into() )
+        }
+
+
+
+
+    }
+
+    pub async fn star_search(
+        &self,
+        star_pattern: StarPattern
+    ) -> Result<SearchHits, Error> {
+
+        let hits = self.surface_api.star_search(star_pattern).await?;
+        Ok(hits)
+    }
+
+
+
+
     pub async fn select_values(
         &self,
         path: ResourcePath,
         selector: ResourcePropertyValueSelector
     ) -> Result<ResourceValues<ResourceStub>, Error> {
 
-        let mut proto = ProtoMessage::new();
-        proto.to(path.into());
-        proto.from(MessageFrom::Inject);
-        proto.payload = Option::Some(ResourceRequestMessage::SelectValues(selector));
-        let proto = proto.try_into()?;
+        match selector {
+            ResourcePropertyValueSelector::Registry(selector) => {
 
-        let reply = self
-            .surface_api
-            .exchange(proto, ReplyKind::ResourceValues, "StarlaneApi: select_values ")
-            .await?;
+                let parent = path.parent().ok_or("expected resource to have a parent")?;
+                let parent = self.fetch_resource_record(parent.into() ).await?;
+                let op = ResourcePropertyOp{
+                    resource: path.into(),
+                    property: selector
+                };
+                let mut proto = ProtoStarMessage::new();
+                proto.to = ProtoStarMessageTo::Star(parent.location.host);
+                proto.payload = StarMessagePayload::ResourceRegistry(ResourceRegistryRequest::SelectValues(op));
 
-        match reply{
-            Reply::ResourceValues(values) => Ok(values),
-            _ => unimplemented!("StarlaneApi::select_values() did not receive the expected reply from surface_api")
+                let reply = self
+                    .surface_api
+                    .exchange(proto, ReplyKind::ResourceValues, "StarlaneApi: select_values ")
+                    .await?;
+
+                match reply{
+                    Reply::ResourceValues(values) => Ok(values),
+                    _ => unimplemented!("StarlaneApi::select_values() did not receive the expected reply from surface_api")
+                }
+            }
+            ResourcePropertyValueSelector::Host(selector) => {
+                let mut proto = ProtoMessage::new();
+                proto.to(path.into());
+                proto.from(MessageFrom::Inject);
+                proto.payload = Option::Some(ResourceRequestMessage::SelectValues(selector));
+                let proto = proto.try_into()?;
+
+                let reply = self
+                    .surface_api
+                    .exchange(proto, ReplyKind::ResourceValues, "StarlaneApi: select_values ")
+                    .await?;
+
+                match reply{
+                    Reply::ResourceValues(values) => Ok(values),
+                    _ => unimplemented!("StarlaneApi::select_values() did not receive the expected reply from surface_api")
+                }
+            }
         }
+
+
     }
 
 
@@ -311,7 +446,7 @@ info!("received reply for {}",description);
         let surface_api = self.surface_api.clone();
 
             let mut proto = ProtoMessage::new();
-            let selector = ResourcePropertyValueSelector::State{
+            let selector = ResourceHostPropertyValueSelector::State{
                 aspect: DataSetAspectSelector::All,
                 field: FieldValueSelector::All
             };
@@ -328,7 +463,7 @@ info!("received reply for {}",description);
                 .await;
             match result {
                 Ok(Reply::ResourceValues(values)) => {
-                   let state = values.values.get(&selector ).ok_or("expected state value")?.clone();
+                   let state = values.values.get(&(selector.clone().into()) ).ok_or("expected state value")?.clone();
                    match state {
                        ResourceValue::DataSet(state) => {
                            Ok(state)
@@ -357,7 +492,7 @@ info!("received reply for {}",description);
             archetype: ResourceArchetype {
                 kind: ResourceKind::Space,
                 specific: None,
-                config: None,
+                config: ConfigSrc::None,
             },
             state_src: state,
             registry_info: None,
@@ -424,7 +559,7 @@ impl SpaceApi {
             archetype: ResourceArchetype {
                 kind: ResourceKind::User,
                 specific: None,
-                config: None,
+                config: ConfigSrc::None,
             },
             state_src: resource_src,
             registry_info: None,
@@ -445,7 +580,7 @@ impl SpaceApi {
             archetype: ResourceArchetype {
                 kind: ResourceKind::App,
                 specific: None,
-                config: Option::Some(ConfigSrc::Artifact(app_config)),
+                config: ConfigSrc::Artifact(app_config),
             },
             state_src: resource_src,
             registry_info: None,
@@ -466,7 +601,7 @@ impl SpaceApi {
             archetype: ResourceArchetype {
                 kind: ResourceKind::FileSystem,
                 specific: None,
-                config: None,
+                config: ConfigSrc::None,
             },
             state_src: resource_src,
             registry_info: None,
@@ -477,29 +612,7 @@ impl SpaceApi {
         Ok(Creation::new(self.starlane_api(), create))
     }
 
-    pub fn create_artifact_bundle_versions(
-        &self,
-        name: &str,
-    ) -> Result<Creation<ArtifactBundleSeriesApi>, Error> {
-        let resource_src = AssignResourceStateSrc::Stateless;
 
-        let create = ResourceCreate {
-            parent: self.stub.key.clone().into(),
-            key: KeyCreationSrc::None,
-            address: AddressCreationSrc::Append(name.to_string()),
-            archetype: ResourceArchetype {
-                kind: ResourceKind::ArtifactBundleSeries,
-                specific: None,
-                config: None,
-            },
-            state_src: resource_src,
-            registry_info: None,
-            owner: None,
-            strategy: ResourceCreateStrategy::Create,
-            from: MessageFrom::Inject
-        };
-        Ok(Creation::new(self.starlane_api(), create))
-    }
 }
 
 
@@ -548,7 +661,7 @@ impl AppApi {
             archetype: ResourceArchetype {
                 kind: ResourceKind::Mechtron,
                 specific: None,
-                config: Option::Some(ConfigSrc::Artifact(config)),
+                config: ConfigSrc::Artifact(config),
             },
             state_src: resource_src,
             registry_info: None,
@@ -667,7 +780,7 @@ impl FileSystemApi {
             archetype: ResourceArchetype {
                 kind: ResourceKind::File(FileKind::File),
                 specific: None,
-                config: None,
+                config: ConfigSrc::None,
             },
             state_src: resource_src,
             registry_info: None,
@@ -740,7 +853,7 @@ impl ArtifactBundleSeriesApi {
         &self,
         version: Version,
         data: Arc<Vec<u8>>,
-    ) -> Result<Creation<ArtifactBundleApi>, Fail> {
+    ) -> Result<Creation<ArtifactBundleApi>, Error> {
         let content = BinSrc::Memory(data);
         let mut state: DataSet<BinSrc> = DataSet::new();
         state.insert("zip".to_string(), content);
@@ -756,7 +869,7 @@ impl ArtifactBundleSeriesApi {
             archetype: ResourceArchetype {
                 kind: ResourceKind::ArtifactBundle,
                 specific: None,
-                config: None,
+                config: ConfigSrc::None,
             },
             state_src: resource_src,
             registry_info: None,

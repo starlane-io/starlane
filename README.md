@@ -2,86 +2,184 @@
 Starlane is a RESOURCE MESH which can also execute client and server side WebAssembly. You can read more about what Starlane is and what it does on Starlane's [about page](http://starlane.io/about/).
 
 ## A WORK IN PROGRESS 
-Right now Starlane is little more that a toy since there is no way to connect an external service to it--althought that is being worked on and will be availble next.  For now you can do the following with Starlane: 
+Starlane is a work in progress and not ready for production yet, however it is ready for community feedback.
 
-* Run a local Starlane server instance
-* Connect to the server instance via the Starline CLI
-* Create a FileSystem
-* Upload and/or download a File
-* Watch a file for changes
 
 ## GETTING STARTED
-To build starlane you will need to have rust and make installed.  Follow the official Rust instructions to [install Rust](https://www.rust-lang.org/tools/install).
 
+### INSTALL RUST
+To build starlane you will need to have **rust** and **make** installed.  Follow the official Rust instructions to [install Rust](https://www.rust-lang.org/tools/install).
+
+### MAKE
 You will need **Make** installed to execute the Makefile.  Sorry, you will have to figure that out yourself!
 
-## INSTALLING
-to install Starlane run this in the directory where you checked out this repository:
+### WASM PACK
+In order to build executable WebAssembly components knowns as Mechtrons, you will need to install wasm-pack.  Follow the [wasm-pack installation instructions](https://rustwasm.github.io/wasm-pack/installer/) for your platform. 
+
+
+## INSTALLING STARLANE
+To install Starlane run this in the directory where you checked out this repository:
 
 ```bash
 make install
 ```
 
-## RUNNING
-So here's the fun part when you actually get to play with Starlane.  
+## RUN THE EXAMPLE
+The following is a simple runnable example that illustrates the basic utility of Starlane.  
 
-Let's run it in the same directory where you checked out the Starlane source code.  (NOTE: when the starlane server runs, it will automatically create a new local directory called 'data' You can delete this directory after it is finished running.)
+NOTE: The following example works most of the time, however, about 1 out of every 20 runs Starlane has an initialization failure causing the example to break.  If you notice a problem, maybe try rerunning the example from the start.
 
-Start a Starlane server instance:
+### START A STARLANE SERVER INSTANCE
+Open a terminal and run the following command to start a server instance of Starlane:
 
 ```bash
 starlane serve
 ```
 
-The command should appear to do nothing (no output is printed, it's just waiting for connections.)
+At this point starlane should be serving a Http Server on port 8080.  Open a browser and point it to [http://localhost:8080/](http://localhost:8080/).  You should see a "Welcome" message that also indicates that the 'localhost' space has not yet been created.
 
-Next, we create a new FileSystem under the default space called creatively 'space'.  You must open up a brand new terminal so as not to terminate the running starlane server.  In your new terminal run:
+### CREATE LOCALHOST SPACE
+Next we need to create the localhost space.  There is a one to one relationshib between the hostname and space.
 
-```bash
-starlane create "space:myfiles<FileSystem>"
-```
-
-It should print some output and exit.  Notice we pass the name we want 'myfiles' and the type "FileSystem".
-
-Let's check to see if that FileSystem was actually created by listing the contents of 'space':
+Open a NEW terminal (since your previous terminal is still running the starlane server.)
 
 ```bash
-starlane ls space
+starlane create "localhost<Space>"
 ```
 
-You should expect to see that space has one child resource, the FileSystem you just created.
+You can see that we are naming the resource 'localhost' and we use the <> delimeters to indicate which type we want to create. 
 
-Okay, now how about uploading a file!  Since you are in the repository directory lets upload this very README.md file:
+Now refresh your browser pointed to [http://localhost:8080/](http://localhost:8080/)
+
+You should see a new message reading "The 'localhost' Space is there, but it doesn't have a router config assigned yet."
+
+### CREATE A FILESYSTEM
+We want a place where we can upload and serve files, so let's provision a filesystem:
 
 ```bash
-starlane cp README.md "space:myfiles:/README.md"
+starlane create "localhost:my-files<FileSystem>"
 ```
 
-So that is the 'cp' command or copy command.  You can also download files in the way you would expect:
+You can see we are creating a filesystem which is a child resource of 'localhost' called 'my-files' and again we pass the type as <FileSystem>.
+
+### UPLOAD A FILE
+Let's upload a file (which will serve as our entire website)  from the example directory we want to upload 'example/websites/simple-site1/index.html''
+
+IMPORTANT: you MUST run this command from the directory where you checked out the starlane git respository
 
 ```bash
-starlane cp "space:myfiles:/README.md" README.md.copy
+starlane cp expample/websites/simple-site1/index.html "localhost:my-files:/index.html"
 ```
 
-Now we have come to the fun part and the part that makes Starlane really special.  Let's Watch the file for changes.  To do so we run:
+Here you can see we are uploading file index.html to a File newly created File resource which is a child of the FileSystem 'my-files.'
+
+### ROUTER CONFIG
+Before we go on to the next step lets take a moment to look at the router config we want to apply to our localhost.
+
+Here are the contents of example/localhost-config/routes.conf
+
+```
+GET /files/(.*) -> localhost:my-files:/$1;
+GET /app/ -> localhost:my-app:main;
+```
+
+Let's take a look at the first directive `GET /files/(.*) -> localhost:my-files:/$1;`   This is telling the router to take any GET request whose path matches the regex pattern ``` /files/(.*)  ``` Keen regex experts will notice that the parenthesis is a regex capture. 
+
+The -> points to the starlane resource address to route the request, and this is where the regex captures are used, the $1 takes the value from the capture and appends it to the resource path.
+
+### PUBLISHING AN ARTIFACT
+Now we need to get the routes.conf into starlane so the router can actually use it.
+
+To do so we need to publish an artifact bundle.  An artifact bundle is a versioned zip file containing configurations and assets.
+
+So let's publish version 1.0.0 of our resource bundle by running this command:
+
+```bash 
+starlane publish ./example/localhost-config "localhost:config:1.0.0"
+``` 
+
+notice that 'config' is the artifact bundle series name and version 1.0.0 is the version. 
+
+### BINDING THE CONFIG TO LOCALHOST
+For the filesystem to be accessable by the Http server the router config must be bound to the localhost space.
+
+```bash 
+starlane set "localhost::config=localhost:config:1.0.0:/routes.conf"
+```
+
+Refresh the browser pointed at [http://localhost:8080/](http://localhost:8080/).  Now you should see a message saying 'CONFIGURED' indicating that localhost is configured. 
+
+And now the fun part:  change your browser location to [http://localhost:8080/files/index.html](http://localhost:8080/files/index.html) And you should see a message saying "SOMETHING DIFFERENT" which is the entire simple-site1 webiste.  
+
+You have now served your first static file resource from Starlane.
+
+### AN APP AND A MECHTRON
+Static files are fun but you can't do much with them because they are static.  Starlane has another type of resource called a Mechtron which is a framework for executing client and server side WebAssembly. 
+
+In Starlane an App resource is composed of Mechtrons which can handle http requests, access other resources and message other mechtrons.  
+
+Let's build and deploy an App composed of a single Mechtron and serve some mechtron content on our webserver.
+
+### BUILDING THE MECHTRON
+It's beyond the scope of this guide to explain how to create a Mechtron, so we are going to build and deploy a preexisting example located in example/app
+
+
+Run the Makefile:
 
 ```bash
-starlane watch "space:myfiles:/README.md"
+cd example/app
+make all
+cd ../..
 ```
 
-And like when we ran the server we sacrifice this terminal as it now is just listening for changes.  
-
-To test watch open up a new terminal and run:
+### PUBLISH THE APP AND MECHTRON ARTIFACT BUNDLE
+The build process creates a Wasm file and lays out the configuration files in a directory called 'example/app/bundle'  Next we will publish that bundle so it can be referenced by our app:
 
 ```bash
-starlane cp README.md "space:myfiles:/README.md"
+starlane publish example/app/bundle "localhost:app-config:1.0.0"
 ```
 
-Of course the file is already there, but it will be written to again and will therefore trigger a state change event.
+### CREATE THE APP
+Finally we will create our App which by configuration references the mechtron we just built.  
 
-If you observe the watching terminal you should see that it prints out a message: **received notification: State**
+```bash
+starlane create "localhost:my-app<App>" "localhost:app-config:1.0.0:/app/my-app.yaml"
+```
 
-And that's all Starlane does so far.  Stay tuned for the next release when you can connect external services and receive change events when your files change... then Starlane may actually be useful!
+Here we have created an App resource called my-app using the usual syntax, but additionally we have passed a reference to "ocalhost:app-config:1.0.0:/app/my-app.yaml" which is the configuration artifact for the app which we just published.
+
+A little reminder, the second line in the routes.conf file looked like this: 
+```
+GET /app/ -> localhost:my-app:main;
+```
+
+Which  was telling the router to take the /app/ path and route it's request to the 'main' mechtron of 'my-app'
+
+So let's see it!  Point your browser to [http://localhost:8080/app/](http://localhost:8080/app/)
+
+You should see a very different looking webpage saying 'MECHTRON' with the footer saying "This page was served by a Mechtron."
+
+### MORE TO COME
+Congratulations! You have just deployed a static website and a dynamic mechtron in Starlane.
+
+Stay tuned for more features and better examples of dynamic Mechtrons that can interact with eachother..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

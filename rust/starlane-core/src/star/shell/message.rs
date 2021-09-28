@@ -151,6 +151,7 @@ impl MessagingComponent {
                         }
                     }
                     StarMessagePayload::Reply(SimpleReply::Fail(fail)) => Err(fail.into()),
+
                     _ => {
                         error!(
                             "unexpected response for message exchange with description: {}",
@@ -253,7 +254,7 @@ impl MessagingComponent {
                             return;
                         }
                     };
-                    record.location.star
+                    record.location.host
                 }
                 ProtoStarMessageTo::Star(star) => star.clone(),
             };

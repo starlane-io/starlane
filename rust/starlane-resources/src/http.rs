@@ -5,6 +5,7 @@ use crate::error::Error;
 use serde::{Serialize,Deserialize};
 use std::convert::{TryInto, TryFrom};
 use std::sync::Arc;
+use crate::DomainCase;
 
 pub type Headers = HashMap<String,String>;
 
@@ -13,7 +14,17 @@ pub type Headers = HashMap<String,String>;
 pub struct HttpResponse{
     pub status: usize,
     pub headers: Headers,
-    pub body: BinSrc
+    pub body: Option<BinSrc>
+}
+
+impl HttpResponse {
+    pub fn new( ) -> HttpResponse {
+        Self {
+            status: 200,
+            headers: Headers::new(),
+            body: Option::None
+        }
+    }
 }
 
 
@@ -45,6 +56,17 @@ pub struct HttpRequest{
    pub body: BinSrc
 }
 
+impl HttpRequest {
+    pub fn with_path(self, path: String) -> Self {
+        HttpRequest{
+            path,
+            method: self.method,
+            headers: self.headers,
+            body: self.body
+        }
+    }
+}
+
 impl TryInto<BinSrc> for HttpRequest {
     type Error = Error;
 
@@ -65,7 +87,7 @@ impl TryFrom<BinSrc> for HttpRequest {
     }
 }
 
-#[derive(Debug,Clone,Serialize,Deserialize)]
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
 pub enum HttpMethod {
     Get,
     Put,

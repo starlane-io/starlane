@@ -5,7 +5,7 @@ use std::thread;
 
 use url::Url;
 
-use crate::resource::ResourceAddress;
+use crate::resource::{ResourceAddress};
 use crate::star::{StarSkel};
 use crate::starlane::api::{StarlaneApi, StarlaneApiRelay};
 use tokio::sync::{oneshot, mpsc};
@@ -22,8 +22,19 @@ use starlane_resources::data::{BinSrc, DataSet};
 use std::sync::Arc;
 use starlane_resources::message::{ProtoMessage, ResourcePortMessage,MessageFrom};
 use std::convert::TryInto;
-use crate::frame::Reply;
-use starlane_resources::ResourcePath;
+use crate::frame::{Reply, ReplyKind};
+use starlane_resources::{ResourcePath, ResourceStub, ConfigSrc,ArtifactKind};
+use crate::parse::parse_host;
+use handlebars::Handlebars;
+use serde_json::json;
+use starlane_resources::property::{ResourcePropertyValueSelector, ResourceRegistryPropertyValueSelector, ResourceValue, ResourceValues};
+use std::future::Future;
+use nom::AsBytes;
+use crate::artifact::ArtifactRef;
+use crate::cache::ArtifactItem;
+use crate::config::http_router::HttpRouterConfig;
+use crate::html::HTML;
+use regex::Regex;
 
 
 pub struct WebVariant {
@@ -59,13 +70,13 @@ impl WebVariant {
     fn init(&self, tx: tokio::sync::oneshot::Sender<Result<(), crate::error::Error>>) {
         let api = StarlaneApi::new(self.skel.surface_api.clone());
 
-        start(api);
+        start(api,self.skel.clone());
 
         tx.send(Ok(())).unwrap_or_default();
     }
 }
 
-fn start(api: StarlaneApi) {
+fn start(api: StarlaneApi,skel: StarSkel) {
     thread::spawn(move || {
 
         let runtime = Runtime::new().unwrap();
@@ -75,14 +86,18 @@ fn start(api: StarlaneApi) {
                 Ok(std_listener) => {
                     let listener = TcpListener::from_std(std_listener).unwrap();
                     while let Ok((mut stream, _)) = listener.accept().await {
-                        match process_request(stream, api.clone()).await {
-                            Ok(_) => {
-                                info!("ok");
+                        let api = api.clone();
+                        let skel = skel.clone();
+                        tokio::spawn( async move {
+                            match process_request(stream, api.clone(),skel).await {
+                                Ok(_) => {
+                                    info!("ok");
+                                }
+                                Err(error) => {
+                                    error!("{}",error);
+                                }
                             }
-                            Err(error) => {
-                                error!("{}",error);
-                            }
-                        }
+                        });
                     }
                 }
                 Err(error) => {
@@ -93,7 +108,7 @@ fn start(api: StarlaneApi) {
     });
 }
 
-async fn process_request( mut stream: TcpStream, api: StarlaneApi ) -> Result<(),Error>{
+async fn process_request( mut stream: TcpStream, api: StarlaneApi, skel: StarSkel ) -> Result<(),Error>{
     info!("received HTTP Stream...");
 
     let mut request_buf: Vec<u8> = vec![];
@@ -104,12 +119,12 @@ async fn process_request( mut stream: TcpStream, api: StarlaneApi ) -> Result<()
             Ok(size) => request_buf.extend(&buf[0..size]),
             Err(_) => {} // handle err,
         }
+println!("ok...");
         let mut headers = [httparse::EMPTY_HEADER; 16];
         let mut req = Request::new(&mut headers);
         if let Ok(status) = req.parse(&request_buf) {
 
             if status.is_complete() {
-                info!("path is {}", req.path.expect("expected path "));
 
                 let mut http_headers = Headers::new();
                 for header in req.headers {
@@ -119,7 +134,6 @@ async fn process_request( mut stream: TcpStream, api: StarlaneApi ) -> Result<()
                 let method = HttpMethod::from_str(req.method.expect("expected method"))?;
 
                 let body_offset = status.unwrap();
-info!("body offset: {}", body_offset);
                 let mut body:Vec<u8> = vec![];
                 for index in body_offset..request_buf.len() {
                     body.push( request_buf.get(index).unwrap().clone() );
@@ -132,55 +146,204 @@ info!("body offset: {}", body_offset);
                     headers: http_headers,
                     body
                 };
+            } else {
+                println!("incomplete parse... ");
             }
         }
     };
 
-    info!("PATH: {}",request.path);
-    info!("method: {}",request.method.to_string() );
-    info!("headers: {}",request.headers.len());
+    match create_response(request,api,skel).await {
+        Ok(response) => {
+            stream.write(format!("HTTP/1.1 {} OK\r\n\r\n",response.status).as_bytes() ).await?;
 
-    for (k,v) in &request.headers {
-        info!("... header {}={}", k,v );
-    }
-
-    let mut payload = DataSet::new();
-    payload.insert("request".to_string(), request.try_into()? );
-
-
-    let mut proto = ProtoMessage::new();
-    proto.to = Option::Some(ResourcePath::from_str("hyperspace:starlane:appy:main")?.into());
-    proto.from = Option::Some(MessageFrom::Inject);
-    proto.payload = Option::Some(ResourcePortMessage {
-        port: "web".to_string(),
-        payload
-    });
-
-    proto.validate()?;
-    let message = proto.create()?;
-
-    info!("SENDING MESSAGE");
-
-    let reply = api.send(message, "sending http request").await?;
-
-    info!("Received Reply!");
-    if let Reply::Port(payload) = reply {
-        let response = payload.get("response").cloned().ok_or("expected 'response'")?;
-        let response : HttpResponse = response.try_into()?;
-
-        match response.body {
-            BinSrc::Memory(bin) => {
-                stream.write( bin.as_slice() ).await?;
-                return Ok(());
+            match response.body.unwrap() {
+                BinSrc::Memory(body) => {
+                    stream.write( body.as_bytes() ).await?;
+                }
             }
         }
-
+        Err(e) => {
+eprintln!("ERROR: {}", e.to_string() );
+            error_response(stream, 500, "Internal Server Error").await;
+        }
     }
-
-    stream.write(b"ERROR").await?;
 
     Ok(())
 }
 
+async fn error_response( mut stream: TcpStream, code: usize, message: &str)  {
+    stream.write(format!("HTTP/1.1 {} OK\r\n\r\n",code).as_bytes() ).await.unwrap();
+    let messages = json!({"title": code, "message":message});
+    stream.write(HTML.render("error-code-page", &messages ).unwrap().as_bytes() ).await.unwrap();
+}
+
+async fn create_response( request: HttpRequest, api: StarlaneApi, skel: StarSkel ) -> Result<HttpResponse,Error> {
+
+    let (_,host) = parse_host(request.headers.get("Host").ok_or("Missing HOST")?.as_str())?;
+
+    // first thing we do is try to get a configuration for localhost
+    let selector = ResourcePropertyValueSelector::Registry( ResourceRegistryPropertyValueSelector::Config );
+    let path = ResourcePath::from_str(host)?;
+println!("SENDING FOR VALUES...");
+    let values = api.select_values( path, selector.clone() ).await;
+
+    let values = match values {
+        Ok(values) => {values}
+        Err(fail) => {
+            let mut response = HttpResponse::new();
+            response.status = 404;
+            let error = format!("It looks like you have just installed Starlane and haven't created a space for the '{}' host yet.", host);
+            let messages = json!({"title": "WELCOME", "message": error});
+            response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
+            return Ok(response);
+        }
+    };
+println!("RECEIVED VALUES...");
+    match values.values.get(&selector) {
+        None => {
+            let mut response = HttpResponse::new();
+            response.status = 404;
+            let error = format!("proxy configuration not found for host: '{}'", host);
+            let messages = json!({"title": response.status, "message": error});
+            response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
+            Ok(response)
+        }
+        Some(value) => {
+            if let ResourceValue::Config(config) = value {
+                match config {
+                    ConfigSrc::None => {
+                        let mut response = HttpResponse::new();
+                        response.status = 404;
+                        let error = format!("The '{}' Space is there, but it doesn't have a router config assigned yet.", host);
+                        let messages = json!({"title": host, "message": error});
+                        response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
+                        Ok(response)
+                    }
+                    ConfigSrc::Artifact(artifact) => {
 
 
+                        let factory = skel.machine.get_proto_artifact_caches_factory().await?;
+                        let mut caches = factory.create();
+
+                        let artifact_ref = ArtifactRef {
+                            path: artifact.clone(),
+                            kind: ArtifactKind::HttpRouter
+                        };
+
+                        if let Result::Err(err) = caches.cache(vec![artifact_ref] ).await {
+eprintln!("Error: {}",err.to_string());
+
+                            let mut response = HttpResponse::new();
+                            response.status = 404;
+                            let error = format!("could not cache router config: '{}' Are you sure it's there?", artifact.to_string() );
+                            let messages = json!({"title": "404", "message": error});
+                            response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
+
+                            return Ok(response)
+                        }
+                        let caches = caches.to_caches().await?;
+                        let config = match caches.http_router_config.get(artifact) {
+                            None => {
+                                let mut response = HttpResponse::new();
+                                response.status = 404;
+                                let error = format!("cannot locate router config: '{}'", artifact.to_string() );
+                                let messages = json!({"title": "404", "message": error});
+                                response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
+                                return Ok(response)
+                            }
+                            Some(config) => {
+                                config
+                            }
+                        };
+
+
+                        for mapping in &config.mappings {
+
+
+                            if mapping.path_pattern.is_match(request.path.as_str() ) {
+
+
+                                let resource = mapping.path_pattern.replace( request.path.as_str(), mapping.resource_pattern.as_str()  ).to_string();
+                                let resource = ResourcePath::from_str(resource.as_str() )?;
+
+                                let mut proto = ProtoMessage::new();
+                                proto.payload( request.clone() );
+                                proto.to( resource.into() ) ;
+                                proto.from(MessageFrom::Inject);
+                                match api.send_http_message(proto, ReplyKind::HttpResponse, "sending an HttpRequest").await {
+                                    Ok(reply) => {
+                                        if let Reply::HttpResponse(response ) = reply {
+                                            return Ok(response)
+                                        } else {
+                                           return Err("unexpected reply".into() );
+                                        }
+                                    }
+                                    Err(error) => {
+                                        let mut response = HttpResponse::new();
+                                        response.status = 404;
+                                        let error = "NOT FOUND".to_string();
+                                        let messages = json!({"title": "404", "message": error});
+                                        response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages)?.as_bytes().to_vec())));
+                                        return Ok(response);
+                                    }
+                                }
+                            }
+                        }
+
+
+                        let mut response = HttpResponse::new();
+                        response.status = 200;
+                        let error = format!("Host: '{}' is using router config: '{}'", host, artifact.to_string());
+                        let messages = json!({"title": "CONFIGURED", "message": error});
+                        response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages)?.as_bytes().to_vec())));
+                        Ok(response)
+                    }
+                }
+
+            } else {
+                let mut response = HttpResponse::new();
+                response.status = 500;
+                let error = format!("received an unexpected value when trying to get router config");
+                let messages = json!({"title": "500", "message": error});
+                response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
+                Ok(response)
+            }
+        }
+    }
+
+
+
+}
+
+
+
+mod tests {
+
+}
+#[cfg(test)]
+mod test {
+    use crate::error::Error;
+    use regex::Regex;
+
+    #[test]
+    pub fn path_regex() -> Result<(),Error> {
+        let regex = Regex::new("/files/")?;
+        assert!(regex.is_match("/files/"));
+
+
+        let regex = Regex::new("/files/.*")?;
+        assert!(regex.is_match("/files/"));
+
+        let regex = Regex::new("/files/(.*)")?;
+        assert!(regex.is_match("/files/some-path"));
+        assert_eq!("/some-path".to_string(),regex.replace("/files/some-path", "/$1").to_string());
+
+
+        let regex = Regex::new("/files/(.*)")?;
+        assert!(regex.is_match("/files/some/path.html"));
+        assert_eq!("/some/path.html".to_string(),regex.replace("/files/some/path.html", "/$1").to_string());
+
+
+        Ok(())
+    }
+}

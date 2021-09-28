@@ -49,10 +49,18 @@ where
     }
 }
 
+impl<M> Into<StarMessage> for Delivery<M> where
+    M: Clone + Send + Sync + 'static{
+    fn into(self) -> StarMessage {
+        self.star_message
+    }
+}
+
 impl<M> Delivery<M>
 where
     M: Clone + Send + Sync + 'static,
 {
+
     pub fn result(&self, result: Result<Reply, Fail>) {
         match result {
             Ok(reply) => {

@@ -9,10 +9,10 @@ use lru::LruCache;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
-use starlane_resources::{ResourceArchetype, ResourceIdentifier, ResourceStub, ResourcePath};
+use starlane_resources::{ResourceArchetype, ResourceIdentifier, ResourceStub, ResourcePath, ConfigSrc};
 use starlane_resources::message::Fail;
 
-use crate::frame::{RegistryAction, Reply, ReplyKind, SimpleReply, StarMessagePayload};
+use crate::frame::{ResourceRegistryRequest, Reply, ReplyKind, SimpleReply, StarMessagePayload};
 use crate::message::ProtoStarMessage;
 use crate::resource::{ResourceAddress, ResourceKey, ResourceKind, ResourceRecord, ResourceType};
 use crate::star::{
@@ -58,7 +58,6 @@ impl ResourceLocatorApi {
             .await
             .unwrap_or_default();
 
-        //Ok(tokio::time::timeout( Duration::from_secs(15), rx).await???)
         let rtn = tokio::time::timeout(Duration::from_secs(15), rx).await???;
         Ok(rtn)
     }
@@ -217,7 +216,7 @@ impl ResourceLocatorComponent {
                             .await,
                     )?;
                     let rtn = locator_api
-                        .external_locate(identifier, parent_record.location.star)
+                        .external_locate(identifier, parent_record.location.host)
                         .await?;
 
                     Ok(rtn)
@@ -234,7 +233,7 @@ impl ResourceLocatorComponent {
                     archetype: ResourceArchetype {
                         kind: ResourceKind::Root,
                         specific: None,
-                        config: None,
+                        config: ConfigSrc::None,
                     },
                     owner: None,
                 },
@@ -295,7 +294,7 @@ impl ResourceLocatorComponent {
         let (identifier, star) = locate.payload.clone();
         let mut proto = ProtoStarMessage::new();
         proto.to = star.clone().into();
-        proto.payload = StarMessagePayload::ResourceManager(RegistryAction::Find(identifier));
+        proto.payload = StarMessagePayload::ResourceRegistry(ResourceRegistryRequest::Find(identifier));
         proto.log = locate.log;
         let skel = self.skel.clone();
         tokio::spawn(async move {

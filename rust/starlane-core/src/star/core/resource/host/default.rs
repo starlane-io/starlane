@@ -3,7 +3,7 @@ use starlane_resources::data::{BinSrc, DataSet};
 use starlane_resources::message::Fail;
 
 use crate::error::Error;
-use crate::resource::ResourceKey;
+use crate::resource::{ResourceKey, ResourceType};
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
@@ -14,19 +14,26 @@ use std::collections::HashMap;
 pub struct StatelessHost {
     skel: StarSkel,
     store: StateStore,
+    resource_type: ResourceType
 }
 
 impl StatelessHost {
-    pub async fn new(skel: StarSkel) -> Self {
+    pub async fn new(skel: StarSkel, resource_type: ResourceType ) -> Self {
         StatelessHost {
             skel: skel.clone(),
             store: StateStore::new(skel).await,
+            resource_type
         }
     }
 }
 
 #[async_trait]
 impl Host for StatelessHost {
+
+    fn resource_type(&self) -> ResourceType {
+        self.resource_type.clone()
+    }
+
 
     async fn assign(
         &self,
