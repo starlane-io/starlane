@@ -6,13 +6,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/../docs/content/docs.md" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/content/docs.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../docs/static/css/common.css" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/static/css/common.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../docs/static/css/home.css" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/static/css/home.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../docs/static/css/style.css" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/static/css/style.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../docs/content/about.md" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/content/about.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../docs/themes/starlane/layouts/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/themes/starlane/layouts/index.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../docs/themes/starlane/layouts/partials/footer.html" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/themes/starlane/layouts/partials/footer.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../docs/themes/starlane/layouts/partials/header.html" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/themes/starlane/layouts/partials/header.html" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -230,7 +225,7 @@
       <workItem from="1630446426365" duration="31484000" />
       <workItem from="1631559262142" duration="147604000" />
       <workItem from="1632540389238" duration="23913000" />
-      <workItem from="1632628868278" duration="10641000" />
+      <workItem from="1632628868278" duration="11480000" />
     </task>
     <servers />
   </component>
