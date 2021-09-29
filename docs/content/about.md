@@ -1,133 +1,65 @@
 # ABOUT STARLANE
-Starlane is a **RESOURCE MESH** which can also execute client and server side WebAssembly using an actor model framework.  It's still a work in progress and not ready for production.
+Starlane is a ***Resource Mesh*** that enables micro services to create, find, watch and use various micro resources across the enterprise as well as message other micro services.
 
-Understanding what Starlane is and does can be a bit confusing because of the duality of its missions of Resource Mesh AND WebAssembly executor.  A little history clears it up somewhat:  The origin of the Starlane project was an attempt to create an environment for client and server side WebAssembly actors to deploy themselves, to securely access network resources, observe network resources for changes and message other WebAssembly actors.  
+Starlane also provides mechanisms for deploying, executing and connecting client and server side WebAssembly actors known as Mechtrons.
 
-In the journey to enable WebAssembly actors it became apparent that Starlane's proposition would be useful to traditional microservices as well and that is when the second concept of the Resource Mesh became a first class feature in Starlane.  
+Understanding what Starlane is and does can be a bit confusing because of the duality of its missions of Resource Mesh AND ubiquitous WebAssembly host.  A little history clears it up somewhat:  The origin of the Starlane project was an attempt to create an environment for client and server side WebAssembly actors to deploy , to securely access network resources, observe network resources for changes and message other WebAssembly actors.  
+
+In the journey to enable WebAssembly actors it became apparent that Starlane's proposition would be useful to traditional Micro Services as well and that is when the second concept of the Resource Mesh became a first class feature in Starlane.  
 
 Let's start by explaining what a Resource Mesh is:
 
 ## WHAT IS A RESOURCE MESH?
 An enterprise is composed of **Services**, **Resources** and the **Mesh** that binds them all together.  
 
-For anyone who doesn't know: Resources are nouns, they are 'things', Services are 'verbs' they act upon Resources and Meshes are the medium for the nouns and verbs to interact with each other. A primitive mesh would be your local area network and The largest mesh would be the internet. 
+You may have heard of Service Meshes before. Whereas the raw network is just a mechanism of information transmission the Service Mesh's innovation was that knowledge could be enshrined **between** things instead of in things. For example: In a Service Mesh the credentials for the database don't need to be known by various Micro Services. Trusted Applications can connect to the mesh and the Service Mesh will proxy that connection to the database with the correct credentials filled in.  This makes things HUGELY easier to configure since multiple Micro Services use the same database. 
 
-You may have heard of Service Meshes before. Whereas the raw network is just a mindless mechanism of information transmition the innovation of Service Mesh was that knowledge could be enshrined between things instead of in things. For example, the credentials for the database didn't need to be known by services. Trusted services can connect directly to the mesh which in turn provides the credentials to the database... This makes things HUGELY easier to configure since multiple services that use the same database.
+Service meshes are amazing in many other ways.  Their varied benefits can be boiled down into a single commonality: Service Meshes move complexity from Micro Services--which there are many of--to the Mesh which there is one of. As a rule complexity is easier to manage in one place and removing complexity from the Micro Services means faster development time, easier to understand code and fewer bugs.
 
-Service meshes are amazing in many other ways, but at their core they moved complexity from Services--which there are many of--to a single Mesh which there is one of. As a rule complexity is easier to manage in one place. Like the Service Mesh the goal of a Resource Mesh is to move complexity from the application to the Resource Mesh.  Less complexity means faster development time, easier to understand code and fewer bugs.
+The Resource Mesh is meant to build upon the Service Mesh concept.  A Resource Mesh allows a Micro Service to find, create and access various "Micro Resources."  Micro Resources are smaller concepts than the typical Kubernetes Resource.... so for example a Kubernetes Resource might represet a Pod, a PersistenVolumeClaim etc, whereas a Resource Mesh might reference an individual File, a Database table, a MessageQueue and many more things.  We will refer to Micro Resources as plain old Resources for the rest of this document.
 
-Now let's consider a developer creating an application composed of services. We'll write his code in plain english: He codes: "Messaging Service: Send a save request message to the file service 'xyz' for file '123' and to save it in bucket 'ABC'." 
-
-It's weird because as developers it's like we spend all day talking to elusive "verb processing machines"  telling them what we want them to do to the nouns on our behalf.
-
-Service architectures feel like the old days--before object oriented programming--where we called functions, passing references to the data we wanted to modify instead of invoking an object method to modify the data directly.
-
-And it is somewhat that object oriented encapsulation that I miss when I'm working with microservices.  I want to write my code like this: "Bucket,save this file."  Can you see the difference?  When I'm talking directly to the resource some things are understood: "(You, the bucket) save this file (the file I'm handing to you)."  Speaking directly in a clear context reduces what needs to be said which makes the meaning easier to understand while it also reduces what can go wrong.
- 
-Now, back to the technology: Of course, Resources aren't supposed to do anything, so how exactly are we going to talk to things that don't do anything? The answer is that a Resource Mesh is a facade that takes what the developer is saying to the resources and with its knowledge converts to instructions that the Services can act upon.
+When a Micro Service creates a resource via a Resource Mesh it does not need to know anything about where that resource lives and in most cases doesn't need to know the specifics on how the resource is created.  It merely supplies a binding address to reference the resource later.  The resource itself can even be moved to a new location by the Resource Mesh without disturbing the services since the services will continue to refernce the resource using the bound path.
 
 ## WEB ASSEMBLY
-TODO: Still working on the description of how WebAssembly works inside of Starlane. STAY TUNED!
+Now let's talk WebAssembly.  WebAssembly is a binary instruction set that can be executed consistently and securely anywhere: meaning in the browser client and on the server.  It's an amazing breakthrough that is already working on all the major browsers.  If you want to learn more about WebAssembly check it out on the [WebAssembly.org website](https://webassembly.org/).
 
-## EXAMPLE
-Say you have an application with a service that lets a user upload a profile picture to a mounted persistent store, and another service that sizes that image file correctly and copies the resized file to an S3 bucket.  We will call these services the 'upload' service and the 'profile-processor' service. 
+One reason that WebAssembly is secure is that it is executed in a "host" environment, which also serves as its sandbox.  WebAssembly cannot by itself access any files or connect to the network.  A WebAssembly program cannot even create a thread and update itself automatically, it relies upon its host to provide it with data and execution time. The host also provides an interface for WebAssembly to call for additional custom interaction between the host and the WebAssembly guest.
 
-In the starlane CLI we would create two filesystems resources:
+This brings us back to one of the orignal problems Starlane was created to solve:  WebAssembly needs a standard way to interact with varied enterprise resources.  And to that end the **Mechtron** was invented...
 
-```
-starlane create "main:uploads<FileSystem<Standard>>"
-starlane create "main:profiles<FileSystem<S3>>"
-```
+### MECHTRONS
+The Mechtron is an open source standard implementation of the [Actor model](https://en.wikipedia.org/wiki/Actor_model) for interacting with a Resource Mesh and thus accessing the Resources managed by the mesh.  Starlane implements the host Mechtron interface and can communicate to any WebAssembly binary that was compiled with an implementation of the guest Mechtron interface. 
 
-Above we have created two filesystems under the 'main' space.  We provide an address with a type of <FileSystem> and a kind associated with it, uploads is a <Standard> mounted filesystem kind and profiles is an <S3> bucket kind.  
+Additionally a Mechtron standard defines:
+* A bind configuration which tells the Resource Mesh what kind of messages the Mechtron can receive and the schema of the expected message payloads 
+* A mechtron deployment configuration file which defines which WebAssembly binary artifact to execute and references a bind config artifact to implement as well as some additional custom parameters
+* A standard for referencing Artifact Bundles that may contain useful assets for the Mechtron--including in some cases the schema definition files used to serialize and deserialize message payloads
+* An application configuration which defines the mechtron initialization and composition of the app as well as some other required resources like FileSystems, Databases etc.
 
-Although Starlane itself is written in Rust, you can connect to a starlane instance API using a library.  We are going to write this example in Java Spring Boot.  
+Importantly the WebAssembly binary can now use the Mechtron interface to access The Resource Mesh in order to access any Resource in the enterprise and talk to other Mechtrons in an agreed upon message payload serialization thanks to the bind references.
 
-The only configuration we need for each services is a connection to Starlane and references to the various FileSystems they will be using (upload and profiles)
+An Application that executes within Starlane's Mesh can be composed of many multiple mechtrons that may be written by completely different people in completely differen languages yet they will be able to communicate and coordinate with each other.  
 
-Here's the upload service:
+And... the Application can even swap out mechtrons while it is running...  
 
-```java
-// this is only pseudo code for example's sake, don't try to run it
+And...  Tenants of a Starlane Cloud Service could be given permission to overwrite the default Mechtron that managed something specific to them: let's say for example users of a social media site would like to write custom code to render their Profile page. They could create a custom mechtron that implements the profile bind referenced by the application and then deploy and let the social medias sites Starlane instance securely execute their custom code infrastructure!  
 
-@Service
-public class UploadService {
-
-  @Autowired
-  private Starlane starlane;
-
-  // this value is overridden in configuration
-  @Autowired
-  private String uploadFileSystem = "main:uploads";
+Mechtrons are made to encourage creativity and collaboration through code!  The possibilities are very exciting!
 
 
-  public void upload( String username, byte[] image ) {
-     // create by specifying an address and providing the raw image bytes as the state
-     var path = String.format("%s:/%s<File>",uploadFileSystem,username);
-     starlane.create( path, image );   
-  }
-
-}
-```
-
-That's it for the upload example.  Of course there are some problems with this simple example, what if the user uploads two profile pictures at once and there's a collision with the username being used to identify his file?  And It would be nice to use an InputStream for the image instead of holding it all in a byte buffer, we could work around these problems if this was a real application but for now this code example will serve us for illustration purposes.
-
-Next let's dive into the profiler-processor service:
-
-
-```java
-@Service
-public class  ProfileProcessorService{
-
-  @Autowired
-  private Starlane starlane;
-
-
-  // this value is overridden in configuration
-  @Autowired 
-  private String uploadFileSystem = "main:uploads";
- 
-  // this value is overridden in configuration
-  @Autowired
-  private String profileFileSystem= "main:profiles";
- 
-
-  @PostConstruct
-  public void startWatch(){
-
-    // watch the children of the main:uploads FileSystem for changes (CREATE & DELETE)
-    starlane.watch(uploadFileSystem, ResourceProperty.CHILDREN, (notification)-> {
-
-     // we only want to respond to CREATE or UPDATE events, not DELETE
-     if notifcation.change.kind == ResourcePropertyChange.CHILD.CREATE {
-
-       // get the State data of the child that has changed
-       State state = starlane.get( notifcation.change.getChild(), ResourceProperty.STATE );
-
-       // grab the 'content' aspect of the state which holds the image content
-       byte[] originalImage = state.get("content"); 
-       
-       // do some resizing work and produce a new image
-       byte[] resizedImage = processImageSomehow(originalImage);
-
-       // create the actual resizedFilePath which should exist on S3 bucket
-       var username = someRegexToExtractUsername( notification.from );
-       var resizedFilePath = String.format("%s:/%s<File>",profileFileSystem,username);
-
-       // create the resized image on the S3 bucket
-       starlane.create( resizedFilePath, resizedImage );
-     }
-    }); 
-  }
-}
-```
+## TRY IT OUT
+Why not try out the [Getting Started]({{< ref "/docs" >}} "Docs") guide today where you can deploy Starlane, upload some Files to a FileSystem, serve those files from an http server and then deploy an actual Mechtron and serve an html page from that mechtron.
 
 
 
-It's not the best way to implement this solution in Spring, but to make things fit nicely into one class file we are using a @PostConstruct which will execute the startWatch() method after the ProfileProcessorService has been created.
 
-The startWatch() method begins to watch the children of the main:uploads filesystem for changes. When a new file is added to uploads a notification is pushed via the starlane connection to the profile-processor service.  
 
-The profile-processor service resizes the image and then copies the newly resized image to the S3 bucket by creating a new file.  
+
+
+
+
+
+
+
 
 

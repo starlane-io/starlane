@@ -6,21 +6,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/../README.md" beforeDir="false" afterPath="$PROJECT_DIR$/../README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../docs/content/docs.md" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/content/docs.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../docs/static/css/style.css" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/static/css/style.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../example/0-starlane-server.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../example/0-starlane-server.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../example/1-create-localhost-space.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../example/1-create-localhost-space.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../example/2-create-filesystem.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../example/2-create-filesystem.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../example/3-upload-file.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../example/3-upload-file.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../example/4-publish-localhost-config.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../example/4-publish-localhost-config.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../example/5-set-localhost-config.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../example/5-set-localhost-config.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../example/6-publish-app-bundle.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../example/6-publish-app-bundle.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../example/7-create-a-mechtron.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../example/7-create-a-mechtron.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../example/99-install-everything.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../example/99-install-everything.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../example/app/my-mechtron.zip" beforeDir="false" afterPath="$PROJECT_DIR$/../example/app/my-mechtron.zip" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant/web.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/web.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -237,7 +223,7 @@
       <workItem from="1630446426365" duration="31484000" />
       <workItem from="1631559262142" duration="147604000" />
       <workItem from="1632540389238" duration="23913000" />
-      <workItem from="1632628868278" duration="9294000" />
+      <workItem from="1632628868278" duration="11646000" />
     </task>
     <servers />
   </component>

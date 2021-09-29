@@ -8,6 +8,44 @@ header {
   margin-right: auto;
 }
 
+header nav {
+    width: 100%;
+}
+
+header nav ul {
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    text-align: right;
+    list-style: none;
+}
+
+header nav ul li {
+    float: none;
+    display: inline-block;
+    position: relative;
+}
+
+
+header nav ul li:nth-child(1) {
+    float: left;
+}
+header nav ul li:nth-child(2) {
+    float: left;
+}
+header nav ul li:nth-child(3) {
+    float: left;
+}
+
+
+header nav ul li a {
+    display: block;
+    text-decoration: none;
+    padding: 5px;
+    margin: 0;
+    font-family: "Jura", sans-serif;
+}
+
 #stack {
  display: block;
  margin-left: auto;
@@ -28,12 +66,9 @@ header {
  z-index: 0;
  background-color: #000000cc;
  min-height: 100vh;
+ padding-left: 16px;
+ padding-right: 16px;
  
-}
-
-#content div {
- padding: 16px;
- padding-bottom: 64px;
 }
 
 h1 {
@@ -70,9 +105,7 @@ h3 {
 
 p {
   color: #cccccc;
-  font-family: "Roboto", sans-serif;
   font-size: large;
-  letter-spacing: 0.5px;
 }
 
 
@@ -113,12 +146,7 @@ footer div small {
   font-size: small;
 }
 
-footer div nav{
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-  width: 100%;
-}
+
 
 
 
@@ -129,7 +157,7 @@ nav{
   justify-content: center;
 }
 
-nav a{
+nav > a{
   text-decoration: none;
   color: #cccccc;
   margin: 0 40px;
@@ -139,10 +167,14 @@ nav a{
   font-family: "Jura", sans-serif;
 }
 
-nav a i {
+nav > a > i {
   background: -webkit-linear-gradient(white, #38495a);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+a {
+  color: #ffffff
 }
 
 a:hover {
@@ -152,19 +184,24 @@ a:hover {
 }
 
 #logo{
+  position: absolute;
+  left: 50%;
+  content: "";
   text-decoration: none;
   width: 200px;
   height: 100%;
   font-size: xx-large;
   font-family: "Josefin Sans", sans-serif;
   text-align: center;
+  margin-left: -100px;
+}
+
+#logo > span {
   background: -webkit-linear-gradient(white, #38495a);
   background: -webkit-linear-gradient(white, #eeaa5a);
   letter-spacing: 2px;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 
@@ -229,9 +266,25 @@ input[type=submit]:hover {
   padding: 20px;
 }
 
+p strong {
+  font-weight: 900
+}
+
 p a {
   color: white;
 }
+
+ul {
+  margin: 0px;
+  padding-bottom: 16px;
+}
+
+ul > li {
+  color: #cccccc;
+  font-size: large;
+}
+
+
 
 #mc_embed_signup{clear:left; font:14px Roboto,sans-serif; width:100%; }
 
@@ -239,3 +292,98 @@ p a {
 display: inline;
 background-color: black;
 }
+
+
+
+.mobile {
+  display: none;
+}
+
+
+
+#mobile-nav{
+  display: none;
+  font-size: large;
+}
+
+#mobile-nav ul li {
+    list-style: none;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+#mobile-nav ul li a {
+    display: block;
+    text-decoration: underline;
+    padding: 10px 0;
+}
+
+
+
+
+
+/* On screens that are 992px or less, set the background color to blue */
+@media screen and (max-width: 992px) {
+ 
+  #stack{
+    width: 100%;
+    max-width: 100%;
+  }
+
+  #content{
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .mobile {
+    display: block;
+  }
+
+  #mobile-nav {
+    display: block;
+  }
+
+  .desktop {
+    display: none;
+  }
+
+  header {
+  width: 100%;
+  max-width: 100%;
+  text-align: center;
+  }
+
+  footer {
+    position: relative;
+    width: 100%;
+  }
+
+  footer > #mobile-nav{
+     display: block;
+  }
+  
+  h1 {
+    font-size: x-large;
+  }
+
+  h2 {
+    font-size: large;
+  }
+
+  h3 {
+    font-size: medium;
+  }
+
+  footer > div > #icons {
+    font-size: small;
+  }
+
+  #content {
+   padding-bottom: 0px;
+   padding: 16px;
+  }
+
+}
+
+
+
