@@ -6,7 +6,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/../docs/content/docs.md" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/content/docs.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../docs/content/roadmap.md" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/content/roadmap.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/shell/lanes.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/shell/lanes.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -224,6 +227,8 @@
       <workItem from="1631559262142" duration="147604000" />
       <workItem from="1632540389238" duration="23913000" />
       <workItem from="1632628868278" duration="11646000" />
+      <workItem from="1634345190982" duration="10876000" />
+      <workItem from="1634734665290" duration="4446000" />
     </task>
     <servers />
   </component>

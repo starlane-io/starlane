@@ -66,7 +66,7 @@ Let's upload a file (which will serve as our entire website)  from the example d
 IMPORTANT: you MUST run this command from the directory where you checked out the starlane git respository
 
 ```bash
-starlane cp expample/websites/simple-site1/index.html "localhost:my-files:/index.html"
+starlane cp example/websites/simple-site1/index.html "localhost:my-files:/index.html"
 ```
 
 Here you can see we are uploading file index.html to a File newly created File resource which is a child of the FileSystem 'my-files.'
