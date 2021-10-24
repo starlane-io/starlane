@@ -59,9 +59,10 @@ pub mod template;
 pub mod util;
 pub mod watch;
 pub mod mechtron;
-mod wasm;
+pub mod wasm;
 pub mod parse;
 pub mod html;
+pub mod mesh;
 
 lazy_static! {
     static ref VERSION: semver::Version = {
