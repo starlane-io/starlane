@@ -9,7 +9,7 @@ pub type Port=v0_0_1::Port;
 pub mod id {
     use mesh_portal_serde::version::v0_0_1::generic;
     use mesh_portal_serde::version::v0_0_1::id;
-    use starlane_resources::ResourcePath;
+    use starlane_resources::{ResourcePath, ResourceIdentifier};
     use crate::resource::{ResourceKey, ResourceKind};
 
     pub type ResourceType = ResourceType;
@@ -23,7 +23,7 @@ pub mod id {
     }
 
     pub type Identifiers = generic::id::Identifiers<Key, Address>;
-    pub type Identifier = generic::id::Identifier<Key, Address>;
+    pub type Identifier = ResourceIdentifier;
 }
 
 pub mod messaging {
@@ -74,10 +74,9 @@ pub mod http {
 }
 
 pub mod resource {
-    use mesh_portal_serde::version::latest::id::{Key, Address, Kind};
+    use crate::mesh::serde::id::{Identifier,Key, Address, Kind,ResourceType};
     use serde::{Deserialize, Serialize};
     use mesh_portal_serde::version::v0_0_1::resource;
-
     use mesh_portal_serde::version::v0_0_1::{State, generic};
 
     pub type Status = resource::Status;
@@ -86,14 +85,15 @@ pub mod resource {
     pub type StateSrc=generic::resource::StateSrc;
     pub type CreateStrategy=generic::resource::CreateStrategy;
     pub type AddressSrc=generic::resource::AddressSrc;
-    pub type Selector=generic::resource::Selector;
+    pub type Selector=generic::resource::Selector<Identifier,Kind,ResourceType>;
     pub type MetaSelector=generic::resource::MetaSelector;
+    pub type FieldSelector =generic::resource::select::FieldSelector<Identifier,Kind,ResourceType>;
     pub type ResourceStub = generic::resource::ResourceStub<Key,Address,Kind>;
-    pub type Archetype = generic::resource::Archetype<Kind>;
+
 }
 
 pub mod config {
-    use mesh_portal_serde::version::latest::id::{Key, Address, Kind};
+    use crate::mesh::serde::id::*;
     use mesh_portal_serde::version::v0_0_1::config;
     use mesh_portal_serde::version::v0_0_1::generic;
 
@@ -109,7 +109,7 @@ pub mod config {
 }
 
 pub mod payload {
-    use mesh_portal_serde::version::latest::id::{Key, Address, Kind};
+    use crate::mesh::serde::id::*;
     use mesh_portal_serde::version::v0_0_1::payload;
     use mesh_portal_serde::version::v0_0_1::generic;
     use mesh_portal_serde::version::v0_0_1::bin::Bin;
@@ -122,8 +122,8 @@ pub mod payload {
 pub mod entity {
 
     pub mod request {
+        use crate::mesh::serde::id::*;
         use mesh_portal_serde::version::v0_0_1::generic;
-        use mesh_portal_serde::version::latest::id::{Key, Address, Kind,ResourceType};
 
         pub type ReqEntity = generic::entity::request::ReqEntity<Key,Address,Kind,ResourceType>;
         pub type Rc = generic::entity::request::Rc<Key,Address,Kind,ResourceType>;
@@ -131,9 +131,9 @@ pub mod entity {
         pub type Http = generic::entity::request::Http;
     }
     pub mod response{
+        use crate::mesh::serde::id::*;
         use mesh_portal_serde::version::v0_0_1::generic;
         use mesh_portal_serde::version::latest::fail;
-        use mesh_portal_serde::version::latest::id::{Key, Address, Kind};
 
         pub type RespEntity = generic::entity::response::RespEntity<Key,Address,Kind,fail::Fail>;
     }
@@ -141,7 +141,7 @@ pub mod entity {
 
 pub mod portal {
     pub mod inlet {
-        use mesh_portal_serde::version::latest::id::{Key, Address, Kind, ResourceType};
+        use crate::mesh::serde::id::*;
         use std::convert::TryFrom;
         use std::convert::TryInto;
 
@@ -157,16 +157,16 @@ pub mod portal {
 
 
         pub mod exchange {
+            use crate::mesh::serde::id::*;
             use mesh_portal_serde::version::v0_0_1::generic;
-            use mesh_portal_serde::version::latest::id::{Key, Address, Kind, ResourceType};
 
             pub type Request=generic::portal::inlet::exchange::Request<Key,Address,Kind,ResourceType>;
         }
     }
 
     pub mod outlet {
-        use mesh_portal_serde::version::latest::id::{Key, Address, Kind, ResourceType};
 
+        use crate::mesh::serde::id::*;
         use std::convert::TryFrom;
         use std::convert::TryInto;
 
@@ -181,8 +181,8 @@ pub mod portal {
         pub type Frame=generic::portal::outlet::Frame<Key,Address,Kind,ResourceType>;
 
         pub mod exchange {
+            use crate::mesh::serde::id::*;
             use mesh_portal_serde::version::v0_0_1::generic;
-            use mesh_portal_serde::version::latest::id::{Key, Address, Kind,ResourceType};
 
             pub type Request=generic::portal::outlet::exchange::Request<Key,Address,Kind,ResourceType>;
         }
@@ -210,7 +210,6 @@ pub mod fail {
     pub mod resource {
         use serde::{Deserialize, Serialize};
         use mesh_portal_serde::version::v0_0_1::fail::resource;
-        use mesh_portal_serde::version::latest::id::Address;
 
         pub type Fail = resource::Fail;
         pub type Create= resource::Create;
@@ -220,13 +219,11 @@ pub mod fail {
 
     pub mod port {
         use mesh_portal_serde::version::v0_0_1::fail::port;
-        use mesh_portal_serde::version::latest::id::Address;
         pub type Fail = port::Fail;
     }
 
     pub mod http {
         use mesh_portal_serde::version::v0_0_1::fail::http;
-        use mesh_portal_serde::version::latest::id::Address;
         use serde::{Deserialize, Serialize};
 
         pub type Error = http::Error;
