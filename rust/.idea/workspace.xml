@@ -6,6 +6,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/../docs/content/roadmap.md" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/content/roadmap.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/mesh/serde.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/mesh/serde.rs" afterDir="false" />
     </list>
@@ -228,7 +229,7 @@
       <workItem from="1634345190982" duration="10876000" />
       <workItem from="1634734665290" duration="17515000" />
       <workItem from="1635009259888" duration="33353000" />
-      <workItem from="1636706841180" duration="4929000" />
+      <workItem from="1636706841180" duration="7968000" />
     </task>
     <servers />
   </component>

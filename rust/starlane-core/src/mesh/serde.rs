@@ -139,7 +139,7 @@ pub mod resource {
 
     pub type Status = resource::Status;
 
-    pub type Archetype= generic::resource::Archetype<Kind>;
+    pub type Archetype= generic::resource::Archetype<Kind,Address>;
     pub type ResourceStub = generic::resource::ResourceStub<Key,Address,Kind>;
 }
 
@@ -147,9 +147,12 @@ pub mod portal {
 
     pub mod inlet {
         use mesh_portal_serde::version::latest::generic;
-        use mesh_portal_serde::version::latest::id::{Address, Key, Kind, ResourceType};
-        use mesh_portal_serde::version::latest::frame::PrimitiveFrame;
-        use mesh_portal_serde::version::latest::error::Error;
+        use mesh_portal_serde::version::latest;
+        use crate::mesh::serde::id::{Address, Key, Kind, ResourceType,Identifier};
+        use crate::mesh::serde::error::Error;
+        use std::convert::TryFrom;
+        use crate::mesh::serde::entity::request::ReqEntity;
+        use mesh_portal_serde::version::v0_0_1::generic::entity::request::{Rc, Http};
 
         pub type Request=generic::portal::inlet::Request<Key,Address,Kind,ResourceType>;
         pub type Response=generic::portal::inlet::Response<Key,Address,Kind>;
@@ -261,7 +264,7 @@ pub mod generic {
         use mesh_portal_serde::version::latest::generic::id::{AddressAndKind, Identifier};
         use mesh_portal_serde::version::latest::State;
 
-        pub type Archetype<KIND>=generic::resource::Archetype<KIND>;
+        pub type Archetype<KIND,ADDRESS>=generic::resource::Archetype<KIND,ADDRESS>;
         pub type ResourceStub<KEY, ADDRESS, KIND > = generic::resource::ResourceStub<KEY,ADDRESS,KIND>;
         pub type Resource<KEY, ADDRESS, KIND, BIN > = generic::resource::Resource<KEY,ADDRESS,KIND,BIN>;
     }

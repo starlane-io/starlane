@@ -10,11 +10,11 @@
 * create a new example mechtron [upload,display profile pic]
 
 
-
 ## BACKLOG
 
 ### KUBERNETES AND DATABASES version: 0.3.0 [backlog]
 * Introduction of the Starlane Kubernetes Operator 
+  - ability to specify the number of stars that serve mechtrons
 * resource registry persistence (before resource registry was handled by in-memory SQLite)
 * ability to provision a Database
 * ability to extend Starlane's provisioning system through the Starlane Kubernetes Operator in order to support any relational Database that runs in a docker container
@@ -38,15 +38,6 @@
 * FIX: return proper HttpResponse headers
 * FIX: some issues with router cause it to crash
 * improvement of router configuration to make it look more like bind configuration 
-
-* Mechtron Bind Improvements:
-  - addition of Directive block to pipelines 
-  - add/remove header directives
-  - regex directive 
-  - directive block is 'templatized' and can be run through a templating engine when a message is received 
-  - filter pipeline--ability to filter a port or http request through another Mechtron to make any custom modifications to the request
-
-
 
 ### REMOTE SERIALIZATION & API version: 0.5.0 [backlog]
 * create a serialization for accessing resources remotely 
@@ -85,6 +76,7 @@
   - ability to grant additional resource permissions to a request
   - ability to set a timeout for mechtron port's execution time
   - ability to set a timeout for mechtron port's total time to respond to a message (includes whatever is being done with other resources)
+
   
 
 ### FOR THE BETTERMENT OF ALL ERROR MESSAGES version: 0.7.0 [backlog]
@@ -111,13 +103,15 @@ This release will be focussed on making sure that problems with Starlane are as 
 * ability to query the status of resources [Unknown, Creating, Ready, Panic, Destroyed, etc.] also include descriptive error messages for some states like Panic describing the nature of the panic.
 * ability to query the status of Stars 
 
+* Actually enforce Mechtron Bind released in 'MORE MECHTRONY GOODNESS'
+  - ensure clear error message if there is a bind failure
+
 * improved message reliability:
   - send message acknowledgements when a message is received by a Star
   - message will be resent if it has not been acknowledged after a timeout
   - ensure message delivery will happen once or not at all in case of a failure
   - if a message has not received an acknowledgement and is out of retries, return a Timeout failure to the sender
   - ability to configure ack timeout, retries and max retry 
-
 
 ### MECHTRON HUB (for artifact bundles) version: 0.8.0 [backlog]
 * ability to publish and share artifact bundles via on mechtronhub.io
@@ -152,14 +146,13 @@ This release will be focussed on making sure that problems with Starlane are as 
   - rust client library for new rest API for downloading and unzipping ArtifactBundles as well as caching Artifacts 
   - incorporate rust client library into starlane itself 
 
-* support for larger binaries
-  - Implementation of the 'Data Conveyor' (Starlane's support for large files & messages)
 
 ### PRODUCTION version: 1.0.0-beta [backlog]
 The first version where Starlane is ready for production environments.
-* Starlane Operator updated to provision persistent storage
-* Starlane Operator capable of distributing Stars accross multiple container
+* support for larger binaries
+  - Implementation of the 'Data Conveyor' (Starlane's support for large files & messages)
 * Lot's and Lot's of testing the robustness of the app
+
 
 ### PRODUCTION version: 1.0.0 [backlog]
 * Lot's and Lot's of more testing....
@@ -202,7 +195,25 @@ The first version where Starlane is ready for production environments.
 * Mechtrons can be configured as Stateful
 * new configuration rules for mechtrons governing state persistence [None, ReplicateToFile] 
 * ability to replicate Mechtrons accross hosts in order to survive individual machine crashes
+* creation of 'Mechtron Cache API' which allows mechtrons to cache work between message requests
+  - mechtron can specify a memory block to 'cache'
+  - host will copy the memory block out of the mechtron
+  - when the memory block is needed again the mechtron can request to copy it back in
+  - at the end of the request the memory block will be once again evicted
+  - mechanism needed for a mechtron to 'release' it's claim on cached memory
 
+### SCALE version: 2.0.0 [backlog]
+* Kubernetes operator gains ability to distribute stars accross multiple containers
+  - ability to 'resize & reshape' the Starlane cluster based on Kubernetes resource definition 
+* Sharding of resources
+  - Multiple Database clusters & FileSystem providers etc, can be available
+  - Provisioners will spread creations accross available hosts
+  - ability to 'move' resources from one host to another
+* Slow Lanes: creation of a new type of 'lane' that delivers less urgent messages (like Logs)
+* Mesh Star Sharding: ability to shard the mesh star 
+  - reduce traffic by load ballancing accross lanes
+  - increase redundancy in case an individual Mesh Star crashes
+* Resource state replication
 
 ## DONE
 
