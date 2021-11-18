@@ -1,9 +1,19 @@
 use crate::mesh::serde::portal::outlet;
 
-mod serde;
+pub mod serde;
 
-// always use these Request / Response within the Mesh, only use other specifics for particular serialization use cases
-pub type Request = mesh_portal_serde::mesh::generic::Request<serde::entity::request::ReqEntity>;
-pub type Response = mesh_portal_serde::mesh::generic::Response;
+use crate::mesh::serde::id;
+use crate::mesh::serde::entity;
+use mesh_portal_api;
 
+pub type Message=mesh_portal_api::message::generic::Message<entity::request::ReqEntity,id::Identifier>;
 
+#[cfg(test)]
+pub mod test {
+
+    #[test]
+    pub fn test() {
+
+    }
+
+}

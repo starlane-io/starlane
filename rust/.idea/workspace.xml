@@ -6,9 +6,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/../docs/content/roadmap.md" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/content/roadmap.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/mesh/serde.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/mesh/serde.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/mesh/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/mesh/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/message/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/message/resource.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -67,7 +68,7 @@
       <recent name="$PROJECT_DIR$/starlane-core/src/config" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test star::variant::web::test::path_regex">
+  <component name="RunManager" selected="Cargo.Test mesh::test::test">
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
       <option name="command" value="run  --bin starlane -- serve --with-external" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -118,8 +119,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test parse::tests::test_parse_resource_property_assignment" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-resources --lib parse::tests::test_parse_resource_property_assignment -- --exact" />
+    <configuration name="Test mesh::test::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib mesh::test::test -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -134,8 +135,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test parse::tests::test_parse_resource_value_selector" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-resources --lib parse::tests::test_parse_resource_value_selector -- --exact" />
+    <configuration name="Test parse::tests::test_parse_resource_property_assignment" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib parse::tests::test_parse_resource_property_assignment -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -185,19 +186,19 @@
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test" />
-      <item itemvalue="Cargo.Test parse::tests::test_parse_resource_value_selector" />
       <item itemvalue="Cargo.Test config::reverse_proxy::tests::test_parse_resource_path" />
       <item itemvalue="Cargo.Test config::reverse_proxy::tests::test_reverse_proxy_config" />
       <item itemvalue="Cargo.Test parse::tests::test_parse_resource_property_assignment" />
       <item itemvalue="Cargo.Test star::variant::web::test::path_regex" />
+      <item itemvalue="Cargo.Test mesh::test::test" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Test mesh::test::test" />
         <item itemvalue="Cargo.Test star::variant::web::test::path_regex" />
         <item itemvalue="Cargo.Test parse::tests::test_parse_resource_property_assignment" />
         <item itemvalue="Cargo.Test config::reverse_proxy::tests::test_reverse_proxy_config" />
         <item itemvalue="Cargo.Test config::reverse_proxy::tests::test_parse_resource_path" />
-        <item itemvalue="Cargo.Test parse::tests::test_parse_resource_value_selector" />
       </list>
     </recent_temporary>
   </component>
@@ -229,7 +230,7 @@
       <workItem from="1634345190982" duration="10876000" />
       <workItem from="1634734665290" duration="17515000" />
       <workItem from="1635009259888" duration="33353000" />
-      <workItem from="1636706841180" duration="7968000" />
+      <workItem from="1636706841180" duration="18678000" />
     </task>
     <servers />
   </component>
