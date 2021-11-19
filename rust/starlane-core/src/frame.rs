@@ -334,7 +334,7 @@ impl StarMessage {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum StarMessagePayload {
     None,
-    MessagePayload(MessagePayload),
+    MessagePayload(crate::mesh::RxMessage),
     ResourceRegistry(ResourceRegistryRequest),
     ResourceHost(ResourceHostAction),
     Space(SpaceMessage),

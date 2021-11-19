@@ -33,18 +33,29 @@ where
 {
     skel: StarSkel,
     star_message: StarMessage,
-    pub payload: M,
+    pub entity: M,
 }
 
 impl<M> Delivery<M>
 where
     M: Clone + Send + Sync + 'static,
 {
-    pub fn new(payload: M, star_message: StarMessage, skel: StarSkel) -> Self {
+    pub fn new(entity: M, star_message: StarMessage, skel: StarSkel) -> Self {
         Delivery {
-            payload,
+            entity,
             star_message: star_message,
             skel: skel,
+        }
+    }
+
+    pub async fn to(&self) -> Result<ResourceKey,Error> {
+        match &self.star_message.payload {
+            StarMessagePayload::MessagePayload(message) => {
+                Ok(self.skel.resource_locator_api.locate(message.to()).await?)
+            }
+            _ => {
+                Err("this type of Delivery does not support to() resolution".into())
+            }
         }
     }
 }

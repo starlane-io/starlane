@@ -92,7 +92,7 @@ impl Host for MechtronHost {
         info!("MECHTRON HOST RECEIVED DELIVERY");
         let mechtron = self.mechtrons.get(key.clone()).await?.ok_or(format!("could not deliver mechtron to {}",key.to_string()))?;
         info!("GOT MECHTRON");
-        let reply = mechtron.message(delivery.payload.clone()).await?;
+        let reply = mechtron.message(delivery.entity.clone()).await?;
 
         if let Option::Some(reply) = reply {
             delivery.reply(Reply::Port(reply.payload));
@@ -107,7 +107,7 @@ info!("=====>> MECHTRON SENT REPLY");
         info!("MECHTRON HOST RECEIVED DELIVERY");
         let mechtron = self.mechtrons.get(key.clone()).await?.ok_or(format!("could not deliver mechtron to {}",key.to_string()))?;
         info!("GOT MECHTRON");
-        let reply = mechtron.http_request(delivery.payload.clone()).await?;
+        let reply = mechtron.http_request(delivery.entity.clone()).await?;
 
         if let Option::Some(reply) = reply {
             delivery.reply(Reply::HttpResponse(reply));

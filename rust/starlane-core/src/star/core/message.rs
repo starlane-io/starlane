@@ -2,8 +2,8 @@ use std::convert::TryInto;
 
 use tokio::sync::{mpsc, oneshot};
 
-use starlane_resources::{Resource, ResourceArchetype, ResourceIdentifier};
-use starlane_resources::message::{Message, ResourceRequestMessage, ResourceResponseMessage, ResourcePortMessage};
+use starlane_resources::{Resource, ResourceArchetype, ResourceIdentifier, ResourceCreate, KeyCreationSrc, AddressCreationSrc, ConfigSrc, AssignResourceStateSrc, ResourceCreateStrategy};
+use starlane_resources::message::{Message, ResourceRequestMessage, ResourceResponseMessage, ResourcePortMessage, MessageFrom};
 use starlane_resources::message::Fail;
 
 use starlane_resources::data::DataSet;
@@ -23,6 +23,11 @@ use tokio::sync::oneshot::error::RecvError;
 use starlane_resources::property::{ResourcePropertyAssignment, ResourcePropertyValueSelector, ResourceValue, ResourceValues, ResourceRegistryPropertyAssignment, ResourceRegistryPropertyValueSelector};
 use std::collections::HashMap;
 use starlane_resources::http::HttpRequest;
+use crate::mesh::RxMessage;
+use crate::mesh::serde::entity::request::{ReqEntity, Rc, Msg, Http};
+use crate::mesh::Request;
+use crate::mesh::Response;
+use crate::parse::{command, consume_command, Command, StateSrc, select};
 
 pub enum CoreMessageCall {
     Message(StarMessage),
@@ -68,6 +73,26 @@ impl MessagingEndpointComponent {
     async fn process_resource_message(&mut self, star_message: StarMessage) -> Result<(), Error> {
         match &star_message.payload {
             StarMessagePayload::MessagePayload(message_payload) => match &message_payload {
+                RxMessage::Request( request ) => {
+                    match &request.entity {
+                        ReqEntity::Rc(rc) => {
+                            let delivery = Delivery::new(rc.clone(), star_message, self.skel.clone());
+                            self.process_resource_command(delivery).await?;
+                        }
+                        ReqEntity::Msg(msg) => {
+                            let delivery = Delivery::new(msg.clone(), star_message, self.skel.clone());
+                            self.process_resource_port_request(delivery).await?;
+                        }
+                        ReqEntity::Http(http) => {
+                            let delivery = Delivery::new(http.clone(), star_message, self.skel.clone());
+                            self.process_resource_http_request(delivery).await?;
+                        }
+                    }
+                }
+                RxMessage::Response( response ) => {
+                    // we don't handle responses here
+                }
+                /*
                 MessagePayload::Request(request) => {
                     let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
                     self.process_resource_request(delivery).await?;
@@ -84,6 +109,8 @@ impl MessagingEndpointComponent {
                 MessagePayload::Response(_) => {
                     // we don't handle responses here...
                 }
+
+                 */
             },
             StarMessagePayload::ResourceRegistry(action) => {
                 let delivery = Delivery::new(action.clone(), star_message, self.skel.clone());
@@ -111,9 +138,9 @@ impl MessagingEndpointComponent {
         Ok(())
     }
 
-    async fn process_resource_request(
+    async fn process_resource_command(
         &mut self,
-        delivery: Delivery<Message<ResourceRequestMessage>>,
+        delivery: Delivery<Rc>,
     ) -> Result<(), Error> {
         let skel = self.skel.clone();
         let host_tx = self.host_tx.clone();
@@ -121,25 +148,47 @@ impl MessagingEndpointComponent {
             async fn process(
                 skel: StarSkel,
                 host_tx: mpsc::Sender<HostCall>,
-                delivery: Delivery<Message<ResourceRequestMessage>>,
+                delivery: Delivery<Rc>,
             ) -> Result<(), Error> {
-                match delivery.payload.payload.clone() {
-                    ResourceRequestMessage::Create(create) => {
-                        let parent_key = match create
-                            .parent
-                            .clone()
-                            .key_or("expected parent to be a ResourceKey")
-                        {
-                            Ok(key) => key,
-                            Err(error) => {
-                                return Err(error.to_string().into());
-                            }
+
+                let command = consume_command(delivery.entity.command.as_str() )?;
+
+                match command {
+                    Command::Create(create) => {
+                        let key = delivery.to().await?;
+                        let parent_key = key.parent();
+
+                        let state_src = match create.state_src {
+                            StateSrc::None => { AssignResourceStateSrc::Stateless }
+                            StateSrc::Address(address) => { AssignResourceStateSrc::Identifier(ResourceIdentifier::Address(address))}
+                            StateSrc::Direct(payload) => { AssignResourceStateSrc::Direct(payload)}
+                            StateSrc::FromCommandPayload => { AssignResourceStateSrc::Direct(delivery.entity.payload.clone()) }
                         };
+
+                        // hackish?  transformting this into the old ResourceCreate object
+                        // so I don't have to rewrite any code beyond this point...
+                        let create = ResourceCreate {
+                            parent: ResourceIdentifier::Parent(parent_key),
+                            key: KeyCreationSrc::None,
+                            address: AddressCreationSrc::Exact(create.address_and_kind.path.clone()),
+                            archetype: ResourceArchetype {
+                                kind: create.address_and_kind.kind.clone(),
+                                specific: create.address_and_kind.kind.specific.clone(),
+                                config: ConfigSrc::None
+                            },
+                            state_src,
+                            registry_info: None,
+                            owner: None,
+                            strategy: ResourceCreateStrategy::Create,
+                            from: MessageFrom::Inject,
+                            set_directives: create.set_directives
+                        };
+
                         let parent = MessagingEndpointComponent::get_parent_resource(
                             skel.clone(),
                             parent_key,
-                        )
-                        .await?;
+                        ) .await?;
+
                         let record = parent.create(create.clone()).await.await;
 
                         match record {
@@ -156,7 +205,7 @@ impl MessagingEndpointComponent {
                             }
                         }
                     }
-                    ResourceRequestMessage::Select(selector) => {
+                    Command::Select(selector) => {
                         let resources = skel
                             .registry
                             .as_ref()
@@ -165,15 +214,28 @@ impl MessagingEndpointComponent {
                             .await?;
                         delivery.reply(Reply::Records(resources))
                     }
-                    ResourceRequestMessage::Unique(resource_type) => {
-                        let resource = skel.resource_locator_api.locate(delivery.payload.to.clone() ).await?;
+                    Command::Unique(resource_type) => {
+                        let resource = skel.resource_locator_api.locate(delivery.entity.to.clone() ).await?;
                         let unique_src = skel
-                                .registry
-                                .as_ref()
+                            .registry
+                            .as_ref()
                             .unwrap()
-                            .unique_src(resource.stub.archetype.kind.resource_type(), delivery.payload.to.clone().into())
+                            .unique_src(resource.stub.archetype.kind.resource_type(), delivery.entity.to.clone().into())
                             .await;
                         delivery.reply(Reply::Id(unique_src.next(&resource_type).await?));
+                    }
+                }
+
+                /*
+                match delivery.entity.payload.clone() {
+                    ResourceRequestMessage::Create(create) => {
+
+                    }
+                    ResourceRequestMessage::Select(selector) => {
+
+                    }
+                    ResourceRequestMessage::Unique(resource_type) => {
+
                     }
                     ResourceRequestMessage::SelectValues(selector) => {
 
@@ -181,12 +243,10 @@ impl MessagingEndpointComponent {
                             .registry
                             .as_ref()
                             .unwrap()
-                            .get(delivery.payload.to.clone() )
+                            .get(delivery.entity.to.clone() )
                             .await?.ok_or("expected resource: ")?;
 
-
-
-                        let key: ResourceKey = skel.resource_locator_api.as_key(delivery.payload.to.clone()).await?;
+                        let key: ResourceKey = skel.resource_locator_api.as_key(delivery.entity.to.clone()).await?;
                         let (tx, rx) = oneshot::channel();
 
 
@@ -200,7 +260,7 @@ impl MessagingEndpointComponent {
                         }
                     }
                     ResourceRequestMessage::UpdateState(state) => {
-                        let key: ResourceKey = skel.resource_locator_api.as_key(delivery.payload.to.clone()).await?;
+                        let key: ResourceKey = skel.resource_locator_api.as_key(delivery.entity.to.clone()).await?;
                         let (tx, rx) = oneshot::channel();
                         host_tx.send(HostCall::UpdateState{ key, state, tx }).await?;
                         let result = rx.await;
@@ -222,6 +282,8 @@ impl MessagingEndpointComponent {
                     }
 
                 }
+
+                 */
                 Ok(())
             }
 
@@ -237,7 +299,7 @@ impl MessagingEndpointComponent {
 
     async fn process_resource_port_request(
         &mut self,
-        delivery: Delivery<Message<ResourcePortMessage>>,
+        delivery: Delivery<Msg>,
     ) -> Result<(), Error> {
         let skel = self.skel.clone();
         let host_tx = self.host_tx.clone();
@@ -245,7 +307,7 @@ impl MessagingEndpointComponent {
             async fn process(
                 skel: StarSkel,
                 host_tx: mpsc::Sender<HostCall>,
-                delivery: Delivery<Message<ResourcePortMessage>>,
+                delivery: Delivery<Msg>,
             ) -> Result<(), Error> {
                 host_tx.try_send( HostCall::Port(delivery)).unwrap_or_default();
                 Ok(())
@@ -263,7 +325,7 @@ impl MessagingEndpointComponent {
 
     async fn process_resource_http_request(
         &mut self,
-        delivery: Delivery<Message<HttpRequest>>,
+        delivery: Delivery<Http>,
     ) -> Result<(), Error> {
         let skel = self.skel.clone();
         let host_tx = self.host_tx.clone();
@@ -271,7 +333,7 @@ impl MessagingEndpointComponent {
             async fn process(
                 skel: StarSkel,
                 host_tx: mpsc::Sender<HostCall>,
-                delivery: Delivery<Message<HttpRequest>>,
+                delivery: Delivery<Http>,
             ) -> Result<(), Error> {
                 host_tx.try_send( HostCall::Http(delivery)).unwrap_or_default();
                 Ok(())
@@ -296,7 +358,7 @@ impl MessagingEndpointComponent {
         tokio::spawn(async move {
             async fn process( skel: StarSkel, delivery: Delivery<ResourceRegistryRequest> ) -> Result<(),Error> {
                 if let Option::Some(registry) = skel.registry.clone() {
-                    match &delivery.payload {
+                    match &delivery.entity {
                         ResourceRegistryRequest::Register(registration) => {
                             let result = registry.register(registration.clone()).await;
                             delivery.result_ok(result);
@@ -415,7 +477,7 @@ println!("Select Property Ops... op.resource: {}", op.resource.to_string());
         &self,
         delivery: Delivery<ResourceHostAction>,
     ) -> Result<(), Error> {
-        match &delivery.payload {
+        match &delivery.entity {
             ResourceHostAction::Assign(assign) => {
                 let (tx, rx) = oneshot::channel();
                 let call = HostCall::Assign {

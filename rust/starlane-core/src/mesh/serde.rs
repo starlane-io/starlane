@@ -19,7 +19,7 @@ pub mod id {
     use mesh_portal_serde::version::latest::id;
     use mesh_portal_serde::version::latest::generic;
     use crate::resource::{ResourceKey, ResourceKind};
-    use starlane_resources::ResourcePath;
+    use starlane_resources::{ResourcePath, ResourceIdentifier};
 
     pub type Key = ResourceKey;
     pub type Address = ResourcePath;
@@ -27,7 +27,7 @@ pub mod id {
     pub type Kind = ResourceKind;
     pub type Specific = id::Specific;
     pub type Version = id::Version;
-    pub type Identifier = generic::id::Identifier<Key,Address>;
+    pub type Identifier = ResourceIdentifier;
     pub type Identifiers = generic::id::Identifiers<Key,Address>;
     pub type AddressAndKind = generic::id::AddressAndKind<Address,Kind>;
     pub type AddressAndType = generic::id::AddressAndType<Address,ResourceType>;
@@ -114,9 +114,10 @@ pub mod entity {
     pub mod request {
         use mesh_portal_serde::version::latest::generic;
         use mesh_portal_serde::version::latest::id::{Address, Key, Kind, ResourceType};
+        use crate::mesh::serde::bin::Bin;
 
         pub type ReqEntity = generic::entity::request::ReqEntity<Key,Address,Kind,ResourceType>;
-        pub type Rc = generic::entity::request::Rc<ResourceType>;
+        pub type Rc = generic::entity::request::Rc<Key,Address,Kind>;
         pub type Msg = generic::entity::request::Msg<Key,Address,Kind>;
         pub type Http = generic::entity::request::Http;
     }
@@ -230,7 +231,7 @@ pub mod generic {
             use mesh_portal_serde::version::latest::generic::payload::Payload;
 
             pub type ReqEntity<KEY, ADDRESS, KIND, RESOURCE_TYPE> = generic::entity::request::ReqEntity<KEY,ADDRESS,KIND,RESOURCE_TYPE>;
-            pub type Rc<RESOURCE_TYPE> = generic::entity::request::Rc<RESOURCE_TYPE>;
+            pub type Rc<KEY,ADDRESS,KIND> = generic::entity::request::Rc<KEY,ADDRESS,KIND,Bin>;
             pub type Msg<KEY, ADDRESS, KIND> = generic::entity::request::Msg<KEY,ADDRESS,KIND>;
             pub type Http = generic::entity::request::Http;
         }

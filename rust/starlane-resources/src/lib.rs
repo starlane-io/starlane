@@ -23,6 +23,8 @@ use starlane_macros::resources;
 use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
 use crate::message::{Fail, MessageFrom};
+use crate::mesh::serde::payload::Payload;
+use crate::mesh::serde::payload::Primitive;
 
 pub mod data;
 pub mod error;
@@ -1782,11 +1784,12 @@ pub struct ResourceCreate {
     pub key: KeyCreationSrc,
     pub address: AddressCreationSrc,
     pub archetype: ResourceArchetype,
-    pub state_src: AssignResourceStateSrc<DataSet<BinSrc>>,
+    pub state_src: AssignResourceStateSrc<Payload>,
     pub registry_info: Option<ResourceRegistryInfo>,
     pub owner: Option<UserKey>,
     pub strategy: ResourceCreateStrategy,
-    pub from: MessageFrom
+    pub from: MessageFrom,
+    pub set_directives: Vec<SetDir>
 }
 
 impl ResourceCreate {
@@ -1907,8 +1910,8 @@ pub enum KeySrc {
 #[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
 pub enum AssignResourceStateSrc<DATASET> {
     Stateless,
-    Direct(DATASET),
-    CreateArgs(String),
+    Identifier(ResourceIdentifier),
+    Direct(DATASET)
 }
 
 impl TryInto<LocalStateSetSrc> for AssignResourceStateSrc<DataSet<BinSrc>> {

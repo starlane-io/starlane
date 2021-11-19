@@ -172,15 +172,15 @@ impl Host for FileSystemHost {
     async fn http_message(&self, key: ResourceKey, delivery: Delivery<Message<HttpRequest>>) -> Result<(),Error> {
         let record = self.skel.resource_locator_api.locate(key.into()).await?;
 
-        let filepath = if delivery.payload.payload.path.ends_with("/") {
-            format!("{}:{}index.html", record.stub.address.to_string(),delivery.payload.payload.path )
+        let filepath = if delivery.entity.payload.path.ends_with("/") {
+            format!("{}:{}index.html", record.stub.address.to_string(),delivery.entity.payload.path )
         } else {
-            format!("{}:{}", record.stub.address.to_string(),delivery.payload.payload.path )
+            format!("{}:{}", record.stub.address.to_string(),delivery.entity.payload.path )
         };
 
         eprintln!("FILEPATH: {}", filepath );
         let filepath = ResourcePath::from_str(filepath.as_str())?;
-        let mut message = delivery.payload.clone();
+        let mut message = delivery.entity.clone();
         message.to = filepath.into();
         let mut star_message:StarMessage = delivery.into();
         star_message.payload = StarMessagePayload::MessagePayload(MessagePayload::HttpRequest(message));

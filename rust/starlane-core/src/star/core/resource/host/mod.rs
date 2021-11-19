@@ -26,6 +26,7 @@ use starlane_resources::http::HttpRequest;
 use crate::html::{HTML, html_error_code};
 use crate::frame::Reply;
 use crate::star::core::message::WrappedHttpRequest;
+use crate::mesh::serde::entity::request::{Http, Msg};
 
 pub mod artifact;
 mod default;
@@ -59,8 +60,8 @@ pub enum HostCall {
         key: ResourceKey,
         tx: oneshot::Sender<bool>,
     },
-    Port(Delivery<Message<ResourcePortMessage>>),
-    Http(Delivery<Message<HttpRequest>>),
+    Port(Delivery<Msg>),
+    Http(Delivery<Http>),
 }
 
 impl Call for HostCall {}
@@ -116,28 +117,28 @@ impl AsyncProcessor<HostCall> for HostComponent {
                 tx.send(host.has(key).await);
             }
             HostCall::Port(delivery) => {
-                match self.skel.resource_locator_api.as_key( delivery.payload.to.clone() ).await
+                match self.skel.resource_locator_api.as_key( delivery.entity.to.clone() ).await
                 {
                     Ok(key) => {
                         let host = self.host(key.resource_type()).await;
                         host.port_message(key, delivery).await;
                     }
                     Err(_) => {
-                        error!("could not find key for: {}", delivery.payload.to.to_string() );
+                        error!("could not find key for: {}", delivery.entity.to.to_string() );
                     }
 
                 }
             }
             HostCall::Http(delivery) => {
-                match self.skel.resource_locator_api.as_key( delivery.payload.to.clone() ).await
+                match self.skel.resource_locator_api.as_key( delivery.entity.to.clone() ).await
                 {
                     Ok(key) => {
                         let host = self.host(key.resource_type()).await;
                         host.http_message(key, delivery).await;
                     }
                     Err(_) => {
-                        error!("could not find key for: {}", delivery.payload.to.to_string() );
-                        delivery.fail( Fail::Error(format!("could not find key for: {}", delivery.payload.to.to_string())));
+                        error!("could not find key for: {}", delivery.entity.to.to_string() );
+                        delivery.fail( Fail::Error(format!("could not find key for: {}", delivery.entity.to.to_string())));
                     }
 
                 }

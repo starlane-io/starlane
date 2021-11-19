@@ -219,6 +219,10 @@ pub fn parse_resource_kind(input: &str) -> Res<&str, Result<ResourceKind,Error>>
             )
         })
 }
+
+
+
+
 pub fn parse_resource_path(input: &str) -> Res<&str, ResourcePath> {
     context(
         "resource-path",
@@ -260,6 +264,8 @@ pub fn parse_resource_path_and_kind(input: &str) -> Res<&str, Result<ResourcePat
         )
     } )
 }
+
+
 
 pub fn parse_resource_path_and_type(input: &str) -> Res<&str, Result<ResourcePathAndType,Error>> {
     context(
