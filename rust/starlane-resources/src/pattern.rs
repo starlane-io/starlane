@@ -1,11 +1,10 @@
-use std::ops::Deref;
-use std::str::FromStr;
-use semver::VersionReq;
 use crate::pattern::specific::{ProductPattern, VariantPattern, VendorPattern, VersionPattern};
 use crate::{CamelCase, Error, ResourceType};
+use semver::VersionReq;
+use std::ops::Deref;
+use std::str::FromStr;
 
-
-#[derive(Eq,PartialEq)]
+#[derive(Eq, PartialEq)]
 pub enum SegmentPattern {
     Any,       // *
     Recursive, // **
@@ -15,26 +14,25 @@ pub enum SegmentPattern {
 pub type KeySegment = String;
 pub type AddressSegment = String;
 
-#[derive(Eq,PartialEq)]
+#[derive(Eq, PartialEq)]
 pub enum ExactSegment {
     Key(KeySegment),
     Address(AddressSegment),
 }
 
-#[derive(Eq,PartialEq)]
+#[derive(Eq, PartialEq)]
 pub struct Hop {
     pub segment: SegmentPattern,
-    pub tks: TKSPattern,
+    pub tks: TksPattern,
 }
 
-#[derive(Eq,PartialEq)]
+#[derive(Eq, PartialEq)]
 pub enum Pattern<P> {
     Any,
     Exact(P),
 }
 
-impl Into<Pattern<String>> for Pattern<&str>
-{
+impl Into<Pattern<String>> for Pattern<&str> {
     fn into(self) -> Pattern<String> {
         match self {
             Pattern::Any => Pattern::Any,
@@ -43,18 +41,26 @@ impl Into<Pattern<String>> for Pattern<&str>
     }
 }
 
+impl <P> ToString for Pattern<P> where P:ToString {
+    fn to_string(&self) -> String {
+        match self{
+            Pattern::Any => {"*".to_string()}
+            Pattern::Exact(exact) => {exact.to_string()}
+        }
+    }
+}
 
 pub type ResourceTypePattern = Pattern<CamelCase>;
 pub type KindPattern = Pattern<CamelCase>;
 pub mod specific {
-    use std::ops::Deref;
-    use std::str::FromStr;
     use crate::pattern::Pattern;
     use crate::{DomainCase, Error, SkewerCase};
     use semver::VersionReq;
+    use std::ops::Deref;
+    use std::str::FromStr;
 
     pub struct Version {
-        pub req: VersionReq
+        pub req: VersionReq,
     }
 
     impl Deref for Version {
@@ -65,12 +71,12 @@ pub mod specific {
         }
     }
 
-    impl FromStr for Version  {
+    impl FromStr for Version {
         type Err = Error;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
-            Ok(Version{
-                req: VersionReq::from_str(s)?
+            Ok(Version {
+                req: VersionReq::from_str(s)?,
             })
         }
     }
@@ -79,10 +85,9 @@ pub mod specific {
     pub type ProductPattern = Pattern<SkewerCase>;
     pub type VariantPattern = Pattern<SkewerCase>;
     pub type VersionPattern = Pattern<Version>;
-
 }
 
-#[derive(Eq,PartialEq)]
+#[derive(Eq, PartialEq)]
 pub struct SpecificPattern {
     pub vendor: VendorPattern,
     pub product: ProductPattern,
@@ -90,46 +95,63 @@ pub struct SpecificPattern {
     pub version: VersionReq,
 }
 
-#[derive(Eq,PartialEq)]
-pub struct TKSPattern {
+impl ToString for SpecificPattern{
+    fn to_string(&self) -> String {
+        format!("{}:{}:{}:({})", self.vendor.to_string(), self.product.to_string(), self.variant.to_string(), self.version.to_string() )
+    }
+}
+
+#[derive(Eq, PartialEq)]
+pub struct TksPattern {
     pub resource_type: ResourceTypePattern,
     pub kind: KindPattern,
     pub specific: Pattern<SpecificPattern>,
 }
 
-impl TKSPattern {
-    pub fn any() -> Self {
+
+impl TksPattern {
+    pub fn new(resource_type: ResourceTypePattern, kind: KindPattern, specific: Pattern<SpecificPattern> ) -> Self {
         Self {
-            resource_type: ResourceTypePattern::Any,
-            kind: KindPattern::Any,
-            specific: Pattern::Any
+            resource_type,
+            kind,
+            specific
         }
     }
 }
 
-#[derive(Eq,PartialEq)]
+impl TksPattern {
+    pub fn any() -> Self {
+        Self {
+            resource_type: ResourceTypePattern::Any,
+            kind: KindPattern::Any,
+            specific: Pattern::Any,
+        }
+    }
+}
+
+#[derive(Eq, PartialEq)]
 pub struct ResourcePattern {
     pub hops: Vec<Hop>,
 }
 
 pub mod parse {
     use crate::parse::any_resource_path_segment;
+    use crate::pattern::specific::VersionPattern;
     use crate::pattern::{
         AddressSegment, ExactSegment, Hop, KindPattern, Pattern, ResourceTypePattern,
-        SegmentPattern, SpecificPattern, TKSPattern,
+        SegmentPattern, SpecificPattern, TksPattern,
     };
-    use crate::{domain, skewer, camel, Res, Error, version_req,ResourceType};
+    use crate::{camel, domain, skewer, version_req, Error, Res, ResourceType};
     use nom::branch::alt;
     use nom::bytes::complete::tag;
-    use nom::character::complete::alpha1;
+    use nom::character::complete::{alpha1, digit1};
     use nom::combinator::{opt, recognize};
     use nom::error::VerboseError;
     use nom::sequence::{delimited, tuple};
     use nom::IResult;
+    use nom::Parser;
     use nom_supreme::{parse_from_str, ParserExt};
     use semver::VersionReq;
-    use crate::pattern::specific::VersionPattern;
-    use nom::Parser;
 
     fn any_segment(input: &str) -> Res<&str, SegmentPattern> {
         tag("*")(input).map(|(next, _)| (next, SegmentPattern::Any))
@@ -156,7 +178,7 @@ pub mod parse {
         parse: fn(input: &str) -> Res<&str, P>,
     ) -> impl Fn(&str) -> Res<&str, Pattern<P>> {
         move |input: &str| match tag::<&str, &str, VerboseError<&str>>("*")(input) {
-            Ok((next,_)) => Ok((next, Pattern::Any)),
+            Ok((next, _)) => Ok((next, Pattern::Any)),
             Err(_) => {
                 let (next, p) = parse(input)?;
                 let pattern = Pattern::Exact(p);
@@ -165,8 +187,8 @@ pub mod parse {
         }
     }
 
-    fn version( input: &str ) -> Res<&str, ResourceType> {
-        parse_from_str( version_req).parse(input)
+    fn version(input: &str) -> Res<&str, VersionReq> {
+        parse_from_str(version_req).parse(input)
     }
 
     fn specific(input: &str) -> Res<&str, SpecificPattern> {
@@ -177,32 +199,28 @@ pub mod parse {
             tag(":"),
             pattern(skewer),
             tag(":"),
-            pattern(version ),
+            delimited(tag("("),version, tag(")"))
         ))(input)
         .map(|(next, (vendor, _, product, _, variant, _, version))| {
             let specific = SpecificPattern {
                 vendor,
                 product,
                 variant,
-                version: VersionReq::any(),
+                version
             };
             (next, specific)
         })
     }
 
     fn kind(input: &str) -> Res<&str, KindPattern> {
-        pattern(camel)(input).map(|(next, kind)| {
-            (next, kind)
-        })
+        pattern(camel)(input).map(|(next, kind)| (next, kind))
     }
 
     fn resource_type(input: &str) -> Res<&str, ResourceTypePattern> {
-        pattern(camel)(input).map(|(next, resource_type)| {
-            (next, resource_type)
-        })
+        pattern(camel)(input).map(|(next, resource_type)| (next, resource_type))
     }
 
-    fn tks(input: &str) -> Res<&str, TKSPattern> {
+    fn tks(input: &str) -> Res<&str, TksPattern> {
         delimited(
             tag("<"),
             tuple((
@@ -227,7 +245,7 @@ pub mod parse {
                 ),
             };
 
-            let tks = TKSPattern {
+            let tks = TksPattern {
                 resource_type,
                 kind,
                 specific,
@@ -237,29 +255,74 @@ pub mod parse {
         })
     }
 
-    fn hop( input: &str ) -> Res<&str,Hop> {
-        tuple( (segment,opt(tks)) )(input).map( |(next,(segment,tks))|{
+    fn hop(input: &str) -> Res<&str, Hop> {
+        tuple((segment, opt(tks)))(input).map(|(next, (segment, tks))| {
             let tks = match tks {
-                None => {
-                    TKSPattern::any()
-                }
-                Some(tks) => {
-                    tks
-                }
+                None => TksPattern::any(),
+                Some(tks) => tks,
             };
-            (next, Hop{ segment, tks })
+            (next, Hop { segment, tks })
         })
     }
 
     #[cfg(test)]
     pub mod test {
-        use crate::Error;
-        use crate::pattern::parse::segment;
-        use crate::pattern::SegmentPattern;
+        use std::str::FromStr;
+        use nom::combinator::all_consuming;
+        use semver::VersionReq;
+        use crate::pattern::parse::{segment, specific, tks, version};
+        use crate::pattern::{AddressSegment, ExactSegment, Pattern, SegmentPattern, SpecificPattern, TksPattern};
+        use crate::{CamelCase, DomainCase, Error, SkewerCase};
 
         #[test]
-        pub fn test() -> Result<(),Error> {
-            assert!( segment("*")? == ("",SegmentPattern::Any));
+        pub fn test_segs() -> Result<(), Error> {
+            assert!(segment("*")? == ("", SegmentPattern::Any));
+            assert!(segment("**")? == ("", SegmentPattern::Recursive));
+            assert!(segment("hello")? == ("", SegmentPattern::Exact(ExactSegment::Address("hello".to_string()) )));
+            Ok(())
+        }
+
+        #[test]
+        pub fn test_specific() -> Result<(),Error> {
+           let (_,x) = specific( "mysql.org:mysql:innodb:(7.0.1)'")?;
+println!("specific: '{}'",x.to_string()) ;
+            let (_,x) = specific( "mysql.org:mysql:innodb:(>=7.0.1, <8.0.0)" )?;
+println!("specific: '{}'",x.to_string()) ;
+
+            Ok(())
+        }
+
+        #[test]
+        pub fn test_tks() -> Result<(), Error> {
+            let tks_pattern = TksPattern {
+                resource_type: Pattern::Exact(CamelCase::new("App")),
+                kind: Pattern::Any,
+                specific: Pattern::Any
+            };
+
+            assert!( tks( "<App>")? == ("",tks_pattern) );
+
+            let tks_pattern = TksPattern {
+                resource_type: Pattern::Exact(CamelCase::new("Database")),
+                kind: Pattern::Exact(CamelCase::new("Relational")),
+                specific: Pattern::Any
+            };
+
+            assert!( tks( "<Database<Relational>>")? == ("",tks_pattern) );
+
+            let tks_pattern = TksPattern {
+                resource_type: Pattern::Exact(CamelCase::new("Database")),
+                kind: Pattern::Exact(CamelCase::new("Relational")),
+                specific: Pattern::Exact( SpecificPattern {
+                    vendor: Pattern::Exact(DomainCase::new("mysql.org")),
+                    product: Pattern::Exact(SkewerCase::new("mysql")),
+                    variant: Pattern::Exact(SkewerCase::new("innodb")),
+                    version: VersionReq::from_str("^7.0.1")?
+                })
+            };
+
+            assert!( tks( "<Database<Relational<mysql.org:mysql:innodb:^7.0.1>>>")? == ("",tks_pattern) );
+
             Ok(())
         }
     }

@@ -8,7 +8,6 @@
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-resources/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-resources/src/parse.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/parse.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-resources/src/pattern.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/pattern.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -76,7 +75,7 @@
       <recent name="$PROJECT_DIR$/starlane-core/src/config" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test pattern::parse::test::test">
+  <component name="RunManager" selected="Cargo.Test pattern::parse::test::test_specific">
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
       <option name="command" value="run  --bin starlane -- serve --with-external" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -95,40 +94,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test config::reverse_proxy::tests::test_reverse_proxy_config" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib config::reverse_proxy::tests::test_reverse_proxy_config -- --exact" />
-      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
-      <option name="channel" value="DEFAULT" />
-      <option name="requiredFeatures" value="true" />
-      <option name="allFeatures" value="false" />
-      <option name="emulateTerminal" value="false" />
-      <option name="withSudo" value="false" />
-      <option name="backtrace" value="SHORT" />
-      <envs />
-      <option name="isRedirectInput" value="false" />
-      <option name="redirectInputPath" value="" />
-      <method v="2">
-        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
-      </method>
-    </configuration>
     <configuration name="Test mesh::test::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
       <option name="command" value="test --package starlane-core --lib mesh::test::test -- --exact" />
-      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
-      <option name="channel" value="DEFAULT" />
-      <option name="requiredFeatures" value="true" />
-      <option name="allFeatures" value="false" />
-      <option name="emulateTerminal" value="false" />
-      <option name="withSudo" value="false" />
-      <option name="backtrace" value="SHORT" />
-      <envs />
-      <option name="isRedirectInput" value="false" />
-      <option name="redirectInputPath" value="" />
-      <method v="2">
-        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
-      </method>
-    </configuration>
-    <configuration name="Test parse::tests::test_parse_resource_property_assignment" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-resources --lib parse::tests::test_parse_resource_property_assignment -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -159,8 +126,40 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test star::variant::web::test::path_regex" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib star::variant::web::test::path_regex -- --exact" />
+    <configuration name="Test pattern::parse::test::test_specific" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib pattern::parse::test::test_specific -- --exact" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <envs />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test pattern::parse::test::test_tks" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib pattern::parse::test::test_tks -- --exact" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <envs />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test pattern::parse::test::test_version" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib pattern::parse::test::test_version -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -194,19 +193,19 @@
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test" />
-      <item itemvalue="Cargo.Test config::reverse_proxy::tests::test_reverse_proxy_config" />
-      <item itemvalue="Cargo.Test parse::tests::test_parse_resource_property_assignment" />
-      <item itemvalue="Cargo.Test star::variant::web::test::path_regex" />
       <item itemvalue="Cargo.Test mesh::test::test" />
       <item itemvalue="Cargo.Test pattern::parse::test::test" />
+      <item itemvalue="Cargo.Test pattern::parse::test::test_version" />
+      <item itemvalue="Cargo.Test pattern::parse::test::test_tks" />
+      <item itemvalue="Cargo.Test pattern::parse::test::test_specific" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Test pattern::parse::test::test_specific" />
+        <item itemvalue="Cargo.Test pattern::parse::test::test_tks" />
+        <item itemvalue="Cargo.Test pattern::parse::test::test_version" />
         <item itemvalue="Cargo.Test pattern::parse::test::test" />
         <item itemvalue="Cargo.Test mesh::test::test" />
-        <item itemvalue="Cargo.Test star::variant::web::test::path_regex" />
-        <item itemvalue="Cargo.Test parse::tests::test_parse_resource_property_assignment" />
-        <item itemvalue="Cargo.Test config::reverse_proxy::tests::test_reverse_proxy_config" />
       </list>
     </recent_temporary>
   </component>
@@ -240,7 +239,7 @@
       <workItem from="1635009259888" duration="33353000" />
       <workItem from="1636706841180" duration="37334000" />
       <workItem from="1637486238155" duration="249000" />
-      <workItem from="1637486555303" duration="12144000" />
+      <workItem from="1637486555303" duration="15073000" />
     </task>
     <servers />
   </component>

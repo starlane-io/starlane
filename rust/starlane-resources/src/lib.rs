@@ -318,13 +318,25 @@ fn version_req<T>(i: T) -> Res<T, T>
     i.split_at_position1_complete(
         |item| {
             let char_item = item.as_char();
+            !(char_item == ' ') &&
+            !(char_item == '.') &&
+            !(char_item == ',') &&
             !(char_item == '=') &&
             !(char_item == '>') &&
             !(char_item == '<') &&
             !(char_item == '~') &&
             !(char_item == '^') &&
             !(char_item == '*') &&
-            !(char_item.is_dec_digit())
+            !(char_item == '0') &&
+            !(char_item == '1') &&
+            !(char_item == '2') &&
+            !(char_item == '3') &&
+            !(char_item == '4') &&
+            !(char_item == '5') &&
+            !(char_item == '6') &&
+            !(char_item == '7') &&
+            !(char_item == '8') &&
+            !(char_item == '9')
         },
         ErrorKind::AlphaNumeric,
     )
