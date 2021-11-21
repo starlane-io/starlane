@@ -118,7 +118,7 @@ pub mod parse {
         AddressSegment, ExactSegment, Hop, KindPattern, Pattern, ResourceTypePattern,
         SegmentPattern, SpecificPattern, TKSPattern,
     };
-    use crate::{domain, skewer, camel, Res, Error, version_req};
+    use crate::{domain, skewer, camel, Res, Error, version_req,ResourceType};
     use nom::branch::alt;
     use nom::bytes::complete::tag;
     use nom::character::complete::alpha1;
@@ -129,6 +129,7 @@ pub mod parse {
     use nom_supreme::{parse_from_str, ParserExt};
     use semver::VersionReq;
     use crate::pattern::specific::VersionPattern;
+    use nom::Parser;
 
     fn any_segment(input: &str) -> Res<&str, SegmentPattern> {
         tag("*")(input).map(|(next, _)| (next, SegmentPattern::Any))
@@ -164,7 +165,7 @@ pub mod parse {
         }
     }
 
-    fn version( input: &str ) -> Res<&str, VersionReq> {
+    fn version( input: &str ) -> Res<&str, ResourceType> {
         parse_from_str( version_req).parse(input)
     }
 

@@ -608,8 +608,8 @@ fn skewer(input: &str) -> Res<&str, SkewerCase> {
 }
 
 fn camel(input: &str) -> Res<&str, CamelCase> {
-    context("camel-case", recognize(tuple((upper1,alpha0)))(input)
-        .map(|(input, camel)| (input, CamelCase::new(camel))))
+    recognize(tuple((upper1,alpha0)))(input)
+        .map(|(input, camel)| (input, CamelCase::new(camel)))
 }
 
 
@@ -760,6 +760,12 @@ impl Into<ResourceAddress> for ResourceAddressKind {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct CamelCase{
     string: String,
+}
+
+impl CamelCase {
+    pub fn new( s: &str ) -> Self {
+        CamelCase{ string: s.to_string() }
+    }
 }
 
 impl ToString for CamelCase{

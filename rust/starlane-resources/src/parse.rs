@@ -505,6 +505,7 @@ mod tests {
         Ok(())
     }
 
+    /*
     #[test]
     fn test_parse_resource_value_selector() -> Result<(), Error> {
         let (leftover, result)= parse_resource_value_selector("hello:my::state")?;
@@ -576,5 +577,7 @@ mod tests {
 
         Ok(())
     }
+
+     */
 
 }
