@@ -15,7 +15,7 @@ use crate::error::Error;
 use crate::property::{ResourcePropertyValueSelector, DataSetAspectSelector, ResourceValueSelector, ResourceProperty, ResourcePropertyAssignment, ResourceRegistryPropertyValueSelector, ResourceHostPropertyValueSelector, ResourceRegistryProperty};
 use nom::branch::alt;
 
-fn any_resource_path_segment<T>(i: T) -> Res<T, T>
+pub fn any_resource_path_segment<T>(i: T) -> Res<T, T>
     where
         T: InputTakeAtPosition,
         <T as InputTakeAtPosition>::Item: AsChar,
