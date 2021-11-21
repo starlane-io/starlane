@@ -23,13 +23,10 @@ use starlane_macros::resources;
 use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
 use crate::message::{Fail, MessageFrom};
-use crate::mesh::serde::payload::Payload;
-use crate::mesh::serde::payload::Primitive;
 
 pub mod data;
 pub mod error;
 pub mod parse;
-pub mod message;
 pub mod http;
 pub mod property;
 pub mod status;
@@ -1789,7 +1786,7 @@ pub struct ResourceCreate {
     pub owner: Option<UserKey>,
     pub strategy: ResourceCreateStrategy,
     pub from: MessageFrom,
-    pub set_directives: Vec<SetDir>
+    pub set_directives: HashMap<String,Value>
 }
 
 impl ResourceCreate {

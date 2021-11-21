@@ -36,6 +36,7 @@ use crate::watch::{WatchResourceSelector, Watcher};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
 use crate::artifact::ArtifactBundle;
 use starlane_resources::http::HttpRequest;
+use crate::resources::message::ProtoMessage;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -67,21 +68,8 @@ impl StarlaneApi {
     ) -> Result<Creation<ArtifactBundleSeriesApi>, Error> {
         let resource_src = AssignResourceStateSrc::Stateless;
 
-        let create = ResourceCreate {
-            parent: path.parent().ok_or("ArtifactBundleSeries must have a parent".to_string() )?.into(),
-            key: KeyCreationSrc::None,
-            address: AddressCreationSrc::Append(path.name().to_string()),
-            archetype: ResourceArchetype {
-                kind: ResourceKind::ArtifactBundleSeries,
-                specific: None,
-                config: ConfigSrc::None,
-            },
-            state_src: resource_src,
-            registry_info: None,
-            owner: None,
-            strategy: ResourceCreateStrategy::Create,
-            from: MessageFrom::Inject
-        };
+        let create = format!("{}<{}>", path.to_string(), ResourceKind::ArtifactBundleSeries.to_string() );
+
         Ok(Creation::new(self.clone(), create))
     }
 }
@@ -122,7 +110,7 @@ impl StarlaneApi {
         Ok(())
     }
 
-    pub async fn send( &self, message: Message<ResourcePortMessage>, description: &str ) -> Result<Reply,Error> {
+    pub async fn send( &self, message: MessageRx, description: &str ) -> Result<Reply,Error> {
         let proto = message.try_into()?;
 info!("staring message exchange for {}",description);
         let reply = self.surface_api.exchange(proto, ReplyKind::Port, description ).await?;
@@ -136,7 +124,8 @@ info!("received reply for {}",description);
 
     }
 
-    pub async fn send_http_message( &self, proto: ProtoMessage<HttpRequest>, expect: ReplyKind, description: &str ) -> Result<Reply,Error> {
+    /*
+    pub async fn send_http_message( &self, proto: ProtoMessage, expect: ReplyKind, description: &str ) -> Result<Reply,Error> {
         let proto = proto.try_into()?;
         info!("staring message exchange for {}",description);
         let reply = self.surface_api.exchange(proto, expect, description ).await?;
@@ -149,6 +138,8 @@ info!("received reply for {}",description);
         }
 
     }
+
+     */
 
 
 
@@ -213,9 +204,7 @@ info!("received reply for {}",description);
 
      */
 
-    pub async fn create_resource(&self, create: ResourceCreate) -> Result<ResourceRecord, Error> {
-        let create = to_keyed_for_reasource_create(create, self.clone()).await?;
-
+    pub async fn create_resource(&self, create: String) -> Result<ResourceRecord, Error> {
 
         let mut proto = ProtoMessage::new();
         proto.to(create.parent.clone().into());
@@ -398,7 +387,7 @@ info!("received reply for {}",description);
         self.select(identifier, selector).await
     }
 
-    pub async fn create_api<API>(&self, create: ResourceCreate) -> Result<API, Error>
+    pub async fn create_api<API>(&self, create: String ) -> Result<API, Error>
     where
         API: TryFrom<ResourceApi>,
     {
@@ -948,7 +937,7 @@ where
     API: TryFrom<ResourceApi>,
 {
     api: StarlaneApi,
-    create: ResourceCreate,
+    create: String,
     phantom: PhantomData<API>,
 }
 
@@ -956,10 +945,10 @@ impl<API> Creation<API>
 where
     API: TryFrom<ResourceApi>,
 {
-    pub fn new(api: StarlaneApi, create: ResourceCreate) -> Self {
+    pub fn new(api: StarlaneApi, create: String ) -> Self {
         Self {
-            api: api,
-            create: create,
+            api,
+            create,
             phantom: PhantomData {},
         }
     }

@@ -13,13 +13,14 @@ use starlane_resources::message::{Fail, Message, MessageId, MessageReply, RawSta
 use crate::error::Error;
 use crate::id::Id;
 use crate::logger::Flags;
-use crate::message::{MessageExpect, MessageUpdate, ProtoStarMessage};
-use crate::message::resource::ActorMessage;
+use crate::message::{MessageExpect, MessageUpdate, ProtoStarMessage, MessageId};
+use crate::message::delivery::ActorMessage;
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey};
 use crate::watch::{Notification, Watch, WatchKey};
 use crate::resource::{ResourceId, ResourceRegistration, ResourceRecord, ResourceType, ResourceKey, ResourceSliceStatus,  UserKey, AppKey, ActorKey};
 use starlane_resources::property::{ResourceValues, ResourceRegistryProperty, ResourceRegistryPropertyAssignment, ResourceRegistryPropertyValueSelector, ResourcePropertyOp};
 use starlane_resources::http::{HttpResponse, HttpRequest};
+use crate::mesh;
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum Frame {
@@ -359,6 +360,7 @@ impl Debug for StarMessagePayload {
     }
 }
 
+/*
 #[derive(Clone, Serialize, Deserialize)]
 pub enum MessagePayload {
     Request(Message<ResourceRequestMessage>),
@@ -366,6 +368,8 @@ pub enum MessagePayload {
     PortRequest(Message<ResourcePortMessage>),
     HttpRequest(Message<HttpRequest>),
 }
+
+ */
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum ResourceHostAction {
@@ -691,5 +695,11 @@ impl fmt::Display for ProtoFrame {
     }
 }
 
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum Fail {
+    Star,
+    MeshPortal(mesh::serde::fail::Fail)
+}
 
 

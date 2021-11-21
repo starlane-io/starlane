@@ -19,12 +19,7 @@ use crate::message::ProtoStarMessage;
 use crate::resource::{ResourceId, ResourceKey, ResourceRecord, ResourceType};
 use crate::star::{StarCommand, StarSkel};
 use crate::util;
-
-//pub type MessageTo = ResourceIdentifier;
-
-pub fn reverse(to: MessageTo) -> MessageFrom {
-    MessageFrom::Resource(to)
-}
+use crate::mesh::serde::fail::Fail;
 
 #[derive(Clone)]
 pub struct Delivery<M>
@@ -51,7 +46,7 @@ where
     pub async fn to(&self) -> Result<ResourceKey,Error> {
         match &self.star_message.payload {
             StarMessagePayload::MessagePayload(message) => {
-                Ok(self.skel.resource_locator_api.locate(message.to()).await?)
+                Ok(self.skel.resource_locator_api.locate(message.to()).await?.stub.key)
             }
             _ => {
                 Err("this type of Delivery does not support to() resolution".into())

@@ -17,7 +17,7 @@ use crate::star::core::resource::host::mechtron::MechtronHost;
 use crate::star::core::resource::host::space::SpaceHost;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use crate::message::resource::Delivery;
+use crate::message::delivery::Delivery;
 use crate::star::core::resource::host::kube::KubeHost;
 use crate::star::core::resource::host::file::{FileHost, FileSystemHost};
 use starlane_resources::property::{ResourceValueSelector, ResourceValues, ResourcePropertyValueSelector, ResourceValue, ResourceHostPropertyValueSelector};

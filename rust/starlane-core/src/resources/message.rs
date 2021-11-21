@@ -1,0 +1,140 @@
+use std::collections::HashSet;
+use std::convert::Infallible;
+use std::iter::FromIterator;
+use std::string::FromUtf8Error;
+
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+
+use crate::{ResourceAddress, ResourceCreate, ResourceIdentifier, ResourceKey, ResourceKind, ResourceSelector, ResourceStub, ResourceType, SkewerCase, Specific, ResourceId, Resource};
+use crate::error::Error;
+use crate::data::{DataSet, BinSrc, Meta};
+use crate::property::{ResourcePropertyValueSelector, ResourceValueSelector, ResourceProperty, ResourceRegistryProperty, ResourceHostPropertyValueSelector};
+use crate::mesh::serde::entity::request::ReqEntity;
+use starlane_resources::ResourceIdentifier;
+use crate::mesh::serde::entity::response::RespEntity;
+use crate::mesh::Request;
+use crate::mesh::Response;
+use crate::mesh::serde::messaging::{Exchange, ExchangeId};
+
+pub struct ProtoMessage {
+    pub id: MessageId,
+    pub from: Option<ResourceIdentifier>,
+    pub to: Option<ResourceIdentifier>,
+    pub entity: Option<ReqEntity>,
+    pub exchange: ExchangeType,
+    pub trace: bool,
+    pub log: bool,
+}
+
+impl ProtoMessage {
+    pub fn new() -> Self {
+        ProtoMessage {
+            id: MessageId::new_v4(),
+            from: Option::None,
+            to: Option::None,
+            entity: None,
+            trace: false,
+            log: false,
+            exchange: Exchange::Notification
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), Error> {
+        if self.to.is_none() {
+            Err("ProtoMessage: RESOURCE to must be set".into())
+        } else if self.from.is_none() {
+            Err("ProtoMessage: from must be set".into())
+        } else if let Option::None = self.payload {
+            Err("ProtoMessage: message payload cannot be None".into())
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn create(self) -> Result<Request, Error> {
+        if let &Option::None = &self.payload {
+            return Err("ResourceMessagePayload cannot be None".into());
+        }
+        Ok(Request{
+            id: self.id.to_string(),
+            from: self.from.ok_or("need to set 'from' in ProtoMessage")?,
+            to: self.to.ok_or("need to set 'to' in ProtoMessage")?,
+            entity: self
+                .entity
+                .ok_or("need to set a payload in ProtoMessage")?,
+            exchange: self.exchange
+        })
+
+    }
+
+    pub fn to(&mut self, to: MessageTo) {
+        self.to = Option::Some(to);
+    }
+
+    pub fn from(&mut self, from: MessageFrom) {
+        self.from = Option::Some(from);
+    }
+
+    pub fn entity(&mut self, entity: ReqEntity) {
+        self.entity = Option::Some(entity);
+    }
+}
+
+
+
+pub struct ProtoMessageReply {
+    pub id: MessageId,
+    pub to: ResourceIdentifier,
+    pub from: Option<ResourceIdentifier>,
+    pub entity: Option<RespEntity>,
+    pub exchange: Option<ExchangeId>,
+    pub trace: bool,
+    pub log: bool,
+}
+
+impl ProtoMessageReply {
+
+    pub fn validate(&self) -> Result<(), Error> {
+        if self.reply_to.is_none() {
+            Err("ProtoMessageReply:reply_to must be set".into())
+        } else if self.from.is_none() {
+            Err("ProtoMessageReply: from must be set".into())
+        } else if let Option::None = self.entity {
+            Err("ProtoMessageReply: message entity cannot be None".into())
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn create(self) -> Result<Response, Error> {
+
+        Ok(Response{
+            id: self.id.to_string(),
+            to: self.to,
+            from: self.from.ok_or("need to set 'from' in ProtoMessageReply")?,
+            exchange: self
+                .exchange
+                .ok_or("need to set 'exchange' in ProtoMessageReply")?,
+            entity: self.
+                entity
+                .ok_or("need to set an entity in ProtoMessageReply")?,
+        })
+    }
+
+    pub fn from(&mut self, from: MessageFrom) {
+        self.from = Option::Some(from);
+    }
+
+    pub fn payload(&mut self, payload: P) {
+        self.payload = Option::Some(payload);
+    }
+}
+
+
+pub type MessageTo = ResourceIdentifier;
+
+
+pub type MessageId = Uuid;
+

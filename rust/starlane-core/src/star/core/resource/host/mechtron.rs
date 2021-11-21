@@ -13,7 +13,7 @@ use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util::AsyncHashMap;
-use crate::message::resource::Delivery;
+use crate::message::delivery::Delivery;
 use crate::frame::Reply;
 use starlane_resources::http::HttpRequest;
 

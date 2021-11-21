@@ -116,8 +116,8 @@ pub mod entity {
         use mesh_portal_serde::version::latest::id::{Address, Key, Kind, ResourceType};
         use crate::mesh::serde::bin::Bin;
 
-        pub type ReqEntity = generic::entity::request::ReqEntity<Key,Address,Kind,ResourceType>;
-        pub type Rc = generic::entity::request::Rc<Key,Address,Kind>;
+        pub type ReqEntity = generic::entity::request::ReqEntity<Key,Address,Kind>;
+        pub type Rc = generic::entity::request::Rc<Key,Address,Kind,Bin>;
         pub type Msg = generic::entity::request::Msg<Key,Address,Kind>;
         pub type Http = generic::entity::request::Http;
     }
@@ -155,14 +155,14 @@ pub mod portal {
         use crate::mesh::serde::entity::request::ReqEntity;
         use mesh_portal_serde::version::v0_0_1::generic::entity::request::{Rc, Http};
 
-        pub type Request=generic::portal::inlet::Request<Key,Address,Kind,ResourceType>;
+        pub type Request=generic::portal::inlet::Request<Key,Address,Kind>;
         pub type Response=generic::portal::inlet::Response<Key,Address,Kind>;
-        pub type Frame=generic::portal::inlet::Frame<Key,Address,Kind,ResourceType>;
+        pub type Frame=generic::portal::inlet::Frame<Key,Address,Kind>;
 
         pub mod exchange {
             use mesh_portal_serde::version::latest::id::{Address, Key, Kind, ResourceType};
             use mesh_portal_serde::version::latest::generic;
-            pub type Request=generic::portal::inlet::exchange::Request<Key,Address,Kind,ResourceType>;
+            pub type Request=generic::portal::inlet::exchange::Request<Key,Address,Kind>;
         }
     }
 
@@ -230,7 +230,7 @@ pub mod generic {
             use mesh_portal_serde::version::latest::generic::payload::Primitive;
             use mesh_portal_serde::version::latest::generic::payload::Payload;
 
-            pub type ReqEntity<KEY, ADDRESS, KIND, RESOURCE_TYPE> = generic::entity::request::ReqEntity<KEY,ADDRESS,KIND,RESOURCE_TYPE>;
+            pub type ReqEntity<KEY, ADDRESS, KIND> = generic::entity::request::ReqEntity<KEY,ADDRESS,KIND>;
             pub type Rc<KEY,ADDRESS,KIND> = generic::entity::request::Rc<KEY,ADDRESS,KIND,Bin>;
             pub type Msg<KEY, ADDRESS, KIND> = generic::entity::request::Msg<KEY,ADDRESS,KIND>;
             pub type Http = generic::entity::request::Http;
@@ -282,9 +282,9 @@ pub mod generic {
 
             use mesh_portal_serde::version::latest::generic::portal::inlet;
 
-            pub type Request<KEY, ADDRESS, KIND, RESOURCE_TYPE> = inlet::Request<KEY,ADDRESS,KIND,RESOURCE_TYPE>;
+            pub type Request<KEY, ADDRESS, KIND> = inlet::Request<KEY,ADDRESS,KIND>;
             pub type Response<KEY, ADDRESS, KIND> = inlet::Response<KEY,ADDRESS,KIND>;
-            pub type Frame<KEY, ADDRESS, KIND, RESOURCE_TYPE> = inlet::Frame<KEY,ADDRESS,KIND,RESOURCE_TYPE>;
+            pub type Frame<KEY, ADDRESS, KIND> = inlet::Frame<KEY,ADDRESS,KIND>;
 
             pub mod exchange {
                 use std::fmt::Debug;
@@ -294,7 +294,7 @@ pub mod generic {
                 use serde::{Deserialize, Serialize};
                 use mesh_portal_serde::version::latest::generic::portal::inlet::exchange;
 
-                pub type Request<KEY, ADDRESS, KIND, RESOURCE_TYPE> = exchange::Request<KEY,ADDRESS,KIND,RESOURCE_TYPE>;
+                pub type Request<KEY, ADDRESS, KIND> = exchange::Request<KEY,ADDRESS,KIND>;
             }
         }
 

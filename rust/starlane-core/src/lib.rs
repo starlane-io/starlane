@@ -63,6 +63,7 @@ pub mod wasm;
 pub mod parse;
 pub mod html;
 pub mod mesh;
+pub mod resources;
 
 lazy_static! {
     static ref VERSION: semver::Version = {

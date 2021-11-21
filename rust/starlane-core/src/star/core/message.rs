@@ -12,7 +12,7 @@ use crate::frame::{
     MessagePayload, ResourceRegistryRequest, Reply, ResourceHostAction, SimpleReply, StarMessage,
     StarMessagePayload,
 };
-use crate::message::resource::Delivery;
+use crate::message::delivery::Delivery;
 use crate::resource::{Parent, ParentCore, ResourceAddress, ResourceId, ResourceKey, ResourceManager, ResourceRecord};
 use crate::resource::{ResourceKind, ResourceType};
 use crate::star::{StarCommand, StarKind, StarSkel};

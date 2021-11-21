@@ -17,7 +17,7 @@ use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::watch::{Notification, Change, Topic, WatchSelector, Property};
-use crate::message::resource::Delivery;
+use crate::message::delivery::Delivery;
 use starlane_resources::http::HttpRequest;
 use starlane_resources::http::HttpResponse;
 use crate::html::html_error_code;
