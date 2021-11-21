@@ -7,7 +7,6 @@
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-resources/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/lib.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-resources/src/pattern.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/pattern.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -94,8 +93,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test mesh::test::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib mesh::test::test -- --exact" />
+    <configuration name="Test pattern::parse::test::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib pattern::parse::test::test -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -110,8 +109,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test pattern::parse::test::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-resources --lib pattern::parse::test::test -- --exact" />
+    <configuration name="Test pattern::parse::test::test_hop" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib pattern::parse::test::test_hop -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -193,19 +192,19 @@
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test" />
-      <item itemvalue="Cargo.Test mesh::test::test" />
       <item itemvalue="Cargo.Test pattern::parse::test::test" />
       <item itemvalue="Cargo.Test pattern::parse::test::test_version" />
       <item itemvalue="Cargo.Test pattern::parse::test::test_tks" />
       <item itemvalue="Cargo.Test pattern::parse::test::test_specific" />
+      <item itemvalue="Cargo.Test pattern::parse::test::test_hop" />
     </list>
     <recent_temporary>
       <list>
         <item itemvalue="Cargo.Test pattern::parse::test::test_specific" />
+        <item itemvalue="Cargo.Test pattern::parse::test::test_hop" />
         <item itemvalue="Cargo.Test pattern::parse::test::test_tks" />
         <item itemvalue="Cargo.Test pattern::parse::test::test_version" />
         <item itemvalue="Cargo.Test pattern::parse::test::test" />
-        <item itemvalue="Cargo.Test mesh::test::test" />
       </list>
     </recent_temporary>
   </component>
@@ -239,7 +238,7 @@
       <workItem from="1635009259888" duration="33353000" />
       <workItem from="1636706841180" duration="37334000" />
       <workItem from="1637486238155" duration="249000" />
-      <workItem from="1637486555303" duration="15073000" />
+      <workItem from="1637486555303" duration="19066000" />
     </task>
     <servers />
   </component>

@@ -1,29 +1,97 @@
 use crate::pattern::specific::{ProductPattern, VariantPattern, VendorPattern, VersionPattern};
-use crate::{CamelCase, Error, ResourceType};
+use crate::{CamelCase, Error, ResourceType, Specific};
 use semver::VersionReq;
 use std::ops::Deref;
 use std::str::FromStr;
 
+
 #[derive(Eq, PartialEq)]
+pub struct AddressTksPattern {
+    pub hops: Vec<Hop>,
+}
+
+impl AddressTksPattern {
+
+    pub fn pop(&self) -> Option<AddressTksPattern> {
+        if self.hops.len() <= 1 {
+            Option::None
+        } else {
+            let mut hops = self.hops.clone();
+            hops.remove(0);
+            Option::Some( AddressTksPattern {
+               hops
+            });
+        }
+    }
+
+    pub fn matches( &self, address_tks_path: &AddressTksPath  ) -> bool {
+        if address_tks_path.segments.is_empty() || self.hops.is_empty() {
+            return false;
+        }
+        else {
+            let hop = self.hops.first()
+        }
+    }
+}
+
+
+#[derive(Clone,Eq, PartialEq)]
 pub enum SegmentPattern {
     Any,       // *
     Recursive, // **
     Exact(ExactSegment),
 }
 
+impl SegmentPattern{
+    pub fn matches( &self, segment: &String ) -> bool {
+        match self {
+            SegmentPattern::Any => {
+                true
+            }
+            SegmentPattern::Recursive => {
+                true
+            }
+            SegmentPattern::Exact(exact) => {
+                match exact {
+                    ExactSegment::Address(pattern) => {
+                        *pattern == *segment
+                    }
+                }
+            }
+        }
+        false
+    }
+}
+
 pub type KeySegment = String;
 pub type AddressSegment = String;
 
-#[derive(Eq, PartialEq)]
+#[derive(Clone,Eq, PartialEq)]
 pub enum ExactSegment {
-    Key(KeySegment),
     Address(AddressSegment),
 }
 
-#[derive(Eq, PartialEq)]
+impl ExactSegment {
+    pub fn matches( &self, segment: &AddressSegment ) -> bool {
+        match self {
+            ExactSegment::Address(s)  => {
+              *s == *segment
+            }
+        }
+        false
+    }
+}
+
+#[derive(Clone, Eq, PartialEq)]
 pub struct Hop {
     pub segment: SegmentPattern,
     pub tks: TksPattern,
+}
+
+impl Hop {
+        pub fn matches( &self, address_tks_segment: &AddressTksSegment) -> bool {
+            self.segment.matches(&address_tks_segment.address_segment)
+        }
 }
 
 #[derive(Eq, PartialEq)]
@@ -129,9 +197,50 @@ impl TksPattern {
     }
 }
 
+
 #[derive(Eq, PartialEq)]
-pub struct ResourcePattern {
-    pub hops: Vec<Hop>,
+pub struct AddressTksPath {
+    pub segments: Vec<AddressTksSegment>
+}
+
+impl AddressTksPath {
+    pub fn pop(&self) -> Option<AddressTksPath> {
+        if self.segments.len() <= 1 {
+            Option::None
+        }
+        let mut segments = self.segments.clone();
+        segments.remove(0);
+        Option::Some( AddressTksPath {
+            segments
+        } )
+    }
+}
+
+
+#[derive(Eq, PartialEq)]
+pub struct AddressTksSegment{
+    pub address_segment: AddressSegment,
+    pub tks: Tks
+}
+
+
+#[derive(Eq, PartialEq)]
+pub struct Tks {
+    pub resource_type: ResourceType,
+    pub kind: Option<ResourceKind>
+}
+
+impl Tks {
+    pub fn specific(&self) -> Option<Specific> {
+        match &self.kind {
+            Some(kind) => {
+                kind.specific()
+            }
+            None => {
+                None
+            }
+        }
+    }
 }
 
 pub mod parse {
@@ -270,7 +379,7 @@ pub mod parse {
         use std::str::FromStr;
         use nom::combinator::all_consuming;
         use semver::VersionReq;
-        use crate::pattern::parse::{segment, specific, tks, version};
+        use crate::pattern::parse::{hop, segment, specific, tks, version};
         use crate::pattern::{AddressSegment, ExactSegment, Pattern, SegmentPattern, SpecificPattern, TksPattern};
         use crate::{CamelCase, DomainCase, Error, SkewerCase};
 
@@ -288,6 +397,8 @@ pub mod parse {
 println!("specific: '{}'",x.to_string()) ;
             let (_,x) = specific( "mysql.org:mysql:innodb:(>=7.0.1, <8.0.0)" )?;
 println!("specific: '{}'",x.to_string()) ;
+            let (_,x) = specific( "mysql.org:*:innodb:(>=7.0.1, <8.0.0)" )?;
+            println!("specific: '{}'",x.to_string()) ;
 
             Ok(())
         }
@@ -321,7 +432,23 @@ println!("specific: '{}'",x.to_string()) ;
                 })
             };
 
-            assert!( tks( "<Database<Relational<mysql.org:mysql:innodb:^7.0.1>>>")? == ("",tks_pattern) );
+            assert!( tks( "<Database<Relational<mysql.org:mysql:innodb:(^7.0.1)>>>")? == ("",tks_pattern) );
+
+            Ok(())
+        }
+
+        #[test]
+        pub fn test_hop() -> Result<(),Error>{
+            hop( "*<Database<Relational<mysql.org:mysql:innodb:(^7.0.1)>>>")?;
+            hop( "**<Database<Relational<mysql.org:mysql:innodb:(^7.0.1)>>>")?;
+            hop( "space.org:<Database<Relational<mysql.org:mysql:innodb:(^7.0.1)>>>")?;
+            hop( "space.org:something<Database<Relational<mysql.org:mysql:innodb:(^7.0.1)>>>")?;
+            hop( "space.org:no-type")?;
+            hop( "space.org:no-type:**")?;
+            hop( "space.org:app:users:*:tenant:**")?;
+            hop( "space.org:app:users:*:tenant:**<Mechtron>")?;
+            hop( "space.org:something:**<*<*<mysql.org:mysql:innodb:(^7.0.1)>>>")?;
+            hop( "space.org:something<*>")?;
 
             Ok(())
         }
@@ -365,3 +492,10 @@ println!("specific: '{}'",x.to_string()) ;
 // -> { -| $admins:** +c*wx |-> $app:**<Mechtron>*; }
 // allow agent pattern and permissions for sending anything to the admin/** port call
 // -> { -| $admins:** +c*wx |-> $app:**<Mechtron>^Msg!admin/**; }
+
+// <App> 'taint'
+// block -| $app:..:** +crwx |-| !$app:..:** +---- |
+
+
+
+
