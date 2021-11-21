@@ -10,7 +10,7 @@ use nom::{AsChar, InputTakeAtPosition, IResult};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
 use nom::character::complete::{alpha0, alpha1, anychar, digit0, digit1, one_of};
-use nom::combinator::{not, opt};
+use nom::combinator::{not, opt, recognize};
 use nom::error::{context, ErrorKind, VerboseError};
 use nom::multi::{many1, many_m_n, separated_list0, separated_list1};
 use nom::sequence::{delimited, preceded, terminated, tuple};
@@ -30,6 +30,11 @@ pub mod parse;
 pub mod http;
 pub mod property;
 pub mod status;
+pub mod pattern;
+
+// hacks for now
+pub type Payload = String;
+pub type SetDir = String;
 
 pub enum Galaxy{
     Local,
@@ -275,6 +280,20 @@ where
     )
 }
 
+fn upper1<T>(i: T) -> Res<T, T>
+    where
+        T: InputTakeAtPosition,
+        <T as InputTakeAtPosition>::Item: AsChar,
+{
+    i.split_at_position1_complete(
+        |item| {
+            let char_item = item.as_char();
+            !((char_item.is_alpha() && char_item.is_uppercase()) || char_item.is_dec_digit())
+        },
+        ErrorKind::AlphaNumeric,
+    )
+}
+
 fn loweralphanumerichyphen1<T>(i: T) -> Res<T, T>
 where
     T: InputTakeAtPosition,
@@ -285,6 +304,38 @@ where
             let char_item = item.as_char();
             !(char_item == '-')
                 && !((char_item.is_alpha() && char_item.is_lowercase()) || char_item.is_dec_digit())
+        },
+        ErrorKind::AlphaNumeric,
+    )
+}
+
+fn version_req<T>(i: T) -> Res<T, T>
+    where
+        T: InputTakeAtPosition,
+        <T as InputTakeAtPosition>::Item: AsChar,
+{
+    i.split_at_position1_complete(
+        |item| {
+            let char_item = item.as_char();
+            !(char_item == ' ') &&
+            !(char_item == '.') &&
+            !(char_item == ',') &&
+            !(char_item == '=') &&
+            !(char_item == '>') &&
+            !(char_item == '<') &&
+            !(char_item == '~') &&
+            !(char_item == '^') &&
+            !(char_item == '*') &&
+            !(char_item == '0') &&
+            !(char_item == '1') &&
+            !(char_item == '2') &&
+            !(char_item == '3') &&
+            !(char_item == '4') &&
+            !(char_item == '5') &&
+            !(char_item == '6') &&
+            !(char_item == '7') &&
+            !(char_item == '8') &&
+            !(char_item == '9')
         },
         ErrorKind::AlphaNumeric,
     )
@@ -567,6 +618,12 @@ fn skewer(input: &str) -> Res<&str, SkewerCase> {
         .map(|(input, skewer)| (input, SkewerCase::new(skewer)))
 }
 
+fn camel(input: &str) -> Res<&str, CamelCase> {
+    recognize(tuple((upper1,alpha0)))(input)
+        .map(|(input, camel)| (input, CamelCase::new(camel)))
+}
+
+
 fn skewer_segment(input: &str) -> Res<&str, ResourcePathSegment> {
     context("skewer-case-part", skewer)(input)
         .map(|(input, skewer)| (input, ResourcePathSegment::SkewerCase(skewer)))
@@ -710,6 +767,24 @@ impl Into<ResourceAddress> for ResourceAddressKind {
     }
 }
  */
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub struct CamelCase{
+    string: String,
+}
+
+impl CamelCase {
+    pub fn new( s: &str ) -> Self {
+        CamelCase{ string: s.to_string() }
+    }
+}
+
+impl ToString for CamelCase{
+    fn to_string(&self) -> String {
+        self.string.clone()
+    }
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct SkewerCase {
