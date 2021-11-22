@@ -14,7 +14,6 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 
-starlane-resources= { path = "../starlane-resources", version="0.1.0" }
 tokio = { version = "1.4.0", features = ["full"] }
 serde = { version="1.0.69", features=['derive','rc'] }
 serde_yaml = "0.8.19"
@@ -75,3 +74,4 @@ mesh-portal-serde = { path = "../../../mesh-portal/rust/mesh-portal-serde", vers
 mesh-portal-api-server = { path = "../../../mesh-portal/rust/mesh-portal-api-server", version="0.0.1"}
 mesh-portal-api = { path = "../../../mesh-portal/rust/mesh-portal-api", version="0.0.1"}
 mesh-portal-parse= { path = "../../../mesh-portal/rust/mesh-portal-parse", version="0.0.1"}
+starlane-macros = { path = "../starlane-macros", version= "0.1.0"}

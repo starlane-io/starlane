@@ -1,7 +1,6 @@
 use serde::{Serialize,Deserialize};
-use starlane_resources::message::{ResourcePortMessage, Message, ResourcePortReply};
-use starlane_resources::http::{HttpRequest, HttpResponse};
 
+/*
 #[derive(Clone,Serialize,Deserialize)]
 pub struct MechtronCall {
     pub mechtron: String,
@@ -21,3 +20,5 @@ pub enum MechtronResponse{
     PortReply(ResourcePortReply),
     HttpResponse(HttpResponse)
 }
+
+ */

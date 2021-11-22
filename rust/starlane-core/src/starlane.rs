@@ -26,7 +26,6 @@ use crate::proto::{
     local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoTunnel,
 };
 
-use starlane_resources::data::BinContext;
 use crate::star::surface::SurfaceApi;
 use crate::star::{ConstellationBroadcast, StarKind, StarStatus};
 use crate::star::{Request, Star, StarCommand, StarController, StarInfo, StarKey, StarTemplateId};

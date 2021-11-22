@@ -12,5 +12,4 @@ license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-starlane-resources= { path = "../starlane-resources", version="0.1.0"}
 serde = { version="1.0.69", features=['derive','rc'] }

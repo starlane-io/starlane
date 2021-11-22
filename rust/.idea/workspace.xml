@@ -6,23 +6,32 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/starlane-core/src/resources/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../example/app/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/../example/app/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/rust.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/rust.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mechtron-common/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/mechtron-common/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mechtron-common/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/mechtron-common/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mechtron/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/mechtron/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/frame.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/frame.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/mesh/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/mesh/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/mesh/serde.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/mesh/serde.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/message.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/message/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/message/delivery.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/parse.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/parse.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/file.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/file.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/mechtron.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/mechtron.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/host/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-resources/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-resources/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-resources/src/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resources/message.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/security/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/security/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/security/permissions.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/security/permissions.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources-test/Cargo.toml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources-test/src/main.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/Cargo.toml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/src/data.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/src/error.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/src/http.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/resources.rs/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/src/parse.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/resources/parse.rs/parse.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/src/pattern.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/pattern.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/src/property.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/resources/property.rs/property.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-resources/src/status.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/main.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -70,6 +79,9 @@
     <property name="jdk.selected.JAVA_MODULE" value="14" />
     <property name="last_opened_file_path" value="$PROJECT_DIR$/starlane-core/src/star/core/resource/host" />
     <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
+    <property name="project.structure.last.edited" value="Modules" />
+    <property name="project.structure.proportion" value="0.0" />
+    <property name="project.structure.side.proportion" value="0.2" />
     <property name="settings.editor.selected.configurable" value="language.rust" />
   </component>
   <component name="RecentsManager">
@@ -77,12 +89,14 @@
       <recent name="$PROJECT_DIR$/starlane-core/src/star/core/resource/host" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/starlane/src/resources/property.rs" />
+      <recent name="$PROJECT_DIR$/starlane/src/resources/parse.rs" />
+      <recent name="$PROJECT_DIR$/starlane/src/resources.rs" />
+      <recent name="$PROJECT_DIR$/starlane/src" />
       <recent name="$PROJECT_DIR$/starlane-core/src/resources" />
-      <recent name="$PROJECT_DIR$/starlane-resources/src" />
-      <recent name="$PROJECT_DIR$/starlane-core/src/config" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test mesh::test::test">
+  <component name="RunManager" selected="Cargo.Test lib::test">
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
       <option name="command" value="run  --bin starlane -- serve --with-external" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -101,24 +115,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test config::reverse_proxy::tests::test_parse_resource_path" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib config::reverse_proxy::tests::test_parse_resource_path -- --exact" />
-      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
-      <option name="channel" value="DEFAULT" />
-      <option name="requiredFeatures" value="true" />
-      <option name="allFeatures" value="false" />
-      <option name="emulateTerminal" value="false" />
-      <option name="withSudo" value="false" />
-      <option name="backtrace" value="SHORT" />
-      <envs />
-      <option name="isRedirectInput" value="false" />
-      <option name="redirectInputPath" value="" />
-      <method v="2">
-        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
-      </method>
-    </configuration>
-    <configuration name="Test config::reverse_proxy::tests::test_reverse_proxy_config" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib config::reverse_proxy::tests::test_reverse_proxy_config -- --exact" />
+    <configuration name="Test lib::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib test" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -149,8 +147,24 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test parse::tests::test_parse_resource_property_assignment" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-resources --lib parse::tests::test_parse_resource_property_assignment -- --exact" />
+    <configuration name="Test parse::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib pattern::parse::test" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <envs />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test pattern::parse::test::test_tks" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-resources --lib pattern::parse::test::test_tks -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -200,19 +214,19 @@
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test" />
-      <item itemvalue="Cargo.Test config::reverse_proxy::tests::test_parse_resource_path" />
-      <item itemvalue="Cargo.Test config::reverse_proxy::tests::test_reverse_proxy_config" />
-      <item itemvalue="Cargo.Test parse::tests::test_parse_resource_property_assignment" />
       <item itemvalue="Cargo.Test star::variant::web::test::path_regex" />
       <item itemvalue="Cargo.Test mesh::test::test" />
+      <item itemvalue="Cargo.Test pattern::parse::test::test_tks" />
+      <item itemvalue="Cargo.Test parse::test" />
+      <item itemvalue="Cargo.Test lib::test" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Test lib::test" />
+        <item itemvalue="Cargo.Test parse::test" />
+        <item itemvalue="Cargo.Test pattern::parse::test::test_tks" />
         <item itemvalue="Cargo.Test mesh::test::test" />
         <item itemvalue="Cargo.Test star::variant::web::test::path_regex" />
-        <item itemvalue="Cargo.Test parse::tests::test_parse_resource_property_assignment" />
-        <item itemvalue="Cargo.Test config::reverse_proxy::tests::test_reverse_proxy_config" />
-        <item itemvalue="Cargo.Test config::reverse_proxy::tests::test_parse_resource_path" />
       </list>
     </recent_temporary>
   </component>
@@ -244,7 +258,8 @@
       <workItem from="1634345190982" duration="10876000" />
       <workItem from="1634734665290" duration="17515000" />
       <workItem from="1635009259888" duration="33353000" />
-      <workItem from="1636706841180" duration="50318000" />
+      <workItem from="1636706841180" duration="59702000" />
+      <workItem from="1637543276000" duration="1271000" />
     </task>
     <servers />
   </component>

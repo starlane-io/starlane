@@ -6,6 +6,8 @@ use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 use std::sync::Arc;
 
+use mesh_portal_serde::version::latest::fail::Fail;
+use mesh_portal_serde::version::latest::payload::Payload;
 use nom::{AsChar, InputTakeAtPosition, IResult};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
@@ -22,7 +24,6 @@ use starlane_macros::resources;
 
 use crate::data::{BinSrc, DataSet};
 use crate::error::Error;
-use crate::message::{Fail, MessageFrom};
 
 pub mod data;
 pub mod error;
@@ -30,11 +31,10 @@ pub mod parse;
 pub mod http;
 pub mod property;
 pub mod status;
-pub mod pattern;
 
 // hacks for now
-pub type Payload = String;
-pub type SetDir = String;
+// pub type Payload = String;
+// pub type SetDir = String;
 
 pub enum Galaxy{
     Local,
@@ -1850,6 +1850,7 @@ impl ResourceArchetype {
 
 
 
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceCreate {
     pub parent: ResourceIdentifier,
@@ -1861,7 +1862,7 @@ pub struct ResourceCreate {
     pub owner: Option<UserKey>,
     pub strategy: ResourceCreateStrategy,
     pub from: MessageFrom,
-    pub set_directives: HashMap<String,Value>
+    pub set_directives: HashMap<String,SetDir>
 }
 
 impl ResourceCreate {
@@ -2241,35 +2242,6 @@ impl ResourceRegistryInfo {
 pub type Labels = HashMap<String, String>;
 pub type Names = Vec<String>;
 
-impl From<&str> for Fail {
-    fn from(str: &str) -> Self {
-        Fail::Error(str.to_string())
-    }
-}
-impl From<String> for Fail {
-    fn from(str: String) -> Self {
-        Fail::Error(str)
-    }
-}
-
-
-impl From<()> for Fail {
-    fn from(_error: ()) -> Self {
-        Fail::Error("() From Error".to_string())
-    }
-}
-
-impl From<std::io::Error> for Fail {
-    fn from(error: std::io::Error) -> Self {
-        Fail::Error(error.to_string())
-    }
-}
-
-impl From<SemVerError> for Fail {
-    fn from(error: SemVerError) -> Self {
-        Fail::Error(error.to_string())
-    }
-}
 
 impl ResourcePath {
     pub fn new( segments: Vec<String> ) -> Self {

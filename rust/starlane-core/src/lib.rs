@@ -64,10 +64,22 @@ pub mod parse;
 pub mod html;
 pub mod mesh;
 pub mod resources;
+pub mod security;
 
 lazy_static! {
     static ref VERSION: semver::Version = {
         semver::Version::from_str("0.1.0-alpha")
             .expect("expected starlane::VERSION semver string to parse.")
     };
+}
+
+#[cfg(test)]
+pub mod test {
+
+    #[test]
+    pub fn test() {
+        println!("It Works!");
+    }
+
+}
 }

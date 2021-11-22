@@ -7,18 +7,23 @@ extern crate tablestream;
 
 use std::fs::File;
 use std::io::{Read, Write};
+use std::io;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
+use tablestream::{Column, Stream};
 use tokio::runtime::Runtime;
 use tracing::dispatcher::set_global_default;
 use tracing_subscriber::FmtSubscriber;
 
 use starlane_core::error::Error;
+use starlane_core::frame::StarPattern;
+use starlane_core::parse::parse_star_pattern;
 use starlane_core::resource::{ResourceAddress, ResourceRecord};
 use starlane_core::resource::selector::MultiResourceSelector;
+use starlane_core::star::StarKey;
 use starlane_core::starlane::{
     ConstellationCreate, StarlaneCommand, StarlaneMachine, StarlaneMachineRunner,
 };
@@ -26,21 +31,16 @@ use starlane_core::starlane::api::StarlaneApi;
 use starlane_core::template::{ConstellationData, ConstellationLayout, ConstellationTemplate};
 use starlane_core::util;
 use starlane_core::util::shutdown;
-
-use starlane_resources::{ResourceCreate, KeyCreationSrc, AddressCreationSrc, ResourceArchetype, AssignResourceStateSrc, ResourceCreateStrategy, ResourceSelector, ResourcePath, ResourcePathAndKind, ResourceKind, FileKind, ConfigSrc};
-use starlane_resources::data::{DataSet, BinSrc, Meta};
-use starlane_resources::property::{ResourcePropertyValueSelector, ResourceValueSelector, ResourcePropertyAssignment};
-use starlane_core::watch::{WatchResourceSelector, Property};
+use starlane_core::watch::{Property, WatchResourceSelector};
+use starlane_resources::{AddressCreationSrc, AssignResourceStateSrc, ConfigSrc, FileKind, KeyCreationSrc, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceKind, ResourcePath, ResourcePathAndKind, ResourceSelector};
+use starlane_resources::data::{BinSrc, DataSet, Meta};
 use starlane_resources::message::MessageFrom;
-use starlane_core::frame::StarPattern;
-use std::io;
-use tablestream::{Stream, Column};
-use starlane_core::star::StarKey;
-use starlane_core::parse::parse_star_pattern;
 use starlane_resources::parse::parse_resource_properties_kind;
+use starlane_resources::property::{ResourcePropertyAssignment, ResourcePropertyValueSelector, ResourceValueSelector};
 
 mod cli;
 mod resource;
+pub mod pattern;
 
 fn main() -> Result<(), Error> {
     let subscriber = FmtSubscriber::default();
