@@ -1,13 +1,13 @@
 use crate::cache::{ArtifactItem, ArtifactCaches};
 use crate::config::mechtron::MechtronConfig;
 use crate::config::wasm::Wasm;
-use crate::config::bind::BindConfig;
+use crate::config::bind::{BindConfig};
 use crate::error::Error;
 use wasm_membrane_host::membrane::WasmMembrane;
 use std::sync::Arc;
 use starlane_resources::message::{ResourcePortMessage, Message, ResourcePortReply};
-use mechtron_common::{MechtronCall, MechtronCommand, MechtronResponse};
 use starlane_resources::http::{HttpRequest, HttpResponse};
+use mesh_portal_api::message::Message;
 
 #[derive(Clone)]
 pub struct Mechtron {
@@ -35,7 +35,7 @@ impl Mechtron {
         })
     }
 
-    pub async fn message( &self, message: Message<ResourcePortMessage>) -> Result<Option<ResourcePortReply>,Error> {
+    pub async fn message( &self, message: Message) -> Result<Option<ResourcePortReply>,Error> {
         let call = MechtronCall {
             mechtron: self.config.name.clone(),
             command: MechtronCommand::Message(message)
