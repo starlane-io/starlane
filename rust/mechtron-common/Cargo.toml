@@ -13,3 +13,6 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 serde = { version="1.0.69", features=['derive','rc'] }
+mesh-portal-serde = { path = "../../../mesh-portal/rust/mesh-portal-serde", version="0.0.1"}
+mesh-portal-api= { path = "../../../mesh-portal/rust/mesh-portal-api", version="0.0.1"}
+bincode = "1.3.3"

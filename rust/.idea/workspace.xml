@@ -6,10 +6,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/mechtron-common/src/version/latest/mod.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mechtron-common/src/version/v0_0_1/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mechtron-common/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/mechtron-common/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mechtron-common/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/mechtron-common/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mechtron/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/mechtron/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mechtron/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/mechtron/src/lib.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/mechtron.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/mechtron.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/mesh/serde.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/mesh/serde.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/wasm_membrane_guest/src/error.rs" beforeDir="false" afterPath="$PROJECT_DIR$/wasm_membrane_guest/src/error.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/wasm_membrane_guest/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/wasm_membrane_guest/src/lib.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -74,7 +80,7 @@
       <recent name="$PROJECT_DIR$/starlane/src" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test lib::test">
+  <component name="RunManager" selected="Cargo.Test test::test">
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
       <option name="command" value="run  --bin starlane -- serve --with-external" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -157,8 +163,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test star::variant::web::test::path_regex" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib star::variant::web::test::path_regex -- --exact" />
+    <configuration name="Test test::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package mechtron --lib test::test -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -192,19 +198,19 @@
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test" />
-      <item itemvalue="Cargo.Test star::variant::web::test::path_regex" />
       <item itemvalue="Cargo.Test mesh::test::test" />
       <item itemvalue="Cargo.Test pattern::parse::test::test_tks" />
       <item itemvalue="Cargo.Test parse::test" />
       <item itemvalue="Cargo.Test lib::test" />
+      <item itemvalue="Cargo.Test test::test" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Test test::test" />
         <item itemvalue="Cargo.Test lib::test" />
         <item itemvalue="Cargo.Test parse::test" />
         <item itemvalue="Cargo.Test pattern::parse::test::test_tks" />
         <item itemvalue="Cargo.Test mesh::test::test" />
-        <item itemvalue="Cargo.Test star::variant::web::test::path_regex" />
       </list>
     </recent_temporary>
   </component>
@@ -237,7 +243,8 @@
       <workItem from="1634734665290" duration="17515000" />
       <workItem from="1635009259888" duration="33353000" />
       <workItem from="1636706841180" duration="59702000" />
-      <workItem from="1637543276000" duration="27497000" />
+      <workItem from="1637543276000" duration="33373000" />
+      <workItem from="1637853168732" duration="1736000" />
     </task>
     <servers />
   </component>

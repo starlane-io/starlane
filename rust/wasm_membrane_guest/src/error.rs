@@ -39,3 +39,9 @@ impl From<FromUtf8Error> for Error {
         }
     }
 }
+
+impl ToString for Error {
+    fn to_string(&self) -> String {
+        self.error.clone()
+    }
+}

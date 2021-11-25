@@ -1,24 +1,6 @@
-use serde::{Serialize,Deserialize};
+use mesh_portal_serde::version::latest::portal::inlet;
+use mesh_portal_serde::version::latest::portal::outlet;
+use serde::{Deserialize, Serialize};
 
-/*
-#[derive(Clone,Serialize,Deserialize)]
-pub struct MechtronCall {
-    pub mechtron: String,
-    pub command: MechtronCommand
-}
+pub mod version;
 
-
-#[derive(Clone,Serialize,Deserialize)]
-pub enum MechtronCommand {
-    Message(Message<ResourcePortMessage>),
-    HttpRequest(Message<HttpRequest>)
-}
-
-
-#[derive(Clone,Serialize,Deserialize)]
-pub enum MechtronResponse{
-    PortReply(ResourcePortReply),
-    HttpResponse(HttpResponse)
-}
-
- */

@@ -6,8 +6,8 @@ use crate::error::Error;
 use wasm_membrane_host::membrane::WasmMembrane;
 use std::sync::Arc;
 use starlane_resources::message::{ResourcePortMessage, Message, ResourcePortReply};
-use starlane_resources::http::{HttpRequest, HttpResponse};
 use mesh_portal_api::message::Message;
+use mechtron_common::{MechtronGuestCall, HostToGuestFrame};
 
 #[derive(Clone)]
 pub struct Mechtron {
@@ -36,9 +36,9 @@ impl Mechtron {
     }
 
     pub async fn message( &self, message: Message) -> Result<Option<ResourcePortReply>,Error> {
-        let call = MechtronCall {
+        let call = MechtronGuestCall {
             mechtron: self.config.name.clone(),
-            command: MechtronCommand::Message(message)
+            frame: HostToGuestFrame::Message(message)
         };
 
         let string = serde_json::to_string(&call)?;
@@ -78,6 +78,7 @@ info!("... HOST .... SENDING REPLY......");
     }
 
 
+    /*
     pub async fn http_request( &self, message: Message<HttpRequest>) -> Result<Option<HttpResponse>,Error> {
         let call = MechtronCall {
             mechtron: self.config.name.clone(),
@@ -124,7 +125,7 @@ info!("... HOST .... SENDING REPLY......");
             }
         }
 
-    }
+    }*/
 
 
 

@@ -1,12 +1,22 @@
 use std::sync::{RwLock, Arc};
 use std::collections::HashMap;
-use starlane_resources::message::{Message, ResourcePortMessage, ResourcePortReply};
-use wasm_membrane_guest::membrane::{membrane_consume_string, log, membrane_guest_alloc_buffer, membrane_write_str};
-use mechtron_common::{MechtronCall, MechtronCommand, MechtronResponse};
+use wasm_membrane_guest::membrane::{membrane_consume_string, log, membrane_guest_alloc_buffer, membrane_write_str, membrane_write_buffer, membrane_consume_buffer};
+use mechtron_common::{MechtronGuestCall, HostToGuestFrame, GuestToHostFrame};
 use lazy_static::lazy_static;
 use wasm_bindgen::prelude::*;
-use starlane_resources::http::{HttpRequest, HttpResponse, Headers};
-use starlane_resources::data::BinSrc;
+use mesh_portal_api::message::Message;
+use mesh_portal_serde::version::latest::portal::inlet;
+use mesh_portal_serde::version::latest::portal::outlet;
+use mesh_portal_serde::version::v0_0_1::generic::payload::{PayloadDelivery, PayloadRef, PayloadPattern, Payload};
+use mesh_portal_serde::version::v0_0_1::generic::portal::outlet::Frame;
+use mesh_portal_serde::version::v0_0_1::generic::id::Identifier;
+use mesh_portal_serde::version::v0_0_1::id::Address;
+use mesh_portal_serde::version::latest::config::Info;
+use mesh_portal_serde::version::latest::command::CommandEvent;
+use mesh_portal_serde::version::latest::frame::{CloseReason, PrimitiveFrame};
+use std::convert::TryInto;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use mesh_portal_serde::version::latest::messaging::Exchange;
 
 #[macro_use]
 extern crate wasm_bindgen;
@@ -19,12 +29,49 @@ extern crate lazy_static;
 
 lazy_static! {
     pub static ref MECHTRONS : RwLock<HashMap<String,Arc<dyn Mechtron>>> = RwLock::new(HashMap::new());
+    pub static ref EXCHANGE_INDEX : AtomicUsize = AtomicUsize::new();
 }
 
 
 extern "C"
 {
-    pub fn mechtron_message_reply(call_id: i32, reply: i32);
+    pub fn mechtron_respond(call_id: i32, respond: i32);
+    pub fn mechtron_host_call(call_id: i32) -> i32;
+}
+pub fn mechtron_notify( request: inlet::Request ) -> Result<Option<outlet::Response>,Error>{
+    let request = inlet::exchange::Request {
+        id: request.id,
+        to: request.to,
+        entity: request.entity,
+        exchange: Exchange::Notification
+    };
+    send_request(request)
+}
+
+pub fn mechtron_request( request: inlet::Request ) -> Result<Option<outlet::Response>,Error> {
+    let request = inlet::exchange::Request {
+        id: request.id,
+        to: request.to,
+        entity: request.entity,
+        exchange: Exchange::RequestResponse(EXCHANGE_INDEX.fetch_add(1, Ordering::Relaxed).to_string())
+    };
+    send_request(request)
+}
+
+fn send_request( request: inlet::exchange::Request ) -> Result<Option<outlet::Response>,Error> {
+    let frame = inlet::Frame::Request( request );
+    let call = GuestToHostFrame::MeshPortalFrame(frame);
+    let buffer = bincode::serialize(&call)?;
+    let buffer = membrane_write_buffer(buffer );
+    let response = unsafe {
+        mechtron_host_call(buffer)
+    };
+    if response == 0 {
+        return Ok(Option::None);
+    }
+    let response = membrane_consume_buffer(response)?;
+    let response = bincode::deserialize(response.as_slice() )?;
+    Ok(Option::Some(response))
 }
 
 pub fn mechtron_register( mechtron: Arc<dyn Mechtron> ) {
@@ -43,9 +90,9 @@ pub fn mechtron_get(name: String) -> Arc<dyn Mechtron> {
 pub fn mechtron_call(call_id: i32 ) -> i32 {
     log("received mechtron call");
     match membrane_consume_string(call_id) {
-        Ok(json) => {
+        Ok(call) => {
 log("String consumed");
-            let call: MechtronCall = match serde_json::from_str(json.as_str()) {
+            let call: MechtronGuestCall = match serde_json::from_str(call.as_str()) {
                 Ok(call) => call,
                 Err(error) => {
                     log(format!("mechtron call serialization error: {}",error.to_string()).as_str());
@@ -60,46 +107,43 @@ log(format!("got mechtron call {}", call.mechtron ).as_str());
             };
 log("GOT MECHTRON ");
 
-            match call.command {
-                MechtronCommand::Message(message) => {
+            match call.frame {
+                HostToGuestFrame::MeshPortalFrame(frame) => {
 
-                    log("delivered message to mechtron within Wasm");
-                    let reply = mechtron.deliver(message);
-                    log("delivery complete");
-
-                    match reply {
-                        None => {
-                            0
+                    match frame {
+                        Frame::Init(info) => {
+                            mechtron.init(info);
                         }
-                        Some(reply) => {
-
-                            let reply = MechtronResponse::PortReply(reply);
-                            let reply = serde_json::to_string(&reply).expect("expected resource port reply to be able to serialize into a string");
-                            let reply = membrane_write_str(reply.as_str() );
-                            log("WASM message reply COMPLETE...");
-                            reply
+                        Frame::CommandEvent(e) => {
+                            mechtron.command_event(e);
                         }
-                    }
-                }
-                MechtronCommand::HttpRequest(message) => {
+                        Frame::Request(request) => {
+                            log("delivered message to mechtron within Wasm");
+                            let response = mechtron.request(request);
+                            log("delivery complete");
 
-                    log("delivered message to mechtron within Wasm");
-                    let reply = mechtron.http_request(message);
-                    log(format!("delivery complete response: {}", reply.is_some()).as_str() );
-
-                    match reply {
-                        None => {
-                            0
+                            match response {
+                                None => {
+                                    0
+                                }
+                                Some(reply) => {
+                                    let response = bincode::serialize(&response).expect("expected resource port reply to be able to serialize into a bincode");
+                                    let response = membrane_write_str(response.as_str() );
+                                    log("WASM message reply COMPLETE...");
+                                    response
+                                }
+                            }
                         }
-                        Some(reply) => {
-                            let reply = MechtronResponse::HttpResponse(reply);
-                            let reply = serde_json::to_string(&reply).expect("expected resource port reply to be able to serialize into a string");
-                            let reply = membrane_write_str(reply.as_str() );
-                            log("WASM message reply COMPLETE...");
-                            reply
+                        Frame::Response(response) => {
+                            // we should actually never get a response frame
+                            // instead wait for response from host
+                            // this frame is useful in other portal implementations
+                        }
+                        Frame::Close(close) => {
+                            mechtron.close(close);
                         }
                     }
-
+                    0
                 }
             }
 
@@ -115,19 +159,50 @@ log("GOT MECHTRON ");
 pub trait Mechtron: Sync+Send+'static {
     fn name(&self) -> String;
 
-    fn deliver( &self, message: Message<ResourcePortMessage>) -> Option<ResourcePortReply> {
+    fn init(&self, info: Info) {
+
+    }
+
+    fn command_event(&self, event: CommandEvent  ) {
+
+    }
+
+    fn request(&self, request: outlet::exchange::Request ) -> Option<inlet::Response> {
         Option::None
     }
 
-    fn http_request(&self, message: Message<HttpRequest>) -> Option<HttpResponse> {
-        Option::None
+    fn close( &self, close: CloseReason ) {
+
     }
+}
 
 
-/*    fn message( &self, message: Message<HttpRequest>) -> Option<HttpResponse>;{
-        log("this is the ABSTRACT Mechtron, not the one you wanted to call....");
-        Option::None
+pub struct Error {
+    pub message: String
+}
+
+impl From<mesh_portal_serde::version::latest::error::Error> for Error {
+    fn from(error: mesh_portal_serde::version::latest::error::Error) -> Self {
+        Self {
+            message: error.to_string()
+        }
     }
-    */
+}
 
+impl From<wasm_membrane_guest::error::Error> for Error {
+    fn from(error: wasm_membrane_guest::error::Error) -> Self {
+        Self {
+            message: error.to_string()
+        }
+    }
+}
+
+
+
+#[cfg(test)]
+pub mod test {
+    #[test]
+    pub fn test () {
+
+    }
 }

@@ -5,4 +5,4 @@ extern crate wasm_bindgen;
 extern crate lazy_static;
 
 pub mod membrane;
-mod error;
+pub mod error;
