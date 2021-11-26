@@ -214,6 +214,14 @@ error!("WASM MEMBRANE INIT CALLED");
         Ok(rtn)
     }
 
+    pub fn consume_buffer(&self, buffer_id: i32 ) ->Result<Vec<u8>,Error>
+    {
+        let raw = self.read_buffer(buffer_id)?;
+        self.membrane_guest_dealloc_buffer(buffer_id)?;
+        Ok(raw)
+    }
+
+
     fn membrane_guest_dealloc_buffer( &self, buffer_id: i32 )->Result<(),Error>
     {
         self.instance.exports.get_native_function::<i32,()>("membrane_guest_dealloc_buffer")?.call(buffer_id.clone())?;

@@ -7,7 +7,7 @@ use starlane_resources::message::{Fail, ResourcePortMessage, Message};
 use starlane_resources::ConfigSrc;
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
-use crate::mechtron::Mechtron;
+use crate::mechtron::MechtronShell;
 use crate::resource::{ArtifactKind, ResourceKey, ResourceType};
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
@@ -19,7 +19,7 @@ use starlane_resources::http::HttpRequest;
 
 pub struct MechtronHost {
     skel: StarSkel,
-    mechtrons: AsyncHashMap<ResourceKey,Mechtron>
+    mechtrons: AsyncHashMap<ResourceKey, MechtronShell>
 
 }
 
@@ -62,7 +62,7 @@ impl Host for MechtronHost {
         let mechtron_config = caches.mechtron_configs.get(&mechtron_config_artifact).ok_or::<Error>(format!("expected mechtron_config").into())?;
 
 
-        let mechtron = Mechtron::new(mechtron_config, &caches)?;
+        let mechtron = MechtronShell::new(mechtron_config, &caches)?;
         self.mechtrons.put( assign.stub.key.clone(), mechtron ).await?;
 
         println!("ASSIGN MECHTRON!");
@@ -92,7 +92,7 @@ impl Host for MechtronHost {
         info!("MECHTRON HOST RECEIVED DELIVERY");
         let mechtron = self.mechtrons.get(key.clone()).await?.ok_or(format!("could not deliver mechtron to {}",key.to_string()))?;
         info!("GOT MECHTRON");
-        let reply = mechtron.message(delivery.entity.clone()).await?;
+        let reply = mechtron.handle(delivery.entity.clone()).await?;
 
         if let Option::Some(reply) = reply {
             delivery.reply(Reply::Port(reply.payload));
