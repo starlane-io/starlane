@@ -16,7 +16,7 @@ pub mod guest {
     }
 
     pub type Request = crate::version::v0_0_1::guest::generic::Request<latest::id::Address,latest::id::Identifier,latest::payload::Payload>;
-    pub type Response = crate::version::v0_0_1::guest::generic::Response<latest::payload::Payload>;
+    pub type Response = crate::version::v0_0_1::guest::generic::Response<latest::id::Address,latest::id::Identifier,latest::payload::Payload>;
 
     pub mod generic {
         use mesh_portal_serde::version::latest;
@@ -45,7 +45,8 @@ pub mod guest {
         }
 
         #[derive(Clone)]
-        pub struct Response<IDENTIFIER,PAYLOAD> {
+        pub struct Response<ADDRESS,IDENTIFIER,PAYLOAD> {
+            pub to: ADDRESS,
             pub from: IDENTIFIER,
             pub entity: latest::generic::entity::response::RespEntity<PAYLOAD,latest::fail::Fail>
         }
@@ -65,7 +66,7 @@ pub mod host {
         Respond(Response)
     }
 
-    pub type Request = crate::version::v0_0_1::host::generic::Request<latest::id::Identifier,latest::payload::Payload>;
+    pub type Request = crate::version::v0_0_1::host::generic::Request<latest::id::Address,latest::id::Identifier,latest::payload::Payload>;
     pub type Response = crate::version::v0_0_1::host::generic::Response<latest::payload::Payload>;
 
 
@@ -74,8 +75,9 @@ pub mod host {
 
         // host should be able to ascertain who it is from
         #[derive(Clone)]
-        pub struct Request<IDENTIFIER, PAYLOAD> {
-            pub to: IDENTIFIER,
+        pub struct Request<ADDRESS,IDENTIFIER, PAYLOAD> {
+            pub to: ADDRESS,
+            pub from: IDENTIFIER,
             pub entity: latest::generic::entity::request::ReqEntity<PAYLOAD>,
             pub exchange: latest::messaging::ExchangeType
         }

@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock, Weak};
 
 
 use crate::error::Error;
-use wasmer::{Module, Instance, WasmPtr, Array, WasmerEnv, imports, Function, RuntimeError};
+use wasmer::{Module, Instance, WasmPtr, Array, WasmerEnv, imports, Function, RuntimeError, ImportObject, ChainableNamedResolver};
 
 pub static VERSION: i32 = 1;
 
@@ -339,8 +339,11 @@ impl WasmMembrane {
     pub fn new(module: Arc<Module>) -> Result<Arc<Self>, Error> {
         Self::new_with_init(module, "membrane_guest_init".to_string() )
     }
-
     pub fn new_with_init(module: Arc<Module>, init: String) -> Result<Arc<Self>, Error> {
+        Self::new_with_init_and_imports(module,init,Option::None)
+    }
+
+    pub fn new_with_init_and_imports(module: Arc<Module>, init: String, ext_imports: Option<ImportObject>) -> Result<Arc<Self>, Error> {
         let host = Arc::new(RwLock::new(WasmHost::new()));
 
         let imports = imports! {
@@ -379,25 +382,10 @@ impl WasmMembrane {
                    }
                 }
             }),
-         "mechtron_message_reply"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env,call_id:i32,reply:i32| {
-
-                match env.unwrap()
-                {
-                   Ok(membrane)=>{
-info!("RECEIVED REPLY...");
-println!("RECEIVED REPLY");
-                      let reply_json = membrane.consume_string(reply).unwrap();
-info!("REPLY ::::>    {}",reply_json);
-println!("REPLY ::::>    {}",reply_json);
-                   },
-                   Err(_)=>{
-
-                   error!("error in reply");
-                   }
-                }
-            }),
 
         } };
+
+        let imports = imports.chain_back(ext_imports);
 
 
         let instance = Instance::new(&module, &imports)?;

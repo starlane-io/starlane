@@ -26,6 +26,8 @@ extern crate strum_macros;
 extern crate tracing;
 #[macro_use]
 extern crate validate;
+#[macro_use]
+extern crate wasmer;
 
 use std::str::FromStr;
 
@@ -59,7 +61,6 @@ pub mod template;
 pub mod util;
 pub mod watch;
 pub mod mechtron;
-pub mod wasm;
 pub mod parse;
 pub mod html;
 pub mod mesh;
