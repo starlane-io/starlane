@@ -15,22 +15,23 @@ pub mod guest {
         Request(Request)
     }
 
-    pub type Request = crate::version::v0_0_1::guest::generic::Request<latest::id::Address,latest::id::Identifier,latest::payload::Payload>;
-    pub type Response = crate::version::v0_0_1::guest::generic::Response<latest::id::Address,latest::id::Identifier,latest::payload::Payload>;
+    pub type Request = crate::version::v0_0_1::guest::generic::Request<latest::id::Identifier,latest::payload::Payload>;
+    pub type Response = crate::version::v0_0_1::guest::generic::Response<latest::id::Identifier,latest::payload::Payload>;
 
     pub mod generic {
+        use serde::{Serialize,Deserialize};
         use mesh_portal_serde::version::latest;
         use crate::version::v0_0_1::host;
 
-        #[derive(Clone)]
-        pub struct Request<ADDRESS,IDENTIFIER, PAYLOAD> {
-            pub to: ADDRESS,
+        #[derive(Clone,Serialize,Deserialize)]
+        pub struct Request<IDENTIFIER, PAYLOAD> {
+            pub to: IDENTIFIER,
             pub from: IDENTIFIER,
             pub entity: latest::generic::entity::request::ReqEntity<PAYLOAD>,
             pub exchange: latest::messaging::Exchange
         }
 
-        impl<ADDRESS,IDENTIFIER, PAYLOAD> Request<ADDRESS,IDENTIFIER, PAYLOAD> {
+        impl<IDENTIFIER, PAYLOAD> Request<IDENTIFIER, PAYLOAD> {
             pub fn ok( self, payload: PAYLOAD ) -> host::generic::Response<PAYLOAD> {
                 host::generic::Response {
                     entity: latest::generic::entity::response::RespEntity::Ok(payload),
@@ -44,9 +45,9 @@ pub mod guest {
             }
         }
 
-        #[derive(Clone)]
-        pub struct Response<ADDRESS,IDENTIFIER,PAYLOAD> {
-            pub to: ADDRESS,
+        #[derive(Clone,Serialize,Deserialize)]
+        pub struct Response<IDENTIFIER,PAYLOAD> {
+            pub to: IDENTIFIER,
             pub from: IDENTIFIER,
             pub entity: latest::generic::entity::response::RespEntity<PAYLOAD,latest::fail::Fail>
         }
@@ -66,23 +67,24 @@ pub mod host {
         Respond(Response)
     }
 
-    pub type Request = crate::version::v0_0_1::host::generic::Request<latest::id::Address,latest::id::Identifier,latest::payload::Payload>;
+    pub type Request = crate::version::v0_0_1::host::generic::Request<latest::id::Identifier,latest::payload::Payload>;
     pub type Response = crate::version::v0_0_1::host::generic::Response<latest::payload::Payload>;
 
 
     pub mod generic {
+        use serde::{Serialize,Deserialize};
         use mesh_portal_serde::version::latest;
 
         // host should be able to ascertain who it is from
-        #[derive(Clone)]
-        pub struct Request<ADDRESS,IDENTIFIER, PAYLOAD> {
-            pub to: ADDRESS,
+        #[derive(Clone, Serialize, Deserialize)]
+        pub struct Request<IDENTIFIER, PAYLOAD> {
+            pub to: IDENTIFIER,
             pub from: IDENTIFIER,
             pub entity: latest::generic::entity::request::ReqEntity<PAYLOAD>,
             pub exchange: latest::messaging::ExchangeType
         }
 
-        #[derive(Clone)]
+        #[derive(Clone, Serialize, Deserialize)]
         pub struct Response<PAYLOAD> {
             pub entity: latest::generic::entity::response::RespEntity<PAYLOAD,latest::fail::Fail>,
         }

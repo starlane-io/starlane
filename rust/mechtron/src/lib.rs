@@ -11,7 +11,7 @@ use mesh_portal_serde::version::latest::config::Info;
 use mesh_portal_serde::version::latest::frame::{CloseReason, PrimitiveFrame};
 use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::id::Identifier;
-use mesh_portal_serde::version::latest::messaging::Exchange;
+use mesh_portal_serde::version::latest::messaging::{Exchange, ExchangeType};
 use mesh_portal_serde::version::latest::payload::{Payload, PayloadDelivery, PayloadPattern, PayloadRef};
 use mesh_portal_serde::version::latest::portal::inlet;
 use mesh_portal_serde::version::latest::portal::outlet;
@@ -23,8 +23,8 @@ use mechtron_common::version::latest::guest;
 use mechtron_common::version::latest::host;
 use wasm_membrane_guest::membrane::{log, membrane_consume_buffer, membrane_consume_string, membrane_guest_alloc_buffer, membrane_write_buffer, membrane_write_str};
 use mesh_portal_serde::version::latest::resource::Status;
-use mesh_portal_serde::version::v0_0_1::generic::portal::inlet::Response;
-use mesh_portal_serde::version::latest::fail::port::Fail;
+use mesh_portal_serde::version::latest::fail::Fail;
+use mechtron_common::version::v0_0_1::host::generic::Response;
 
 mod error;
 
@@ -37,6 +37,7 @@ extern crate lazy_static;
 lazy_static! {
     pub static ref FACTORIES: RwLock<HashMap<Address,Arc<dyn MechtronFactory >>> = RwLock::new(HashMap::new());
     pub static ref MECHTRONS: RwLock<HashMap<Address,Arc<MechtronWrapper>>> = RwLock::new(HashMap::new());
+    pub static ref MECHTRON_KEY_TO_ADDRESS: RwLock<HashMap<String,Address>> = RwLock::new(HashMap::new());
     pub static ref EXCHANGE_INDEX : AtomicUsize = AtomicUsize::new(0);
 }
 
@@ -50,8 +51,9 @@ extern "C"
 pub fn mechtron_request_notify(request: host::Request ) -> Result<Option<guest::Response>,Error>{
     let request = host::Request {
         to: request.to,
+        from: request.from,
         entity: request.entity,
-        exchange: Exchange::Notification
+        exchange: ExchangeType::Notification
     };
     send_request(request)
 }
@@ -59,13 +61,16 @@ pub fn mechtron_request_notify(request: host::Request ) -> Result<Option<guest::
 pub fn mechtron_request_exchange(request: host::Request ) -> Result<guest::Response,Error> {
     let request = host::Request {
         to: request.to,
+        from: request.from,
         entity: request.entity,
-        exchange: Exchange::RequestResponse(EXCHANGE_INDEX.fetch_add(1,Ordering::Relaxed).to_string())
+        exchange: ExchangeType::RequestResponse
     };
     let response = send_request(request);
     let response = match response {
         Ok(response) => {
-            Ok(response.ok_or("expected response from an exchange message request".into() )?)
+            let result:Result<guest::Response,Error> = response.ok_or("expected response from an exchange message request".into() );
+            let response = result?;
+            Ok(response)
         }
         Err(err) => {Err(err)}
     };
@@ -95,9 +100,9 @@ log(format!("REGISTERED MECHTRON FACTORY: {}", factory.config_address().to_strin
     lock.insert(factory.config_address(), factory);
 }
 
-pub fn mechtron_get(address: Address) -> Arc<dyn Mechtron> {
+pub fn mechtron_get(address: Address) -> Arc<MechtronWrapper> {
     let lock = MECHTRONS.read().unwrap();
-    lock.get(&address).cloned().expect(format!("failed to get mechtron named: {}",name).as_str() )
+    lock.get(&address).cloned().expect(format!("failed to get mechtron with address: {}",address.to_string()).as_str() )
 }
 
 #[wasm_bindgen]
@@ -116,26 +121,35 @@ pub fn mechtron_guest_frame(frame_buffer_id: i32 ) -> i32 {
             guest::Frame::Create(info) => {
                 let factory: Arc<dyn MechtronFactory> = {
                     let read = FACTORIES.read()?;
-                    read.get(&info.archetype.config_src.expect("mechtrons must have a config")).cloned().expect(format!("expected mechtron: {}", call.mechtron).as_str())
+                    read.get(info.archetype.config_src.as_ref().expect("mechtrons must have a config")).cloned().expect(format!("expected mechtron: ..." ).as_str())
                 };
 
                 let mechtron = factory.create(info.clone())?;
                 let mechtron = MechtronWrapper::new(info, mechtron);
                 {
+                    let mut write = MECHTRON_KEY_TO_ADDRESS.write()?;
+                    write.insert(mechtron.info.key.clone(), mechtron.info.address.clone() );
+                }
+                {
                     let mut write = MECHTRONS.write()?;
                     write.insert(mechtron.info.address.clone(), Arc::new(mechtron));
                 }
+
 
                 Ok(0)
             }
             guest::Frame::Assign(info) => {
                 let factory: Arc<dyn MechtronFactory> = {
                     let read = FACTORIES.read()?;
-                    read.get(&call.mechtron).cloned().expect(format!("expected mechtron: {}", call.mechtron).as_str())
+                    read.get(info.archetype.config_src.as_ref().expect("mechtrons must have a config")).cloned().expect(format!("expected mechtron: ..." ).as_str())
                 };
 
                 let mechtron = factory.assign(info.clone())?;
                 let mechtron = MechtronWrapper::new(info, mechtron);
+                {
+                    let mut write = MECHTRON_KEY_TO_ADDRESS.write()?;
+                    write.insert(mechtron.info.key.clone(), mechtron.info.address.clone() );
+                }
                 {
                     let mut write = MECHTRONS.write()?;
                     write.insert(mechtron.info.address.clone(), Arc::new(mechtron));
@@ -144,16 +158,33 @@ pub fn mechtron_guest_frame(frame_buffer_id: i32 ) -> i32 {
                 Ok(0)
             }
             guest::Frame::Destroy(address) => {
-                {
+                let mechtron = {
                     let mut write = MECHTRONS.write()?;
                     write.remove(&address )
                 };
+                if let Some(mechtron) = mechtron {
+                    let mut write = MECHTRON_KEY_TO_ADDRESS.write()?;
+                    write.remove(&mechtron.info.key );
+                }
                 Ok(0)
             }
             guest::Frame::Request(request) => {
+
+                let address = match &request.to {
+                    Identifier::Key(key) => {
+                        let mut read = MECHTRON_KEY_TO_ADDRESS.read()?;
+                        let result: Result<&Address,Error> = read.get(key ).ok_or(format!("could not find key {}",key).into());
+                        let address: Address = result?.clone();
+                        address
+                    }
+                    Identifier::Address(address) => {
+                        address.clone()
+                    }
+                };
+
                 let mechtron = {
-                    let read = MECHTRONS.write()?;
-                    read.get(&request.to )
+                    let read = MECHTRONS.read()?;
+                    read.get(&address ).cloned()
                 };
 
                 match mechtron {
@@ -163,87 +194,31 @@ pub fn mechtron_guest_frame(frame_buffer_id: i32 ) -> i32 {
                     }
                     Some(mechtron) => {
                         match mechtron.handle(request) {
-                            Ok(response) => {}
+                            Ok(response) => {
+                               match response {
+                                   None => {
+                                       Ok(0)
+                                   }
+                                   Some(response) => {
+                                       let frame = host::Frame::Respond(response);
+                                       let buffer = bincode::serialize(&frame )?;
+                                       let buffer = membrane_write_buffer(buffer );
+                                       let response = unsafe {
+                                           mechtron_host_frame(buffer)
+                                       };
+                                       Ok(response)
+                                   }
+                               }
+                            }
                             Err(panic) => {
-                                mechtron_panic(err)
+                                // not sure how to handle this yet
+                                Err("mechtron panic".into())
                             }
                         }
                     }
                 }
             }
         }
-/*        match frame {
-            guest::Frame::Version(_) => {
-                return Ok(0);
-            }
-            guest::Frame::Call(call) => {
-                log("GOT MECHTRON ");
-
-                match call.frame {
-                    outlet::Frame::Create(info) => {
-                        let factory: Arc<dyn MechtronFactory> = {
-                            let read = FACTORIES.read()?;
-                            read.get(&call.mechtron).cloned().expect(format!("expected mechtron: {}", call.mechtron).as_str())
-                        };
-
-                        let mechtron = factory.create(info);
-                        {
-                            let mut write = MECHTRONS.write()?;
-                            write.insert(call.mechtron.clone(), Arc::new(*mechtron));
-                        }
-
-                        return Ok(0);
-                    }
-                    outlet::Frame::CommandEvent(e) => {
-//                            mechtron.process_command_event(e);
-                        return Ok(0);
-                    }
-                    outlet::Frame::Request(request) => {
-                        let mechtron = {
-                            let read = MECHTRONS.read()?;
-                            read.get(&call.mechtron)
-                        };
-
-
-                        let mechtron = if let Option::Some(mechtron) = mechtron {
-                            mechtron.clone()
-                        } else {
-                            let err = format!("mechtron not found: '{}'", call.mechtron).as_str();
-                            log(err);
-                            return Err(err.into());
-                        };
-
-                        log("delivered message to mechtron within Wasm");
-                        let response = mechtron.process_request(request);
-                        log("delivery complete");
-
-                        match response {
-                            None => {
-                                return Ok(0);
-                            }
-                            Some(response) => {
-                                let response = bincode::serialize(&response).expect("expected resource response to be able to serialize into a bincode");
-                                let response = membrane_write_buffer(response);
-                                log("WASM message reply COMPLETE...");
-                                return Ok(response);
-                            }
-                        }
-                    }
-                    outlet::Frame::Response(response) => {
-                        // we should actually never get a response frame
-                        // instead wait for response from host
-                        // this frame is useful in other portal implementations
-                        return Ok(-1);
-                    }
-                    outlet::Frame::Close(close) => {
-                        mechtron.close(close);
-                        return Ok(0);
-                    }
-                }
-            }
-        }
-
- */
     }
 
     match mechtron_guest_frame_inner(frame_buffer_id) {
@@ -261,8 +236,8 @@ pub fn mechtron_guest_frame(frame_buffer_id: i32 ) -> i32 {
 pub trait MechtronFactory: Sync+Send+'static {
     fn config_address(&self) -> Address;
 
-    fn create(&self, info: Info) -> Result<Box<dyn Mechtron>,Panic>;
-    fn assign(&self, info: Info) -> Result<Box<dyn Mechtron>,Panic>;
+    fn create(&self, info: Info) -> Result<Box<dyn Mechtron>,Error>;
+    fn assign(&self, info: Info) -> Result<Box<dyn Mechtron>,Error>;
 }
 
 
@@ -283,8 +258,8 @@ impl MechtronWrapper {
     }
 
 
-    pub fn handle(&self, request: guest::Request ) -> Result<Option<host::Response>,Panic> {
-        self.mechtron.handle(self, request)
+    pub fn handle(&self, request: guest::Request ) -> Result<Option<host::Response>,Fail> {
+        self.mechtron.handle(self, request )
     }
 
     pub fn close( &self, close: CloseReason ) {
@@ -325,7 +300,8 @@ pub trait Mechtron: Sync+Send+'static {
 
 
 pub struct Panic {
-
+  pub fail: Fail,
+  pub message: String
 }
 
 #[cfg(test)]

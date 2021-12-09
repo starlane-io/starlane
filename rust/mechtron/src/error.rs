@@ -1,8 +1,35 @@
 use bincode::ErrorKind;
+use std::sync::{PoisonError, RwLockReadGuard, Arc, RwLockWriteGuard};
+use std::collections::HashMap;
+use crate::{MechtronFactory, MechtronWrapper};
+use mesh_portal_serde::version::v0_0_1::id::Address;
 
 pub struct Error {
     pub message: String
 }
+
+impl ToString for Error {
+    fn to_string(&self) -> String {
+        self.message.clone()
+    }
+}
+
+impl From<&str> for Error {
+    fn from(error: &str) -> Self {
+        Self {
+            message: error.to_string()
+        }
+    }
+}
+
+impl From<String> for Error {
+    fn from(error: String) -> Self {
+        Self {
+            message: error
+        }
+    }
+}
+
 
 impl From<mesh_portal_serde::error::Error> for Error {
     fn from(error: mesh_portal_serde::error::Error) -> Self {
@@ -27,3 +54,29 @@ impl From<Box<bincode::ErrorKind>> for Error {
         }
     }
 }
+
+impl <T> From<PoisonError<T>> for Error {
+    fn from(_: PoisonError<T>) -> Self {
+        Self {
+            message: "Poison error".to_string()
+        }
+    }
+}
+
+/*
+impl From<PoisonError<RwLockWriteGuard<'_, HashMap<String, mesh_portal_serde::version::latest::id::Address>>>> for Error {
+    fn from(_: PoisonError<RwLockWriteGuard<'_, HashMap<String, Address>>>) -> Self {
+        Self {
+            message: "Poison error".to_string()
+        }
+    }
+}
+
+
+impl From<PoisonError<RwLockWriteGuard<'_, HashMap<mesh_portal_serde::version::latest::id::Address, Arc<MechtronWrapper>>>>> for Error {
+    fn from(_: PoisonError<RwLockWriteGuard<'_, HashMap<Address, Arc<MechtronWrapper>>>>) -> Self {
+        todo!()
+    }
+}
+
+ */
