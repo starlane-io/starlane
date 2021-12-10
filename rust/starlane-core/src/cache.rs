@@ -12,9 +12,6 @@ use tokio::runtime::Handle;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use wasmer::{Cranelift, Store, Universal};
 
-use starlane_resources::{ResourceArchetype, ResourceIdentifier, ResourceStub, ResourcePath};
-use starlane_resources::data::{BinSrc, DataSet};
-use starlane_resources::message::Fail;
 
 use crate::artifact::ArtifactRef;
 use crate::config::app::{AppConfig, AppConfigParser};
@@ -23,7 +20,7 @@ use crate::config::mechtron::{MechtronConfig, MechtronConfigParser};
 use crate::config::wasm::{Wasm, WasmCompiler};
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use crate::resource::{Path, ResourceAddress, ResourceKind, ResourceRecord};
+use crate::resource::{Path, ResourceAddress, Kind, ResourceRecord};
 use crate::resource::ArtifactKind;
 use crate::resource::config::Parser;
 use crate::starlane::api::StarlaneApi;
@@ -98,7 +95,7 @@ impl<C: Cacheable> ArtifactItemCache<C> {
     }
 
     fn add(&mut self, item: ArtifactItem<C>) {
-        self.map.insert(item.artifact().path, item);
+        self.map.insert(item.artifact().address, item);
     }
 }
 
@@ -208,7 +205,7 @@ impl ProtoArtifactCacheProc {
         let mut more = vec![];
 
         for artifact in artifacts {
-            println!(".... CACHING... {}", artifact.clone().path.to_string());
+            println!(".... CACHING... {}", artifact.clone().address.to_string());
             let claim = root_caches.claim(artifact).await?;
             println!("claimed...");
             let references = claim.references();
@@ -873,7 +870,7 @@ impl<C: Cacheable> RootItemCacheProc<C> {
     fn get(&self, artifact: ArtifactRef) -> Result<ArtifactItem<C>, Error> {
         let ref_count = self.map.get(&artifact).ok_or(format!(
             "could not find artifact: '{}'",
-            artifact.path.to_string()
+            artifact.address.to_string()
         ))?;
         Ok(ArtifactItem::new(
             ref_count.reference.clone(),
@@ -914,20 +911,20 @@ impl<C: Cacheable> RootItemCacheProc<C> {
         parser: Arc<dyn Parser<X>>,
         bundle_cache: ArtifactBundleCache,
     ) -> Result<Arc<X>, Error> {
-        println!("root: cache_artifact: {}", artifact.path.to_string());
-        let address: ResourceIdentifier = artifact.path.parent().ok_or("expected parent for artifact")?.into();
+        println!("root: cache_artifact: {}", artifact.address.to_string());
+        let address: ResourceIdentifier = artifact.address.parent().ok_or("expected parent for artifact")?.into();
         bundle_cache.download(address.try_into()?).await?;
-        println!("bundle cached : parsing: {}", artifact.path.to_string());
+        println!("bundle cached : parsing: {}", artifact.address.to_string());
         let file_access = ArtifactBundleCache::with_bundle_files_path(
             bundle_cache.file_access(),
-            artifact.path.parent().ok_or("expected parent")?.try_into()?,
+            artifact.address.parent().ok_or("expected parent")?.try_into()?,
         )?;
         println!(
             "file acces scached : parsing: {}",
-            artifact.path.to_string()
+            artifact.address.to_string()
         );
         let data = file_access.read(&artifact.trailing_path()?).await?;
-        println!("root: parsing: {}", artifact.path.to_string());
+        println!("root: parsing: {}", artifact.address.to_string());
         parser.parse(artifact, data)
     }
 }

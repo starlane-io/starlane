@@ -19,7 +19,7 @@ use crate::file_access::{FileAccess, FileEvent};
 use crate::resource::{
     FileKind, FileSystemKey, Path,
     ResourceAddress,
-    ResourceCreationChamber, ResourceKind, ResourceType,
+    ResourceCreationChamber, Kind, ResourceType,
 };
 use crate::resource::ResourceKey;
 use crate::star::core::resource::state::StateStore;

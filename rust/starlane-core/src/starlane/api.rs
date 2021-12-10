@@ -22,7 +22,7 @@ use starlane_resources::message::Fail;
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
 use crate::frame::{Reply, ReplyKind, StarPattern, TraversalAction, ResourceRegistryRequest, StarMessagePayload};
-use crate::resource::{Path, ResourceKind, ResourceRecord, ResourceType, to_keyed_for_reasource_create, to_keyed_for_resource_selector};
+use crate::resource::{Path, Kind, ResourceRecord, ResourceType, to_keyed_for_reasource_create, to_keyed_for_resource_selector};
 use crate::resource::file_system::FileSystemState;
 use crate::resource::FileKind;
 use crate::resource::ResourceKey;
@@ -68,7 +68,7 @@ impl StarlaneApi {
     ) -> Result<Creation<ArtifactBundleSeriesApi>, Error> {
         let resource_src = AssignResourceStateSrc::Stateless;
 
-        let create = format!("{}<{}>", path.to_string(), ResourceKind::ArtifactBundleSeries.to_string() );
+        let create = format!("{}<{}>", path.to_string(), Kind::ArtifactBundleSeries.to_string() );
 
         Ok(Creation::new(self.clone(), create))
     }
@@ -479,7 +479,7 @@ info!("received reply for {}",description);
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Just(name.to_string()),
             archetype: ResourceArchetype {
-                kind: ResourceKind::Space,
+                kind: Kind::Space,
                 specific: None,
                 config: ConfigSrc::None,
             },
@@ -546,7 +546,7 @@ impl SpaceApi {
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Append(email.to_string()),
             archetype: ResourceArchetype {
-                kind: ResourceKind::User,
+                kind: Kind::User,
                 specific: None,
                 config: ConfigSrc::None,
             },
@@ -567,7 +567,7 @@ impl SpaceApi {
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Append(name.to_string()),
             archetype: ResourceArchetype {
-                kind: ResourceKind::App,
+                kind: Kind::App,
                 specific: None,
                 config: ConfigSrc::Artifact(app_config),
             },
@@ -588,7 +588,7 @@ impl SpaceApi {
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Append(name.to_string()),
             archetype: ResourceArchetype {
-                kind: ResourceKind::FileSystem,
+                kind: Kind::FileSystem,
                 specific: None,
                 config: ConfigSrc::None,
             },
@@ -648,7 +648,7 @@ impl AppApi {
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Append(name.to_string()),
             archetype: ResourceArchetype {
-                kind: ResourceKind::Mechtron,
+                kind: Kind::Mechtron,
                 specific: None,
                 config: ConfigSrc::Artifact(config),
             },
@@ -767,7 +767,7 @@ impl FileSystemApi {
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Append(path.to_string()),
             archetype: ResourceArchetype {
-                kind: ResourceKind::File(FileKind::File),
+                kind: Kind::File(FileKind::File),
                 specific: None,
                 config: ConfigSrc::None,
             },
@@ -856,7 +856,7 @@ impl ArtifactBundleSeriesApi {
             key: KeyCreationSrc::None,
             address: AddressCreationSrc::Append(version.to_string()),
             archetype: ResourceArchetype {
-                kind: ResourceKind::ArtifactBundle,
+                kind: Kind::ArtifactBundle,
                 specific: None,
                 config: ConfigSrc::None,
             },

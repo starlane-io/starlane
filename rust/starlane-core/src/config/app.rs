@@ -1,4 +1,4 @@
-use crate::resource::{ResourceKind, ResourceAddress};
+use crate::resource::{Kind, ResourceAddress};
 use crate::cache::{Cacheable, Data};
 use std::collections::HashMap;
 use crate::resource::ArtifactKind;
@@ -9,17 +9,17 @@ use crate::error::Error;
 use crate::config::app::yaml::AppConfigYaml;
 use std::str::FromStr;
 use std::convert::TryInto;
-use starlane_resources::ResourcePath;
+use crate::mesh::serde::id::Address;
 
 pub struct AppConfig {
-    artifact: ResourcePath,
+    artifact: Address,
     pub main: ArtifactRef
 }
 
 impl Cacheable for AppConfig {
     fn artifact(&self) -> ArtifactRef {
         ArtifactRef {
-            path: self.artifact.clone(),
+            address: self.artifact.clone(),
             kind: ArtifactKind::AppConfig,
         }
     }
@@ -30,8 +30,8 @@ impl Cacheable for AppConfig {
 }
 
 impl ResourceConfig for AppConfigParser {
-    fn kind(&self) -> ResourceKind {
-        ResourceKind::App
+    fn kind(&self) -> Kind {
+        Kind::App
     }
 }
 
@@ -49,15 +49,15 @@ impl Parser<AppConfig> for AppConfigParser {
         let data = String::from_utf8((*_data).clone() )?;
         let yaml: AppConfigYaml = serde_yaml::from_str( data.as_str() )?;
 
-        let address: ResourcePath = artifact.path.clone();
+        let address: Address = artifact.address.clone();
         let bundle_address = address.parent().ok_or::<Error>("expected artifact to have bundle parent".into())?;
 
         let main = yaml.spec.main.replace("{bundle}", bundle_address.to_string().as_str() );
-        let main = ResourcePath::from_str(main.as_str() )?;
+        let main = Address::from_str(main.as_str() )?;
         let main = ArtifactRef::new(main.try_into()?,ArtifactKind::MechtronConfig );
 
         Ok(Arc::new(AppConfig {
-            artifact: artifact.path,
+            artifact: artifact.address,
             main
         }))
     }

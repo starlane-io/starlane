@@ -11,7 +11,7 @@ use starlane_resources::data::{BinSrc, DataSet};
 use starlane_resources::message::Fail;
 
 use crate::error::Error;
-use crate::resource::{Path, ResourceAddress, ResourceCreationChamber, ResourceKey, ResourceKind, ResourceType};
+use crate::resource::{Path, ResourceAddress, ResourceCreationChamber, ResourceKey, Kind, ResourceType};
 use crate::star::StarSkel;
 use crate::star::core::resource::host::Host;
 

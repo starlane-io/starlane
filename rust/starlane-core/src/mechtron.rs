@@ -8,7 +8,6 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use starlane_resources::message::{ResourcePortMessage, Message, ResourcePortReply};
 use mesh_portal_api::message::Message;
-use mechtron_common::{MechtronGuestCall, HostToGuestFrame};
 use mechtron_common::version::latest::{guest, host};
 use crate::mesh;
 use mesh_portal_serde::version::latest;
@@ -27,7 +26,6 @@ use crate::mesh::serde::messaging::Exchange;
 use std::collections::HashMap;
 use futures::SinkExt;
 use mesh_portal_serde::version::v0_0_1::generic::portal::inlet::Response;
-use mesh_portal_serde::version::v0_0_1::generic::id::Identifier;
 use mesh_portal_serde::version::v0_0_1::generic::payload::Payload;
 use tokio::sync::oneshot::error::RecvError;
 use std::sync::mpsc::Sender;
@@ -72,8 +70,8 @@ impl MechtronShellTemplate {
     pub fn new(config: ArtifactItem<MechtronConfig>, caches: &ArtifactCaches) -> Result<Self, Error> {
         let skel = Self {
             config,
-            wasm: caches.wasms.get(&config.wasm.path).ok_or(format!("could not get referenced Wasm: {}", config.wasm.path.to_string()))?,
-            bind: caches.bind_configs.get(&config.bind.path).ok_or::<Error>(format!("could not get referenced BindConfig: {}", config.wasm.path.to_string()).into())?,
+            wasm: caches.wasms.get(&config.wasm.address).ok_or(format!("could not get referenced Wasm: {}", config.wasm.address.to_string()))?,
+            bind: caches.bind_configs.get(&config.bind.address).ok_or::<Error>(format!("could not get referenced BindConfig: {}", config.wasm.address.to_string()).into())?,
         };
 
         Ok(skel)
@@ -300,6 +298,7 @@ impl MechtronShell {
     }
 }
 
+#[async_trait]
 impl PortalCtrl for MechtronShell{
 
     async fn handle(&self, message: Message) -> Result<Option<mesh::serde::portal::inlet::Response>,Error> {

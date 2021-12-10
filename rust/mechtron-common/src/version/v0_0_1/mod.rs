@@ -15,8 +15,8 @@ pub mod guest {
         Request(Request)
     }
 
-    pub type Request = crate::version::v0_0_1::guest::generic::Request<latest::id::Identifier,latest::payload::Payload>;
-    pub type Response = crate::version::v0_0_1::guest::generic::Response<latest::id::Identifier,latest::payload::Payload>;
+    pub type Request = crate::version::v0_0_1::guest::generic::Request<latest::id::Address,latest::payload::Payload>;
+    pub type Response = crate::version::v0_0_1::guest::generic::Response<latest::id::Address,latest::payload::Payload>;
 
     pub mod generic {
         use serde::{Serialize,Deserialize};
@@ -67,7 +67,7 @@ pub mod host {
         Respond(Response)
     }
 
-    pub type Request = crate::version::v0_0_1::host::generic::Request<latest::id::Identifier,latest::payload::Payload>;
+    pub type Request = crate::version::v0_0_1::host::generic::Request<latest::id::Address,latest::payload::Payload>;
     pub type Response = crate::version::v0_0_1::host::generic::Response<latest::payload::Payload>;
 
 

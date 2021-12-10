@@ -1,4 +1,4 @@
-use crate::resource::{ResourceKind, ResourceAddress,ArtifactKind};
+use crate::resource::{Kind, ResourceAddress, ArtifactKind};
 use crate::artifact::ArtifactRef;
 use crate::cache::{Cacheable, Data};
 use crate::resource::config::{ResourceConfig, Parser};
@@ -20,7 +20,7 @@ pub struct MechtronConfig {
 impl Cacheable for MechtronConfig {
     fn artifact(&self) -> ArtifactRef {
         ArtifactRef {
-            path: self.artifact.clone(),
+            address: self.artifact.clone(),
             kind: ArtifactKind::MechtronConfig,
         }
     }
@@ -31,8 +31,8 @@ impl Cacheable for MechtronConfig {
 }
 
 impl ResourceConfig for MechtronConfigParser {
-    fn kind(&self) -> ResourceKind {
-        ResourceKind::Mechtron
+    fn kind(&self) -> Kind {
+        Kind::Mechtron
     }
 }
 
@@ -50,7 +50,7 @@ impl Parser<MechtronConfig> for MechtronConfigParser {
         let data = String::from_utf8((*_data).clone() )?;
         let yaml: MechtronConfigYaml = serde_yaml::from_str( data.as_str() )?;
 
-        let address = artifact.path.clone();
+        let address = artifact.address.clone();
         let bundle_address = address.parent().ok_or::<Error>("expected artifact to have bundle parent".into())?;
 
         let bind = yaml.spec.bind.replace("{bundle}", bundle_address.to_string().as_str() );
@@ -62,7 +62,7 @@ impl Parser<MechtronConfig> for MechtronConfigParser {
         let wasm = ArtifactRef::new(wasm.try_into()?,ArtifactKind::Wasm);
 
         Ok(Arc::new(MechtronConfig {
-            artifact: artifact.path,
+            artifact: artifact.address,
             bind,
             wasm,
             name: yaml.spec.name,

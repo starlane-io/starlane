@@ -14,7 +14,7 @@ use starlane_resources::message::Fail;
 
 use crate::frame::{ResourceRegistryRequest, Reply, ReplyKind, SimpleReply, StarMessagePayload};
 use crate::message::ProtoStarMessage;
-use crate::resource::{ResourceAddress, ResourceKey, ResourceKind, ResourceRecord, ResourceType};
+use crate::resource::{ResourceAddress, ResourceKey, Kind, ResourceRecord, ResourceType};
 use crate::star::{
     LogId, Request, ResourceRegistryBacking, Set, Star, StarCommand, StarKey, StarKind, StarSkel,
 };
@@ -231,7 +231,7 @@ impl ResourceLocatorComponent {
                     key: ResourceKey::Root,
                     address: ResourcePath::root(),
                     archetype: ResourceArchetype {
-                        kind: ResourceKind::Root,
+                        kind: Kind::Root,
                         specific: None,
                         config: ConfigSrc::None,
                     },

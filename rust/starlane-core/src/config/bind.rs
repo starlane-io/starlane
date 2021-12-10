@@ -1,4 +1,4 @@
-use crate::resource::{ResourceKind, ResourceAddress,ArtifactKind};
+use crate::resource::{Kind, ResourceAddress, ArtifactKind};
 use crate::artifact::ArtifactRef;
 use crate::cache::{Cacheable, Data};
 use crate::resource::config::{ResourceConfig, Parser};
@@ -17,7 +17,7 @@ pub struct BindConfig {
 impl Cacheable for BindConfig {
     fn artifact(&self) -> ArtifactRef {
         ArtifactRef {
-            path: self.artifact.clone(),
+            address: self.artifact.clone(),
             kind: ArtifactKind::BindConfig
         }
     }
@@ -79,7 +79,7 @@ impl Parser<BindConfig> for BindConfigParser {
         let data = String::from_utf8((*_data).clone() )?;
         let yaml: BindConfigYaml = serde_yaml::from_str( data.as_str() )?;
 
-        let address = artifact.path.clone();
+        let address = artifact.address.clone();
         let bundle_address = address.parent().ok_or::<Error>("expected artifact to have bundle parent".into())?;
 
         // validate
@@ -90,7 +90,7 @@ impl Parser<BindConfig> for BindConfigParser {
         }
 
         Ok(Arc::new(BindConfig {
-            artifact: artifact.path,
+            artifact: artifact.address,
             message: Message {
                 inbound: Inbound {
                     ports: yaml.spec.message.inbound.ports.iter().map( |p| Port {

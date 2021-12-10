@@ -19,7 +19,7 @@ pub struct HttpRouterConfig {
 impl Cacheable for HttpRouterConfig {
     fn artifact(&self) -> ArtifactRef {
         ArtifactRef {
-            path: self.artifact.clone(),
+            address: self.artifact.clone(),
             kind: ArtifactKind::HttpRouter
         }
     }
@@ -50,7 +50,7 @@ impl Parser<HttpRouterConfig> for HttpRouterConfigParser {
         let mappings = mappings?;
 
         Ok(Arc::new(HttpRouterConfig {
-            artifact: artifact.path,
+            artifact: artifact.address,
             mappings
         }))
     }

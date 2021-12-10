@@ -15,7 +15,7 @@ use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::resource::{
     Path, ResourceAddress,
-    ResourceKey, ResourceKind, Specific,
+    ResourceKey, Kind, Specific,
 };
 use crate::star::StarSkel;
 use crate::starlane::files::MachineFileSystem;

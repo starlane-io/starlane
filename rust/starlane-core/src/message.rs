@@ -13,7 +13,7 @@ use crate::error::Error;
 use crate::frame::{
     Frame, MessageAck, MessagePayload, ReplyKind, SimpleReply, StarMessage, StarMessagePayload,
 };
-use crate::resource::{ResourceAddress, ResourceKind, ResourceType, Specific};
+use crate::resource::{ResourceAddress, Kind, ResourceType, Specific};
 use crate::star::{StarCommand, StarKey};
 use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
 use starlane_resources::http::HttpRequest;

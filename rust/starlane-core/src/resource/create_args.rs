@@ -7,7 +7,7 @@ use zip::write::FileOptions;
 use zip::{CompressionMethod, ZipWriter};
 
 use crate::error::Error;
-use crate::resource::{ResourceAddress,ResourceType,ResourceKind};
+use crate::resource::{ResourceAddress, ResourceType, Kind};
 use std::convert::TryInto;
 use starlane_resources::ResourcePath;
 

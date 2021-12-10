@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock, Weak};
 
 
 use crate::error::Error;
-use wasmer::{Module, Instance, WasmPtr, Array, WasmerEnv, imports, Function, RuntimeError, ImportObject, ChainableNamedResolver};
+use wasmer::{Module, Instance, WasmPtr, Array, WasmerEnv, imports, Function, RuntimeError, ImportObject, ChainableNamedResolver, NamedResolver};
 
 pub static VERSION: i32 = 1;
 
@@ -385,10 +385,17 @@ impl WasmMembrane {
 
         } };
 
-        let imports = imports.chain_back(ext_imports);
+        let instance = match ext_imports {
+            None => {
+                Instance::new(&module, &imports)?
+            }
+            Some(ext_imports) => {
+                let imports = imports.chain_back(ext_imports);
+                Instance::new(&module, &imports)?
+            }
+        };
 
 
-        let instance = Instance::new(&module, &imports)?;
 
         let membrane = Arc::new(WasmMembrane {
             instance: instance,

@@ -6,7 +6,7 @@ use tokio::sync::{mpsc, oneshot};
 use starlane_resources::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceStub, ResourcePath, ConfigSrc};
 
 use crate::error::Error;
-use crate::resource::{create_args, ResourceAddress, ResourceKind, ResourceRecord, ResourceRegistration, ResourceLocation};
+use crate::resource::{create_args, ResourceAddress, Kind, ResourceRecord, ResourceRegistration, ResourceLocation};
 use crate::resource::ResourceKey;
 use crate::star::{StarKey, StarSkel};
 use crate::star::variant::{FrameVerdict, VariantCall};
@@ -49,7 +49,7 @@ impl CentralVariant {
                 key: ResourceKey::Root,
                 address: ResourcePath::root(),
                 archetype: ResourceArchetype {
-                    kind: ResourceKind::Root,
+                    kind: Kind::Root,
                     specific: None,
                     config: ConfigSrc::None,
                 },

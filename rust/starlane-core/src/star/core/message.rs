@@ -14,7 +14,7 @@ use crate::frame::{
 };
 use crate::message::delivery::Delivery;
 use crate::resource::{Parent, ParentCore, ResourceAddress, ResourceId, ResourceKey, ResourceManager, ResourceRecord};
-use crate::resource::{ResourceKind, ResourceType};
+use crate::resource::{Kind, ResourceType};
 use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::star::core::resource::host::{HostCall, HostComponent};
 use crate::star::shell::pledge::ResourceHostSelector;

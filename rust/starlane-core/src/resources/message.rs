@@ -7,16 +7,13 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 
-use crate::{ResourceAddress, ResourceCreate, ResourceIdentifier, ResourceKey, ResourceKind, ResourceSelector, ResourceStub, ResourceType, SkewerCase, Specific, ResourceId, Resource};
 use crate::error::Error;
-use crate::data::{DataSet, BinSrc, Meta};
-use crate::property::{ResourcePropertyValueSelector, ResourceValueSelector, ResourceProperty, ResourceRegistryProperty, ResourceHostPropertyValueSelector};
 use crate::mesh::serde::entity::request::ReqEntity;
-use starlane_resources::ResourceIdentifier;
 use crate::mesh::serde::entity::response::RespEntity;
 use crate::mesh::Request;
 use crate::mesh::Response;
 use crate::mesh::serde::messaging::{Exchange, ExchangeId};
+use mesh_portal_serde::version::latest::messaging::ExchangeType;
 
 pub struct ProtoMessage {
     pub id: MessageId,
@@ -37,7 +34,7 @@ impl ProtoMessage {
             entity: None,
             trace: false,
             log: false,
-            exchange: Exchange::Notification
+            exchange: ExchangeType::Notification
         }
     }
 

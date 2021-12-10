@@ -80,7 +80,7 @@ println!("SpaceHost: CREATE FROM ARGS...");
         let mut cache = factory.create();
         let address = space_address()?;
         let artifact_ref = ArtifactRef {
-            path: address.clone(),
+            address: address.clone(),
             kind: ArtifactKind::Raw
         };
 println!("SpaceHost: CACHING...");

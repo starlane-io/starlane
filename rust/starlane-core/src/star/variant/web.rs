@@ -226,7 +226,7 @@ println!("RECEIVED VALUES...");
                         let mut caches = factory.create();
 
                         let artifact_ref = ArtifactRef {
-                            path: artifact.clone(),
+                            address: artifact.clone(),
                             kind: ArtifactKind::HttpRouter
                         };
 

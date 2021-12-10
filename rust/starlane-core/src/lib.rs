@@ -66,6 +66,8 @@ pub mod html;
 pub mod mesh;
 pub mod resources;
 pub mod security;
+pub mod pattern;
+pub mod fail;
 
 lazy_static! {
     static ref VERSION: semver::Version = {

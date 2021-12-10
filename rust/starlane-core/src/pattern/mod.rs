@@ -2,6 +2,8 @@ use starlane::pattern::specific::{ProductPattern, VariantPattern, VendorPattern,
 use semver::VersionReq;
 use std::ops::Deref;
 use std::str::FromStr;
+use crate::pattern::specific::{VendorPattern, ProductPattern, VariantPattern};
+use crate::mesh::serde::id::Specific;
 
 #[derive(Eq, PartialEq)]
 pub struct AddressTksPattern {
@@ -182,6 +184,8 @@ pub mod specific {
     use semver::VersionReq;
     use std::ops::Deref;
     use std::str::FromStr;
+    use crate::pattern::Pattern;
+    use crate::error::Error;
 
     pub struct Version {
         pub req: VersionReq,
