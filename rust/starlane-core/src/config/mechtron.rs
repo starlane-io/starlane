@@ -1,4 +1,4 @@
-use crate::resource::{Kind, ResourceAddress, ArtifactKind};
+use crate::resource::{Kind, ArtifactKind};
 use crate::artifact::ArtifactRef;
 use crate::cache::{Cacheable, Data};
 use crate::resource::config::{ResourceConfig, Parser};
@@ -7,12 +7,12 @@ use std::sync::Arc;
 use crate::error::Error;
 use std::str::FromStr;
 use std::convert::TryInto;
-use starlane_resources::ResourcePath;
+use crate::mesh::serde::id::Address;
 
 pub struct MechtronConfig {
     pub name: String,
     pub prefix: String,
-    pub artifact: ResourcePath,
+    pub artifact: Address,
     pub bind: ArtifactRef,
     pub wasm: ArtifactRef,
 }

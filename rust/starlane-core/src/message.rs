@@ -6,17 +6,13 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, oneshot};
 use uuid::Uuid;
 
-use starlane_resources::message::{Message, MessageId, MessageReply, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage, ResourcePortMessage};
-use starlane_resources::ResourceIdentifier;
-
 use crate::error::Error;
 use crate::frame::{
-    Frame, MessageAck, MessagePayload, ReplyKind, SimpleReply, StarMessage, StarMessagePayload,
+    Frame, MessageAck, ReplyKind, SimpleReply, StarMessage, StarMessagePayload,
 };
-use crate::resource::{ResourceAddress, Kind, ResourceType, Specific};
+use crate::resource::{Kind, ResourceType, Specific};
 use crate::star::{StarCommand, StarKey};
 use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
-use starlane_resources::http::HttpRequest;
 use crate::resources::message::ProtoMessage;
 use crate::mesh::{Request, Response};
 

@@ -1,4 +1,4 @@
-use crate::resource::{Kind, ResourceAddress};
+use crate::resource::{Kind};
 use crate::cache::{Cacheable, Data};
 use std::collections::HashMap;
 use crate::resource::ArtifactKind;

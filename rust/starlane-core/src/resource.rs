@@ -15,18 +15,6 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::{mpsc, oneshot};
 
-use starlane_resources::data::{BinSrc, DataSet};
-use starlane_resources::message::{
-    Fail, MessageFrom, MessageReply, MessageTo, ProtoMessage, ResourceRequestMessage,
-    ResourceResponseMessage,
-};
-use starlane_resources::ConfigSrc;
-use starlane_resources::{
-    AddressCreationSrc, AssignKind, AssignResourceStateSrc, FieldSelection, KeyCreationSrc,
-    LabelSelection, MetaSelector, Names, ResourceAction, ResourceArchetype, ResourceAssign,
-    ResourceCreate, ResourceCreateStrategy, ResourceIdentifier, ResourcePath, ResourceRegistryInfo,
-    ResourceSelector, ResourceStub, Unique,
-};
 
 use crate::error::Error;
 use crate::file_access::FileAccess;
@@ -51,7 +39,6 @@ use crate::mesh::serde::payload::Payload;
 
 pub mod artifact;
 pub mod config;
-pub mod create_args;
 pub mod file;
 pub mod file_system;
 pub mod selector;
@@ -2188,7 +2175,7 @@ pub enum Kind {
     Authenticator,
     ArtifactBundleSeries,
     ArtifactBundle,
-    Artifact,
+    Artifact(ArtifactKind),
     Proxy,
     Credentials,
 }
@@ -2208,7 +2195,7 @@ impl Kind {
             Kind::Authenticator => ResourceType::Authenticator,
             Kind::ArtifactBundleSeries => ResourceType::ArtifactBundleSeries,
             Kind::ArtifactBundle => ResourceType::ArtifactBundle,
-            Kind::Artifact => ResourceType::Artifact,
+            Kind::Artifact(_) => ResourceType::Artifact,
             Kind::Proxy => ResourceType::Proxy,
             Kind::Credentials => ResourceType::Credentials
         }
@@ -2226,6 +2213,7 @@ impl Kind {
 
 
 
+#[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize,strum_macros::Display,strum_macros::EnumString)]
 pub enum DatabaseKind {
     Relational(Specific)
 }
@@ -2244,6 +2232,7 @@ impl DatabaseKind {
 
 
 
+#[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize,strum_macros::Display,strum_macros::EnumString)]
 pub enum BaseKind {
     User,
     App,
@@ -2253,11 +2242,22 @@ pub enum BaseKind {
     Any
 }
 
+#[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize,strum_macros::Display,strum_macros::EnumString)]
 pub enum FileKind {
     File,
     Dir
 }
 
+
+#[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize,strum_macros::Display,strum_macros::EnumString)]
+pub enum ArtifactKind{
+    Raw,
+    AppConfig,
+    MechtronConfig,
+    BindConfig,
+    Wasm,
+    HttpRouter
+}
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -15,10 +15,10 @@ use tokio::sync::mpsc::error::{SendError, TrySendError};
 use tokio::time::error::Elapsed;
 use zip::result::ZipError;
 
-use starlane_resources::message::Fail;
 use wasmer::CompileError;
 use actix_web::ResponseError;
 use handlebars::RenderError;
+use crate::fail::Fail;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Error {

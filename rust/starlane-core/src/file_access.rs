@@ -4,7 +4,7 @@ use std::{fs, thread};
 use std::fs::{DirBuilder, File};
 
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{PathBuf };
 use std::str::FromStr;
 use std::sync::{mpsc, Arc};
 
@@ -15,7 +15,7 @@ use walkdir::WalkDir;
 
 use crate::error::Error;
 use crate::resource::FileKind;
-use crate::resource::Path;
+use mesh_portal_parse::path::Path;
 
 use crate::util;
 use std::convert::TryFrom;

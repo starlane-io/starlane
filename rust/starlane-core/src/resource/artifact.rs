@@ -3,11 +3,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use starlane_resources::data::{BinSrc, DataSet};
-
 use crate::error::Error;
-use crate::resource::ArtifactBundleKey;
-use crate::resource::ResourceAddress;
 
 #[derive(Clone)]
 pub struct ArtifactBundle {

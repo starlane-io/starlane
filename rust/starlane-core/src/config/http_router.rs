@@ -1,18 +1,18 @@
-use starlane_resources::ResourcePath;
 use crate::cache::{Cacheable, Data};
 use crate::artifact::ArtifactRef;
 use crate::resource::config::Parser;
 use std::sync::Arc;
 use crate::error::Error;
-use starlane_resources::http::HttpMethod;
-use starlane_resources::ArtifactKind;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 use crate::config::http_router::parse::{parse_http_mappings, parse_reverse_proxy_config};
 use regex::Regex;
+use crate::mesh::serde::id::Address;
+use crate::resource::ArtifactKind;
+use mesh_portal_serde::version::v0_0_1::generic::payload::HttpMethod;
 
 pub struct HttpRouterConfig {
-    pub artifact: ResourcePath,
+    pub artifact: Address,
     pub mappings: Vec<HttpMapping>
 }
 
@@ -76,9 +76,7 @@ impl HttpMapping {
 }
 
 mod parse {
-    use starlane_resources::http::HttpMethod;
     use crate::error::Error;
-    use starlane_resources::Res;
     use nom::error::{context, ErrorKind};
     use nom::sequence::{tuple, delimited, terminated, preceded};
     use nom::character::complete::{alpha1, multispace0, multispace1};
@@ -86,9 +84,10 @@ mod parse {
     use nom::branch::alt;
     use nom::{InputTakeAtPosition, AsChar};
     use nom::bytes::complete::{tag, take_until};
-    use starlane_resources::parse::{parse_resource_path, not_whitespace_or_semi};
     use crate::config::http_router::{HttpMapping, HttpRouterConfig};
     use nom::multi::{separated_list0, many0};
+    use mesh_portal_parse::parse::Res;
+    use mesh_portal_serde::version::v0_0_1::generic::payload::HttpMethod;
 
 
     fn asterisk<T>(i: T) -> Res<T, T>
@@ -190,7 +189,7 @@ mod parse {
 mod tests {
     use crate::config::http_router::parse::{parse_http_mapping, parse_http_methods, parse_http_mappings, parse_reverse_proxy_config};
     use crate::error::Error;
-    use starlane_resources::http::HttpMethod;
+    use mesh_portal_serde::version::v0_0_1::generic::payload::HttpMethod;
 
     #[test]
     fn test_http_mapping() -> Result<(), Error> {

@@ -6,9 +6,6 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::error::Elapsed;
 
-use starlane_resources::{AssignResourceStateSrc, ResourceAssign, ResourceCreate, ResourceIdentifier, ResourceSelector, ResourceStatus, ResourceStub, ResourceAddress, Labels};
-use starlane_resources::data::{BinSrc, DataSet};
-use starlane_resources::message::{Fail, Message, MessageId, MessageReply, RawState, ResourceRequestMessage, ResourceResponseMessage, ResourcePortMessage, ResourcePortReply};
 
 use crate::error::Error;
 use crate::id::Id;
@@ -17,10 +14,12 @@ use crate::message::{MessageExpect, MessageUpdate, ProtoStarMessage, MessageId};
 use crate::message::delivery::ActorMessage;
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey};
 use crate::watch::{Notification, Watch, WatchKey};
-use crate::resource::{ResourceId, ResourceRegistration, ResourceRecord, ResourceType, ResourceKey, ResourceSliceStatus,  UserKey, AppKey, ActorKey};
-use starlane_resources::property::{ResourceValues, ResourceRegistryProperty, ResourceRegistryPropertyAssignment, ResourceRegistryPropertyValueSelector, ResourcePropertyOp};
-use starlane_resources::http::{HttpResponse, HttpRequest};
 use crate::mesh;
+use crate::resource::selector::{ResourceSelector, Labels};
+use crate::mesh::serde::resource::ResourceStub;
+use crate::mesh::serde::http::HttpResponse;
+use crate::resource::{ResourceRegistration, ResourceRecord, ResourceSliceStatus};
+use crate::resource::ResourceType;
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum Frame {

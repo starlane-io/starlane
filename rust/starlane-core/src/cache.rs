@@ -20,16 +20,17 @@ use crate::config::mechtron::{MechtronConfig, MechtronConfigParser};
 use crate::config::wasm::{Wasm, WasmCompiler};
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use crate::resource::{Path, ResourceAddress, Kind, ResourceRecord};
+use crate::resource::{Kind, ResourceRecord};
 use crate::resource::ArtifactKind;
 use crate::resource::config::Parser;
 use crate::starlane::api::StarlaneApi;
 use crate::starlane::StarlaneMachine;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
 use crate::config::http_router::{HttpRouterConfig, HttpRouterConfigParser};
+use crate::mesh::serde::id::Address;
 
 pub type Data = Arc<Vec<u8>>;
-pub type ZipFile = Path;
+pub type ZipFile = Address;
 
 pub trait Cacheable: Send + Sync + 'static {
     fn artifact(&self) -> ArtifactRef;
@@ -80,7 +81,7 @@ impl ArtifactCaches {
 }
 
 pub struct ArtifactItemCache<C: Cacheable> {
-    map: HashMap<ResourcePath, ArtifactItem<C>>,
+    map: HashMap<Address, ArtifactItem<C>>,
 }
 
 impl<C: Cacheable> ArtifactItemCache<C> {
@@ -90,7 +91,7 @@ impl<C: Cacheable> ArtifactItemCache<C> {
         }
     }
 
-    pub fn get(&self, artifact: &ResourcePath) -> Option<ArtifactItem<C>> {
+    pub fn get(&self, artifact: &Address) -> Option<ArtifactItem<C>> {
         self.map.get(&artifact).cloned()
     }
 
@@ -261,11 +262,11 @@ impl AsyncProcessor<ProtoArtifactCall> for ProtoArtifactCacheProc {
 
 pub enum ArtifactBundleCacheCommand {
     Cache {
-        bundle: ResourcePath,
+        bundle: Address,
         tx: oneshot::Sender<Result<(), Error>>,
     },
     Result {
-        bundle: ResourcePath,
+        bundle: Address,
         result: Result<(), Error>,
     },
 }
@@ -275,7 +276,7 @@ struct ArtifactBundleCacheRunner {
     rx: tokio::sync::mpsc::Receiver<ArtifactBundleCacheCommand>,
     src: ArtifactBundleSrc,
     file_access: FileAccess,
-    notify: HashMap<ResourcePath, Vec<oneshot::Sender<Result<(), Error>>>>,
+    notify: HashMap<Address, Vec<oneshot::Sender<Result<(), Error>>>>,
     logger: AuditLogger,
     machine: StarlaneMachine
 }
@@ -379,7 +380,7 @@ impl ArtifactBundleCacheRunner {
         }
     }
 
-    async fn has(&self, bundle: ResourcePath ) -> Result<(), Error> {
+    async fn has(&self, bundle: Address ) -> Result<(), Error> {
         let file_access =
             ArtifactBundleCache::with_bundle_path(self.file_access.clone(), bundle.clone())?;
         file_access.read(&Path::from_str("/.ready")?).await?;
@@ -389,7 +390,7 @@ impl ArtifactBundleCacheRunner {
     async fn download_and_extract(
         src: ArtifactBundleSrc,
         file_access: FileAccess,
-        bundle: ResourcePath,
+        bundle: Address,
         machine: StarlaneMachine,
         logger: AuditLogger,
     ) -> Result<(), Error> {
@@ -456,7 +457,7 @@ impl ArtifactBundleCache {
         })
     }
 
-    pub async fn download(&self, bundle: ResourcePath) -> Result<(), Error> {
+    pub async fn download(&self, bundle: Address) -> Result<(), Error> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(ArtifactBundleCacheCommand::Cache { bundle, tx })
@@ -470,14 +471,14 @@ impl ArtifactBundleCache {
 
     pub fn with_bundle_files_path(
         file_access: FileAccess,
-        address: ResourcePath,
+        address: Address,
     ) -> Result<FileAccess, Error> {
         Ok(file_access.with_path(format!("bundles/{}/files", address.to_string()))?)
     }
 
     pub fn with_bundle_path(
         file_access: FileAccess,
-        address: ResourcePath,
+        address: Address,
     ) -> Result<FileAccess, Error> {
         Ok(file_access.with_path(format!("bundles/{}", address.to_string()))?)
     }
@@ -970,7 +971,7 @@ impl RootArtifactCaches {
 
 #[derive(Clone)]
 pub enum Audit {
-    Download(ResourcePath),
+    Download(Address),
 }
 
 #[derive(Clone)]

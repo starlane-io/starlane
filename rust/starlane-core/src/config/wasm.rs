@@ -1,4 +1,4 @@
-use crate::resource::{Kind, ResourceAddress, ArtifactKind};
+use crate::resource::{Kind, ArtifactKind};
 use crate::artifact::ArtifactRef;
 use crate::cache::{Cacheable, Data};
 use crate::resource::config::{ResourceConfig, Parser};
@@ -7,10 +7,10 @@ use crate::error::Error;
 use std::str::FromStr;
 use std::convert::TryInto;
 use wasmer::{Cranelift, Universal, Store, Module};
-use starlane_resources::ResourcePath;
+use crate::mesh::serde::id::Address;
 
 pub struct Wasm {
-    pub artifact: ResourcePath,
+    pub artifact: Address,
     pub module: Arc<Module>
 }
 
