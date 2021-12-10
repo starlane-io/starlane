@@ -6,7 +6,6 @@ use crate::error::Error;
 use wasm_membrane_host::membrane::WasmMembrane;
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use starlane_resources::message::{ResourcePortMessage, Message, ResourcePortReply};
 use mesh_portal_api::message::Message;
 use mechtron_common::version::latest::{guest, host};
 use crate::mesh;

@@ -3,14 +3,11 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
 
-use starlane_resources::message::{Fail, ResourcePortMessage, Message, MessageReply};
-use starlane_resources::ResourceIdentifier;
-
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
 use crate::frame::{Reply, ReplyKind, StarPattern};
 use crate::message::ProtoStarMessage;
-use crate::resource::{ResourceRecord, ResourceKey};
+use crate::resource::{ResourceRecord };
 use crate::star::{StarCommand, StarSkel, StarInfo};
 use crate::star::shell::locator::ResourceLocateCall;
 use crate::star::shell::message::MessagingCall;

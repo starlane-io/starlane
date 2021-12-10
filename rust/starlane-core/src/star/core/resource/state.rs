@@ -6,16 +6,10 @@ use rusqlite::{Connection, params, Row};
 use rusqlite::types::ValueRef;
 use tokio::sync::{mpsc, oneshot};
 
-use starlane_resources::{LocalStateSetSrc, Resource, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceIdentifier, ResourceStatePersistenceManager};
-use starlane_resources::data::{BinSrc, DataSet};
-use starlane_resources::message::Fail;
-
-use starlane_resources::ConfigSrc;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::resource::{
-    Path, ResourceAddress,
-    ResourceKey, Kind, Specific,
+     Kind, Specific,
 };
 use crate::star::StarSkel;
 use crate::starlane::files::MachineFileSystem;

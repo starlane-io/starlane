@@ -3,15 +3,16 @@ use std::sync::Arc;
 
 use tokio::sync::{mpsc, oneshot};
 
-use starlane_resources::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceStub, ResourcePath, ConfigSrc};
 
 use crate::error::Error;
-use crate::resource::{create_args, ResourceAddress, Kind, ResourceRecord, ResourceRegistration, ResourceLocation};
-use crate::resource::ResourceKey;
+use crate::resource::{Kind, ResourceRecord, ResourceRegistration, ResourceLocation};
 use crate::star::{StarKey, StarSkel};
 use crate::star::variant::{FrameVerdict, VariantCall};
 use crate::starlane::api::StarlaneApi;
 use crate::util::{AsyncProcessor, AsyncRunner};
+use crate::mesh::serde::generic::resource::ResourceStub;
+use crate::resource::selector::ConfigSrc;
+use crate::mesh::serde::id::Address;
 
 pub struct CentralVariant {
     skel: StarSkel,
@@ -46,14 +47,12 @@ impl CentralVariant {
     fn init(&self, tx: oneshot::Sender<Result<(), Error>>) {
         let root_resource = ResourceRecord {
             stub: ResourceStub {
-                key: ResourceKey::Root,
-                address: ResourcePath::root(),
+                address: Address::root(),
                 archetype: ResourceArchetype {
                     kind: Kind::Root,
                     specific: None,
                     config: ConfigSrc::None,
                 },
-                owner: None,
             },
             location: ResourceLocation {
                 host: StarKey::central(),

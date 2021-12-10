@@ -3,12 +3,9 @@ use lru::LruCache;
 use tokio::sync::mpsc;
 use tokio::time::Duration;
 
-use starlane_resources::message::Fail;
-use starlane_resources::ResourceIdentifier;
-
 use crate::frame::{ResourceRegistryRequest, Reply, SimpleReply, StarMessagePayload};
 use crate::message::ProtoStarMessage;
-use crate::resource::{ResourceAddress, ResourceId, ResourceKey, ResourceRecord, ResourceType};
+use crate::resource::{ResourceRecord, ResourceType};
 use crate::star::{LogId, Set, Star, StarCommand, StarKey, StarKind, StarSkel};
 use crate::star::Request;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};

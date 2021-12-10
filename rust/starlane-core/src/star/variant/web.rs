@@ -5,7 +5,6 @@ use std::thread;
 
 use url::Url;
 
-use crate::resource::{ResourceAddress};
 use crate::star::{StarSkel};
 use crate::starlane::api::{StarlaneApi, StarlaneApiRelay};
 use tokio::sync::{oneshot, mpsc};
@@ -17,17 +16,12 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use crate::error::Error;
 use bytes::BytesMut;
 use httparse::{Request, Header};
-use starlane_resources::http::{HttpRequest, Headers, HttpMethod, HttpResponse};
-use starlane_resources::data::{BinSrc, DataSet};
 use std::sync::Arc;
-use starlane_resources::message::{ProtoMessage, ResourcePortMessage,MessageFrom};
 use std::convert::TryInto;
 use crate::frame::{Reply, ReplyKind};
-use starlane_resources::{ResourcePath, ResourceStub, ConfigSrc,ArtifactKind};
 use crate::parse::parse_host;
 use handlebars::Handlebars;
 use serde_json::json;
-use starlane_resources::property::{ResourcePropertyValueSelector, ResourceRegistryPropertyValueSelector, ResourceValue, ResourceValues};
 use std::future::Future;
 use nom::AsBytes;
 use crate::artifact::ArtifactRef;
@@ -35,6 +29,11 @@ use crate::cache::ArtifactItem;
 use crate::config::http_router::HttpRouterConfig;
 use crate::html::HTML;
 use regex::Regex;
+use crate::mesh::serde::entity::request::Http;
+use crate::mesh::serde::payload::Payload;
+use crate::resource::selector::ConfigSrc;
+use crate::resource::ArtifactKind;
+use crate::resources::message::ProtoMessage;
 
 
 pub struct WebVariant {
@@ -140,7 +139,7 @@ println!("ok...");
                 }
                 let body = BinSrc::Memory( Arc::new(body) );
 
-                break HttpRequest {
+                break Http{
                     path: req.path.expect("expected path").to_string(),
                     method: method,
                     headers: http_headers,
@@ -177,7 +176,8 @@ async fn error_response( mut stream: TcpStream, code: usize, message: &str)  {
     stream.write(HTML.render("error-code-page", &messages ).unwrap().as_bytes() ).await.unwrap();
 }
 
-async fn create_response( request: HttpRequest, api: StarlaneApi, skel: StarSkel ) -> Result<HttpResponse,Error> {
+async fn create_response( request: Http, api: StarlaneApi, skel: StarSkel ) -> Result<HttpResponse,Error> {
+    /*
 
     let (_,host) = parse_host(request.headers.get("Host").ok_or("Missing HOST")?.as_str())?;
 
@@ -270,7 +270,7 @@ eprintln!("Error: {}",err.to_string());
                                 proto.payload( request.clone() );
                                 proto.to( resource.into() ) ;
                                 proto.from(MessageFrom::Inject);
-                                match api.send_http_message(proto, ReplyKind::HttpResponse, "sending an HttpRequest").await {
+                                match api.send_http_message(proto, ReplyKind::HttpResponse, "sending an Http").await {
                                     Ok(reply) => {
                                         if let Reply::HttpResponse(response ) = reply {
                                             return Ok(response)
@@ -313,6 +313,25 @@ eprintln!("Error: {}",err.to_string());
 
 
 
+
+     */
+    unimplemented!()
+}
+#[derive(Debug,Clone,Serialize,Deserialize)]
+pub struct HttpResponse{
+    pub status: usize,
+    pub headers: Headers,
+    pub body: Payload
+}
+
+impl HttpResponse {
+    pub fn new( ) -> HttpResponse {
+        Self {
+            status: 200,
+            headers: Headers::new(),
+            body: Payload::Empty
+        }
+    }
 }
 
 

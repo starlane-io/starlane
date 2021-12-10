@@ -9,14 +9,12 @@ use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
 
-use starlane_resources::message::Fail;
-use starlane_resources::ResourceAssign;
-
 use crate::error::Error;
 use crate::resource::{
     RemoteResourceHost, ResourceHost, ResourceLocationAffinity, ResourceType,
 };
 use crate::star::{StarCommand, StarConscriptKind, StarInfo, StarKey, StarKind, StarSkel};
+use crate::fail::Fail;
 
 #[derive(Clone)]
 pub struct StarWranglerBacking {

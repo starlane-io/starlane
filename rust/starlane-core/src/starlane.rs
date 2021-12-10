@@ -88,9 +88,6 @@ impl StarlaneMachine {
 
     }
 
-    pub fn bin_context(&self) -> Arc<dyn BinContext> {
-        self.machine_filesystem.clone()
-    }
 
     pub fn machine_filesystem(&self) -> Arc<MachineFileSystem> {
         self.machine_filesystem.clone()
@@ -908,10 +905,8 @@ mod test {
         Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog,
         StarLogPayload,
     };
-    use starlane_resources::message::Fail;
     use crate::names::Name;
     use crate::permissions::Authentication;
-    use crate::resource::{ResourceAddress};
     use crate::space::CreateAppControllerFail;
     use crate::star::{StarController, StarInfo, StarKey, StarKind};
     use crate::starlane::{

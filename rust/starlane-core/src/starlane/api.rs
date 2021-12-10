@@ -12,31 +12,27 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 
-use starlane_resources::{AddressCreationSrc, AssignResourceStateSrc, FieldSelection, KeyCreationSrc, LocalStateSetSrc, RemoteDataSrc, ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceIdentifier, ResourceRegistryInfo, ResourceSelector, ResourceStub, ResourcePath};
-use starlane_resources::ConfigSrc;
-use starlane_resources::data::{BinSrc, DataSet, Meta};
-use starlane_resources::data::Binary;
-use starlane_resources::message::{MessageFrom, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage, ResourcePortMessage, Message, MessageReply};
-use starlane_resources::message::Fail;
-
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
 use crate::frame::{Reply, ReplyKind, StarPattern, TraversalAction, ResourceRegistryRequest, StarMessagePayload};
-use crate::resource::{Path, Kind, ResourceRecord, ResourceType, to_keyed_for_reasource_create, to_keyed_for_resource_selector};
+use crate::resource::{Kind, ResourceType, AssignResourceStateSrc, ResourceRecord};
 use crate::resource::file_system::FileSystemState;
 use crate::resource::FileKind;
-use crate::resource::ResourceKey;
 use crate::resource::user::UserState;
 use crate::star::{Request, StarCommand, StarKind, StarSkel, StarKey};
 use crate::star::shell::search::{SearchInit, SearchHits};
 use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
-use starlane_resources::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, ResourceValue, ResourceValueSelector, ResourceValues, ResourceProperty, ResourcePropertyAssignment, ResourceRegistryPropertyAssignment, ResourceHostPropertyValueSelector, ResourcePropertyOp};
 use crate::watch::{WatchResourceSelector, Watcher};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
 use crate::artifact::ArtifactBundle;
-use starlane_resources::http::HttpRequest;
 use crate::resources::message::ProtoMessage;
+use crate::mesh::serde::id::Address;
+use kube::ResourceExt;
+use crate::resource::selector::{ResourceSelector, FieldSelection, ConfigSrc, ResourceRegistryInfo};
+use crate::mesh::serde::resource::ResourceStub;
+use mesh_portal_parse::path::Path;
+use crate::mesh::serde::bin::Bin;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -47,7 +43,7 @@ pub struct StarlaneApi {
 impl StarlaneApi {
     pub async fn create_artifact_bundle(
         &self,
-        bundle: ResourcePath,
+        bundle: Address,
         data: Arc<Vec<u8>>,
     ) -> Result<Creation<ArtifactBundleApi>, Error> {
 
@@ -64,7 +60,7 @@ impl StarlaneApi {
 
     pub fn create_artifact_bundle_series(
         &self,
-        path: ResourcePath,
+        path: Address,
     ) -> Result<Creation<ArtifactBundleSeriesApi>, Error> {
         let resource_src = AssignResourceStateSrc::Stateless;
 
@@ -170,14 +166,14 @@ info!("received reply for {}",description);
     }
      */
 
-    pub async fn fetch_resource_address(&self, key: ResourceKey) -> Result<ResourcePath, Error> {
+    pub async fn fetch_resource_address(&self, key: ResourceKey) -> Result<Address, Error> {
         match self.fetch_resource_record(key.into()).await {
             Ok(record) => Ok(record.stub.address),
             Err(fail) => Err(fail.into()),
         }
     }
 
-    pub async fn fetch_resource_key(&self, address: ResourcePath ) -> Result<ResourceKey, Error> {
+    pub async fn fetch_resource_key(&self, address: Address ) -> Result<ResourceKey, Error> {
         match self.fetch_resource_record(address.into()).await {
             Ok(record) => Ok(record.stub.key),
             Err(fail) => Err(fail.into()),
@@ -186,7 +182,7 @@ info!("received reply for {}",description);
 
     pub async fn fetch_resource_record(
         &self,
-        identifier: ResourceIdentifier,
+        identifier: Address ,
     ) -> Result<ResourceRecord, Error> {
         self.surface_api.locate(identifier).await
     }
@@ -250,7 +246,7 @@ info!("received reply for {}",description);
 
     pub async fn select(
         &self,
-        parent_resource: &ResourceIdentifier,
+        parent_resource: &Address,
         mut selector: ResourceSelector,
     ) -> Result<Vec<ResourceRecord>, Error> {
         let resource = parent_resource.clone();
@@ -324,7 +320,7 @@ info!("received reply for {}",description);
 
     pub async fn select_values(
         &self,
-        path: ResourcePath,
+        path: Address,
         selector: ResourcePropertyValueSelector
     ) -> Result<ResourceValues<ResourceStub>, Error> {
 
@@ -493,7 +489,7 @@ info!("received reply for {}",description);
     }
 
 
-    pub async fn get_space(&self, identifier: ResourceIdentifier) -> Result<SpaceApi, Error> {
+    pub async fn get_space(&self, identifier: Address) -> Result<SpaceApi, Error> {
         let record = self.fetch_resource_record(identifier).await?;
         Ok(SpaceApi::new(self.surface_api.clone(), record.stub)?)
     }
@@ -509,7 +505,7 @@ impl SpaceApi {
         self.stub.key.clone()
     }
 
-    pub fn address(&self) -> ResourcePath {
+    pub fn address(&self) -> Address {
         self.stub.address.clone()
     }
 
@@ -560,7 +556,7 @@ impl SpaceApi {
     }
 
 
-    pub fn create_app(&self, name: &str, app_config: ResourcePath ) -> Result<Creation<AppApi>, Error> {
+    pub fn create_app(&self, name: &str, app_config: Address ) -> Result<Creation<AppApi>, Error> {
         let resource_src = AssignResourceStateSrc::Stateless;
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
@@ -615,7 +611,7 @@ impl AppApi {
         self.stub.key.clone()
     }
 
-    pub fn address(&self) -> ResourcePath {
+    pub fn address(&self) -> Address {
         self.stub.address.clone()
     }
 
@@ -641,7 +637,7 @@ impl AppApi {
         })
     }
 
-    pub fn create_mechtron(&self, name: &str, config: ResourcePath ) -> Result<Creation<MechtronApi>, Error> {
+    pub fn create_mechtron(&self, name: &str, config: Address ) -> Result<Creation<MechtronApi>, Error> {
         let resource_src = AssignResourceStateSrc::Stateless;
         let create = ResourceCreate {
             parent: self.stub.key.clone().into(),
@@ -676,7 +672,7 @@ impl MechtronApi{
         self.stub.key.clone()
     }
 
-    pub fn address(&self) -> ResourcePath {
+    pub fn address(&self) -> Address {
         self.stub.address.clone()
     }
 
@@ -716,7 +712,7 @@ impl FileSystemApi {
         self.stub.key.clone()
     }
 
-    pub fn address(&self) -> ResourcePath {
+    pub fn address(&self) -> Address {
         self.stub.address.clone()
     }
 
@@ -753,7 +749,7 @@ impl FileSystemApi {
         self.create_file(path, Arc::new(string.into_bytes()))
     }
 
-    pub fn create_file(&self, path: &Path, data: Binary) -> Result<Creation<FileApi>, Error> {
+    pub fn create_file(&self, path: &Path, data: Bin) -> Result<Creation<FileApi>, Error> {
         let content = BinSrc::Memory(data);
         let mut state: DataSet<BinSrc> = DataSet::new();
         state.insert("content".to_string(), content);

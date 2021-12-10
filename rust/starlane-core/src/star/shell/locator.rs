@@ -8,13 +8,9 @@ use async_trait::async_trait;
 use lru::LruCache;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
-
-use starlane_resources::{ResourceArchetype, ResourceIdentifier, ResourceStub, ResourcePath, ConfigSrc};
-use starlane_resources::message::Fail;
-
 use crate::frame::{ResourceRegistryRequest, Reply, ReplyKind, SimpleReply, StarMessagePayload};
 use crate::message::ProtoStarMessage;
-use crate::resource::{ResourceAddress, ResourceKey, Kind, ResourceRecord, ResourceType};
+use crate::resource::{Kind, ResourceRecord, ResourceType};
 use crate::star::{
     LogId, Request, ResourceRegistryBacking, Set, Star, StarCommand, StarKey, StarKind, StarSkel,
 };

@@ -6,14 +6,13 @@ use tokio::time::Duration;
 use tokio::time::error::Elapsed;
 use tokio::time::Instant;
 
-use starlane_resources::message::{Fail, MessageId, ProtoMessage};
-
 use crate::error::Error;
 use crate::frame::{Reply, ReplyKind, SimpleReply, StarMessage, StarMessagePayload};
-use crate::message::{MessageExpect, ProtoStarMessage, ProtoStarMessageTo};
+use crate::message::{MessageExpect, ProtoStarMessage, ProtoStarMessageTo, MessageId};
 use crate::resource::ResourceRecord;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
+use crate::fail::Fail;
 
 #[derive(Clone)]
 pub struct MessagingApi {

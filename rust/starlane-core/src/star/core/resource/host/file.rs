@@ -6,15 +6,14 @@ use yaml_rust::Yaml;
 
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
-use crate::resource::{ArtifactKind, ResourceAddress, ResourceKey, ResourceType, ResourceAssign, AssignResourceStateSrc};
-use crate::resource::create_args::{artifact_bundle_address, create_args_artifact_bundle, space_address};
+use crate::resource::{ArtifactKind, ResourceType, ResourceAssign, AssignResourceStateSrc};
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::watch::{Notification, Change, Topic, WatchSelector, Property};
 use crate::message::delivery::Delivery;
 use crate::html::html_error_code;
-use crate::frame::{Reply, StarMessagePayload, MessagePayload, StarMessage};
+use crate::frame::{Reply, StarMessagePayload, StarMessage};
 
 use std::str::FromStr;
 use crate::mesh::serde::id::Address;
@@ -124,8 +123,8 @@ impl Host for FileSystemHost {
 
     async fn assign(
         &self,
-        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<DataSet<BinSrc>, Error> {
+        assign: ResourceAssign<AssignResourceStateSrc>,
+    ) -> Result<(), Error> {
         match assign.state_src {
             AssignResourceStateSrc::Stateless => {}
             AssignResourceStateSrc::CreateArgs(_) => {}
@@ -134,27 +133,19 @@ impl Host for FileSystemHost {
             }
         };
 
-        Ok(DataSet::new())
+        Ok(())
     }
 
-    async fn has(&self, key: ResourceKey) -> bool {
+    async fn has(&self, key: Address) -> bool {
         match self.store.has(key).await {
             Ok(v) => v,
             Err(_) => false,
         }
     }
 
-    async fn get_state(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
-        self.store.get(key).await
-    }
-
-
-
-    async fn delete(&self, key: ResourceKey) -> Result<(), Error> {
-        todo!()
-    }
-
-    async fn http_message(&self, key: ResourceKey, delivery: Delivery<Message<HttpRequest>>) -> Result<(),Error> {
+    fn handle(&self,  delivery: Delivery<Message>)  {
+        unimplemented!()
+        /*
         let record = self.skel.resource_locator_api.locate(key.into()).await?;
 
         let filepath = if delivery.entity.payload.path.ends_with("/") {
@@ -171,6 +162,7 @@ impl Host for FileSystemHost {
         star_message.payload = StarMessagePayload::MessagePayload(MessagePayload::HttpRequest(message));
         self.skel.router_api.route(star_message);
         Ok(())
+         */
     }
 
 
