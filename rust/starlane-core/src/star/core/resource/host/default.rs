@@ -1,9 +1,6 @@
-use starlane_resources::{AssignResourceStateSrc, Resource, ResourceAssign};
-use starlane_resources::data::{BinSrc, DataSet};
-use starlane_resources::message::Fail;
 
 use crate::error::Error;
-use crate::resource::{ResourceKey, ResourceType};
+use crate::resource::{ResourceType, AssignResourceStateSrc};
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
@@ -37,7 +34,7 @@ impl Host for StatelessHost {
 
     async fn assign(
         &self,
-        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
+        assign: ResourceAssign<AssignResourceStateSrc>,
     ) -> Result<DataSet<BinSrc>, Error> {
         match assign.state_src {
             AssignResourceStateSrc::Stateless => {}

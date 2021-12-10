@@ -4,26 +4,23 @@ use std::sync::Arc;
 use clap::{App, AppSettings};
 use yaml_rust::Yaml;
 
-use starlane_resources::{AssignKind, AssignResourceStateSrc, Resource, ResourceAssign, ResourcePath};
-use starlane_resources::message::{ResourcePortMessage, Message, ResourceRequestMessage};
-use starlane_resources::data::{BinSrc, DataSet, Meta};
-use starlane_resources::message::Fail;
-
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
-use crate::resource::{ArtifactKind, ResourceAddress, ResourceKey, ResourceType};
+use crate::resource::{ArtifactKind, ResourceAddress, ResourceKey, ResourceType, ResourceAssign, AssignResourceStateSrc};
 use crate::resource::create_args::{artifact_bundle_address, create_args_artifact_bundle, space_address};
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::watch::{Notification, Change, Topic, WatchSelector, Property};
 use crate::message::delivery::Delivery;
-use starlane_resources::http::HttpRequest;
-use starlane_resources::http::HttpResponse;
 use crate::html::html_error_code;
 use crate::frame::{Reply, StarMessagePayload, MessagePayload, StarMessage};
 
 use std::str::FromStr;
+use crate::mesh::serde::id::Address;
+use mesh_portal_api::message::Message;
+use mesh_portal_serde::version::v0_0_1::generic::entity::request::ReqEntity;
+use mesh_portal_serde::version::v0_0_1::generic::payload::Payload;
 
 #[derive(Debug)]
 pub struct FileHost {
@@ -44,8 +41,8 @@ impl FileHost {
 impl Host for FileHost {
     async fn assign(
         &self,
-        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<DataSet<BinSrc>, Error> {
+        assign: ResourceAssign<AssignResourceStateSrc>,
+    ) -> Result<(), Error> {
         let state = match assign.state_src {
             AssignResourceStateSrc::Direct(data) => data,
             AssignResourceStateSrc::Stateless => return Err("File cannot be stateless".into()),
@@ -63,56 +60,44 @@ impl Host for FileHost {
 
         self.skel.watch_api.fire( Notification::new(selector, Change::State(state.clone()) ));
 
-        Ok(state)
+        Ok(())
     }
 
-    async fn has(&self, key: ResourceKey) -> bool {
+    async fn has(&self, key: Address) -> bool {
         match self.store.has(key).await {
             Ok(v) => v,
             Err(_) => false,
         }
     }
 
-    async fn get_state(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
-        self.store.get(key).await
-    }
-
-
-    async fn update_state(&self,key: ResourceKey, state: DataSet<BinSrc> ) -> Result<(),Error> {
-
-        self.store.put( key.clone(), state.clone() ).await?;
-
-        let selector = WatchSelector{
-            topic: Topic::Resource(key),
-            property: Property::State
-        };
-
-        self.skel.watch_api.fire( Notification::new(selector, Change::State(state.clone()) ));
-
-        Ok(())
-    }
-
-
-    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Error> {
-        unimplemented!()
-    }
 
     fn resource_type(&self) -> ResourceType {
         ResourceType::File
     }
 
-    async fn http_message(&self, key: ResourceKey, delivery: Delivery<Message<HttpRequest>>) -> Result<(),Error> {
+    fn handle(&self,delivery: Delivery<Message>) {
+        match &delivery.entity {
+            Message::Request(request) => {
+                match &request.entity {
+                    ReqEntity::Rc(_) => {}
+                    ReqEntity::Msg(_) => {}
+                    ReqEntity::Http(http) => {
+                        unimplemented!()
+                        /*
+                        let state = self.store.get(key).await?.ok_or("expected state to be in the store")?;
+                        let content = state.get("content").ok_or("expected file to have content")?.clone();
+                        let mut response = HttpResponse::new();
+                        response.status = 200;
+                        response.body = Option::Some(content);
+                        delivery.reply(Reply::HttpResponse(response));
 
-       let state = self.store.get(key).await?.ok_or("expected state to be in the store")?;
-       let content = state.get("content").ok_or("expected file to have content")?.clone();
-       let mut response = HttpResponse::new();
-       response.status = 200;
-       response.body = Option::Some(content);
-       delivery.reply(Reply::HttpResponse(response));
-
-       Ok(())
+                         */
+                    }
+                }
+            }
+            Message::Response(response) => {}
+        }
     }
-
 }
 
 

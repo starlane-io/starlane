@@ -18,8 +18,6 @@ use tokio::sync::oneshot;
 
 use shell::pledge::{StarConscript, StarConscriptionSatisfaction, StarWranglerBacking};
 use shell::search::{SearchCommit, SearchHits, SearchInit, StarSearchTransaction, TransactionResult};
-use starlane_resources::{Resource, ResourceIdentifier, ResourceSelector };
-use starlane_resources::message::{Fail, MessageId};
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::constellation::ConstellationStatus;
@@ -36,11 +34,7 @@ use crate::lane::{
     UltimaLaneKey,
 };
 use crate::logger::{Flags, Logger, LogInfo};
-use crate::message::{
-    MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage,
-    ProtoStarMessageTo, TrackerJob,
-};
-use crate::resource::{ActorKey, Registry, RegistryReservation, RegistryUniqueSrc, ResourceAddress, ResourceKey, ResourceNamesReservationRequest, ResourceRecord, ResourceRegistration, ResourceRegistryAction, ResourceRegistryCommand, ResourceRegistryResult, ResourceType, UniqueSrc};
+use crate::message::{MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage, ProtoStarMessageTo, TrackerJob, MessageId};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::shell::golden::GoldenPathApi;
 use crate::star::shell::lanes::LaneMuxerApi;
@@ -52,10 +46,12 @@ use crate::star::shell::watch::WatchApi;
 use crate::star::surface::SurfaceApi;
 use crate::star::variant::{FrameVerdict, VariantApi};
 use crate::starlane::StarlaneMachine;
-use starlane_resources::status::Status;
 use crate::template::StarTemplateHandle;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
-use starlane_resources::property::{ResourcePropertyAssignment, ResourceRegistryPropertyAssignment};
+use crate::fail::Fail;
+use crate::resource::{ResourceType, ResourceRecord, ResourceNamesReservationRequest, RegistryReservation, ResourceRegistration, UniqueSrc, ResourceRegistryAction, Registry, ResourceRegistryCommand, RegistryUniqueSrc, ResourceRegistryResult};
+use crate::resource::selector::ResourceSelector;
+use crate::mesh::serde::resource::Status;
 
 pub mod core;
 pub mod shell;
@@ -632,8 +628,9 @@ impl Star {
                                     .try_send(StarCommand::SetStatus(StarStatus::Ready)).unwrap_or_default();
                             }
                             Err(error) => {
+                                let err_msg = format!("{}",error.to_string());
                                 skel.star_tx
-                                    .try_send(StarCommand::SetStatus(StarStatus::Panic)).unwrap_or_default();
+                                    .try_send(StarCommand::SetStatus(StarStatus::Panic(err_msg))).unwrap_or_default();
                                 error!("{}",error.to_string())
                             }
                         }
@@ -658,8 +655,9 @@ impl Star {
                                 .try_send(StarCommand::SetStatus(StarStatus::Ready)).unwrap_or_default();
                         }
                         Err(error) => {
+                            let err_msg = format!("{}",error.to_string());
                             skel.star_tx
-                                .try_send(StarCommand::SetStatus(StarStatus::Panic)).unwrap_or_default();
+                                .try_send(StarCommand::SetStatus(StarStatus::Panic(err_msg))).unwrap_or_default();
                             error!("{}",error.to_string())
                         }
                     }

@@ -3,12 +3,9 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use starlane_resources::{AssignResourceStateSrc, LocalStateSetSrc, Resource};
-use starlane_resources::data::{BinSrc, DataSet};
-
 use crate::error::Error;
 use crate::resource::{
-    ResourceAddress, ResourceType, UserKey,
+     ResourceType
 };
 
 #[derive(Clone)]

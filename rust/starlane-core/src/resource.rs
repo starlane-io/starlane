@@ -910,7 +910,7 @@ impl Parent {
         create: ResourceCreate,
         reservation: RegistryReservation,
         rx: oneshot::Receiver<
-            Result<ResourceAction<AssignResourceStateSrc<DataSet<BinSrc>>>, Fail>,
+            Result<ResourceAction<AssignResourceStateSrc>, Fail>,
         >,
     ) -> Result<ResourceRecord, Error> {
         let action = rx.await??;
@@ -1102,7 +1102,7 @@ pub struct ResourceCreationChamber {
     parent: ResourceStub,
     create: ResourceCreate,
     skel: StarSkel,
-    tx: oneshot::Sender<Result<ResourceAction<AssignResourceStateSrc<DataSet<BinSrc>>>, Fail>>,
+    tx: oneshot::Sender<Result<ResourceAction<AssignResourceStateSrc>, Fail>>,
 }
 
 impl ResourceCreationChamber {
@@ -1110,7 +1110,7 @@ impl ResourceCreationChamber {
         parent: ResourceStub,
         create: ResourceCreate,
         skel: StarSkel,
-    ) -> oneshot::Receiver<Result<ResourceAction<AssignResourceStateSrc<DataSet<BinSrc>>>, Fail>>
+    ) -> oneshot::Receiver<Result<ResourceAction<AssignResourceStateSrc>, Fail>>
     {
         let (tx, rx) = oneshot::channel();
         let chamber = ResourceCreationChamber {
@@ -1293,7 +1293,7 @@ impl ResourceCreationChamber {
         &self,
         key: ResourceKey,
         address: Address,
-    ) -> Result<ResourceAction<AssignResourceStateSrc<DataSet<BinSrc>>>, Fail> {
+    ) -> Result<ResourceAction<AssignResourceStateSrc>, Fail> {
         let stub = ResourceStub {
             address: address.clone(),
             archetype: self.create.archetype.clone(),
@@ -1313,7 +1313,7 @@ pub trait ResourceHost: Send + Sync {
     fn star_key(&self) -> StarKey;
     async fn assign(
         &self,
-        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
+        assign: ResourceAssign<AssignResourceStateSrc>,
     ) -> Result<(), Error>;
 
     async fn init(&self, key: ResourceKey) -> Result<(), Error>;
@@ -2044,7 +2044,7 @@ impl ResourceHost for RemoteResourceHost {
 
     async fn assign(
         &self,
-        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
+        assign: ResourceAssign<AssignResourceStateSrc>,
     ) -> Result<(), Error> {
         if !self
             .handle
@@ -2290,5 +2290,70 @@ impl Resource {
 
     pub fn state_src(&self) -> Payload {
         self.state.clone()
+    }
+}
+
+/// can have other options like to Initialize the state data
+#[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
+pub enum AssignResourceStateSrc {
+    Stateless,
+    Direct(Payload),
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceAssign<S> {
+    pub kind: AssignKind,
+    pub stub: ResourceStub,
+    pub state_src: S,
+}
+
+impl <S> ResourceAssign<S> {
+
+    pub fn archetype(&self) -> Archetype{
+        self.stub.archetype.clone()
+    }
+}
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ResourceKindParts {
+    pub resource_type: String,
+    pub kind: Option<String>,
+    pub specific: Option<Specific>,
+}
+
+impl ToString for ResourceKindParts {
+    fn to_string(&self) -> String {
+        if self.specific.is_some() && self.kind.is_some() {
+            format!(
+                "<{}<{}<{}>>>",
+                self.resource_type,
+                self.kind.as_ref().unwrap().to_string(),
+                self.specific.as_ref().unwrap().to_string()
+            )
+        } else if self.kind.is_some() {
+            format!(
+                "<{}<{}>>",
+                self.resource_type,
+                self.kind.as_ref().unwrap().to_string()
+            )
+        } else {
+            format!("<{}>", self.resource_type)
+        }
+    }
+}
+
+impl FromStr for ResourceKindParts {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (leftover, rtn) = parse_kind(s)?;
+        if leftover.len() > 0 {
+            return Err(format!(
+                "ResourceKindParts ERROR: could not parse extra: '{}' in string '{}'",
+                leftover, s
+            )
+                .into());
+        }
+        Ok(rtn)
     }
 }

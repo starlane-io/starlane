@@ -19,6 +19,9 @@ use crate::resource::{
 };
 use crate::star::StarSkel;
 use crate::starlane::files::MachineFileSystem;
+use crate::mesh::serde::id::Address;
+use crate::mesh::serde::payload::Payload;
+use mesh_portal_parse::path::Path;
 
 #[derive(Clone, Debug)]
 pub struct StateStore {
@@ -42,9 +45,9 @@ impl StateStore {
 
     pub async fn put(
         &self,
-        key: ResourceKey,
-        state : DataSet<BinSrc>,
-    ) -> Result<DataSet<BinSrc>, Error> {
+        key: Address,
+        state : Payload,
+    ) -> Result<Payload, Error> {
         let (tx, rx) = oneshot::channel();
 
         self.tx
@@ -130,8 +133,8 @@ impl StateStoreFS {
     async fn save(
         &mut self,
         key: ResourceKey,
-        state: DataSet<BinSrc>,
-    ) -> Result<DataSet<BinSrc>, Error> {
+        state: Payload,
+    ) -> Result<Payload, Error> {
         let key = key.to_snake_case();
 
         let state_path = Path::from_str(
@@ -152,8 +155,6 @@ impl StateStoreFS {
                 )
                 .as_str(),
             )?;
-            let bin_context = self.skel.machine.bin_context();
-            let bin = data.to_bin(bin_context)?;
 
             let data_access = self.skel.machine.machine_filesystem().data_access();
             data_access.write(&state_aspect_file,bin).await?;
@@ -168,13 +169,12 @@ impl StateStoreFS {
         Ok(state)
     }
 
-    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
-        let key = key.to_snake_case();
+    async fn get(&self, key: Address ) -> Result<Payload, Error> {
         let machine_filesystem = self.skel.machine.machine_filesystem();
         let mut data_access = machine_filesystem.data_access();
 
         let state_path = Path::from_str(
-            format!("/stars/{}/states/{}", self.skel.info.key.to_string(), key).as_str(),
+            format!("/stars/{}/states/{}", self.skel.info.key.to_string(), key.to_string()).as_str(),
         )?;
         let mut dataset = DataSet::new();
         for aspect in data_access.list(&state_path).await? {
@@ -182,7 +182,7 @@ impl StateStoreFS {
                 format!(
                     "/stars/{}/states/{}/{}",
                     self.skel.info.key.to_string(),
-                    key,
+                    key.to_string(),
                     aspect
                         .last_segment()
                         .ok_or("expected final segment from list")?
@@ -199,10 +199,11 @@ impl StateStoreFS {
                 bin_src,
             );
         }
-        Ok(Option::Some(dataset))
+        unimplemented!();
+//        Ok()
     }
 
-    async fn has(&self, key: ResourceKey) -> bool {
+    async fn has(&self, key: Address ) -> bool {
         if let Ok(Some(_)) = self.get(key).await {
             true
         } else {

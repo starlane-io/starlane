@@ -6,14 +6,12 @@ use kube::api::{ListParams, PostParams};
 use kube::Api;
 use serde::{Deserialize, Serialize};
 
-use starlane_resources::{AddressCreationSrc, AssignResourceStateSrc, KeyCreationSrc, RemoteDataSrc, Resource, ResourceArchetype, ResourceAssign, ResourceCreate, ResourceCreateStrategy, ResourceIdentifier, ResourceKindParts, ResourceStub};
-use starlane_resources::data::{BinSrc, DataSet};
-use starlane_resources::message::Fail;
 
 use crate::error::Error;
-use crate::resource::{Path, ResourceAddress, ResourceCreationChamber, ResourceKey, Kind, ResourceType};
+use crate::resource::{ResourceCreationChamber, Kind, ResourceType, AssignResourceStateSrc, ResourceAssign, ResourceKindParts};
 use crate::star::StarSkel;
 use crate::star::core::resource::host::Host;
+use crate::mesh::serde::payload::Payload;
 
 
 pub struct KubeHost {
@@ -76,8 +74,8 @@ impl Host for KubeHost {
 
      async fn assign(
             &self,
-            assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-        ) -> Result<DataSet<BinSrc>, Error> {
+            assign: ResourceAssign<AssignResourceStateSrc>,
+        ) -> Result<Payload, Error> {
 println!("Assigning Kube Resource Host....");
         let provisioners: Api<StarlaneProvisioner> = Api::default_namespaced(self.client.clone() );
         let parts: ResourceKindParts = assign.archetype().kind.into();
@@ -124,7 +122,7 @@ println!("Assigning Kube Resource Host....");
 
         println!("STARLANE RESOURCE CREATED!");
 
-        Ok(DataSet::new())
+        Ok(Payload::Empty)
     }
 
     async fn has(&self, key: ResourceKey) -> bool {

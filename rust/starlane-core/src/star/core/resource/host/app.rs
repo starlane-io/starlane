@@ -4,29 +4,25 @@ use std::sync::Arc;
 use clap::{App, AppSettings};
 use yaml_rust::Yaml;
 
-use starlane_resources::{AssignResourceStateSrc, Resource, ResourceAssign};
-use starlane_resources::data::{BinSrc, DataSet, Meta};
-use starlane_resources::message::Fail;
-
-use starlane_resources::ConfigSrc;
 use crate::artifact::ArtifactRef;
 use crate::cache::ArtifactItem;
 use crate::config::app::AppConfig;
 use crate::error::Error;
-use crate::resource::{ArtifactKind, ResourceAddress, ResourceKey, ResourceType};
-use crate::resource::create_args::{artifact_bundle_address, create_args_artifact_bundle, space_address};
+use crate::resource::{ArtifactKind, Address, ResourceType, ResourceAssign, AssignResourceStateSrc};
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::starlane::api::{AppApi, MechtronApi, StarlaneApi};
-use starlane_resources::property::{ResourceValueSelector, ResourceValues, ResourcePropertyValueSelector};
 use std::collections::HashMap;
-use starlane_resources::status::Status;
 use crate::util::AsyncHashMap;
+use crate::resource::selector::ConfigSrc;
+use mesh_portal_serde::version::latest::resource::Status;
+use crate::message::delivery::Delivery;
+use mesh_portal_api::message::Message;
 
 pub struct AppHost {
     skel: StarSkel,
-    apps: AsyncHashMap<ResourceKey,Status>
+    apps: AsyncHashMap<Address,Status>
 }
 
 impl AppHost {
@@ -46,14 +42,11 @@ impl Host for AppHost {
 
     async fn assign(
         &self,
-        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<DataSet<BinSrc>, Error> {
+        assign: ResourceAssign<AssignResourceStateSrc>,
+    ) -> Result<(), Error> {
         match assign.state_src {
             AssignResourceStateSrc::Direct(data) => return Err("App cannot be stateful".into()),
             AssignResourceStateSrc::Stateless => {
-            }
-            AssignResourceStateSrc::CreateArgs(args) => {
-                //return Err("App doesn't currently accept command line args.".into())
             }
         }
 
@@ -77,11 +70,16 @@ println!("artifact : {}", artifact.to_string());
         println!("main: {}", app_config.main.address.to_string() );
         self.apps.put( assign.stub.key.clone(), Status::Ready ).await;
 
-        Ok(DataSet::new())
+        Ok(())
     }
 
+    fn handle(&self, delivery: Delivery<Message>) {
+        todo!()
+    }
+
+    /*
     async fn init(&self,
-                  key: ResourceKey,
+                  key: Address,
     ) -> Result<(),Error> {
 println!("CREATE APP create()");
         if key.resource_type() != ResourceType::App {
@@ -110,21 +108,12 @@ println!("MECHTRON CREATED");
         }
 
         Ok(())
-    }
+    }*/
 
-    async fn has(&self, key: ResourceKey) -> bool {
+    async fn has(&self, key: Address) -> bool {
         self.apps.contains( key ).await.unwrap_or(false)
     }
 
-
-    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Error> {
-        self.apps.remove(_identifier).await.unwrap_or_default();
-        Ok(())
-    }
-
-    async fn get_state(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
-        todo!()
-    }
 }
 
 impl AppHost {

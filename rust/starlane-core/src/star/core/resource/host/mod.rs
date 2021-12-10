@@ -4,12 +4,8 @@ use std::sync::Arc;
 
 use tokio::sync::{mpsc, oneshot};
 
-use starlane_resources::{AssignKind, AssignResourceStateSrc, Resource, ResourceAssign, ResourcePathAndType};
-use starlane_resources::data::{BinSrc, DataSet};
-use starlane_resources::message::{Fail, ResourcePortMessage, Message};
-
 use crate::error::Error;
-use crate::resource::{ResourceKey, ResourceType};
+use crate::resource::{ResourceType, AssignResourceStateSrc, ResourceAssign};
 use crate::star::core::resource::host::app::AppHost;
 use crate::star::core::resource::host::artifact::ArtifactBundleHost;
 use crate::star::core::resource::host::default::StatelessHost;
@@ -20,13 +16,13 @@ use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::message::delivery::Delivery;
 use crate::star::core::resource::host::kube::KubeHost;
 use crate::star::core::resource::host::file::{FileHost, FileSystemHost};
-use starlane_resources::property::{ResourceValueSelector, ResourceValues, ResourcePropertyValueSelector, ResourceValue, ResourceHostPropertyValueSelector};
-use starlane_resources::status::Status;
-use starlane_resources::http::HttpRequest;
 use crate::html::{HTML, html_error_code};
 use crate::frame::Reply;
 use crate::star::core::message::WrappedHttpRequest;
 use crate::mesh::serde::entity::request::{Http, Msg};
+use crate::mesh::serde::resource::Resource;
+use mesh_portal_api::message::Message;
+use crate::mesh::serde::id::Address;
 
 pub mod artifact;
 mod default;
@@ -39,17 +35,8 @@ mod file;
 
 pub enum HostCall {
     Assign {
-        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
+        assign: ResourceAssign<AssignResourceStateSrc>,
         tx: oneshot::Sender<Result<Resource, Error>>,
-    },
-    Init{
-        key: ResourceKey,
-        tx: oneshot::Sender<Result<(), Error>>,
-    },
-    UpdateState {
-        key: ResourceKey,
-        state: DataSet<BinSrc>,
-        tx: oneshot::Sender<Result<(),Error>>
     },
     Select {
         key: ResourceKey,
@@ -60,8 +47,7 @@ pub enum HostCall {
         key: ResourceKey,
         tx: oneshot::Sender<bool>,
     },
-    Port(Delivery<Msg>),
-    Http(Delivery<Http>),
+    Handle(Delivery<Message>),
 }
 
 impl Call for HostCall {}
@@ -104,44 +90,13 @@ impl AsyncProcessor<HostCall> for HostComponent {
                     }
                 }
             }
-            HostCall::Init { key, tx } => {
-                let host = self.host(key.resource_type()).await;
-                tx.send(host.init(key).await);
-            }
-            HostCall::UpdateState { key, state, tx }  => {
-                let host = self.host(key.resource_type()).await;
-                tx.send(host.update_state(key, state).await);
-            }
             HostCall::Has { key, tx } => {
                 let host = self.host(key.resource_type()).await;
                 tx.send(host.has(key).await);
             }
-            HostCall::Port(delivery) => {
-                match self.skel.resource_locator_api.as_key( delivery.entity.to.clone() ).await
-                {
-                    Ok(key) => {
-                        let host = self.host(key.resource_type()).await;
-                        host.port_message(key, delivery).await;
-                    }
-                    Err(_) => {
-                        error!("could not find key for: {}", delivery.entity.to.to_string() );
-                    }
-
-                }
-            }
-            HostCall::Http(delivery) => {
-                match self.skel.resource_locator_api.as_key( delivery.entity.to.clone() ).await
-                {
-                    Ok(key) => {
-                        let host = self.host(key.resource_type()).await;
-                        host.http_message(key, delivery).await;
-                    }
-                    Err(_) => {
-                        error!("could not find key for: {}", delivery.entity.to.to_string() );
-                        delivery.fail( Fail::Error(format!("could not find key for: {}", delivery.entity.to.to_string())));
-                    }
-
-                }
+            HostCall::Handle(delivery) => {
+                let host = self.host(key.resource_type() ).await;
+                host.handle(delivery);
             }
         }
     }
@@ -180,52 +135,12 @@ pub trait Host: Send + Sync {
 
     async fn assign(
         &self,
-        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<DataSet<BinSrc>, Error>;
+        assign: ResourceAssign<AssignResourceStateSrc>,
+    ) -> Result<(), Error>;
 
-
-    async fn init(&self, key: ResourceKey ) -> Result<(),Error> {
-        Ok(())
-    }
-    async fn has(&self, key: ResourceKey) -> bool;
-//    async fn select(&self, key: ResourceKey, selector: ResourcePropertyValueSelector ) -> Result<Option<ResourceValues<ResourceKey>>, Error>;
-    async fn delete(&self, key: ResourceKey) -> Result<(), Error>;
-
-    async fn get_state(&self,key: ResourceKey) -> Result<Option<DataSet<BinSrc>>,Error>;
-
-    async fn update_state(&self,key: ResourceKey, state: DataSet<BinSrc> ) -> Result<(),Error> {
-        Err(format!("resource type: {} does not allow state updates", key.resource_type().to_string()).into() )
-    }
-
-    async fn port_message(&self, key: ResourceKey, delivery: Delivery<Message<ResourcePortMessage>>) -> Result<(),Error>{
-        info!("ignoring delivery");
-        Ok(())
-    }
-
-
-    async fn http_message(&self, key: ResourceKey, delivery: Delivery<Message<HttpRequest>>) -> Result<(),Error>{
-        eprintln!("resource does not respond to HttpRequest: <{}>", self.resource_type().to_string() );
-        let response = html_error_code(400, "BAD REQUEST".to_string(), format!("This type of resource: <{}> cannot respond to http requests", self.resource_type().to_string()  ) )?;
-        delivery.reply(Reply::HttpResponse(response));
-        Ok(())
-    }
-
+    fn handle( &self, delivery: Delivery<Message> );
+    async fn has(&self, address: Address) -> bool;
 
     fn shutdown(&self) {}
-
-    async fn select(&self, key: ResourceKey, selector: ResourceHostPropertyValueSelector) -> Result<Option<ResourceValues<ResourceKey>>, Error> {
-        match &selector {
-            ResourceHostPropertyValueSelector::State { aspect, field } => {
-                let state = self.get_state(key.clone()).await?.unwrap_or(DataSet::new());
-                let state = aspect.filter(state);
-                let mut values = HashMap::new();
-                values.insert(selector.into(), state );
-                Ok(Option::Some(ResourceValues{
-                    resource: key,
-                    values
-                }))
-            }
-        }
-    }
 
 }

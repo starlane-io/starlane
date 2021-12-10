@@ -4,17 +4,14 @@ use std::sync::Arc;
 use clap::{App, AppSettings};
 use yaml_rust::Yaml;
 
-use starlane_resources::{AssignKind, AssignResourceStateSrc, Resource, ResourceAssign};
-use starlane_resources::data::{BinSrc, DataSet, Meta};
-use starlane_resources::message::Fail;
-
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
-use crate::resource::{ArtifactKind, ResourceAddress, ResourceKey, ResourceType};
-use crate::resource::create_args::{artifact_bundle_address, create_args_artifact_bundle, space_address};
+use crate::resource::{ArtifactKind, ResourceType, ResourceAssign, AssignResourceStateSrc};
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
+use crate::mesh::serde::id::Meta;
+use crate::mesh::serde::payload::Payload;
 
 #[derive(Debug)]
 pub struct SpaceHost {
@@ -35,15 +32,11 @@ impl SpaceHost {
 impl Host for SpaceHost {
     async fn assign(
         &self,
-        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<DataSet<BinSrc>, Error> {
+        assign: ResourceAssign<AssignResourceStateSrc>,
+    ) -> Result<Payload, Error> {
         let state = match assign.state_src {
             AssignResourceStateSrc::Direct(data) => data,
             AssignResourceStateSrc::Stateless => return Err("space cannot be stateless".into()),
-            AssignResourceStateSrc::CreateArgs(args) => {
-//                self.create_from_args(args).await?
-                DataSet::new()
-            }
         };
 
 
@@ -71,7 +64,8 @@ impl Host for SpaceHost {
 }
 
 impl SpaceHost {
-    async fn create_from_args(&self, args: String) -> Result<DataSet<BinSrc>,Error> {
+    /*
+    async fn create_from_args(&self, args: String) -> Result<Payload,Error> {
 
 println!("SpaceHost: CREATE FROM ARGS...");
         let args:Vec<String> = args.trim().split(" ").map( |s| s.to_string()).collect();
@@ -107,4 +101,6 @@ println!("DISPLAY NAME == '{}'", display_name.unwrap_or_default());
 
         Ok(data_set)
     }
+
+     */
 }

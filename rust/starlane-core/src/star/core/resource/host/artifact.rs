@@ -9,17 +9,12 @@ use std::sync::Arc;
 use tempdir::TempDir;
 use tokio::sync::Mutex;
 
-use starlane_resources::{AssignKind, AssignResourceStateSrc, ResourceAssign, ResourceIdentifier};
-use starlane_resources::data::{BinSrc, DataSet};
-use starlane_resources::message::Fail;
-
-use crate::resource::{ResourceKey, ResourceType};
+use crate::resource::{ResourceType, AssignResourceStateSrc};
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util;
 use crate::error::Error;
-use starlane_resources::property::{ResourcePropertyValueSelector, ResourceValues};
 
 /*
 =======
@@ -333,7 +328,7 @@ impl Host for ArtifactBundleHost {
 
     async fn assign(
         &self,
-        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
+        assign: ResourceAssign<AssignResourceStateSrc>,
     ) -> Result<DataSet<BinSrc>, Error> {
         let state = match assign.state_src {
             AssignResourceStateSrc::Direct(data) => {
@@ -342,9 +337,7 @@ impl Host for ArtifactBundleHost {
             AssignResourceStateSrc::Stateless => {
                 return Err("ArtifactBundle cannot be stateless".into())
             },
-            AssignResourceStateSrc::CreateArgs(ref args) => {
-                return Err("ArtifactBundle does not accept create-args".into())
-           }
+
         };
 
         Ok(self.store.put( assign.stub.key, state ).await?)

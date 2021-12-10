@@ -1,10 +1,8 @@
 use tokio::sync::oneshot;
 
-use starlane_resources::message::Fail;
-use starlane_resources::ResourceSelector;
-
 use crate::error::Error;
-use crate::resource::AppKey;
+use crate::resource::selector::ResourceSelector;
+use crate::fail::Fail;
 
 pub struct AppSelectCommand {
     pub selector: ResourceSelector,

@@ -2,32 +2,28 @@ use std::convert::TryInto;
 
 use tokio::sync::{mpsc, oneshot};
 
-use starlane_resources::{Resource, ResourceArchetype, ResourceIdentifier, ResourceCreate, KeyCreationSrc, AddressCreationSrc, ConfigSrc, AssignResourceStateSrc, ResourceCreateStrategy};
-use starlane_resources::message::{Message, ResourceRequestMessage, ResourceResponseMessage, ResourcePortMessage, MessageFrom};
-use starlane_resources::message::Fail;
 
-use starlane_resources::data::DataSet;
 use crate::error::Error;
 use crate::frame::{
-    MessagePayload, ResourceRegistryRequest, Reply, ResourceHostAction, SimpleReply, StarMessage,
+    ResourceRegistryRequest, Reply, ResourceHostAction, SimpleReply, StarMessage,
     StarMessagePayload,
 };
 use crate::message::delivery::Delivery;
-use crate::resource::{Parent, ParentCore, ResourceAddress, ResourceId, ResourceKey, ResourceManager, ResourceRecord};
+use crate::resource::{Parent, ParentCore, ResourceManager, ResourceRecord, AssignResourceStateSrc};
 use crate::resource::{Kind, ResourceType};
 use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::star::core::resource::host::{HostCall, HostComponent};
 use crate::star::shell::pledge::ResourceHostSelector;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use tokio::sync::oneshot::error::RecvError;
-use starlane_resources::property::{ResourcePropertyAssignment, ResourcePropertyValueSelector, ResourceValue, ResourceValues, ResourceRegistryPropertyAssignment, ResourceRegistryPropertyValueSelector};
 use std::collections::HashMap;
-use starlane_resources::http::HttpRequest;
 use crate::mesh::RxMessage;
 use crate::mesh::serde::entity::request::{ReqEntity, Rc, Msg, Http};
 use crate::mesh::Request;
 use crate::mesh::Response;
 use crate::parse::{command, consume_command, Command, StateSrc, select};
+use crate::resource::selector::ConfigSrc;
+use crate::mesh::serde::http::HttpRequest;
 
 pub enum CoreMessageCall {
     Message(StarMessage),

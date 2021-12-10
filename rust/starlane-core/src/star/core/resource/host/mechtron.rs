@@ -1,21 +1,21 @@
 use std::collections::HashMap;
 
-use starlane_resources::{AssignResourceStateSrc, Resource, ResourceAssign};
-use starlane_resources::data::{BinSrc, DataSet};
-use starlane_resources::message::{Fail, ResourcePortMessage, Message};
-
-use starlane_resources::ConfigSrc;
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
 use crate::mechtron::MechtronShell;
-use crate::resource::{ArtifactKind, ResourceKey, ResourceType};
+use crate::resource::{ArtifactKind,  ResourceType, ResourceAssign, AssignResourceStateSrc};
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util::AsyncHashMap;
 use crate::message::delivery::Delivery;
 use crate::frame::Reply;
-use starlane_resources::http::HttpRequest;
+use crate::resource::selector::ConfigSrc;
+use crate::mesh::serde::payload::Payload;
+use crate::mesh::serde::entity::request::{Msg, Http};
+use mesh_portal_api::message::Message;
+use mesh_portal_api_client::PortalCtrl;
+use crate::mesh::serde::id::Address;
 
 pub struct MechtronHost {
     skel: StarSkel,
@@ -36,8 +36,8 @@ impl MechtronHost {
 impl Host for MechtronHost {
     async fn assign(
         &self,
-        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<DataSet<BinSrc>, Error> {
+        assign: ResourceAssign<AssignResourceStateSrc>,
+    ) -> Result<Payload, Error> {
         match assign.state_src {
             AssignResourceStateSrc::Stateless => {}
             _ => {
@@ -62,6 +62,8 @@ impl Host for MechtronHost {
         let mechtron_config = caches.mechtron_configs.get(&mechtron_config_artifact).ok_or::<Error>(format!("expected mechtron_config").into())?;
 
 
+        unimplemented!();
+        /*
         let mechtron = MechtronShell::new(mechtron_config, &caches)?;
         self.mechtrons.put( assign.stub.key.clone(), mechtron ).await?;
 
@@ -69,25 +71,18 @@ impl Host for MechtronHost {
 
 
         Ok(DataSet::new())
+
+         */
     }
 
-    async fn has(&self, key: ResourceKey) -> bool {
-        match self.mechtrons.contains(key).await {
+    async fn has(&self, address: Address) -> bool {
+        match self.mechtrons.contains(address).await {
             Ok(flag) => {flag}
             Err(_) => {false}
         }
     }
 
-    async fn get_state(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
-        // since we only support stateless for now
-        Ok(Option::None)
-    }
-
-    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Error> {
-        unimplemented!()
-    }
-
-    async fn port_message(&self, key: ResourceKey, delivery: Delivery<Message<ResourcePortMessage>>) -> Result<(),Error>{
+    fn handle(&self,  delivery: Delivery<Message>) -> Result<(),Error>{
 
         info!("MECHTRON HOST RECEIVED DELIVERY");
         let mechtron = self.mechtrons.get(key.clone()).await?.ok_or(format!("could not deliver mechtron to {}",key.to_string()))?;
@@ -101,22 +96,6 @@ info!("=====>> MECHTRON SENT REPLY");
 
         Ok(())
     }
-
-    async fn http_message(&self, key: ResourceKey, delivery: Delivery<Message<HttpRequest>>) -> Result<(),Error>{
-
-        info!("MECHTRON HOST RECEIVED DELIVERY");
-        let mechtron = self.mechtrons.get(key.clone()).await?.ok_or(format!("could not deliver mechtron to {}",key.to_string()))?;
-        info!("GOT MECHTRON");
-        let reply = mechtron.http_request(delivery.entity.clone()).await?;
-
-        if let Option::Some(reply) = reply {
-            delivery.reply(Reply::HttpResponse(reply));
-            info!("=====>> MECHTRON SENT REPLY");
-        }
-
-        Ok(())
-    }
-
 
     fn resource_type(&self) -> ResourceType {
         ResourceType::Mechtron
