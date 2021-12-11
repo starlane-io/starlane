@@ -225,20 +225,20 @@ impl MechtronShell {
         impl FnOnce<PortalSkel> for Factory {
             type Output = Box<dyn PortalCtrl>;
 
-            extern "rust-call" fn call_once(self, portal: PortalSkel) -> Self::Output {
-                Box::new(MechtronShell::new( self.skel, portal ))
+            extern "rust-call" fn call_once(self, skel: PortalSkel) -> Self::Output {
+                Box::new(MechtronShell::new( self.skel, skel ))
             }
         }
 
         impl FnMut<PortalSkel> for Factory {
-            extern "rust-call" fn call_mut(&mut self, args: PortalSkel) -> Self::Output {
-                Box::new(MechtronShell::new( self.skel.clone(), portal ))
+            extern "rust-call" fn call_mut(&mut self, skel: PortalSkel) -> Self::Output {
+                Box::new(MechtronShell::new( self.skel.clone(), skel ))
             }
         }
 
         impl Fn<PortalSkel> for Factory {
-            extern "rust-call" fn call(&self, args: PortalSkel) -> Self::Output {
-                Box::new(MechtronShell::new( self.skel.clone(), portal ))
+            extern "rust-call" fn call(&self, skel: PortalSkel) -> Self::Output {
+                Box::new(MechtronShell::new( self.skel.clone(), skel))
             }
         }
 

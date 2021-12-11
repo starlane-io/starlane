@@ -15,7 +15,7 @@ use tokio::time::error::Elapsed;
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
 use crate::frame::{Reply, ReplyKind, StarPattern, TraversalAction, ResourceRegistryRequest, StarMessagePayload};
-use crate::resource::{Kind, ResourceType, AssignResourceStateSrc, ResourceRecord};
+use crate::resource::{Kind, ResourceType, AssignResourceStateSrc, ResourceRecord, ResourceCreate};
 use crate::resource::file_system::FileSystemState;
 use crate::resource::FileKind;
 use crate::resource::user::UserState;
@@ -41,6 +41,8 @@ pub struct StarlaneApi {
 }
 
 impl StarlaneApi {
+
+
     pub async fn create_artifact_bundle(
         &self,
         bundle: Address,
@@ -94,13 +96,6 @@ impl StarlaneApi {
         Self::new_with_options(surface_api, Option::Some(starlane_tx))
     }
 
-    pub async fn to_key(&self, identifier: ResourceIdentifier) -> Result<ResourceKey, Error> {
-        match identifier {
-            ResourceIdentifier::Key(key) => Ok(key),
-            ResourceIdentifier::Address(address) => self.fetch_resource_key(address).await,
-        }
-    }
-
     pub fn shutdown(&self) -> Result<(), Error> {
         self.starlane_tx.as_ref().ok_or("this api does not have access to the StarlaneMachine and therefore cannot do a shutdown")?.try_send(StarlaneCommand::Shutdown);
         Ok(())
@@ -117,7 +112,6 @@ info!("received reply for {}",description);
         } else {
             Err(format!("unexpected reply: {}", reply.to_string()).into())
         }
-
     }
 
     /*
@@ -166,25 +160,11 @@ info!("received reply for {}",description);
     }
      */
 
-    pub async fn fetch_resource_address(&self, key: ResourceKey) -> Result<Address, Error> {
-        match self.fetch_resource_record(key.into()).await {
-            Ok(record) => Ok(record.stub.address),
-            Err(fail) => Err(fail.into()),
-        }
-    }
-
-    pub async fn fetch_resource_key(&self, address: Address ) -> Result<ResourceKey, Error> {
-        match self.fetch_resource_record(address.into()).await {
-            Ok(record) => Ok(record.stub.key),
-            Err(fail) => Err(fail.into()),
-        }
-    }
-
     pub async fn fetch_resource_record(
         &self,
-        identifier: Address ,
+        address: Address,
     ) -> Result<ResourceRecord, Error> {
-        self.surface_api.locate(identifier).await
+        self.surface_api.locate(address).await
     }
 
     pub async fn get_caches(&self) -> Result<Arc<ProtoArtifactCachesFactory>, Error> {
