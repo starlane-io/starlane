@@ -1,12 +1,11 @@
 use crate::error::Error;
 use crate::frame::StarPattern;
-use crate::mesh::serde::id::{AddressAndKind, ResourceType};
+use crate::mesh::serde::id::{AddressAndKind, ResourceType, Address};
 use crate::mesh::serde::payload::Payload;
 use crate::mesh::serde::payload::Primitive;
-use crate::resource::{DomainCase, ResourceAddressPartKind};
 use crate::star::StarKind;
 use actix_web::web::block;
-use mesh_portal_parse::parse::skewer;
+use mesh_portal_parse::parse::{skewer, Res, camel_case};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
 use nom::character::complete::{alpha1, anychar, multispace0, multispace1};
@@ -16,15 +15,11 @@ use nom::multi::{many0, many1, separated_list0};
 use nom::sequence::{delimited, preceded, terminated, tuple};
 use nom::{AsChar, InputTakeAtPosition};
 use nom_supreme::parse_from_str;
-use starlane_resources::message::MessageFrom;
-use starlane_resources::parse::{parse_domain, parse_resource_path, parse_resource_path_and_kind};
-use starlane_resources::{
-    AddressCreationSrc, AssignResourceStateSrc, ConfigSrc, KeyCreationSrc, Res, ResourceAddress,
-    ResourceArchetype, ResourceCreate, ResourceCreateStrategy, ResourceIdentifier, ResourcePath,
-    ResourcePathAndKind, ResourceSelector,
-};
 use std::str::FromStr;
 use std::collections::HashMap;
+use crate::resource::selector::ResourceSelector;
+use serde::{Serialize,Deserialize};
+use crate::resource::ResourceCreate;
 
 pub fn parse_star_kind(input: &str) -> Res<&str, Result<StarKind, Error>> {
     context("star_kind", delimited(tag("<"), alpha1, tag(">")))(input).map(|(input_next, kind)| {
@@ -212,26 +207,24 @@ pub fn consume_command(input: &str) -> Result<Command, Error> {
 }
 
 pub enum Command {
-    Create(CreateCommand),
+    Create(ResourceCreate),
     Select(ResourceSelector),
-    Unique(ResourceType),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateCommand {
     pub address_and_kind: ResourcePathAndKind,
     pub state_src: StateSrc,
-    pub set_directives: HashMap<String,Payload>,
 }
 
 impl CreateCommand {
-    pub fn parent(&self) -> ResourceIdentifier {
+    pub fn parent(&self) -> Address {
         match self.address_and_kind.path.parent() {
             None => {
-                ResourceKey::root().into()
+                Address::root()
             }
             Some(parent) => {
-                parent.into()
+                parent
             }
         }
     }
@@ -244,9 +237,7 @@ pub struct SetDir {
 
 pub enum StateSrc {
     None,
-    Address(ResourcePath),
     Direct(Payload),
-    FromCommandPayload,
 }
 
 
@@ -263,4 +254,75 @@ pub struct PipelineStep {
 }
 
 
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub struct SkewerCase {
+    string: String,
+}
 
+impl ToString for SkewerCase {
+    fn to_string(&self) -> String {
+        self.string.clone()
+    }
+}
+
+impl SkewerCase {
+    fn new(string: &str) -> Self {
+        Self {
+            string: string.to_string(),
+        }
+    }
+}
+
+
+impl FromStr for SkewerCase {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (_, skewer) = all_consuming(skewer)(s)?;
+
+            Ok(Self{
+                string: skewer.to_string()
+            })
+    }
+}
+
+
+
+
+
+
+
+
+
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub struct CamelCase {
+    string: String,
+}
+
+impl ToString for CamelCase {
+    fn to_string(&self) -> String {
+        self.string.clone()
+    }
+}
+
+impl CamelCase {
+    fn new(string: &str) -> Self {
+        Self {
+            string: string.to_string(),
+        }
+    }
+}
+
+
+impl FromStr for CamelCase {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (_, camel) = all_consuming(camel_case)(s)?;
+
+        Ok(Self{
+            string: camel.to_string()
+        })
+    }
+}

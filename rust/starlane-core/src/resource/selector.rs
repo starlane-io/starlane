@@ -3,12 +3,11 @@ use std::str::FromStr;
 use nom::error::VerboseError;
 use nom::IResult;
 
-use starlane_resources::{FieldSelection, parse_kind, ResourceSelector};
-
 use crate::error::Error;
 use crate::resource::{ResourceType, Kind};
 use std::collections::{HashMap, HashSet};
 use crate::mesh::serde::id::{Address, Specific};
+use serde::{Serialize,Deserialize};
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
@@ -39,11 +38,8 @@ impl FromStr for MultiResourceSelector {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (leftover, parts) = parse_kind(s)?;
+        let kind = Kind::from_str(s)?;
 
-        if !leftover.is_empty() {
-            return Err(format!("unexpected leftover '{}' when parsing '{}'", leftover, s).into());
-        }
         let resource_type = ResourceType::from_str(parts.resource_type.as_str())?;
 
         Ok(MultiResourceSelector { rt: resource_type })
@@ -60,13 +56,13 @@ pub struct ResourceSelector {
 }
 
 impl ResourceSelector {
-    pub fn children_selector(parent: ResourceIdentifier) -> Self {
+    pub fn children_selector(parent: Address) -> Self {
         let mut selector = Self::new();
         selector.add_field(FieldSelection::Parent(parent));
         selector
     }
 
-    pub fn children_of_type_selector(parent: ResourceIdentifier, child_type: ResourceType) -> Self {
+    pub fn children_of_type_selector(parent: Address, child_type: ResourceType) -> Self {
         let mut selector = Self::new();
         selector.add_field(FieldSelection::Parent(parent));
         selector.add_field(FieldSelection::Type(child_type));

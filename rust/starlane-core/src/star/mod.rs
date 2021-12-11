@@ -49,9 +49,10 @@ use crate::starlane::StarlaneMachine;
 use crate::template::StarTemplateHandle;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 use crate::fail::Fail;
-use crate::resource::{ResourceType, ResourceRecord, ResourceNamesReservationRequest, RegistryReservation, ResourceRegistration, UniqueSrc, ResourceRegistryAction, Registry, ResourceRegistryCommand, RegistryUniqueSrc, ResourceRegistryResult};
+use crate::resource::{ResourceType, ResourceRecord, ResourceNamesReservationRequest, RegistryReservation, ResourceRegistration, UniqueSrc, ResourceRegistryAction, Registry, ResourceRegistryCommand, ResourceRegistryResult};
 use crate::resource::selector::ResourceSelector;
 use crate::mesh::serde::resource::Status;
+use crate::mesh::serde::id::Address;
 
 pub mod core;
 pub mod shell;
@@ -618,7 +619,7 @@ impl Star {
                     .satisfied(self.skel.info.kind.conscripts())
                     .await;
                 if let Result::Ok(StarConscriptionSatisfaction::Ok) = satisfied {
-                    self.set_status(StarStatus::Initializing);
+                    self.set_status(StarStatus::Pending);
                     let skel = self.skel.clone();
                     tokio::spawn(async move {
                         let result = skel.variant_api.init().await;
@@ -645,7 +646,7 @@ impl Star {
 //                    eprintln!("handles not satisfied for : {} Lacking: [ {}]", self.skel.info.kind.to_string(), s);
                 }
             } else {
-                self.set_status(StarStatus::Initializing);
+                self.set_status(StarStatus::Pending);
                 let skel = self.skel.clone();
                 tokio::spawn(async move {
                     let result = skel.variant_api.init().await;
@@ -1200,8 +1201,7 @@ pub trait ResourceRegistryBacking: Sync + Send {
     async fn register(&self, registration: ResourceRegistration) -> Result<(), Error>;
     async fn select(&self, select: ResourceSelector) -> Result<Vec<ResourceRecord>, Error>;
     async fn set_location(&self, location: ResourceRecord) -> Result<(), Error>;
-    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<ResourceRecord>, Error>;
-    async fn unique_src(&self, resource_type: ResourceType, key: ResourceIdentifier) -> Box<dyn UniqueSrc>;
+    async fn get(&self, address: Address) -> Result<Option<ResourceRecord>, Error>;
     async fn update(&self, assignment: ResourceRegistryPropertyAssignment ) -> Result<(),Error>;
 }
 
@@ -1272,8 +1272,8 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
         Ok(())
     }
 
-    async fn get(&self, identifier: ResourceIdentifier) -> Result<Option<ResourceRecord>, Error> {
-        let (request, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Get(identifier));
+    async fn get(&self, address: Address ) -> Result<Option<ResourceRecord>, Error> {
+        let (request, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Get(address));
         self.registry.send(request).await;
         //match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
         match Self::timeout(rx).await? {
@@ -1284,9 +1284,6 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
         }
     }
 
-    async fn unique_src(&self, resource_type: ResourceType, id: ResourceIdentifier) -> Box<dyn UniqueSrc> {
-        Box::new(RegistryUniqueSrc::new(resource_type, id, self.registry.clone()))
-    }
 
     async fn update(&self, assignment: ResourceRegistryPropertyAssignment ) -> Result<(),Error>
     {
@@ -1300,14 +1297,6 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
 
 pub type StarStatus = Status;
 
-impl Into<LogId<String>> for &'static ResourceIdentifier {
-    fn into(self) -> LogId<String> {
-        match self {
-            ResourceIdentifier::Key(key) => LogId(format!("[{}]", key.to_string())),
-            ResourceIdentifier::Address(address) => LogId(format!("'{}'", address.to_string())),
-        }
-    }
-}
 
 impl Into<LogId<String>> for &'static Star {
     fn into(self) -> LogId<String> {

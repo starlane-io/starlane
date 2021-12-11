@@ -9,7 +9,7 @@ use crate::frame::{
     StarMessagePayload,
 };
 use crate::message::delivery::Delivery;
-use crate::resource::{Parent, ParentCore, ResourceManager, ResourceRecord, AssignResourceStateSrc};
+use crate::resource::{Parent, ParentCore, ResourceManager, ResourceRecord, AssignResourceStateSrc, ResourceCreate, ResourceCreateStrategy};
 use crate::resource::{Kind, ResourceType};
 use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::star::core::resource::host::{HostCall, HostComponent};
@@ -24,6 +24,8 @@ use crate::mesh::Response;
 use crate::parse::{command, consume_command, Command, StateSrc, select};
 use crate::resource::selector::ConfigSrc;
 use crate::mesh::serde::http::HttpRequest;
+use crate::fail::Fail;
+use crate::mesh::serde::id::Address;
 
 pub enum CoreMessageCall {
     Message(StarMessage),
@@ -145,44 +147,16 @@ impl MessagingEndpointComponent {
                 skel: StarSkel,
                 host_tx: mpsc::Sender<HostCall>,
                 delivery: Delivery<Rc>,
-            ) -> Result<(), Error> {
+            ) -> Result<(), Fail> {
 
                 let command = consume_command(delivery.entity.command.as_str() )?;
 
                 match command {
                     Command::Create(create) => {
-                        let key = delivery.to().await?;
-                        let parent_key = key.parent();
-
-                        let state_src = match create.state_src {
-                            StateSrc::None => { AssignResourceStateSrc::Stateless }
-                            StateSrc::Address(address) => { AssignResourceStateSrc::Identifier(ResourceIdentifier::Address(address))}
-                            StateSrc::Direct(payload) => { AssignResourceStateSrc::Direct(payload)}
-                            StateSrc::FromCommandPayload => { AssignResourceStateSrc::Direct(delivery.entity.payload.clone()) }
-                        };
-
-                        // hackish?  transformting this into the old ResourceCreate object
-                        // so I don't have to rewrite any code beyond this point...
-                        let create = ResourceCreate {
-                            parent: ResourceIdentifier::Parent(parent_key),
-                            key: KeyCreationSrc::None,
-                            address: AddressCreationSrc::Exact(create.address_and_kind.path.clone()),
-                            archetype: ResourceArchetype {
-                                kind: create.address_and_kind.kind.clone(),
-                                specific: create.address_and_kind.kind.specific.clone(),
-                                config: ConfigSrc::None
-                            },
-                            state_src,
-                            registry_info: None,
-                            owner: None,
-                            strategy: ResourceCreateStrategy::Create,
-                            from: MessageFrom::Inject,
-                            set_directives: create.set_directives
-                        };
 
                         let parent = MessagingEndpointComponent::get_parent_resource(
                             skel.clone(),
-                            parent_key,
+                            create.address_pattern.parent,
                         ) .await?;
 
                         let record = parent.create(create.clone()).await.await;
@@ -209,16 +183,6 @@ impl MessagingEndpointComponent {
                             .select(selector.clone())
                             .await?;
                         delivery.reply(Reply::Records(resources))
-                    }
-                    Command::Unique(resource_type) => {
-                        let resource = skel.resource_locator_api.locate(delivery.entity.to.clone() ).await?;
-                        let unique_src = skel
-                            .registry
-                            .as_ref()
-                            .unwrap()
-                            .unique_src(resource.stub.archetype.kind.resource_type(), delivery.entity.to.clone().into())
-                            .await;
-                        delivery.reply(Reply::Id(unique_src.next(&resource_type).await?));
                     }
                 }
 
@@ -496,8 +460,8 @@ println!("Select Property Ops... op.resource: {}", op.resource.to_string());
         Ok(())
     }
 
-    async fn get_parent_resource(skel: StarSkel, key: ResourceKey) -> Result<Parent, Error> {
-        let resource = skel.resource_locator_api.locate(key.clone().into()).await?;
+    async fn get_parent_resource(skel: StarSkel, address: Address) -> Result<Parent, Error> {
+        let resource = skel.resource_locator_api.locate(address.clone().into()).await?;
 
         Ok(Parent {
             core: ParentCore {

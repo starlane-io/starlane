@@ -1,9 +1,10 @@
-use starlane::pattern::specific::{ProductPattern, VariantPattern, VendorPattern, VersionPattern};
 use semver::VersionReq;
 use std::ops::Deref;
 use std::str::FromStr;
 use crate::pattern::specific::{VendorPattern, ProductPattern, VariantPattern};
-use crate::mesh::serde::id::Specific;
+use crate::mesh::serde::id::{Specific, ResourceType};
+use crate::resource::Kind;
+use crate::parse::CamelCase;
 
 #[derive(Eq, PartialEq)]
 pub struct AddressTksPattern {
@@ -180,12 +181,12 @@ pub type ResourceTypePattern = Pattern<CamelCase>;
 pub type KindPattern = Pattern<CamelCase>;
 
 pub mod specific {
-    use starlane::pattern::Pattern;
     use semver::VersionReq;
     use std::ops::Deref;
     use std::str::FromStr;
     use crate::pattern::Pattern;
     use crate::error::Error;
+    use crate::parse::SkewerCase;
 
     pub struct Version {
         pub req: VersionReq,
@@ -301,7 +302,7 @@ pub struct AddressTksSegment {
 #[derive(Eq, PartialEq)]
 pub struct Tks {
     pub resource_type: ResourceType,
-    pub kind: Option<ResourceKind>,
+    pub kind: Option<Kind>,
 }
 
 impl Tks {
@@ -314,12 +315,7 @@ impl Tks {
 }
 
 pub mod parse {
-    use starlane_resources::parse::any_resource_path_segment;
-    use starlane::pattern::specific::VersionPattern;
-    use starlane::pattern::{
-        AddressSegment, ExactSegment, Hop, KindPattern, Pattern, ResourceTypePattern,
-        SegmentPattern, SpecificPattern, TksPattern,
-    };
+
     use nom::branch::alt;
     use nom::bytes::complete::tag;
     use nom::character::complete::{alpha1, digit1};
@@ -330,6 +326,8 @@ pub mod parse {
     use nom::Parser;
     use nom_supreme::{parse_from_str, ParserExt};
     use semver::VersionReq;
+    use crate::pattern::{SegmentPattern, ExactSegment, Pattern, SpecificPattern, KindPattern, ResourceTypePattern, TksPattern, Hop};
+    use mesh_portal_parse::parse::{Res, skewer};
 
     fn any_segment(input: &str) -> Res<&str, SegmentPattern> {
         tag("*")(input).map(|(next, _)| (next, SegmentPattern::Any))
@@ -445,13 +443,13 @@ pub mod parse {
 
     #[cfg(test)]
     pub mod test {
-        use starlane::pattern::parse::{hop, segment, specific, tks, version};
-        use starlane::pattern::{
-            AddressSegment, ExactSegment, Pattern, SegmentPattern, SpecificPattern, TksPattern,
-        };
+
         use nom::combinator::all_consuming;
         use semver::VersionReq;
         use std::str::FromStr;
+        use crate::error::Error;
+        use crate::pattern::{SegmentPattern, ExactSegment, TksPattern, Pattern, SpecificPattern};
+        use crate::pattern::parse::{segment, specific, tks, hop};
 
         #[test]
         pub fn test_segs() -> Result<(), Error> {
@@ -574,7 +572,7 @@ pub mod parse {
 
 // -> { +( sa .:users:*||.:old-users:*; )+( grant .:my-files:** +CRWX; )-> $app:**<Mechtron>^Msg/admin/**; }
 // -> { +( sa .:(users|old-users):*; )+( grant .:my-files:** +CRWX; )-> $app:**<Mechtron>^Msg/admin/**; }
-// -> { +( sa .:(users|old-users):*; )+( grant .:my-files:** +CRWX; )-> $app:**<Mechtron>^Http/admins/*; }
+// -> { +( sa .:(users|old-users):*; )+( grant .:my-files:** +CRUDLX; )-> $app:**<Mechtron>^Http/admins/*; }
 
 // Http<Post>:/some/path/(.*) +( set req.path="/new/path/$1" )-[ Map{ body<Bin~json> } ]+( session )-[ Map{ headers<Meta>, body<Bin~json>, session<Text> } ]-> {*} => &;
 

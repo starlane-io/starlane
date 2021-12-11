@@ -14,6 +14,7 @@ use crate::mesh::Request;
 use crate::mesh::Response;
 use crate::mesh::serde::messaging::{Exchange, ExchangeId};
 use mesh_portal_serde::version::latest::messaging::ExchangeType;
+use crate::mesh::serde::id::Address;
 
 pub struct ProtoMessage {
     pub id: MessageId,
@@ -130,7 +131,7 @@ impl ProtoMessageReply {
 }
 
 
-pub type MessageTo = ResourceIdentifier;
+pub type MessageTo = Address;
 
 
 pub type MessageId = Uuid;

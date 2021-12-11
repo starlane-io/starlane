@@ -1,11 +1,10 @@
-use starlane_resources::ResourceAddress;
-use crate::resource::ResourceKey;
 use core::ops;
-use starlane::pattern::AddressTksPattern;
 use std::str::FromStr;
 use nom::combinator::all_consuming;
 use crate::security::permissions::parse::permissions;
 use crate::error::Error;
+use crate::pattern::AddressTksPattern;
+use crate::mesh::serde::id::Address;
 
 pub enum Pattern {
     None,
@@ -15,14 +14,14 @@ pub enum Pattern {
 
 
 pub struct Access {
-    pub agent: ResourceKey,
+    pub agent: Address,
     pub pattern: AddressTksPattern,
-    pub permission: Permission,
+    pub permissions: Permissions,
 }
 
 pub struct Grant {
-    pub permission: Permission,
-    pub resource: ResourceKey
+    pub permissions: Permissions,
+    pub resource: Address
 }
 
 #[derive(Clone)]
@@ -85,11 +84,11 @@ impl FromStr for Permissions {
 
 
 pub mod parse {
-    use starlane_resources::Res;
     use nom::branch::alt;
     use nom::bytes::complete::tag;
     use crate::security::permissions::Permissions;
     use nom::sequence::tuple;
+    use mesh_portal_parse::parse::Res;
 
     fn create(input: &str) -> Res<&str,bool> {
         alt( (tag("c"),tag("C")))(input).map( |(next,value):(&str,&str) | {
