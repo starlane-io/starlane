@@ -15,6 +15,7 @@ use crate::star::{StarCommand, StarKey};
 use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
 use crate::resources::message::ProtoMessage;
 use crate::mesh::{Request, Response};
+use crate::mesh::serde::id::Address;
 
 pub mod delivery;
 
@@ -24,7 +25,7 @@ pub type MessageId=String;
 pub enum ProtoStarMessageTo {
     None,
     Star(StarKey),
-    Resource(ResourceIdentifier),
+    Resource(Address),
 }
 
 impl ProtoStarMessageTo {

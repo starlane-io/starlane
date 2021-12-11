@@ -18,8 +18,9 @@ use crate::mesh;
 use crate::resource::selector::{ResourceSelector, Labels};
 use crate::mesh::serde::resource::ResourceStub;
 use crate::mesh::serde::http::HttpResponse;
-use crate::resource::{ResourceRegistration, ResourceRecord, ResourceSliceStatus};
+use crate::resource::{ResourceRegistration, ResourceRecord, ResourceSliceStatus, ResourceAssign, AssignResourceStateSrc};
 use crate::resource::ResourceType;
+use crate::mesh::serde::id::Address;
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum Frame {
@@ -373,7 +374,7 @@ pub enum MessagePayload {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum ResourceHostAction {
     //IsHosting(ResourceKey),
-    Assign(ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>),
+    Assign(ResourceAssign<AssignResourceStateSrc>),
     Init(ResourceKey),
 }
 
@@ -381,14 +382,8 @@ pub enum ResourceHostAction {
 pub enum ResourceRegistryRequest {
     Register(ResourceRegistration),
     Location(ResourceRecord),
-    Find(ResourceIdentifier),
+    Find(Address),
     Status(ResourceStatusReport),
-    UniqueResourceId {
-        parent: ResourceIdentifier,
-        child_type: ResourceType,
-    },
-    Set(ResourceRegistryPropertyAssignment),
-    SelectValues(ResourcePropertyOp<ResourceRegistryPropertyValueSelector>)
 }
 
 impl ToString for ResourceRegistryRequest {
@@ -398,9 +393,6 @@ impl ToString for ResourceRegistryRequest {
             ResourceRegistryRequest::Location(_) => "Location".to_string(),
             ResourceRegistryRequest::Find(_) => "Find".to_string(),
             ResourceRegistryRequest::Status(_) => "Status".to_string(),
-            ResourceRegistryRequest::UniqueResourceId { .. } => "UniqueResourceId".to_string(),
-            ResourceRegistryRequest::Set(_) => "Set".to_string(),
-            ResourceRegistryRequest::SelectValues(_) => "SelectValues".to_string()
         }
     }
 }

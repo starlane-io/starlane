@@ -1,6 +1,6 @@
 
 use crate::error::Error;
-use crate::resource::{ResourceType, AssignResourceStateSrc};
+use crate::resource::{ResourceType, AssignResourceStateSrc, ResourceAssign};
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
@@ -35,16 +35,15 @@ impl Host for StatelessHost {
     async fn assign(
         &self,
         assign: ResourceAssign<AssignResourceStateSrc>,
-    ) -> Result<DataSet<BinSrc>, Error> {
+    ) -> Result<(), Error> {
         match assign.state_src {
             AssignResourceStateSrc::Stateless => {}
-            AssignResourceStateSrc::CreateArgs(_) => {}
             _ => {
                 return Err("must be stateless or empty create args".into());
             }
         };
 
-        Ok(DataSet::new())
+        Ok(())
     }
 
     async fn has(&self, key: ResourceKey) -> bool {
@@ -52,14 +51,6 @@ impl Host for StatelessHost {
             Ok(v) => v,
             Err(_) => false,
         }
-    }
-
-    async fn get_state(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
-        self.store.get(key).await
-    }
-
-    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Error> {
-        unimplemented!()
     }
 
 }

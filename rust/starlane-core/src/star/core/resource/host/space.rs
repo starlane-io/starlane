@@ -50,14 +50,6 @@ impl Host for SpaceHost {
         }
     }
 
-    async fn get_state(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
-        self.store.get(key).await
-    }
-
-    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Error> {
-        unimplemented!()
-    }
-
     fn resource_type(&self) -> ResourceType {
         ResourceType::Space
     }

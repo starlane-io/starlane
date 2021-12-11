@@ -138,7 +138,10 @@ pub trait Host: Send + Sync {
         assign: ResourceAssign<AssignResourceStateSrc>,
     ) -> Result<(), Error>;
 
-    fn handle( &self, delivery: Delivery<Message> );
+    fn handle( &self, delivery: Delivery<Message> ) {
+        // delivery.fail(fail::Undeliverable)
+    }
+
     async fn has(&self, address: Address) -> bool;
 
     fn shutdown(&self) {}

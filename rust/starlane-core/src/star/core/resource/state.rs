@@ -16,6 +16,7 @@ use crate::starlane::files::MachineFileSystem;
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::payload::Payload;
 use mesh_portal_parse::path::Path;
+use crate::fail::Fail;
 
 #[derive(Clone, Debug)]
 pub struct StateStore {
@@ -29,10 +30,10 @@ impl StateStore {
         }
     }
 
-    pub async fn has(&self, key: ResourceKey) -> Result<bool, Error> {
+    pub async fn has(&self, address: Address) -> Result<bool, Fail> {
         let (tx, rx) = oneshot::channel();
 
-        self.tx.send(ResourceStoreCommand::Has { key, tx }).await?;
+        self.tx.send(ResourceStoreCommand::Has { address, tx }).await?;
 
         Ok(rx.await?)
     }
@@ -41,21 +42,21 @@ impl StateStore {
         &self,
         key: Address,
         state : Payload,
-    ) -> Result<Payload, Error> {
+    ) -> Result<(), Fail> {
         let (tx, rx) = oneshot::channel();
 
         self.tx
-            .send(ResourceStoreCommand::Save { key, state, tx })
+            .send(ResourceStoreCommand::Save { address: key, state, tx })
             .await?;
-
-        Ok(rx.await??)
+        rx.await??;
+        Ok(())
     }
 
-    pub async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
+    pub async fn get(&self, address: Address) -> Result<Payload, Fail> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(ResourceStoreCommand::Get {
-                key: key.clone(),
+                address,
                 tx,
             })
             .await?;
@@ -74,16 +75,16 @@ impl StateStore {
 pub enum ResourceStoreCommand {
     Close,
     Save {
-        key: ResourceKey,
-        state: DataSet<BinSrc>,
-        tx: oneshot::Sender<Result<DataSet<BinSrc>, Error>>,
+        address: Address,
+        state: Payload,
+        tx: oneshot::Sender<Result<(), Fail>>,
     },
     Get {
-        key: ResourceKey,
-        tx: oneshot::Sender<Result<Option<DataSet<BinSrc>>, Error>>,
+        address: Address,
+        tx: oneshot::Sender<Result<Payload, Fail>>,
     },
     Has {
-        key: ResourceKey,
+        address: Address,
         tx: oneshot::Sender<bool>,
     },
 }
@@ -163,12 +164,14 @@ impl StateStoreFS {
         Ok(state)
     }
 
-    async fn get(&self, key: Address ) -> Result<Payload, Error> {
+    async fn get(&self, address: Address ) -> Result<Payload, Error> {
+        unimplemented!();
+        /*
         let machine_filesystem = self.skel.machine.machine_filesystem();
         let mut data_access = machine_filesystem.data_access();
 
         let state_path = Path::from_str(
-            format!("/stars/{}/states/{}", self.skel.info.key.to_string(), key.to_string()).as_str(),
+            format!("/stars/{}/states/{}", self.skel.info.key.to_string(), address.to_string()).as_str(),
         )?;
         let mut dataset = DataSet::new();
         for aspect in data_access.list(&state_path).await? {
@@ -176,7 +179,7 @@ impl StateStoreFS {
                 format!(
                     "/stars/{}/states/{}/{}",
                     self.skel.info.key.to_string(),
-                    key.to_string(),
+                    address.to_string(),
                     aspect
                         .last_segment()
                         .ok_or("expected final segment from list")?
@@ -193,12 +196,13 @@ impl StateStoreFS {
                 bin_src,
             );
         }
-        unimplemented!();
 //        Ok()
+
+         */
     }
 
-    async fn has(&self, key: Address ) -> bool {
-        if let Ok(Some(_)) = self.get(key).await {
+    async fn has(&self, address: Address ) -> bool {
+        if let Ok(Some(_)) = self.get(address).await {
             true
         } else {
             false
@@ -207,13 +211,13 @@ impl StateStoreFS {
 
     async fn process(&mut self, command: ResourceStoreCommand) {
         match command {
-            ResourceStoreCommand::Save { key, state, tx } => {
+            ResourceStoreCommand::Save { address: key, state, tx } => {
                 tx.send(self.save(key, state).await).unwrap_or_default();
             }
-            ResourceStoreCommand::Get { key, tx } => {
+            ResourceStoreCommand::Get { address: key, tx } => {
                 tx.send(self.get(key).await).unwrap_or_default();
             }
-            ResourceStoreCommand::Has { key, tx } => {
+            ResourceStoreCommand::Has { address: key, tx } => {
                 tx.send(self.has(key).await).unwrap_or_default();
             }
             ResourceStoreCommand::Close => {}

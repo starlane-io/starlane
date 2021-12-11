@@ -35,6 +35,7 @@ use crate::resource::selector::ConfigSrc;
 use crate::resource::ArtifactKind;
 use crate::resources::message::ProtoMessage;
 use serde::{Serialize,Deserialize};
+use crate::mesh::serde::id::Meta;
 
 
 pub struct WebVariant {
@@ -109,6 +110,8 @@ fn start(api: StarlaneApi,skel: StarSkel) {
 }
 
 async fn process_request( mut stream: TcpStream, api: StarlaneApi, skel: StarSkel ) -> Result<(),Error>{
+    unimplemented!()
+    /*
     info!("received HTTP Stream...");
 
     let mut request_buf: Vec<u8> = vec![];
@@ -169,6 +172,8 @@ eprintln!("ERROR: {}", e.to_string() );
     }
 
     Ok(())
+
+     */
 }
 
 async fn error_response( mut stream: TcpStream, code: usize, message: &str)  {
@@ -321,7 +326,7 @@ eprintln!("Error: {}",err.to_string());
 #[derive(Debug,Clone,Serialize,Deserialize)]
 pub struct HttpResponse{
     pub status: usize,
-    pub headers: Headers,
+    pub headers: Meta,
     pub body: Payload
 }
 
@@ -329,7 +334,7 @@ impl HttpResponse {
     pub fn new( ) -> HttpResponse {
         Self {
             status: 200,
-            headers: Headers::new(),
+            headers: Meta::new(),
             body: Payload::Empty
         }
     }

@@ -16,6 +16,10 @@ use crate::star::{
 };
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::error::Error;
+use crate::mesh::serde::id::Address;
+use crate::mesh::serde::generic::resource::ResourceStub;
+use crate::resource::selector::ConfigSrc;
+use crate::fail::Fail;
 
 #[derive(Clone)]
 pub struct ResourceLocatorApi {
@@ -27,30 +31,11 @@ impl ResourceLocatorApi {
         Self { tx }
     }
 
-    pub async fn fetch_resource_key(
-        &self,
-        identifier: ResourceIdentifier,
-    ) -> Result<ResourceKey, Fail> {
-        match self.locate(identifier).await {
-            Ok(record) => Ok(record.stub.key),
-            Err(fail) => Err(fail.into()),
-        }
-    }
 
-    pub async fn fetch_resource_address(
-        &self,
-        identifier: ResourceIdentifier,
-    ) -> Result<ResourcePath, Fail> {
-        match self.locate(identifier).await {
-            Ok(record) => Ok(record.stub.address),
-            Err(fail) => Err(fail.into()),
-        }
-    }
-
-    pub async fn locate(&self, identifier: ResourceIdentifier) -> Result<ResourceRecord, Error> {
+    pub async fn locate(&self, address: Address ) -> Result<ResourceRecord, Fail> {
         let (tx, mut rx) = oneshot::channel();
         self.tx
-            .send(ResourceLocateCall::Locate { identifier, tx })
+            .send(ResourceLocateCall::Locate { address, tx })
             .await
             .unwrap_or_default();
 
@@ -58,42 +43,17 @@ impl ResourceLocatorApi {
         Ok(rtn)
     }
 
-    pub async fn as_key(&self, identifier: ResourceIdentifier) -> Result<ResourceKey, Error> {
-        match identifier{
-            ResourceIdentifier::Key(key) => {
-                Ok(key)
-            }
-            ResourceIdentifier::Address(address) => {
-                let record = self.locate(address.into()).await?;
-                Ok(record.stub.key)
-            }
-        }
-    }
-
-    pub async fn as_address(&self, identifier: ResourceIdentifier) -> Result<ResourcePath, Error> {
-        match identifier{
-            ResourceIdentifier::Key(key) => {
-                let record = self.locate(key.into()).await?;
-                Ok(record.stub.address)
-            }
-            ResourceIdentifier::Address(address) => {
-                Ok(address)
-            }
-        }
-    }
-
-
 
     pub async fn external_locate(
         &self,
-        identifier: ResourceIdentifier,
+        address: Address,
         star: StarKey,
     ) -> Result<ResourceRecord, Error> {
         let (tx, mut rx) = oneshot::channel();
         self.tx
             .send(ResourceLocateCall::ExternalLocate {
                 star,
-                identifier,
+                address: address,
                 tx,
             })
             .await
@@ -111,7 +71,7 @@ impl ResourceLocatorApi {
         });
     }
 
-    pub fn filter(&self, result: Result<ResourceRecord, Error>) -> Result<ResourceRecord, Error> {
+    pub fn filter(&self, result: Result<ResourceRecord, Fail>) -> Result<ResourceRecord, Fail> {
 
         if let Result::Ok(record) = &result {
             self.found(record.clone());
@@ -122,13 +82,13 @@ impl ResourceLocatorApi {
 
 pub enum ResourceLocateCall {
     Locate {
-        identifier: ResourceIdentifier,
-        tx: oneshot::Sender<Result<ResourceRecord, Error>>,
+        address: Address,
+        tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
     },
     ExternalLocate {
-        identifier: ResourceIdentifier,
+        address: Address,
         star: StarKey,
-        tx: oneshot::Sender<Result<ResourceRecord, Error>>,
+        tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
     },
     Found(ResourceRecord),
 }
@@ -137,8 +97,7 @@ impl Call for ResourceLocateCall {}
 
 pub struct ResourceLocatorComponent {
     skel: StarSkel,
-    resource_record_cache: LruCache<ResourceKey, ResourceRecord>,
-    resource_address_to_key: LruCache<ResourcePath, ResourceKey>,
+    resource_record_cache: LruCache<Address, ResourceRecord>,
 }
 
 impl ResourceLocatorComponent {
@@ -146,7 +105,6 @@ impl ResourceLocatorComponent {
         AsyncRunner::new(
             Box::new(Self {
                 skel: skel.clone(),
-                resource_address_to_key: LruCache::new(1024),
                 resource_record_cache: LruCache::new(1024),
             }),
             skel.resource_locator_api.tx.clone(),
@@ -159,11 +117,11 @@ impl ResourceLocatorComponent {
 impl AsyncProcessor<ResourceLocateCall> for ResourceLocatorComponent {
     async fn process(&mut self, call: ResourceLocateCall) {
         match call {
-            ResourceLocateCall::Locate { identifier, tx } => {
+            ResourceLocateCall::Locate { address: identifier, tx } => {
                 self.locate(identifier, tx);
             }
             ResourceLocateCall::ExternalLocate {
-                identifier,
+                address: identifier,
                 star,
                 tx,
             } => {
@@ -183,7 +141,7 @@ impl ResourceLocatorComponent {
     fn locate(
         &mut self,
         identifier: ResourceIdentifier,
-        tx: oneshot::Sender<Result<ResourceRecord, Error>>,
+        tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
     ) {
         if self.has_cached_record(&identifier) {
             let result = match self
@@ -224,14 +182,12 @@ impl ResourceLocatorComponent {
         } else {
             let record = ResourceRecord::new(
                 ResourceStub {
-                    key: ResourceKey::Root,
                     address: ResourcePath::root(),
                     archetype: ResourceArchetype {
                         kind: Kind::Root,
                         specific: None,
                         config: ConfigSrc::None,
                     },
-                    owner: None,
                 },
                 StarKey::central(),
             );
@@ -243,54 +199,36 @@ impl ResourceLocatorComponent {
         &mut self,
         identifier: ResourceIdentifier,
         star: StarKey,
-        tx: oneshot::Sender<Result<ResourceRecord, Error>>,
+        tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
     ) {
         let (request, rx) = Request::new((identifier, star));
         self.request_resource_record_from_star(request).await;
         tokio::spawn(async move {
             async fn timeout(
-                rx: oneshot::Receiver<Result<ResourceRecord, Error>>,
-            ) -> Result<ResourceRecord, Error> {
+                rx: oneshot::Receiver<Result<ResourceRecord, Fail>>,
+            ) -> Result<ResourceRecord, Fail> {
                 Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
             }
             tx.send(timeout(rx).await).unwrap_or_default();
         });
     }
 
-    fn has_cached_record(&mut self, identifier: &ResourceIdentifier) -> bool {
-        match identifier {
-            ResourceIdentifier::Key(key) => self.resource_record_cache.contains(key),
-            ResourceIdentifier::Address(address) => {
-                let key = self.resource_address_to_key.get(address);
-                match key {
-                    None => false,
-                    Some(key) => self.resource_record_cache.contains(key),
-                }
-            }
-        }
+    fn has_cached_record(&mut self, address: &Address) -> bool {
+      self.resource_record_cache.contains(address)
     }
 
-    fn get_cached_record(&mut self, identifier: &ResourceIdentifier) -> Option<ResourceRecord> {
-        match identifier {
-            ResourceIdentifier::Key(key) => self.resource_record_cache.get(key).cloned(),
-            ResourceIdentifier::Address(address) => {
-                let key = self.resource_address_to_key.get(address);
-                match key {
-                    None => Option::None,
-                    Some(key) => self.resource_record_cache.get(key).cloned(),
-                }
-            }
-        }
+    fn get_cached_record(&mut self, address: &Address) -> Option<ResourceRecord> {
+        self.resource_record_cache.get(address).cloned()
     }
 
     async fn request_resource_record_from_star(
         &mut self,
-        locate: Request<(ResourceIdentifier, StarKey), ResourceRecord>,
+        locate: Request<(Address, StarKey), ResourceRecord>,
     ) {
-        let (identifier, star) = locate.payload.clone();
+        let (address, star) = locate.payload.clone();
         let mut proto = ProtoStarMessage::new();
         proto.to = star.clone().into();
-        proto.payload = StarMessagePayload::ResourceRegistry(ResourceRegistryRequest::Find(identifier));
+        proto.payload = StarMessagePayload::ResourceRegistry(ResourceRegistryRequest::Find(address));
         proto.log = locate.log;
         let skel = self.skel.clone();
         tokio::spawn(async move {

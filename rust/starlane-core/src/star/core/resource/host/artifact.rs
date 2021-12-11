@@ -9,12 +9,15 @@ use std::sync::Arc;
 use tempdir::TempDir;
 use tokio::sync::Mutex;
 
-use crate::resource::{ResourceType, AssignResourceStateSrc};
+use crate::resource::{ResourceType, AssignResourceStateSrc, ResourceAssign};
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util;
 use crate::error::Error;
+use crate::mesh::serde::id::Address;
+use crate::message::delivery::Delivery;
+use mesh_portal_api::message::Message;
 
 /*
 =======
@@ -329,7 +332,7 @@ impl Host for ArtifactBundleHost {
     async fn assign(
         &self,
         assign: ResourceAssign<AssignResourceStateSrc>,
-    ) -> Result<DataSet<BinSrc>, Error> {
+    ) -> Result<(), Error> {
         let state = match assign.state_src {
             AssignResourceStateSrc::Direct(data) => {
                 data
@@ -339,22 +342,16 @@ impl Host for ArtifactBundleHost {
             },
 
         };
-
-        Ok(self.store.put( assign.stub.key, state ).await?)
+        self.store.put( assign.stub.address, state ).await?;
+        Ok(())
     }
 
-    async fn has(&self, key: ResourceKey) -> bool {
-        match self.store.has(key).await {
+
+    async fn has(&self, address: Address) -> bool {
+        match self.store.has(address).await {
             Ok(v) => v,
             Err(_) => false,
         }
     }
 
-    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Error> {
-        unimplemented!()
-    }
-
-    async fn get_state(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
-        self.store.get(key).await
-    }
 }

@@ -12,6 +12,7 @@ use crate::resource::{ResourceCreationChamber, Kind, ResourceType, AssignResourc
 use crate::star::StarSkel;
 use crate::star::core::resource::host::Host;
 use crate::mesh::serde::payload::Payload;
+use crate::mesh::serde::id::Address;
 
 
 pub struct KubeHost {
@@ -125,15 +126,7 @@ println!("Assigning Kube Resource Host....");
         Ok(Payload::Empty)
     }
 
-    async fn has(&self, key: ResourceKey) -> bool {
-        todo!()
-    }
-
-    async fn get_state(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Error> {
-        todo!()
-    }
-
-    async fn delete(&self, key: ResourceKey) -> Result<(), Error> {
+    async fn has(&self, address: Address) -> bool {
         todo!()
     }
 

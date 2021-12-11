@@ -145,7 +145,7 @@ impl AsyncProcessor<SurfaceCall> for SurfaceComponent {
                 self.skel
                     .resource_locator_api
                     .tx
-                    .try_send(ResourceLocateCall::Locate { identifier, tx })
+                    .try_send(ResourceLocateCall::Locate { address: identifier, tx })
                     .unwrap_or_default();
             }
             SurfaceCall::Watch { selector, tx } => {

@@ -788,7 +788,7 @@ pub struct AddResourceLocation {
 
 pub struct Request<P: Debug, R> {
     pub payload: P,
-    pub tx: oneshot::Sender<Result<R, Error>>,
+    pub tx: oneshot::Sender<Result<R, Fail>>,
     pub log: bool,
 }
 
@@ -799,7 +799,7 @@ impl<P: Debug, R> Debug for Request<P, R> {
 }
 
 impl<P: Debug, R> Request<P, R> {
-    pub fn new(payload: P) -> (Self, oneshot::Receiver<Result<R, Error>>) {
+    pub fn new(payload: P) -> (Self, oneshot::Receiver<Result<R, Fail>>) {
         let (tx, rx) = oneshot::channel();
         (
             Request {

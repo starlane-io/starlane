@@ -5,7 +5,7 @@ use tokio::sync::{mpsc, oneshot};
 
 
 use crate::error::Error;
-use crate::resource::{Kind, ResourceRecord, ResourceRegistration, ResourceLocation};
+use crate::resource::{Kind, ResourceRecord, ResourceRegistration, ResourceLocation, ResourceCreateStrategy};
 use crate::star::{StarKey, StarSkel};
 use crate::star::variant::{FrameVerdict, VariantCall};
 use crate::starlane::api::StarlaneApi;
@@ -85,17 +85,6 @@ impl CentralVariant {
         let mut creation = starlane_api.create_space("space", "Space")?;
         creation.set_strategy(ResourceCreateStrategy::Ensure);
         creation.submit().await?;
-
-        {
-            let bundle = create_args::artifact_bundle_address();
-
-            let mut creation = starlane_api.create_artifact_bundle(
-                bundle,
-                Arc::new(create_args::create_args_artifact_bundle()?),
-            ).await?;
-            creation.set_strategy(ResourceCreateStrategy::Ensure);
-            creation.submit().await?;
-        }
 
         Ok(())
     }
