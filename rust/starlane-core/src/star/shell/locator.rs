@@ -18,7 +18,6 @@ use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::error::Error;
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::generic::resource::ResourceStub;
-use crate::resource::selector::ConfigSrc;
 use crate::fail::Fail;
 
 #[derive(Clone)]

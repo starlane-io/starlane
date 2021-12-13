@@ -24,9 +24,7 @@ use crate::mesh::serde::payload::Payload;
 use crate::mesh::serde::resource::{Archetype, ResourceStub};
 use crate::message::{MessageExpect, ProtoStarMessage, ReplyKind};
 use crate::names::Name;
-use crate::resource::selector::{
-    ConfigSrc, FieldSelection, LabelSelection, MetaSelector, ResourceRegistryInfo, ResourceSelector,
-};
+
 use crate::resources::message::{ProtoMessage, MessageFrom};
 use crate::star::shell::pledge::{ResourceHostSelector, StarConscript};
 use crate::star::{ResourceRegistryBacking, StarInfo, StarKey, StarSkel};
@@ -49,7 +47,6 @@ pub mod artifact;
 pub mod config;
 pub mod file;
 pub mod file_system;
-pub mod selector;
 pub mod user;
 
 //static RESOURCE_QUERY_FIELDS: &str = "r.key,r.address,r.kind,r.specific,r.owner,r.config,r.host,r.gathering";

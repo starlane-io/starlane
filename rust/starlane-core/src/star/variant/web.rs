@@ -29,7 +29,6 @@ use crate::html::HTML;
 use regex::Regex;
 use crate::mesh::serde::entity::request::Http;
 use crate::mesh::serde::payload::Payload;
-use crate::resource::selector::ConfigSrc;
 use crate::resource::ArtifactKind;
 use crate::resources::message::ProtoMessage;
 use serde::{Serialize,Deserialize};

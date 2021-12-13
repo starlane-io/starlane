@@ -24,6 +24,7 @@ use crate::mesh::Response;
 use mesh_portal_serde::version::latest::util::unique_id;
 use crate::mesh::serde::messaging::Exchange;
 use crate::mesh::Message;
+use crate::message::Reply;
 
 #[derive(Clone)]
 pub struct Delivery<M>
@@ -49,7 +50,7 @@ where
 
     pub async fn to(&self) -> Result<Address,Error> {
         match &self.star_message.payload {
-            StarMessagePayload::MessagePayload(message) => {
+            StarMessagePayload::Request(message) => {
                 Ok(self.skel.resource_locator_api.locate(message.to()).await?.stub.key)
             }
             _ => {
@@ -67,8 +68,6 @@ impl<M> Into<StarMessage> for Delivery<M> where
 }
 
 impl Delivery<Request>
-    where
-        M: Clone + Send + Sync + 'static,
 {
 
     pub fn ok(self, payload: Payload) {
@@ -84,7 +83,7 @@ impl Delivery<Request>
 
             let proto = self
                 .star_message
-                .reply(StarMessagePayload::MessagePayload(Message::Response(response)));
+                .reply(StarMessagePayload::Request(Message::Response(response)));
             self.skel.messaging_api.send(proto);
         } else {
             eprintln!("cannot respond to a Notification exchange")
@@ -103,9 +102,7 @@ impl Delivery<Request>
                 exchange,
             };
 
-            let proto = self
-                .star_message
-                .reply(StarMessagePayload::MessagePayload(Message::Response(response)));
+            let proto = self.star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Response(response))));
             self.skel.messaging_api.send(proto);
         } else {
             eprintln!("cannot respond to a Notification exchange")

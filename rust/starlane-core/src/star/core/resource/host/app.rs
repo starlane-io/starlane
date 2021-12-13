@@ -14,7 +14,6 @@ use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use std::collections::HashMap;
 use crate::util::AsyncHashMap;
-use crate::resource::selector::ConfigSrc;
 use mesh_portal_serde::version::latest::resource::Status;
 use crate::message::delivery::Delivery;
 use mesh_portal_api::message::Message;

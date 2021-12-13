@@ -9,7 +9,6 @@ use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util::AsyncHashMap;
 use crate::message::delivery::Delivery;
-use crate::resource::selector::ConfigSrc;
 use crate::mesh::serde::payload::Payload;
 use crate::mesh::serde::entity::request::{Msg, Http};
 use mesh_portal_api::message::Message;

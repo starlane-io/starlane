@@ -10,12 +10,11 @@ use tokio::time::error::Elapsed;
 use crate::error::Error;
 use crate::id::Id;
 use crate::logger::Flags;
-use crate::message::{MessageExpect, MessageUpdate, ProtoStarMessage, MessageId};
+use crate::message::{MessageExpect, MessageUpdate, ProtoStarMessage, MessageId, Reply};
 use crate::message::delivery::ActorMessage;
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey};
 use crate::watch::{Notification, Watch, WatchKey};
 use crate::mesh;
-use crate::resource::selector::{ResourceSelector, Labels};
 use crate::mesh::serde::resource::ResourceStub;
 use crate::mesh::serde::http::HttpResponse;
 use crate::resource::{ResourceRegistration, ResourceRecord, ResourceSliceStatus, ResourceAssign, AssignResourceStateSrc};
@@ -339,7 +338,7 @@ impl StarMessage {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum StarMessagePayload {
     None,
-    MessagePayload(crate::mesh::Message),
+    Request(crate::mesh::Request),
     ResourceRegistry(ResourceRegistryRequest),
     ResourceHost(ResourceHostAction),
 //    Space(SpaceMessage),
@@ -350,7 +349,7 @@ impl Debug for StarMessagePayload {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.write_str(match self {
             StarMessagePayload::None => "None",
-            StarMessagePayload::MessagePayload(_) => "MessagePayload",
+            StarMessagePayload::Request(_) => "MessagePayload",
             StarMessagePayload::ResourceRegistry(_) => "ResourceRegistry",
             StarMessagePayload::ResourceHost(_) => "ResourceHost",
             StarMessagePayload::Space(_) => "Space",
@@ -530,52 +529,6 @@ pub enum SpacePayload {
 
  */
 
-#[derive(Clone, Serialize, Deserialize)]
-pub enum SupervisorPayload {
-    AppSequenceRequest(AppKey),
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub enum ServerPayload {
-    SequenceResponse(u64),
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub enum SpaceReply {
-    AppSequenceResponse(u64),
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub enum AssignMessage {}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct AppLabelRequest {
-    pub app: AppKey,
-    pub labels: Labels,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub enum Event {
-    App(AppEvent),
-    Actor(ActorEvent),
-    Star(StarEvent),
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub enum ActorEvent {
-    StateChange(RawState),
-    Gathered(ActorGathered),
-    Scattered(ActorScattered),
-    Broadcast(ActorBroadcast),
-    Destroyed,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub enum AppEvent {
-    Created,
-    Ready,
-    Destroyed,
-}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum StarEvent {
@@ -618,7 +571,7 @@ impl fmt::Display for StarMessagePayload {
             StarMessagePayload::ResourceRegistry(_) => "ResourceManager".to_string(),
             StarMessagePayload::ResourceHost(_) => "ResourceHost".to_string(),
             StarMessagePayload::UniqueId(_) => "UniqueId".to_string(),
-            StarMessagePayload::MessagePayload(_) => "MessagePayload".to_string(),
+            StarMessagePayload::Request(_) => "MessagePayload".to_string(),
             StarMessagePayload::Select(_) => "Select".to_string()
         };
         write!(f, "{}", r)

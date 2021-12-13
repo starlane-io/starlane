@@ -24,12 +24,11 @@ use crate::star::shell::search::{SearchInit, SearchHits};
 use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
 use crate::watch::{WatchResourceSelector, Watcher};
-use crate::message::{ProtoStarMessage, ProtoStarMessageTo, ReplyKind};
+use crate::message::{ProtoStarMessage, ProtoStarMessageTo, ReplyKind, Reply};
 use crate::artifact::ArtifactBundle;
 use crate::resources::message::ProtoMessage;
 use crate::mesh::serde::id::Address;
 use kube::ResourceExt;
-use crate::resource::selector::{ResourceSelector, FieldSelection, ConfigSrc, ResourceRegistryInfo};
 use crate::mesh::serde::resource::ResourceStub;
 use mesh_portal_parse::path::Path;
 use crate::mesh::serde::bin::Bin;
@@ -122,7 +121,7 @@ impl StarlaneApi {
 
         let reply = self
             .surface_api
-            .exchange(proto, ReplyKind::Record, "StarlaneApi: create_resource")
+            .exchange(proto, ReplyKind::Response, "StarlaneApi: create_resource")
             .await?;
 
         match reply{

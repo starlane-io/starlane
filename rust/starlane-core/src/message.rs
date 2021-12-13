@@ -129,7 +129,7 @@ impl TryFrom<ProtoMessage> for ProtoStarMessage {
         proto.to = message.to.clone().into();
         proto.trace = message.trace;
         proto.log = message.log;
-        proto.payload = StarMessagePayload::MessagePayload(message.into());
+        proto.payload = StarMessagePayload::Request(message.into());
         Ok(proto)
     }
 }
@@ -300,13 +300,15 @@ pub enum RejectKind {
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum ReplyKind{
     Empty,
-    Record
+    Record,
+    Response
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
 pub enum Reply{
     Empty,
-    Record(ResourceRecord)
+    Record(ResourceRecord),
+    Response(Response)
 }
 
 fn hash_to_string(hash: &HashSet<ResourceType>) -> String {
@@ -322,7 +324,7 @@ impl From<Request> for ProtoStarMessage {
     fn from(request: Request) -> Self {
         let mut proto = ProtoStarMessage::new();
         proto.to = request.to.clone().into();
-        proto.payload = StarMessagePayload::MessagePayload(request.into());
+        proto.payload = StarMessagePayload::Request(request.into());
         proto
     }
 }
@@ -330,7 +332,7 @@ impl From<Request> for ProtoStarMessage {
 impl From<Response> for ProtoStarMessage {
     fn from(response: Response ) -> Self {
         let mut proto = ProtoStarMessage::new();
-        proto.payload = StarMessagePayload::MessagePayload(response.into());
+        proto.payload = StarMessagePayload::Request(response.into());
         proto
     }
 }

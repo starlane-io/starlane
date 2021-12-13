@@ -44,7 +44,6 @@ use crate::template::StarTemplateHandle;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 use crate::fail::Fail;
 use crate::resource::{ResourceType, ResourceRecord, ResourceNamesReservationRequest, RegistryReservation, ResourceRegistration, UniqueSrc, ResourceRegistryAction, Registry, ResourceRegistryCommand, ResourceRegistryResult};
-use crate::resource::selector::ResourceSelector;
 use crate::mesh::serde::resource::Status;
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::resource::command::select::Select;

@@ -18,7 +18,6 @@ use crate::mesh::Message;
 use crate::mesh::serde::entity::request::{ReqEntity, Rc, Msg, Http};
 use crate::mesh::Request;
 use crate::mesh::Response;
-use crate::resource::selector::ConfigSrc;
 use crate::mesh::serde::http::HttpRequest;
 use crate::fail::Fail;
 use crate::mesh::serde::id::Address;
@@ -70,7 +69,7 @@ impl AsyncProcessor<CoreMessageCall> for MessagingEndpointComponent {
 impl MessagingEndpointComponent {
     async fn process_resource_message(&mut self, star_message: StarMessage) -> Result<(), Error> {
         match &star_message.payload {
-            StarMessagePayload::MessagePayload(message_payload) => match &message_payload {
+            StarMessagePayload::Request(message_payload) => match &message_payload {
                 Message::Request(request ) => {
                     let delivery = Delivery::new(request.clone(), star_message, self.skel.clone() );
 

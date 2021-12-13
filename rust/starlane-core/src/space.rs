@@ -1,7 +1,6 @@
 use tokio::sync::oneshot;
 
 use crate::error::Error;
-use crate::resource::selector::ResourceSelector;
 use crate::fail::Fail;
 
 pub struct AppSelectCommand {

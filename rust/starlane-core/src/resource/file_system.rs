@@ -7,12 +7,13 @@ use crate::error::Error;
 use crate::resource::{
     ResourceType,
 };
+use crate::mesh::serde::id::Address;
+use crate::mesh::serde::resource::command::common::StateSrc;
 
 #[derive(Clone)]
 pub struct FileSystem {
-    key: FileSystemKey,
-    address: ResourceAddress,
-    state_src: DataSet<BinSrc>,
+    address: Address,
+    state_src: StateSrc
 }
 
 #[derive(Clone, Serialize, Deserialize)]

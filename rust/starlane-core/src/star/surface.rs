@@ -6,7 +6,7 @@ use tokio::time::Duration;
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
 use crate::frame::{StarPattern};
-use crate::message::ProtoStarMessage;
+use crate::message::{ProtoStarMessage, ReplyKind, Reply};
 use crate::resource::{ResourceRecord };
 use crate::star::{StarCommand, StarSkel, StarInfo};
 use crate::star::shell::locator::ResourceLocateCall;
@@ -14,6 +14,8 @@ use crate::star::shell::message::MessagingCall;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::watch::{WatchSelector, Notification, Topic, Watch, WatchResourceSelector, Watcher};
 use crate::star::shell::search::SearchHits;
+use crate::mesh::serde::resource::command::create::AddressTemplate;
+use crate::mesh::serde::id::Address;
 
 #[derive(Clone)]
 pub struct SurfaceApi {
@@ -88,7 +90,8 @@ pub enum SurfaceCall {
         description: String,
     },
     Watch{ selector: WatchResourceSelector, tx: oneshot::Sender<Result<Watcher,Error>> },
-    StarSearch{ star_pattern: StarPattern, tx: oneshot::Sender<Result<SearchHits,Error>>}
+    StarSearch{ star_pattern: StarPattern, tx: oneshot::Sender<Result<SearchHits,Error>>},
+    RequestStarAddress { address_template: AddressTemplate, tx: oneshot::Sender<Result<Address,Error>> }
 
 }
 

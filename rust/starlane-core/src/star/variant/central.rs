@@ -11,7 +11,6 @@ use crate::star::variant::{FrameVerdict, VariantCall};
 use crate::starlane::api::StarlaneApi;
 use crate::util::{AsyncProcessor, AsyncRunner};
 use crate::mesh::serde::generic::resource::ResourceStub;
-use crate::resource::selector::ConfigSrc;
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::resource::command::create::Strategy;
 
