@@ -9,7 +9,7 @@ use mesh_portal_serde::mesh::generic;
 
 pub type Request = generic::Request<entity::request::ReqEntity>;
 pub type Response = generic::Response;
-pub type RxMessage = mesh_portal_api::message::generic::Message<entity::request::ReqEntity>;
+pub type Message = mesh_portal_api::message::generic::Message<entity::request::ReqEntity>;
 
 
 #[cfg(test)]

@@ -10,12 +10,12 @@ use tokio::sync::oneshot;
 use tokio::time::Duration;
 
 use crate::error::Error;
-use crate::frame::{ Reply, SimpleReply, StarMessage, StarMessagePayload};
 use crate::message::ProtoStarMessage;
 use crate::resource::{ResourceRecord, ResourceType};
 use crate::star::{StarCommand, StarSkel};
 use crate::util;
 use crate::fail::Fail;
+use crate::frame::{StarMessage, StarMessagePayload};
 
 #[derive(Clone)]
 pub struct Delivery<M>

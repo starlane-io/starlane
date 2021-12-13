@@ -54,11 +54,11 @@ impl Parser<MechtronConfig> for MechtronConfigParser {
         let bundle_address = address.parent().ok_or::<Error>("expected artifact to have bundle parent".into())?;
 
         let bind = yaml.spec.bind.replace("{bundle}", bundle_address.to_string().as_str() );
-        let bind= ResourcePath::from_str(bind.as_str() )?;
+        let bind= Address::from_str(bind.as_str() )?;
         let bind = ArtifactRef::new(bind.try_into()?,ArtifactKind::BindConfig);
 
         let wasm = yaml.spec.wasm.replace("{bundle}", bundle_address.to_string().as_str() );
-        let wasm= ResourcePath::from_str(wasm.as_str() )?;
+        let wasm= Address::from_str(wasm.as_str() )?;
         let wasm = ArtifactRef::new(wasm.try_into()?,ArtifactKind::Wasm);
 
         Ok(Arc::new(MechtronConfig {

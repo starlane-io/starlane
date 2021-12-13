@@ -86,8 +86,9 @@ mod parse {
     use nom::bytes::complete::{tag, take_until};
     use crate::config::http_router::{HttpMapping, HttpRouterConfig};
     use nom::multi::{separated_list0, many0};
-    use mesh_portal_parse::parse::Res;
     use mesh_portal_serde::version::v0_0_1::generic::payload::HttpMethod;
+    use nom::combinator::not;
+    use mesh_portal_serde::version::v0_0_1::parse::Res;
 
 
     fn asterisk<T>(i: T) -> Res<T, T>
@@ -103,6 +104,8 @@ mod parse {
             ErrorKind::AlphaNumeric,
         )
     }
+
+
     pub fn parse_http_methods(input: &str) -> Res<&str, Result<Vec<HttpMethod>,Error>> {
         context(
             "parse_http_methods",
@@ -135,7 +138,7 @@ mod parse {
 
             tuple( (delimited( multispace0, parse_http_methods, multispace1 ),
                         terminated( take_until("->"), tag("->")),
-                            preceded( multispace0, not_whitespace_or_semi )
+                            preceded( multispace0, not(" \r\n\t;") )
                          ) ),
 
         )(input).map( |(input_next, (methods,path_pattern,resource_pattern))| {

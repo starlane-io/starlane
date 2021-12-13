@@ -4,10 +4,7 @@ use tokio::sync::{mpsc, oneshot};
 
 
 use crate::error::Error;
-use crate::frame::{
-    ResourceRegistryRequest, Reply, ResourceHostAction, SimpleReply, StarMessage,
-    StarMessagePayload,
-};
+use crate::frame::{StarMessagePayload, StarMessage, ResourceRegistryRequest, ResourceHostAction};
 use crate::message::delivery::Delivery;
 use crate::resource::{Parent, ParentCore, ResourceManager, ResourceRecord, AssignResourceStateSrc, ResourceCreate, ResourceCreateStrategy};
 use crate::resource::{Kind, ResourceType};
@@ -17,7 +14,7 @@ use crate::star::shell::pledge::ResourceHostSelector;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use tokio::sync::oneshot::error::RecvError;
 use std::collections::HashMap;
-use crate::mesh::RxMessage;
+use crate::mesh::Message;
 use crate::mesh::serde::entity::request::{ReqEntity, Rc, Msg, Http};
 use crate::mesh::Request;
 use crate::mesh::Response;
@@ -72,7 +69,7 @@ impl MessagingEndpointComponent {
     async fn process_resource_message(&mut self, star_message: StarMessage) -> Result<(), Error> {
         match &star_message.payload {
             StarMessagePayload::MessagePayload(message_payload) => match &message_payload {
-                RxMessage::Request( request ) => {
+                Message::Request(request ) => {
                     match &request.entity {
                         ReqEntity::Rc(rc) => {
                             let delivery = Delivery::new(rc.clone(), star_message, self.skel.clone());
@@ -88,7 +85,7 @@ impl MessagingEndpointComponent {
                         }
                     }
                 }
-                RxMessage::Response( response ) => {
+                Message::Response(response ) => {
                     // we don't handle responses here
                 }
                 /*

@@ -176,7 +176,7 @@ pub async fn wait_for_it<R>(rx: oneshot::Receiver<Result<R, Error>>) -> Result<R
             },
             Err(error) => log_err(error),
         },
-        Err(_err) => log_err(Fail::Timeout),
+        Err(_err) => log_err("timeout"),
     }
 }
 
@@ -186,7 +186,7 @@ pub async fn wait_for_it_whatever<R>(rx: oneshot::Receiver<R>) -> Result<R, Erro
             Ok(result) => Ok(result),
             Err(error) => log_err(error),
         },
-        Err(_err) => log_err(Fail::Timeout),
+        Err(_err) => log_err("timeout"),
     }
 }
 
@@ -202,7 +202,7 @@ pub async fn wait_for_it_for<R>(
             },
             Err(error) => log_err(error),
         },
-        Err(_err) => log_err(Fail::Timeout),
+        Err(_err) => log_err("timeout"),
     }
 }
 

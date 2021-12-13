@@ -38,14 +38,14 @@ pub struct MechtronShell {
 enum Call {
     GuestRequest { request: guest::Request, tx: oneshot::Sender<Result<Option<latest::portal::inlet::Response>,Error>> },
     HostResponse(host::Response),
-    GuestResponse(GuestResponse),
+    GuestResponse(guest::Response),
     PortalOutletRequest(host::Request),
     PortalOutletResponse(latest::portal::outlet::Response)
 }
 
 struct ExchangeInfo {
     pub tx: oneshot::Sender<latest::portal::outlet::Response>,
-    pub requester: latest::id::Identifier,
+    pub requester: latest::id::Address,
     pub responder: latest::id::Address,
 }
 
@@ -96,10 +96,11 @@ impl MechtronShellSkel {
             tokio::spawn(async move {
                 let mut exchanger = HashMap::new();
                 while let Option::Some(call) = rx.recv() {
+                    let skel = skel.clone();
                     match call {
                         Call::GuestRequest { request, tx } => {
                          tokio::spawn( async move {
-                             fn handle(request: guest::Request) -> Result<Option<latest::portal::inlet::Response>, Error> {
+                             fn handle(skel: &MechtronShellSkel, request: guest::Request) -> Result<Option<latest::portal::inlet::Response>, Error> {
                                  let from = request.from.clone();
                                  let frame = guest::Frame::Request(request);
                                  let frame = bincode::serialize(&frame)?;
@@ -120,7 +121,7 @@ impl MechtronShellSkel {
                                      Ok(Option::None)
                                  }
                              }
-                             let result = handle(request);
+                             let result = handle(&skel, request);
                              tx.send(result);
                          });
                         }
@@ -197,7 +198,7 @@ impl MechtronShellSkel {
 
         "mechtron_host_request"=>Function::new_native_with_env(module.store(),skel.clone(),|skel:&MechtronShellSkel,request:i32| {
                 fn handle(skel: &MechtronShellSkel, request:i32) -> Result<(),Error> {
-                  let request = self.membrane.consume_buffer(buffer);
+                  let request = skel.membrane.consume_buffer(buffer);
                   let request: host::Request = bincode::deserialize(request.as_slice());
                   skel.tx.try_send(Call::PortalOutletRequest(request))?;
                 }

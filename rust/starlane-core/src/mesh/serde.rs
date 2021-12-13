@@ -198,6 +198,7 @@ pub mod resource {
             pub type Create = generic::resource::command::create::Create<Kind>;
             pub type AddressTemplate  = generic::resource::command::create::AddressTemplate;
             pub type AddressSegmentTemplate = generic::resource::command::create::AddressSegmentTemplate;
+            pub type KindTemplate = generic::resource::command::create::KindTemplate;
             pub type Strategy = generic::resource::command::create::Strategy;
             pub type Template = generic::resource::command::create::Template;
         }
@@ -492,7 +493,7 @@ pub mod util {
 }
 
 pub mod error {
-    pub type Error=mesh_portal_serde::version::latest::error::Error;
+    pub type Error=mesh_portal_serde::error::Error;
 
 }
 

@@ -23,11 +23,6 @@ use crate::cache::ProtoArtifactCachesFactory;
 use crate::constellation::ConstellationStatus;
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use crate::frame::{
-    ActorLookup, Frame, ProtoFrame, ResourceRegistryRequest, Reply, SearchHit, SearchResults,
-    SearchTraversal, SearchWindDown, SearchWindUp, SimpleReply, StarMessage, StarMessagePayload, StarPattern,
-    TraversalAction, WatchInfo,
-};
 use crate::id::Id;
 use crate::lane::{
     ConnectorController, LaneCommand, LaneEnd, LaneIndex, LaneMeta, LaneWrapper, ProtoLaneEnd,
@@ -54,6 +49,7 @@ use crate::resource::selector::ResourceSelector;
 use crate::mesh::serde::resource::Status;
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::resource::command::select::Select;
+use crate::frame::{ProtoFrame, Frame, StarPattern, StarMessage, TraversalAction};
 
 pub mod core;
 pub mod shell;
@@ -1022,11 +1018,11 @@ impl ToString for StarKey {
             let mut string = String::new();
             for (index, node) in self.subgraph.iter().enumerate() {
                 if index != 0 {
-                    string.push_str("-");
+                    string.push_str(":");
                 }
                 string.push_str(node.to_string().as_str());
             }
-            format!("{}-{}", string, self.index)
+            format!("{}:{}", string, self.index)
         } else {
             self.index.to_string()
         }

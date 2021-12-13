@@ -7,15 +7,13 @@ use tokio::sync::{broadcast, oneshot};
 use uuid::Uuid;
 
 use crate::error::Error;
-use crate::frame::{
-    Frame, MessageAck, ReplyKind, SimpleReply, StarMessage, StarMessagePayload,
-};
 use crate::resource::{Kind, ResourceType, Specific};
 use crate::star::{StarCommand, StarKey};
 use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
 use crate::resources::message::ProtoMessage;
 use crate::mesh::{Request, Response};
 use crate::mesh::serde::id::Address;
+use crate::frame::{StarMessagePayload, StarMessage, SimpleReply, MessageAck};
 
 pub mod delivery;
 
@@ -44,14 +42,14 @@ impl From<StarKey> for ProtoStarMessageTo {
     }
 }
 
-impl From<ResourceIdentifier> for ProtoStarMessageTo {
-    fn from(id: ResourceIdentifier) -> Self {
+impl From<Address> for ProtoStarMessageTo {
+    fn from(id: Address) -> Self {
         ProtoStarMessageTo::Resource(id)
     }
 }
 
-impl From<Option<ResourceIdentifier>> for ProtoStarMessageTo {
-    fn from(id: Option<ResourceIdentifier>) -> Self {
+impl From<Option<Address>> for ProtoStarMessageTo {
+    fn from(id: Option<Address>) -> Self {
         match id {
             None => ProtoStarMessageTo::None,
             Some(id) => ProtoStarMessageTo::Resource(id.into()),

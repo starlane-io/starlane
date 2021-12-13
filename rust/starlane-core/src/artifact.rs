@@ -4,8 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 
-use crate::resource::ResourceType;
+use crate::resource::{ResourceType, ArtifactKind};
 use crate::mesh::serde::id::Address;
+use mesh_portal_parse::path::Path;
 
 #[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct ArtifactBundle {
@@ -197,7 +198,7 @@ impl ArtifactRef {
         }
     }
 
-    pub fn trailing_path(&self) -> Result<Address,Error> {
-        Ok(Address::from_str(self.address.segments.last().as_ref().ok_or("expected one ResourcePath segment")?.as_str())?)
+    pub fn trailing_path(&self) -> Result<Path,Error> {
+        Ok(Path::from_str(self.address.segments.last().as_ref().ok_or("expected one ResourcePath segment")?.as_str())?)
     }
 }

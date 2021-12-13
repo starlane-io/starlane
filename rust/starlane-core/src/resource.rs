@@ -18,7 +18,6 @@ use tokio::sync::{mpsc, oneshot};
 use crate::error::Error;
 use crate::fail::Fail;
 use crate::file_access::FileAccess;
-use crate::frame::{Reply, ReplyKind, ResourceHostAction, SimpleReply, StarMessagePayload};
 use crate::logger::{elog, LogInfo, StaticLogInfo};
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::payload::Payload;
@@ -28,7 +27,7 @@ use crate::names::Name;
 use crate::resource::selector::{
     ConfigSrc, FieldSelection, LabelSelection, MetaSelector, ResourceRegistryInfo, ResourceSelector,
 };
-use crate::resources::message::ProtoMessage;
+use crate::resources::message::{ProtoMessage, MessageFrom};
 use crate::star::shell::pledge::{ResourceHostSelector, StarConscript};
 use crate::star::{ResourceRegistryBacking, StarInfo, StarKey, StarSkel};
 use crate::starlane::api::StarlaneApi;
@@ -41,9 +40,10 @@ use mesh_portal_serde::version::v0_0_1::generic::entity::request::ReqEntity;
 use crate::mesh::serde::entity::request::Rc;
 use crate::mesh::serde::payload::{RcCommand, Primitive, PayloadMap};
 use crate::mesh::serde::fail;
-use crate::mesh::serde::resource::command::create::Create;
+use crate::mesh::serde::resource::command::create::{Create, Strategy};
 use crate::mesh::serde::resource::command::create::AddressSegmentTemplate;
 use crate::mesh::serde::resource::command::update::Update;
+use crate::frame::{ResourceHostAction, StarMessagePayload};
 
 pub mod artifact;
 pub mod config;
@@ -856,7 +856,7 @@ impl Parent {
 
                 proto.entity(ReqEntity::Rc(Rc::new(RcCommand::Update(Box::new(update)), resource.state_src() )));
                 proto.to(resource.address.clone());
-                proto.from(core.stub.address.clone());
+                proto.from(MessageFrom::Address(core.stub.address.clone()));
 
                 let reply = core
                     .skel
@@ -1092,16 +1092,16 @@ impl ResourceCreationChamber {
                match record {
                    Ok(record) => {
                        match chamber.create.strategy {
-                           ResourceCreateStrategy::Create => {
+                           Strategy::Create => {
 
                                let fail = Fail::Fail(fail::Fail::Resource(fail::resource::Fail::Create(fail::resource::Create::AddressAlreadyInUse(address.to_string()))));
                                return Err(fail);
                            }
-                           ResourceCreateStrategy::Ensure => {
+                           Strategy::Ensure => {
                                // we've proven it's here, now we can go home
                                return Ok(ResourceAction::None);
                            }
-                           ResourceCreateStrategy::CreateOrUpdate => {
+                           Strategy::CreateOrUpdate => {
                                if record.stub.archetype != chamber.create.archetype {
                                    let fail = Fail::Fail(fail::Fail::Resource(fail::resource::Fail::Create(fail::resource::Create::CannotUpdateArchetype)));
                                    return Err(fail);

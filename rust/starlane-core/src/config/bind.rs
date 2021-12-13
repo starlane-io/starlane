@@ -7,6 +7,7 @@ use std::sync::Arc;
 use crate::error::Error;
 use std::str::FromStr;
 use std::convert::TryInto;
+use crate::mesh::serde::id::Address;
 
 pub struct BindConfig {
     pub artifact: Address,

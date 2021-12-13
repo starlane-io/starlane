@@ -59,11 +59,14 @@ pub enum ProtoFrame {
 
 
 
+/*
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WatchInfo {
     pub id: Id,
     pub actor: ActorKey,
 }
+
+ */
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StarMessageAck {
@@ -336,13 +339,11 @@ impl StarMessage {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum StarMessagePayload {
     None,
-    MessagePayload(crate::mesh::RxMessage),
+    MessagePayload(crate::mesh::Message),
     ResourceRegistry(ResourceRegistryRequest),
     ResourceHost(ResourceHostAction),
-    Space(SpaceMessage),
+//    Space(SpaceMessage),
     Reply(SimpleReply),
-    UniqueId(ResourceId),
-    Select(ResourceSelector)
 }
 
 impl Debug for StarMessagePayload {
@@ -354,8 +355,6 @@ impl Debug for StarMessagePayload {
             StarMessagePayload::ResourceHost(_) => "ResourceHost",
             StarMessagePayload::Space(_) => "Space",
             StarMessagePayload::Reply(_) => "Reply",
-            StarMessagePayload::UniqueId(_) => "UniqueId",
-            StarMessagePayload::Select(_) => "Select"
         });
         Ok(())
     }
@@ -374,17 +373,16 @@ pub enum MessagePayload {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum ResourceHostAction {
-    //IsHosting(ResourceKey),
+    //IsHosting(Address),
     Assign(ResourceAssign<AssignResourceStateSrc>),
-    Init(ResourceKey),
+    Init(Address),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResourceRegistryRequest {
     Register(ResourceRegistration),
     Location(ResourceRecord),
-    Find(Address),
-    Status(ResourceStatusReport),
+    Find(Address)
 }
 
 impl ToString for ResourceRegistryRequest {
@@ -393,20 +391,15 @@ impl ToString for ResourceRegistryRequest {
             ResourceRegistryRequest::Register(_) => "Register".to_string(),
             ResourceRegistryRequest::Location(_) => "Location".to_string(),
             ResourceRegistryRequest::Find(_) => "Find".to_string(),
-            ResourceRegistryRequest::Status(_) => "Status".to_string(),
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceStatusReport {
-    pub key: ResourceKey,
-    pub status: ResourceStatus,
-}
+
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ResourceSliceStatusReport {
-    pub key: ResourceKey,
+    pub key: Address,
     pub status: ResourceSliceStatus,
 }
 
@@ -439,10 +432,11 @@ impl StarMessagePayload {
     }
 }
 
+/*
 #[derive(Clone, Serialize, Deserialize, strum_macros::Display)]
 pub enum Reply {
     Empty,
-    Key(ResourceKey),
+    Key(Address),
     Address(ResourceAddress),
     Records(Vec<ResourceRecord>),
     Record(ResourceRecord),
@@ -471,6 +465,7 @@ pub enum ReplyKind {
     HttpResponse
 }
 
+
 impl ReplyKind {
     pub fn is_match(&self, reply: &Reply) -> bool {
         match reply {
@@ -489,6 +484,7 @@ impl ReplyKind {
         }
     }
 }
+ */
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum SequenceMessage {
@@ -509,6 +505,7 @@ pub enum MessageAckKind {
     Processing,
 }
 
+/*
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SpaceMessage {
     pub user: UserKey,
@@ -530,6 +527,8 @@ pub enum SpacePayload {
     Server(ServerPayload),
     Supervisor(SupervisorPayload),
 }
+
+ */
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum SupervisorPayload {
@@ -593,38 +592,6 @@ pub struct LaneEvent {
 pub enum LaneEventKind {
     Connect,
     Disconnect,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ActorGathered {
-    pub to: ResourceKey,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ActorScattered {
-    pub from: ResourceKey,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ActorBroadcast {
-    pub topic: String,
-    pub data: Vec<u8>,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ActorLocationRequest {
-    pub lookup: ActorLookup,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ActorLocationReport {
-    pub resource: ResourceKey,
-    pub location: ResourceRecord,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub enum ActorLookup {
-    Key(ActorKey),
 }
 
 #[derive(Clone, Serialize, Deserialize)]

@@ -28,6 +28,8 @@ use crate::starlane::StarlaneMachine;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
 use crate::config::http_router::{HttpRouterConfig, HttpRouterConfigParser};
 use crate::mesh::serde::id::Address;
+use mesh_portal_parse::path::Path;
+use crate::mesh::serde::bin::Bin;
 
 pub type Data = Arc<Vec<u8>>;
 pub type ZipFile = Address;
@@ -315,8 +317,8 @@ impl ArtifactBundleCacheRunner {
         while let Option::Some(command) = self.rx.recv().await {
             match command {
                 ArtifactBundleCacheCommand::Cache { bundle, tx } => {
-                    let bundle_identifier: ResourceIdentifier = bundle.clone().into();
-                    let record = match self.src.fetch_resource_record(bundle_identifier).await {
+                    let bundle_address: Address = bundle.clone().into();
+                    let record = match self.src.fetch_resource_record(bundle_address).await {
                         Ok(record) => record,
                         Err(err) => {
                             tx.send(Err(err.into()));
@@ -394,7 +396,7 @@ impl ArtifactBundleCacheRunner {
         machine: StarlaneMachine,
         logger: AuditLogger,
     ) -> Result<(), Error> {
-        let bundle: ResourceIdentifier = bundle.into();
+        let bundle: Address = bundle.into();
         println!("download&extract src.fetch_resource_record...");
         let record = src.fetch_resource_record(bundle.clone()).await?;
         println!("download&extract src.fetch_resource_record DONE");
@@ -492,23 +494,23 @@ pub enum ArtifactBundleSrc {
 impl ArtifactBundleSrc {
     pub async fn get_resource_state(
         &self,
-        identifier: ResourceIdentifier,
-    ) -> Result<DataSet<BinSrc>, Error> {
+        address: Address,
+    ) -> Result<Bin, Error> {
         match self {
             ArtifactBundleSrc::STARLANE_API(api) => {
-                                api.get_resource_state(identifier).await
+                                api.get_resource_state(address).await
             }
-            //            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(identifier).await,
+            //            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(address).await,
         }
     }
 
     pub async fn fetch_resource_record(
         &self,
-        identifier: ResourceIdentifier,
+        address: Address,
     ) -> Result<ResourceRecord, Error> {
         match self {
-            ArtifactBundleSrc::STARLANE_API(api) => api.fetch_resource_record(identifier).await,
-            //            ArtifactBundleSrc::MOCK(mock) => mock.fetch_resource_record(identifier).await,
+            ArtifactBundleSrc::STARLANE_API(api) => api.fetch_resource_record(address).await,
+            //            ArtifactBundleSrc::MOCK(mock) => mock.fetch_resource_record(address).await,
         }
     }
 }
@@ -566,7 +568,7 @@ impl MockArtifactBundleSrc {
 impl MockArtifactBundleSrc {
     pub async fn get_resource_state(
         &self,
-        identifier: ResourceIdentifier,
+        address: Address,
     ) -> Result<Option<Arc<Vec<u8>>>, Fail> {
         let mut file = fs::File::open("test-data/localhost-config/artifact-bundle.zip").await?;
         let mut data = vec![];
@@ -576,7 +578,7 @@ impl MockArtifactBundleSrc {
 
     pub async fn fetch_resource_record(
         &self,
-        identifier: ResourceIdentifier,
+        address: Address,
     ) -> Result<ResourceRecord, Fail> {
         Ok(self.resource.clone())
     }
@@ -913,7 +915,7 @@ impl<C: Cacheable> RootItemCacheProc<C> {
         bundle_cache: ArtifactBundleCache,
     ) -> Result<Arc<X>, Error> {
         println!("root: cache_artifact: {}", artifact.address.to_string());
-        let address: ResourceIdentifier = artifact.address.parent().ok_or("expected parent for artifact")?.into();
+        let address: Address = artifact.address.parent().ok_or("expected parent for artifact")?.into();
         bundle_cache.download(address.try_into()?).await?;
         println!("bundle cached : parsing: {}", artifact.address.to_string());
         let file_access = ArtifactBundleCache::with_bundle_files_path(
