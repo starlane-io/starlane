@@ -9,7 +9,6 @@ use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util::AsyncHashMap;
 use crate::message::delivery::Delivery;
-use crate::frame::Reply;
 use crate::resource::selector::ConfigSrc;
 use crate::mesh::serde::payload::Payload;
 use crate::mesh::serde::entity::request::{Msg, Http};
@@ -19,7 +18,7 @@ use crate::mesh::serde::id::Address;
 
 pub struct MechtronHost {
     skel: StarSkel,
-    mechtrons: AsyncHashMap<ResourceKey, MechtronShell>
+    mechtrons: AsyncHashMap<Address, MechtronShell>
 
 }
 
@@ -84,15 +83,17 @@ impl Host for MechtronHost {
 
     fn handle(&self,  delivery: Delivery<Message>) -> Result<(),Error>{
 
-        info!("MECHTRON HOST RECEIVED DELIVERY");
-        let mechtron = self.mechtrons.get(key.clone()).await?.ok_or(format!("could not deliver mechtron to {}",key.to_string()))?;
-        info!("GOT MECHTRON");
-        let reply = mechtron.handle(delivery.entity.clone()).await?;
+        tokio::spawn( async move {
+            info!("MECHTRON HOST RECEIVED DELIVERY");
+            let mechtron = self.mechtrons.get(key.clone()).await?.ok_or(format!("could not deliver mechtron to {}", key.to_string()))?;
+            info!("GOT MECHTRON");
+            let reply = mechtron.handle(delivery.entity.clone()).await?;
 
-        if let Option::Some(reply) = reply {
-            delivery.reply(Reply::Port(reply.payload));
-info!("=====>> MECHTRON SENT REPLY");
-        }
+            if let Option::Some(reply) = reply {
+                delivery.reply(Reply::Port(reply.payload));
+                info!("=====>> MECHTRON SENT REPLY");
+            }
+        });
 
         Ok(())
     }

@@ -7,7 +7,7 @@ use tokio::time::error::Elapsed;
 use tokio::time::Instant;
 
 use crate::error::Error;
-use crate::frame::{Reply, ReplyKind, SimpleReply, StarMessage, StarMessagePayload};
+use crate::frame::{ SimpleReply, StarMessage, StarMessagePayload};
 use crate::message::{MessageExpect, ProtoStarMessage, ProtoStarMessageTo, MessageId};
 use crate::resource::ResourceRecord;
 use crate::star::StarSkel;

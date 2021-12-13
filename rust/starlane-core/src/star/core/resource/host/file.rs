@@ -13,7 +13,7 @@ use crate::star::StarSkel;
 use crate::watch::{Notification, Change, Topic, WatchSelector, Property};
 use crate::message::delivery::Delivery;
 use crate::html::html_error_code;
-use crate::frame::{Reply, StarMessagePayload, StarMessage};
+use crate::frame::{StarMessagePayload, StarMessage};
 
 use std::str::FromStr;
 use crate::mesh::serde::id::Address;

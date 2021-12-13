@@ -17,7 +17,6 @@ use crate::message::delivery::Delivery;
 use crate::star::core::resource::host::kube::KubeHost;
 use crate::star::core::resource::host::file::{FileHost, FileSystemHost};
 use crate::html::{HTML, html_error_code};
-use crate::frame::Reply;
 use crate::star::core::message::WrappedHttpRequest;
 use crate::mesh::serde::entity::request::{Http, Msg};
 use crate::mesh::serde::resource::Resource;
@@ -38,13 +37,8 @@ pub enum HostCall {
         assign: ResourceAssign<AssignResourceStateSrc>,
         tx: oneshot::Sender<Result<Resource, Error>>,
     },
-    Select {
-        key: ResourceKey,
-        selector: ResourceHostPropertyValueSelector,
-        tx: oneshot::Sender<Result<Option<ResourceValues<ResourceKey>>, Error>>,
-    },
     Has {
-        key: ResourceKey,
+        address: Address,
         tx: oneshot::Sender<bool>,
     },
     Handle(Delivery<Message>),
@@ -90,7 +84,7 @@ impl AsyncProcessor<HostCall> for HostComponent {
                     }
                 }
             }
-            HostCall::Has { key, tx } => {
+            HostCall::Has { address: key, tx } => {
                 let host = self.host(key.resource_type()).await;
                 tx.send(host.has(key).await);
             }

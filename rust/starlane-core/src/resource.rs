@@ -98,7 +98,7 @@ pub enum ResourceRegistryResult {
     Error(String),
     Resource(Option<ResourceRecord>),
     Resources(Vec<ResourceRecord>),
-    Address(ResourceAddress),
+    Address(Address),
     Reservation(RegistryReservation),
     Key(Address),
     Unique(u64),
@@ -578,10 +578,9 @@ impl Registry {
 
         let stub = ResourceStub {
             address: address,
-            archetype: ResourceArchetype {
+            archetype: Archetype{
                 kind: kind,
-                specific: specific,
-                config: config,
+                config_src: config
             },
         };
 
@@ -662,10 +661,6 @@ impl LogInfo for Registry {
     }
 }
 
-#[async_trait]
-pub trait ResourceIdSeq: Send + Sync {
-    async fn next(&self) -> ResourceId;
-}
 
 #[async_trait]
 pub trait HostedResource: Send + Sync {
@@ -1033,20 +1028,7 @@ impl ResourceManager for Parent {
 }
 
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceCreate {
-    pub address_pattern: AddressCreationPattern,
-    pub archetype: Archetype,
-    pub state_src: AssignResourceStateSrc,
-    pub registry_info: Option<ResourceRegistryInfo>,
-    pub strategy: ResourceCreateStrategy,
-}
 
-pub enum ResourceCreateStrategy {
-    Create,
-    CreateOrUpdate,
-    Ensure
-}
 
 
 pub struct ResourceCreationChamber {

@@ -51,7 +51,7 @@ pub mod guest {
         pub struct Response<PAYLOAD> {
             pub to: Address,
             pub from: Address,
-            pub entity: latest::generic::entity::response::RespEntity<PAYLOAD,latest::fail::Fail>
+            pub entity: latest::generic::entity::response::RespEntity<PAYLOAD>
         }
     }
 
@@ -89,7 +89,7 @@ pub mod host {
 
         #[derive(Clone, Serialize, Deserialize)]
         pub struct Response<Payload> {
-            pub entity: latest::generic::entity::response::RespEntity<Payload,latest::fail::Fail>,
+            pub entity: latest::generic::entity::response::RespEntity<Payload>,
         }
     }
 

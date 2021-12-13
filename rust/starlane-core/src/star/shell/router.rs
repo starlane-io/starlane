@@ -2,7 +2,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
 
 use crate::error::Error;
-use crate::frame::{Frame, ProtoFrame, Reply, ReplyKind, StarMessage, WatchFrame};
+use crate::frame::{Frame, ProtoFrame, StarMessage, WatchFrame};
 use crate::lane::{LaneKey, LaneSession, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
 use crate::star::core::message::CoreMessageCall;

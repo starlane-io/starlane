@@ -8,8 +8,8 @@ use mesh_portal_api;
 use mesh_portal_serde::mesh::generic;
 
 pub type Request = generic::Request<entity::request::ReqEntity>;
-pub type Response = generic::Response;
-pub type Message = mesh_portal_api::message::generic::Message<entity::request::ReqEntity>;
+pub type Response = generic::Response<entity::response::RespEntity>;
+pub type Message = mesh_portal_api::message::generic::Message<entity::request::ReqEntity,entity::response::RespEntity>;
 
 
 #[cfg(test)]

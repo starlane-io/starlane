@@ -6,7 +6,7 @@ use tokio::sync::{mpsc, oneshot};
 use crate::error::Error;
 use crate::frame::{StarMessagePayload, StarMessage, ResourceRegistryRequest, ResourceHostAction};
 use crate::message::delivery::Delivery;
-use crate::resource::{Parent, ParentCore, ResourceManager, ResourceRecord, AssignResourceStateSrc, ResourceCreate, ResourceCreateStrategy};
+use crate::resource::{Parent, ParentCore, ResourceManager, ResourceRecord, AssignResourceStateSrc };
 use crate::resource::{Kind, ResourceType};
 use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::star::core::resource::host::{HostCall, HostComponent};
@@ -70,6 +70,7 @@ impl MessagingEndpointComponent {
         match &star_message.payload {
             StarMessagePayload::MessagePayload(message_payload) => match &message_payload {
                 Message::Request(request ) => {
+
                     match &request.entity {
                         ReqEntity::Rc(rc) => {
                             let delivery = Delivery::new(rc.clone(), star_message, self.skel.clone());
@@ -206,7 +207,7 @@ impl MessagingEndpointComponent {
                             .get(delivery.entity.to.clone() )
                             .await?.ok_or("expected resource: ")?;
 
-                        let key: ResourceKey = skel.resource_locator_api.as_key(delivery.entity.to.clone()).await?;
+                        let key: Address = skel.resource_locator_api.as_key(delivery.entity.to.clone()).await?;
                         let (tx, rx) = oneshot::channel();
 
 
@@ -220,7 +221,7 @@ impl MessagingEndpointComponent {
                         }
                     }
                     ResourceRequestMessage::UpdateState(state) => {
-                        let key: ResourceKey = skel.resource_locator_api.as_key(delivery.entity.to.clone()).await?;
+                        let key: Address = skel.resource_locator_api.as_key(delivery.entity.to.clone()).await?;
                         let (tx, rx) = oneshot::channel();
                         host_tx.send(HostCall::UpdateState{ key, state, tx }).await?;
                         let result = rx.await;
@@ -402,11 +403,11 @@ impl MessagingEndpointComponent {
         })
     }
 
-    pub async fn has_resource(&self, key: &ResourceKey) -> Result<bool, Error> {
+    pub async fn has_resource(&self, key: &Address) -> Result<bool, Error> {
         let (tx, mut rx) = oneshot::channel();
         self.host_tx
             .send(HostCall::Has {
-                key: key.clone(),
+                address: key.clone(),
                 tx,
             })
             .await?;
@@ -416,6 +417,6 @@ impl MessagingEndpointComponent {
 }
 
 pub struct WrappedHttpRequest {
-    pub resource: ResourceIdentifier,
+    pub resource: Address,
     pub request: HttpRequest,
 }

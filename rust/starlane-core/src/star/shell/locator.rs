@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use lru::LruCache;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
-use crate::frame::{ResourceRegistryRequest, Reply, ReplyKind, SimpleReply, StarMessagePayload};
+use crate::frame::{ResourceRegistryRequest,  SimpleReply, StarMessagePayload};
 use crate::message::ProtoStarMessage;
 use crate::resource::{Kind, ResourceRecord, ResourceType};
 use crate::star::{
@@ -117,15 +117,15 @@ impl ResourceLocatorComponent {
 impl AsyncProcessor<ResourceLocateCall> for ResourceLocatorComponent {
     async fn process(&mut self, call: ResourceLocateCall) {
         match call {
-            ResourceLocateCall::Locate { address: identifier, tx } => {
-                self.locate(identifier, tx);
+            ResourceLocateCall::Locate { address: address, tx } => {
+                self.locate(address, tx);
             }
             ResourceLocateCall::ExternalLocate {
-                address: identifier,
+                address: address,
                 star,
                 tx,
             } => {
-                self.external_locate(identifier, star, tx).await;
+                self.external_locate(address, star, tx).await;
             }
             ResourceLocateCall::Found(record) => {
                 self.resource_address_to_key
@@ -140,12 +140,12 @@ impl AsyncProcessor<ResourceLocateCall> for ResourceLocatorComponent {
 impl ResourceLocatorComponent {
     fn locate(
         &mut self,
-        identifier: ResourceIdentifier,
+        address: Address,
         tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
     ) {
-        if self.has_cached_record(&identifier) {
+        if self.has_cached_record(&address) {
             let result = match self
-                .get_cached_record(&identifier)
+                .get_cached_record(&address)
                 .ok_or("expected resource record")
             {
                 Ok(record) => Ok(record),
@@ -153,30 +153,30 @@ impl ResourceLocatorComponent {
             };
 
             tx.send(result).unwrap_or_default();
-        } else if identifier.parent().is_some() {
+        } else if address.parent().is_some() {
             let locator_api = self.skel.resource_locator_api.clone();
             tokio::spawn(async move {
                 async fn locate(
                     locator_api: ResourceLocatorApi,
-                    identifier: ResourceIdentifier,
-                ) -> Result<ResourceRecord, Error> {
+                    address: Address,
+                ) -> Result<ResourceRecord, Fail> {
                     let parent_record = locator_api.filter(
                         locator_api
                             .locate(
-                                identifier
+                                address
                                     .parent()
-                                    .expect("expected this identifier to have a parent"),
+                                    .expect("expected this address to have a parent"),
                             )
                             .await,
                     )?;
                     let rtn = locator_api
-                        .external_locate(identifier, parent_record.location.host)
+                        .external_locate(address, parent_record.location.host)
                         .await?;
 
                     Ok(rtn)
                 }
 
-                tx.send(locate(locator_api, identifier).await)
+                tx.send(locate(locator_api, address).await)
                     .unwrap_or_default();
             });
         } else {
@@ -197,11 +197,11 @@ impl ResourceLocatorComponent {
 
     async fn external_locate(
         &mut self,
-        identifier: ResourceIdentifier,
+        address: Address,
         star: StarKey,
         tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
     ) {
-        let (request, rx) = Request::new((identifier, star));
+        let (request, rx) = Request::new((address, star));
         self.request_resource_record_from_star(request).await;
         tokio::spawn(async move {
             async fn timeout(

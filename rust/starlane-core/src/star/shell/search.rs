@@ -6,7 +6,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
 
 use crate::error::Error;
-use crate::frame::{Frame, Reply, ReplyKind, SearchHit, SearchResults, SearchTraversal, SearchWindDown, SearchWindUp, StarMessage, StarPattern, TraversalAction};
+use crate::frame::{Frame, SearchHit, SearchResults, SearchTraversal, SearchWindDown, SearchWindUp, StarMessage, StarPattern, TraversalAction};
 use crate::lane::{LaneCommand, LaneKey, LaneWrapper, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
 use crate::star::{StarCommand, StarKey, StarKind, StarSkel};

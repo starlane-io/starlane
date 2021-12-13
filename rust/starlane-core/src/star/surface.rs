@@ -5,7 +5,7 @@ use tokio::time::Duration;
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
-use crate::frame::{Reply, ReplyKind, StarPattern};
+use crate::frame::{StarPattern};
 use crate::message::ProtoStarMessage;
 use crate::resource::{ResourceRecord };
 use crate::star::{StarCommand, StarSkel, StarInfo};
