@@ -15,30 +15,32 @@ pub mod guest {
         Request(Request)
     }
 
-    pub type Request = crate::version::v0_0_1::guest::generic::Request<latest::id::Address,latest::payload::Payload>;
-    pub type Response = crate::version::v0_0_1::guest::generic::Response<latest::id::Address,latest::payload::Payload>;
+    pub type Request = crate::version::v0_0_1::guest::generic::Request<latest::id::ResourceType,latest::id::Kind>;
+    pub type Response = crate::version::v0_0_1::guest::generic::Response<latest::payload::Payload>;
 
     pub mod generic {
         use serde::{Serialize,Deserialize};
         use mesh_portal_serde::version::latest;
         use crate::version::v0_0_1::host;
+        use mesh_portal_serde::version::latest::id::Address;
+        use mesh_portal_serde::version::latest::generic::payload::Payload;
 
         #[derive(Clone,Serialize,Deserialize)]
-        pub struct Request<IDENTIFIER, PAYLOAD> {
-            pub to: IDENTIFIER,
-            pub from: IDENTIFIER,
-            pub entity: latest::generic::entity::request::ReqEntity<PAYLOAD>,
+        pub struct Request<ResourceType,Kind> {
+            pub to: Address,
+            pub from: Address,
+            pub entity: latest::generic::entity::request::ReqEntity<ResourceType,Kind>,
             pub exchange: latest::messaging::Exchange
         }
 
-        impl<IDENTIFIER, PAYLOAD> Request<IDENTIFIER, PAYLOAD> {
-            pub fn ok( self, payload: PAYLOAD ) -> host::generic::Response<PAYLOAD> {
+        impl<ResourceType,Kind> Request<ResourceType,Kind> {
+            pub fn ok( self, payload: Payload<Kind>) -> host::generic::Response<Payload<Kind>> {
                 host::generic::Response {
                     entity: latest::generic::entity::response::RespEntity::Ok(payload),
                 }
             }
 
-            pub fn fail( self, fail: latest::fail::Fail ) -> host::generic::Response<PAYLOAD> {
+            pub fn fail( self, fail: latest::fail::Fail ) -> host::generic::Response<Payload<Kind>> {
                 host::generic::Response {
                     entity: latest::generic::entity::response::RespEntity::Fail(fail),
                 }
@@ -46,9 +48,9 @@ pub mod guest {
         }
 
         #[derive(Clone,Serialize,Deserialize)]
-        pub struct Response<IDENTIFIER,PAYLOAD> {
-            pub to: IDENTIFIER,
-            pub from: IDENTIFIER,
+        pub struct Response<PAYLOAD> {
+            pub to: Address,
+            pub from: Address,
             pub entity: latest::generic::entity::response::RespEntity<PAYLOAD,latest::fail::Fail>
         }
     }
@@ -67,26 +69,27 @@ pub mod host {
         Respond(Response)
     }
 
-    pub type Request = crate::version::v0_0_1::host::generic::Request<latest::id::Address,latest::payload::Payload>;
+    pub type Request = crate::version::v0_0_1::host::generic::Request<latest::id::ResourceType,latest::id::Kind>;
     pub type Response = crate::version::v0_0_1::host::generic::Response<latest::payload::Payload>;
 
 
     pub mod generic {
         use serde::{Serialize,Deserialize};
         use mesh_portal_serde::version::latest;
+        use mesh_portal_serde::version::latest::id::Address;
 
         // host should be able to ascertain who it is from
         #[derive(Clone, Serialize, Deserialize)]
-        pub struct Request<IDENTIFIER, PAYLOAD> {
-            pub to: IDENTIFIER,
-            pub from: IDENTIFIER,
-            pub entity: latest::generic::entity::request::ReqEntity<PAYLOAD>,
+        pub struct Request<ResourceType,Kind> {
+            pub to: Address,
+            pub from: Address,
+            pub entity: latest::generic::entity::request::ReqEntity<ResourceType,Kind>,
             pub exchange: latest::messaging::ExchangeType
         }
 
         #[derive(Clone, Serialize, Deserialize)]
-        pub struct Response<PAYLOAD> {
-            pub entity: latest::generic::entity::response::RespEntity<PAYLOAD,latest::fail::Fail>,
+        pub struct Response<Payload> {
+            pub entity: latest::generic::entity::response::RespEntity<Payload,latest::fail::Fail>,
         }
     }
 

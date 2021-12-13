@@ -19,7 +19,6 @@ use httparse::{Request, Header};
 use std::sync::Arc;
 use std::convert::TryInto;
 use crate::frame::{Reply, ReplyKind};
-use crate::parse::parse_host;
 use handlebars::Handlebars;
 use serde_json::json;
 use std::future::Future;

@@ -25,7 +25,6 @@ use crate::lane::{
     STARLANE_PROTOCOL_VERSION,
 };
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
-use crate::permissions::AuthTokenSource;
 use crate::star::core::message::MessagingEndpointComponent;
 use crate::star::shell::lanes::{LaneMuxerApi, LaneMuxer, LanePattern};
 use crate::star::shell::search::{StarSearchApi, StarSearchComponent, StarSearchTransaction, ShortestPathStarKey};

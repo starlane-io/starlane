@@ -21,11 +21,12 @@ use crate::mesh::RxMessage;
 use crate::mesh::serde::entity::request::{ReqEntity, Rc, Msg, Http};
 use crate::mesh::Request;
 use crate::mesh::Response;
-use crate::parse::{command, consume_command, Command, StateSrc, select};
 use crate::resource::selector::ConfigSrc;
 use crate::mesh::serde::http::HttpRequest;
 use crate::fail::Fail;
 use crate::mesh::serde::id::Address;
+use mesh_portal_serde::version::v0_0_1::generic::resource::command::RcCommand;
+use mesh_portal_serde::version::v0_0_1::generic::pattern::TksPattern;
 
 pub enum CoreMessageCall {
     Message(StarMessage),
@@ -151,15 +152,14 @@ impl MessagingEndpointComponent {
 
                 let command = consume_command(delivery.entity.command.as_str() )?;
 
-                match command {
-                    Command::Create(create) => {
-
+                match delivery.entity.command{
+                    RcCommand::Create(create) => {
                         let parent = MessagingEndpointComponent::get_parent_resource(
                             skel.clone(),
-                            create.address_pattern.parent,
+                            create.address_template.parent
                         ) .await?;
 
-                        let record = parent.create(create.clone()).await.await;
+                        let record = parent.create((*create).clone()).await.await;
 
                         match record {
                             Ok(record) => match record {
@@ -175,14 +175,17 @@ impl MessagingEndpointComponent {
                             }
                         }
                     }
-                    Command::Select(selector) => {
+                    RcCommand::Select(select) => {
                         let resources = skel
                             .registry
                             .as_ref()
                             .unwrap()
-                            .select(selector.clone())
+                            .select((*select).clone())
                             .await?;
                         delivery.reply(Reply::Records(resources))
+                    }
+                    RcCommand::Update(_) => {
+                        unimplemented!()
                     }
                 }
 

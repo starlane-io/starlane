@@ -39,9 +39,11 @@ use std::collections::hash_map::RandomState;
 use tracing_futures::WithSubscriber;
 use mesh_portal_serde::version::v0_0_1::generic::entity::request::ReqEntity;
 use crate::mesh::serde::entity::request::Rc;
-use crate::mesh::serde::generic::payload::{RcCommand, Primitive};
-use mesh_portal_parse::address::AddressCreationPattern;
+use crate::mesh::serde::payload::{RcCommand, Primitive, PayloadMap};
 use crate::mesh::serde::fail;
+use crate::mesh::serde::resource::command::create::Create;
+use crate::mesh::serde::resource::command::create::AddressSegmentTemplate;
+use crate::mesh::serde::resource::command::update::Update;
 
 pub mod artifact;
 pub mod config;
@@ -770,7 +772,7 @@ impl Parent {
     #[instrument]
     async fn create_child(
         core: ParentCore,
-        create: ResourceCreate,
+        create: Create,
         tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
     ) {
         let parent = match create
@@ -818,7 +820,7 @@ impl Parent {
 
     async fn process_action(
         core: ParentCore,
-        create: ResourceCreate,
+        create: Create,
         reservation: RegistryReservation,
         rx: oneshot::Receiver<Result<ResourceAction<AssignResourceStateSrc>, Fail>>,
     ) -> Result<ResourceRecord, Error> {
@@ -847,7 +849,12 @@ impl Parent {
                 // save resource state...
                 let mut proto = ProtoMessage::new();
 
-                proto.entity(ReqEntity::Rc(Rc::new(RcCommand::Update, resource.state_src() )));
+                let update = Update{
+                    address: resource.address.clone(),
+                    properties: PayloadMap::default()
+                };
+
+                proto.entity(ReqEntity::Rc(Rc::new(RcCommand::Update(Box::new(update)), resource.state_src() )));
                 proto.to(resource.address.clone());
                 proto.from(core.stub.address.clone());
 
@@ -1013,7 +1020,7 @@ impl LogInfo for ParentCore {
 impl ResourceManager for Parent {
     async fn create(
         &self,
-        create: ResourceCreate,
+        create: Create,
     ) -> oneshot::Receiver<Result<ResourceRecord, Fail>> {
         let (tx, rx) = oneshot::channel();
 
@@ -1044,7 +1051,7 @@ pub enum ResourceCreateStrategy {
 
 pub struct ResourceCreationChamber {
     parent: ResourceStub,
-    create: ResourceCreate,
+    create: Create,
     skel: StarSkel,
     tx: oneshot::Sender<Result<ResourceAction<AssignResourceStateSrc>, Fail>>,
 }
@@ -1052,7 +1059,7 @@ pub struct ResourceCreationChamber {
 impl ResourceCreationChamber {
     pub async fn new(
         parent: ResourceStub,
-        create: ResourceCreate,
+        create: Create,
         skel: StarSkel,
     ) -> oneshot::Receiver<Result<ResourceAction<AssignResourceStateSrc>, Fail>> {
         let (tx, rx) = oneshot::channel();
@@ -1069,37 +1076,12 @@ impl ResourceCreationChamber {
     async fn run(self) {
         tokio::spawn(async move {
            async fn create( chamber: &ResourceCreationChamber) -> Result<ResourceAction<AssignResourceStateSrc>,Fail> {
-               if !chamber
-                   .create
-                   .archetype
-                   .kind
-                   .resource_type()
-                   .parents()
-                   .contains(&chamber.parent.archetype.kind.resource_type())
-               {
-                   let fail = Fail::Fail(fail::Fail::Resource(fail::resource::Fail::Create(fail::resource::Create::WrongParentResourceType {expected: chamber.create.archetype.kind.to_string(), found: chamber.parent.archetype.kind.resource_type().to_string()})));
-                   return Err(fail);
-               };
 
-/*               match chamber.create.validate() {
-                   Ok(_) => {}
-                   Err(error) => {
-                       self.tx.send(Err(error));
-                       return;
+               let address = match &chamber.create.address_template.child_segment_template {
+                   AddressSegmentTemplate::Exact(segment) => {
+                       chamber.create.address_template.parent.push(segment.clone())?
                    }
-               }
-
- */
-
-               let mut address = Address{
-                   segments: chamber.create.address_pattern.parent.segments.clone()
                };
-
-               match pattern.segment {
-                   AddressCreationPattern::Exact(seg) => {
-                       address.segments.push(seg);
-                   }
-               }
 
                let record = chamber
                    .skel

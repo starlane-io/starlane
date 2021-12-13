@@ -906,7 +906,6 @@ mod test {
         StarLogPayload,
     };
     use crate::names::Name;
-    use crate::permissions::Authentication;
     use crate::space::CreateAppControllerFail;
     use crate::star::{StarController, StarInfo, StarKey, StarKind};
     use crate::starlane::{

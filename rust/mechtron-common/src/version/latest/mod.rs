@@ -13,8 +13,8 @@ pub mod guest {
 
     pub mod generic {
         use crate::version::v0_0_1;
-        pub type Request<IDENTIFIER,PAYLOAD> = v0_0_1::guest::generic::Request<IDENTIFIER,PAYLOAD>;
-        pub type Response<IDENTIFIER,PAYLOAD> = v0_0_1::guest::generic::Response<IDENTIFIER,PAYLOAD>;
+        pub type Request<ResourceType,Kind> = v0_0_1::guest::generic::Request<ResourceType,Kind>;
+        pub type Response<Payload> = v0_0_1::guest::generic::Response<Payload>;
     }
 }
 
@@ -27,7 +27,7 @@ pub mod host {
 
     pub mod generic {
         use crate::version::v0_0_1;
-        pub type Request<IDENTIFIER,PAYLOAD> = v0_0_1::host::generic::Request<IDENTIFIER,PAYLOAD>;
+        pub type Request<ResourceType,Kind> = v0_0_1::host::generic::Request<ResourceType,Kind>;
         pub type Response<PAYLOAD> = v0_0_1::host::generic::Response<PAYLOAD>;
     }
 }

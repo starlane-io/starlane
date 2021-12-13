@@ -21,6 +21,7 @@ use crate::mesh::serde::http::HttpResponse;
 use crate::resource::{ResourceRegistration, ResourceRecord, ResourceSliceStatus, ResourceAssign, AssignResourceStateSrc};
 use crate::resource::ResourceType;
 use crate::mesh::serde::id::Address;
+use crate::fail::Fail;
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum Frame {
@@ -687,10 +688,5 @@ impl fmt::Display for ProtoFrame {
 }
 
 
-#[derive(Clone,Serialize,Deserialize)]
-pub enum Fail {
-    Star,
-    MeshPortal(mesh::serde::fail::Fail)
-}
 
 

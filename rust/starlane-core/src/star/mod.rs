@@ -53,6 +53,7 @@ use crate::resource::{ResourceType, ResourceRecord, ResourceNamesReservationRequ
 use crate::resource::selector::ResourceSelector;
 use crate::mesh::serde::resource::Status;
 use crate::mesh::serde::id::Address;
+use crate::mesh::serde::resource::command::select::Select;
 
 pub mod core;
 pub mod shell;
@@ -1199,7 +1200,7 @@ pub trait ResourceRegistryBacking: Sync + Send {
         request: ResourceNamesReservationRequest,
     ) -> Result<RegistryReservation, Error>;
     async fn register(&self, registration: ResourceRegistration) -> Result<(), Error>;
-    async fn select(&self, select: ResourceSelector) -> Result<Vec<ResourceRecord>, Error>;
+    async fn select(&self, select: Select) -> Result<Vec<ResourceRecord>, Error>;
     async fn set_location(&self, location: ResourceRecord) -> Result<(), Error>;
     async fn get(&self, address: Address) -> Result<Option<ResourceRecord>, Error>;
     async fn update(&self, assignment: ResourceRegistryPropertyAssignment ) -> Result<(),Error>;

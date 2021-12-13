@@ -7,9 +7,9 @@ use crate::mesh::serde::entity;
 use mesh_portal_api;
 use mesh_portal_serde::mesh::generic;
 
-pub type Request = generic::Request<entity::request::ReqEntity,id::Identifier>;
-pub type Response = generic::Response<id::Identifier>;
-pub type RxMessage =mesh_portal_api::message::generic::Message<entity::request::ReqEntity,id::Identifier>;
+pub type Request = generic::Request<entity::request::ReqEntity>;
+pub type Response = generic::Response;
+pub type RxMessage = mesh_portal_api::message::generic::Message<entity::request::ReqEntity>;
 
 
 #[cfg(test)]

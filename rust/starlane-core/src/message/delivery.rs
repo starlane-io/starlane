@@ -15,7 +15,7 @@ use crate::message::ProtoStarMessage;
 use crate::resource::{ResourceRecord, ResourceType};
 use crate::star::{StarCommand, StarSkel};
 use crate::util;
-use crate::mesh::serde::fail::Fail;
+use crate::fail::Fail;
 
 #[derive(Clone)]
 pub struct Delivery<M>

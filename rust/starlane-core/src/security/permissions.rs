@@ -3,8 +3,8 @@ use std::str::FromStr;
 use nom::combinator::all_consuming;
 use crate::security::permissions::parse::permissions;
 use crate::error::Error;
-use crate::pattern::AddressTksPattern;
 use crate::mesh::serde::id::Address;
+use crate::mesh::serde::pattern::AddressKindPattern;
 
 pub enum Pattern {
     None,
@@ -15,7 +15,7 @@ pub enum Pattern {
 
 pub struct Access {
     pub agent: Address,
-    pub pattern: AddressTksPattern,
+    pub pattern: AddressKindPattern,
     pub permissions: Permissions,
 }
 

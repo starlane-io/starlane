@@ -49,7 +49,6 @@ pub mod lane;
 pub mod logger;
 pub mod message;
 pub mod names;
-pub mod permissions;
 pub mod proto;
 pub mod resource;
 pub mod server;

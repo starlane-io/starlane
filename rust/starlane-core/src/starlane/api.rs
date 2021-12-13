@@ -33,6 +33,12 @@ use crate::resource::selector::{ResourceSelector, FieldSelection, ConfigSrc, Res
 use crate::mesh::serde::resource::ResourceStub;
 use mesh_portal_parse::path::Path;
 use crate::mesh::serde::bin::Bin;
+use crate::mesh::serde::resource::command::common::{StateSrc, SetLabel};
+use crate::mesh::serde::resource::command::create::{Create, Strategy, Template};
+use crate::mesh::serde::pattern::TksPattern;
+use crate::mesh::serde::payload::Payload;
+use crate::mesh::serde::entity::request::ReqEntity;
+use crate::mesh::serde::generic::payload::RcCommand;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -42,6 +48,11 @@ pub struct StarlaneApi {
 
 impl StarlaneApi {
 
+
+    pub async fn create<API>(  &self, template: Template ) -> Creation<API> {
+        let create = Create::new(template);
+        Creation::new(self.clone(), create  )
+    }
 
     pub async fn create_artifact_bundle(
         &self,
@@ -53,7 +64,7 @@ impl StarlaneApi {
 
         // first we have to be sure that ArtifactBundleSeries exists...
         let mut series = self.create_artifact_bundle_series(series )?;
-        series.create.strategy = ResourceCreateStrategy::Ensure;
+        series.create.strategy = Strategy::Ensure;
         let series_api = series.submit().await?;
 
         let version = semver::Version::from_str(bundle.name().as_str())?;
@@ -180,12 +191,11 @@ info!("received reply for {}",description);
 
      */
 
-    pub async fn create_resource(&self, create: String) -> Result<ResourceRecord, Error> {
+    pub async fn create_resource(&self, create: Create) -> Result<ResourceRecord, Error> {
 
         let mut proto = ProtoMessage::new();
-        proto.to(create.parent.clone().into());
-        proto.from(MessageFrom::Inject);
-        proto.payload = Option::Some(ResourceRequestMessage::Create(create));
+        proto.to(create.template.address.parent.clone());
+        proto.entity( ReqEntity::Rc( RcCommand::Create( Box::new(create) )));
         let proto = proto.try_into()?;
 
         let reply = self
@@ -363,7 +373,7 @@ info!("received reply for {}",description);
         self.select(identifier, selector).await
     }
 
-    pub async fn create_api<API>(&self, create: String ) -> Result<API, Error>
+    pub async fn create_api<API>(&self, create: Create ) -> Result<API, Error>
     where
         API: TryFrom<ResourceApi>,
     {
@@ -913,7 +923,7 @@ where
     API: TryFrom<ResourceApi>,
 {
     api: StarlaneApi,
-    create: String,
+    create: Create,
     phantom: PhantomData<API>,
 }
 
@@ -921,7 +931,7 @@ impl<API> Creation<API>
 where
     API: TryFrom<ResourceApi>,
 {
-    pub fn new(api: StarlaneApi, create: String ) -> Self {
+    pub fn new(api: StarlaneApi, create: Create ) -> Self {
         Self {
             api,
             create,
@@ -933,23 +943,20 @@ where
         self.api.create_api(self.create).await
     }
 
-    fn registry_info(&mut self) -> &mut ResourceRegistryInfo {
-        if self.create.registry_info.is_none() {
-            self.create.registry_info = Option::Some(ResourceRegistryInfo::new());
-        }
-        self.create.registry_info.as_mut().unwrap()
-    }
-
-    pub fn set_strategy(&mut self, strategy: ResourceCreateStrategy) {
+    pub fn set_strategy(&mut self, strategy: Strategy) {
         self.create.strategy = strategy;
     }
 
-    pub fn add_tag(&mut self, tag: String) {
-        self.registry_info().names.push(tag);
+    pub fn set_state(&mut self, payload: Payload ) {
+        self.create.state = StateSrc::StatefulDirect(payload);
     }
 
-    pub fn add_label(&mut self, key: String, value: String) {
-        self.registry_info().labels.insert(key, value);
+    pub fn set_label(&mut self, key: String) {
+        self.create.registry.push(SetLabel::Set(key));
+    }
+
+    pub fn set_label_with_value(&mut self, key: String, value: String ) {
+        self.create.registry.push(SetLabel::SetValue {key,value} );
     }
 }
 

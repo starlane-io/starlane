@@ -4,8 +4,6 @@ use crate::mesh::serde::id::{AddressAndKind, ResourceType, Address};
 use crate::mesh::serde::payload::Payload;
 use crate::mesh::serde::payload::Primitive;
 use crate::star::StarKind;
-use actix_web::web::block;
-use mesh_portal_parse::parse::{skewer, Res, camel_case};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
 use nom::character::complete::{alpha1, anychar, multispace0, multispace1};
@@ -20,6 +18,8 @@ use std::collections::HashMap;
 use crate::resource::selector::ResourceSelector;
 use serde::{Serialize,Deserialize};
 use crate::resource::ResourceCreate;
+use mesh_portal_serde::version::v0_0_1::parse::{filepath_chars, Res};
+/*
 
 pub fn parse_star_kind(input: &str) -> Res<&str, Result<StarKind, Error>> {
     context("star_kind", delimited(tag("<"), alpha1, tag(">")))(input).map(|(input_next, kind)| {
@@ -115,7 +115,7 @@ pub fn text_payload_block(input: &str) -> Res<&str, Block> {
 pub fn upload_pattern_block(input: &str) -> Res<&str, Block> {
     delimited(
         tag("^["),
-        tuple((multispace0, filename, multispace0)),
+        tuple((multispace0, filepath_chars, multispace0)),
         tag("]"),
     )(input)
     .map(|(next, (_, block, filename))| (next, Block::Upload(filename.to_string())))
@@ -168,7 +168,6 @@ pub fn create(input: &str) -> Res<&str, Command> {
         let create = CreateCommand {
             address_and_kind,
             state_src,
-            set_directives: set_map,
         };
 
         (next, Command::Create(create))
@@ -326,3 +325,5 @@ impl FromStr for CamelCase {
         })
     }
 }
+
+ */

@@ -10,16 +10,22 @@ use uuid::Uuid;
 use crate::error::Error;
 use crate::mesh::serde::entity::request::ReqEntity;
 use crate::mesh::serde::entity::response::RespEntity;
+use crate::mesh::serde::messaging::ExchangeType;
+use crate::mesh::serde::messaging::Exchange;
+use crate::mesh::serde::messaging::ExchangeId;
 use crate::mesh::Request;
 use crate::mesh::Response;
-use crate::mesh::serde::messaging::{Exchange, ExchangeId};
-use mesh_portal_serde::version::latest::messaging::ExchangeType;
 use crate::mesh::serde::id::Address;
+
+pub enum MessageFrom {
+    Inject,
+    Address(Address)
+}
 
 pub struct ProtoMessage {
     pub id: MessageId,
-    pub from: Option<ResourceIdentifier>,
-    pub to: Option<ResourceIdentifier>,
+    pub from: Option<MessageFrom>,
+    pub to: Option<MessageTo>,
     pub entity: Option<ReqEntity>,
     pub exchange: ExchangeType,
     pub trace: bool,
@@ -62,7 +68,12 @@ impl ProtoMessage {
             entity: self
                 .entity
                 .ok_or("need to set a payload in ProtoMessage")?,
-            exchange: self.exchange
+            exchange: match self.exchange {
+                ExchangeType::Notification => {Exchange::Notification}
+                ExchangeType::RequestResponse => {
+                    Exchange::RequestResponse(uuid::Uuid::new_v4().to_string())
+                }
+            }
         })
 
     }

@@ -19,15 +19,24 @@ pub type Port=mesh_portal_serde::version::latest::Port;
 pub mod id {
     use mesh_portal_serde::version::latest::id;
     use mesh_portal_serde::version::latest::generic;
+    use crate::resource;
 
     pub type Address = id::Address;
-    pub type ResourceType = id::ResourceType;
-    pub type Kind = id::Kind;
+    pub type ResourceType = resource::ResourceType;
+    pub type Kind = resource::Kind;
     pub type Specific = id::Specific;
     pub type Version = id::Version;
-    pub type AddressAndKind = generic::id::AddressAndKind<Address,Kind>;
-    pub type AddressAndType = generic::id::AddressAndType<Address,ResourceType>;
+    pub type AddressAndKind = generic::id::AddressAndKind<Kind>;
+    pub type AddressAndType = generic::id::AddressAndType<ResourceType>;
     pub type Meta=id::Meta;
+}
+
+pub mod pattern {
+    use crate::mesh::serde::id::ResourceType;
+    use crate::mesh::serde::id::Kind;
+    use mesh_portal_serde::version::latest::generic::pattern;
+    pub type TksPattern = pattern::TksPattern<ResourceType,Kind>;
+    pub type AddressKindPattern = pattern::AddressKindPattern<ResourceType,Kind>;
 }
 
 pub mod messaging {
@@ -35,6 +44,7 @@ pub mod messaging {
 
     pub type ExchangeId = messaging::ExchangeId;
     pub type Exchange = messaging::Exchange;
+    pub type ExchangeType = messaging::ExchangeType;
 }
 
 
@@ -57,27 +67,28 @@ pub mod bin {
 pub mod payload {
     use mesh_portal_serde::version::latest::generic;
     use mesh_portal_serde::version::latest::bin::Bin;
-    use mesh_portal_serde::version::latest::id::{Address, Kind};
     use mesh_portal_serde::version::latest::payload;
+    use crate::mesh::serde::id::Kind;
+    use crate::mesh::serde::id::ResourceType;
+    use crate::mesh::serde::pattern::TksPattern;
 
-    pub type Primitive = generic::payload::Primitive<Address,Kind>;
-    pub type Payload = generic::payload::Payload<Address,Kind>;
+    pub type Primitive = generic::payload::Primitive<Kind>;
+    pub type Payload = generic::payload::Payload<Kind>;
     pub type PayloadType = payload::PayloadType;
     pub type PrimitiveType= payload::PrimitiveType;
     pub type PayloadRef = payload::PayloadRef;
     pub type PayloadDelivery = generic::payload::PayloadDelivery<Payload,PayloadRef>;
-    pub type Call = generic::payload::Call<Address>;
+    pub type Call = generic::payload::Call;
     pub type CallKind = generic::payload::CallKind;
-    pub type CallWithConfig = generic::payload::CallWithConfig<Address>;
-    pub type MapPattern = generic::payload::MapPattern<Address,Kind>;
-    pub type PayloadTypePattern = generic::payload::PayloadListPattern<Address,Kind>;
-    pub type PayloadPattern = generic::payload::PayloadPattern<Address,Kind>;
+    pub type CallWithConfig = generic::payload::CallWithConfig;
+    pub type MapPattern = generic::payload::MapPattern;
+    pub type PayloadTypePattern = generic::payload::PayloadListPattern;
+    pub type PayloadPattern = generic::payload::PayloadPattern;
     pub type ListPattern = generic::payload::ListPattern;
-    pub type PayloadMap = generic::payload::PayloadMap<Address,Kind>;
+    pub type PayloadMap = generic::payload::PayloadMap<Kind>;
     pub type PayloadFormat= generic::payload::PayloadFormat;
     pub type Range = generic::payload::Range;
-    pub type RcCommand = payload::RcCommand;
-
+    pub type RcCommand = generic::payload::RcCommand<ResourceType,Kind>;
 }
 
 pub mod command {
@@ -98,12 +109,12 @@ pub mod http {
 
 
 pub mod config {
+    use crate::mesh::serde::id::Kind;
     use mesh_portal_serde::version::latest::generic;
-    use mesh_portal_serde::version::latest::id::{Address, Kind};
     use mesh_portal_serde::version::latest::config;
 
     pub type PortalKind = config::PortalKind;
-    pub type Info = generic::config::Info<Address,Kind>;
+    pub type Info = generic::config::Info<Kind>;
     pub type Config = config::Config;
     pub type SchemaRef = config::SchemaRef;
     pub type BindConfig = config::BindConfig;
@@ -120,20 +131,22 @@ pub mod entity {
 
     pub mod request {
         use mesh_portal_serde::version::latest::generic;
-        use mesh_portal_serde::version::latest::id::{Address, Kind, ResourceType};
+        use crate::mesh::serde::id::Kind;
+        use crate::mesh::serde::id::ResourceType;
+        use crate::mesh::serde::pattern::TksPattern;
+        use crate::mesh::serde::payload::Payload;
+        use mesh_portal_serde::version::latest::id::Address;
         use mesh_portal_serde::version::latest::bin::Bin;
-        use mesh_portal_serde::version::latest::payload::Payload;
 
-        pub type ReqEntity = generic::entity::request::ReqEntity<Payload>;
-        pub type Rc = generic::entity::request::Rc<Payload>;
+        pub type ReqEntity = generic::entity::request::ReqEntity<ResourceType,Kind>;
+        pub type Rc = generic::entity::request::Rc<ResourceType,Kind>;
         pub type Msg = generic::entity::request::Msg<Payload>;
         pub type Http = generic::entity::request::Http<Payload>;
     }
 
     pub mod response{
         use mesh_portal_serde::version::latest::{fail, generic};
-        use mesh_portal_serde::version::latest::id::{Address,  Kind};
-        use mesh_portal_serde::version::latest::payload::Payload;
+        use crate::mesh::serde::payload::Payload;
 
         pub type RespEntity = generic::entity::response::RespEntity<Payload,fail::Fail>;
     }
@@ -145,34 +158,101 @@ pub mod resource {
 
     use mesh_portal_serde::version::latest::resource;
     use mesh_portal_serde::version::latest::generic;
-    use mesh_portal_serde::version::latest::id::{Address, Kind, ResourceType};
-
+    use mesh_portal_serde::version::latest::id::{Address};
+    use crate::resource::ResourceType;
+    use crate::resource::Kind;
     pub type Status = resource::Status;
 
-    pub type Archetype= generic::resource::Archetype<Kind,Address>;
-    pub type ResourceStub = generic::resource::ResourceStub<Address,Kind>;
-    pub type Resource = generic::resource::Resource<Address,Kind>;
+    pub type Archetype= generic::resource::Archetype<Kind>;
+    pub type ResourceStub = generic::resource::ResourceStub<Kind>;
+    pub type Resource = generic::resource::Resource<Kind>;
+
+    pub mod command {
+        use mesh_portal_serde::version::latest::generic;
+        use serde::{Deserialize, Serialize};
+        use crate::mesh::serde::id::ResourceType;
+        use crate::mesh::serde::id::Kind;
+        use crate::mesh::serde::pattern::TksPattern;
+
+        pub type RcCommand = generic::resource::command::RcCommand<ResourceType,Kind>;
+        pub type RcCommandType = generic::resource::command::RcCommandType;
+
+        pub mod common {
+            use mesh_portal_serde::version::latest::generic;
+            use crate::mesh::serde::id::ResourceType;
+            use crate::mesh::serde::id::Kind;
+            use crate::mesh::serde::pattern::TksPattern;
+
+            pub type StateSrc = generic::resource::command::common::StateSrc<Kind>;
+            pub type SetProperties = generic::resource::command::common::SetProperties<Kind>;
+            pub type SetLabel = generic::resource::command::common::SetLabel;
+            pub type SetRegistry = generic::resource::command::common::SetRegistry;
+        }
+
+        pub mod create {
+            use mesh_portal_serde::version::latest::generic;
+            use crate::mesh::serde::id::ResourceType;
+            use crate::mesh::serde::id::Kind;
+            use crate::mesh::serde::pattern::TksPattern;
+
+            pub type Create = generic::resource::command::create::Create<Kind>;
+            pub type AddressTemplate  = generic::resource::command::create::AddressTemplate;
+            pub type AddressSegmentTemplate = generic::resource::command::create::AddressSegmentTemplate;
+            pub type Strategy = generic::resource::command::create::Strategy;
+            pub type Template = generic::resource::command::create::Template;
+        }
+
+        pub mod select {
+            use mesh_portal_serde::version::latest::generic;
+            use crate::mesh::serde::id::ResourceType;
+            use crate::mesh::serde::id::Kind;
+            use crate::mesh::serde::pattern::TksPattern;
+
+            pub type Select=generic::resource::command::select::Select<ResourceType,Kind>;
+            pub type PropertiesPattern = generic::resource::command::select::PropertiesPattern;
+        }
+
+        pub mod update {
+            use mesh_portal_serde::version::latest::generic;
+            use crate::mesh::serde::id::ResourceType;
+            use crate::mesh::serde::id::Kind;
+            use crate::mesh::serde::pattern::TksPattern;
+
+            pub type Update=generic::resource::command::update::Update<Kind>;
+        }
+    }
+
 }
 
 pub mod portal {
 
     pub mod inlet {
+        use crate::resource::ResourceType;
+        use crate::resource::Kind;
+        use crate::mesh::serde::payload::Payload;
+        use crate::mesh::serde::entity::request::ReqEntity;
+
         use mesh_portal_serde::version::latest::generic;
-        use mesh_portal_serde::version::latest::id::{Address, Kind, ResourceType};
+        use mesh_portal_serde::version::latest::id::{Address};
         use mesh_portal_serde::version::latest::frame::PrimitiveFrame;
         use mesh_portal_serde::error::Error;
-        use mesh_portal_serde::version::latest::payload::Payload;
 
-        pub type Request=generic::portal::inlet::Request<Address,Payload>;
-        pub type Response=generic::portal::inlet::Response<Address,Payload>;
+        pub type Request=generic::portal::inlet::Request<ReqEntity>;
+        pub type Response=generic::portal::inlet::Response<Payload>;
         pub type Frame=generic::portal::inlet::Frame<Address,Payload>;
 
-        pub mod exchange {
-            use mesh_portal_serde::version::latest::id::{Address, Kind, ResourceType };
+/*        pub mod exchange {
+            use crate::resource::ResourceType;
+            use crate::resource::Kind;
+            use crate::mesh::serde::payload::Payload;
+            use crate::mesh::serde::entity::request::ReqEntity;
+            use mesh_portal_serde::version::latest::id::{Address};
             use mesh_portal_serde::version::latest::generic;
             use mesh_portal_serde::version::latest::payload::PayloadDelivery;
             pub type Request=generic::portal::inlet::exchange::Request<Address,PayloadDelivery>;
         }
+
+ */
     }
 
     pub mod outlet {
@@ -187,6 +267,7 @@ pub mod portal {
         pub type Response=portal::outlet::Response;
         pub type Frame=portal::outlet::Frame;
 
+        /*
         pub mod exchange {
             use mesh_portal_serde::version::latest::id::{Address, Kind, ResourceType};
             use mesh_portal_serde::version::latest::generic;
@@ -194,6 +275,7 @@ pub mod portal {
 
             pub type Request=generic::portal::outlet::exchange::Request<Address,Payload>;
         }
+         */
     }
 }
 
@@ -208,8 +290,8 @@ pub mod generic {
         use mesh_portal_serde::version::latest::generic;
 
 
-        pub type AddressAndKind<ADDRESS,KIND> = generic::id::AddressAndKind<ADDRESS,KIND>;
-        pub type AddressAndType<KEY, RESOURCE_TYPE> = generic::id::AddressAndType<KEY,RESOURCE_TYPE>;
+        pub type AddressAndKind<KIND> = generic::id::AddressAndKind<KIND>;
+        pub type AddressAndType<RESOURCE_TYPE> = generic::id::AddressAndType<RESOURCE_TYPE>;
     }
 
     pub mod config {
@@ -224,7 +306,7 @@ pub mod generic {
         use mesh_portal_serde::version::latest::generic::resource::Archetype;
         use mesh_portal_serde::version::latest::generic;
 
-        pub type Info<ADDRESS, KIND>=generic::config::Info<ADDRESS,KIND>;
+        pub type Info<KIND>=generic::config::Info<KIND>;
     }
 
     pub mod entity {
@@ -239,12 +321,11 @@ pub mod generic {
             use mesh_portal_serde::version::latest::bin::Bin;
             use mesh_portal_serde::version::latest::generic;
             use mesh_portal_serde::version::latest::generic::payload::Primitive;
-            use mesh_portal_serde::version::latest::generic::payload::Payload;
 
-            pub type ReqEntity<PAYLOAD> = generic::entity::request::ReqEntity<PAYLOAD>;
-            pub type Rc<PAYLOAD> = generic::entity::request::Rc<PAYLOAD>;
-            pub type Msg<PAYLOAD> = generic::entity::request::Msg<PAYLOAD>;
-            pub type Http<PAYLOAD> = generic::entity::request::Http<PAYLOAD>;
+            pub type ReqEntity<ResourceType,Kind> = generic::entity::request::ReqEntity<ResourceType,Kind>;
+            pub type Rc<ResourceType,Kind> = generic::entity::request::Rc<ResourceType,Kind>;
+            pub type Msg<Kind> = generic::entity::request::Msg<Kind>;
+            pub type Http<Kind> = generic::entity::request::Http<Kind>;
         }
 
         pub mod response {
@@ -275,9 +356,9 @@ pub mod generic {
         use mesh_portal_serde::version::latest::generic::id::{AddressAndKind};
         use mesh_portal_serde::version::latest::State;
 
-        pub type Archetype<KIND,ADDRESS>=generic::resource::Archetype<KIND,ADDRESS>;
-        pub type ResourceStub<ADDRESS, KIND > = generic::resource::ResourceStub<ADDRESS, KIND>;
-        pub type Resource<ADDRESS,KIND> = generic::resource::Resource<ADDRESS,KIND>;
+        pub type Archetype<KIND>=generic::resource::Archetype<KIND>;
+        pub type ResourceStub<KIND > = generic::resource::ResourceStub<KIND>;
+        pub type Resource<KIND> = generic::resource::Resource<KIND>;
     }
 
     pub mod portal {
@@ -292,9 +373,9 @@ pub mod generic {
 
             use mesh_portal_serde::version::latest::generic::portal::inlet;
 
-            pub type Request<IDENTIFIER, PAYLOAD> = inlet::Request<IDENTIFIER,PAYLOAD>;
-            pub type Response<IDENTIFIER, PAYLOAD> = inlet::Response<IDENTIFIER,PAYLOAD>;
-            pub type Frame<IDENTIFIER, PAYLOAD> = inlet::Frame<IDENTIFIER,PAYLOAD>;
+            pub type Request<Entity> = inlet::Request<Entity>;
+            pub type Response<PAYLOAD> = inlet::Response<PAYLOAD>;
+            pub type Frame<ReqEntity,Payload> = inlet::Frame<ReqEntity,Payload>;
 
             pub mod exchange {
                 use std::fmt::Debug;
@@ -304,7 +385,7 @@ pub mod generic {
                 use serde::{Deserialize, Serialize};
                 use crate::mesh::serde::generic::portal::inlet::exchange;
 
-                pub type Request<IDENTIFIER, PAYLOAD> = exchange::Request<IDENTIFIER,PAYLOAD>;
+//                pub type Request<PAYLOAD> = exchange::Request<PAYLOAD>;
             }
         }
 
@@ -319,9 +400,9 @@ pub mod generic {
 
             use mesh_portal_serde::version::latest::generic::portal::outlet;
 
-            pub type Request<ADDRESS, PAYLOAD> =  outlet::Request<ADDRESS,PAYLOAD>;
-            pub type Response<ADDRESS, PAYLOAD> =  outlet::Response<ADDRESS,PAYLOAD>;
-            pub type Frame< ADDRESS,KIND,PAYLOAD> =  outlet::Frame<ADDRESS,KIND,PAYLOAD>;
+            pub type Request<Entity> =  outlet::Request<Entity>;
+            pub type Response<PAYLOAD> =  outlet::Response<PAYLOAD>;
+            pub type Frame< KIND,PAYLOAD,ReqEntity> =  outlet::Frame<KIND,PAYLOAD,ReqEntity>;
 
             pub mod exchange {
                 use std::fmt::Debug;
@@ -332,7 +413,7 @@ pub mod generic {
 
                 use crate::mesh::serde::generic::portal::outlet::exchange;
 
-                pub type Request<IDENTIFIER, PAYLOAD> = exchange::Request<IDENTIFIER,PAYLOAD>;
+              //  pub type Request<IDENTIFIER, PAYLOAD> = exchange::Request<IDENTIFIER,PAYLOAD>;
             }
         }
     }
@@ -347,19 +428,18 @@ pub mod generic {
 
         use mesh_portal_serde::version::latest::generic::payload;
 
-        pub type Payload<ADDRESS,KIND> = payload::Payload<ADDRESS,KIND>;
-        pub type PayloadMap<ADDRESS, KIND> = payload::PayloadMap<ADDRESS,KIND>;
-        pub type Primitive<ADDRESS,KIND> = payload::Primitive<ADDRESS,KIND>;
-        pub type PayloadDelivery<PAYLOAD,PAYLOAD_REF> = payload::PayloadDelivery<PAYLOAD,PAYLOAD_REF>;
-        pub type Call<ADDRESS> = payload::Call<ADDRESS>;
+        pub type Payload<KIND> = payload::Payload<KIND>;
+        pub type PayloadMap<KIND> = payload::PayloadMap<KIND>;
+        pub type Primitive<KIND> = payload::Primitive<KIND>;
+        pub type Call = payload::Call;
         pub type CallKind = payload::CallKind;
-        pub type CallWithConfig<ADDRESS> = payload::CallWithConfig<ADDRESS>;
-        pub type MapPattern<ADDRESS,KIND>= payload::MapPattern<ADDRESS,KIND>;
+        pub type CallWithConfig = payload::CallWithConfig;
+        pub type MapPattern= payload::MapPattern;
         pub type ListPattern = payload::ListPattern;
-        pub type PayloadListPattern<ADDRESS, KIND>= payload::PayloadTypePattern<ADDRESS,KIND>;
-        pub type PayloadPattern<ADDRESS,KIND> = payload::PayloadPattern<ADDRESS, KIND>;
+        pub type PayloadListPattern= payload::PayloadTypePattern;
+        pub type PayloadPattern = payload::PayloadPattern;
         pub type Range= payload::Range;
-        pub type RcCommand = payload::RcCommand;
+        pub type RcCommand<ResourceType,Kind> = payload::RcCommand<ResourceType,Kind>;
         pub type PayloadFormat = payload::PayloadFormat;
     }
 
