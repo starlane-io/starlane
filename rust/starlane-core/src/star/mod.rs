@@ -1,4 +1,3 @@
-use std::{cmp, fmt};
 use std::cmp::{min, Ordering};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
@@ -50,6 +49,11 @@ use crate::mesh::serde::resource::Status;
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::resource::command::select::Select;
 use crate::frame::{ProtoFrame, Frame, StarPattern, StarMessage, TraversalAction};
+use crate::mesh::serde::generic::resource::ResourceStub;
+use crate::mesh::serde::resource::command::update::Update;
+use crate::mesh::serde::payload::Payload;
+use std::fmt;
+use std::cmp;
 
 pub mod core;
 pub mod shell;
@@ -1196,10 +1200,10 @@ pub trait ResourceRegistryBacking: Sync + Send {
         request: ResourceNamesReservationRequest,
     ) -> Result<RegistryReservation, Error>;
     async fn register(&self, registration: ResourceRegistration) -> Result<(), Error>;
-    async fn select(&self, select: Select) -> Result<Vec<ResourceRecord>, Error>;
+    async fn select(&self, select: Select) -> Result<Payload, Fail>;
+    async fn update(&self, update: Update) -> Result<(),Error>;
     async fn set_location(&self, location: ResourceRecord) -> Result<(), Error>;
-    async fn get(&self, address: Address) -> Result<Option<ResourceRecord>, Error>;
-    async fn update(&self, assignment: ResourceRegistryPropertyAssignment ) -> Result<(),Error>;
+    async fn locate(&self, address: Address) -> Result<Option<ResourceRecord>, Error>;
 }
 
 pub struct ResourceRegistryBackingSqLite {
@@ -1269,8 +1273,8 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
         Ok(())
     }
 
-    async fn get(&self, address: Address ) -> Result<Option<ResourceRecord>, Error> {
-        let (request, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Get(address));
+    async fn locate(&self, address: Address ) -> Result<Option<ResourceRecord>, Error> {
+        let (request, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Locate(address));
         self.registry.send(request).await;
         //match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
         match Self::timeout(rx).await? {

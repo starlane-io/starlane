@@ -32,7 +32,7 @@ where
 {
     skel: StarSkel,
     star_message: StarMessage,
-    pub entity: M,
+    pub request: M,
 }
 
 impl<M> Delivery<M>
@@ -41,7 +41,7 @@ where
 {
     pub fn new(entity: M, star_message: StarMessage, skel: StarSkel) -> Self {
         Delivery {
-            entity,
+            request: entity,
             star_message: star_message,
             skel: skel,
         }
@@ -72,12 +72,12 @@ impl Delivery<Request>
 {
 
     pub fn ok(self, payload: Payload) {
-        if let Exchange::RequestResponse( exchange ) = self.entity.exchange {
+        if let Exchange::RequestResponse( exchange ) = self.request.exchange {
             let entity = RespEntity::Ok(payload);
             let response = Response {
                 id: unique_id(),
-                to: self.entity.from.clone(),
-                from: self.entity.to.clone(),
+                to: self.request.from.clone(),
+                from: self.request.to.clone(),
                 entity,
                 exchange,
             };
@@ -93,12 +93,12 @@ impl Delivery<Request>
 
     pub fn fail( self, fail: crate::mesh::serde::fail::Fail  )
     {
-        if let Exchange::RequestResponse( exchange ) = self.entity.exchange {
+        if let Exchange::RequestResponse( exchange ) = self.request.exchange {
             let entity = RespEntity::Fail(fail);
             let response = Response {
                 id: unique_id(),
-                to: self.entity.from.clone(),
-                from: self.entity.to.clone(),
+                to: self.request.from.clone(),
+                from: self.request.to.clone(),
                 entity,
                 exchange,
             };

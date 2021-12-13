@@ -5,7 +5,7 @@ use tokio::sync::{mpsc, oneshot};
 
 
 use crate::error::Error;
-use crate::resource::{Kind, ResourceRecord, ResourceRegistration, ResourceLocation, ResourceCreateStrategy};
+use crate::resource::{Kind, ResourceRecord, ResourceRegistration, ResourceLocation};
 use crate::star::{StarKey, StarSkel};
 use crate::star::variant::{FrameVerdict, VariantCall};
 use crate::starlane::api::StarlaneApi;
@@ -13,6 +13,7 @@ use crate::util::{AsyncProcessor, AsyncRunner};
 use crate::mesh::serde::generic::resource::ResourceStub;
 use crate::resource::selector::ConfigSrc;
 use crate::mesh::serde::id::Address;
+use crate::mesh::serde::resource::command::create::Strategy;
 
 pub struct CentralVariant {
     skel: StarSkel,
@@ -83,7 +84,7 @@ impl CentralVariant {
     async fn ensure(starlane_api: StarlaneApi) -> Result<(), Error> {
 
         let mut creation = starlane_api.create_space("space", "Space")?;
-        creation.set_strategy(ResourceCreateStrategy::Ensure);
+        creation.set_strategy(Strategy::Ensure);
         creation.submit().await?;
 
         Ok(())

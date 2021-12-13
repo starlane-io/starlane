@@ -7,7 +7,7 @@ use tokio::sync::{broadcast, oneshot};
 use uuid::Uuid;
 
 use crate::error::Error;
-use crate::resource::{Kind, ResourceType, Specific};
+use crate::resource::{Kind, ResourceType, Specific, ResourceRecord};
 use crate::star::{StarCommand, StarKey};
 use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
 use crate::resources::message::ProtoMessage;
@@ -295,6 +295,18 @@ pub enum RejectKind {
     Error,
     Denied,
     BadRequest,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
+pub enum ReplyKind{
+    Empty,
+    Record
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
+pub enum Reply{
+    Empty,
+    Record(ResourceRecord)
 }
 
 fn hash_to_string(hash: &HashSet<ResourceType>) -> String {

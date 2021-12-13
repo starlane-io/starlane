@@ -75,7 +75,7 @@ impl Host for FileHost {
     }
 
     fn handle(&self,delivery: Delivery<Message>) {
-        match &delivery.entity {
+        match &delivery.request {
             Message::Request(request) => {
                 match &request.entity {
                     ReqEntity::Rc(_) => {}

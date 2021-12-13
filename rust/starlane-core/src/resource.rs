@@ -22,7 +22,7 @@ use crate::logger::{elog, LogInfo, StaticLogInfo};
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::payload::Payload;
 use crate::mesh::serde::resource::{Archetype, ResourceStub};
-use crate::message::{MessageExpect, ProtoStarMessage};
+use crate::message::{MessageExpect, ProtoStarMessage, ReplyKind};
 use crate::names::Name;
 use crate::resource::selector::{
     ConfigSrc, FieldSelection, LabelSelection, MetaSelector, ResourceRegistryInfo, ResourceSelector,
@@ -89,7 +89,7 @@ pub enum ResourceRegistryCommand {
     Commit(ResourceRegistration),
     Select(ResourceSelector),
     SetLocation(ResourceRecord),
-    Get(Address),
+    Locate(Address),
     Update(ResourceRegistryPropertyAssignment),
 }
 
@@ -438,7 +438,7 @@ impl Registry {
                 trans.commit()?;
                 Ok(ResourceRegistryResult::Ok)
             }
-            ResourceRegistryCommand::Get(address) => {
+            ResourceRegistryCommand::Locate(address) => {
                 if address.is_root() {
                     return Ok(ResourceRegistryResult::Resource(Option::Some(
                         ResourceRecord::root(),
@@ -768,7 +768,7 @@ impl Parent {
     async fn create_child(
         core: ParentCore,
         create: Create,
-        tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
+        tx: oneshot::Sender<Result<ResourceStub, Fail>>,
     ) {
         let parent = match create
             .parent
@@ -798,7 +798,7 @@ impl Parent {
             tokio::spawn(async move {
                 match Self::process_action(core.clone(), create.clone(), reservation, rx).await {
                     Ok(resource) => {
-                        tx.send(Ok(resource));
+                        tx.send(Ok(resource.into()));
                     }
                     Err(fail) => {
                         error!("Failed to create child: FAIL: {}", fail.to_string());
@@ -841,6 +841,7 @@ impl Parent {
                 Ok(record)
             }
             ResourceAction::Update(resource) => {
+                /*
                 // save resource state...
                 let mut proto = ProtoMessage::new();
 
@@ -874,6 +875,8 @@ impl Parent {
                     Err(err) => Err(err.into()),
                 }
 
+
+                 */
                 //               reservation.cancel();
             }
             ResourceAction::None => {
@@ -1016,7 +1019,7 @@ impl ResourceManager for Parent {
     async fn create(
         &self,
         create: Create,
-    ) -> oneshot::Receiver<Result<ResourceRecord, Fail>> {
+    ) -> oneshot::Receiver<Result<ResourceStub, Fail>> {
         let (tx, rx) = oneshot::channel();
 
         let core = self.core.clone();

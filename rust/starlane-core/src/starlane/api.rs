@@ -15,7 +15,7 @@ use tokio::time::error::Elapsed;
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
 use crate::frame::{StarPattern, TraversalAction, ResourceRegistryRequest, StarMessagePayload};
-use crate::resource::{Kind, ResourceType, AssignResourceStateSrc, ResourceRecord, ResourceCreate};
+use crate::resource::{Kind, ResourceType, AssignResourceStateSrc, ResourceRecord};
 use crate::resource::file_system::FileSystemState;
 use crate::resource::FileKind;
 use crate::resource::user::UserState;
@@ -24,7 +24,7 @@ use crate::star::shell::search::{SearchInit, SearchHits};
 use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
 use crate::watch::{WatchResourceSelector, Watcher};
-use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
+use crate::message::{ProtoStarMessage, ProtoStarMessageTo, ReplyKind};
 use crate::artifact::ArtifactBundle;
 use crate::resources::message::ProtoMessage;
 use crate::mesh::serde::id::Address;
@@ -84,19 +84,6 @@ impl StarlaneApi {
     pub fn shutdown(&self) -> Result<(), Error> {
         self.starlane_tx.as_ref().ok_or("this api does not have access to the StarlaneMachine and therefore cannot do a shutdown")?.try_send(StarlaneCommand::Shutdown);
         Ok(())
-    }
-
-    pub async fn send( &self, message: MessageRx, description: &str ) -> Result<Reply,Error> {
-        let proto = message.try_into()?;
-info!("staring message exchange for {}",description);
-        let reply = self.surface_api.exchange(proto, ReplyKind::Port, description ).await?;
-info!("received reply for {}",description);
-
-        if ReplyKind::Port.is_match(&reply) {
-            Ok(reply)
-        } else {
-            Err(format!("unexpected reply: {}", reply.to_string()).into())
-        }
     }
 
     pub async fn timeout<T>(

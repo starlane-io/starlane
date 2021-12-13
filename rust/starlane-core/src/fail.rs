@@ -12,3 +12,22 @@ pub enum Fail {
 pub enum StarlaneFailure {
   Error(String)
 }
+
+impl ToString for StarlaneFailure {
+    fn to_string(&self) -> String {
+        match self {
+            StarlaneFailure::Error(e) => {e.clone()}
+        }
+    }
+}
+
+impl Into<fail::Fail> for Fail {
+    fn into(self) -> fail::Fail {
+        match self {
+            Fail::Fail(fail) => {fail}
+            Fail::Starlane(error) => {
+                fail::Fail::Mesh(fail::mesh::Fail::Error(error.to_string()))
+            }
+        }
+    }
+}

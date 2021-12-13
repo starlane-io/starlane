@@ -22,8 +22,10 @@ use crate::resource::selector::ConfigSrc;
 use crate::mesh::serde::http::HttpRequest;
 use crate::fail::Fail;
 use crate::mesh::serde::id::Address;
-use mesh_portal_serde::version::v0_0_1::generic::resource::command::RcCommand;
-use mesh_portal_serde::version::v0_0_1::generic::pattern::TksPattern;
+use crate::mesh::serde::resource::command::RcCommand;
+use crate::mesh::serde::pattern::TksPattern;
+use crate::mesh::serde::payload::Payload;
+use crate::mesh::serde::payload::Primitive;
 
 pub enum CoreMessageCall {
     Message(StarMessage),
@@ -70,44 +72,20 @@ impl MessagingEndpointComponent {
         match &star_message.payload {
             StarMessagePayload::MessagePayload(message_payload) => match &message_payload {
                 Message::Request(request ) => {
+                    let delivery = Delivery::new(request.clone(), star_message, self.skel.clone() );
 
                     match &request.entity {
-                        ReqEntity::Rc(rc) => {
-                            let delivery = Delivery::new(rc.clone(), star_message, self.skel.clone());
+                        ReqEntity::Rc(_) => {
                             self.process_resource_command(delivery).await?;
                         }
-                        ReqEntity::Msg(msg) => {
-                            let delivery = Delivery::new(msg.clone(), star_message, self.skel.clone());
-                            self.process_resource_port_request(delivery).await?;
-                        }
-                        ReqEntity::Http(http) => {
-                            let delivery = Delivery::new(http.clone(), star_message, self.skel.clone());
-                            self.process_resource_http_request(delivery).await?;
+                        _ => {
+                            self.handle_by_host(delivery).await?;
                         }
                     }
                 }
                 Message::Response(response ) => {
                     // we don't handle responses here
                 }
-                /*
-                MessagePayload::Request(request) => {
-                    let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
-                    self.process_resource_request(delivery).await?;
-                }
-                MessagePayload::PortRequest(request) => {
-                    let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
-                    self.process_resource_port_request(delivery).await?;
-                }
-
-                MessagePayload::HttpRequest(request) => {
-                    let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
-                    self.process_resource_http_request(delivery).await?;
-                }
-                MessagePayload::Response(_) => {
-                    // we don't handle responses here...
-                }
-
-                 */
             },
             StarMessagePayload::ResourceRegistry(action) => {
                 let delivery = Delivery::new(action.clone(), star_message, self.skel.clone());
@@ -117,7 +95,7 @@ impl MessagingEndpointComponent {
                 let delivery = Delivery::new(action.clone(), star_message, self.skel.clone());
                 self.process_resource_host_action(delivery).await?;
             }
-            StarMessagePayload::Select(selector) => {
+/*            StarMessagePayload::Select(selector) => {
                 let delivery = Delivery::new(selector.clone(), star_message.clone(), self.skel.clone());
                 let results = self.skel.registry.as_ref().unwrap().select(selector.clone()).await;
                 match results {
@@ -129,6 +107,7 @@ impl MessagingEndpointComponent {
                     }
                 }
             }
+ */
 
             _ => {}
         }
@@ -137,7 +116,7 @@ impl MessagingEndpointComponent {
 
     async fn process_resource_command(
         &mut self,
-        delivery: Delivery<Rc>,
+        delivery: Delivery<Request>,
     ) -> Result<(), Error> {
         let skel = self.skel.clone();
         let host_tx = self.host_tx.clone();
@@ -145,12 +124,12 @@ impl MessagingEndpointComponent {
             async fn process(
                 skel: StarSkel,
                 host_tx: mpsc::Sender<HostCall>,
-                delivery: Delivery<Rc>,
+                delivery: Delivery<Request>,
             ) -> Result<(), Fail> {
 
-                let command = consume_command(delivery.entity.command.as_str() )?;
+                let command = consume_command(delivery.request.entity.as_str() )?;
 
-                match delivery.entity.command{
+                match delivery.request.entity.command{
                     RcCommand::Create(create) => {
                         let parent = MessagingEndpointComponent::get_parent_resource(
                             skel.clone(),
@@ -161,11 +140,12 @@ impl MessagingEndpointComponent {
 
                         match record {
                             Ok(record) => match record {
-                                Ok(record) => {
-                                    delivery.reply(Reply::Record(record));
+                                Ok(stub) => {
+                                    let payload = Payload::Primitive( Primitive::Stub(stub) );
+                                    delivery.respond(payload);
                                 }
                                 Err(fail) => {
-                                    delivery.fail(fail);
+                                    delivery.fail(fail.into());
                                 }
                             },
                             Err(err) => {
@@ -174,13 +154,19 @@ impl MessagingEndpointComponent {
                         }
                     }
                     RcCommand::Select(select) => {
-                        let resources = skel
+                        match skel
                             .registry
                             .as_ref()
                             .unwrap()
                             .select((*select).clone())
-                            .await?;
-                        delivery.reply(Reply::Records(resources))
+                            .await {
+                            Ok(rtn) => {
+                                delivery.respond(rtn);
+                            }
+                            Err(fail) => {
+                                delivery.respond(fail.into());
+                            }
+                        }
                     }
                     RcCommand::Update(_) => {
                         unimplemented!()
@@ -319,7 +305,7 @@ impl MessagingEndpointComponent {
         tokio::spawn(async move {
             async fn process( skel: StarSkel, delivery: Delivery<ResourceRegistryRequest> ) -> Result<(),Error> {
                 if let Option::Some(registry) = skel.registry.clone() {
-                    match &delivery.entity {
+                    match &delivery.request {
                         ResourceRegistryRequest::Register(registration) => {
                             let result = registry.register(registration.clone()).await;
                             delivery.result_ok(result);
@@ -329,7 +315,7 @@ impl MessagingEndpointComponent {
                             delivery.result_ok(result);
                         }
                         ResourceRegistryRequest::Find(find) => {
-                            let result = registry.get(find.to_owned()).await;
+                            let result = registry.locate(find.to_owned()).await;
 
                             match result {
                                 Ok(result) => match result {
@@ -367,7 +353,7 @@ impl MessagingEndpointComponent {
         &self,
         delivery: Delivery<ResourceHostAction>,
     ) -> Result<(), Error> {
-        match &delivery.entity {
+        match &delivery.request {
             ResourceHostAction::Assign(assign) => {
                 let (tx, rx) = oneshot::channel();
                 let call = HostCall::Assign {

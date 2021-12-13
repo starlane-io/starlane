@@ -9,7 +9,7 @@ use lru::LruCache;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use crate::frame::{ResourceRegistryRequest,  SimpleReply, StarMessagePayload};
-use crate::message::ProtoStarMessage;
+use crate::message::{ProtoStarMessage, ReplyKind, Reply};
 use crate::resource::{Kind, ResourceRecord, ResourceType};
 use crate::star::{
     LogId, Request, ResourceRegistryBacking, Set, Star, StarCommand, StarKey, StarKind, StarSkel,
@@ -182,7 +182,7 @@ impl ResourceLocatorComponent {
         } else {
             let record = ResourceRecord::new(
                 ResourceStub {
-                    address: ResourcePath::root(),
+                    address: Address::root(),
                     archetype: ResourceArchetype {
                         kind: Kind::Root,
                         specific: None,
