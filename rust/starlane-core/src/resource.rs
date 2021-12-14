@@ -42,6 +42,7 @@ use crate::mesh::serde::resource::command::create::{Create, Strategy};
 use crate::mesh::serde::resource::command::create::AddressSegmentTemplate;
 use crate::mesh::serde::resource::command::update::Update;
 use crate::frame::{ResourceHostAction, StarMessagePayload};
+use crate::mesh::serde::resource::command::common::{SetRegistry, SetProperties};
 
 pub mod artifact;
 pub mod config;
@@ -60,12 +61,12 @@ impl ToSql for Name {
 
 pub struct ResourceRegistryAction {
     pub tx: oneshot::Sender<ResourceRegistryResult>,
-    pub command: ResourceRegistryCommand,
+    pub command: RegistryCall,
 }
 
 impl ResourceRegistryAction {
     pub fn new(
-        command: ResourceRegistryCommand,
+        command: RegistryCall,
     ) -> (Self, oneshot::Receiver<ResourceRegistryResult>) {
         let (tx, rx) = oneshot::channel();
         (
@@ -78,12 +79,11 @@ impl ResourceRegistryAction {
     }
 }
 
-pub enum ResourceRegistryCommand {
+pub enum RegistryCall {
     Close,
     Clear,
     //Accepts(HashSet<ResourceType>),
-    Reserve(ResourceNamesReservationRequest),
-    Commit(ResourceRegistration),
+    Register{registration:Registration, tx: oneshot::Sender<Result<(),Fail>>},
     Select(ResourceSelector),
     SetLocation(ResourceRecord),
     Locate(Address),
@@ -123,74 +123,77 @@ impl ToString for ResourceRegistryResult {
 type Blob = Vec<u8>;
 
 struct RegistryParams {
-    address: Option<String>,
+    address: String,
     resource_type: String,
-    kind: String,
-    specific: Option<String>,
-    config: Option<String>,
-    host: Option<String>,
-    parent: Option<String>,
+    kind: Option<String>,
+    vendor: Option<String>,
+    product: Option<String>,
+    variant: Option<String>,
+    version: Option<String>,
+    version_pre: Option<String>,
+    parent: String,
 }
 
 impl RegistryParams {
-    pub fn from_registration(registration: ResourceRegistration) -> Result<Self, Error> {
-        Self::new(
-            registration.resource.stub.archetype,
-            registration.resource.stub.key.parent(),
-            Option::Some(registration.resource.stub.key),
-        )
-    }
+    pub fn from_registration(registration: &Registration ) -> Result<Self, Error> {
 
-    pub fn from_archetype(archetype: Archetype, parent: Option<Address>) -> Result<Self, Error> {
-        Self::new(archetype, parent, Option::None)
-    }
+        let address = registration.address.to_string();
+        let parent = registration.parent.to_string();
+        let resource_type = registration.kind.resource_type().to_string();
+        let kind = registration.kind.sub_string();
 
-    pub fn new(
-        archetype: Archetype,
-        address: Option<Address>,
-        host: Option<StarKey>,
-    ) -> Result<Self, Error> {
-        let parent = if let Option::Some(address) = &address {
-            match address.parent() {
-                None => Option::None,
-                Some(parent) => parent.to_string(),
+        let vendor = match &registration.kind.specific() {
+            None => Option::None,
+            Some(specific) => Option::Some(specific.vendor.clone()),
+        };
+
+        let product= match &registration.kind.specific() {
+            None => Option::None,
+            Some(specific) => Option::Some(specific.product.clone()),
+        };
+
+        let variant = match &registration.kind.specific() {
+            None => Option::None,
+            Some(specific) => Option::Some(specific.variant.clone()),
+        };
+
+        let version = match &registration.kind.specific() {
+            None => Option::None,
+            Some(specific) =>  {
+                let version = &specific.version;
+                Option::Some(format!( "{}.{}.{}", version.major, version.minor, version.patch ))
             }
-        } else {
-            Option::None
         };
 
-        let address = if let Option::Some(address) = address {
-            Option::Some(address.to_string())
-        } else {
-            Option::None
-        };
-
-        let resource_type = archetype.kind.resource_type().to_string();
-        let kind = archetype.kind.to_string();
-
-        let specific = match &archetype.specific {
+        let version_pre = match &registration.kind.specific() {
             None => Option::None,
-            Some(specific) => Option::Some(specific.to_string()),
-        };
-
-        let config = match &archetype.config {
-            ConfigSrc::None => Option::None,
-            ConfigSrc::Artifact(config) => Option::Some(config.to_string()),
-        };
-
-        let host = match host {
-            Some(host) => Option::Some(host.to_string()),
-            None => Option::None,
+            Some(specific) =>  {
+                let version = &specific.version;
+                if version.is_prerelease() {
+                    let mut pre = String::new();
+                    for (i, x) in version.pre.iter().enumerate() {
+                        if i != 0 {
+                            result.push_str(".");
+                        }
+                        result.push_str(format!("{}", x).as_ref());
+                    }
+                    Option::Some(pre)
+                } else {
+                    Option::None
+                }
+            }
         };
 
         Ok(RegistryParams {
-            address: address,
-            resource_type: resource_type,
-            kind: kind,
-            specific: specific,
-            parent: parent,
-            config: config,
-            host: host,
+            address,
+            parent,
+            resource_type,
+            kind,
+            vendor,
+            product,
+            variant,
+            version,
+            version_pre
         })
     }
 }
@@ -257,7 +260,7 @@ impl Registry {
         };
 
         while let Option::Some(request) = self.rx.recv().await {
-            if let ResourceRegistryCommand::Close = request.command {
+            if let RegistryCall::Close = request.command {
                 break;
             }
             match self.process(request.command) {
@@ -278,22 +281,79 @@ impl Registry {
 
     fn process(
         &mut self,
-        command: ResourceRegistryCommand,
+        command: RegistryCall,
     ) -> Result<ResourceRegistryResult, Error> {
         match command {
-            ResourceRegistryCommand::Close => Ok(ResourceRegistryResult::Ok),
-            ResourceRegistryCommand::Clear => {
+            RegistryCall::Close => Ok(ResourceRegistryResult::Ok),
+            RegistryCall::Clear => {
                 let trans = self.conn.transaction()?;
                 trans.execute("DELETE FROM labels", [])?;
-                trans.execute("DELETE FROM names", [])?;
+                trans.execute("DELETE FROM tags", [])?;
+                trans.execute("DELETE FROM properties", [])?;
                 trans.execute("DELETE FROM resources", [])?;
-                trans.execute("DELETE FROM uniques", [])?;
                 trans.commit()?;
 
                 Ok(ResourceRegistryResult::Ok)
             }
 
-            ResourceRegistryCommand::Commit(registration) => {
+            RegistryCall::Register{ registration, tx } => {
+
+                fn register( registration: Registration, trans: Transaction ) -> Result<(),Fail> {
+                    let params = RegistryParams::from_registration(&registration)?;
+                    trans.execute("INSERT INTO resources (address,resource_type,kind,vendor,product,variant,version,version_pre,parent) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)", params![params.address,params.resource_type,params.kind,params.vendor,params.product,params.variant,params.version,params.version_pre,params.parent])?;
+
+                    fn properties( prefix: &str, properties: SetProperties, trans: &Transaction ) -> Result<(),Fail> {
+                        for (key, payload) in properties.iter() {
+                            match payload {
+                                Payload::Empty => {}
+                                Payload::Primitive(primitive) => {
+                                    match primitive {
+                                        Primitive::Text(text) => {
+                                            trans.execute("INSERT INTO properties (address,key,value) VALUES (?1,?2,?3)", params![params.address,key.to_string(),text.to_string()])?;
+                                        }
+                                        Primitive::Address(address) => {
+                                            trans.execute("INSERT INTO properties (address,key,value) VALUES (?1,?2,?3)", params![params.address,key.to_string(),address.to_string()])?;
+                                        }
+                                        found => {
+                                            return Err(Fail::Fail(fail::Fail::Resource(fail::resource::Fail::Create(fail::resource::Create::InvalidProperty { expected: "Text|Address|PayloadMap".to_string(), found: found.primitive_type().to_string() }))));
+                                        }
+                                    }
+                                }
+                                Payload::Map(map) => {
+                                    let prefix = if prefix.len() == 0 {
+                                        key.clone()
+                                    } else {
+                                        format!("{}.{}",prefix,key)
+                                    };
+                                    properties( prefix.as_str(), map, &trans)?;
+                                }
+                                found => {
+                                    return Err(Fail::Fail(fail::Fail::Resource(fail::resource::Fail::Create(fail::resource::Create::InvalidProperty { expected: "Text|Address|PayloadMap".to_string(), found: found.payload_type().to_string() }))));
+                                }
+                            }
+                        }
+                        Ok(())
+                    }
+
+                    properties( "", registration.properties, &trans )?;
+
+                    trans.commit()?;
+                    Ok(())
+                }
+                let trans = self.conn.transaction()?;
+                match register( registration, trans ) {
+                    Ok(_) => {
+                        tx.send(Ok(()));
+                    }
+                    Err(err) => {
+                        tx.send(Err(Fail::Starlane(StarlaneFailure::Error(err.to_string()))));
+                        return Err(err.into())
+                    }
+                }
+
+                Ok(ResourceRegistryResult::Ok)
+            }
+            RegistryCall::Commit(registration) => {
                 let params = RegistryParams::from_registration(registration.clone())?;
 
                 let trans = self.conn.transaction()?;
@@ -325,7 +385,7 @@ impl Registry {
                 trans.commit()?;
                 Ok(ResourceRegistryResult::Ok)
             }
-            ResourceRegistryCommand::Select(selector) => {
+            RegistryCall::Select(selector) => {
                 let mut params: Vec<FieldSelectionSql> = vec![];
                 let mut where_clause = String::new();
 
@@ -424,7 +484,7 @@ impl Registry {
 
                 Ok(ResourceRegistryResult::Resources(resources))
             }
-            ResourceRegistryCommand::SetLocation(location_record) => {
+            RegistryCall::SetLocation(location_record) => {
                 let key = location_record.stub.key.bin()?;
                 let host = location_record.location.host.bin()?;
                 let trans = self.conn.transaction()?;
@@ -435,7 +495,7 @@ impl Registry {
                 trans.commit()?;
                 Ok(ResourceRegistryResult::Ok)
             }
-            ResourceRegistryCommand::Locate(address) => {
+            RegistryCall::Locate(address) => {
                 if address.is_root() {
                     return Ok(ResourceRegistryResult::Resource(Option::Some(
                         ResourceRecord::root(),
@@ -475,7 +535,7 @@ impl Registry {
                 }
             }
 
-            ResourceRegistryCommand::Reserve(request) => {
+            RegistryCall::Reserve(request) => {
                 let trans = self.conn.transaction()?;
                 trans.execute("DELETE FROM names WHERE key IS NULL AND datetime(reservation_timestamp) < datetime('now')", [] )?;
 
@@ -513,7 +573,7 @@ impl Registry {
                         params.address = Option::Some(record.stub.address.to_string());
                         let registration = ResourceRegistration::new(record.clone(), info);
                         let (action, rx) = ResourceRegistryAction::new(
-                            ResourceRegistryCommand::Commit(registration),
+                            RegistryCall::Commit(registration),
                         );
                         action_tx.send(action).await;
                         rx.await;
@@ -529,7 +589,7 @@ impl Registry {
                 });
                 Ok(ResourceRegistryResult::Reservation(reservation))
             }
-            ResourceRegistryCommand::Update(assignment) => {
+            RegistryCall::Update(assignment) => {
 
                 unimplemented!()
             }
@@ -590,53 +650,59 @@ impl Registry {
     }
 
     pub fn setup(&mut self) -> Result<(), Error> {
-        let labels = r#"
-       CREATE TABLE IF NOT EXISTS labels (
-	      resource_key INTEGER PRIMARY KEY AUTOINCREMENT,
-	      name TEXT NOT NULL,
-	      value TEXT NOT NULL,
-          UNIQUE(key,name),
-          FOREIGN KEY (resource_key) REFERENCES resources (key)
-        )"#;
 
-        let names = r#"
-       CREATE TABLE IF NOT EXISTS names(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          key BLOB,
-	      name TEXT NOT NULL,
-	      resource_type TEXT NOT NULL,
-          kind BLOB NOT NULL,
-          specific TEXT,
-          parent BLOB,
-          app TEXT,
-          owner BLOB,
-          reservation_timestamp TEXT,
-          UNIQUE(name,resource_type,kind,specific,parent)
-        )"#;
 
         let resources = r#"CREATE TABLE IF NOT EXISTS resources (
          address TEXT PRIMARY KEY,
+         parent TEXT NOT NULL,
          resource_type TEXT NOT NULL,
          kind TEXT NOT NULL,
-         specific TEXT,
-         config TEXT,
-         parent TEXT,
+         vendor TEXT,
+         product TEXT,
+         variant TEXT,
+         version TEXT,
+         version_variant TEXT,
          host TEXT
+        )"#;
+
+        let labels = r#"
+       CREATE TABLE IF NOT EXISTS labels (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+	      address TEXT NOT NULL,
+	      key TEXT NOT NULL,
+	      value TEXT,
+          UNIQUE(key,value),
+          FOREIGN KEY (address) REFERENCES resources (address)
+        )"#;
+
+        /// note that a tag may reference an address NOT in this database
+        /// therefore it does not have a FOREIGN KEY constraint
+        let tags = r#"
+       CREATE TABLE IF NOT EXISTS tags(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          parent TEXT NOT NULL,
+          tag TEXT NOT NULL,
+          address TEXT NOT NULL,
+          UNIQUE(tag)
+        )"#;
+
+
+        let properties = r#"CREATE TABLE IF NOT EXISTS properties (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         address TEXT NOT NULL,
+         key TEXT NOT NULL,
+         value TEXT NOT NULL,
+         FOREIGN KEY (address) REFERENCES resources (address),
+         UNIQUE(address,key)
         )"#;
 
         let address_index = "CREATE UNIQUE INDEX resource_address_index ON resources(address)";
 
-        let uniques = r#"CREATE TABLE IF NOT EXISTS uniques(
-         key BLOB PRIMARY KEY,
-         sequence INTEGER NOT NULL DEFAULT 0,
-         id_index INTEGER NOT NULL DEFAULT 0
-        )"#;
-
         let transaction = self.conn.transaction()?;
         transaction.execute(labels, [])?;
-        transaction.execute(names, [])?;
+        transaction.execute(tags, [])?;
         transaction.execute(resources, [])?;
-        transaction.execute(uniques, [])?;
+        transaction.execute(properties, [])?;
         transaction.execute(address_index, [])?;
         transaction.commit()?;
 
@@ -781,7 +847,7 @@ impl Parent {
 
         if let Ok(reservation) = core
             .child_registry
-            .reserve(ResourceNamesReservationRequest {
+            .reserve(Registration {
                 parent: parent,
                 archetype: create.archetype.clone(),
                 info: create.registry_info.clone(),
@@ -1147,10 +1213,12 @@ pub trait ResourceHost: Send + Sync {
     async fn init(&self, key: Address) -> Result<(), Error>;
 }
 
-pub struct ResourceNamesReservationRequest {
-    pub info: Option<ResourceRegistryInfo>,
+pub struct Registration {
+    pub address: Address,
+    pub kind: Kind,
     pub parent: Address,
-    pub archetype: ResourceArchetype,
+    pub registry: SetRegistry,
+    pub properties: SetProperties
 }
 
 pub struct RegistryReservation {
@@ -1968,6 +2036,26 @@ impl Kind {
         }
     }
 
+    pub fn sub_string(&self) -> Option<String> {
+        match self {
+            Self::Base(base) =>  {
+                Option::Some(base.to_string())
+            }
+            Self::File( file ) => {
+                Option::Some(file.to_string())
+            }
+            Self::Database( db) => {
+                Option::Some(db.to_string())
+            }
+            Self::Artifact( artifact) => {
+                Option::Some(artifact.to_string())
+            }
+            _ => {
+                Option::None
+            }
+        }
+    }
+
     pub fn specific(&self) -> Option<Specific> {
         match self {
             Self::Database(kind) => kind.specific(),
@@ -1985,7 +2073,6 @@ impl Kind {
     Serialize,
     Deserialize,
     strum_macros::Display,
-    strum_macros::EnumString,
 )]
 pub enum DatabaseKind {
     Relational(Specific),
@@ -2016,7 +2103,6 @@ pub enum BaseKind {
     App,
     Mechtron,
     Database,
-
     Any,
 }
 

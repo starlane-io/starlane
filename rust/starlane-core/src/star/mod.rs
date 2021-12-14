@@ -43,7 +43,7 @@ use crate::starlane::StarlaneMachine;
 use crate::template::StarTemplateHandle;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 use crate::fail::Fail;
-use crate::resource::{ResourceType, ResourceRecord, ResourceNamesReservationRequest, RegistryReservation, ResourceRegistration, UniqueSrc, ResourceRegistryAction, Registry, ResourceRegistryCommand, ResourceRegistryResult};
+use crate::resource::{ResourceType, ResourceRecord, Registration, RegistryReservation, ResourceRegistration, UniqueSrc, ResourceRegistryAction, Registry, RegistryCall, ResourceRegistryResult};
 use crate::mesh::serde::resource::Status;
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::resource::command::select::Select;
@@ -1196,7 +1196,7 @@ impl StarNotify {
 pub trait ResourceRegistryBacking: Sync + Send {
     async fn reserve(
         &self,
-        request: ResourceNamesReservationRequest,
+        request: Registration,
     ) -> Result<RegistryReservation, Error>;
     async fn register(&self, registration: ResourceRegistration) -> Result<(), Error>;
     async fn select(&self, select: Select) -> Result<Payload, Fail>;
@@ -1227,9 +1227,9 @@ impl ResourceRegistryBackingSqLite {
 impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
     async fn reserve(
         &self,
-        request: ResourceNamesReservationRequest,
+        request: Registration,
     ) -> Result<RegistryReservation, Error> {
-        let (action, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Reserve(request));
+        let (action, rx) = ResourceRegistryAction::new(RegistryCall::Reserve(request));
         self.registry.send(action).await?;
 
         match Self::timeout(rx).await? {
@@ -1246,7 +1246,7 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
 
     async fn register(&self, registration: ResourceRegistration) -> Result<(), Error> {
         let (request, rx) =
-            ResourceRegistryAction::new(ResourceRegistryCommand::Commit(registration));
+            ResourceRegistryAction::new(RegistryCall::Commit(registration));
         self.registry.send(request).await?;
         //        tokio::time::timeout(Duration::from_secs(5), rx).await??;
         Self::timeout(rx).await?;
@@ -1254,7 +1254,7 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
     }
 
     async fn select(&self, selector: ResourceSelector) -> Result<Vec<ResourceRecord>, Error> {
-        let (request, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Select(selector));
+        let (request, rx) = ResourceRegistryAction::new(RegistryCall::Select(selector));
         self.registry.send(request).await?;
         // match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
         match Self::timeout(rx).await? {
@@ -1265,7 +1265,7 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
 
     async fn set_location(&self, location: ResourceRecord) -> Result<(), Error> {
         let (request, rx) =
-            ResourceRegistryAction::new(ResourceRegistryCommand::SetLocation(location));
+            ResourceRegistryAction::new(RegistryCall::SetLocation(location));
         self.registry.send(request).await;
         //tokio::time::timeout(Duration::from_secs(5), rx).await??;
         Self::timeout(rx).await?;
@@ -1273,7 +1273,7 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
     }
 
     async fn locate(&self, address: Address ) -> Result<Option<ResourceRecord>, Error> {
-        let (request, rx) = ResourceRegistryAction::new(ResourceRegistryCommand::Locate(address));
+        let (request, rx) = ResourceRegistryAction::new(RegistryCall::Locate(address));
         self.registry.send(request).await;
         //match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
         match Self::timeout(rx).await? {
@@ -1288,7 +1288,7 @@ impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
     async fn update(&self, assignment: ResourceRegistryPropertyAssignment ) -> Result<(),Error>
     {
         let (request, rx) =
-            ResourceRegistryAction::new(ResourceRegistryCommand::Update(assignment));
+            ResourceRegistryAction::new(RegistryCall::Update(assignment));
         self.registry.send(request).await;
         Self::timeout(rx).await?;
         Ok(())
