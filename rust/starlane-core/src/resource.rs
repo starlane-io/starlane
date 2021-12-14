@@ -43,6 +43,9 @@ use crate::mesh::serde::resource::command::create::AddressSegmentTemplate;
 use crate::mesh::serde::resource::command::update::Update;
 use crate::frame::{ResourceHostAction, StarMessagePayload};
 use crate::mesh::serde::resource::command::common::{SetRegistry, SetProperties};
+use crate::mesh::serde::resource::command::select::Select;
+use crate::mesh::serde::pattern::AddressKindPattern;
+use mesh_portal_serde::version::v0_0_1::pattern::SegmentPattern;
 
 pub mod artifact;
 pub mod config;
@@ -84,7 +87,7 @@ pub enum RegistryCall {
     Clear,
     //Accepts(HashSet<ResourceType>),
     Register{registration:Registration, tx: oneshot::Sender<Result<(),Fail>>},
-    Select(ResourceSelector),
+    Select{ select: Select, tx: oneshot::Sender<Result<Vec<ResourceStub>,Fail>>},
     SetLocation(ResourceRecord),
     Locate(Address),
     Update(ResourceRegistryPropertyAssignment),
@@ -353,39 +356,28 @@ impl Registry {
 
                 Ok(ResourceRegistryResult::Ok)
             }
-            RegistryCall::Commit(registration) => {
-                let params = RegistryParams::from_registration(registration.clone())?;
+            RegistryCall::Select{select,tx} => {
 
-                let trans = self.conn.transaction()?;
 
-                if params.address.is_some() {
-                    trans.execute(
-                        "DELETE FROM labels WHERE labels.resource_key=?1",
-                        [params.key.clone()],
-                    );
-                    trans.execute(
-                        "DELETE FROM resources WHERE address=?1",
-                        [params.address.clone()],
-                    )?;
+                fn address_pattern( address: AddressKindPattern ) -> String {
+                    let mut rtn = String::new();
+                    for (index, hop) in address.hops.iter().enumerate() {
+                       match hop.segment {
+                           SegmentPattern::Any => {
+                               rtn.push_str("%");
+                               if index != address.hops.len() {
+                                   rtn.push_str(":");
+                               }
+                           }
+                           SegmentPattern::Recursive => {}
+                           SegmentPattern::Exact(_) => {}
+                       }
+                    }
+                    rtn
                 }
 
-                trans.execute("INSERT INTO resources (address,resource_type,kind,specific,parent,config,host) VALUES (?1,?2,?3,?4,?5,?6,?7)", params![params.address,params.resource_type,params.kind,params.specific,params.parent,params.config,params.host])?;
-                if let Option::Some(info) = registration.info {
-                    for name in info.names {
-                        trans.execute("UPDATE names SET key=?1 WHERE name=?1", [name])?;
-                    }
-                    for (name, value) in info.labels {
-                        trans.execute(
-                            "INSERT INTO labels (resource_key,name,value) VALUES (?1,?2,?3)",
-                            params![params.key, name, value],
-                        )?;
-                    }
-                }
 
-                trans.commit()?;
-                Ok(ResourceRegistryResult::Ok)
-            }
-            RegistryCall::Select(selector) => {
+
                 let mut params: Vec<FieldSelectionSql> = vec![];
                 let mut where_clause = String::new();
 
@@ -2061,6 +2053,39 @@ impl Kind {
             Self::Database(kind) => kind.specific(),
             _ => Option::None,
         }
+    }
+
+    pub fn from( resource_type: ResourceType, kind: Option<String>, specific: Option<Specific> ) -> Result<Self,Error> {
+        Ok(match resource_type {
+            ResourceType::Root => {Self::Root}
+            ResourceType::Space => {Self::Space}
+            ResourceType::Base => {
+                let kind = kind.ok_or("expected sub kind".into() )?
+                Self::Base(BaseKind::from_str(kind)?)
+            }
+            ResourceType::User => { Self::User}
+            ResourceType::App => {Self::App}
+            ResourceType::Mechtron => {Self::Mechtron}
+            ResourceType::FileSystem => {Self::FileSystem}
+            ResourceType::File => {Self::File}
+            ResourceType::Database => {
+                let kind = kind.ok_or("expected sub kind".into() )?;
+                if "Relational" != kind.as_str() {
+                    return Err(format!("DatabaseKind is not recognized found: {}",kind).into());
+                }
+                let specific = specific.ok_or("expected specific".into() )?;
+                Self::Database(DatabaseKind::Relational(specific))
+            }
+            ResourceType::Authenticator => {Self::Authenticator}
+            ResourceType::ArtifactBundleSeries => {Self::ArtifactBundleSeries}
+            ResourceType::ArtifactBundle => {Self::ArtifactBundle}
+            ResourceType::Artifact => {
+                let kind = kind.ok_or("expected sub kind".into() )?;
+                Self::Artifact(ArtifactKind::from_str(kind)?)
+            }
+            ResourceType::Proxy => {Self::Proxy}
+            ResourceType::Credentials => {Self::Credentials}
+        })
     }
 }
 

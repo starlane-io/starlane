@@ -22,6 +22,7 @@ pub mod id {
     use crate::resource;
 
     pub type Address = id::Address;
+    pub type AddressSegment = id::AddressSegment;
     pub type ResourceType = resource::ResourceType;
     pub type Kind = resource::Kind;
     pub type Specific = id::Specific;
@@ -37,6 +38,10 @@ pub mod pattern {
     use mesh_portal_serde::version::latest::generic::pattern;
     pub type TksPattern = pattern::TksPattern<ResourceType,Kind>;
     pub type AddressKindPattern = pattern::AddressKindPattern<ResourceType,Kind>;
+    pub type SegmentPattern = pattern::SegmentPattern;
+    pub type ExactPattern = pattern::ExactPattern;
+    pub type Pattern = pattern::Pattern;
+    pub type Hop = pattern::Hop<ResourceType, Kind>;
 }
 
 pub mod messaging {
