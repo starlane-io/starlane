@@ -1,5 +1,5 @@
 use crate::util::{Call, AsyncRunner, AsyncProcessor};
-use crate::star::StarSkel;
+use crate::star::{StarSkel, StarKey};
 use crate::star::core::resource::host::HostCall;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
@@ -40,7 +40,7 @@ impl RegistryApi {
 
 pub enum RegistryCall {
     Register{registration:Registration, tx: oneshot::Sender<Result<(),Fail>>},
-    Select{ selector: Selector, tx: oneshot::Sender<Result<Vec<ResourceStub>,Fail>>},
+    SelectorHop { selector: Selector, tx: oneshot::Sender<Result<Vec<ResourceStub>,Fail>>},
 }
 
 impl Call for RegistryCall {}
@@ -73,7 +73,7 @@ impl AsyncProcessor<RegistryCall> for RegistryComponent {
             RegistryCall::Register { registration, tx } => {
                 self.register(registration,tx);
             }
-            RegistryCall::Select { selector, tx } => {
+            RegistryCall::SelectorHop { selector, tx } => {
                 self.select(selector,tx);
             }
         }
@@ -309,15 +309,14 @@ impl RegistryComponent {
         };
 
         let kind = Kind::from( resource_type, kind, specific)?;
-
         let host = StarKey::from_str(host)?;
+        let status = Status::from_str(status)?;
 
         let stub = ResourceStub {
-            address: address,
-            archetype: Archetype{
-                kind: kind,
-                config_src: Option::None
-            },
+            address,
+            kind,
+            properties: Default::default(), // not implemented yet...
+            status
         };
 
         let record = ResourceRecord {
@@ -432,6 +431,10 @@ impl RegistryParams {
     }
 }
 
+
+
+
+
 pub fn setup(conn: &mut Connection) -> Result<(), Error> {
 
 
@@ -495,3 +498,5 @@ pub fn setup(conn: &mut Connection) -> Result<(), Error> {
 
     Ok(())
 }
+
+

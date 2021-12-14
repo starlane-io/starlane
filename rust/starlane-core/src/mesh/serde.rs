@@ -153,7 +153,7 @@ pub mod entity {
         use mesh_portal_serde::version::latest::{fail, generic};
         use crate::mesh::serde::payload::Payload;
 
-        pub type RespEntity = generic::entity::response::RespEntity<Payload,fail::Fail>;
+        pub type RespEntity = generic::entity::response::RespEntity<Payload>;
     }
 
 }
@@ -171,6 +171,7 @@ pub mod resource {
     pub type Archetype= generic::resource::Archetype<Kind>;
     pub type ResourceStub = generic::resource::ResourceStub<Kind>;
     pub type Resource = generic::resource::Resource<Kind>;
+    pub type Properties = generic::resource::Properties<Kind>;
 
     pub mod command {
         use mesh_portal_serde::version::latest::generic;
@@ -344,7 +345,7 @@ pub mod generic {
 
             use serde::{Deserialize, Serialize};
 
-            pub type RespEntity<PAYLOAD,FAIL> = generic::entity::response::RespEntity<PAYLOAD,FAIL>;
+            pub type RespEntity<PAYLOAD> = generic::entity::response::RespEntity<PAYLOAD>;
         }
     }
 
@@ -365,6 +366,7 @@ pub mod generic {
         pub type Archetype<KIND>=generic::resource::Archetype<KIND>;
         pub type ResourceStub<KIND > = generic::resource::ResourceStub<KIND>;
         pub type Resource<KIND> = generic::resource::Resource<KIND>;
+        pub type Properties<KIND> = generic::resource::Properties<KIND>;
     }
 
     pub mod portal {
