@@ -21,6 +21,7 @@ use crate::resource::{ResourceRegistration, ResourceRecord, ResourceSliceStatus,
 use crate::resource::ResourceType;
 use crate::mesh::serde::id::Address;
 use crate::fail::Fail;
+use crate::star::core::resource::registry::SubSelector;
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum Frame {
@@ -343,6 +344,7 @@ pub enum StarMessagePayload {
     ResourceHost(ResourceHostAction),
 //    Space(SpaceMessage),
     Reply(SimpleReply),
+    SubSelect(SubSelector)
 }
 
 impl Debug for StarMessagePayload {

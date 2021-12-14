@@ -8,7 +8,7 @@ use crate::error::Error;
 use crate::mesh::serde::id::{Address, Kind, Specific};
 use crate::mesh::serde::resource::command::common::{SetRegistry, SetProperties};
 use crate::fail::Fail;
-use crate::mesh::serde::generic::payload::{Payload, Primitive};
+use crate::mesh::serde::payload::{Payload, Primitive};
 use crate::mesh::serde::fail;
 use crate::mesh::serde::resource::command::select::Select;
 use crate::mesh::serde::resource::ResourceStub;
@@ -24,6 +24,8 @@ use crate::resource::{ResourceRecord, ResourceLocation};
 use rusqlite::types::ValueRef;
 use std::str::FromStr;
 use crate::mesh::serde::generic::resource::Archetype;
+use futures::SinkExt;
+use mesh_portal_serde::version::v0_0_1::generic::payload::PrimitiveList;
 
 static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_pre,host,status";
 
@@ -36,11 +38,30 @@ impl RegistryApi {
     pub fn new(tx: mpsc::Sender<RegistryCall>) -> Self {
         Self { tx }
     }
+
+    pub async fn register( &self, registration: Registration ) -> Result<(),Fail> {
+        let (tx,rx) = oneshot::channel();
+        self.tx.send(RegistryCall::Register {registration, tx });
+        rx.await?
+    }
+
+    pub async fn select( &self, select: Select, address: Address) -> Result<Payload,Fail> {
+        let (tx,rx) = oneshot::channel();
+        self.tx.send(RegistryCall::Select{select, address, tx });
+        rx.await?
+    }
+
+    pub async fn sub_select( &self, selector: SubSelector ) -> Result<Vec<ResourceStub>,Fail> {
+        let (tx,rx) = oneshot::channel();
+        self.tx.send(RegistryCall::SubSelect{selector, tx });
+        rx.await?
+    }
 }
 
 pub enum RegistryCall {
     Register{registration:Registration, tx: oneshot::Sender<Result<(),Fail>>},
-    SelectorHop { selector: Selector, tx: oneshot::Sender<Result<Vec<ResourceStub>,Fail>>},
+    Select{select: Select, address: Address, tx: oneshot::Sender<Result<Payload,Fail>>},
+    SubSelect { selector: SubSelector, tx: oneshot::Sender<Result<Vec<ResourceStub>,Fail>>},
 }
 
 impl Call for RegistryCall {}
@@ -73,8 +94,11 @@ impl AsyncProcessor<RegistryCall> for RegistryComponent {
             RegistryCall::Register { registration, tx } => {
                 self.register(registration,tx);
             }
-            RegistryCall::SelectorHop { selector, tx } => {
-                self.select(selector,tx);
+            RegistryCall::Select { select, address, tx} => {
+                self.select(select, address, tx);
+            }
+            RegistryCall::SubSelect { selector, tx } => {
+                self.sub_select(selector, tx);
             }
         }
     }
@@ -128,9 +152,37 @@ impl RegistryComponent {
         tx.send(register( self, registration ));
     }
 
+    fn select(&mut self, select: Select, address: Address, tx: oneshot::Sender<Result<Payload,Fail>>) {
+        async fn sub_select(registry: &mut RegistryComponent, selector: Select ) -> Result<Payload, Fail> {
+            if address != selector.address_pattern.query_root() {
+                let fail = fail::Fail::Resource(fail::resource::Fail::Select(fail::resource::Select::WrongAddress {required:selector.address_pattern.query_root(), found: address }));
+                return Err(Fail::Fail(fail));
+            }
+            let resource = registry.skel.resource_locator_api.locate(selector.address_pattern.query_root()).await?;
+            if resource.location.host != registry.skel.info.key {
+                let fail = fail::Fail::Resource(fail::resource::Fail::Select(fail::resource::Select::BadSelectRouting {required:resource.location.host.to_string(), found: registry.skel.info.key.to_string()}));
+                return Err(Fail::Fail(fail));
+            }
 
-    fn select(&mut self, selector: Selector, tx: oneshot::Sender<Result<Vec<ResourceStub>,Fail>>) {
-        fn select( registry: &mut RegistryComponent, selector: Selector) -> Result<Vec<ResourceStub>,Fail> {
+            let sub_selector = SubSelector{
+                address,
+                hops: selector.address_pattern.sub_select_hops()
+            };
+
+            let stubs = registry.skel.core_registry_api.sub_select(sub_selector).await?;
+
+            let rtn  = selector.into_payload.to_primitive(stubs)?;
+
+            let rtn = Payload::List(rtn);
+
+            Ok(rtn)
+        }
+    }
+
+
+
+            fn sub_select(&mut self, selector: SubSelector, tx: oneshot::Sender<Result<Vec<ResourceStub>,Fail>>) {
+        fn sub_select(registry: &mut RegistryComponent, selector: SubSelector) -> Result<Vec<ResourceStub>,Fail> {
             let mut params: Vec<String> = vec![];
             let mut where_clause = String::new();
             let mut index = 0;
@@ -243,11 +295,13 @@ impl RegistryComponent {
                 resources.push(process_resource_row_catch(row)?);
             }
 
+            // next IF there are more hops, must coordinate with possible other stars...
+
 
             Ok(vec![])
         }
 
-        tx.send(select( self, selector));
+        tx.send(sub_select(self, selector));
     }
 
 //    static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_pre,host,status";
@@ -332,8 +386,8 @@ impl RegistryComponent {
 
 
 
-pub struct Selector {
-    pub parent: Address,
+pub struct SubSelector {
+    pub address: Address,
     pub hops: Vec<Hop>
 }
 

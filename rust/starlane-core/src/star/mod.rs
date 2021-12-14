@@ -53,6 +53,7 @@ use crate::mesh::serde::resource::command::update::Update;
 use crate::mesh::serde::payload::Payload;
 use std::fmt;
 use std::cmp;
+use crate::star::core::resource::registry::RegistryApi;
 
 pub mod core;
 pub mod shell;

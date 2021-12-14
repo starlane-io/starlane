@@ -217,6 +217,8 @@ pub mod resource {
 
             pub type Select=generic::resource::command::select::Select<ResourceType,Kind>;
             pub type PropertiesPattern = generic::resource::command::select::PropertiesPattern;
+            pub type SelectIntoPayload=generic::resource::command::select::SelectIntoPayload<Kind>;
+            pub type SelectIntoStubPayload=generic::resource::command::select::SelectIntoStubPayload<Kind>;
         }
 
         pub mod update {
@@ -469,6 +471,7 @@ pub mod fail {
         pub type Fail=mesh_portal_serde::version::latest::fail::resource::Fail;
         pub type Create=mesh_portal_serde::version::latest::fail::resource::Create;
         pub type Update=mesh_portal_serde::version::latest::fail::resource::Update;
+        pub type Select=mesh_portal_serde::version::latest::fail::resource::Select;
     }
 
     pub mod port {
