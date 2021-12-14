@@ -8,7 +8,7 @@ use tokio::time::Instant;
 
 use crate::error::Error;
 use crate::frame::{ SimpleReply, StarMessage, StarMessagePayload};
-use crate::message::{MessageExpect, ProtoStarMessage, ProtoStarMessageTo, MessageId};
+use crate::message::{MessageExpect, ProtoStarMessage, ProtoStarMessageTo, MessageId, ReplyKind, Reply};
 use crate::resource::ResourceRecord;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};

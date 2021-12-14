@@ -42,6 +42,8 @@ pub mod pattern {
     pub type ExactPattern = pattern::ExactPattern;
     pub type Pattern = pattern::Pattern;
     pub type Hop = pattern::Hop<ResourceType, Kind>;
+    pub type AddressTksPath = pattern::AddressTksPath<Kind>;
+    pub type AddressTksSegment = pattern::AddressTksSegment<Kind>;
 }
 
 pub mod messaging {

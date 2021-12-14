@@ -5,14 +5,14 @@ use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use rusqlite::{Connection, params_from_iter, Row, Transaction};
 use crate::error::Error;
-use crate::mesh::serde::id::{Address, Kind, Specific};
+use crate::mesh::serde::id::{Address, Kind, Specific, AddressSegment};
 use crate::mesh::serde::resource::command::common::{SetRegistry, SetProperties};
-use crate::fail::Fail;
+use crate::fail::{Fail, StarlaneFailure};
 use crate::mesh::serde::payload::{Payload, Primitive};
 use crate::mesh::serde::fail;
 use crate::mesh::serde::resource::command::select::Select;
 use crate::mesh::serde::resource::ResourceStub;
-use crate::mesh::serde::pattern::Hop;
+use crate::mesh::serde::pattern::{Hop, AddressKindPattern, AddressTksPath, AddressTksSegment};
 use crate::mesh::serde::pattern::Pattern;
 use crate::mesh::serde::pattern::SegmentPattern;
 use crate::mesh::serde::pattern::ExactSegment;
@@ -26,6 +26,10 @@ use std::str::FromStr;
 use crate::mesh::serde::generic::resource::Archetype;
 use futures::SinkExt;
 use mesh_portal_serde::version::v0_0_1::generic::payload::PrimitiveList;
+use crate::message::{ProtoStarMessage, ProtoStarMessageTo, ReplyKind, Reply};
+use crate::star::core::resource::registry::RegistryCall::SubSelect;
+use crate::frame::StarMessagePayload;
+use futures::future::join_all;
 
 static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_pre,host,status";
 
@@ -56,12 +60,20 @@ impl RegistryApi {
         self.tx.send(RegistryCall::SubSelect{selector, tx });
         rx.await?
     }
+
+    pub async fn address_tks_path_query(&self, address: Address ) -> Result<AddressTksPath,Fail> {
+        let (tx,rx) = oneshot::channel();
+        self.tx.send(RegistryCall::AddressTksPathQuery{address, tx });
+        rx.await?
+    }
+
 }
 
 pub enum RegistryCall {
     Register{registration:Registration, tx: oneshot::Sender<Result<(),Fail>>},
     Select{select: Select, address: Address, tx: oneshot::Sender<Result<Payload,Fail>>},
     SubSelect { selector: SubSelector, tx: oneshot::Sender<Result<Vec<ResourceStub>,Fail>>},
+    AddressTksPathQuery{ address: Address, tx: oneshot::Sender<Result<AddressTksPath,Fail>>},
 }
 
 impl Call for RegistryCall {}
@@ -100,11 +112,65 @@ impl AsyncProcessor<RegistryCall> for RegistryComponent {
             RegistryCall::SubSelect { selector, tx } => {
                 self.sub_select(selector, tx);
             }
+            RegistryCall::AddressTksPathQuery { address, tx } => {
+                self.address_tks_path_query(address,tx)
+            }
         }
     }
 }
 
 impl RegistryComponent {
+    fn address_tks_path_query( &mut self, address: Address, tx: oneshot::Sender<Result<AddressTksPath,Fail>>) {
+        async fn query(skel: StarSkel, trans:Transaction, address: Address) -> Result<AddressTksPath, Fail> {
+
+            if address.segments.len() == 0 {
+                return Err(Fail::Starlane(StarlaneFailure::Error("cannot address_tks_path_query on Root".to_string())));
+            }
+            if address.segments.len() == 1 {
+                let segment = AddressTksSegment {
+                    address_segment: address.last_segment().expect("expected at least one segment"),
+                    tks: Kind::Space
+                };
+                return Ok(AddressTksPath{
+                    segments: vec![segment]
+                });
+            }
+
+            let parent = address.parent().expect("expecting parent since we have already established the segments are >= 2");
+            let address_segment = address.last_segment().expect("expecting a last_segment since we know segments are >= 2");
+            let mut proto = ProtoStarMessage::new();
+            proto.payload = StarMessagePayload::AddressTksPathQuery(parent.clone());
+            proto.to = ProtoStarMessageTo::Resource(parent.clone());
+            let reply = skel.messaging_api.exchange(proto, ReplyKind::AddressTksPath, format!("getting AddressTksPath for {}",parent.to_string()).as_str()  ).await?;
+            if let Reply::AddressTksPath(parent_path) = reply {
+                let statement = format!( "SELECT DISTINCT {} FROM resources as r WHERE parent=?1 AND address_segment=?2", RESOURCE_QUERY_FIELDS );
+                let mut statement = trans.prepare(statement.as_str())?;
+                let mut record = statement.query_row(params!(parent.to_string(),address_segment), Self::process_resource_row_catch)?;
+                let segment = AddressTksSegment{
+                    address_segment: record.stub.address.last_segment().expect("expected at least one segment"),
+                    tks: record.stub.kind
+                };
+
+                let path = parent_path.push(segment);
+                Ok(path)
+            } else {
+                Err(Fail::Starlane(StarlaneFailure::Error("expected AddressTksPath reply".to_string())))
+            }
+        }
+
+        match self.conn.transaction() {
+            Ok(transaction) => {
+                let skel = self.skel.clone();
+                tokio::spawn( async move {
+                    tx.send(query(skel, transaction, address).await);
+                });
+            }
+            Err(err) => {
+                tx.send( Err(Fail::Starlane(StarlaneFailure::Error("address_tks_path_query could not create database transaction".to_string()))))
+            }
+        }
+
+    }
 
     fn register( &mut self, registration: Registration, tx: oneshot::Sender<Result<(),Fail>>) {
         fn register( registry: &mut RegistryComponent, registration: Registration ) -> Result<(),Fail> {
@@ -154,19 +220,23 @@ impl RegistryComponent {
 
     fn select(&mut self, select: Select, address: Address, tx: oneshot::Sender<Result<Payload,Fail>>) {
         async fn sub_select(registry: &mut RegistryComponent, selector: Select ) -> Result<Payload, Fail> {
-            if address != selector.address_pattern.query_root() {
-                let fail = fail::Fail::Resource(fail::resource::Fail::Select(fail::resource::Select::WrongAddress {required:selector.address_pattern.query_root(), found: address }));
+            if address != selector.pattern.query_root() {
+                let fail = fail::Fail::Resource(fail::resource::Fail::Select(fail::resource::Select::WrongAddress {required:selector.pattern.query_root(), found: address }));
                 return Err(Fail::Fail(fail));
             }
-            let resource = registry.skel.resource_locator_api.locate(selector.address_pattern.query_root()).await?;
+            let resource = registry.skel.resource_locator_api.locate(selector.pattern.query_root()).await?;
             if resource.location.host != registry.skel.info.key {
                 let fail = fail::Fail::Resource(fail::resource::Fail::Select(fail::resource::Select::BadSelectRouting {required:resource.location.host.to_string(), found: registry.skel.info.key.to_string()}));
                 return Err(Fail::Fail(fail));
             }
 
+            let address_tks_path = registry.skel.core_registry_api.address_tks_path_query(address).await?;
+
             let sub_selector = SubSelector{
+                pattern: selector.pattern.clone(),
                 address,
-                hops: selector.address_pattern.sub_select_hops()
+                hops: selector.pattern.sub_select_hops(),
+                address_tks_path
             };
 
             let stubs = registry.skel.core_registry_api.sub_select(sub_selector).await?;
@@ -181,17 +251,20 @@ impl RegistryComponent {
 
 
 
-            fn sub_select(&mut self, selector: SubSelector, tx: oneshot::Sender<Result<Vec<ResourceStub>,Fail>>) {
-        fn sub_select(registry: &mut RegistryComponent, selector: SubSelector) -> Result<Vec<ResourceStub>,Fail> {
+    fn sub_select(&mut self, selector: SubSelector, tx: oneshot::Sender<Result<Vec<ResourceStub>,Fail>>) {
+        async fn sub_select(skel: StarSkel, transaction: Transaction,  selector: SubSelector) -> Result<Vec<ResourceStub>,Fail> {
             let mut params: Vec<String> = vec![];
             let mut where_clause = String::new();
-            let mut index = 0;
+            let mut index = 1;
+            where_clause.push_str( "parent=?1" );
+            params.push( selector.address.to_string() );
+
             if let Option::Some(hop) = selector.hops.first()
             {
                 match &hop.segment {
                     SegmentPattern::Exact(exact) => {
                         index = index+1;
-                        where_clause.push_str( format!("address_segment=?{}",index).as_str() );
+                        where_clause.push_str( format!(" AND address_segment=?{}",index).as_str() );
                         match exact {
                             ExactSegment::Address(address) => {
                                 params.push( address.to_string() );
@@ -204,11 +277,8 @@ impl RegistryComponent {
                 match &hop.tks.resource_type {
                     Pattern::Any => {},
                     Pattern::Exact(resource_type)=> {
-                        if index > 0 {
-                            where_clause.push_str( " AND ");
-                        }
                         index = index+1;
-                        where_clause.push_str( format!("resource_type=?{}",index).as_str() );
+                        where_clause.push_str( format!(" AND resource_type=?{}",index).as_str() );
                         params.push( resource_type.to_string() );
                     },
                 }
@@ -219,11 +289,8 @@ impl RegistryComponent {
                         match kind.sub_string() {
                             None => {}
                             Some(sub) => {
-                                if index > 0 {
-                                    where_clause.push_str( " AND ");
-                                }
                                 index = index+1;
-                                where_clause.push_str(format!("kind=?{}", index).as_str());
+                                where_clause.push_str(format!(" AND kind=?{}", index).as_str());
                                 params.push(sub);
                             }
                         }
@@ -237,33 +304,24 @@ impl RegistryComponent {
                         match &specific.vendor {
                             Pattern::Any => {}
                             Pattern::Exact(vendor) => {
-                                if index > 0 {
-                                    where_clause.push_str( " AND ");
-                                }
                                 index = index+1;
-                                where_clause.push_str(format!("vendor=?{}", index).as_str());
+                                where_clause.push_str(format!(" AND vendor=?{}", index).as_str());
                                 params.push(vendor.clone() );
                             }
                         }
                         match &specific.product{
                             Pattern::Any => {}
                             Pattern::Exact(product) => {
-                                if index > 0 {
-                                    where_clause.push_str( " AND ");
-                                }
                                 index = index+1;
-                                where_clause.push_str(format!("product=?{}", index).as_str());
+                                where_clause.push_str(format!(" AND product=?{}", index).as_str());
                                 params.push(product.clone() );
                             }
                         }
                         match &specific.variant{
                             Pattern::Any => {}
                             Pattern::Exact(variant) => {
-                                if index > 0 {
-                                    where_clause.push_str( " AND ");
-                                }
                                 index = index+1;
-                                where_clause.push_str(format!("variant=?{}", index).as_str());
+                                where_clause.push_str(format!(" AND variant=?{}", index).as_str());
                                 params.push(variant.clone());
                             }
                         }
@@ -276,35 +334,91 @@ impl RegistryComponent {
                RESOURCE_QUERY_FIELDS, where_clause
             );
 
-            let mut statement = registry.conn.prepare(statement.as_str())?;
+            let mut statement = transaction.prepare(statement.as_str())?;
             let mut rows = statement.query(params_from_iter(params.iter()))?;
 
-            fn process_resource_row_catch(row: &Row) -> Result<ResourceRecord, Error> {
-                match Self::process_resource_row(row) {
-                    Ok(ok) => Ok(ok),
-                    Err(error) => {
-                        eprintln!("process_resource_rows: {}", error);
-                        Err(error)
+
+            let mut records = vec![];
+            while let Option::Some(row) = rows.next()? {
+                records.push(Self::process_resource_row_catch(row)?);
+            }
+
+            // next IF there are more hops, must coordinate with possible other stars...
+            if !selector.hops.is_empty() {
+                let mut hops = selector.hops.clone();
+                hops.remove(0);
+                let mut futures = vec![];
+                for record in records {
+                    if let Option::Some(last_segment) = record.stub.address.last_segment() {
+                        let address = selector.address.push_segment(last_segment.clone());
+                        let address_tks_path = selector.address_tks_path.push(AddressTksSegment{
+                            address_segment: last_segment,
+                            tks: record.stub.kind.clone()
+                        });
+                        let selector = SubSelector {
+                            pattern: selector.pattern.clone(),
+                            address,
+                            hops: hops.clone(),
+                            address_tks_path
+                        };
+                        let mut proto = ProtoStarMessage::new();
+                        proto.payload = StarMessagePayload::SubSelect(selector);
+                        proto.to = ProtoStarMessageTo::Star(record.location.host.clone());
+                        futures.push(skel.messaging_api.exchange(proto, ReplyKind::Records, "sub-select" ));
+                    }
+                }
+                let futures =  join_all(futures).await;
+
+                // the records matched the present hop (which we needed for deeper searches) however
+                // they may not or may not match the ENTIRE pattern therefore they must be filtered
+                records.retain(|record| {
+                    let address_tks_path = selector.address_tks_path.push(AddressTksSegment{
+                        address_segment: record.stub.address.last_segment().expect("expecting at least one segment" ),
+                        tks: record.stub.kind.clone()
+                    });
+                    selector.pattern.matches(&address_tks_path)
+                });
+
+                // here we already know that the child sub_select should have filtered it's
+                // not matching addresses so we can add all the results
+                for future in futures {
+                    let reply = future?;
+                    if let Reply::Records(mut more_records) =reply {
+                        records.append(  & mut more_records );
                     }
                 }
             }
 
+            let stubs: Vec<ResourceStub> = records.into_iter().map(|record|record.into()).collect();
 
-            let mut resources = vec![];
-            while let Option::Some(row) = rows.next()? {
-                resources.push(process_resource_row_catch(row)?);
+            Ok(stubs)
+        }
+        match self.conn.transaction() {
+            Ok(transaction) => {
+                let skel = self.skel.clone();
+                tokio::spawn( async move {
+                    tx.send(sub_select(skel, transaction, selector).await);
+                });
             }
-
-            // next IF there are more hops, must coordinate with possible other stars...
-
-
-            Ok(vec![])
+            Err(err) => {
+                tx.send( Err(Fail::Starlane(StarlaneFailure::Error("sub select could not create database transaction".to_string()))))
+            }
         }
 
-        tx.send(sub_select(self, selector));
     }
 
-//    static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_pre,host,status";
+    fn process_resource_row_catch(row: &Row) -> Result<ResourceRecord, Error> {
+        match Self::process_resource_row(row) {
+            Ok(ok) => Ok(ok),
+            Err(error) => {
+                eprintln!("process_resource_rows: {}", error);
+                Err(error)
+            }
+        }
+    }
+
+
+    //    static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_pre,host,status";
     fn process_resource_row(row: &Row) -> Result<ResourceRecord, Error> {
 
         fn opt( row: &Row, index: usize ) -> Result<Option<String>,Error>
@@ -386,9 +500,11 @@ impl RegistryComponent {
 
 
 
-pub struct SubSelector {
+struct SubSelector {
+    pub pattern: AddressKindPattern,
     pub address: Address,
-    pub hops: Vec<Hop>
+    pub hops: Vec<Hop>,
+    pub address_tks_path: AddressTksPath
 }
 
 

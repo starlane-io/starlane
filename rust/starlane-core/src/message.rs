@@ -14,6 +14,7 @@ use crate::resources::message::ProtoMessage;
 use crate::mesh::{Request, Response};
 use crate::mesh::serde::id::Address;
 use crate::frame::{StarMessagePayload, StarMessage, SimpleReply, MessageAck};
+use crate::mesh::serde::pattern::AddressTksPath;
 
 pub mod delivery;
 
@@ -301,14 +302,18 @@ pub enum RejectKind {
 pub enum ReplyKind{
     Empty,
     Record,
-    Response
+    Records,
+    Response,
+    AddressTksPath
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
 pub enum Reply{
     Empty,
     Record(ResourceRecord),
-    Response(Response)
+    Records(Vec<ResourceRecord>),
+    Response(Response),
+    AddressTksPath(AddressTksPath)
 }
 
 fn hash_to_string(hash: &HashSet<ResourceType>) -> String {

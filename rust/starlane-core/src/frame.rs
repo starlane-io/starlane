@@ -344,7 +344,8 @@ pub enum StarMessagePayload {
     ResourceHost(ResourceHostAction),
 //    Space(SpaceMessage),
     Reply(SimpleReply),
-    SubSelect(SubSelector)
+    SubSelect(SubSelector),
+    AddressTksPathQuery(Address)
 }
 
 impl Debug for StarMessagePayload {
