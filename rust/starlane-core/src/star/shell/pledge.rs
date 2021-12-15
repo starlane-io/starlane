@@ -11,7 +11,7 @@ use tokio::time::Duration;
 
 use crate::error::Error;
 use crate::resource::{
-    RemoteResourceHost, ResourceHost, ResourceLocationAffinity, ResourceType,
+    ResourceType,
 };
 use crate::star::{StarCommand, StarConscriptKind, StarInfo, StarKey, StarKind, StarSkel};
 use crate::fail::Fail;

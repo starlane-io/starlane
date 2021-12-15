@@ -5,7 +5,7 @@ use tokio::sync::{mpsc, oneshot};
 
 
 use crate::error::Error;
-use crate::resource::{Kind, ResourceRecord, ResourceRegistration, ResourceLocation};
+use crate::resource::{Kind, ResourceRecord,  ResourceLocation};
 use crate::star::{StarKey, StarSkel};
 use crate::star::variant::{FrameVerdict, VariantCall};
 use crate::starlane::api::StarlaneApi;
@@ -13,6 +13,7 @@ use crate::util::{AsyncProcessor, AsyncRunner};
 use crate::mesh::serde::generic::resource::ResourceStub;
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::resource::command::create::Strategy;
+use crate::mesh::serde::resource::Status;
 
 pub struct CentralVariant {
     skel: StarSkel,
@@ -48,11 +49,9 @@ impl CentralVariant {
         let root_resource = ResourceRecord {
             stub: ResourceStub {
                 address: Address::root(),
-                archetype: ResourceArchetype {
                     kind: Kind::Root,
-                    specific: None,
-                    config: ConfigSrc::None,
-                },
+                properties: Default::default(),
+                status: Status::Ready
             },
             location: ResourceLocation {
                 host: StarKey::central(),

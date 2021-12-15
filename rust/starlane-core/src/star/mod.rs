@@ -43,9 +43,8 @@ use crate::starlane::StarlaneMachine;
 use crate::template::StarTemplateHandle;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 use crate::fail::Fail;
-use crate::resource::{ResourceType, ResourceRecord, Registration, RegistryReservation, ResourceRegistration, UniqueSrc, ResourceRegistryAction, ResourceRegistryResult};
 use crate::mesh::serde::resource::Status;
-use crate::mesh::serde::id::Address;
+use crate::mesh::serde::id::{Address, ResourceType};
 use crate::mesh::serde::resource::command::select::Select;
 use crate::frame::{ProtoFrame, Frame, StarPattern, StarMessage, TraversalAction};
 use crate::mesh::serde::generic::resource::ResourceStub;
@@ -54,6 +53,7 @@ use crate::mesh::serde::payload::Payload;
 use std::fmt;
 use std::cmp;
 use crate::star::core::resource::registry::RegistryApi;
+use crate::resource::ResourceRecord;
 
 pub mod core;
 pub mod shell;
@@ -1193,108 +1193,6 @@ impl StarNotify {
     }
 }
 
-#[async_trait]
-pub trait ResourceRegistryBacking: Sync + Send {
-    async fn reserve(
-        &self,
-        request: Registration,
-    ) -> Result<RegistryReservation, Error>;
-    async fn register(&self, registration: ResourceRegistration) -> Result<(), Error>;
-    async fn select(&self, select: Select) -> Result<Payload, Fail>;
-    async fn update(&self, update: Update) -> Result<(),Error>;
-    async fn set_location(&self, location: ResourceRecord) -> Result<(), Error>;
-    async fn locate(&self, address: Address) -> Result<Option<ResourceRecord>, Error>;
-}
-
-pub struct ResourceRegistryBackingSqLite {
-    registry: tokio::sync::mpsc::Sender<ResourceRegistryAction>,
-}
-
-impl ResourceRegistryBackingSqLite {
-    pub async fn new(star_info: StarInfo, star_data_path: String) -> Result<Self, Error> {
-        let rtn = ResourceRegistryBackingSqLite {
-            registry: Registry::new(star_info, star_data_path).await,
-        };
-
-        Ok(rtn)
-    }
-
-    async fn timeout<X>(rx: oneshot::Receiver<X>) -> Result<X, Error> {
-        Ok(tokio::time::timeout(Duration::from_secs(25), rx).await??)
-    }
-}
-
-#[async_trait]
-impl ResourceRegistryBacking for ResourceRegistryBackingSqLite {
-    async fn reserve(
-        &self,
-        request: Registration,
-    ) -> Result<RegistryReservation, Error> {
-        let (action, rx) = ResourceRegistryAction::new(RegistryCall::Reserve(request));
-        self.registry.send(action).await?;
-
-        match Self::timeout(rx).await? {
-            ResourceRegistryResult::Reservation(reservation) => Result::Ok(reservation),
-            _ => Result::Err(Fail::expected("ResourceRegistryResult::Reservation(_)").into()),
-        }
-
-        /*        match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
-                   ResourceRegistryResult::Reservation(reservation) => Result::Ok(reservation),
-                   _ => Result::Err(Fail::Timeout),
-               }
-        */
-    }
-
-    async fn register(&self, registration: ResourceRegistration) -> Result<(), Error> {
-        let (request, rx) =
-            ResourceRegistryAction::new(RegistryCall::Commit(registration));
-        self.registry.send(request).await?;
-        //        tokio::time::timeout(Duration::from_secs(5), rx).await??;
-        Self::timeout(rx).await?;
-        Ok(())
-    }
-
-    async fn select(&self, selector: ResourceSelector) -> Result<Vec<ResourceRecord>, Error> {
-        let (request, rx) = ResourceRegistryAction::new(RegistryCall::Select(selector));
-        self.registry.send(request).await?;
-        // match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
-        match Self::timeout(rx).await? {
-            ResourceRegistryResult::Resources(resources) => Result::Ok(resources),
-            _ => Result::Err(Fail::Timeout.into()),
-        }
-    }
-
-    async fn set_location(&self, location: ResourceRecord) -> Result<(), Error> {
-        let (request, rx) =
-            ResourceRegistryAction::new(RegistryCall::SetLocation(location));
-        self.registry.send(request).await;
-        //tokio::time::timeout(Duration::from_secs(5), rx).await??;
-        Self::timeout(rx).await?;
-        Ok(())
-    }
-
-    async fn locate(&self, address: Address ) -> Result<Option<ResourceRecord>, Error> {
-        let (request, rx) = ResourceRegistryAction::new(RegistryCall::Locate(address));
-        self.registry.send(request).await;
-        //match tokio::time::timeout(Duration::from_secs(5), rx).await?? {
-        match Self::timeout(rx).await? {
-            ResourceRegistryResult::Resource(resource) => {
-                Ok(resource)
-            }
-            _ => Err(Fail::expected("ResourceRegistryResult::Resource(_)").into()),
-        }
-    }
-
-
-    async fn update(&self, assignment: ResourceRegistryPropertyAssignment ) -> Result<(),Error>
-    {
-        let (request, rx) =
-            ResourceRegistryAction::new(RegistryCall::Update(assignment));
-        self.registry.send(request).await;
-        Self::timeout(rx).await?;
-        Ok(())
-    }
-}
 
 pub type StarStatus = Status;
 

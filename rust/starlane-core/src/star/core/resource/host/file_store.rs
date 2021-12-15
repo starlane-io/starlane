@@ -14,8 +14,9 @@ use crate::error::Error;
 use crate::file_access::{FileAccess, FileEvent};
 use crate::resource::{
     FileKind,
-    ResourceCreationChamber, Kind, ResourceType,
+    Kind, ResourceType,
 };
+use crate::star::core::resource::registry::ResourceCreationChamber;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util;

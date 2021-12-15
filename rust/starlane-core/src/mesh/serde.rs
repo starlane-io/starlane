@@ -83,6 +83,7 @@ pub mod payload {
     pub type Payload = generic::payload::Payload<Kind>;
     pub type PayloadType = payload::PayloadType;
     pub type PrimitiveType= payload::PrimitiveType;
+    pub type PrimitiveList= generic::payload::PrimitiveList<Kind>;
     pub type PayloadRef = payload::PayloadRef;
     pub type PayloadDelivery = generic::payload::PayloadDelivery<Payload,PayloadRef>;
     pub type Call = generic::payload::Call;
@@ -218,8 +219,8 @@ pub mod resource {
             use crate::mesh::serde::pattern::TksPattern;
 
             pub type Select=generic::resource::command::select::Select<ResourceType,Kind>;
+            pub type SubSelector=generic::resource::command::select::SubSelector<ResourceType,Kind>;
             pub type PropertiesPattern = generic::resource::command::select::PropertiesPattern;
-            pub type SelectIntoPayload=generic::resource::command::select::SelectIntoPayload<Kind>;
             pub type SelectIntoStubPayload=generic::resource::command::select::SelectIntoStubPayload<Kind>;
         }
 

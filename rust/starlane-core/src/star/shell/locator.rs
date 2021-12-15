@@ -12,13 +12,14 @@ use crate::frame::{ResourceRegistryRequest,  SimpleReply, StarMessagePayload};
 use crate::message::{ProtoStarMessage, ReplyKind, Reply};
 use crate::resource::{Kind, ResourceRecord, ResourceType};
 use crate::star::{
-    LogId, Request, ResourceRegistryBacking, Set, Star, StarCommand, StarKey, StarKind, StarSkel,
+    LogId, Request,  Set, Star, StarCommand, StarKey, StarKind, StarSkel,
 };
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::error::Error;
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::generic::resource::ResourceStub;
 use crate::fail::Fail;
+use crate::mesh::serde::resource::Status;
 
 #[derive(Clone)]
 pub struct ResourceLocatorApi {
@@ -182,11 +183,9 @@ impl ResourceLocatorComponent {
             let record = ResourceRecord::new(
                 ResourceStub {
                     address: Address::root(),
-                    archetype: ResourceArchetype {
                         kind: Kind::Root,
-                        specific: None,
-                        config: ConfigSrc::None,
-                    },
+                    properties: Default::default(),
+                    status: Status::Ready
                 },
                 StarKey::central(),
             );

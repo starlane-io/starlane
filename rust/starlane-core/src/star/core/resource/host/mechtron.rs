@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
 use crate::mechtron::MechtronShell;
-use crate::resource::{ArtifactKind,  ResourceType, ResourceAssign, AssignResourceStateSrc};
+use crate::resource::{ArtifactKind, ResourceType, ResourceAssign, AssignResourceStateSrc, Kind};
 use crate::star::core::resource::host::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
@@ -14,11 +14,25 @@ use crate::mesh::serde::entity::request::{Msg, Http};
 use mesh_portal_api::message::Message;
 use mesh_portal_api_client::PortalCtrl;
 use crate::mesh::serde::id::Address;
+use crate::mesh::serde::resource::Properties;
+use crate::fail::Fail;
+use crate::mesh::serde::generic::payload::{MapPattern, PayloadPattern};
+use mesh_portal_parse::pattern::consume_data_struct_def;
+use mesh_portal_serde::version::v0_0_1::util::ValueMatcher;
+use mesh_portal_serde::version::v0_0_1::generic::payload::Primitive;
+
+lazy_static!{
+
+static ref MECHTRON_PROPERTIES_PATTERN : PayloadPattern= {
+             let (_,payload_pattern) = consume_data_struct_def("Map{config<Address>}" );
+             payload_pattern
+        };
+}
+
 
 pub struct MechtronHost {
     skel: StarSkel,
     mechtrons: AsyncHashMap<Address, MechtronShell>
-
 }
 
 impl MechtronHost {
@@ -43,14 +57,8 @@ impl Host for MechtronHost {
             }
         };
 
-        let mechtron_config_artifact = match &assign.stub.archetype.config {
-            ConfigSrc::None => return Err("Mechtron requires a config".into() ),
-            ConfigSrc::Artifact(artifact) => {
-                println!("artifact : {}", artifact.to_string());
-                artifact.clone()
-            }
-            _ => return Err("Mechtron requires a config referencing an artifact".into() ),
-        };
+        let properties = MechtronProperties::new(assign.stub.properties.clone())?;
+        let mechtron_config_artifact = properties.config().ok_or("expected mechtron config")?;
 
         let factory = self.skel.machine.get_proto_artifact_caches_factory().await?;
         let mut proto = factory.create();
@@ -100,4 +108,45 @@ impl Host for MechtronHost {
     fn resource_type(&self) -> ResourceType {
         ResourceType::Mechtron
     }
+}
+
+pub struct MechtronProperties {
+    properties: Properties
+}
+
+
+
+
+impl MechtronProperties {
+
+    pub fn new( properties: Properties ) -> Result<Self,Error> {
+
+        let payload = properties.into();
+
+        MECHTRON_PROPERTIES_PATTERN.is_match(&payload)?;
+
+        Ok(Self{
+            properties
+        })
+    }
+
+    pub fn config(&self) -> Option<Address> {
+        match self.properties.get("config") {
+            None => {None}
+            Some(config) => {
+                match config {
+                    Payload::Primitive(config) => {
+                        match config {
+                            Primitive::Address(address) => {
+                                Option::Some(address.clone())
+                            }
+                            _ => {None}
+                        }
+                    }
+                    _ => {None}
+                }
+            }
+        }
+    }
+
 }

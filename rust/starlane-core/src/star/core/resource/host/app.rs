@@ -48,6 +48,7 @@ impl Host for AppHost {
             }
         }
 
+        /*
         let app_config_artifact = match &assign.stub.archetype.config {
             ConfigSrc::None => return Err("App requires a config".into() ),
             ConfigSrc::Artifact(artifact) => {
@@ -56,16 +57,18 @@ println!("artifact : {}", artifact.to_string());
             }
         };
 
+         */
+
         let factory = self.skel.machine.get_proto_artifact_caches_factory().await?;
         let mut proto = factory.create();
         let app_config_artifact_ref = ArtifactRef::new(app_config_artifact.clone(), ArtifactKind::AppConfig );
         proto.cache(vec![app_config_artifact_ref]).await?;
         let caches = proto.to_caches().await?;
-        let app_config = caches.app_configs.get(&app_config_artifact).ok_or::<Error>(format!("expected app_config").into())?;
+//        let app_config = caches.app_configs.get(&app_config_artifact).ok_or::<Error>(format!("expected app_config").into())?;
 
         println!("App config loaded!");
 
-        println!("main: {}", app_config.main.address.to_string() );
+//        println!("main: {}", app_config.main.address.to_string() );
         self.apps.put( assign.stub.key.clone(), Status::Ready ).await;
 
         Ok(())
