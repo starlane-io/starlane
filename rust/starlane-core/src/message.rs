@@ -15,6 +15,7 @@ use crate::mesh::{Request, Response};
 use crate::mesh::serde::id::Address;
 use crate::frame::{StarMessagePayload, StarMessage, SimpleReply, MessageAck};
 use crate::mesh::serde::pattern::AddressTksPath;
+use crate::mesh::serde::resource::ResourceStub;
 
 pub mod delivery;
 
@@ -303,6 +304,7 @@ pub enum ReplyKind{
     Empty,
     Record,
     Records,
+    Stubs,
     Response,
     AddressTksPath
 }
@@ -312,6 +314,7 @@ pub enum Reply{
     Empty,
     Record(ResourceRecord),
     Records(Vec<ResourceRecord>),
+    Stubs(Vec<ResourceStub>),
     Response(Response),
     AddressTksPath(AddressTksPath)
 }

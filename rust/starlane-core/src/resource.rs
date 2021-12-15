@@ -201,6 +201,7 @@ impl RegistryParams {
     }
 }
 
+/*
 pub struct Registry {
     pub conn: Connection,
     pub tx: mpsc::Sender<ResourceRegistryAction>,
@@ -312,10 +313,10 @@ impl Registry {
                                 Payload::Primitive(primitive) => {
                                     match primitive {
                                         Primitive::Text(text) => {
-                                            trans.execute("INSERT INTO properties (address,key,value) VALUES (?1,?2,?3)", params![params.address,key.to_string(),text.to_string()])?;
+                                            trans.execute("INSERT INTO properties (parent,address_segment,key,value) VALUES (?1,?2,?3)", params![params.parent,parzms.address_segment,key.to_string(),text.to_string()])?;
                                         }
                                         Primitive::Address(address) => {
-                                            trans.execute("INSERT INTO properties (address,key,value) VALUES (?1,?2,?3)", params![params.address,key.to_string(),address.to_string()])?;
+                                            trans.execute("INSERT INTO properties (parent,address_segment,address,key,value) VALUES (?1,?2,?3)", params![params.parent,params.address_segment,key.to_string(),address.to_string()])?;
                                         }
                                         found => {
                                             return Err(Fail::Fail(fail::Fail::Resource(fail::resource::Fail::Create(fail::resource::Create::InvalidProperty { expected: "Text|Address|PayloadMap".to_string(), found: found.primitive_type().to_string() }))));
@@ -702,6 +703,7 @@ impl Registry {
     }
 }
 
+
 impl LogInfo for Registry {
     fn log_identifier(&self) -> String {
         self.star_info.log_identifier()
@@ -716,6 +718,7 @@ impl LogInfo for Registry {
     }
 }
 
+ */
 
 #[async_trait]
 pub trait HostedResource: Send + Sync {
@@ -2060,7 +2063,7 @@ impl Kind {
             ResourceType::Root => {Self::Root}
             ResourceType::Space => {Self::Space}
             ResourceType::Base => {
-                let kind = kind.ok_or("expected sub kind".into() )?
+                let kind = kind.ok_or("expected sub kind".into() )?;
                 Self::Base(BaseKind::from_str(kind)?)
             }
             ResourceType::User => { Self::User}

@@ -43,7 +43,7 @@ use crate::starlane::StarlaneMachine;
 use crate::template::StarTemplateHandle;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 use crate::fail::Fail;
-use crate::resource::{ResourceType, ResourceRecord, Registration, RegistryReservation, ResourceRegistration, UniqueSrc, ResourceRegistryAction, Registry, RegistryCall, ResourceRegistryResult};
+use crate::resource::{ResourceType, ResourceRecord, Registration, RegistryReservation, ResourceRegistration, UniqueSrc, ResourceRegistryAction, ResourceRegistryResult};
 use crate::mesh::serde::resource::Status;
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::resource::command::select::Select;
@@ -1094,7 +1094,7 @@ pub struct StarSkel {
     pub info: StarInfo,
     pub star_tx: mpsc::Sender<StarCommand>,
     pub core_messaging_endpoint_tx: mpsc::Sender<CoreMessageCall>,
-    pub core_registry_api: RegistryApi,
+    pub registry_api: RegistryApi,
     pub resource_locator_api: ResourceLocatorApi,
     pub star_search_api: StarSearchApi,
     pub router_api: RouterApi,
@@ -1107,7 +1107,6 @@ pub struct StarSkel {
     pub flags: Flags,
     pub logger: Logger,
     pub sequence: Arc<AtomicU64>,
-    pub registry: Option<Arc<dyn ResourceRegistryBacking>>,
     pub star_handler: Option<StarWranglerBacking>,
     pub persistence: Persistence,
     pub data_access: FileAccess,

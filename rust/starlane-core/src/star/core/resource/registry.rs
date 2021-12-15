@@ -15,7 +15,6 @@ use crate::mesh::serde::resource::ResourceStub;
 use crate::mesh::serde::pattern::{Hop, AddressKindPattern, AddressTksPath, AddressTksSegment};
 use crate::mesh::serde::pattern::Pattern;
 use crate::mesh::serde::pattern::SegmentPattern;
-use crate::mesh::serde::pattern::ExactSegment;
 use crate::mesh::serde::id::Version;
 use mesh_portal_serde::version::latest::generic::pattern::ExactSegment;
 use mesh_portal_serde::version::v0_0_1::util::ValuePattern;
@@ -30,6 +29,8 @@ use crate::message::{ProtoStarMessage, ProtoStarMessageTo, ReplyKind, Reply};
 use crate::star::core::resource::registry::RegistryCall::SubSelect;
 use crate::frame::StarMessagePayload;
 use futures::future::join_all;
+use serde::{Serialize,Deserialize};
+use  rusqlite::params;
 
 static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_pre,host,status";
 
@@ -93,7 +94,7 @@ impl RegistryComponent {
                 skel: skel.clone(),
                 conn
             }),
-            skel.core_registry_api.tx.clone(),
+            skel.registry_api.tx.clone(),
             rx,
         );
     }
@@ -177,16 +178,16 @@ impl RegistryComponent {
             let params = RegistryParams::from_registration(&registration)?;
             trans.execute("INSERT INTO resources (address_segment,resource_type,kind,vendor,product,variant,version,version_pre,parent,status) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'Pending')", params![params.address_segment,params.resource_type,params.kind,params.vendor,params.product,params.variant,params.version,params.version_pre,params.parent])?;
 
-            fn properties( prefix: &str, properties: SetProperties, trans: &Transaction ) -> Result<(),Fail> {
-                for (key, payload) in properties.iter() {
+            fn set_properties(prefix: &str, params: &RegistryParams, props: &SetProperties, trans: &Transaction ) -> Result<(),Fail> {
+                for (key, payload) in props.iter() {
                     match payload {
                         Payload::Primitive(primitive) => {
                             match primitive {
                                 Primitive::Text(text) => {
-                                    trans.execute("INSERT INTO properties (address,key,value) VALUES (?1,?2,?3)", params![params.address,key.to_string(),text.to_string()])?;
+                                    trans.execute("INSERT INTO properties (resource_id,key,value) VALUES ((SELECT id FROM resources WHERE parent=?1 AND address_segment=?2),?3,?4)", params![params.parent,params.address_segment,key.to_string(),text.to_string()])?;
                                 }
                                 Primitive::Address(address) => {
-                                    trans.execute("INSERT INTO properties (address,key,value) VALUES (?1,?2,?3)", params![params.address,key.to_string(),address.to_string()])?;
+                                    trans.execute("INSERT INTO properties (resource_id,key,value) VALUES ((SELECT id FROM resources WHERE parent=?1 AND address_segment=?2),?3,?4)", params![params.parent,params.address_segment,key.to_string(),address.to_string()])?;
                                 }
                                 found => {
                                     return Err(Fail::Fail(fail::Fail::Resource(fail::resource::Fail::Create(fail::resource::Create::InvalidProperty { expected: "Text|Address|PayloadMap".to_string(), found: found.primitive_type().to_string() }))));
@@ -199,7 +200,7 @@ impl RegistryComponent {
                             } else {
                                 format!("{}.{}",prefix,key)
                             };
-                            properties( prefix.as_str(), map, &trans)?;
+                            set_properties(prefix.as_str(), params, map, &trans)?;
                         }
                         found => {
                             return Err(Fail::Fail(fail::Fail::Resource(fail::resource::Fail::Create(fail::resource::Create::InvalidProperty { expected: "Text|Address|PayloadMap".to_string(), found: found.payload_type().to_string() }))));
@@ -209,7 +210,7 @@ impl RegistryComponent {
                 Ok(())
             }
 
-            properties( "", registration.properties, &trans )?;
+            set_properties("", &params, &registration.properties, &trans )?;
 
             trans.commit()?;
             Ok(())
@@ -230,7 +231,7 @@ impl RegistryComponent {
                 return Err(Fail::Fail(fail));
             }
 
-            let address_tks_path = registry.skel.core_registry_api.address_tks_path_query(address).await?;
+            let address_tks_path = registry.skel.registry_api.address_tks_path_query(address).await?;
 
             let sub_selector = SubSelector{
                 pattern: selector.pattern.clone(),
@@ -239,7 +240,7 @@ impl RegistryComponent {
                 address_tks_path
             };
 
-            let stubs = registry.skel.core_registry_api.sub_select(sub_selector).await?;
+            let stubs = registry.skel.registry_api.sub_select(sub_selector).await?;
 
             let rtn  = selector.into_payload.to_primitive(stubs)?;
 
@@ -500,7 +501,8 @@ impl RegistryComponent {
 
 
 
-struct SubSelector {
+#[derive(Debug,Clone,Serialize,Deserialize)]
+pub struct SubSelector {
     pub pattern: AddressKindPattern,
     pub address: Address,
     pub hops: Vec<Hop>,
@@ -649,11 +651,10 @@ pub fn setup(conn: &mut Connection) -> Result<(), Error> {
     let properties = r#"CREATE TABLE IF NOT EXISTS properties (
          id INTEGER PRIMARY KEY AUTOINCREMENT,
 	     resource_id INTEGER NOT NULL,
-         address TEXT NOT NULL,
          key TEXT NOT NULL,
          value TEXT NOT NULL,
          FOREIGN KEY (resource_id) REFERENCES resources (id),
-         UNIQUE(address,key)
+         UNIQUE(resource_id,key)
         )"#;
 
     let address_index = "CREATE UNIQUE INDEX resource_address_index ON resources(address)";

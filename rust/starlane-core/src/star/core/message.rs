@@ -4,7 +4,7 @@ use tokio::sync::{mpsc, oneshot};
 
 
 use crate::error::Error;
-use crate::frame::{StarMessagePayload, StarMessage, ResourceRegistryRequest, ResourceHostAction};
+use crate::frame::{StarMessagePayload, StarMessage, ResourceRegistryRequest, ResourceHostAction, SimpleReply};
 use crate::message::delivery::Delivery;
 use crate::resource::{Parent, ParentCore, ResourceManager, ResourceRecord, AssignResourceStateSrc };
 use crate::resource::{Kind, ResourceType};
@@ -25,6 +25,8 @@ use crate::mesh::serde::resource::command::RcCommand;
 use crate::mesh::serde::pattern::TksPattern;
 use crate::mesh::serde::payload::Payload;
 use crate::mesh::serde::payload::Primitive;
+use mesh_portal_serde::version::v0_0_1::generic::resource::ResourceStub;
+use crate::message::{ProtoStarMessage, ProtoStarMessageTo, ReplyKind, Reply};
 
 pub enum CoreMessageCall {
     Message(StarMessage),
@@ -93,6 +95,36 @@ impl MessagingEndpointComponent {
             StarMessagePayload::ResourceHost(action) => {
                 let delivery = Delivery::new(action.clone(), star_message, self.skel.clone());
                 self.process_resource_host_action(delivery).await?;
+            }
+            StarMessagePayload::SubSelect(selector) => {
+                let skel = self.skel.clone();
+                tokio::spawn( async move {
+                    match skel.registry_api.sub_select(selector.clone()).await {
+                        Ok(stubs) => {
+                            let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Stubs(stubs))));
+                            skel.messaging_api.send( proto );
+                        }
+                        Err(fail) => {
+                            let proto = star_message.fail(fail);
+                            skel.messaging_api.send( proto );
+                        }
+                    }
+                });
+            }
+            StarMessagePayload::AddressTksPathQuery(address) => {
+                let skel = self.skel.clone();
+                tokio::spawn( async move {
+                    match skel.registry_api.address_tks_path_query(address.clone()).await {
+                        Ok(address_tks_path) => {
+                            let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::AddressTksPath(address_tks_path))));
+                            skel.messaging_api.send( proto );
+                        }
+                        Err(fail) => {
+                            let proto = star_message.fail(fail);
+                            skel.messaging_api.send( proto );
+                        }
+                    }
+                });
             }
 /*            StarMessagePayload::Select(selector) => {
                 let delivery = Delivery::new(selector.clone(), star_message.clone(), self.skel.clone());

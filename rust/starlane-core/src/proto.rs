@@ -43,6 +43,7 @@ use crate::template::StarKeyConstellationIndex;
 use crate::star::shell::locator::{ResourceLocatorApi, ResourceLocatorComponent};
 use crate::star::shell::golden::{GoldenPathApi, GoldenPathComponent};
 use crate::star::shell::watch::{WatchApi, WatchComponent};
+use crate::star::core::resource::registry::{RegistryApi, RegistryComponent};
 
 
 pub struct ProtoStar {
@@ -182,6 +183,7 @@ impl ProtoStar {
                         let (golden_path_tx, golden_path_rx) = mpsc::channel(1024);
                         let (variant_tx, variant_rx) = mpsc::channel(1024);
                         let (watch_tx, watch_rx) = mpsc::channel(1024);
+                        let (registry_tx, registry_rx) = mpsc::channel(1024);
 
                         let resource_locator_api = ResourceLocatorApi::new(resource_locator_tx);
                         let star_search_api = StarSearchApi::new(star_locator_tx);
@@ -190,24 +192,12 @@ impl ProtoStar {
                         let golden_path_api = GoldenPathApi::new(golden_path_tx);
                         let variant_api = VariantApi::new(variant_tx);
                         let watch_api = WatchApi::new(watch_tx);
+                        let registry_api = RegistryApi::new(registry_tx);
 
 
                         let data_access = self
                             .data_access
                             .with_path(format!("stars/{}", info.key.to_string()))?;
-
-                        let resource_registry: Option<Arc<dyn ResourceRegistryBacking>> =
-                            if info.kind.is_resource_manager() {
-                                Option::Some(Arc::new(
-                                    ResourceRegistryBackingSqLite::new(
-                                        info.clone(),
-                                        data_access.path(),
-                                    )
-                                    .await?,
-                                ))
-                            } else {
-                                Option::None
-                            };
 
                         let star_handler: Option<StarWranglerBacking> =
                             if !info.kind.conscripts().is_empty() {
@@ -217,16 +207,15 @@ impl ProtoStar {
                             };
 
                         let skel = StarSkel {
-                            info: info,
+                            info,
                             sequence: self.sequence.clone(),
                             star_tx: self.star_tx.clone(),
                             core_messaging_endpoint_tx: core_messaging_endpoint_tx.clone(),
                             logger: self.logger.clone(),
                             flags: self.flags.clone(),
-                            registry: resource_registry,
-                            star_handler: star_handler,
+                            star_handler,
                             persistence: Persistence::Memory,
-                            data_access: data_access,
+                            data_access,
                             machine: self.machine.clone(),
                             surface_api: self.surface_api,
                             resource_locator_api,
@@ -236,7 +225,8 @@ impl ProtoStar {
                             lane_muxer_api: self.lane_muxer_api,
                             golden_path_api,
                             variant_api,
-                            watch_api
+                            watch_api,
+                            registry_api
                         };
 
                         start_variant(skel.clone(), variant_rx );
@@ -249,6 +239,7 @@ impl ProtoStar {
                         SurfaceComponent::start(skel.clone(), self.surface_rx);
                         GoldenPathComponent::start(skel.clone(), golden_path_rx);
                         WatchComponent::start(skel.clone(), watch_rx);
+                        RegistryComponent::start( skel.clone(), registry_rx );
 
                         return Ok(Star::from_proto(
                             skel,
