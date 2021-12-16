@@ -101,20 +101,6 @@ impl MessagingEndpointComponent {
                 let delivery = Delivery::new(action.clone(), star_message, self.skel.clone());
                 self.process_resource_host_action(delivery).await?;
             }
-
-            /*            StarMessagePayload::Select(selector) => {
-                           let delivery = Delivery::new(selector.clone(), star_message.clone(), self.skel.clone());
-                           let results = self.skel.registry.as_ref().unwrap().select(selector.clone()).await;
-                           match results {
-                               Ok(records) => {
-                                   delivery.reply(Reply::Records(records))
-                               }
-                               Err(error) => {
-                                   delivery.fail(Fail::Error("could not select records".to_string()))
-                               }
-                           }
-                       }
-            */
             _ => {}
         }
         Ok(())
@@ -123,7 +109,7 @@ impl MessagingEndpointComponent {
     async fn process_resource_command(&mut self, delivery: Delivery<Rc>) -> Result<(), Error> {
         let skel = self.skel.clone();
         tokio::spawn(async move {
-            async fn process(skel: StarSkel, rc: &Rc, to: Address) -> Result<(), Fail> {
+            async fn process(skel: StarSkel, rc: &Rc, to: Address) -> Result<Payload, Fail> {
                 match &rc.command {
                     RcCommand::Create(create) => {
                         let address = match &create.template.address.child_segment_template {
@@ -158,7 +144,7 @@ impl MessagingEndpointComponent {
 
                         match assign( skel, stub, create.state.clone() ).await {
                             Ok(_) => {
-                                Ok(())
+                                Ok(Payload::Empty)
                             }
                             Err(fail) => {
                                 skel.registry_api.set_status(to, Status::Panic( "could not assign resource to host".to_string())).await;
@@ -325,22 +311,6 @@ impl MessagingEndpointComponent {
             }
         }
         Ok(())
-    }
-
-    async fn get_parent_resource(skel: StarSkel, address: Address) -> Result<Parent, Error> {
-        let resource = skel
-            .resource_locator_api
-            .locate(address.clone().into())
-            .await?;
-
-        Ok(Parent {
-            core: ParentCore {
-                stub: resource.into(),
-                selector: ResourceHostSelector::new(skel.clone()),
-                child_registry: skel.registry.as_ref().unwrap().clone(),
-                skel: skel.clone(),
-            },
-        })
     }
 
     pub async fn has_resource(&self, key: &Address) -> Result<bool, Error> {
