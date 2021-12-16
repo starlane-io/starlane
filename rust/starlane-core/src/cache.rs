@@ -31,6 +31,7 @@ use crate::mesh::serde::id::Address;
 use mesh_portal_parse::path::Path;
 use crate::mesh::serde::bin::Bin;
 use crate::mesh::serde::payload::Payload;
+use crate::mesh::serde::payload::Primitive;
 
 pub type Data = Arc<Vec<u8>>;
 pub type ZipFile = Address;
@@ -402,21 +403,21 @@ impl ArtifactBundleCacheRunner {
         let record = src.fetch_resource_record(bundle.clone()).await?;
         println!("download&extract src.fetch_resource_record DONE");
 
-        let stream = src
-            .get_resource_state(bundle.clone())
-            .await?.get("zip").ok_or("expected a zip file for the bundle")?.to_bin(machine.bin_context())?;
+        let zip = src.get_bundle_zip(bundle.clone()).await?;
+
+
 println!("Pre FileAccess");
         let mut file_access =
-            ArtifactBundleCache::with_bundle_path(file_access, record.stub.address.try_into()?)?;
-        let bundle_zip = Path::from_str("/bundle.zip")?;
+            ArtifactBundleCache::with_bundle_path(file_access, record.stub.address.clone().try_into()?)?;
+        let bundle_zip_path = Path::from_str("/bundle.zip")?;
         let key_file = Path::from_str("/key.ser")?;
         file_access.write(
             &key_file,
-            Arc::new(record.stub.key.to_string().as_bytes().to_vec()),
+            Arc::new(record.stub.address.to_string().as_bytes().to_vec()),
         );
 
-println!("WRITING...{}", bundle_zip.to_string());
-        file_access.write(&bundle_zip, stream).await?;
+println!("WRITING...{}", bundle_zip_path.to_string());
+        file_access.write(&bundle_zip_path, zip).await?;
 println!("DONE WRITING...");
 
 println!("extracting files...");
@@ -493,13 +494,14 @@ pub enum ArtifactBundleSrc {
 }
 
 impl ArtifactBundleSrc {
-    pub async fn get_resource_state(
+    pub async fn get_bundle_zip(
         &self,
         address: Address,
-    ) -> Result<Payload, Error> {
+    ) -> Result<Bin, Error> {
         Ok(match self {
             ArtifactBundleSrc::STARLANE_API(api) => {
-                                api.get_state(address).await?
+                                let bundle: Primitive = api.get_state(address).await?.try_into()?;
+                                 bundle.try_into()?
             }
             //            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(address).await,
         })

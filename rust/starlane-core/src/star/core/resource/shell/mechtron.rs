@@ -92,7 +92,7 @@ impl Host for MechtronHost {
         }
     }
 
-    fn request(&self, delivery: Delivery<Request>) -> Result<(),Error>{
+    fn handle_request(&self, delivery: Delivery<Request>) -> Result<(),Error>{
 
         tokio::spawn( async move {
             info!("MECHTRON HOST RECEIVED DELIVERY");

@@ -75,7 +75,7 @@ impl Host for FileHost {
         ResourceType::File
     }
 
-    fn request(&self, delivery: Delivery<Message>) {
+    fn handle_request(&self, delivery: Delivery<Message>) {
         match &delivery.item {
             Message::Request(request) => {
                 match &request.entity {
@@ -143,7 +143,7 @@ impl Host for FileSystemHost {
         }
     }
 
-    fn request(&self, delivery: Delivery<Message>)  {
+    fn handle_request(&self, delivery: Delivery<Message>)  {
         unimplemented!()
         /*
         let record = self.skel.resource_locator_api.locate(key.into()).await?;

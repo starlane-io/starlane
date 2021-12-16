@@ -22,6 +22,10 @@ use crate::mesh::serde::resource::Resource;
 use mesh_portal_api::message::Message;
 use crate::mesh::serde::id::{Address, Kind};
 use crate::mesh::{Request, Response};
+use crate::fail::Fail;
+use k8s_openapi::kind;
+use crate::mesh::serde::fail;
+use crate::mesh::serde::generic::payload::Payload;
 
 pub mod artifact;
 mod default;
@@ -32,29 +36,27 @@ mod app;
 mod file;
 
 pub enum HostCall {
-    Assign {
-        assign: ResourceAssign,
-        tx: oneshot::Sender<Result<(), Error>>,
-    },
+    Assign( Delivery<ResourceAssign> ),
     Has {
         address: Address,
         tx: oneshot::Sender<bool>,
     },
-    Request {delivery: Delivery<Request>, kind: Kind },
-    Response{response: Response, kind: Kind },
+    Request (Delivery<Request>),
+    Get(Delivery<Rc>)
 }
 
 impl Call for HostCall {}
 
 pub struct HostComponent {
     skel: StarSkel,
-    hosts: HashMap<ResourceType,Arc<dyn Host>>
+    hosts: HashMap<ResourceType,Arc<dyn Host>>,
+    resources: HashMap<Address,ResourceType>
 }
 
 impl HostComponent {
     pub fn new(skel: StarSkel) -> mpsc::Sender<HostCall> {
         let (tx, rx) = mpsc::channel(1024);
-        AsyncRunner::new(Box::new(Self { skel, hosts: HashMap::new() }), tx.clone(), rx);
+        AsyncRunner::new(Box::new(Self { skel, hosts: HashMap::new(), resources: HashMap::new() }), tx.clone(), rx);
         tx
     }
 }
@@ -63,44 +65,56 @@ impl HostComponent {
 impl AsyncProcessor<HostCall> for HostComponent {
     async fn process(&mut self, call: HostCall) {
         match call {
-            HostCall::Select { key, selector, tx } => {
-                let host = self.host(key.resource_type()).await;
-                tx.send(host.select( key, selector).await);
-            }
-            HostCall::Assign { assign, tx } => {
-                let host = self.host(assign.stub.key.resource_type()).await;
-                match host.assign(assign.clone()).await {
-                    Ok(state) => {
-                        let resource = Resource::new(
-                            assign.stub.key.clone(),
-                            assign.stub.address.clone(),
-                            assign.stub.archetype.clone(),
-                            state,
-                        );
-                        tx.send(Ok(resource));
+            HostCall::Assign(assign) => {
+                let stub = assign.item.stub.clone();
+                match self.host(assign.item.stub.key.resource_type()).await
+                {
+                    Ok(host) => {
+                        let result = host.assign(assign.clone().item).await;
+                        if result.is_ok()
+                        {
+                            self.resources.insert( stub.address, stub.kind.resource_type() );
+                        }
+                        assign.ok(Payload::Empty);
                     }
                     Err(err) => {
-                        tx.send(Err(err));
+                        // need to send a FAIL message if the delivery fails...
+                        eprintln!("{}", err.to_string());
                     }
                 }
+
             }
-            HostCall::Has { address: key, tx } => {
-                let host = self.host(key.resource_type()).await;
-                tx.send(host.has(key).await);
+            HostCall::Has { address, tx } => {
+                tx.send(self.resources.has(address).await);
             }
-            HostCall::Request {delivery,kind }=> {
-                let host = self.host(kind.resource_type() ).await;
-                host.request(delivery);
+            HostCall::Request(delivery)=> {
+                match self.resources.get(&delivery.to()) {
+                    None => {
+                        let fail = fail::Fail::Resource(fail::resource::Fail::BadRequest(fail::BadRequest::NotFound(fail::NotFound::Address(delivery.to().to_string()))));
+                        delivery.fail(fail);
+                    }
+                    Some(resource_type) => {
+                        match self.host(resource_type).await
+                        {
+                            Ok(host) => {
+                                host.handle_request(delivery);
+                            }
+                            Err(err) => {
+                                eprintln!("cannot find host for resource_type: {}", resource_type.to_string() );
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 impl HostComponent {
-    async fn host(&mut self, rt: ResourceType) -> Arc<dyn Host> {
+    async fn host(&mut self, rt: &ResourceType) -> Result<Arc<dyn Host>,Error> {
 
-        if self.hosts.contains_key(&rt) {
-            return self.hosts.get(&rt).cloned().expect("expected reference to shell");
+        if self.hosts.contains_key(rt) {
+            Ok(self.hosts.get(rt).cloned().ok_or("expected reference to shell".into()));
         }
 
         let host: Arc<dyn Host> = match rt {
@@ -113,11 +127,11 @@ impl HostComponent {
             ResourceType::FileSystem => Arc::new(FileSystemHost::new(self.skel.clone() ).await),
             ResourceType::File => Arc::new(FileHost::new(self.skel.clone()).await),
 
-            t => unimplemented!("no HOST implementation for type {}", t.to_string()),
+            t => return Err(format!("no HOST implementation for type {}", t.to_string()).into()),
         };
 
-        self.hosts.insert( rt, host.clone() );
-        host
+        self.hosts.insert( rt.clone(), host.clone() );
+        Ok(host)
     }
 }
 
@@ -130,9 +144,10 @@ pub trait Host: Send + Sync {
     async fn assign(
         &self,
         assign: ResourceAssign,
-    ) -> Result<(), Error>;
+    ) -> Result<(),Error>;
 
-    fn request(&self, request: Delivery<Request> ) {
+
+    fn handle_request(&self, request: Delivery<Request> ) {
         // delivery.fail(fail::Undeliverable)
     }
 

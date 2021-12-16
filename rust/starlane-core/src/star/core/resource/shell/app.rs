@@ -70,7 +70,7 @@ impl Host for AppHost {
          */
     }
 
-    fn request(&self, request : Delivery<Request>) {
+    fn handle_request(&self, request : Delivery<Request>) {
         todo!()
     }
 

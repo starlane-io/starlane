@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::fmt::{Debug, Formatter};
 use std::iter::FromIterator;
-use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use futures::future::select_all;
@@ -15,21 +15,36 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
+use shell::search::{
+    SearchCommit, SearchHits, SearchInit, StarSearchTransaction, TransactionResult,
+};
 use shell::wrangler::{StarWrangle, StarWrangleSatisfaction, StarWranglerApi};
-use shell::search::{SearchCommit, SearchHits, SearchInit, StarSearchTransaction, TransactionResult};
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::constellation::ConstellationStatus;
 use crate::error::Error;
+use crate::fail::Fail;
 use crate::file_access::FileAccess;
+use crate::frame::{Frame, ProtoFrame, StarMessage, StarPattern, TraversalAction};
 use crate::id::Id;
 use crate::lane::{
     ConnectorController, LaneCommand, LaneEnd, LaneIndex, LaneMeta, LaneWrapper, ProtoLaneEnd,
     UltimaLaneKey,
 };
-use crate::logger::{Flags, Logger, LogInfo};
-use crate::message::{MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage, ProtoStarMessageTo, TrackerJob, MessageId};
+use crate::logger::{Flags, LogInfo, Logger};
+use crate::mesh::serde::generic::resource::ResourceStub;
+use crate::mesh::serde::id::{Address, ResourceType};
+use crate::mesh::serde::payload::Payload;
+use crate::mesh::serde::resource::command::select::Select;
+use crate::mesh::serde::resource::command::update::Update;
+use crate::mesh::serde::resource::Status;
+use crate::message::{
+    MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage,
+    ProtoStarMessageTo, TrackerJob,
+};
+use crate::resource::ResourceRecord;
 use crate::star::core::message::CoreMessageCall;
+use crate::star::core::resource::registry::RegistryApi;
 use crate::star::shell::golden::GoldenPathApi;
 use crate::star::shell::lanes::LaneMuxerApi;
 use crate::star::shell::locator::ResourceLocatorApi;
@@ -42,18 +57,8 @@ use crate::star::variant::{FrameVerdict, VariantApi};
 use crate::starlane::StarlaneMachine;
 use crate::template::StarTemplateHandle;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
-use crate::fail::Fail;
-use crate::mesh::serde::resource::Status;
-use crate::mesh::serde::id::{Address, ResourceType};
-use crate::mesh::serde::resource::command::select::Select;
-use crate::frame::{ProtoFrame, Frame, StarPattern, StarMessage, TraversalAction};
-use crate::mesh::serde::generic::resource::ResourceStub;
-use crate::mesh::serde::resource::command::update::Update;
-use crate::mesh::serde::payload::Payload;
-use std::fmt;
 use std::cmp;
-use crate::star::core::resource::registry::RegistryApi;
-use crate::resource::ResourceRecord;
+use std::fmt;
 
 pub mod core;
 pub mod shell;
@@ -137,7 +142,10 @@ impl StarKind {
                     ]
                 }
                 StarKind::Mesh => vec![],
-                StarKind::App => vec![StarWrangleKind::req(StarKind::Mechtron), StarWrangleKind::req(StarKind::FileStore)],
+                StarKind::App => vec![
+                    StarWrangleKind::req(StarKind::Mechtron),
+                    StarWrangleKind::req(StarKind::FileStore),
+                ],
                 StarKind::Mechtron => vec![],
                 StarKind::FileStore => vec![],
                 StarKind::Gateway => vec![],
@@ -193,12 +201,12 @@ impl StarKind {
             ResourceType::FileSystem => Self::Space,
             ResourceType::File => Self::Space,
             ResourceType::Database => Self::K8s,
-            ResourceType::Authenticator=> Self::K8s,
+            ResourceType::Authenticator => Self::K8s,
             ResourceType::ArtifactBundleSeries => Self::Space,
             ResourceType::ArtifactBundle => Self::ArtifactStore,
             ResourceType::Artifact => Self::ArtifactStore,
             ResourceType::Proxy => Self::Space,
-            ResourceType::Credentials=> Self::Space,
+            ResourceType::Credentials => Self::Space,
         }
     }
 
@@ -212,13 +220,13 @@ impl StarKind {
             ResourceType::FileSystem => Self::FileStore,
             ResourceType::File => Self::FileStore,
             ResourceType::Database => Self::K8s,
-            ResourceType::Authenticator=> Self::K8s,
+            ResourceType::Authenticator => Self::K8s,
             ResourceType::ArtifactBundleSeries => Self::ArtifactStore,
             ResourceType::ArtifactBundle => Self::ArtifactStore,
             ResourceType::Artifact => Self::ArtifactStore,
             ResourceType::Proxy => Self::Space,
             ResourceType::Credentials => Self::Space,
-            ResourceType::Base => Self::Space
+            ResourceType::Base => Self::Space,
         }
     }
 
@@ -255,24 +263,24 @@ impl StarKind {
     }
 }
 
-#[derive(Clone,Hash,Eq,PartialEq)]
+#[derive(Clone, Hash, Eq, PartialEq)]
 pub struct StarWrangleKind {
     pub kind: StarKind,
-    pub required: bool
+    pub required: bool,
 }
 
 impl StarWrangleKind {
-    pub fn req(kind:StarKind)->Self {
+    pub fn req(kind: StarKind) -> Self {
         Self {
             kind,
-            required: true
+            required: true,
         }
     }
 
-    pub fn opt(kind:StarKind)->Self {
+    pub fn opt(kind: StarKind) -> Self {
         Self {
             kind,
-            required: false
+            required: false,
         }
     }
 }
@@ -374,8 +382,6 @@ impl StarKind {
     }
 }
 
-
-
 pub static MAX_HOPS: usize = 32;
 
 pub struct Star {
@@ -435,109 +441,111 @@ impl Star {
     #[instrument]
     pub async fn run(mut self) {
         loop {
-
             let command = self.star_rx.recv().await;
 
             if let Some(command) = command {
-//                let instructions = self.variant.filter(&command, &mut lane);
+                //                let instructions = self.variant.filter(&command, &mut lane);
 
-                    match command {
-                        StarCommand::Init => {
-                            self.init().await;
-                        }
-                        StarCommand::GetStarInfo(tx) => {
-                            tx.send(Option::Some(self.skel.info.clone()));
-                        }
-                        StarCommand::SetFlags(set_flags) => {
-                            self.skel.flags = set_flags.flags;
-                            set_flags.tx.send(());
-                        }
-                        StarCommand::AddConnectorController(connector_ctrl) => {
-                            self.connector_ctrls.push(connector_ctrl);
-                        }
-                        StarCommand::ReleaseHold(star) => {
-                            unimplemented!()
-/*                            if let Option::Some(frames) = self.frame_hold.release(&star) {
-                                let lane = self.lane_with_shortest_path_to_star(&star);
-                                if let Option::Some(lane) = lane {
-                                    for frame in frames {
-                                        lane.outgoing()
-                                            .out_tx
-                                            .send(LaneCommand::Frame(frame))
-                                            .await;
-                                    }
-                                } else {
-                                    eprintln!("release hold called on star that is not ready!")
-                                }
-                            }
-
- */
-                        }
-
-                        StarCommand::AddLogger(_tx) => {
-                            //                        self.logger.tx.push(tx);
-                        }
-                        StarCommand::Test(_test) => {
-                            /*                        match test
-                                                   {
-                                                       StarTest::StarSearchForStarKey(star) => {
-                                                           let search = Search{
-                                                               pattern: StarSearchPattern::StarKey(star),
-                                                               tx: (),
-                                                               max_hops: 0
-                                                           };
-                                                           self.do_search(star).await;
+                match command {
+                    StarCommand::Init => {
+                        self.init().await;
+                    }
+                    StarCommand::GetStarInfo(tx) => {
+                        tx.send(Option::Some(self.skel.info.clone()));
+                    }
+                    StarCommand::SetFlags(set_flags) => {
+                        self.skel.flags = set_flags.flags;
+                        set_flags.tx.send(());
+                    }
+                    StarCommand::AddConnectorController(connector_ctrl) => {
+                        self.connector_ctrls.push(connector_ctrl);
+                    }
+                    StarCommand::ReleaseHold(star) => {
+                        unimplemented!()
+                        /*                            if let Option::Some(frames) = self.frame_hold.release(&star) {
+                                                       let lane = self.lane_with_shortest_path_to_star(&star);
+                                                       if let Option::Some(lane) = lane {
+                                                           for frame in frames {
+                                                               lane.outgoing()
+                                                                   .out_tx
+                                                                   .send(LaneCommand::Frame(frame))
+                                                                   .await;
+                                                           }
+                                                       } else {
+                                                           eprintln!("release hold called on star that is not ready!")
                                                        }
                                                    }
 
-                            */
+                        */
+                    }
+
+                    StarCommand::AddLogger(_tx) => {
+                        //                        self.logger.tx.push(tx);
+                    }
+                    StarCommand::Test(_test) => {
+                        /*                        match test
+                                               {
+                                                   StarTest::StarSearchForStarKey(star) => {
+                                                       let search = Search{
+                                                           pattern: StarSearchPattern::StarKey(star),
+                                                           tx: (),
+                                                           max_hops: 0
+                                                       };
+                                                       self.do_search(star).await;
+                                                   }
+                                               }
+
+                        */
+                    }
+
+                    StarCommand::CheckStatus => {
+                        self.check_status().await;
+                    }
+                    StarCommand::SetStatus(status) => {
+                        self.set_status(status.clone());
+                        //                            println!("{} {}", &self.skel.info.kind, &self.status.to_string());
+                    }
+                    StarCommand::Diagnose(diagnose) => {
+                        self.diagnose(diagnose).await;
+                    }
+                    StarCommand::GetStatusListener(tx) => {
+                        tx.send(self.status_broadcast.subscribe());
+                        self.status_broadcast.send(self.status.clone());
+                    }
+
+                    StarCommand::GetSkel(tx) => {
+                        tx.send(self.skel.clone()).unwrap_or_default();
+                    }
+                    StarCommand::AddProtoLaneEndpoint(lane) => {
+                        lane.outgoing
+                            .out_tx
+                            .try_send(LaneCommand::Frame(Frame::Proto(ProtoFrame::ReportStarKey(
+                                self.skel.info.key.clone(),
+                            ))))
+                            .unwrap_or_default();
+
+                        self.skel
+                            .lane_muxer_api
+                            .add_proto_lane(lane, StarPattern::Any);
+                    }
+                    StarCommand::Shutdown => {
+                        for (_, lane) in &mut self.lanes {
+                            lane.outgoing().out_tx.try_send(LaneCommand::Shutdown);
+                        }
+                        for lane in &mut self.proto_lanes {
+                            lane.outgoing().out_tx.try_send(LaneCommand::Shutdown);
                         }
 
-                        StarCommand::CheckStatus => {
-                            self.check_status().await;
-                        }
-                        StarCommand::SetStatus(status) => {
-                            self.set_status(status.clone());
-                            //                            println!("{} {}", &self.skel.info.kind, &self.status.to_string());
-                        }
-                        StarCommand::Diagnose(diagnose) => {
-                            self.diagnose(diagnose).await;
-                        }
-                        StarCommand::GetStatusListener(tx) => {
-                            tx.send(self.status_broadcast.subscribe());
-                            self.status_broadcast.send(self.status.clone());
-                        }
+                        self.lanes.clear();
+                        self.proto_lanes.clear();
 
-                        StarCommand::GetSkel(tx) => {
-                            tx.send(self.skel.clone()).unwrap_or_default();
-                        }
-                        StarCommand::AddProtoLaneEndpoint(lane) => {
-                                   lane.outgoing
-                                        .out_tx
-                                        .try_send(LaneCommand::Frame(Frame::Proto(
-                                            ProtoFrame::ReportStarKey(self.skel.info.key.clone()),
-                                        ))).unwrap_or_default();
-
-                            self.skel.lane_muxer_api.add_proto_lane(lane, StarPattern::Any );
-                        }
-                       StarCommand::Shutdown => {
-                            for (_, lane) in &mut self.lanes {
-                                lane.outgoing().out_tx.try_send(LaneCommand::Shutdown);
-                            }
-                            for lane in &mut self.proto_lanes {
-                                lane.outgoing().out_tx.try_send(LaneCommand::Shutdown);
-                            }
-
-                            self.lanes.clear();
-                            self.proto_lanes.clear();
-
-                            break;
-                        }
-                        _ => {
-                            unimplemented!("cannot process command: {}", command.to_string());
-                        }
+                        break;
+                    }
+                    _ => {
+                        unimplemented!("cannot process command: {}", command.to_string());
                     }
                 }
+            }
         }
     }
 
@@ -548,11 +556,14 @@ impl Star {
 
     fn set_status(&mut self, status: StarStatus) {
         self.status = status.clone();
-        self.status_broadcast.send(status.clone() );
+        self.status_broadcast.send(status.clone());
 
-        let notification = Notification{
-            selector: WatchSelector { topic: Topic::Star(self.skel.info.key.clone()), property: Property::Status },
-            changes: vec![Change::Status(status)]
+        let notification = Notification {
+            selector: WatchSelector {
+                topic: Topic::Star(self.skel.info.key.clone()),
+                property: Property::Status,
+            },
+            changes: vec![Change::Status(status)],
         };
         self.skel.watch_api.fire(notification);
     }
@@ -562,61 +573,65 @@ impl Star {
             self.set_status(StarStatus::Pending);
         }
 
-        if let Option::Some(star_handler) = &self.skel.star_wrangler_api {
-
-            for conscript_kind in self.skel.info.kind.conscripts() {
-                let search = SearchInit::new(StarPattern::StarKind(conscript_kind.kind.clone()), TraversalAction::SearchHits);
-                let (tx,rx) = oneshot::channel();
-                self.skel.star_search_api.tx.try_send(StarSearchCall::Search {init:search, tx} ).unwrap_or_default();
-                let star_handler = star_handler.clone();
-                let kind = conscript_kind.kind.clone();
-                let skel = self.skel.clone();
-                tokio::spawn(async move {
-                    let result = tokio::time::timeout(Duration::from_secs(15), rx).await;
-                    match result {
-                        Ok(Ok(hits)) => {
-                            for (star, hops) in hits.hits {
-                                let handle = StarWrangle {
-                                    key: star,
-                                    kind: kind.clone(),
-                                    hops: Option::Some(hops),
-                                };
-                                let result = star_handler.add_star_handle(handle).await;
-                                match result {
-                                    Ok(_) => {
-                                        skel.star_tx.send(StarCommand::CheckStatus).await;
-                                    }
-                                    Err(error) => {
-                                        eprintln!(
-                                            "error when adding star handle: {}",
-                                            error.to_string()
-                                        )
-                                    }
+        for conscript_kind in self.skel.info.kind.conscripts() {
+            let search = SearchInit::new(
+                StarPattern::StarKind(conscript_kind.kind.clone()),
+                TraversalAction::SearchHits,
+            );
+            let (tx, rx) = oneshot::channel();
+            self.skel
+                .star_search_api
+                .tx
+                .try_send(StarSearchCall::Search { init: search, tx })
+                .unwrap_or_default();
+            let kind = conscript_kind.kind.clone();
+            let skel = self.skel.clone();
+            tokio::spawn(async move {
+                let result = tokio::time::timeout(Duration::from_secs(15), rx).await;
+                match result {
+                    Ok(Ok(hits)) => {
+                        for (star, hops) in hits.hits {
+                            let handle = StarWrangle {
+                                key: star,
+                                kind: kind.clone(),
+                                hops: Option::Some(hops),
+                            };
+                            let result = skel.star_wrangler_api.add_star_handle(handle).await;
+                            match result {
+                                Ok(_) => {
+                                    skel.star_tx.send(StarCommand::CheckStatus).await;
+                                }
+                                Err(error) => {
+                                    eprintln!(
+                                        "error when adding star handle: {}",
+                                        error.to_string()
+                                    )
                                 }
                             }
                         }
-                        Err(error) => {
-                            error!(
-                            "error encountered when attempting to get a handle for: {} TIMEOUT: {}",
-                            kind.to_string(), error.to_string()
-                        );
-                        }
-                        Ok(Err(error)) => {
-                            error!(
-                                "error encountered when attempting to get a handle for: {} ERROR: {}",
-                                kind.to_string(), error.to_string()
-                            );
-                        }
                     }
-                });
-            }
+                    Err(error) => {
+                        error!(
+                            "error encountered when attempting to get a handle for: {} TIMEOUT: {}",
+                            kind.to_string(),
+                            error.to_string()
+                        );
+                    }
+                    Ok(Err(error)) => {
+                        error!(
+                            "error encountered when attempting to get a handle for: {} ERROR: {}",
+                            kind.to_string(),
+                            error.to_string()
+                        );
+                    }
+                }
+            });
         }
     }
 
     async fn check_status(&mut self) {
         if self.status == StarStatus::Pending {
-            if let Option::Some(star_handler) = &self.skel.star_wrangler_api {
-                let satisfied = star_handler
+                let satisfied = self.skel.star_wrangler_api
                     .satisfied(self.skel.info.kind.conscripts())
                     .await;
                 if let Result::Ok(StarWrangleSatisfaction::Ok) = satisfied {
@@ -627,16 +642,17 @@ impl Star {
                         match result {
                             Ok(_) => {
                                 skel.star_tx
-                                    .try_send(StarCommand::SetStatus(StarStatus::Ready)).unwrap_or_default();
+                                    .try_send(StarCommand::SetStatus(StarStatus::Ready))
+                                    .unwrap_or_default();
                             }
                             Err(error) => {
-                                let err_msg = format!("{}",error.to_string());
+                                let err_msg = format!("{}", error.to_string());
                                 skel.star_tx
-                                    .try_send(StarCommand::SetStatus(StarStatus::Panic(err_msg))).unwrap_or_default();
-                                error!("{}",error.to_string())
+                                    .try_send(StarCommand::SetStatus(StarStatus::Panic(err_msg)))
+                                    .unwrap_or_default();
+                                error!("{}", error.to_string())
                             }
                         }
-
                     });
                 } else if let Result::Ok(StarWrangleSatisfaction::Lacking(lacking)) = satisfied {
                     let mut s = String::new();
@@ -644,37 +660,19 @@ impl Star {
                         s.push_str(lack.to_string().as_str());
                         s.push_str(", ");
                     }
-//                    eprintln!("handles not satisfied for : {} Lacking: [ {}]", self.skel.info.kind.to_string(), s);
+                    //                    eprintln!("handles not satisfied for : {} Lacking: [ {}]", self.skel.info.kind.to_string(), s);
                 }
-            } else {
-                self.set_status(StarStatus::Pending);
-                let skel = self.skel.clone();
-                tokio::spawn(async move {
-                    let result = skel.variant_api.init().await;
-                    match result {
-                        Ok(_) => {
-                            skel.star_tx
-                                .try_send(StarCommand::SetStatus(StarStatus::Ready)).unwrap_or_default();
-                        }
-                        Err(error) => {
-                            let err_msg = format!("{}",error.to_string());
-                            skel.star_tx
-                                .try_send(StarCommand::SetStatus(StarStatus::Panic(err_msg))).unwrap_or_default();
-                            error!("{}",error.to_string())
-                        }
-                    }
-                });
-            }
+
         }
     }
 
-    pub async fn wait_for_it<R>(rx: oneshot::Receiver<Result<R, Fail>>) -> Result<R, Fail> {
+    pub async fn wait_for_it<R>(rx: oneshot::Receiver<Result<R, Error>>) -> Result<R, Error> {
         match tokio::time::timeout(Duration::from_secs(15), rx).await {
             Ok(result) => match result {
                 Ok(result) => result,
-                Err(_err) => Err(Fail::ChannelRecvErr),
+                Err(_err) => Err("Fail::ChannelRecvErr".into()),
             },
-            Err(_) => Err(Fail::Timeout),
+            Err(_) => Err("Fail::Timeout".into()),
         }
     }
 
@@ -693,8 +691,7 @@ impl Star {
     async fn diagnose(&self, diagnose: Diagnose) {
         match diagnose {
             Diagnose::HandlersSatisfied(satisfied) => {
-                if let Option::Some(star_handler) = &self.skel.star_wrangler_api {
-                    if let Result::Ok(satisfaction) = star_handler
+                    if let Result::Ok(satisfaction) = self.skel.star_wrangler_api
                         .satisfied(self.skel.info.kind.conscripts())
                         .await
                     {
@@ -702,9 +699,7 @@ impl Star {
                     } else {
                         // let satisfied.tx drop since we can't give it an answer
                     }
-                } else {
-                    satisfied.tx.send(StarWrangleSatisfaction::Ok);
-                }
+
             }
         }
     }
@@ -757,10 +752,16 @@ pub enum StarCommand {
     },
     Shutdown,
     GetSkel(oneshot::Sender<StarSkel>),
-    Broadcast { frame: Frame, exclude: Option<HashSet<UltimaLaneKey>> },
+    Broadcast {
+        frame: Frame,
+        exclude: Option<HashSet<UltimaLaneKey>>,
+    },
     LaneKeys(oneshot::Sender<Vec<UltimaLaneKey>>),
-    LaneWithShortestPathToStar { star: StarKey, tx: oneshot::Sender<Option<UltimaLaneKey>> },
-    GatewayAssign(Vec<StarSubGraphKey>)
+    LaneWithShortestPathToStar {
+        star: StarKey,
+        tx: oneshot::Sender<Option<UltimaLaneKey>>,
+    },
+    GatewayAssign(Vec<StarSubGraphKey>),
 }
 
 #[derive(Clone)]
@@ -1193,9 +1194,7 @@ impl StarNotify {
     }
 }
 
-
 pub type StarStatus = Status;
-
 
 impl Into<LogId<String>> for &'static Star {
     fn into(self) -> LogId<String> {

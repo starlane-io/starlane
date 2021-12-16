@@ -65,7 +65,7 @@ impl StarWranglerApi {
         let result = tokio::time::timeout(Duration::from_secs(5), rx).await??;
         match result {
             StarWrangleResult::Satisfaction(satisfaction) => Ok(satisfaction),
-            _what => Err(Fail::expected("StarHandleResult::Satisfaction(_)").into()),
+            _what => Err("StarHandleResult::Satisfaction(_)".into()),
         }
     }
 }
@@ -434,10 +434,9 @@ impl StarWrangleDB {
                     Err(err) => {
                         match err {
                             rusqlite::Error::QueryReturnedNoRows => {
-                                return Err(Fail::SuitableHostNotAvailable(format!(
-                                    "could not select for: {}",
-                                    selector.to_string()
-                                )).into());
+                                return Err(format!("could not select for: {}",
+                                    selector.to_string()).into()
+                                );
                             }
                             _ => {
                                 return Err(err.to_string().into());

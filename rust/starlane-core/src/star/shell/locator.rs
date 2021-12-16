@@ -32,7 +32,7 @@ impl ResourceLocatorApi {
     }
 
 
-    pub async fn locate(&self, address: Address ) -> Result<ResourceRecord, Fail> {
+    pub async fn locate(&self, address: Address ) -> Result<ResourceRecord, Error> {
         let (tx, mut rx) = oneshot::channel();
         self.tx
             .send(ResourceLocateCall::Locate { address, tx })

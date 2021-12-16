@@ -85,16 +85,18 @@ impl MessagingEndpointComponent {
                 }
                 _ => {
                     let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
-                    self.handle_by_host(delivery).await?;
+                    self.host_tx.send( HostCall::Request (delivery)).await;
                 }
             },
-            StarMessagePayload::ResourceRegistry(action) => {
-                let delivery = Delivery::new(action.clone(), star_message, self.skel.clone());
-                self.process_registry_action(delivery).await?;
-            }
+
             StarMessagePayload::ResourceHost(action) => {
-                let delivery = Delivery::new(action.clone(), star_message, self.skel.clone());
-                self.process_resource_host_action(delivery).await?;
+                match action {
+                    ResourceHostAction::Assign(assign) => {
+                        let delivery = Delivery::new(assign.clone(), star_message, self.skel.clone());
+                        self.host_tx.send( HostCall::Assign(delivery)).await;
+                    }
+                    ResourceHostAction::Init(_) => {}
+                }
             }
             _ => {}
         }
@@ -104,7 +106,7 @@ impl MessagingEndpointComponent {
     async fn process_resource_command(&mut self, delivery: Delivery<Rc>) -> Result<(), Error> {
         let skel = self.skel.clone();
         tokio::spawn(async move {
-            async fn process(skel: StarSkel, rc: &Rc, to: Address) -> Result<Payload, Fail> {
+            async fn process(skel: StarSkel, rc: &Rc, to: Address) -> Result<Payload, Error> {
                 match &rc.command {
                     RcCommand::Create(create) => {
                         let address = match &create.template.address.child_segment_template {
@@ -156,12 +158,12 @@ impl MessagingEndpointComponent {
                                         ),
                                     )
                                     .await;
-                                Err(fail)
+                                Err(fail.into())
                             }
                         }
                     }
                     RcCommand::Select(select) => Ok(Payload::List(
-                        skel.registry_api.select(select.clone(), to).await?,
+                        skel.registry_api.select(select.clone(), to).await?
                     )),
                     RcCommand::Update(_) => {
                         unimplemented!()
@@ -172,154 +174,21 @@ impl MessagingEndpointComponent {
                             .await?
                             .to_string(),
                     ))),
-                }
-            }
-
-            delivery.result(process(skel, &delivery.item, delivery.to()));
-        });
-        Ok(())
-    }
-
-    async fn process_resource_port_request(
-        &mut self,
-        delivery: Delivery<Msg>,
-    ) -> Result<(), Error> {
-        let skel = self.skel.clone();
-        let host_tx = self.host_tx.clone();
-        tokio::spawn(async move {
-            async fn process(
-                skel: StarSkel,
-                host_tx: mpsc::Sender<HostCall>,
-                delivery: Delivery<Msg>,
-            ) -> Result<(), Error> {
-                host_tx
-                    .try_send(HostCall::Port(delivery))
-                    .unwrap_or_default();
-                Ok(())
-            }
-
-            match process(skel, host_tx, delivery).await {
-                Ok(_) => {}
-                Err(err) => {
-                    error!("{}", err.to_string());
-                }
-            }
-        });
-        Ok(())
-    }
-
-    async fn process_resource_http_request(
-        &mut self,
-        delivery: Delivery<Http>,
-    ) -> Result<(), Error> {
-        let skel = self.skel.clone();
-        let host_tx = self.host_tx.clone();
-        tokio::spawn(async move {
-            async fn process(
-                skel: StarSkel,
-                host_tx: mpsc::Sender<HostCall>,
-                delivery: Delivery<Http>,
-            ) -> Result<(), Error> {
-                host_tx
-                    .try_send(HostCall::Http(delivery))
-                    .unwrap_or_default();
-                Ok(())
-            }
-
-            match process(skel, host_tx, delivery).await {
-                Ok(_) => {}
-                Err(err) => {
-                    error!("{}", err.to_string());
-                }
-            }
-        });
-        Ok(())
-    }
-
-    async fn process_registry_action(
-        &mut self,
-        delivery: Delivery<ResourceRegistryRequest>,
-    ) -> Result<(), Error> {
-        let skel = self.skel.clone();
-
-        tokio::spawn(async move {
-            async fn process(
-                skel: StarSkel,
-                delivery: Delivery<ResourceRegistryRequest>,
-            ) -> Result<(), Error> {
-                if let Option::Some(registry) = skel.registry.clone() {
-                    match &delivery.item {
-                        ResourceRegistryRequest::Register(registration) => {
-                            let result = registry.register(registration.clone()).await;
-                            delivery.result_ok(result);
-                        }
-                        ResourceRegistryRequest::Location(location) => {
-                            let result = registry.set_location(location.clone()).await;
-                            delivery.result_ok(result);
-                        }
-                        ResourceRegistryRequest::Find(find) => {
-                            let result = registry.locate(find.to_owned()).await;
-
-                            match result {
-                                Ok(result) => match result {
-                                    Some(record) => delivery.reply(Reply::Record(record)),
-                                    None => {
-                                        delivery.fail(Fail::ResourceNotFound(find.clone()));
-                                    }
-                                },
-                                Err(fail) => {
-                                    delivery.fail(fail.into());
-                                }
-                            }
-                        }
-                        ResourceRegistryRequest::Status(_report) => {
-                            unimplemented!()
-                        }
+                    RcCommand::Get => {
+                        skel.host_tx.send(  HostCall::Get(delivery)).await;
                     }
                 }
-                Ok(())
             }
 
-            match process(skel, delivery).await {
-                Ok(_) => {}
-                Err(error) => {
-                    eprintln!(
-                        "error when processing registry action: {}",
-                        error.to_string()
-                    );
-                }
-            }
+            delivery.result(process(skel, &delivery.item, delivery.to().expect("expected this to work since we have already established that the item is a Request")).await.into());
         });
-
         Ok(())
     }
 
-    async fn process_resource_host_action(
-        &self,
-        delivery: Delivery<ResourceHostAction>,
-    ) -> Result<(), Error> {
-        match &delivery.item {
-            ResourceHostAction::Assign(assign) => {
-                let (tx, rx) = oneshot::channel();
-                let call = HostCall::Assign {
-                    assign: assign.clone(),
-                    tx,
-                };
-                self.host_tx.try_send(call).unwrap_or_default();
-                delivery.result_rx(rx);
-            }
-            ResourceHostAction::Init(key) => {
-                let (tx, rx) = oneshot::channel();
-                let call = HostCall::Init {
-                    key: key.clone(),
-                    tx,
-                };
-                self.host_tx.try_send(call).unwrap_or_default();
-                delivery.result_rx(rx);
-            }
-        }
-        Ok(())
-    }
+
+
+
+
 
     pub async fn has_resource(&self, key: &Address) -> Result<bool, Error> {
         let (tx, mut rx) = oneshot::channel();
