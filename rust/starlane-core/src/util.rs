@@ -208,6 +208,9 @@ pub async fn wait_for_it_for<R>(
 
 #[async_trait]
 pub trait AsyncProcessor<C>: Send + Sync + 'static {
+    async fn init(&mut self) {
+
+    }
     async fn process(&mut self, call: C);
 }
 

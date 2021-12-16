@@ -16,6 +16,9 @@ use crate::watch::{WatchSelector, Notification, Topic, Watch, WatchResourceSelec
 use crate::star::shell::search::SearchHits;
 use crate::mesh::serde::resource::command::create::AddressTemplate;
 use crate::mesh::serde::id::Address;
+use crate::resources::message::ProtoRequest;
+use crate::mesh::Response;
+use crate::mesh::serde::messaging::ExchangeType;
 
 #[derive(Clone)]
 pub struct SurfaceApi {
@@ -38,14 +41,28 @@ impl SurfaceApi {
         Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
     }
 
-    pub async fn exchange(
+    pub fn notify( &self, mut request: ProtoRequest ) {
+        request.exchange = ExchangeType::Notification;
+        self.tx.try_send(SurfaceCall::Notify(request));
+    }
+
+    pub async fn exchange( &self, mut request: ProtoRequest ) -> Result<Response,Error> {
+        request.exchange = ExchangeType::RequestResponse;
+        let (tx,rx) = oneshot::channel();
+        self.tx.send(SurfaceCall::Exchange{request,tx}).await;
+
+        Ok(rx.await??)
+    }
+
+
+    pub async fn exchange_proto_star_message(
         &self,
         proto: ProtoStarMessage,
         expect: ReplyKind,
         description: &str,
     ) -> Result<Reply, Error> {
         let (tx, rx) = oneshot::channel();
-        self.tx.try_send(SurfaceCall::Exchange {
+        self.tx.try_send(SurfaceCall::ExchangeStarMessage {
             proto,
             expect,
             tx,
@@ -83,15 +100,17 @@ pub enum SurfaceCall {
         address: Address,
         tx: oneshot::Sender<Result<ResourceRecord, Error>>,
     },
-    Exchange {
+    ExchangeStarMessage {
         proto: ProtoStarMessage,
         expect: ReplyKind,
         tx: oneshot::Sender<Result<Reply, Error>>,
         description: String,
     },
+    Notify(ProtoRequest),
+    Exchange{request: ProtoRequest, tx: oneshot::Sender<Result<Response,Error>>},
     Watch{ selector: WatchResourceSelector, tx: oneshot::Sender<Result<Watcher,Error>> },
     StarSearch{ star_pattern: StarPattern, tx: oneshot::Sender<Result<SearchHits,Error>>},
-    RequestStarAddress { address_template: AddressTemplate, tx: oneshot::Sender<Result<Address,Error>> }
+    RequestStarAddress { address_template: AddressTemplate, tx: oneshot::Sender<Result<Address,Error>> },
 
 }
 
@@ -127,7 +146,7 @@ impl AsyncProcessor<SurfaceCall> for SurfaceComponent {
                     .try_send(StarCommand::GetCaches(tx))
                     .unwrap_or_default();
             }
-            SurfaceCall::Exchange {
+            SurfaceCall::ExchangeStarMessage {
                 proto,
                 expect,
                 tx,
@@ -172,6 +191,13 @@ println!("SurfaceApi: go watch listener {}",listener.is_ok());
             }
             SurfaceCall::StarSearch { star_pattern, tx } => {
                 tx.send(self.skel.star_search_api.search( star_pattern ).await);
+            }
+            SurfaceCall::RequestStarAddress { .. } => {}
+            SurfaceCall::Notify(request) => {
+                self.skel.messaging_api.notify(request).await;
+            }
+            SurfaceCall::Exchange { request, tx } => {
+                tx.send(self.skel.messaging_api.exchange(request).await.into());
             }
         }
     }

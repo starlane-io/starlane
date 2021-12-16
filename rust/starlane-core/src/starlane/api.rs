@@ -24,7 +24,7 @@ use crate::starlane::StarlaneCommand;
 use crate::watch::{WatchResourceSelector, Watcher};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, ReplyKind, Reply};
 use crate::artifact::ArtifactBundle;
-use crate::resources::message::ProtoRequest;
+use crate::resources::message::{ProtoRequest, MessageFrom};
 use crate::mesh::serde::id::Address;
 use kube::ResourceExt;
 use crate::mesh::serde::resource::ResourceStub;
@@ -38,6 +38,7 @@ use crate::mesh::serde::entity::request::{ReqEntity, Rc};
 use crate::mesh::serde::payload::{RcCommand, Primitive};
 use crate::mesh::serde::resource::command::create::{AddressSegmentTemplate, KindTemplate};
 use crate::fail::{Fail, StarlaneFailure};
+use crate::cache::RootItemCacheCall::Get;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -120,7 +121,7 @@ impl StarlaneApi {
 
         let reply = self
             .surface_api
-            .exchange(proto, ReplyKind::Response, "StarlaneApi: create_resource")
+            .exchange_proto_star_message(proto, ReplyKind::Response, "StarlaneApi: create_resource")
             .await?;
 
         match reply{
@@ -187,6 +188,15 @@ impl StarlaneApi {
     pub async fn get_space(&self, address: Address) -> Result<SpaceApi, Error> {
         let record = self.fetch_resource_record(address).await?;
         Ok(SpaceApi::new(self.surface_api.clone(), record.stub)?)
+    }
+
+    pub async fn get_state( &self, address: Address ) -> Result<Payload,Error> {
+        let mut request = ProtoRequest::new();
+        request.to( address );
+        request.from( MessageFrom::Inject );
+        request.entity(ReqEntity::Rc(Rc::new(RcCommand::Get )));
+        let response = self.surface_api.exchange(request).await?;
+        Ok(response.entity.ok_or()?)
     }
 }
 

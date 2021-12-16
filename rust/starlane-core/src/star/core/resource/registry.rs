@@ -115,22 +115,22 @@ pub struct RegistryComponent {
 
 impl RegistryComponent {
     pub fn start(skel: StarSkel, rx: mpsc::Receiver<RegistryCall>) {
-        let mut conn = Connection::open_in_memory().expect("expected to get sqlite database connection");
-        setup(&mut conn);
+        tokio::spawn(async move {
 
-        AsyncRunner::new(
-            Box::new(Self {
-                skel: skel.clone(),
+            let mut conn = Connection::open_in_memory().expect("expected to get sqlite database connection");
+            setup(&mut conn);
+
+            let mut registry = RegistryComponent{
+                skel,
                 conn
-            }),
-            skel.registry_api.tx.clone(),
-            rx,
-        );
-    }
-}
+            };
 
-#[async_trait]
-impl AsyncProcessor<RegistryCall> for RegistryComponent {
+            while let Option::Some(call) = rx.await {
+                registry.process(call);
+            }
+        });
+    }
+
     async fn process(&mut self, call: RegistryCall) {
         match call {
             RegistryCall::Register { registration, tx } => {

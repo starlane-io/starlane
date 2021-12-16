@@ -53,7 +53,7 @@ impl MessagingApi {
         rx.await?
     }
 
-    pub async fn notify(&self, mut request: ProtoRequest) -> Result<(),Fail>  {
+    pub async fn notify(&self, mut request: ProtoRequest){
         request.exchange = ExchangeType::Notify;
         let request = request.create()?;
         let mut proto = ProtoStarMessage::new();
@@ -61,7 +61,6 @@ impl MessagingApi {
         proto.payload(StarMessagePayload::Request(request));
 
         self.star_notify( request.into() ).await;
-        Ok(())
     }
 
     pub async fn exchange(&self, mut request: ProtoRequest) -> Result<Response,Fail>  {

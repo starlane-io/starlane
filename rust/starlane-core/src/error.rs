@@ -345,3 +345,11 @@ impl From<regex::Error> for Error {
         }
     }
 }
+
+impl From<mesh_portal_serde::error::Error> for Error {
+    fn from(e: mesh_portal_serde::error::Error) -> Self {
+        Self {
+            error: e.to_string()
+        }
+    }
+}

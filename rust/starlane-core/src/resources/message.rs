@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::convert::Infallible;
+use std::convert::{Infallible, TryInto};
 use std::iter::FromIterator;
 use std::string::FromUtf8Error;
 
@@ -17,6 +17,8 @@ use crate::mesh::Request;
 use crate::mesh::Response;
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::payload::Payload;
+use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
+use crate::frame::StarMessagePayload;
 
 pub enum MessageFrom {
     Inject,
@@ -147,4 +149,6 @@ pub type MessageTo = Address;
 
 
 pub type MessageId = Uuid;
+
+
 

@@ -15,7 +15,7 @@ use wasmer::{Cranelift, Store, Universal};
 
 use crate::artifact::ArtifactRef;
 use crate::config::app::{AppConfig, AppConfigParser};
-use crate::config::bind::{BindConfig, BindConfigParser};
+use crate::config::bind::{BindConfig, BindConfigParser };
 use crate::config::mechtron::{MechtronConfig, MechtronConfigParser};
 use crate::config::wasm::{Wasm, WasmCompiler};
 use crate::error::Error;
@@ -30,6 +30,7 @@ use crate::config::http_router::{HttpRouterConfig, HttpRouterConfigParser};
 use crate::mesh::serde::id::Address;
 use mesh_portal_parse::path::Path;
 use crate::mesh::serde::bin::Bin;
+use crate::mesh::serde::payload::Payload;
 
 pub type Data = Arc<Vec<u8>>;
 pub type ZipFile = Address;
@@ -495,13 +496,13 @@ impl ArtifactBundleSrc {
     pub async fn get_resource_state(
         &self,
         address: Address,
-    ) -> Result<Bin, Error> {
-        match self {
+    ) -> Result<Payload, Error> {
+        Ok(match self {
             ArtifactBundleSrc::STARLANE_API(api) => {
-                                api.get_resource_state(address).await
+                                api.get_state(address).await?
             }
             //            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(address).await,
-        }
+        })
     }
 
     pub async fn fetch_resource_record(

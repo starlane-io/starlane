@@ -32,7 +32,7 @@ use crate::mesh::serde::id::{Address, KindParts};
 use crate::mesh::serde::pattern::AddressKindPattern;
 use crate::mesh::serde::payload::{PayloadMap, Primitive, RcCommand};
 use crate::mesh::serde::payload::Payload;
-use crate::mesh::serde::resource::{Archetype, ResourceStub};
+use crate::mesh::serde::resource::{Archetype, ResourceStub, Status};
 use crate::mesh::serde::resource::command::common::{SetProperties, SetRegistry, StateSrc};
 use crate::mesh::serde::resource::command::create::{Create, Strategy};
 use crate::mesh::serde::resource::command::create::AddressSegmentTemplate;
@@ -60,12 +60,10 @@ pub enum ResourceLocation {
 
 impl ResourceLocation {
     pub fn new(star: StarKey) -> Self {
-        Self { host: star }
+        ResourceLocation::Host( star )
     }
     pub fn root() -> Self {
-        Self {
-            host: StarKey::central(),
-        }
+        ResourceLocation::Host(StarKey::central())
     }
 }
 
@@ -116,7 +114,12 @@ impl ResourceRecord {
 
     pub fn root() -> Self {
         Self {
-            stub: ResourceStub::root(),
+            stub: ResourceStub {
+              address: Address::root(),
+              kind: Kind::Root,
+              properties: Default::default(),
+              status: Status::Ready
+            },
             location: ResourceLocation::root(),
         }
     }
