@@ -33,16 +33,16 @@ use crate::mesh::serde::pattern::AddressKindPattern;
 use crate::mesh::serde::payload::{PayloadMap, Primitive, RcCommand};
 use crate::mesh::serde::payload::Payload;
 use crate::mesh::serde::resource::{Archetype, ResourceStub};
-use crate::mesh::serde::resource::command::common::{SetProperties, SetRegistry};
+use crate::mesh::serde::resource::command::common::{SetProperties, SetRegistry, StateSrc};
 use crate::mesh::serde::resource::command::create::{Create, Strategy};
 use crate::mesh::serde::resource::command::create::AddressSegmentTemplate;
 use crate::mesh::serde::resource::command::select::Select;
 use crate::mesh::serde::resource::command::update::Update;
 use crate::message::{MessageExpect, ProtoStarMessage, ReplyKind};
 use crate::names::Name;
-use crate::resources::message::{MessageFrom, ProtoMessage};
+use crate::resources::message::{MessageFrom, ProtoRequest};
 use crate::star::{StarInfo, StarKey, StarSkel};
-use crate::star::shell::pledge::{ResourceHostSelector, StarConscript};
+use crate::star::shell::wrangler::{ResourceHostSelector, StarWrangle};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
 
@@ -54,8 +54,9 @@ pub mod user;
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceLocation {
-    pub host: StarKey,
+pub enum ResourceLocation {
+    Unassigned,
+    Host(StarKey)
 }
 
 impl ResourceLocation {
@@ -387,20 +388,20 @@ pub enum AssignKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceAssign<S> {
+pub struct ResourceAssign {
     pub kind: AssignKind,
     pub stub: ResourceStub,
-    pub state_src: S,
+    pub state: StateSrc,
 }
 
 
-impl<S> ResourceAssign<S> {
+impl ResourceAssign {
 
-    pub fn new( kind: AssignKind, stub: ResourceStub, state_src: S ) -> Self {
+    pub fn new(kind: AssignKind, stub: ResourceStub, state: StateSrc) -> Self {
         Self {
             kind,
             stub,
-            state_src
+            state
         }
     }
 

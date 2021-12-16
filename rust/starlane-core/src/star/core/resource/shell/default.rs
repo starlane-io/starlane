@@ -1,7 +1,7 @@
 
 use crate::error::Error;
 use crate::resource::{ResourceType, AssignResourceStateSrc, ResourceAssign};
-use crate::star::core::resource::host::Host;
+use crate::star::core::resource::shell::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use std::collections::hash_map::RandomState;
@@ -36,7 +36,7 @@ impl Host for StatelessHost {
         &self,
         assign: ResourceAssign<AssignResourceStateSrc>,
     ) -> Result<(), Error> {
-        match assign.state_src {
+        match assign.state {
             AssignResourceStateSrc::Stateless => {}
             _ => {
                 return Err("must be stateless or empty create args".into());

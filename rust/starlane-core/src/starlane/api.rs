@@ -26,7 +26,7 @@ use crate::starlane::StarlaneCommand;
 use crate::watch::{WatchResourceSelector, Watcher};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, ReplyKind, Reply};
 use crate::artifact::ArtifactBundle;
-use crate::resources::message::ProtoMessage;
+use crate::resources::message::ProtoRequest;
 use crate::mesh::serde::id::Address;
 use kube::ResourceExt;
 use crate::mesh::serde::resource::ResourceStub;
@@ -113,7 +113,7 @@ impl StarlaneApi {
 
     pub async fn create_resource(&self, create: Create) -> Result<ResourceRecord, Error> {
 
-        let mut proto = ProtoMessage::new();
+        let mut proto = ProtoRequest::new();
         proto.to(create.template.address.parent.clone());
         let command = RcCommand::Create( Box::new(create) );
         proto.entity( ReqEntity::Rc(command));

@@ -30,7 +30,7 @@ use regex::Regex;
 use crate::mesh::serde::entity::request::Http;
 use crate::mesh::serde::payload::Payload;
 use crate::resource::ArtifactKind;
-use crate::resources::message::ProtoMessage;
+use crate::resources::message::ProtoRequest;
 use serde::{Serialize,Deserialize};
 use crate::mesh::serde::id::Meta;
 
@@ -182,11 +182,11 @@ async fn error_response( mut stream: TcpStream, code: usize, message: &str)  {
 async fn create_response( request: Http, api: StarlaneApi, skel: StarSkel ) -> Result<HttpResponse,Error> {
     /*
 
-    let (_,host) = parse_host(request.headers.get("Host").ok_or("Missing HOST")?.as_str())?;
+    let (_,shell) = parse_host(request.headers.get("Host").ok_or("Missing HOST")?.as_str())?;
 
     // first thing we do is try to get a configuration for localhost
     let selector = ResourcePropertyValueSelector::Registry( ResourceRegistryPropertyValueSelector::Config );
-    let path = ResourcePath::from_str(host)?;
+    let path = ResourcePath::from_str(shell)?;
 println!("SENDING FOR VALUES...");
     let values = api.select_values( path, selector.clone() ).await;
 
@@ -195,7 +195,7 @@ println!("SENDING FOR VALUES...");
         Err(fail) => {
             let mut response = HttpResponse::new();
             response.status = 404;
-            let error = format!("It looks like you have just installed Starlane and haven't created a space for the '{}' host yet.", host);
+            let error = format!("It looks like you have just installed Starlane and haven't created a space for the '{}' shell yet.", shell);
             let messages = json!({"title": "WELCOME", "message": error});
             response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
             return Ok(response);
@@ -206,7 +206,7 @@ println!("RECEIVED VALUES...");
         None => {
             let mut response = HttpResponse::new();
             response.status = 404;
-            let error = format!("proxy configuration not found for host: '{}'", host);
+            let error = format!("proxy configuration not found for shell: '{}'", shell);
             let messages = json!({"title": response.status, "message": error});
             response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
             Ok(response)
@@ -217,8 +217,8 @@ println!("RECEIVED VALUES...");
                     ConfigSrc::None => {
                         let mut response = HttpResponse::new();
                         response.status = 404;
-                        let error = format!("The '{}' Space is there, but it doesn't have a router config assigned yet.", host);
-                        let messages = json!({"title": host, "message": error});
+                        let error = format!("The '{}' Space is there, but it doesn't have a router config assigned yet.", shell);
+                        let messages = json!({"title": shell, "message": error});
                         response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages )?.as_bytes().to_vec())));
                         Ok(response)
                     }
@@ -296,7 +296,7 @@ eprintln!("Error: {}",err.to_string());
 
                         let mut response = HttpResponse::new();
                         response.status = 200;
-                        let error = format!("Host: '{}' is using router config: '{}'", host, artifact.to_string());
+                        let error = format!("Host: '{}' is using router config: '{}'", shell, artifact.to_string());
                         let messages = json!({"title": "CONFIGURED", "message": error});
                         response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &messages)?.as_bytes().to_vec())));
                         Ok(response)

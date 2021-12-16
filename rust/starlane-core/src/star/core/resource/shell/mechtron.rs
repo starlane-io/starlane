@@ -4,7 +4,7 @@ use crate::artifact::ArtifactRef;
 use crate::error::Error;
 use crate::mechtron::MechtronShell;
 use crate::resource::{ArtifactKind, ResourceType, ResourceAssign, AssignResourceStateSrc, Kind};
-use crate::star::core::resource::host::Host;
+use crate::star::core::resource::shell::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util::AsyncHashMap;
@@ -50,7 +50,7 @@ impl Host for MechtronHost {
         &self,
         assign: ResourceAssign<AssignResourceStateSrc>,
     ) -> Result<Payload, Error> {
-        match assign.state_src {
+        match assign.state {
             AssignResourceStateSrc::Stateless => {}
             _ => {
                 return Err("currently only supporting stateless mechtrons".into());
@@ -94,7 +94,7 @@ impl Host for MechtronHost {
             info!("MECHTRON HOST RECEIVED DELIVERY");
             let mechtron = self.mechtrons.get(key.clone()).await?.ok_or(format!("could not deliver mechtron to {}", key.to_string()))?;
             info!("GOT MECHTRON");
-            let reply = mechtron.handle(delivery.request.clone()).await?;
+            let reply = mechtron.handle(delivery.item.clone()).await?;
 
             if let Option::Some(reply) = reply {
                 delivery.reply(Reply::Port(reply.payload));

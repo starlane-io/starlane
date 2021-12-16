@@ -42,8 +42,8 @@ pub mod pattern {
     pub type ExactPattern = pattern::ExactPattern;
     pub type Pattern = pattern::Pattern;
     pub type Hop = pattern::Hop<ResourceType, Kind>;
-    pub type AddressTksPath = pattern::AddressTksPath<Kind>;
-    pub type AddressTksSegment = pattern::AddressTksSegment<Kind>;
+    pub type AddressKindPath = pattern::AddressKindPath<Kind>;
+    pub type AddressKindSegment = pattern::AddressKindSegment<Kind>;
 }
 
 pub mod messaging {
@@ -221,7 +221,7 @@ pub mod resource {
             pub type Select=generic::resource::command::select::Select<ResourceType,Kind>;
             pub type SubSelector=generic::resource::command::select::SubSelector<ResourceType,Kind>;
             pub type PropertiesPattern = generic::resource::command::select::PropertiesPattern;
-            pub type SelectIntoStubPayload=generic::resource::command::select::SelectIntoStubPayload<Kind>;
+            pub type SelectionKind=generic::resource::command::select::SelectionKind<ResourceType,Kind>;
         }
 
         pub mod update {
@@ -231,6 +231,14 @@ pub mod resource {
             use crate::mesh::serde::pattern::TksPattern;
 
             pub type Update=generic::resource::command::update::Update<Kind>;
+        }
+
+        pub mod query{
+            use mesh_portal_serde::version::latest::generic;
+            use crate::mesh::serde::id::Kind;
+
+            pub type Query=generic::resource::command::query::Query;
+            pub type QueryResult=generic::resource::command::query::QueryResult<Kind>;
         }
     }
 

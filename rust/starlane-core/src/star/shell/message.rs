@@ -13,6 +13,12 @@ use crate::resource::ResourceRecord;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::fail::{Fail, StarlaneFailure};
+use crate::resources::message::ProtoRequest;
+use crate::mesh::Response;
+use mesh_portal_serde::version::v0_0_1::messaging::ExchangeType;
+use crate::mesh::serde::messaging::Exchange;
+use mysql::uuid::Uuid;
+use std::convert::TryInto;
 
 #[derive(Clone)]
 pub struct MessagingApi {
@@ -24,13 +30,13 @@ impl MessagingApi {
         Self { tx }
     }
 
-    pub fn send(&self, message: ProtoStarMessage) {
+    pub fn star_notify(&self, message: ProtoStarMessage) {
         self.tx
             .try_send(MessagingCall::Send(message))
             .unwrap_or_default();
     }
 
-    pub async fn exchange(
+    pub async fn star_exchange(
         &self,
         proto: ProtoStarMessage,
         expect: ReplyKind,
@@ -46,6 +52,36 @@ impl MessagingApi {
         self.tx.try_send(call)?;
         rx.await?
     }
+
+    pub async fn notify(&self, mut request: ProtoRequest) -> Result<(),Fail>  {
+        request.exchange = ExchangeType::Notify;
+        let request = request.create()?;
+        let mut proto = ProtoStarMessage::new();
+        proto.to(ProtoStarMessageTo::Resource(request.to.ok_or("expected request.to must be set".into())?));
+        proto.payload(StarMessagePayload::Request(request));
+
+        self.star_notify( request.into() ).await;
+        Ok(())
+    }
+
+    pub async fn exchange(&self, mut request: ProtoRequest) -> Result<Response,Fail>  {
+        request.exchange = ExchangeType::RequestResponse;
+        let request = request.create()?;
+        let mut proto = ProtoStarMessage::new();
+        proto.to(ProtoStarMessageTo::Resource(request.to.ok_or("expected request.to must be set".into())?));
+        proto.payload(StarMessagePayload::Request(request));
+
+        let reply = self.star_exchange( proto, ReplyKind::Response, "exchanging resource message" ).await?;
+        match reply {
+            Reply::Response(response) => {
+                Ok(response)
+            }
+            _ => {
+                Err(Fail::Starlane(StarlaneFailure::Error("expected message response".into())))
+            }
+        }
+    }
+
 
     pub fn on_reply(&self, message: StarMessage) {
         if message.reply_to.is_none() {

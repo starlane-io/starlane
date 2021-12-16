@@ -55,8 +55,8 @@ fn main() -> Result<(), Error> {
         .version("0.1.0")
         .author("Scott Williams <scott@mightydevco.com>")
         .about("A Resource Mesh").subcommands(vec![SubCommand::with_name("serve").usage("serve a starlane machine instance").arg(Arg::with_name("with-external").long("with-external").takes_value(false).required(false)).display_order(0),
-                                                            SubCommand::with_name("config").subcommands(vec![SubCommand::with_name("set-host").usage("set the host that the starlane CLI connects to").arg(Arg::with_name("hostname").required(true).help("the hostname of the starlane instance you wish to connect to")).display_order(0),
-                                                                                                                            SubCommand::with_name("get-host").usage("get the host that the starlane CLI connects to")]).usage("read or manipulate the cli config").display_order(1).display_order(1),
+                                                            SubCommand::with_name("config").subcommands(vec![SubCommand::with_name("set-shell").usage("set the shell that the starlane CLI connects to").arg(Arg::with_name("hostname").required(true).help("the hostname of the starlane instance you wish to connect to")).display_order(0),
+                                                                                                                            SubCommand::with_name("get-shell").usage("get the shell that the starlane CLI connects to")]).usage("read or manipulate the cli config").display_order(1).display_order(1),
                                                             SubCommand::with_name("publish").usage("publish an artifact bundle").args(vec![Arg::with_name("dir").required(true).help("the source directory for this bundle"),Arg::with_name("address").required(true).help("the publish address of this bundle i.e. 'space:sub_space:bundle:1.0.0'")].as_slice()),
                                                             SubCommand::with_name("cp").usage("copy a file").args(vec![Arg::with_name("src").takes_value(true).index(1).required(true).help("the source file [local file or starlane resource address]"),Arg::with_name("dst").takes_value(true).index(2).required(true).help("the  destination [local file or starlane resource address]")].as_slice()),
                                                             SubCommand::with_name("create").usage("create a resource").args(vec![Arg::with_name("address").takes_value(true).index(1).required(true).help("resource address"),Arg::with_name("config").takes_value(true).index(2).required(false).help("the  config")].as_slice()),
@@ -87,10 +87,10 @@ fn main() -> Result<(), Error> {
             starlane.join().await;
         });
     } else if let Option::Some(matches) = matches.subcommand_matches("config") {
-        if let Option::Some(_) = matches.subcommand_matches("get-host") {
+        if let Option::Some(_) = matches.subcommand_matches("get-shell") {
             let config = crate::cli::CLI_CONFIG.lock()?;
             println!("{}", config.hostname);
-        } else if let Option::Some(args) = matches.subcommand_matches("set-host") {
+        } else if let Option::Some(args) = matches.subcommand_matches("set-shell") {
             let mut config = crate::cli::CLI_CONFIG.lock()?;
             config.hostname = args
                 .value_of("hostname")
@@ -461,12 +461,12 @@ async fn stars(args: ArgMatches<'_>) -> Result<(), Error> {
 }
 pub async fn starlane_api() -> Result<StarlaneApi, Error> {
     let starlane = StarlaneMachine::new("client".to_string()).unwrap();
-    let mut layout = ConstellationLayout::client("host".to_string())?;
+    let mut layout = ConstellationLayout::client("shell".to_string())?;
     let host = {
         let config = crate::cli::CLI_CONFIG.lock()?;
         config.hostname.clone()
     };
-    layout.set_machine_host_address("host".to_string(), host);
+    layout.set_machine_host_address("shell".to_string(), host);
     starlane.create_constellation("client", layout).await?;
     Ok(starlane.get_starlane_api().await?)
 }

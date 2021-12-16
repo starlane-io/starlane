@@ -10,7 +10,7 @@ use crate::error::Error;
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::payload::Payload;
 use crate::resource::{AssignResourceStateSrc, Kind, ResourceAssign, ResourceKindParts, ResourceType};
-use crate::star::core::resource::host::Host;
+use crate::star::core::resource::shell::Host;
 use crate::star::core::resource::registry::ResourceCreationChamber;
 use crate::star::StarSkel;
 
@@ -44,8 +44,8 @@ impl KubeHost {
             }
         };
 
-        let starlane_api: Api<crate::star::core::resource::host::kube::Starlane> = Api::namespaced(client.clone(), namespace.as_str() );
-        let starlane: crate::star::core::resource::host::kube::Starlane =  match starlane_api.get(kubernetes_instance_name.as_str()).await {
+        let starlane_api: Api<crate::star::core::resource::shell::kube::Starlane> = Api::namespaced(client.clone(), namespace.as_str() );
+        let starlane: crate::star::core::resource::shell::kube::Starlane =  match starlane_api.get(kubernetes_instance_name.as_str()).await {
             Ok(starlane) => starlane,
             Err(_err) => {
                 let message = format!("FATAL: could not access Kubernetes starlane instance named '{}'", kubernetes_instance_name);

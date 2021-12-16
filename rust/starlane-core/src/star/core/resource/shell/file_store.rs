@@ -281,7 +281,7 @@ impl Host for FileStoreHost {
         Ok(self.store.put(assign).await?)
     }
 
-<<<<<<< HEAD:rust/starlane-core/src/star/core/resource/host/file_store.rs
+<<<<<<< HEAD:rust/starlane-core/src/star/core/resource/shell/file_store.rs
     async fn has(&self, key: ResourceKey) -> bool {
         todo!()
     }

@@ -13,7 +13,7 @@ use crate::util::{AsyncProcessor, AsyncRunner, Call};
 pub mod lanes;
 pub mod locator;
 pub mod message;
-pub mod pledge;
+pub mod wrangler;
 pub mod router;
 pub mod search;
 pub mod golden;

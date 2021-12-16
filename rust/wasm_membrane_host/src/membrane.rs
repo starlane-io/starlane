@@ -305,8 +305,8 @@ impl Env
         let host = self.host.read();
         if host.is_err()
         {
-            println!("WasmMembrane: could not acquire host lock");
-            return Err("could not acquire host lock".into());
+            println!("WasmMembrane: could not acquire shell lock");
+            return Err("could not acquire shell lock".into());
         }
 
         let host = host.unwrap();

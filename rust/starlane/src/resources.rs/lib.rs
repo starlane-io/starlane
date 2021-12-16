@@ -351,7 +351,7 @@ fn path(input: &str) -> Res<&str, Path> {
 
 fn host(input: &str) -> Res<&str, String> {
     context(
-        "host",
+        "shell",
         alt((
             tuple((many1(terminated(alphanumerichyphen1, tag("."))), alpha1)),
             tuple((many_m_n(1, 1, alphanumerichyphen1), take(0 as usize))),

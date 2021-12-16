@@ -7,7 +7,7 @@ use yaml_rust::Yaml;
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
 use crate::resource::{ArtifactKind, ResourceType, ResourceAssign, AssignResourceStateSrc};
-use crate::star::core::resource::host::Host;
+use crate::star::core::resource::shell::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::mesh::serde::id::Meta;
@@ -34,7 +34,7 @@ impl Host for SpaceHost {
         &self,
         assign: ResourceAssign<AssignResourceStateSrc>,
     ) -> Result<Payload, Error> {
-        let state = match assign.state_src {
+        let state = match assign.state {
             AssignResourceStateSrc::Direct(data) => data,
             AssignResourceStateSrc::Stateless => return Err("space cannot be stateless".into()),
         };

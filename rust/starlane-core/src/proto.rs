@@ -29,7 +29,7 @@ use crate::star::core::message::MessagingEndpointComponent;
 use crate::star::shell::lanes::{LaneMuxerApi, LaneMuxer, LanePattern};
 use crate::star::shell::search::{StarSearchApi, StarSearchComponent, StarSearchTransaction, ShortestPathStarKey};
 use crate::star::shell::message::{MessagingApi, MessagingComponent};
-use crate::star::shell::pledge::StarWranglerBacking;
+use crate::star::shell::wrangler::StarWranglerApi;
 use crate::star::shell::router::{RouterApi, RouterComponent, RouterCall};
 use crate::star::surface::{SurfaceApi, SurfaceCall, SurfaceComponent};
 use crate::star::variant::{VariantApi, start_variant};
@@ -199,12 +199,7 @@ impl ProtoStar {
                             .data_access
                             .with_path(format!("stars/{}", info.key.to_string()))?;
 
-                        let star_handler: Option<StarWranglerBacking> =
-                            if !info.kind.conscripts().is_empty() {
-                                Option::Some(StarWranglerBacking::new(self.star_tx.clone()).await)
-                            } else {
-                                Option::None
-                            };
+                        let star_wrangler_api = StarWranglerApi::new(self.star_tx.clone()).await;
 
                         let skel = StarSkel {
                             info,
@@ -213,7 +208,7 @@ impl ProtoStar {
                             core_messaging_endpoint_tx: core_messaging_endpoint_tx.clone(),
                             logger: self.logger.clone(),
                             flags: self.flags.clone(),
-                            star_handler,
+                            star_wrangler_api,
                             persistence: Persistence::Memory,
                             data_access,
                             machine: self.machine.clone(),

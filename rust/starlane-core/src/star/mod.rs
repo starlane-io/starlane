@@ -15,7 +15,7 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
-use shell::pledge::{StarConscript, StarConscriptionSatisfaction, StarWranglerBacking};
+use shell::wrangler::{StarWrangle, StarWrangleSatisfaction, StarWranglerApi};
 use shell::search::{SearchCommit, SearchHits, SearchInit, StarSearchTransaction, TransactionResult};
 
 use crate::cache::ProtoArtifactCachesFactory;
@@ -123,21 +123,21 @@ impl StarKind {
         }
     }
 
-    pub fn conscripts(&self) -> HashSet<StarConscriptKind> {
+    pub fn conscripts(&self) -> HashSet<StarWrangleKind> {
         HashSet::from_iter(
             match self {
-                StarKind::Central => vec![StarConscriptKind::req(StarKind::Space)],
+                StarKind::Central => vec![StarWrangleKind::req(StarKind::Space)],
                 StarKind::Space => {
                     vec![
-                        StarConscriptKind::req(StarKind::FileStore),
-                        StarConscriptKind::req(StarKind::Web),
-                        StarConscriptKind::req(StarKind::ArtifactStore),
-                        StarConscriptKind::opt(StarKind::K8s),
-                        StarConscriptKind::opt(StarKind::App),
+                        StarWrangleKind::req(StarKind::FileStore),
+                        StarWrangleKind::req(StarKind::Web),
+                        StarWrangleKind::req(StarKind::ArtifactStore),
+                        StarWrangleKind::opt(StarKind::K8s),
+                        StarWrangleKind::opt(StarKind::App),
                     ]
                 }
                 StarKind::Mesh => vec![],
-                StarKind::App => vec![StarConscriptKind::req(StarKind::Mechtron), StarConscriptKind::req(StarKind::FileStore)],
+                StarKind::App => vec![StarWrangleKind::req(StarKind::Mechtron), StarWrangleKind::req(StarKind::FileStore)],
                 StarKind::Mechtron => vec![],
                 StarKind::FileStore => vec![],
                 StarKind::Gateway => vec![],
@@ -213,12 +213,12 @@ impl StarKind {
             ResourceType::File => Self::FileStore,
             ResourceType::Database => Self::K8s,
             ResourceType::Authenticator=> Self::K8s,
-            ResourceType::UserBase => Self::Space,
             ResourceType::ArtifactBundleSeries => Self::ArtifactStore,
             ResourceType::ArtifactBundle => Self::ArtifactStore,
             ResourceType::Artifact => Self::ArtifactStore,
             ResourceType::Proxy => Self::Space,
             ResourceType::Credentials => Self::Space,
+            ResourceType::Base => Self::Space
         }
     }
 
@@ -229,7 +229,7 @@ impl StarKind {
                 StarKind::Space => vec![
                     ResourceType::Space,
                     ResourceType::User,
-                    ResourceType::UserBase,
+                    ResourceType::Base,
                     ResourceType::Proxy,
                 ],
                 StarKind::Mesh => vec![],
@@ -256,12 +256,12 @@ impl StarKind {
 }
 
 #[derive(Clone,Hash,Eq,PartialEq)]
-pub struct StarConscriptKind{
+pub struct StarWrangleKind {
     pub kind: StarKind,
     pub required: bool
 }
 
-impl StarConscriptKind {
+impl StarWrangleKind {
     pub fn req(kind:StarKind)->Self {
         Self {
             kind,
@@ -562,7 +562,7 @@ impl Star {
             self.set_status(StarStatus::Pending);
         }
 
-        if let Option::Some(star_handler) = &self.skel.star_handler {
+        if let Option::Some(star_handler) = &self.skel.star_wrangler_api {
 
             for conscript_kind in self.skel.info.kind.conscripts() {
                 let search = SearchInit::new(StarPattern::StarKind(conscript_kind.kind.clone()), TraversalAction::SearchHits);
@@ -576,7 +576,7 @@ impl Star {
                     match result {
                         Ok(Ok(hits)) => {
                             for (star, hops) in hits.hits {
-                                let handle = StarConscript {
+                                let handle = StarWrangle {
                                     key: star,
                                     kind: kind.clone(),
                                     hops: Option::Some(hops),
@@ -615,11 +615,11 @@ impl Star {
 
     async fn check_status(&mut self) {
         if self.status == StarStatus::Pending {
-            if let Option::Some(star_handler) = &self.skel.star_handler {
+            if let Option::Some(star_handler) = &self.skel.star_wrangler_api {
                 let satisfied = star_handler
                     .satisfied(self.skel.info.kind.conscripts())
                     .await;
-                if let Result::Ok(StarConscriptionSatisfaction::Ok) = satisfied {
+                if let Result::Ok(StarWrangleSatisfaction::Ok) = satisfied {
                     self.set_status(StarStatus::Pending);
                     let skel = self.skel.clone();
                     tokio::spawn(async move {
@@ -638,7 +638,7 @@ impl Star {
                         }
 
                     });
-                } else if let Result::Ok(StarConscriptionSatisfaction::Lacking(lacking)) = satisfied {
+                } else if let Result::Ok(StarWrangleSatisfaction::Lacking(lacking)) = satisfied {
                     let mut s = String::new();
                     for lack in lacking {
                         s.push_str(lack.to_string().as_str());
@@ -693,7 +693,7 @@ impl Star {
     async fn diagnose(&self, diagnose: Diagnose) {
         match diagnose {
             Diagnose::HandlersSatisfied(satisfied) => {
-                if let Option::Some(star_handler) = &self.skel.star_handler {
+                if let Option::Some(star_handler) = &self.skel.star_wrangler_api {
                     if let Result::Ok(satisfaction) = star_handler
                         .satisfied(self.skel.info.kind.conscripts())
                         .await
@@ -703,7 +703,7 @@ impl Star {
                         // let satisfied.tx drop since we can't give it an answer
                     }
                 } else {
-                    satisfied.tx.send(StarConscriptionSatisfaction::Ok);
+                    satisfied.tx.send(StarWrangleSatisfaction::Ok);
                 }
             }
         }
@@ -769,7 +769,7 @@ pub enum ConstellationBroadcast {
 }
 
 pub enum Diagnose {
-    HandlersSatisfied(YesNo<StarConscriptionSatisfaction>),
+    HandlersSatisfied(YesNo<StarWrangleSatisfaction>),
 }
 
 pub struct SetFlags {
@@ -905,7 +905,7 @@ impl StarController {
         rx
     }
 
-    pub async fn diagnose_handlers_satisfaction(&self) -> Result<StarConscriptionSatisfaction, Error> {
+    pub async fn diagnose_handlers_satisfaction(&self) -> Result<StarWrangleSatisfaction, Error> {
         let (yesno, rx) = YesNo::new();
         self.star_tx
             .send(StarCommand::Diagnose(Diagnose::HandlersSatisfied(yesno)))
@@ -1107,7 +1107,7 @@ pub struct StarSkel {
     pub flags: Flags,
     pub logger: Logger,
     pub sequence: Arc<AtomicU64>,
-    pub star_handler: Option<StarWranglerBacking>,
+    pub star_wrangler_api: StarWranglerApi,
     pub persistence: Persistence,
     pub data_access: FileAccess,
     pub machine: StarlaneMachine,

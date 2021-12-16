@@ -6,16 +6,16 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::error::Error;
 use crate::resource::{ResourceType, AssignResourceStateSrc, ResourceAssign};
-use crate::star::core::resource::host::app::AppHost;
-use crate::star::core::resource::host::artifact::ArtifactBundleHost;
-use crate::star::core::resource::host::default::StatelessHost;
-use crate::star::core::resource::host::mechtron::MechtronHost;
-use crate::star::core::resource::host::space::SpaceHost;
+use crate::star::core::resource::shell::app::AppHost;
+use crate::star::core::resource::shell::artifact::ArtifactBundleHost;
+use crate::star::core::resource::shell::default::StatelessHost;
+use crate::star::core::resource::shell::mechtron::MechtronHost;
+use crate::star::core::resource::shell::space::SpaceHost;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::message::delivery::Delivery;
-use crate::star::core::resource::host::kube::KubeHost;
-use crate::star::core::resource::host::file::{FileHost, FileSystemHost};
+use crate::star::core::resource::shell::kube::KubeHost;
+use crate::star::core::resource::shell::file::{FileHost, FileSystemHost};
 use crate::html::{HTML, html_error_code};
 use crate::star::core::message::WrappedHttpRequest;
 use crate::mesh::serde::entity::request::{Http, Msg};
@@ -100,7 +100,7 @@ impl HostComponent {
     async fn host(&mut self, rt: ResourceType) -> Arc<dyn Host> {
 
         if self.hosts.contains_key(&rt) {
-            return self.hosts.get(&rt).cloned().expect("expected reference to host");
+            return self.hosts.get(&rt).cloned().expect("expected reference to shell");
         }
 
         let host: Arc<dyn Host> = match rt {

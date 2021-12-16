@@ -78,7 +78,7 @@ pub mod host {
         use mesh_portal_serde::version::latest;
         use mesh_portal_serde::version::latest::id::Address;
 
-        // host should be able to ascertain who it is from
+        // shell should be able to ascertain who it is from
         #[derive(Clone, Serialize, Deserialize)]
         pub struct Request<ResourceType,Kind> {
             pub to: Address,

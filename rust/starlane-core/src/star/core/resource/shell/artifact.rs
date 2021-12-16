@@ -10,7 +10,7 @@ use tempdir::TempDir;
 use tokio::sync::Mutex;
 
 use crate::resource::{ResourceType, AssignResourceStateSrc, ResourceAssign};
-use crate::star::core::resource::host::Host;
+use crate::star::core::resource::shell::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util;
@@ -22,7 +22,7 @@ use mesh_portal_api::message::Message;
 /*
 =======
 use crate::resource::state_store::StateStore;
-use crate::star::core::component::resource::host::Host;
+use crate::star::core::component::resource::shell::Host;
 use crate::star::StarSkel;
 use crate::util;
 
@@ -333,7 +333,7 @@ impl Host for ArtifactBundleHost {
         &self,
         assign: ResourceAssign<AssignResourceStateSrc>,
     ) -> Result<(), Error> {
-        let state = match assign.state_src {
+        let state = match assign.state {
             AssignResourceStateSrc::Direct(data) => {
                 data
             },

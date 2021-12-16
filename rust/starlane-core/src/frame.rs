@@ -343,8 +343,6 @@ pub enum StarMessagePayload {
     ResourceHost(ResourceHostAction),
 //    Space(SpaceMessage),
     Reply(SimpleReply),
-    SubSelect(SubSelector),
-    AddressTksPathQuery(Address)
 }
 
 impl Debug for StarMessagePayload {
@@ -354,7 +352,6 @@ impl Debug for StarMessagePayload {
             StarMessagePayload::Request(_) => "MessagePayload",
             StarMessagePayload::ResourceRegistry(_) => "ResourceRegistry",
             StarMessagePayload::ResourceHost(_) => "ResourceHost",
-            StarMessagePayload::Space(_) => "Space",
             StarMessagePayload::Reply(_) => "Reply",
         });
         Ok(())
@@ -375,7 +372,7 @@ pub enum MessagePayload {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum ResourceHostAction {
     //IsHosting(Address),
-    Assign(ResourceAssign<AssignResourceStateSrc>),
+    Assign(ResourceAssign),
     Init(Address),
 }
 

@@ -10,11 +10,11 @@ use crate::error::Error;
 use crate::resource::{Kind, ResourceType, Specific, ResourceRecord};
 use crate::star::{StarCommand, StarKey};
 use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
-use crate::resources::message::ProtoMessage;
+use crate::resources::message::ProtoRequest;
 use crate::mesh::{Request, Response};
 use crate::mesh::serde::id::Address;
 use crate::frame::{StarMessagePayload, StarMessage, SimpleReply, MessageAck};
-use crate::mesh::serde::pattern::AddressTksPath;
+use crate::mesh::serde::pattern::AddressKindPath;
 use crate::mesh::serde::resource::ResourceStub;
 
 pub mod delivery;
@@ -120,11 +120,11 @@ impl ProtoStarMessage {
     }
 }
 
-impl TryFrom<ProtoMessage> for ProtoStarMessage {
+impl TryFrom<ProtoRequest> for ProtoStarMessage {
 
     type Error = Error;
 
-    fn try_from(proto: ProtoMessage) -> Result<Self, Self::Error> {
+    fn try_from(proto: ProtoRequest) -> Result<Self, Self::Error> {
         proto.validate()?;
         let message = proto.create()?;
         let mut proto = ProtoStarMessage::new();
@@ -316,7 +316,7 @@ pub enum Reply{
     Records(Vec<ResourceRecord>),
     Stubs(Vec<ResourceStub>),
     Response(Response),
-    AddressTksPath(AddressTksPath)
+    AddressTksPath(AddressKindPath)
 }
 
 fn hash_to_string(hash: &HashSet<ResourceType>) -> String {

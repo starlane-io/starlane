@@ -22,7 +22,7 @@ pub enum MessageFrom {
     Address(Address)
 }
 
-pub struct ProtoMessage {
+pub struct ProtoRequest {
     pub id: MessageId,
     pub from: Option<MessageFrom>,
     pub to: Option<MessageTo>,
@@ -32,9 +32,9 @@ pub struct ProtoMessage {
     pub log: bool,
 }
 
-impl ProtoMessage {
+impl ProtoRequest {
     pub fn new() -> Self {
-        ProtoMessage {
+        ProtoRequest {
             id: MessageId::new_v4(),
             from: Option::None,
             to: Option::None,
@@ -93,7 +93,7 @@ impl ProtoMessage {
 
 
 
-pub struct ProtoMessageReply {
+pub struct ProtoResponse {
     pub id: MessageId,
     pub to: ResourceIdentifier,
     pub from: Option<ResourceIdentifier>,
@@ -103,7 +103,7 @@ pub struct ProtoMessageReply {
     pub log: bool,
 }
 
-impl ProtoMessageReply {
+impl ProtoResponse {
 
     pub fn validate(&self) -> Result<(), Error> {
         if self.reply_to.is_none() {

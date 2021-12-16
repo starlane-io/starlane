@@ -7,7 +7,7 @@ use yaml_rust::Yaml;
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
 use crate::resource::{ArtifactKind, ResourceType, ResourceAssign, AssignResourceStateSrc};
-use crate::star::core::resource::host::Host;
+use crate::star::core::resource::shell::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::watch::{Notification, Change, Topic, WatchSelector, Property};
@@ -42,7 +42,7 @@ impl Host for FileHost {
         &self,
         assign: ResourceAssign<AssignResourceStateSrc>,
     ) -> Result<(), Error> {
-        let state = match assign.state_src {
+        let state = match assign.state {
             AssignResourceStateSrc::Direct(data) => data,
             AssignResourceStateSrc::Stateless => return Err("File cannot be stateless".into()),
             _ => {
@@ -75,7 +75,7 @@ impl Host for FileHost {
     }
 
     fn handle(&self,delivery: Delivery<Message>) {
-        match &delivery.request {
+        match &delivery.item {
             Message::Request(request) => {
                 match &request.entity {
                     ReqEntity::Rc(_) => {}
@@ -125,7 +125,7 @@ impl Host for FileSystemHost {
         &self,
         assign: ResourceAssign<AssignResourceStateSrc>,
     ) -> Result<(), Error> {
-        match assign.state_src {
+        match assign.state {
             AssignResourceStateSrc::Stateless => {}
             AssignResourceStateSrc::CreateArgs(_) => {}
             _ => {

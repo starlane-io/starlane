@@ -1,3 +1,3 @@
-pub mod host;
+pub mod shell;
 pub mod state;
 pub mod registry;

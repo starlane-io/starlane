@@ -11,7 +11,7 @@ use tokio::time::Duration;
 
 use crate::error::Error;
 use crate::message::ProtoStarMessage;
-use crate::resource::{ResourceRecord, ResourceType};
+use crate::resource::{ResourceRecord, ResourceType, Kind};
 use crate::star::{StarCommand, StarSkel};
 use crate::util;
 use crate::fail::Fail;
@@ -33,16 +33,16 @@ where
 {
     skel: StarSkel,
     star_message: StarMessage,
-    pub request: M,
+    pub item: M,
 }
 
 impl<M> Delivery<M>
 where
     M: Clone + Send + Sync + 'static,
 {
-    pub fn new(entity: M, star_message: StarMessage, skel: StarSkel) -> Self {
+    pub fn new(item: M, star_message: StarMessage, skel: StarSkel) -> Self {
         Delivery {
-            request: entity,
+            item,
             star_message: star_message,
             skel: skel,
         }
@@ -69,14 +69,24 @@ impl<M> Into<StarMessage> for Delivery<M> where
 
 impl Delivery<Request>
 {
+    pub fn result( self, result: Result<Payload,Fail> )  {
+        match result {
+            Ok(payload) => {
+                self.ok(payload);
+            }
+            Err(fail) => {
+                self.fail(fail.into());
+            }
+        }
+    }
 
     pub fn ok(self, payload: Payload) {
-        if let Exchange::RequestResponse( exchange ) = self.request.exchange {
+        if let Exchange::RequestResponse( exchange ) = self.item.exchange {
             let entity = RespEntity::Ok(payload);
             let response = Response {
                 id: unique_id(),
-                to: self.request.from.clone(),
-                from: self.request.to.clone(),
+                to: self.item.from.clone(),
+                from: self.item.to.clone(),
                 entity,
                 exchange,
             };
@@ -84,7 +94,7 @@ impl Delivery<Request>
             let proto = self
                 .star_message
                 .reply(StarMessagePayload::Request(Message::Response(response)));
-            self.skel.messaging_api.send(proto);
+            self.skel.messaging_api.star_notify(proto);
         } else {
             eprintln!("cannot respond to a Notification exchange")
         }
@@ -92,18 +102,18 @@ impl Delivery<Request>
 
     pub fn fail( self, fail: crate::mesh::serde::fail::Fail  )
     {
-        if let Exchange::RequestResponse( exchange ) = self.request.exchange {
+        if let Exchange::RequestResponse( exchange ) = self.item.exchange {
             let entity = RespEntity::Fail(fail);
             let response = Response {
                 id: unique_id(),
-                to: self.request.from.clone(),
-                from: self.request.to.clone(),
+                to: self.item.from.clone(),
+                from: self.item.to.clone(),
                 entity,
                 exchange,
             };
 
             let proto = self.star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Response(response))));
-            self.skel.messaging_api.send(proto);
+            self.skel.messaging_api.star_notify(proto);
         } else {
             eprintln!("cannot respond to a Notification exchange")
         }

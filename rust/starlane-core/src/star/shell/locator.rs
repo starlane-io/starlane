@@ -232,7 +232,7 @@ impl ResourceLocatorComponent {
         tokio::spawn(async move {
             let result = skel
                 .messaging_api
-                .exchange(
+                .star_exchange(
                     proto,
                     ReplyKind::Record,
                     "ResourceLocatorComponent.request_resource_record_from_star()",

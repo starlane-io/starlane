@@ -1,32 +1,40 @@
 use std::collections::HashMap;
 use std::convert::TryInto;
 
-use mesh_portal_serde::version::v0_0_1::generic::resource::ResourceStub;
-use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::error::RecvError;
+use tokio::sync::{mpsc, oneshot};
 
 use crate::error::Error;
-use crate::fail::Fail;
-use crate::frame::{ResourceHostAction, ResourceRegistryRequest, SimpleReply, StarMessage, StarMessagePayload};
-use crate::mesh::Message;
-use crate::mesh::Request;
-use crate::mesh::Response;
+use crate::fail::{Fail, StarlaneFailure};
+use crate::frame::{
+    ResourceHostAction, ResourceRegistryRequest, SimpleReply, StarMessage, StarMessagePayload,
+};
 use crate::mesh::serde::entity::request::{Http, Msg, Rc, ReqEntity};
+use crate::mesh::serde::fail;
 use crate::mesh::serde::http::HttpRequest;
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::pattern::TksPattern;
 use crate::mesh::serde::payload::Payload;
 use crate::mesh::serde::payload::Primitive;
+use crate::mesh::serde::resource::ResourceStub;
+use crate::mesh::serde::resource::command::create::{AddressSegmentTemplate, KindTemplate};
 use crate::mesh::serde::resource::command::RcCommand;
-use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
+use crate::mesh::Message;
+use crate::mesh::Request;
+use crate::mesh::Response;
 use crate::message::delivery::Delivery;
-use crate::resource::{ResourceRecord};
+use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
+use crate::resource::{ResourceRecord, ResourceAssign, AssignKind};
 use crate::resource::{Kind, ResourceType};
+use crate::star::core::resource::registry::{Parent, ParentCore, Registration};
+use crate::star::core::resource::shell::{HostCall, HostComponent};
+use crate::star::shell::wrangler::{ResourceHostSelector, StarSelector, StarFieldSelection};
 use crate::star::{StarCommand, StarKind, StarSkel};
-use crate::star::core::resource::host::{HostCall, HostComponent};
-use crate::star::core::resource::registry::{Parent, ParentCore};
-use crate::star::shell::pledge::ResourceHostSelector;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
+use mesh_portal_serde::version::latest::fail::BadRequest;
+use std::future::Future;
+use crate::mesh::serde::resource::Status;
+use crate::mesh::serde::resource::command::common::StateSrc;
 
 pub enum CoreMessageCall {
     Message(StarMessage),
@@ -72,19 +80,16 @@ impl MessagingEndpointComponent {
     async fn process_resource_message(&mut self, star_message: StarMessage) -> Result<(), Error> {
         match &star_message.payload {
             StarMessagePayload::Request(message_payload) => match &message_payload {
-                Message::Request(request ) => {
-                    let delivery = Delivery::new(request.clone(), star_message, self.skel.clone() );
-
-                    match &request.entity {
-                        ReqEntity::Rc(_) => {
-                            self.process_resource_command(delivery).await?;
-                        }
-                        _ => {
-                            self.handle_by_host(delivery).await?;
-                        }
+                Message::Request(request) => match &request.entity {
+                    ReqEntity::Rc(rc) => {
+                        let delivery = Delivery::new(rc.clone(), star_message, self.skel.clone());
+                        self.process_resource_command(delivery).await?;
                     }
-                }
-                Message::Response(response ) => {
+                    _ => {
+                        self.handle_by_host(delivery).await?;
+                    }
+                },
+                Message::Response(response) => {
                     // we don't handle responses here
                 }
             },
@@ -96,181 +101,87 @@ impl MessagingEndpointComponent {
                 let delivery = Delivery::new(action.clone(), star_message, self.skel.clone());
                 self.process_resource_host_action(delivery).await?;
             }
-            StarMessagePayload::SubSelect(selector) => {
-                let skel = self.skel.clone();
-                tokio::spawn( async move {
-                    match skel.registry_api.sub_select(selector.clone()).await {
-                        Ok(stubs) => {
-                            let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Stubs(stubs))));
-                            skel.messaging_api.send( proto );
-                        }
-                        Err(fail) => {
-                            let proto = star_message.fail(fail);
-                            skel.messaging_api.send( proto );
-                        }
-                    }
-                });
-            }
-            StarMessagePayload::AddressTksPathQuery(address) => {
-                let skel = self.skel.clone();
-                tokio::spawn( async move {
-                    match skel.registry_api.address_tks_path_query(address.clone()).await {
-                        Ok(address_tks_path) => {
-                            let proto = star_message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::AddressTksPath(address_tks_path))));
-                            skel.messaging_api.send( proto );
-                        }
-                        Err(fail) => {
-                            let proto = star_message.fail(fail);
-                            skel.messaging_api.send( proto );
-                        }
-                    }
-                });
-            }
-/*            StarMessagePayload::Select(selector) => {
-                let delivery = Delivery::new(selector.clone(), star_message.clone(), self.skel.clone());
-                let results = self.skel.registry.as_ref().unwrap().select(selector.clone()).await;
-                match results {
-                    Ok(records) => {
-                        delivery.reply(Reply::Records(records))
-                    }
-                    Err(error) => {
-                        delivery.fail(Fail::Error("could not select records".to_string()))
-                    }
-                }
-            }
- */
 
+            /*            StarMessagePayload::Select(selector) => {
+                           let delivery = Delivery::new(selector.clone(), star_message.clone(), self.skel.clone());
+                           let results = self.skel.registry.as_ref().unwrap().select(selector.clone()).await;
+                           match results {
+                               Ok(records) => {
+                                   delivery.reply(Reply::Records(records))
+                               }
+                               Err(error) => {
+                                   delivery.fail(Fail::Error("could not select records".to_string()))
+                               }
+                           }
+                       }
+            */
             _ => {}
         }
         Ok(())
     }
 
-    async fn process_resource_command(
-        &mut self,
-        delivery: Delivery<Request>,
-    ) -> Result<(), Error> {
+    async fn process_resource_command(&mut self, delivery: Delivery<Rc>) -> Result<(), Error> {
         let skel = self.skel.clone();
-        let host_tx = self.host_tx.clone();
         tokio::spawn(async move {
-            async fn process(
-                skel: StarSkel,
-                host_tx: mpsc::Sender<HostCall>,
-                delivery: Delivery<Request>,
-            ) -> Result<(), Fail> {
-
-                let command = consume_command(delivery.request.entity.as_str() )?;
-
-                match delivery.request.entity.command{
+            async fn process(skel: StarSkel, rc: &Rc, to: Address) -> Result<(), Fail> {
+                match &rc.command {
                     RcCommand::Create(create) => {
-                        let parent = MessagingEndpointComponent::get_parent_resource(
-                            skel.clone(),
-                            create.address_template.parent
-                        ) .await?;
+                        let address = match &create.template.address.child_segment_template {
+                            AddressSegmentTemplate::Exact(child_segment) => {
+                                create.template.address.parent.push(child_segment.clone())?
+                            }
+                        };
 
-                        let record = parent.create((*create).clone()).await.await;
+                        let kind = match_kind(&create.template.kind)?;
 
-                        match record {
-                            Ok(record) => match record {
-                                Ok(stub) => {
-                                    let payload = Payload::Primitive( Primitive::Stub(stub) );
-                                    delivery.respond(payload);
-                                }
-                                Err(fail) => {
-                                    delivery.fail(fail.into());
-                                }
-                            },
-                            Err(err) => {
-                                eprintln!("Error: {}", err);
+                        let registration = Registration {
+                            address: address.clone(),
+                            kind: kind.clone(),
+                            registry: create.registry.clone(),
+                            properties: create.properties.clone(),
+                        };
+
+                        let stub = skel.registry_api.register(registration).await?;
+
+                        async fn assign( skel: StarSkel, stub: ResourceStub, state: StateSrc ) -> Result<(),Fail> {
+                            let star_kind = StarKind::hosts(&stub.kind.resource_type());
+                            let mut star_selector = StarSelector::new();
+                            star_selector.add(StarFieldSelection::Kind(star_kind.clone()));
+                            let wrangle= skel.star_wrangler_api.next(star_selector).await?;
+                            let mut proto = ProtoStarMessage::new();
+                            proto.to(ProtoStarMessageTo::Star(wrangle.key.clone()));
+                            let assign = ResourceAssign::new(AssignKind::Create, stub, state );
+                            proto.payload( StarMessagePayload::ResourceHost(ResourceHostAction::Assign(assign)) );
+                            skel.messaging_api.star_exchange(proto,ReplyKind::Empty, "assign resource to host").await?;
+                            Ok(())
+                        }
+
+                        match assign( skel, stub, create.state.clone() ).await {
+                            Ok(_) => {
+                                Ok(())
+                            }
+                            Err(fail) => {
+                                skel.registry_api.set_status(to, Status::Panic( "could not assign resource to host".to_string())).await;
+                                Err(fail)
                             }
                         }
                     }
                     RcCommand::Select(select) => {
-                        match skel
-                            .registry
-                            .as_ref()
-                            .unwrap()
-                            .select((*select).clone())
-                            .await {
-                            Ok(rtn) => {
-                                delivery.respond(rtn);
-                            }
-                            Err(fail) => {
-                                delivery.respond(fail.into());
-                            }
-                        }
+                        Ok(Payload::List(skel.registry_api.select(select.clone(), to).await?))
                     }
                     RcCommand::Update(_) => {
                         unimplemented!()
                     }
-                }
-
-                /*
-                match delivery.entity.payload.clone() {
-                    ResourceRequestMessage::Create(create) => {
-
-                    }
-                    ResourceRequestMessage::Select(selector) => {
-
-                    }
-                    ResourceRequestMessage::Unique(resource_type) => {
-
-                    }
-                    ResourceRequestMessage::SelectValues(selector) => {
-
-                        let resource = skel
-                            .registry
-                            .as_ref()
-                            .unwrap()
-                            .get(delivery.entity.to.clone() )
-                            .await?.ok_or("expected resource: ")?;
-
-                        let key: Address = skel.resource_locator_api.as_key(delivery.entity.to.clone()).await?;
-                        let (tx, rx) = oneshot::channel();
-
-
-                        host_tx.send(HostCall::Select { key, selector, tx }).await?;
-                        let result = rx.await;
-                        if let Ok(Ok(Option::Some(values))) = result {
-                            let values = values.with(resource.stub);
-                            delivery.reply(Reply::ResourceValues(values));
-                        } else {
-                            delivery.fail(Fail::expected("Ok(Ok(ResourceValues(values)))"));
-                        }
-                    }
-                    ResourceRequestMessage::UpdateState(state) => {
-                        let key: Address = skel.resource_locator_api.as_key(delivery.entity.to.clone()).await?;
-                        let (tx, rx) = oneshot::channel();
-                        host_tx.send(HostCall::UpdateState{ key, state, tx }).await?;
-                        let result = rx.await;
-
-                        match result {
-                            Ok(Ok(())) => {
-                                delivery.reply(Reply::Empty);
-                            }
-                            Ok(Err(error)) => {
-                                eprintln!("result error: {}", error.to_string() );
-                                delivery.fail(Fail::expected("Ok(Ok(()))"));
-                            }
-                            Err(error) => {
-                                eprintln!("Recv Error");
-                                delivery.fail(Fail::expected("Ok(Ok(()))"));
-                            }
-                        }
-
-                    }
-
-                }
-
-                 */
-                Ok(())
-            }
-
-            match process(skel, host_tx, delivery).await {
-                Ok(_) => {}
-                Err(err) => {
-                    error!("{}", err.to_string());
+                    RcCommand::Query(query) => Ok(Payload::Primitive(Primitive::Text(
+                        skel.registry_api
+                            .query(to, query.clone())
+                            .await?
+                            .to_string(),
+                    ))),
                 }
             }
+
+            delivery.result(process(skel, &delivery.item, delivery.to()));
         });
         Ok(())
     }
@@ -287,7 +198,9 @@ impl MessagingEndpointComponent {
                 host_tx: mpsc::Sender<HostCall>,
                 delivery: Delivery<Msg>,
             ) -> Result<(), Error> {
-                host_tx.try_send( HostCall::Port(delivery)).unwrap_or_default();
+                host_tx
+                    .try_send(HostCall::Port(delivery))
+                    .unwrap_or_default();
                 Ok(())
             }
 
@@ -313,7 +226,9 @@ impl MessagingEndpointComponent {
                 host_tx: mpsc::Sender<HostCall>,
                 delivery: Delivery<Http>,
             ) -> Result<(), Error> {
-                host_tx.try_send( HostCall::Http(delivery)).unwrap_or_default();
+                host_tx
+                    .try_send(HostCall::Http(delivery))
+                    .unwrap_or_default();
                 Ok(())
             }
 
@@ -334,9 +249,12 @@ impl MessagingEndpointComponent {
         let skel = self.skel.clone();
 
         tokio::spawn(async move {
-            async fn process( skel: StarSkel, delivery: Delivery<ResourceRegistryRequest> ) -> Result<(),Error> {
+            async fn process(
+                skel: StarSkel,
+                delivery: Delivery<ResourceRegistryRequest>,
+            ) -> Result<(), Error> {
                 if let Option::Some(registry) = skel.registry.clone() {
-                    match &delivery.request {
+                    match &delivery.item {
                         ResourceRegistryRequest::Register(registration) => {
                             let result = registry.register(registration.clone()).await;
                             delivery.result_ok(result);
@@ -371,11 +289,13 @@ impl MessagingEndpointComponent {
             match process(skel, delivery).await {
                 Ok(_) => {}
                 Err(error) => {
-                    eprintln!("error when processing registry action: {}", error.to_string() );
+                    eprintln!(
+                        "error when processing registry action: {}",
+                        error.to_string()
+                    );
                 }
             }
         });
-
 
         Ok(())
     }
@@ -384,7 +304,7 @@ impl MessagingEndpointComponent {
         &self,
         delivery: Delivery<ResourceHostAction>,
     ) -> Result<(), Error> {
-        match &delivery.request {
+        match &delivery.item {
             ResourceHostAction::Assign(assign) => {
                 let (tx, rx) = oneshot::channel();
                 let call = HostCall::Assign {
@@ -396,9 +316,9 @@ impl MessagingEndpointComponent {
             }
             ResourceHostAction::Init(key) => {
                 let (tx, rx) = oneshot::channel();
-                let call = HostCall::Init{
+                let call = HostCall::Init {
                     key: key.clone(),
-                    tx
+                    tx,
                 };
                 self.host_tx.try_send(call).unwrap_or_default();
                 delivery.result_rx(rx);
@@ -408,7 +328,10 @@ impl MessagingEndpointComponent {
     }
 
     async fn get_parent_resource(skel: StarSkel, address: Address) -> Result<Parent, Error> {
-        let resource = skel.resource_locator_api.locate(address.clone().into()).await?;
+        let resource = skel
+            .resource_locator_api
+            .locate(address.clone().into())
+            .await?;
 
         Ok(Parent {
             core: ParentCore {
@@ -430,9 +353,36 @@ impl MessagingEndpointComponent {
             .await?;
         Ok(rx.await?)
     }
-
 }
-
+pub fn match_kind(template: &KindTemplate) -> Result<Kind, Fail> {
+    let resource_type: ResourceType = ResourceType::from_str(template.resource_type.as_str())?;
+    Ok(match resource_type {
+        ResourceType::Root => Kind::Root,
+        ResourceType::Space => Kind::Space,
+        ResourceType::Base => Kind::Base,
+        ResourceType::User => Kind::User,
+        ResourceType::App => Kind::App,
+        ResourceType::Mechtron => Kind::Mechtron,
+        ResourceType::FileSystem => Kind::FileSystem,
+        ResourceType::File => Kind::File,
+        ResourceType::Database => {
+            unimplemented!("need to right a SpecificPattern matcher...")
+        }
+        ResourceType::Authenticator => Kind::Authenticator,
+        ResourceType::ArtifactBundleSeries => Kind::ArtifactBundleSeries,
+        ResourceType::ArtifactBundle => Kind::ArtifactBundle,
+        ResourceType::Artifact => {
+            let artifact_kind = ArtifactKind::from_str(template.kind.ok_or(Err(Fail::Fail(
+                fail::Fail::Resource(fail::resource::Fail::BadRequest(BadRequest::Bad(
+                    fail::Bad::Kind("ArtifactKind cannot be None".to_string()),
+                ))),
+            ))))?;
+            Kind::Artifact(artifact_kind)
+        }
+        ResourceType::Proxy => Kind::Proxy,
+        ResourceType::Credentials => Kind::Credentials,
+    })
+}
 pub struct WrappedHttpRequest {
     pub resource: Address,
     pub request: HttpRequest,

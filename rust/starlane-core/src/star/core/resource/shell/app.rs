@@ -9,7 +9,7 @@ use crate::cache::ArtifactItem;
 use crate::config::app::AppConfig;
 use crate::error::Error;
 use crate::resource::{ArtifactKind, Address, ResourceType, ResourceAssign, AssignResourceStateSrc};
-use crate::star::core::resource::host::Host;
+use crate::star::core::resource::shell::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use std::collections::HashMap;
@@ -42,7 +42,7 @@ impl Host for AppHost {
         &self,
         assign: ResourceAssign<AssignResourceStateSrc>,
     ) -> Result<(), Error> {
-        match assign.state_src {
+        match assign.state {
             AssignResourceStateSrc::Direct(data) => return Err("App cannot be stateful".into()),
             AssignResourceStateSrc::Stateless => {
             }

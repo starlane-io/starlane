@@ -558,7 +558,7 @@ impl MockArtifactBundleSrc {
                     owner: None,
                 },
                 location: ResourceLocation {
-                    host: StarKey::central(),
+                    shell: StarKey::central(),
                 },
             },
         })

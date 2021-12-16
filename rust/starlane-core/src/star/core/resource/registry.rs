@@ -25,27 +25,28 @@ use crate::mesh::serde::fail;
 use crate::mesh::serde::generic::resource::Archetype;
 use crate::mesh::serde::id::{Address, AddressSegment, Kind, Specific};
 use crate::mesh::serde::id::Version;
-use crate::mesh::serde::pattern::{AddressKindPattern, AddressTksPath, AddressTksSegment, Hop};
+use crate::mesh::serde::pattern::{AddressKindPattern, AddressKindPath, AddressKindSegment, Hop};
 use crate::mesh::serde::pattern::Pattern;
 use crate::mesh::serde::pattern::SegmentPattern;
 use crate::mesh::serde::payload::{Payload, Primitive};
 use crate::mesh::serde::resource::command::common::{SetProperties, SetRegistry};
 use crate::mesh::serde::resource::command::create::{AddressSegmentTemplate, Create, Strategy};
 use crate::mesh::serde::resource::command::select::{Select, SubSelector};
+use crate::mesh::serde::resource::command::query::{Query, QueryResult};
 use crate::mesh::serde::resource::{ResourceStub, Status};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
 use crate::resource;
-use crate::star::{ StarKey, StarSkel};
-use crate::star::core::resource::host::HostCall;
-use crate::star::shell::pledge::ResourceHostSelector;
+use crate::star::{StarKey, StarSkel};
+use crate::star::core::resource::shell::HostCall;
+use crate::star::shell::wrangler::ResourceHostSelector;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::resource::{ResourceRecord, AssignResourceStateSrc, Resource, ResourceAssign, AssignKind, ResourceLocation, ResourceType};
-use crate::resources::message::{ProtoMessage, MessageFrom};
-use mesh_portal_serde::version::v0_0_1::generic::resource::command::select::SelectionKind;
+use crate::resources::message::{ProtoRequest, MessageFrom};
+use crate::mesh::serde::resource::command::select::SelectionKind;
 use crate::mesh::serde::entity::request::{ReqEntity, Rc};
 use crate::mesh::serde::generic::payload::RcCommand;
 
-static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_pre,host,status";
+static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_pre,shell,status";
 
 #[derive(Clone)]
 pub struct RegistryApi {
@@ -57,7 +58,7 @@ impl RegistryApi {
         Self { tx }
     }
 
-    pub async fn register( &self, registration: Registration ) -> Result<(),Fail> {
+    pub async fn register( &self, registration: Registration ) -> Result<ResourceStub,Fail> {
         let (tx,rx) = oneshot::channel();
         self.tx.send(RegistryCall::Register {registration, tx });
         rx.await?
@@ -69,31 +70,39 @@ impl RegistryApi {
         rx.await?
     }
 
-    pub async fn sub_select( &self, selector: SubSelector ) -> Result<Vec<ResourceStub>,Fail> {
+    pub async fn query(&self, address: Address, query: Query ) -> Result<QueryResult,Fail> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(RegistryCall::SubSelect{selector, tx });
+        self.tx.send(RegistryCall::Query {address, query, tx });
         rx.await?
     }
 
-    pub async fn address_tks_path_query(&self, address: Address ) -> Result<AddressTksPath,Fail> {
+    pub async fn set_status(&self, address: Address, status: Status ) -> Result<(),Fail> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(RegistryCall::AddressTksPathQuery{address, tx });
+        self.tx.send(RegistryCall::SetStatus{address, status, tx });
         rx.await?
     }
 
-    pub async fn update_status( &self, address: Address, status: Status ) -> Result<(),Fail> {
+    pub async fn set_location(&self, address: Address, location: ResourceLocation) -> Result<(),Fail> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(RegistryCall::UpdateStatus{address, status, tx });
+        self.tx.send(RegistryCall::SetLocation{address, location, tx });
+        rx.await?
+    }
+
+    pub async fn locate(&self, address: Address) -> Result<ResourceRecord,Fail> {
+        let (tx,rx) = oneshot::channel();
+        self.tx.send(RegistryCall::Locate{address, tx });
         rx.await?
     }
 
 }
 
 pub enum RegistryCall {
-    Register{registration:Registration, tx: oneshot::Sender<Result<(),Fail>>},
+    Register{registration:Registration, tx: oneshot::Sender<Result<ResourceStub,Fail>>},
     Select{select: Select, address: Address, tx: oneshot::Sender<Result<PrimitiveList,Fail>>},
-    AddressTksPathQuery{ address: Address, tx: oneshot::Sender<Result<AddressTksPath,Fail>>},
-    UpdateStatus{ address: Address, status: Status, tx: oneshot::Sender<Result<(),Fail>>},
+    Query { address: Address, query: Query, tx: oneshot::Sender<Result<QueryResult,Fail>>},
+    SetStatus { address: Address, status: Status, tx: oneshot::Sender<Result<(),Fail>>},
+    SetLocation{ address: Address, location: ResourceLocation, tx: oneshot::Sender<Result<(),Fail>>},
+    Locate{ address: Address, tx: oneshot::Sender<Result<ResourceRecord,Fail>>},
 }
 
 impl Call for RegistryCall {}
@@ -129,14 +138,17 @@ impl AsyncProcessor<RegistryCall> for RegistryComponent {
             RegistryCall::Select { select, address, tx} => {
                 self.select(select, address, tx);
             }
-            RegistryCall::SubSelect { selector, tx } => {
-                self.sub_select(selector, tx);
+            RegistryCall::Query { address, query, tx } => {
+                self.query(address, query, tx)
             }
-            RegistryCall::AddressTksPathQuery { address, tx } => {
-                self.address_tks_path_query(address,tx)
+            RegistryCall::SetStatus{ address,status,tx } => {
+                self.set_status(address, status, tx)
             }
-            RegistryCall::UpdateStatus { address,status,tx } => {
-                self.update_status(address,status,tx)
+            RegistryCall::SetLocation { address, location, tx } => {
+                self.set_location(address, location, tx)
+            }
+            RegistryCall::Locate { address, tx } => {
+                self.locate(address,tx );
             }
         }
     }
@@ -144,7 +156,7 @@ impl AsyncProcessor<RegistryCall> for RegistryComponent {
 
 impl RegistryComponent {
 
-    fn update_status( &mut self, address: Address, status: Status, tx: oneshot::Sender<Result<(),Fail>>) {
+    fn set_status(&mut self, address: Address, status: Status, tx: oneshot::Sender<Result<(),Fail>>) {
         fn process( conn: &Connection, address:Address, status: Status ) -> Result<(),Fail> {
             let parent = address.parent().ok_or("resource must have a parent")?.to_string();
             let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
@@ -158,49 +170,75 @@ impl RegistryComponent {
         tx.send(process(&self.conn, address,status));
     }
 
-    fn address_tks_path_query( &mut self, address: Address, tx: oneshot::Sender<Result<AddressTksPath,Fail>>) {
-        async fn query(skel: StarSkel, trans:Transaction, address: Address) -> Result<AddressTksPath, Fail> {
+    fn set_location(&mut self, address: Address, location: ResourceLocation, tx: oneshot::Sender<Result<(),Fail>>) {
+        fn process( conn: &Connection, address:Address, location: ResourceLocation) -> Result<(),Fail> {
+            let parent = address.parent().ok_or("resource must have a parent")?.to_string();
+            let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
+            let host = location.host.to_string();
+            let statement = "UPDATE resources SET host=?1 WHERE parent=?2 AND address_segment=?3";
+            let mut statement = conn.prepare(statement.as_str())?;
+            statement.execute(params!(host,parent,address_segment))?;
+            trans.commit()?;
+            Ok(())
+        }
+        tx.send(process(&self.conn, address,status));
+    }
+
+    fn locate(&mut self, address: Address, tx: oneshot::Sender<Result<ResourceRecord,Fail>>) {
+        fn process( conn: &Connection, address:Address) -> Result<ResourceRecord,Fail> {
+            let statement = format!( "SELECT DISTINCT {} FROM resources as r WHERE parent=?1 AND address_segment=?2", RESOURCE_QUERY_FIELDS );
+            let mut statement = trans.prepare(statement.as_str())?;
+            let record = statement.query_row(params!(parent.to_string(),address_segment), RegistryComponent::process_resource_row_catch)?;
+            Ok(record)
+        }
+        tx.send(process(&self.conn, address));
+    }
+
+    fn query(&mut self, address: Address, query: Query, tx: oneshot::Sender<Result<QueryResult,Fail>>) {
+        async fn process(skel: StarSkel, trans:Transaction, address: Address) -> Result<QueryResult, Fail> {
 
             if address.segments.len() == 0 {
                 return Err(Fail::Starlane(StarlaneFailure::Error("cannot address_tks_path_query on Root".to_string())));
             }
             if address.segments.len() == 1 {
-                let segment = AddressTksSegment {
+                let segment = AddressKindSegment {
                     address_segment: address.last_segment().expect("expected at least one segment"),
                     kind: Kind::Space
                 };
-                return Ok(AddressTksPath{
+                return Ok(QueryResult::AddressKindPath(AddressKindPath {
+                    route: address.route.clone(),
                     segments: vec![segment]
-                });
+                }));
             }
 
             let parent = address.parent().expect("expecting parent since we have already established the segments are >= 2");
             let address_segment = address.last_segment().expect("expecting a last_segment since we know segments are >= 2");
-            let mut proto = ProtoStarMessage::new();
-            proto.payload = StarMessagePayload::AddressTksPathQuery(parent.clone());
-            proto.to = ProtoStarMessageTo::Resource(parent.clone());
-            let reply = skel.messaging_api.exchange(proto, ReplyKind::AddressTksPath, format!("getting AddressTksPath for {}",parent.to_string()).as_str()  ).await?;
-            if let Reply::AddressTksPath(parent_path) = reply {
+            let mut proto = ProtoRequest::new();
+            proto.to(parent.clone());
+            proto.entity(ReqEntity::Rc(Rc::new(Query::AddressKindPath.into() )));
+            let response = skel.messaging_api.exchange(proto).await?;
+
+            let parent_kind_path:String = response.entity.ok_or()?.try_into()?.try_into()?;
+            let parent_kind_path = AddressKindPath::from_str(parent_kind_path.as_str())?;
+
+
                 let statement = format!( "SELECT DISTINCT {} FROM resources as r WHERE parent=?1 AND address_segment=?2", RESOURCE_QUERY_FIELDS );
                 let mut statement = trans.prepare(statement.as_str())?;
                 let mut record = statement.query_row(params!(parent.to_string(),address_segment), RegistryComponent::process_resource_row_catch)?;
-                let segment = AddressTksSegment{
+                let segment = AddressKindSegment {
                     address_segment: record.stub.address.last_segment().expect("expected at least one segment"),
                     kind: record.stub.kind
                 };
 
-                let path = parent_path.push(segment);
+                let path = parent_kind_path.push(segment);
                 Ok(path)
-            } else {
-                Err(Fail::Starlane(StarlaneFailure::Error("expected AddressTksPath reply".to_string())))
-            }
         }
 
         match self.conn.transaction() {
             Ok(transaction) => {
                 let skel = self.skel.clone();
                 tokio::spawn( async move {
-                    tx.send(query(skel, transaction, address).await);
+                    tx.send(process(skel, transaction, address).await);
                 });
             }
             Err(err) => {
@@ -210,8 +248,8 @@ impl RegistryComponent {
 
     }
 
-    fn register( &mut self, registration: Registration, tx: oneshot::Sender<Result<(),Fail>>) {
-        fn register( registry: &mut RegistryComponent, registration: Registration ) -> Result<(),Fail> {
+    fn register( &mut self, registration: Registration, tx: oneshot::Sender<Result<ResourceStub,Fail>>) {
+        fn register( registry: &mut RegistryComponent, registration: Registration ) -> Result<ResourceStub,Fail> {
             let params = RegistryParams::from_registration(&registration)?;
             trans.execute("INSERT INTO resources (address_segment,resource_type,kind,vendor,product,variant,version,version_pre,parent,status) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'Pending')", params![params.address_segment,params.resource_type,params.kind,params.vendor,params.product,params.variant,params.version,params.version_pre,params.parent])?;
 
@@ -250,7 +288,13 @@ impl RegistryComponent {
             set_properties("", &params, &registration.properties, &trans )?;
 
             trans.commit()?;
-            Ok(())
+
+            // now we need to create the ResourceStub via 'locate'
+
+
+            unimplemented!()
+
+           // Ok(())
         }
 
         tx.send(register( self, registration ));
@@ -268,9 +312,9 @@ impl RegistryComponent {
                 return Err(Fail::Fail(fail));
             }
 
-            let address_tks_path = registry.skel.registry_api.address_tks_path_query(address.clone()).await?;
+            let address_kind_path = registry.skel.registry_api.query(address.clone(), Query::AddressKindPath ).await?.try_into()?;
 
-            let sub_selector = selector.sub_select(address,selector.pattern.sub_select_hops(), address_tks_path );
+            let sub_selector = selector.sub_select(address, selector.pattern.sub_select_hops(), address_kind_path);
 
             let list = registry.skel.registry_api.select(sub_selector.into(),address.clone()).await?;
 
@@ -376,19 +420,19 @@ impl RegistryComponent {
                 for record in records {
                     if let Option::Some(last_segment) = record.stub.address.last_segment() {
                         let address = selector.address.push_segment(last_segment.clone());
-                        let address_tks_path = selector.address_tks_path.push(AddressTksSegment{
+                        let address_tks_path = selector.address_tks_path.push(AddressKindSegment {
                             address_segment: last_segment,
                             kind: record.stub.kind.clone()
                         });
                         let sub_selector = selector.sub_select(address.clone(),hops.clone(), address_tks_path);
                         let select = sub_selector.into();
-                        let mut proto = ProtoMessage::new();
+                        let mut proto = ProtoRequest::new();
                         let parent = address.parent()?;
                         proto.to(address);
                         proto.from(MessageFrom::Address(parent));
-                        proto.entity(ReqEntity::Rc(Rc::new(RcCommand::Select(Box::new(select)), Payload::Empty )));
+                        proto.entity(ReqEntity::Rc(Rc::new(RcCommand::Select(select))));
                         let proto = proto.try_into()?;
-                        futures.push(skel.messaging_api.exchange(proto, ReplyKind::Records, "sub-select" ));
+                        futures.push(skel.messaging_api.star_exchange(proto, ReplyKind::Records, "sub-select" ));
                     }
                 }
 
@@ -397,7 +441,7 @@ impl RegistryComponent {
                 // the records matched the present hop (which we needed for deeper searches) however
                 // they may not or may not match the ENTIRE pattern therefore they must be filtered
                 records.retain(|record| {
-                    let address_tks_path = selector.address_tks_path.push(AddressTksSegment{
+                    let address_tks_path = selector.address_tks_path.push(AddressKindSegment {
                         address_segment: record.stub.address.last_segment().expect("expecting at least one segment" ),
                         kind: record.stub.kind.clone()
                     });
@@ -447,10 +491,6 @@ impl RegistryComponent {
         }
     }
 
-
-
-
-
     fn process_resource_row_catch(row: &Row) -> Result<ResourceRecord, Error> {
         match Self::process_resource_row(row) {
             Ok(ok) => Ok(ok),
@@ -461,8 +501,7 @@ impl RegistryComponent {
         }
     }
 
-
-    //    static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_pre,host,status";
+    //    static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_pre,shell,status";
     fn process_resource_row(row: &Row) -> Result<ResourceRecord, Error> {
 
         fn opt( row: &Row, index: usize ) -> Result<Option<String>,Error>
@@ -521,7 +560,14 @@ impl RegistryComponent {
         };
 
         let kind = Kind::from( resource_type, kind, specific)?;
-        let host = StarKey::from_str(host)?;
+        let host = match host {
+            Some(host) => {
+                ResourceLocation::Host(StarKey::from_str(host)?)
+            }
+            None => {
+                ResourceLocation::Unassigned
+            }
+        }?;
         let status = Status::from_str(status)?;
 
         let stub = ResourceStub {
@@ -540,9 +586,6 @@ impl RegistryComponent {
     }
 
 }
-
-
-
 
 /*
 #[derive(Debug,Clone,Serialize,Deserialize)]
@@ -667,7 +710,7 @@ pub fn setup(conn: &mut Connection) -> Result<(), Error> {
          variant TEXT,
          version TEXT,
          version_variant TEXT,
-         host TEXT,
+         shell TEXT,
          status TEXT NOT NULL,
          UNIQUE(parent,address_segment)
         )"#;
@@ -714,381 +757,6 @@ pub fn setup(conn: &mut Connection) -> Result<(), Error> {
     transaction.commit()?;
 
     Ok(())
-}
-
-#[derive(Clone)]
-pub struct ParentCore {
-    pub skel: StarSkel,
-    pub stub: ResourceStub,
-    pub selector: ResourceHostSelector,
-    pub child_registry: Arc<dyn ResourceRegistryBacking>,
-}
-
-impl Debug for ParentCore {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("ParentCore")
-            .field(&self.skel)
-            .field(&self.stub)
-            .finish()
-    }
-}
-
-pub struct Parent {
-    pub core: ParentCore,
-}
-
-impl Parent {
-    #[instrument]
-    async fn create_child(
-        core: ParentCore,
-        create: Create,
-        tx: oneshot::Sender<Result<ResourceStub, Fail>>,
-    ) {
-        let parent = match create
-            .parent
-            .clone()
-            .key_or("expected create.parent to already be a key")
-        {
-            Ok(key) => key,
-            Err(error) => {
-                tx.send(Err(Fail::from(error)));
-                return;
-            }
-        };
-
-        if let Ok(reservation) = core
-            .child_registry
-            .reserve(resource::Registration {
-                parent: parent,
-                archetype: create.archetype.clone(),
-                info: create.registry_info.clone(),
-            })
-            .await
-        {
-            let rx =
-                ResourceCreationChamber::new(core.stub.clone(), create.clone(), core.skel.clone())
-                    .await;
-
-            tokio::spawn(async move {
-                match Self::process_action(core.clone(), create.clone(), reservation, rx).await {
-                    Ok(resource) => {
-                        tx.send(Ok(resource.into()));
-                    }
-                    Err(fail) => {
-                        error!("Failed to create child: FAIL: {}", fail.to_string());
-                        tx.send(Err(fail.into()));
-                    }
-                }
-            });
-        } else {
-            error!("ERROR: reservation failed.");
-
-            tx.send(Err("RESERVATION FAILED!".into()));
-        }
-    }
-
-    async fn process_action(
-        core: ParentCore,
-        create: Create,
-        reservation: RegistryReservation,
-        rx: oneshot::Receiver<Result<ResourceAction<AssignResourceStateSrc>, Fail>>,
-    ) -> Result<ResourceRecord, Error> {
-        let action = rx.await??;
-
-        match action {
-            ResourceAction::Assign(assign) => {
-                let host = core
-                    .selector
-                    .select(create.archetype.kind.resource_type())
-                    .await?;
-                let record = ResourceRecord::new(assign.stub.clone(), host.star_key());
-                /// need to make this so that reservation is already committed with status set to Pending
-                /// at this exact point status is updated to Assigning
-                /// if Assigning succeeds then the host may put it through an Initializing status (if this AssignKind is Create vs. Move)
-                /// once Status is Ready the resource can receive & process requests
-                host.assign(assign.clone().try_into()?).await?;
-                /*               let (commit_tx, _commit_rx) = oneshot::channel();
-                                reservation.commit(record.clone(), commit_tx)?;
-                                host.init(assign.stub.address).await?;
-
-                 */
-                Ok(record)
-            }
-            ResourceAction::Update(resource) => {
-                /*
-                // save resource state...
-                let mut proto = ProtoMessage::new();
-
-                let update = Update{
-                    address: resource.address.clone(),
-                    properties: PayloadMap::default()
-                };
-
-                proto.entity(ReqEntity::Rc(Rc::new(RcCommand::Update(Box::new(update)), resource.state_src() )));
-                proto.to(resource.address.clone());
-                proto.from(MessageFrom::Address(core.stub.address.clone()));
-
-                let reply = core
-                    .skel
-                    .messaging_api
-                    .exchange(
-                        proto.try_into()?,
-                        ReplyKind::Empty,
-                        "updating the state of a record ",
-                    )
-                    .await;
-                match reply {
-                    Ok(reply) => {
-                        let record = core
-                            .skel
-                            .resource_locator_api
-                            .locate(resource.address )
-                            .await;
-                        record
-                    }
-                    Err(err) => Err(err.into()),
-                }
-
-
-                 */
-                //               reservation.cancel();
-            }
-            ResourceAction::None => {
-                // do nothing
-            }
-        }
-    }
-
-    /*
-    if let Ok(Ok(assign)) = rx.await {
-    if let Ok(mut host) = core.selector.select(create.archetype.kind.resource_type()).await
-    {
-    let record = ResourceRecord::new(assign.stub.clone(), host.star_key());
-    match host.assign(assign).await
-    {
-    Ok(_) => {}
-    Err(err) => {
-    eprintln!("host assign failed.");
-    return;
-    }
-    }
-    let (commit_tx, commit_rx) = oneshot::channel();
-    match reservation.commit(record.clone(), commit_tx) {
-    Ok(_) => {
-    if let Ok(Ok(_)) = commit_rx.await {
-    tx.send(Ok(record));
-    } else {
-    elog( &core, &record.stub, "create_child()", "commit failed" );
-    tx.send(Err("commit failed".into()));
-    }
-    }
-    Err(err) => {
-    elog( &core, &record.stub, "create_child()", format!("ERROR: commit failed '{}'",err.to_string()).as_str() );
-    tx.send(Err("commit failed".into()));
-    }
-    }
-    } else {
-    elog( &core, &assign.stub, "create_child()", "ERROR: could not select a host" );
-    tx.send(Err("could not select a host".into()));
-    }
-    }
-
-     */
-
-    /*
-    async fn process_create(core: ChildResourceManagerCore, create: ResourceCreate ) -> Result<ResourceRecord,Fail>{
-
-
-
-        if !create.archetype.kind.resource_type().parent().matches(Option::Some(&core.key.resource_type())) {
-            return Err(Fail::WrongParentResourceType {
-                expected: HashSet::from_iter(core.key.resource_type().parent().types()),
-                received: Option::Some(create.parent.resource_type())
-            });
-        };
-
-        create.validate()?;
-
-        let reservation = core.registry.reserve(ResourceNamesReservationRequest{
-            parent: create.parent.clone(),
-            archetype: create.archetype.clone(),
-            info: create.registry_info } ).await?;
-
-        let key = match create.key {
-            KeyCreationSrc::None => {
-                Address::new(core.key.clone(), ResourceId::new(&create.archetype.kind.resource_type(), core.id_seq.next() ) )?
-            }
-            KeyCreationSrc::Key(key) => {
-                if key.parent() != Option::Some(core.key.clone()){
-                    return Err("parent keys do not match".into());
-                }
-                key
-            }
-        };
-
-        let address = match create.address{
-            AddressCreationSrc::None => {
-                let address = format!("{}:{}", core.address.to_parts_string(), key.generate_address_tail()? );
-                create.archetype.kind.resource_type().address_structure().from_str(address.as_str())?
-            }
-            AddressCreationSrc::Append(tail) => {
-                create.archetype.kind.resource_type().append_address(core.address.clone(), tail )?
-            }
-            AddressCreationSrc::Space(space_name) => {
-                if core.key.resource_type() != ResourceType::Nothing{
-                    return Err(format!("Space creation can only be used at top level (Nothing) not by {}",core.key.resource_type().to_string()).into());
-                }
-                ResourceAddress::for_space(space_name.as_str())?
-            }
-        };
-
-        let stub = ResourceStub {
-            key: key,
-            address: address.clone(),
-            archetype: create.archetype.clone(),
-            owner: None
-        };
-
-
-        let assign = ResourceAssign {
-            stub: stub.clone(),
-            state_src: create.src.clone(),
-        };
-
-        let mut host = core.selector.select(create.archetype.kind.resource_type() ).await?;
-        host.assign(assign).await?;
-        let record = ResourceRecord::new( stub, host.star_key() );
-        let (tx,rx) = oneshot::channel();
-        reservation.commit( record.clone(), tx )?;
-
-        Ok(record)
-    }
-
-     */
-}
-
-#[async_trait]
-impl ResourceManager for Parent {
-    async fn create(
-        &self,
-        create: Create,
-    ) -> oneshot::Receiver<Result<ResourceStub, Fail>> {
-        let (tx, rx) = oneshot::channel();
-
-        let core = self.core.clone();
-        tokio::spawn(async move {
-            Parent::create_child(core, create, tx).await;
-        });
-        rx
-    }
-}
-
-
-pub struct ResourceCreationChamber {
-    parent: ResourceStub,
-    create: Create,
-    skel: StarSkel,
-    tx: oneshot::Sender<Result<ResourceAction<AssignResourceStateSrc>, Fail>>,
-}
-
-impl ResourceCreationChamber {
-    pub async fn new(
-        parent: ResourceStub,
-        create: Create,
-        skel: StarSkel,
-    ) -> oneshot::Receiver<Result<ResourceAction<AssignResourceStateSrc>, Fail>> {
-        let (tx, rx) = oneshot::channel();
-        let chamber = ResourceCreationChamber {
-            parent: parent,
-            create: create,
-            skel: skel,
-            tx: tx,
-        };
-        chamber.run().await;
-        rx
-    }
-
-    async fn run(self) {
-        tokio::spawn(async move {
-           async fn create( chamber: &ResourceCreationChamber) -> Result<ResourceAction<AssignResourceStateSrc>,Fail> {
-
-               let address = match &chamber.create.address_template.child_segment_template {
-                   AddressSegmentTemplate::Exact(segment) => {
-                       chamber.create.address_template.parent.push(segment.clone())?
-                   }
-               };
-
-               let record = chamber
-                   .skel
-                   .resource_locator_api
-                   .locate(address.clone().into())
-                   .await;
-
-               match record {
-                   Ok(record) => {
-                       match chamber.create.strategy {
-                           Strategy::Create => {
-                               let fail = Fail::Fail(fail::Fail::Resource(fail::resource::Fail::Create(fail::resource::Create::AddressAlreadyInUse(address.to_string()))));
-                               return Err(fail);
-                           }
-                           Strategy::Ensure => {
-                               // we've ensured that it's here, now we can go home
-                               return Ok(ResourceAction::None);
-                           }
-                           Strategy::CreateOrUpdate => {
-                               if record.stub.archetype != chamber.create.archetype {
-                                   let fail = Fail::Fail(fail::Fail::Resource(fail::resource::Fail::Create(fail::resource::Create::CannotUpdateArchetype)));
-                                   return Err(fail);
-                               }
-                               match &chamber.create.state_src {
-                                   AssignResourceStateSrc::Stateless => {
-                                       // nothing left to do...
-                                       return Ok(ResourceAction::None);
-                                   }
-                                   AssignResourceStateSrc::Direct(state) => {
-                                       let resource = Resource::new(
-                                           record.stub.address,
-                                           record.stub.archetype,
-                                           state.clone(),
-                                       );
-                                       return Ok(ResourceAction::Update(resource));
-                                   }
-                               }
-                           }
-                       }
-                   }
-                   Err(_) => {
-                       // maybe this should be Option since using an error to signal not found
-                       // might get confused with error for actual failure
-                       let assign = ResourceAssign::new(AssignKind::Create, stub, chamber.create.state_src.clone() );
-                       return Ok(ResourceAction::Assign(assign));
-                   }
-               }
-           }
-
-           let result = create(&self).await;
-           self.tx.send(result);
-
-        });
-    }
-
-    async fn finalize_create(
-        &self,
-        key: Address,
-        address: Address,
-    ) -> Result<ResourceAction<AssignResourceStateSrc>, Fail> {
-        let stub = ResourceStub {
-            address: address.clone(),
-            archetype: self.create.archetype.clone(),
-        };
-
-        let assign = ResourceAssign {
-            kind: AssignKind::Create,
-            stub: stub,
-            state_src: self.create.state_src.clone(),
-        };
-        Ok(ResourceAction::Assign(assign))
-    }
 }
 
 
