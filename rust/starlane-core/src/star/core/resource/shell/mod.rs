@@ -2,38 +2,32 @@ use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use k8s_openapi::kind;
+use mesh_portal_api::message::Message;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::error::Error;
-use crate::resource::{ResourceType, AssignResourceStateSrc, ResourceAssign};
-use crate::star::core::resource::shell::app::AppHost;
-use crate::star::core::resource::shell::artifact::ArtifactBundleHost;
-use crate::star::core::resource::shell::default::StatelessHost;
-use crate::star::core::resource::shell::mechtron::MechtronHost;
-use crate::star::StarSkel;
-use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use crate::message::delivery::Delivery;
-use crate::star::core::resource::shell::kube::KubeHost;
-use crate::star::core::resource::shell::file::{FileHost, FileSystemHost};
-use crate::html::{HTML, html_error_code};
-use crate::star::core::message::WrappedHttpRequest;
-use crate::mesh::serde::entity::request::{Http, Msg};
-use crate::mesh::serde::resource::Resource;
-use mesh_portal_api::message::Message;
-use crate::mesh::serde::id::{Address, Kind};
-use crate::mesh::{Request, Response};
 use crate::fail::Fail;
-use k8s_openapi::kind;
+use crate::html::{HTML, html_error_code};
+use crate::mesh::{Request, Response};
+use crate::mesh::serde::entity::request::{Http, Msg};
 use crate::mesh::serde::fail;
 use crate::mesh::serde::generic::payload::Payload;
+use crate::mesh::serde::id::{Address, Kind};
+use crate::mesh::serde::resource::Resource;
+use crate::message::delivery::Delivery;
+use crate::resource::{AssignResourceStateSrc, ResourceAssign, ResourceType};
+use crate::star::core::message::WrappedHttpRequest;
+use crate::star::core::resource::manager::{Host, ResourceManager};
+use crate::star::core::resource::manager::app::AppManager;
+use crate::star::core::resource::manager::artifact::ArtifactBundleManager;
+use crate::star::core::resource::manager::file::{FileManager, FileSystemManager};
+use crate::star::core::resource::manager::kube::KubeManager;
+use crate::star::core::resource::manager::mechtron::MechtronManager;
+use crate::star::core::resource::manager::stateless::StatelessManager;
+use crate::star::StarSkel;
+use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
-pub mod artifact;
-mod default;
-pub mod file_store;
-pub mod kube;
-mod mechtron;
-mod app;
-mod file;
 
 pub enum HostCall {
     Assign( Delivery<ResourceAssign> ),
@@ -49,7 +43,7 @@ impl Call for HostCall {}
 
 pub struct HostComponent {
     skel: StarSkel,
-    hosts: HashMap<ResourceType,Arc<dyn Host>>,
+    hosts: HashMap<ResourceType,Arc<dyn ResourceManager>>,
     resources: HashMap<Address,ResourceType>
 }
 
@@ -111,21 +105,21 @@ impl AsyncProcessor<HostCall> for HostComponent {
 }
 
 impl HostComponent {
-    async fn host(&mut self, rt: &ResourceType) -> Result<Arc<dyn Host>,Error> {
+    async fn host(&mut self, rt: &ResourceType) -> Result<Arc<dyn ResourceManager>,Error> {
 
         if self.hosts.contains_key(rt) {
             Ok(self.hosts.get(rt).cloned().ok_or("expected reference to shell".into()));
         }
 
-        let host: Arc<dyn Host> = match rt {
-            ResourceType::Space => Arc::new(StatelessHost::new(self.skel.clone(), ResourceType::Space ).await),
-            ResourceType::ArtifactBundleSeries => Arc::new(StatelessHost::new(self.skel.clone(), ResourceType::ArtifactBundleSeries).await),
-            ResourceType::ArtifactBundle=> Arc::new(ArtifactBundleHost::new(self.skel.clone()).await),
-            ResourceType::App=> Arc::new(AppHost::new(self.skel.clone()).await),
-            ResourceType::Mechtron => Arc::new(MechtronHost::new(self.skel.clone()).await),
-            ResourceType::Database => Arc::new(KubeHost::new(self.skel.clone(), ResourceType::Database ).await.expect("KubeHost must be created without error")),
-            ResourceType::FileSystem => Arc::new(FileSystemHost::new(self.skel.clone() ).await),
-            ResourceType::File => Arc::new(FileHost::new(self.skel.clone()).await),
+        let host: Arc<dyn ResourceManager> = match rt {
+            ResourceType::Space => Arc::new(StatelessManager::new(self.skel.clone(), ResourceType::Space ).await),
+            ResourceType::ArtifactBundleSeries => Arc::new(StatelessManager::new(self.skel.clone(), ResourceType::ArtifactBundleSeries).await),
+            ResourceType::ArtifactBundle=> Arc::new(ArtifactBundleManager::new(self.skel.clone()).await),
+            ResourceType::App=> Arc::new(AppManager::new(self.skel.clone()).await),
+            ResourceType::Mechtron => Arc::new(MechtronManager::new(self.skel.clone()).await),
+            ResourceType::Database => Arc::new(KubeManager::new(self.skel.clone(), ResourceType::Database ).await.expect("KubeHost must be created without error")),
+            ResourceType::FileSystem => Arc::new(FileSystemManager::new(self.skel.clone() ).await),
+            ResourceType::File => Arc::new(FileManager::new(self.skel.clone()).await),
 
             t => return Err(format!("no HOST implementation for type {}", t.to_string()).into()),
         };
@@ -133,31 +127,4 @@ impl HostComponent {
         self.hosts.insert( rt.clone(), host.clone() );
         Ok(host)
     }
-}
-
-#[async_trait]
-pub trait Host: Send + Sync {
-
-    fn resource_type(&self) -> ResourceType;
-
-
-    async fn assign(
-        &self,
-        assign: ResourceAssign,
-    ) -> Result<(),Error>;
-
-
-    fn handle_request(&self, request: Delivery<Request> ) {
-        // delivery.fail(fail::Undeliverable)
-    }
-
-    fn response(&self, response: Response ) {
-        // delivery.fail(fail::Undeliverable)
-    }
-
-
-    async fn has(&self, address: Address) -> bool;
-
-    fn shutdown(&self) {}
-
 }

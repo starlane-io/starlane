@@ -9,7 +9,7 @@ use crate::cache::ArtifactItem;
 use crate::config::app::AppConfig;
 use crate::error::Error;
 use crate::resource::{ArtifactKind, ResourceType, ResourceAssign, AssignResourceStateSrc};
-use crate::star::core::resource::shell::Host;
+use crate::star::core::resource::manager::ResourceManager;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use std::collections::HashMap;
@@ -21,14 +21,14 @@ use crate::mesh::serde::resource::command::common::StateSrc;
 use crate::mesh::Request;
 use crate::mesh::serde::id::Address;
 
-pub struct AppHost {
+pub struct AppManager {
     skel: StarSkel,
     apps: AsyncHashMap<Address,Status>
 }
 
-impl AppHost {
+impl AppManager {
     pub async fn new(skel: StarSkel) -> Self {
-        AppHost {
+        AppManager {
             skel: skel.clone(),
             apps: AsyncHashMap::new()
         }
@@ -36,7 +36,7 @@ impl AppHost {
 }
 
 #[async_trait]
-impl Host for AppHost {
+impl ResourceManager for AppManager {
     fn resource_type(&self) -> ResourceType {
         ResourceType::App
     }

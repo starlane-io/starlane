@@ -7,7 +7,7 @@ use yaml_rust::Yaml;
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
 use crate::resource::{ArtifactKind, ResourceType, ResourceAssign, AssignResourceStateSrc};
-use crate::star::core::resource::shell::Host;
+use crate::star::core::resource::manager::ResourceManager;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::watch::{Notification, Change, Topic, WatchSelector, Property};
@@ -23,22 +23,22 @@ use mesh_portal_serde::version::v0_0_1::generic::payload::Payload;
 use crate::mesh::serde::resource::command::common::StateSrc;
 
 #[derive(Debug)]
-pub struct FileHost {
+pub struct FileManager {
     skel: StarSkel,
     store: StateStore,
 }
 
-impl FileHost {
-    pub async fn new(skel: StarSkel) -> Self {
-        FileHost {
+impl FileManager {
+    pub fn new(skel: StarSkel) -> Self {
+        FileManager {
             skel: skel.clone(),
-            store: StateStore::new(skel).await,
+            store: StateStore::new(skel),
         }
     }
 }
 
 #[async_trait]
-impl Host for FileHost {
+impl ResourceManager for FileManager {
     async fn assign(
         &self,
         assign: ResourceAssign,
@@ -101,23 +101,23 @@ impl Host for FileHost {
 }
 
 
-pub struct FileSystemHost {
+pub struct FileSystemManager {
     skel: StarSkel,
     store: StateStore,
 }
 
-impl FileSystemHost{
+impl FileSystemManager {
     pub async fn new( skel: StarSkel ) -> Self {
 
-        FileSystemHost{
+        FileSystemManager {
             skel: skel.clone(),
-            store: StateStore::new(skel).await,
+            store: StateStore::new(skel),
         }
     }
 }
 
 #[async_trait]
-impl Host for FileSystemHost {
+impl ResourceManager for FileSystemManager {
     fn resource_type(&self) -> ResourceType {
         ResourceType::FileSystem
     }

@@ -1,33 +1,31 @@
+use mesh_portal_serde::version::v0_0_1::generic::resource::command::common::StateSrc;
 
 use crate::error::Error;
-use crate::resource::{ResourceType, AssignResourceStateSrc, ResourceAssign, Kind};
-use crate::star::core::resource::shell::Host;
+use crate::mesh::serde::id::Address;
+use crate::resource::{ResourceAssign, ResourceType};
+use crate::star::core::resource::manager::ResourceManager;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
-use std::collections::hash_map::RandomState;
-use std::collections::HashMap;
-use mesh_portal_serde::version::v0_0_1::generic::resource::command::common::StateSrc;
-use crate::mesh::serde::id::Address;
 
 #[derive(Debug)]
-pub struct StatelessHost {
+pub struct StatelessManager {
     skel: StarSkel,
     store: StateStore,
     resource_type: ResourceType
 }
 
-impl StatelessHost {
+impl StatelessManager {
     pub async fn new(skel: StarSkel, resource_type: ResourceType ) -> Self {
-        StatelessHost {
+        StatelessManager {
             skel: skel.clone(),
-            store: StateStore::new(skel).await,
+            store: StateStore::new(skel),
             resource_type
         }
     }
 }
 
 #[async_trait]
-impl Host for StatelessHost {
+impl ResourceManager for StatelessManager {
 
     fn resource_type(&self) -> ResourceType {
         self.resource_type.clone()

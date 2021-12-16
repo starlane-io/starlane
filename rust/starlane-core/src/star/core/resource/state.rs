@@ -24,9 +24,9 @@ pub struct StateStore {
 }
 
 impl StateStore {
-    pub async fn new(skel: StarSkel) -> Self {
+    pub fn new(skel: StarSkel) -> Self {
         StateStore {
-            tx: StateStoreFS::new(skel).await,
+            tx: StateStoreFS::new(skel),
         }
     }
 
@@ -96,7 +96,7 @@ pub struct StateStoreFS {
 }
 
 impl StateStoreFS {
-    pub async fn new(skel: StarSkel) -> mpsc::Sender<ResourceStoreCommand> {
+    pub fn new(skel: StarSkel) -> mpsc::Sender<ResourceStoreCommand> {
         let (tx, rx) = mpsc::channel(1024);
         let tx_clone = tx.clone();
 

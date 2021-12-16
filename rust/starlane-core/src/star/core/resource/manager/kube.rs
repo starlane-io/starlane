@@ -10,10 +10,10 @@ use crate::error::Error;
 use crate::mesh::serde::id::{Address, KindParts};
 use crate::mesh::serde::payload::Payload;
 use crate::resource::{AssignResourceStateSrc, Kind, ResourceAssign, ResourceType};
-use crate::star::core::resource::shell::Host;
+use crate::star::core::resource::manager::ResourceManager;
 use crate::star::StarSkel;
 
-pub struct KubeHost {
+pub struct KubeManager {
     skel: StarSkel,
     client: kube::Client,
     starlane_meta: ObjectMeta,
@@ -22,7 +22,7 @@ pub struct KubeHost {
     resource_type: ResourceType
 }
 
-impl KubeHost {
+impl KubeManager {
     pub async fn new(skel: StarSkel, resource_type: ResourceType ) -> Result<Self, Error> {
 
         let client = kube::Client::try_default().await?;
@@ -43,8 +43,8 @@ impl KubeHost {
             }
         };
 
-        let starlane_api: Api<crate::star::core::resource::shell::kube::Starlane> = Api::namespaced(client.clone(), namespace.as_str() );
-        let starlane: crate::star::core::resource::shell::kube::Starlane =  match starlane_api.get(kubernetes_instance_name.as_str()).await {
+        let starlane_api: Api<crate::star::core::resource::manager::kube::Starlane> = Api::namespaced(client.clone(), namespace.as_str() );
+        let starlane: crate::star::core::resource::manager::kube::Starlane =  match starlane_api.get(kubernetes_instance_name.as_str()).await {
             Ok(starlane) => starlane,
             Err(_err) => {
                 let message = format!("FATAL: could not access Kubernetes starlane instance named '{}'", kubernetes_instance_name);
@@ -54,7 +54,7 @@ impl KubeHost {
         };
         let starlane_meta: ObjectMeta = starlane.metadata.clone();
 
-        let rtn = KubeHost {
+        let rtn = KubeManager {
             skel: skel,
             client: client,
             namespace: namespace,
@@ -69,7 +69,7 @@ impl KubeHost {
 
 
 #[async_trait]
-impl Host for KubeHost {
+impl ResourceManager for KubeManager {
 
      async fn assign(
             &self,

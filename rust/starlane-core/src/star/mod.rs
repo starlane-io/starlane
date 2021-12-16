@@ -59,6 +59,7 @@ use crate::template::StarTemplateHandle;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 use std::cmp;
 use std::fmt;
+use crate::star::core::resource::manager::ResourceManagerApi;
 
 pub mod core;
 pub mod shell;

@@ -4,7 +4,7 @@ use crate::artifact::ArtifactRef;
 use crate::error::Error;
 use crate::mechtron::MechtronShell;
 use crate::resource::{ArtifactKind, ResourceType, ResourceAssign, AssignResourceStateSrc, Kind};
-use crate::star::core::resource::shell::Host;
+use crate::star::core::resource::manager::ResourceManager;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util::AsyncHashMap;
@@ -34,14 +34,14 @@ static ref MECHTRON_PROPERTIES_PATTERN : PayloadPattern= {
 }
 
 
-pub struct MechtronHost {
+pub struct MechtronManager {
     skel: StarSkel,
     mechtrons: AsyncHashMap<Address, MechtronShell>
 }
 
-impl MechtronHost {
+impl MechtronManager {
     pub async fn new(skel: StarSkel) -> Self {
-        MechtronHost {
+        MechtronManager {
             skel: skel.clone(),
             mechtrons: AsyncHashMap::new()
         }
@@ -49,7 +49,7 @@ impl MechtronHost {
 }
 
 #[async_trait]
-impl Host for MechtronHost {
+impl ResourceManager for MechtronManager {
     async fn assign(
         &self,
         assign: ResourceAssign,
