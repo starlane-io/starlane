@@ -28,7 +28,7 @@ use crate::frame::{ResourceHostAction, StarMessagePayload};
 use crate::logger::{elog, LogInfo, StaticLogInfo};
 use crate::mesh::serde::entity::request::Rc;
 use crate::mesh::serde::fail;
-use crate::mesh::serde::id::Address;
+use crate::mesh::serde::id::{Address, KindParts};
 use crate::mesh::serde::pattern::AddressKindPattern;
 use crate::mesh::serde::payload::{PayloadMap, Primitive, RcCommand};
 use crate::mesh::serde::payload::Payload;
@@ -45,12 +45,12 @@ use crate::star::{StarInfo, StarKey, StarSkel};
 use crate::star::shell::wrangler::{ResourceHostSelector, StarWrangle};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
+use mesh_portal_serde::version::v0_0_1::pattern::parse::consume_kind;
+use mesh_portal_serde::version::v0_0_1::generic::id::resource_type;
 
 pub mod artifact;
 pub mod config;
 pub mod file;
-pub mod file_system;
-pub mod user;
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,8 +164,6 @@ pub enum ResourceType {
     Eq,
     PartialEq,
     Hash,
-    strum_macros::Display,
-    strum_macros::EnumString,
 )]
 pub enum Kind {
     Root,
@@ -183,6 +181,68 @@ pub enum Kind {
     Artifact(ArtifactKind),
     Proxy,
     Credentials,
+}
+
+impl ToString for Kind {
+    fn to_string(&self) -> String {
+        let parts: KindParts = self.clone().into();
+        parts.to_string()
+    }
+}
+
+impl FromStr for Kind {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts:KindParts = consume_kind(s)?;
+
+        match parts.resource_type {
+            ResourceType::Base => {
+                return Ok(Self::Base(BaseKind::from_str(parts.kind.ok_or("expected Kind for type Base".into())?)?))
+            }
+            ResourceType::Database => {
+                match parts.kind.ok_or("expected Kind for type Database".into())?.as_str()
+                {
+                    "Relational" => {
+                        return Ok(Kind::Database(DatabaseKind::Relational(parts.specific.ok_or("expected Specific for Database<Relational>".into() )?)))
+                    }
+                    what => {
+                        return Err(format!("Database type does not have a Kind {}", what).into());
+                    }
+                }
+            }
+            ResourceType::Artifact => {
+                return Ok(Self::Artifact(ArtifactKind::from_str(parts.kind.ok_or("expected Kind for type Artifact".into())?)?))
+            }
+            _ => {}
+        }
+
+        Ok(match parts.resource_type {
+            ResourceType::Root => {Self::Root}
+            ResourceType::Space => {Self::Space}
+            ResourceType::User => {Self::User}
+            ResourceType::App => {Self::App}
+            ResourceType::Mechtron => {Self::Mechtron}
+            ResourceType::FileSystem => {Self::FileSystem}
+            ResourceType::File => {Self::File}
+            ResourceType::Authenticator => {Self::Authenticator}
+            ResourceType::ArtifactBundleSeries => {Self::ArtifactBundleSeries}
+            ResourceType::ArtifactBundle => {Self::ArtifactBundle}
+            ResourceType::Proxy => {Self::Proxy}
+            ResourceType::Credentials => {Self::Credentials}
+            what => { return Err(format!("missing Kind from_str for: {}",resource_type.to_string()).into())}
+        })
+    }
+}
+
+impl Into<KindParts> for Kind {
+    fn into(self) -> KindParts {
+        KindParts {
+            resource_type: self.resource_type(),
+            kind: self.sub_string(),
+            specific: self.specific()
+        }
+    }
 }
 
 impl Kind {
@@ -347,17 +407,15 @@ pub enum ArtifactKind {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Resource {
-    pub address: Address,
-    pub archetype: ResourceArchetype,
+    pub stub: ResourceStub,
     pub state: Payload,
 }
 
 impl Resource {
-    pub fn new(address: Address, archetype: ResourceArchetype, state: Payload) -> Resource {
+    pub fn new(stub: ResourceStub, state: Payload) -> Resource {
         Resource {
-            address: address,
-            state: state_src,
-            archetype: archetype,
+            stub,
+            state
         }
     }
 
@@ -405,50 +463,6 @@ impl ResourceAssign {
         }
     }
 
-    pub fn archetype(&self) -> Archetype {
-        self.stub.archetype.clone()
-    }
-}
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ResourceKindParts {
-    pub resource_type: String,
-    pub kind: Option<String>,
-    pub specific: Option<Specific>,
 }
 
-impl ToString for ResourceKindParts {
-    fn to_string(&self) -> String {
-        if self.specific.is_some() && self.kind.is_some() {
-            format!(
-                "<{}<{}<{}>>>",
-                self.resource_type,
-                self.kind.as_ref().unwrap().to_string(),
-                self.specific.as_ref().unwrap().to_string()
-            )
-        } else if self.kind.is_some() {
-            format!(
-                "<{}<{}>>",
-                self.resource_type,
-                self.kind.as_ref().unwrap().to_string()
-            )
-        } else {
-            format!("<{}>", self.resource_type)
-        }
-    }
-}
 
-impl FromStr for ResourceKindParts {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (leftover, rtn) = parse_kind(s)?;
-        if leftover.len() > 0 {
-            return Err(format!(
-                "ResourceKindParts ERROR: could not parse extra: '{}' in string '{}'",
-                leftover, s
-            )
-            .into());
-        }
-        Ok(rtn)
-    }
-}

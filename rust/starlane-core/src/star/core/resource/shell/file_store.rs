@@ -16,7 +16,6 @@ use crate::resource::{
     FileKind,
     Kind, ResourceType,
 };
-use crate::star::core::resource::registry::ResourceCreationChamber;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util;

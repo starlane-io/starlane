@@ -23,7 +23,6 @@ use crate::mesh::serde::payload::Payload;
 use crate::mesh::Response;
 use mesh_portal_serde::version::latest::util::unique_id;
 use crate::mesh::serde::messaging::Exchange;
-use crate::mesh::Message;
 use crate::message::Reply;
 
 #[derive(Clone)]
@@ -93,7 +92,7 @@ impl Delivery<Request>
 
             let proto = self
                 .star_message
-                .reply(StarMessagePayload::Request(Message::Response(response)));
+                .reply(StarMessagePayload::Response(response));
             self.skel.messaging_api.star_notify(proto);
         } else {
             eprintln!("cannot respond to a Notification exchange")

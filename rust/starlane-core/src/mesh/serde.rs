@@ -29,6 +29,7 @@ pub mod id {
     pub type Version = id::Version;
     pub type AddressAndKind = generic::id::AddressAndKind<Kind>;
     pub type AddressAndType = generic::id::AddressAndType<ResourceType>;
+    pub type KindParts = generic::id::KindParts<ResourceType>;
     pub type Meta=id::Meta;
 }
 

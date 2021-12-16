@@ -16,25 +16,24 @@ use crate::mesh::serde::id::Address;
 use crate::mesh::serde::pattern::TksPattern;
 use crate::mesh::serde::payload::Payload;
 use crate::mesh::serde::payload::Primitive;
-use crate::mesh::serde::resource::ResourceStub;
+use crate::mesh::serde::resource::command::common::StateSrc;
 use crate::mesh::serde::resource::command::create::{AddressSegmentTemplate, KindTemplate};
 use crate::mesh::serde::resource::command::RcCommand;
-use crate::mesh::Message;
+use crate::mesh::serde::resource::ResourceStub;
+use crate::mesh::serde::resource::Status;
 use crate::mesh::Request;
 use crate::mesh::Response;
 use crate::message::delivery::Delivery;
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
-use crate::resource::{ResourceRecord, ResourceAssign, AssignKind};
-use crate::resource::{Kind, ResourceType};
-use crate::star::core::resource::registry::{Parent, ParentCore, Registration};
+use crate::resource::{ArtifactKind, Kind, ResourceType};
+use crate::resource::{AssignKind, ResourceAssign, ResourceRecord};
+use crate::star::core::resource::registry::Registration;
 use crate::star::core::resource::shell::{HostCall, HostComponent};
-use crate::star::shell::wrangler::{ResourceHostSelector, StarSelector, StarFieldSelection};
+use crate::star::shell::wrangler::{ResourceHostSelector, StarFieldSelection, StarSelector};
 use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use mesh_portal_serde::version::latest::fail::BadRequest;
 use std::future::Future;
-use crate::mesh::serde::resource::Status;
-use crate::mesh::serde::resource::command::common::StateSrc;
 
 pub enum CoreMessageCall {
     Message(StarMessage),
@@ -79,18 +78,14 @@ impl AsyncProcessor<CoreMessageCall> for MessagingEndpointComponent {
 impl MessagingEndpointComponent {
     async fn process_resource_message(&mut self, star_message: StarMessage) -> Result<(), Error> {
         match &star_message.payload {
-            StarMessagePayload::Request(message_payload) => match &message_payload {
-                Message::Request(request) => match &request.entity {
-                    ReqEntity::Rc(rc) => {
-                        let delivery = Delivery::new(rc.clone(), star_message, self.skel.clone());
-                        self.process_resource_command(delivery).await?;
-                    }
-                    _ => {
-                        self.handle_by_host(delivery).await?;
-                    }
-                },
-                Message::Response(response) => {
-                    // we don't handle responses here
+            StarMessagePayload::Request(request) => match &request.entity {
+                ReqEntity::Rc(rc) => {
+                    let delivery = Delivery::new(rc.clone(), star_message, self.skel.clone());
+                    self.process_resource_command(delivery).await?;
+                }
+                _ => {
+                    let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
+                    self.handle_by_host(delivery).await?;
                 }
             },
             StarMessagePayload::ResourceRegistry(action) => {
@@ -129,32 +124,45 @@ impl MessagingEndpointComponent {
 
                         let stub = skel.registry_api.register(registration).await?;
 
-                        async fn assign( skel: StarSkel, stub: ResourceStub, state: StateSrc ) -> Result<(),Fail> {
+                        async fn assign(
+                            skel: StarSkel,
+                            stub: ResourceStub,
+                            state: StateSrc,
+                        ) -> Result<(), Fail> {
                             let star_kind = StarKind::hosts(&stub.kind.resource_type());
                             let mut star_selector = StarSelector::new();
                             star_selector.add(StarFieldSelection::Kind(star_kind.clone()));
-                            let wrangle= skel.star_wrangler_api.next(star_selector).await?;
+                            let wrangle = skel.star_wrangler_api.next(star_selector).await?;
                             let mut proto = ProtoStarMessage::new();
                             proto.to(ProtoStarMessageTo::Star(wrangle.key.clone()));
-                            let assign = ResourceAssign::new(AssignKind::Create, stub, state );
-                            proto.payload( StarMessagePayload::ResourceHost(ResourceHostAction::Assign(assign)) );
-                            skel.messaging_api.star_exchange(proto,ReplyKind::Empty, "assign resource to host").await?;
+                            let assign = ResourceAssign::new(AssignKind::Create, stub, state);
+                            proto.payload(StarMessagePayload::ResourceHost(
+                                ResourceHostAction::Assign(assign),
+                            ));
+                            skel.messaging_api
+                                .star_exchange(proto, ReplyKind::Empty, "assign resource to host")
+                                .await?;
                             Ok(())
                         }
 
-                        match assign( skel, stub, create.state.clone() ).await {
-                            Ok(_) => {
-                                Ok(Payload::Empty)
-                            }
+                        match assign(skel, stub, create.state.clone()).await {
+                            Ok(_) => Ok(Payload::Empty),
                             Err(fail) => {
-                                skel.registry_api.set_status(to, Status::Panic( "could not assign resource to host".to_string())).await;
+                                skel.registry_api
+                                    .set_status(
+                                        to,
+                                        Status::Panic(
+                                            "could not assign resource to host".to_string(),
+                                        ),
+                                    )
+                                    .await;
                                 Err(fail)
                             }
                         }
                     }
-                    RcCommand::Select(select) => {
-                        Ok(Payload::List(skel.registry_api.select(select.clone(), to).await?))
-                    }
+                    RcCommand::Select(select) => Ok(Payload::List(
+                        skel.registry_api.select(select.clone(), to).await?,
+                    )),
                     RcCommand::Update(_) => {
                         unimplemented!()
                     }

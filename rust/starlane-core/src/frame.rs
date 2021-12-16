@@ -339,6 +339,7 @@ impl StarMessage {
 pub enum StarMessagePayload {
     None,
     Request(crate::mesh::Request),
+    Response(crate::mesh::Response),
     ResourceRegistry(ResourceRegistryRequest),
     ResourceHost(ResourceHostAction),
 //    Space(SpaceMessage),
@@ -378,7 +379,6 @@ pub enum ResourceHostAction {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResourceRegistryRequest {
-    Register(ResourceRegistration),
     Location(ResourceRecord),
     Find(Address)
 }
@@ -395,11 +395,7 @@ impl ToString for ResourceRegistryRequest {
 
 
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ResourceSliceStatusReport {
-    pub key: Address,
-    pub status: ResourceSliceStatus,
-}
+
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum SimpleReply {

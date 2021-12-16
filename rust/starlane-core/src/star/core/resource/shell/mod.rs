@@ -129,7 +129,7 @@ pub trait Host: Send + Sync {
 
     async fn assign(
         &self,
-        assign: ResourceAssign<AssignResourceStateSrc>,
+        assign: ResourceAssign,
     ) -> Result<(), Error>;
 
     fn handle( &self, delivery: Delivery<Message> ) {

@@ -16,9 +16,7 @@ use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
 use crate::frame::{StarPattern, TraversalAction, ResourceRegistryRequest, StarMessagePayload};
 use crate::resource::{Kind, ResourceType, AssignResourceStateSrc, ResourceRecord};
-use crate::resource::file_system::FileSystemState;
 use crate::resource::FileKind;
-use crate::resource::user::UserState;
 use crate::star::{Request, StarCommand, StarKind, StarSkel, StarKey};
 use crate::star::shell::search::{SearchInit, SearchHits};
 use crate::star::surface::SurfaceApi;
@@ -39,6 +37,7 @@ use crate::mesh::serde::payload::Payload;
 use crate::mesh::serde::entity::request::ReqEntity;
 use crate::mesh::serde::payload::{RcCommand, Primitive};
 use crate::mesh::serde::resource::command::create::{AddressSegmentTemplate, KindTemplate};
+use crate::fail::{Fail, StarlaneFailure};
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -161,7 +160,7 @@ impl StarlaneApi {
 
         match api {
             Ok(api) => Ok(api),
-            Err(error) => Err(Fail::Error(format!("catastrophic conversion error when attempting to try_convert api").into()).into()),
+            Err(error) => Err("catastrophic conversion error when attempting to try_convert api".into()),
         }
     }
 
@@ -197,9 +196,6 @@ pub struct SpaceApi {
 }
 
 impl SpaceApi {
-    pub fn key(&self) -> ResourceKey {
-        self.stub.key.clone()
-    }
 
     pub fn address(&self) -> Address {
         self.stub.address.clone()
@@ -287,64 +283,10 @@ pub struct ResourceApi {
     surface_api: SurfaceApi,
 }
 
-impl TryFrom<ResourceApi> for FileSystemApi {
-    type Error = Error;
 
-    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
-        Ok(Self::new(value.surface_api, value.stub)?)
-    }
-}
-
-impl TryFrom<ResourceApi> for FileApi {
-    type Error = Error;
-
-    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
-        Ok(Self::new(value.surface_api, value.stub)?)
-    }
-}
-
-impl TryFrom<ResourceApi> for AppApi{
-    type Error = Error;
-
-    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
-        Ok(Self::new(value.surface_api, value.stub)?)
-    }
-}
-
-impl TryFrom<ResourceApi> for MechtronApi {
-    type Error = Error;
-
-    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
-        Ok(Self::new(value.surface_api, value.stub)?)
-    }
-}
-
-impl TryFrom<ResourceApi> for ArtifactBundleApi {
-    type Error = Error;
-
-    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
-        Ok(Self::new(value.surface_api, value.stub)?)
-    }
-}
-
-impl TryFrom<ResourceApi> for ArtifactBundleSeriesApi {
-    type Error = Error;
-
-    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
-        Ok(Self::new(value.surface_api, value.stub)?)
-    }
-}
 
 
 impl TryFrom<ResourceApi> for SpaceApi {
-    type Error = Error;
-
-    fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
-        Ok(Self::new(value.surface_api, value.stub)?)
-    }
-}
-
-impl TryFrom<ResourceApi> for UserApi {
     type Error = Error;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {

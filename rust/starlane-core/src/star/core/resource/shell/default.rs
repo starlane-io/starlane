@@ -1,11 +1,13 @@
 
 use crate::error::Error;
-use crate::resource::{ResourceType, AssignResourceStateSrc, ResourceAssign};
+use crate::resource::{ResourceType, AssignResourceStateSrc, ResourceAssign, Kind};
 use crate::star::core::resource::shell::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
+use mesh_portal_serde::version::v0_0_1::generic::resource::command::common::StateSrc;
+use crate::mesh::serde::id::Address;
 
 #[derive(Debug)]
 pub struct StatelessHost {
@@ -34,20 +36,21 @@ impl Host for StatelessHost {
 
     async fn assign(
         &self,
-        assign: ResourceAssign<AssignResourceStateSrc>,
+        assign: ResourceAssign,
     ) -> Result<(), Error> {
         match assign.state {
-            AssignResourceStateSrc::Stateless => {}
-            _ => {
-                return Err("must be stateless or empty create args".into());
+            StateSrc::Stateless => {
+            }
+            StateSrc::StatefulDirect(_) => {
+                return Err("must be stateless".into());
             }
         };
 
         Ok(())
     }
 
-    async fn has(&self, key: ResourceKey) -> bool {
-        match self.store.has(key).await {
+    async fn has(&self, address: Address ) -> bool {
+        match self.store.has(address).await {
             Ok(v) => v,
             Err(_) => false,
         }

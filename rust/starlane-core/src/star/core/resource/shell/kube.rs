@@ -9,9 +9,8 @@ use serde::{Deserialize, Serialize};
 use crate::error::Error;
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::payload::Payload;
-use crate::resource::{AssignResourceStateSrc, Kind, ResourceAssign, ResourceKindParts, ResourceType};
+use crate::resource::{AssignResourceStateSrc, Kind, ResourceAssign, ResourceType};
 use crate::star::core::resource::shell::Host;
-use crate::star::core::resource::registry::ResourceCreationChamber;
 use crate::star::StarSkel;
 
 pub struct KubeHost {
@@ -74,11 +73,11 @@ impl Host for KubeHost {
 
      async fn assign(
             &self,
-            assign: ResourceAssign<AssignResourceStateSrc>,
+            assign: ResourceAssign,
         ) -> Result<Payload, Error> {
 println!("Assigning Kube Resource Host....");
         let provisioners: Api<StarlaneProvisioner> = Api::default_namespaced(self.client.clone() );
-        let parts: ResourceKindParts = assign.archetype().kind.into();
+        let parts: ResourceKindParts = assign.stub.kind.into();
         let mut list_params = ListParams::default();
         list_params = list_params.labels(format!("type={}",parts.resource_type).as_str() );
         if let Option::Some(kind) = parts.kind {
