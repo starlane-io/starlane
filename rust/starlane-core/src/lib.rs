@@ -1,3 +1,7 @@
+#![feature(fn_traits)]
+#![feature(unboxed_closures)]
+
+
 #[macro_use]
 extern crate actix_web;
 #[macro_use]
@@ -28,6 +32,7 @@ extern crate tracing;
 extern crate validate;
 #[macro_use]
 extern crate wasmer;
+
 
 use std::str::FromStr;
 

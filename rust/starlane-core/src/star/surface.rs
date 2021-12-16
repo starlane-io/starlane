@@ -32,9 +32,9 @@ impl SurfaceApi {
         Ok(())
     }
 
-    pub async fn locate(&self, identifier: ResourceIdentifier) -> Result<ResourceRecord, Error> {
+    pub async fn locate(&self, address: Address ) -> Result<ResourceRecord, Error> {
         let (tx, rx) = oneshot::channel();
-        self.tx.try_send(SurfaceCall::Locate { identifier, tx })?;
+        self.tx.try_send(SurfaceCall::Locate { address: address, tx })?;
         Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
     }
 
@@ -80,7 +80,7 @@ pub enum SurfaceCall {
     Init,
     GetCaches(oneshot::Sender<Arc<ProtoArtifactCachesFactory>>),
     Locate {
-        identifier: ResourceIdentifier,
+        address: Address,
         tx: oneshot::Sender<Result<ResourceRecord, Error>>,
     },
     Exchange {
@@ -144,7 +144,7 @@ impl AsyncProcessor<SurfaceCall> for SurfaceComponent {
                     })
                     .unwrap_or_default();
             }
-            SurfaceCall::Locate { identifier, tx } => {
+            SurfaceCall::Locate { address: identifier, tx } => {
                 self.skel
                     .resource_locator_api
                     .tx

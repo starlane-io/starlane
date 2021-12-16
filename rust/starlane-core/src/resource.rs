@@ -42,11 +42,10 @@ use crate::message::{MessageExpect, ProtoStarMessage, ReplyKind};
 use crate::names::Name;
 use crate::resources::message::{MessageFrom, ProtoRequest};
 use crate::star::{StarInfo, StarKey, StarSkel};
-use crate::star::shell::wrangler::{ResourceHostSelector, StarWrangle};
+use crate::star::shell::wrangler::{StarWrangle};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
 use mesh_portal_serde::version::v0_0_1::pattern::parse::consume_kind;
-use mesh_portal_serde::version::v0_0_1::generic::id::resource_type;
 
 pub mod artifact;
 pub mod config;
@@ -190,12 +189,10 @@ impl ToString for Kind {
     }
 }
 
-impl FromStr for Kind {
-    type Err = Error;
+impl TryFrom<KindParts> for Kind {
+    type Error = mesh_portal_serde::error::Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts:KindParts = consume_kind(s)?;
-
+    fn try_from(parts: KindParts) -> Result<Self, Self::Error> {
         match parts.resource_type {
             ResourceType::Base => {
                 return Ok(Self::Base(BaseKind::from_str(parts.kind.ok_or("expected Kind for type Base".into())?)?))
@@ -230,8 +227,16 @@ impl FromStr for Kind {
             ResourceType::ArtifactBundle => {Self::ArtifactBundle}
             ResourceType::Proxy => {Self::Proxy}
             ResourceType::Credentials => {Self::Credentials}
-            what => { return Err(format!("missing Kind from_str for: {}",resource_type.to_string()).into())}
+            what => { return Err(format!("missing Kind from_str for: {}",what.to_string()).into())}
         })
+    }
+}
+
+impl FromStr for Kind {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok( consume_kind(s)? )
     }
 }
 

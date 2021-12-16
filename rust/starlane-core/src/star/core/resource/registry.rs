@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use futures::future::join_all;
 use futures::SinkExt;
-use mesh_portal_serde::version::latest::generic::pattern::ExactSegment;
+use mesh_portal_serde::version::latest::generic::pattern::{ExactSegment, KindPattern};
 use crate::mesh::serde::payload::PrimitiveList;
 use mesh_portal_serde::version::v0_0_1::pattern::SpecificPattern;
 use mesh_portal_serde::version::v0_0_1::util::ValuePattern;
@@ -26,7 +26,6 @@ use crate::mesh::serde::generic::resource::Archetype;
 use crate::mesh::serde::id::{Address, AddressSegment, Kind, Specific};
 use crate::mesh::serde::id::Version;
 use crate::mesh::serde::pattern::{AddressKindPattern, AddressKindPath, AddressKindSegment, Hop};
-use crate::mesh::serde::pattern::Pattern;
 use crate::mesh::serde::pattern::SegmentPattern;
 use crate::mesh::serde::payload::{Payload, Primitive};
 use crate::mesh::serde::resource::command::common::{SetProperties, SetRegistry};
@@ -38,13 +37,15 @@ use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
 use crate::resource;
 use crate::star::{StarKey, StarSkel};
 use crate::star::core::resource::shell::HostCall;
-use crate::star::shell::wrangler::ResourceHostSelector;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::resource::{ResourceRecord, AssignResourceStateSrc, Resource, ResourceAssign, AssignKind, ResourceLocation, ResourceType};
 use crate::resources::message::{ProtoRequest, MessageFrom};
 use crate::mesh::serde::resource::command::select::SelectionKind;
 use crate::mesh::serde::entity::request::{ReqEntity, Rc};
 use crate::mesh::serde::generic::payload::RcCommand;
+use crate::security::permissions::Pattern;
+use mesh_portal_serde::version::v0_0_1::generic::pattern::ResourceTypePattern;
+use mesh_portal_serde::version::v0_0_1::pattern::specific::{VendorPattern, ProductPattern, VariantPattern};
 
 static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_pre,shell,status";
 
@@ -164,7 +165,6 @@ impl RegistryComponent {
             let statement = "UPDATE resources SET status=?1 WHERE parent=?2 AND address_segment=?3";
             let mut statement = conn.prepare(statement.as_str())?;
             statement.execute(params!(status,parent,address_segment))?;
-            trans.commit()?;
             Ok(())
         }
         tx.send(process(&self.conn, address,status));
@@ -178,16 +178,17 @@ impl RegistryComponent {
             let statement = "UPDATE resources SET host=?1 WHERE parent=?2 AND address_segment=?3";
             let mut statement = conn.prepare(statement.as_str())?;
             statement.execute(params!(host,parent,address_segment))?;
-            trans.commit()?;
             Ok(())
         }
-        tx.send(process(&self.conn, address,status));
+        tx.send(process(&self.conn, address,location));
     }
 
     fn locate(&mut self, address: Address, tx: oneshot::Sender<Result<ResourceRecord,Fail>>) {
         fn process( conn: &Connection, address:Address) -> Result<ResourceRecord,Fail> {
             let statement = format!( "SELECT DISTINCT {} FROM resources as r WHERE parent=?1 AND address_segment=?2", RESOURCE_QUERY_FIELDS );
-            let mut statement = trans.prepare(statement.as_str())?;
+            let mut statement = conn.prepare(statement.as_str())?;
+            let parent = address.parent().ok_or("expected a parent")?;
+            let address_segment = address.last_segment().ok_or("expected last address_segment")?.to_string();
             let record = statement.query_row(params!(parent.to_string(),address_segment), RegistryComponent::process_resource_row_catch)?;
             Ok(record)
         }
@@ -195,7 +196,7 @@ impl RegistryComponent {
     }
 
     fn query(&mut self, address: Address, query: Query, tx: oneshot::Sender<Result<QueryResult,Fail>>) {
-        async fn process(skel: StarSkel, trans:Transaction, address: Address) -> Result<QueryResult, Fail> {
+        async fn process<'a>(skel: StarSkel, trans:Transaction<'a>, address: Address) -> Result<QueryResult, Fail> {
 
             if address.segments.len() == 0 {
                 return Err(Fail::Starlane(StarlaneFailure::Error("cannot address_tks_path_query on Root".to_string())));
@@ -249,7 +250,8 @@ impl RegistryComponent {
     }
 
     fn register( &mut self, registration: Registration, tx: oneshot::Sender<Result<ResourceStub,Fail>>) {
-        fn register( registry: &mut RegistryComponent, registration: Registration ) -> Result<ResourceStub,Fail> {
+        fn register( registry: &mut RegistryComponent, registration: Registration ) -> Result<(),Fail> {
+            let trans = registry.conn.transaction()?;
             let params = RegistryParams::from_registration(&registration)?;
             trans.execute("INSERT INTO resources (address_segment,resource_type,kind,vendor,product,variant,version,version_pre,parent,status) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'Pending')", params![params.address_segment,params.resource_type,params.kind,params.vendor,params.product,params.variant,params.version,params.version_pre,params.parent])?;
 
@@ -286,27 +288,33 @@ impl RegistryComponent {
             }
 
             set_properties("", &params, &registration.properties, &trans )?;
-
             trans.commit()?;
 
-            // now we need to create the ResourceStub via 'locate'
-
-
-            unimplemented!()
-
-           // Ok(())
+           Ok(())
         }
 
-        tx.send(register( self, registration ));
+        let address = registration.address.clone();
+        match register( self, registration ) {
+            Ok(_) => {
+                let skel = self.skel.clone();
+                tokio::spawn(async move {
+                    tx.send(skel.registry_api.locate(address).await.into());
+                });
+            }
+            Err(err) => {
+                tx.send(Err(err))
+            }
+        }
+
     }
 
     fn select(&mut self, select: Select, address: Address, tx: oneshot::Sender<Result<PrimitiveList,Fail>>) {
         async fn initial(registry: &mut RegistryComponent, select: Select,address: Address  ) -> Result<PrimitiveList, Fail> {
-            if address != selector.pattern.query_root() {
-                let fail = fail::Fail::Resource(fail::resource::Fail::Select(fail::resource::Select::WrongAddress {required:selector.pattern.query_root(), found: address }));
+            if address != select.pattern.query_root() {
+                let fail = fail::Fail::Resource(fail::resource::Fail::Select(fail::resource::Select::WrongAddress {required:select.pattern.query_root(), found: address }));
                 return Err(Fail::Fail(fail));
             }
-            let resource = registry.skel.resource_locator_api.locate(selector.pattern.query_root()).await?;
+            let resource = registry.skel.resource_locator_api.locate(select.pattern.query_root()).await?;
             if resource.location.host != registry.skel.info.key {
                 let fail = fail::Fail::Resource(fail::resource::Fail::Select(fail::resource::Select::BadSelectRouting {required:resource.location.host.to_string(), found: registry.skel.info.key.to_string()}));
                 return Err(Fail::Fail(fail));
@@ -314,14 +322,14 @@ impl RegistryComponent {
 
             let address_kind_path = registry.skel.registry_api.query(address.clone(), Query::AddressKindPath ).await?.try_into()?;
 
-            let sub_selector = selector.sub_select(address, selector.pattern.sub_select_hops(), address_kind_path);
+            let sub_selector = select.sub_select(address, select.pattern.sub_select_hops(), address_kind_path);
 
             let list = registry.skel.registry_api.select(sub_selector.into(),address.clone()).await?;
 
             Ok(list)
         }
 
-        async fn sub_select(skel: StarSkel, trans: Transaction,  selector: SubSelector) -> Result<PrimitiveList,Fail> {
+        async fn sub_select<'a>(skel: StarSkel, trans: Transaction<'a>,  selector: SubSelector) -> Result<PrimitiveList,Fail> {
             let mut params: Vec<String> = vec![];
             let mut where_clause = String::new();
             let mut index = 1;
@@ -344,8 +352,8 @@ impl RegistryComponent {
                 }
 
                 match &hop.tks.resource_type {
-                    Pattern::Any => {},
-                    Pattern::Exact(resource_type)=> {
+                    ResourceTypePattern::Any => {},
+                    ResourceTypePattern::Exact(resource_type)=> {
                         index = index+1;
                         where_clause.push_str( format!(" AND resource_type=?{}",index).as_str() );
                         params.push( resource_type.to_string() );
@@ -353,8 +361,8 @@ impl RegistryComponent {
                 }
 
                 match &hop.tks.kind {
-                    Pattern::Any => {},
-                    Pattern::Exact(kind)=> {
+                    KindPattern::Any => {},
+                    KindPattern::Exact(kind)=> {
                         match kind.sub_string() {
                             None => {}
                             Some(sub) => {
@@ -371,24 +379,24 @@ impl RegistryComponent {
                     ValuePattern::None => {}
                     ValuePattern::Pattern(specific) => {
                         match &specific.vendor {
-                            Pattern::Any => {}
-                            Pattern::Exact(vendor) => {
+                            VendorPattern::Any => {}
+                            VendorPattern::Exact(vendor) => {
                                 index = index+1;
                                 where_clause.push_str(format!(" AND vendor=?{}", index).as_str());
                                 params.push(vendor.clone() );
                             }
                         }
                         match &specific.product{
-                            Pattern::Any => {}
-                            Pattern::Exact(product) => {
+                            ProductPattern::Any => {}
+                            ProductPattern::Exact(product) => {
                                 index = index+1;
                                 where_clause.push_str(format!(" AND product=?{}", index).as_str());
                                 params.push(product.clone() );
                             }
                         }
                         match &specific.variant{
-                            Pattern::Any => {}
-                            Pattern::Exact(variant) => {
+                            VariantPattern::Any => {}
+                            VariantPattern::Exact(variant) => {
                                 index = index+1;
                                 where_clause.push_str(format!(" AND variant=?{}", index).as_str());
                                 params.push(variant.clone());
@@ -403,7 +411,7 @@ impl RegistryComponent {
                 RESOURCE_QUERY_FIELDS, where_clause
             );
 
-            let mut statement = transaction.prepare(statement.as_str())?;
+            let mut statement = trans.prepare(statement.as_str())?;
             let mut rows = statement.query(params_from_iter(params.iter()))?;
 
 
@@ -479,7 +487,7 @@ impl RegistryComponent {
                                 });
                             }
                             Err(err) => {
-                                tx.send( Err(Fail::Starlane(StarlaneFailure::Error(error.to_string()))));
+                                tx.send( Err(Fail::Starlane(StarlaneFailure::Error(err.to_string()))));
                             }
                         }
                     }
@@ -535,9 +543,9 @@ impl RegistryComponent {
                     if let Option::Some(version) = version {
                         let version = if let Option::Some(version_pre) = version_pre{
                             let version =  format!("{}-{}",version,version_pre);
-                            Version::from_str(version)?
+                            Version::from_str(version.as_str())?
                         } else {
-                            Version::from_str(version)?
+                            Version::from_str(version.as_str())?
                         };
 
                         Option::Some(Specific {
@@ -579,7 +587,7 @@ impl RegistryComponent {
 
         let record = ResourceRecord {
             stub: stub,
-            location: ResourceLocation { host: host },
+            location: ResourceLocation::Host( host ),
         };
 
         Ok(record)
@@ -600,6 +608,7 @@ pub struct SubSelector {
 
 
 
+#[derive(Clone)]
 pub struct Registration {
     pub address: Address,
     pub kind: Kind,
@@ -667,9 +676,9 @@ impl RegistryParams {
                     let mut pre = String::new();
                     for (i, x) in version.pre.iter().enumerate() {
                         if i != 0 {
-                            result.push_str(".");
+                            pre.push_str(".");
                         }
-                        result.push_str(format!("{}", x).as_ref());
+                        pre.push_str(format!("{}", x).as_ref());
                     }
                     Option::Some(pre)
                 } else {

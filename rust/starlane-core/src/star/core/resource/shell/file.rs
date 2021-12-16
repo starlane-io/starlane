@@ -20,6 +20,7 @@ use crate::mesh::serde::id::Address;
 use mesh_portal_api::message::Message;
 use mesh_portal_serde::version::v0_0_1::generic::entity::request::ReqEntity;
 use mesh_portal_serde::version::v0_0_1::generic::payload::Payload;
+use crate::mesh::serde::resource::command::common::StateSrc;
 
 #[derive(Debug)]
 pub struct FileHost {
@@ -40,24 +41,24 @@ impl FileHost {
 impl Host for FileHost {
     async fn assign(
         &self,
-        assign: ResourceAssign<AssignResourceStateSrc>,
+        assign: ResourceAssign,
     ) -> Result<(), Error> {
         let state = match assign.state {
-            AssignResourceStateSrc::Direct(data) => data,
-            AssignResourceStateSrc::Stateless => return Err("File cannot be stateless".into()),
+            StateSrc::StatefulDirect(data) => data,
+            StateSrc::Stateless => return Err("File cannot be stateless".into()),
             _ => {
                 return Err("File must specify Direct state".into() )
             }
         };
 
-        let state= self.store.put(assign.stub.key.clone(), state ).await?;
+        self.store.put(assign.stub.key.clone(), state.clone() ).await?;
 
         let selector = WatchSelector{
-            topic: Topic::Resource(assign.stub.key),
+            topic: Topic::Resource(assign.stub.address),
             property: Property::State
         };
 
-        self.skel.watch_api.fire( Notification::new(selector, Change::State(state.clone()) ));
+        self.skel.watch_api.fire( Notification::new(selector, Change::State(state) ));
 
         Ok(())
     }
@@ -74,7 +75,7 @@ impl Host for FileHost {
         ResourceType::File
     }
 
-    fn handle(&self,delivery: Delivery<Message>) {
+    fn request(&self, delivery: Delivery<Message>) {
         match &delivery.item {
             Message::Request(request) => {
                 match &request.entity {
@@ -123,11 +124,10 @@ impl Host for FileSystemHost {
 
     async fn assign(
         &self,
-        assign: ResourceAssign<AssignResourceStateSrc>,
+        assign: ResourceAssign,
     ) -> Result<(), Error> {
         match assign.state {
-            AssignResourceStateSrc::Stateless => {}
-            AssignResourceStateSrc::CreateArgs(_) => {}
+            StateSrc::Stateless => {}
             _ => {
                 return Err("must be stateless or empty create args".into());
             }
@@ -143,7 +143,7 @@ impl Host for FileSystemHost {
         }
     }
 
-    fn handle(&self,  delivery: Delivery<Message>)  {
+    fn request(&self, delivery: Delivery<Message>)  {
         unimplemented!()
         /*
         let record = self.skel.resource_locator_api.locate(key.into()).await?;

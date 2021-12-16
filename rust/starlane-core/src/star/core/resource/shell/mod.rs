@@ -10,7 +10,6 @@ use crate::star::core::resource::shell::app::AppHost;
 use crate::star::core::resource::shell::artifact::ArtifactBundleHost;
 use crate::star::core::resource::shell::default::StatelessHost;
 use crate::star::core::resource::shell::mechtron::MechtronHost;
-use crate::star::core::resource::shell::space::SpaceHost;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::message::delivery::Delivery;
@@ -21,27 +20,28 @@ use crate::star::core::message::WrappedHttpRequest;
 use crate::mesh::serde::entity::request::{Http, Msg};
 use crate::mesh::serde::resource::Resource;
 use mesh_portal_api::message::Message;
-use crate::mesh::serde::id::Address;
+use crate::mesh::serde::id::{Address, Kind};
+use crate::mesh::{Request, Response};
 
 pub mod artifact;
 mod default;
 pub mod file_store;
 pub mod kube;
-mod space;
 mod mechtron;
 mod app;
 mod file;
 
 pub enum HostCall {
     Assign {
-        assign: ResourceAssign<AssignResourceStateSrc>,
-        tx: oneshot::Sender<Result<Resource, Error>>,
+        assign: ResourceAssign,
+        tx: oneshot::Sender<Result<(), Error>>,
     },
     Has {
         address: Address,
         tx: oneshot::Sender<bool>,
     },
-    Handle(Delivery<Message>),
+    Request {delivery: Delivery<Request>, kind: Kind },
+    Response{response: Response, kind: Kind },
 }
 
 impl Call for HostCall {}
@@ -88,9 +88,9 @@ impl AsyncProcessor<HostCall> for HostComponent {
                 let host = self.host(key.resource_type()).await;
                 tx.send(host.has(key).await);
             }
-            HostCall::Handle(delivery) => {
-                let host = self.host(key.resource_type() ).await;
-                host.handle(delivery);
+            HostCall::Request {delivery,kind }=> {
+                let host = self.host(kind.resource_type() ).await;
+                host.request(delivery);
             }
         }
     }
@@ -104,7 +104,7 @@ impl HostComponent {
         }
 
         let host: Arc<dyn Host> = match rt {
-            ResourceType::Space => Arc::new(SpaceHost::new(self.skel.clone()).await),
+            ResourceType::Space => Arc::new(StatelessHost::new(self.skel.clone(), ResourceType::Space ).await),
             ResourceType::ArtifactBundleSeries => Arc::new(StatelessHost::new(self.skel.clone(), ResourceType::ArtifactBundleSeries).await),
             ResourceType::ArtifactBundle=> Arc::new(ArtifactBundleHost::new(self.skel.clone()).await),
             ResourceType::App=> Arc::new(AppHost::new(self.skel.clone()).await),
@@ -132,9 +132,14 @@ pub trait Host: Send + Sync {
         assign: ResourceAssign,
     ) -> Result<(), Error>;
 
-    fn handle( &self, delivery: Delivery<Message> ) {
+    fn request(&self, request: Delivery<Request> ) {
         // delivery.fail(fail::Undeliverable)
     }
+
+    fn response(&self, response: Response ) {
+        // delivery.fail(fail::Undeliverable)
+    }
+
 
     async fn has(&self, address: Address) -> bool;
 

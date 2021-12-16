@@ -16,6 +16,7 @@ use crate::mesh::serde::messaging::ExchangeId;
 use crate::mesh::Request;
 use crate::mesh::Response;
 use crate::mesh::serde::id::Address;
+use crate::mesh::serde::payload::Payload;
 
 pub enum MessageFrom {
     Inject,
@@ -95,8 +96,8 @@ impl ProtoRequest {
 
 pub struct ProtoResponse {
     pub id: MessageId,
-    pub to: ResourceIdentifier,
-    pub from: Option<ResourceIdentifier>,
+    pub to: Address,
+    pub from: Option<Address>,
     pub entity: Option<RespEntity>,
     pub exchange: Option<ExchangeId>,
     pub trace: bool,
@@ -132,11 +133,11 @@ impl ProtoResponse {
         })
     }
 
-    pub fn from(&mut self, from: MessageFrom) {
+    pub fn from(&mut self, from: Address ) {
         self.from = Option::Some(from);
     }
 
-    pub fn payload(&mut self, payload: P) {
+    pub fn payload(&mut self, payload: Payload) {
         self.payload = Option::Some(payload);
     }
 }

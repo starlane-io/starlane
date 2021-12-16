@@ -40,8 +40,7 @@ pub mod pattern {
     pub type TksPattern = pattern::TksPattern<ResourceType,Kind>;
     pub type AddressKindPattern = pattern::AddressKindPattern<ResourceType,Kind>;
     pub type SegmentPattern = pattern::SegmentPattern;
-    pub type ExactPattern = pattern::ExactPattern;
-    pub type Pattern = pattern::Pattern;
+    pub type ExactSegment= pattern::ExactSegment;
     pub type Hop = pattern::Hop<ResourceType, Kind>;
     pub type AddressKindPath = pattern::AddressKindPath<Kind>;
     pub type AddressKindSegment = pattern::AddressKindSegment<Kind>;
@@ -91,7 +90,7 @@ pub mod payload {
     pub type CallKind = generic::payload::CallKind;
     pub type CallWithConfig = generic::payload::CallWithConfig;
     pub type MapPattern = generic::payload::MapPattern;
-    pub type PayloadTypePattern = generic::payload::PayloadListPattern;
+    pub type PayloadTypePattern = generic::payload::PayloadTypePattern;
     pub type PayloadPattern = generic::payload::PayloadPattern;
     pub type ListPattern = generic::payload::ListPattern;
     pub type PayloadMap = generic::payload::PayloadMap<Kind>;
@@ -110,7 +109,6 @@ pub mod command {
 
 pub mod http {
     use mesh_portal_serde::version::latest::http;
-    use mesh_portal_serde::version::latest::Bin;
 
     pub type HttpRequest = http::HttpRequest;
     pub type HttpResponse = http::HttpResponse;
@@ -463,6 +461,12 @@ pub mod generic {
         pub type Range= payload::Range;
         pub type RcCommand<ResourceType,Kind> = payload::RcCommand<ResourceType,Kind>;
         pub type PayloadFormat = payload::PayloadFormat;
+    }
+
+    pub mod pattern {
+        use mesh_portal_serde::version::latest::generic::pattern;
+
+        pub type Pattern<P> = pattern::Pattern<P>;
     }
 
 }

@@ -29,7 +29,7 @@ use crate::resource::{ArtifactKind, Kind, ResourceType};
 use crate::resource::{AssignKind, ResourceAssign, ResourceRecord};
 use crate::star::core::resource::registry::Registration;
 use crate::star::core::resource::shell::{HostCall, HostComponent};
-use crate::star::shell::wrangler::{ResourceHostSelector, StarFieldSelection, StarSelector};
+use crate::star::shell::wrangler::{ StarFieldSelection, StarSelector};
 use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use mesh_portal_serde::version::latest::fail::BadRequest;

@@ -9,7 +9,7 @@ use tokio::sync::{mpsc, oneshot};
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::resource::{
-     Kind, Specific,
+     Kind,
 };
 use crate::star::StarSkel;
 use crate::starlane::files::MachineFileSystem;
@@ -77,11 +77,11 @@ pub enum ResourceStoreCommand {
     Save {
         address: Address,
         state: Payload,
-        tx: oneshot::Sender<Result<(), Fail>>,
+        tx: oneshot::Sender<Result<(), Error>>,
     },
     Get {
         address: Address,
-        tx: oneshot::Sender<Result<Payload, Fail>>,
+        tx: oneshot::Sender<Result<Payload, Error>>,
     },
     Has {
         address: Address,
@@ -127,86 +127,47 @@ impl StateStoreFS {
 
     async fn save(
         &mut self,
-        key: ResourceKey,
+        address: Address,
         state: Payload,
-    ) -> Result<Payload, Error> {
-        let key = key.to_snake_case();
+    ) -> Result<(), Error> {
+
 
         let state_path = Path::from_str(
-            format!("/stars/{}/states/{}", self.skel.info.key.to_string(), key).as_str(),
+            format!("/stars/{}/states/{}", self.skel.info.key.to_string(), address.to_string()).as_str(),
         )?;
         let machine_filesystem = self.skel.machine.machine_filesystem();
         let mut data_access = machine_filesystem.data_access();
         data_access.mkdir(&state_path).await?;
 
-//        let mut rxs = vec![];
-        for (aspect, data) in &state {
-            let state_aspect_file = Path::from_str(
-                format!(
-                    "/stars/{}/states/{}/{}",
-                    self.skel.info.key.to_string(),
-                    key,
-                    aspect
-                )
-                .as_str(),
-            )?;
+        let data_access = self.skel.machine.machine_filesystem().data_access();
+        data_access.write(&state_path,Arc::new(bincode::serialize(&state)?)).await?;
 
-            let data_access = self.skel.machine.machine_filesystem().data_access();
-            data_access.write(&state_aspect_file,bin).await?;
-        }
-
-/*        for rx in rxs {
-            rx.await?;
-        }
-
- */
-
-        Ok(state)
+        Ok(())
     }
 
     async fn get(&self, address: Address ) -> Result<Payload, Error> {
-        unimplemented!();
-        /*
         let machine_filesystem = self.skel.machine.machine_filesystem();
         let mut data_access = machine_filesystem.data_access();
 
         let state_path = Path::from_str(
             format!("/stars/{}/states/{}", self.skel.info.key.to_string(), address.to_string()).as_str(),
         )?;
-        let mut dataset = DataSet::new();
-        for aspect in data_access.list(&state_path).await? {
-            let state_aspect_file = Path::from_str(
-                format!(
-                    "/stars/{}/states/{}/{}",
-                    self.skel.info.key.to_string(),
-                    address.to_string(),
-                    aspect
-                        .last_segment()
-                        .ok_or("expected final segment from list")?
-                )
-                .as_str(),
-            )?;
 
-            let bin = data_access.read(&state_aspect_file).await?;
-            let bin_src = BinSrc::Memory(bin);
-            dataset.insert(
-                aspect
-                    .last_segment()
-                    .ok_or("expected final segment from list")?,
-                bin_src,
-            );
-        }
-//        Ok()
 
-         */
+        let bin = data_access.read(&state_path).await?;
+        let payload: Payload = bincode::deserialize(bin.as_slice())?;
+        Ok(payload)
     }
 
     async fn has(&self, address: Address ) -> bool {
-        if let Ok(Some(_)) = self.get(address).await {
-            true
-        } else {
-            false
-        }
+
+        let state_path = Path::from_str(
+            format!("/stars/{}/states/{}", self.skel.info.key.to_string(), address.to_string()).as_str(),
+        )?;
+
+        let machine_filesystem = self.skel.machine.machine_filesystem();
+        let data_access = machine_filesystem.data_access();
+        data_access.exists( state_path ).await
     }
 
     async fn process(&mut self, command: ResourceStoreCommand) {

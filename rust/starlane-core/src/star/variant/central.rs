@@ -46,28 +46,10 @@ impl AsyncProcessor<VariantCall> for CentralVariant {
 
 impl CentralVariant {
     fn init(&self, tx: oneshot::Sender<Result<(), Error>>) {
-        let root_resource = ResourceRecord {
-            stub: ResourceStub {
-                address: Address::root(),
-                    kind: Kind::Root,
-                properties: Default::default(),
-                status: Status::Ready
-            },
-            location: ResourceLocation {
-                host: StarKey::central(),
-            },
-        };
-
-        let registration = ResourceRegistration {
-            resource: root_resource,
-            info: None,
-        };
 
         let skel = self.skel.clone();
 
         tokio::spawn(async move {
-            let registry = skel.registry.as_ref().unwrap();
-            registry.register(registration).await.unwrap();
             let starlane_api = StarlaneApi::new(skel.surface_api.clone());
             let result = Self::ensure(starlane_api).await;
             if let Result::Err(error) = result.as_ref() {

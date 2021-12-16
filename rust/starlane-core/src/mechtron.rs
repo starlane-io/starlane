@@ -17,7 +17,7 @@ use mesh_portal_serde::version::v0_0_1::id::Address;
 use crate::mesh::serde::config::Info;
 use mesh_portal_api_client::{PortalSkel, PortalCtrl};
 use std::convert::TryInto;
-use wasmer::{{ImportObject, imports}, Module};
+use wasmer::{{ImportObject, imports}, Module,Function,};
 use tokio::sync::oneshot;
 use std::time::Duration;
 use mesh_portal_serde::version::v0_0_1::messaging::ExchangeType;
@@ -28,6 +28,7 @@ use mesh_portal_serde::version::v0_0_1::generic::portal::inlet::Response;
 use mesh_portal_serde::version::v0_0_1::generic::payload::Payload;
 use tokio::sync::oneshot::error::RecvError;
 use std::sync::mpsc::Sender;
+use crate::mesh::serde::portal::outlet;
 
 #[derive(Clone)]
 pub struct MechtronShell {
@@ -99,8 +100,10 @@ impl MechtronShellSkel {
                     let skel = skel.clone();
                     match call {
                         Call::GuestRequest { request, tx } => {
+
                          tokio::spawn( async move {
                              fn handle(skel: &MechtronShellSkel, request: guest::Request) -> Result<Option<latest::portal::inlet::Response>, Error> {
+                                 let func = skel.membrane.instance.exports.get_native_function::<i32,i32>("mechtron_guest_frame")?;
                                  let from = request.from.clone();
                                  let frame = guest::Frame::Request(request);
                                  let frame = bincode::serialize(&frame)?;
@@ -196,9 +199,9 @@ impl MechtronShellSkel {
        imports! {
             "env"=>{
 
-        "mechtron_host_request"=>Function::new_native_with_env(module.store(),skel.clone(),|skel:&MechtronShellSkel,request:i32| {
+        "mechtron_host_request"=>Function::new_native_with_env(module.store(),self.skel.clone(),|skel:&MechtronShellSkel,request:i32| {
                 fn handle(skel: &MechtronShellSkel, request:i32) -> Result<(),Error> {
-                  let request = skel.membrane.consume_buffer(buffer);
+                  let request = skel.membrane.consume_buffer(request);
                   let request: host::Request = bincode::deserialize(request.as_slice());
                   skel.tx.try_send(Call::PortalOutletRequest(request))?;
                 }
@@ -216,34 +219,64 @@ impl MechtronShellSkel {
     }
 }
 
+struct Factory {
+    skel: MechtronShellSkel
+}
+
+impl FnOnce<PortalSkel> for Factory {
+    type Output = Box<dyn PortalCtrl>;
+
+    fn call_once(self, skel: PortalSkel) -> Self::Output {
+        Box::new(MechtronShell::new( self.skel, skel ))
+    }
+}
+
+impl FnMut<PortalSkel> for Factory {
+    fn call_mut(&mut self, skel: PortalSkel) -> Self::Output {
+        Box::new(MechtronShell::new( self.skel.clone(), skel ))
+    }
+}
+
+impl Fn<PortalSkel> for Factory {
+    fn call(&self, skel: PortalSkel) -> Self::Output {
+        Box::new(MechtronShell::new( self.skel.clone(), skel))
+    }
+}
+
+struct IsoFactory {
+    template: MechtronShellTemplate
+}
+
+impl FnOnce<PortalSkel> for IsoFactory {
+    type Output = Result<Box<dyn PortalCtrl>,Error>;
+
+    fn call_once(self, portal: PortalSkel) -> Self::Output {
+        let membrane = WasmMembrane::new_with_init(self.template.wasm.module.clone(), "mechtron_init".to_string())?;
+        let skel = MechtronShellSkel::new(self.template, membrane)?;
+        Ok(Box::new(MechtronShell::new(skel,portal)))
+    }
+}
+
+impl FnMut<PortalSkel> for IsoFactory {
+    fn call_mut(&mut self, portal: PortalSkel) -> Self::Output {
+        let membrane = WasmMembrane::new_with_init(self.template.wasm.module.clone(), "mechtron_init".to_string())?;
+        let skel = MechtronShellSkel::new(self.template.clone(), membrane)?;
+        Ok(Box::new(MechtronShell::new(skel,portal)))
+    }
+}
+
+impl Fn<PortalSkel> for IsoFactory {
+    fn call(&self, portal: PortalSkel) -> Self::Output {
+        let membrane = WasmMembrane::new_with_init(self.template.wasm.module.clone(), "mechtron_init".to_string())?;
+        let skel = MechtronShellSkel::new(self.template.clone(), membrane)?;
+        Ok(Box::new(MechtronShell::new(skel,portal)))
+    }
+}
+
 impl MechtronShell {
     pub fn new_shared_wasm_factory(skel: MechtronShellSkel) -> Result<impl Fn<PortalSkel,Output=Box<dyn PortalCtrl>>, Error> {
 
-        struct Factory {
-            skel: MechtronShellSkel
-        }
-
-        impl FnOnce<PortalSkel> for Factory {
-            type Output = Box<dyn PortalCtrl>;
-
-            extern "rust-call" fn call_once(self, skel: PortalSkel) -> Self::Output {
-                Box::new(MechtronShell::new( self.skel, skel ))
-            }
-        }
-
-        impl FnMut<PortalSkel> for Factory {
-            extern "rust-call" fn call_mut(&mut self, skel: PortalSkel) -> Self::Output {
-                Box::new(MechtronShell::new( self.skel.clone(), skel ))
-            }
-        }
-
-        impl Fn<PortalSkel> for Factory {
-            extern "rust-call" fn call(&self, skel: PortalSkel) -> Self::Output {
-                Box::new(MechtronShell::new( self.skel.clone(), skel))
-            }
-        }
-
-        let factory = Factory {
+       let factory = Factory {
             skel
         };
 
@@ -252,37 +285,8 @@ impl MechtronShell {
 
     pub fn new_isolated_wasm_factory(template: MechtronShellTemplate) -> Result<impl Fn<PortalSkel,Output=Result<Box<dyn PortalCtrl>,Error>>, Error> {
 
-        struct Factory {
-            template: MechtronShellTemplate
-        }
 
-        impl FnOnce<PortalSkel> for Factory {
-            type Output = Result<Box<dyn PortalCtrl>,Error>;
-
-            extern "rust-call" fn call_once(self, portal: PortalSkel) -> Self::Output {
-              let membrane = WasmMembrane::new_with_init(self.template.wasm.module.clone(), "mechtron_init".to_string())?;
-              let skel = MechtronShellSkel::new(self.template, membrane)?;
-              Ok(Box::new(MechtronShell::new(skel,portal)))
-            }
-        }
-
-        impl FnMut<PortalSkel> for Factory {
-            extern "rust-call" fn call_mut(&mut self, args: PortalSkel) -> Self::Output {
-                let membrane = WasmMembrane::new_with_init(self.template.wasm.module.clone(), "mechtron_init".to_string())?;
-                let skel = MechtronShellSkel::new(self.template.clone(), membrane)?;
-                Ok(Box::new(MechtronShell::new(skel,portal)))
-            }
-        }
-
-        impl Fn<PortalSkel> for Factory {
-            extern "rust-call" fn call(&self, args: PortalSkel) -> Self::Output {
-                let membrane = WasmMembrane::new_with_init(self.template.wasm.module.clone(), "mechtron_init".to_string())?;
-                let skel = MechtronShellSkel::new(self.template.clone(), membrane)?;
-                Ok(Box::new(MechtronShell::new(skel,portal)))
-            }
-        }
-
-        let factory = Factory {
+        let factory = IsoFactory {
            template
         };
 
@@ -301,10 +305,7 @@ impl MechtronShell {
 #[async_trait]
 impl PortalCtrl for MechtronShell{
 
-    async fn handle(&self, message: Message) -> Result<Option<mesh::serde::portal::inlet::Response>,Error> {
-        let func = self.membrane.instance.exports.get_native_function::<i32,i32>("mechtron_guest_frame")?;
-                match message {
-                    Message::Request(request) => {
+    async fn handle_request(&self, request: outlet::Request) -> Result<Option<mesh::serde::portal::inlet::Response>,Error> {
                         let request = guest::Request {
                             to: self.info.address.clone(),
                             from: request.from,
@@ -313,13 +314,8 @@ impl PortalCtrl for MechtronShell{
                         };
 
                         let (tx,rx) = oneshot::channel();
-                        skel.tx.send(Call::GuestRequest {request, tx}).await?;
-                        rx.await
-                    }
-                    Message::Response(response) => {
-
-                    }
-                }
+                        self.skel.tx.send(Call::GuestRequest {request, tx}).await?;
+                        rx.await?;
 
         Ok(Option::None)
 

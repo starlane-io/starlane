@@ -20,7 +20,6 @@ use crate::mesh::serde::http::HttpResponse;
 use crate::resource::{ResourceType, ResourceAssign, AssignResourceStateSrc, ResourceRecord};
 use crate::mesh::serde::id::Address;
 use crate::fail::Fail;
-use crate::star::core::resource::registry::SubSelector;
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum Frame {
@@ -354,6 +353,7 @@ impl Debug for StarMessagePayload {
             StarMessagePayload::ResourceRegistry(_) => "ResourceRegistry",
             StarMessagePayload::ResourceHost(_) => "ResourceHost",
             StarMessagePayload::Reply(_) => "Reply",
+            StarMessagePayload::Response(_) => "Response"
         });
         Ok(())
     }

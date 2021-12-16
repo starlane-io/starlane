@@ -34,7 +34,7 @@ use crate::mesh::serde::resource::command::common::{StateSrc, SetLabel};
 use crate::mesh::serde::resource::command::create::{Create, Strategy, Template, AddressTemplate};
 use crate::mesh::serde::pattern::TksPattern;
 use crate::mesh::serde::payload::Payload;
-use crate::mesh::serde::entity::request::ReqEntity;
+use crate::mesh::serde::entity::request::{ReqEntity, Rc};
 use crate::mesh::serde::payload::{RcCommand, Primitive};
 use crate::mesh::serde::resource::command::create::{AddressSegmentTemplate, KindTemplate};
 use crate::fail::{Fail, StarlaneFailure};
@@ -114,8 +114,8 @@ impl StarlaneApi {
 
         let mut proto = ProtoRequest::new();
         proto.to(create.template.address.parent.clone());
-        let command = RcCommand::Create( Box::new(create) );
-        proto.entity( ReqEntity::Rc(command));
+        let command = RcCommand::Create( create );
+        proto.entity( ReqEntity::Rc(Rc::new(command)));
         let proto = proto.try_into()?;
 
         let reply = self
@@ -298,8 +298,8 @@ impl TryFrom<ResourceApi> for SpaceApi {
 #[derive(Debug)]
 pub enum StarlaneAction {
     GetState {
-        identifier: ResourceIdentifier,
-        tx: tokio::sync::oneshot::Sender<Result<DataSet<BinSrc>, Error>>,
+        address: Address,
+        tx: tokio::sync::oneshot::Sender<Result<Payload, Error>>,
     },
 }
 
@@ -335,7 +335,7 @@ impl StarlaneApiRunner {
 
     async fn process(&self, action: StarlaneAction) {
         match action {
-            StarlaneAction::GetState { identifier, tx } => {
+            StarlaneAction::GetState { address: identifier, tx } => {
                 tx.send(self.api.get_resource_state(identifier).await );
             }
         }
@@ -348,6 +348,7 @@ pub struct StarlaneApiRelay {
 }
 
 impl StarlaneApiRelay {
+    /*
     pub async fn get_resource_state(
         &self,
         identifier: ResourceIdentifier,
@@ -355,12 +356,13 @@ impl StarlaneApiRelay {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.tx
             .send(StarlaneAction::GetState {
-                identifier: identifier,
+                address: identifier,
                 tx: tx,
             })
             .await;
         rx.await?
     }
+     */
 }
 
 impl Into<StarlaneApiRelay> for StarlaneApi {

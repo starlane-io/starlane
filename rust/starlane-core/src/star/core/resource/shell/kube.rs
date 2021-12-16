@@ -7,7 +7,7 @@ use kube::Api;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
-use crate::mesh::serde::id::Address;
+use crate::mesh::serde::id::{Address, KindParts};
 use crate::mesh::serde::payload::Payload;
 use crate::resource::{AssignResourceStateSrc, Kind, ResourceAssign, ResourceType};
 use crate::star::core::resource::shell::Host;
@@ -77,9 +77,9 @@ impl Host for KubeHost {
         ) -> Result<Payload, Error> {
 println!("Assigning Kube Resource Host....");
         let provisioners: Api<StarlaneProvisioner> = Api::default_namespaced(self.client.clone() );
-        let parts: ResourceKindParts = assign.stub.kind.into();
+        let parts: KindParts = assign.stub.kind.into();
         let mut list_params = ListParams::default();
-        list_params = list_params.labels(format!("type={}",parts.resource_type).as_str() );
+        list_params = list_params.labels(format!("type={}",parts.resource_type.to_string()).as_str() );
         if let Option::Some(kind) = parts.kind {
             list_params = list_params.labels(format!("kind={}", kind).as_str());
         }

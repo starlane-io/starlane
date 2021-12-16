@@ -9,7 +9,7 @@ use crate::mesh::serde::pattern::AddressKindPattern;
 pub enum Pattern {
     None,
     Any, // *
-    Exact(ResourceAddress),
+    Exact(Address),
 }
 
 
@@ -88,7 +88,7 @@ pub mod parse {
     use nom::bytes::complete::tag;
     use crate::security::permissions::Permissions;
     use nom::sequence::tuple;
-    use mesh_portal_parse::parse::Res;
+    use mesh_portal_serde::version::v0_0_1::parse::Res;
 
     fn create(input: &str) -> Res<&str,bool> {
         alt( (tag("c"),tag("C")))(input).map( |(next,value):(&str,&str) | {

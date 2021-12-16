@@ -34,7 +34,3 @@ impl MachineFileSystem {
     }
 }
 
-#[async_trait]
-impl BinContext for MachineFileSystem {
-
-}

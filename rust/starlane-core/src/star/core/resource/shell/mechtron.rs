@@ -20,6 +20,10 @@ use crate::mesh::serde::generic::payload::{MapPattern, PayloadPattern};
 use mesh_portal_parse::pattern::consume_data_struct_def;
 use mesh_portal_serde::version::v0_0_1::util::ValueMatcher;
 use mesh_portal_serde::version::v0_0_1::generic::payload::Primitive;
+use mesh_portal_serde::version::v0_0_1::parse::address;
+use crate::message::Reply;
+use crate::mesh::Request;
+use crate::mesh::serde::resource::command::common::StateSrc;
 
 lazy_static!{
 
@@ -48,10 +52,10 @@ impl MechtronHost {
 impl Host for MechtronHost {
     async fn assign(
         &self,
-        assign: ResourceAssign<AssignResourceStateSrc>,
+        assign: ResourceAssign,
     ) -> Result<Payload, Error> {
         match assign.state {
-            AssignResourceStateSrc::Stateless => {}
+            StateSrc::Stateless => {}
             _ => {
                 return Err("currently only supporting stateless mechtrons".into());
             }
@@ -88,16 +92,16 @@ impl Host for MechtronHost {
         }
     }
 
-    fn handle(&self,  delivery: Delivery<Message>) -> Result<(),Error>{
+    fn request(&self, delivery: Delivery<Request>) -> Result<(),Error>{
 
         tokio::spawn( async move {
             info!("MECHTRON HOST RECEIVED DELIVERY");
-            let mechtron = self.mechtrons.get(key.clone()).await?.ok_or(format!("could not deliver mechtron to {}", key.to_string()))?;
+            let mechtron = self.mechtrons.get(delivery.to()).await?.ok_or(format!("could not deliver mechtron to {}", delivery.to().to_string()))?;
             info!("GOT MECHTRON");
-            let reply = mechtron.handle(delivery.item.clone()).await?;
+            let reply = mechtron.handle_request(delivery.item.clone() ).await?;
 
-            if let Option::Some(reply) = reply {
-                delivery.reply(Reply::Port(reply.payload));
+            if let Option::Some(response) = reply {
+                delivery.result(Ok(response));
                 info!("=====>> MECHTRON SENT REPLY");
             }
         });

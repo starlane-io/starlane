@@ -8,7 +8,7 @@ use crate::artifact::ArtifactRef;
 use crate::cache::ArtifactItem;
 use crate::config::app::AppConfig;
 use crate::error::Error;
-use crate::resource::{ArtifactKind, Address, ResourceType, ResourceAssign, AssignResourceStateSrc};
+use crate::resource::{ArtifactKind, ResourceType, ResourceAssign, AssignResourceStateSrc};
 use crate::star::core::resource::shell::Host;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
@@ -17,6 +17,9 @@ use crate::util::AsyncHashMap;
 use mesh_portal_serde::version::latest::resource::Status;
 use crate::message::delivery::Delivery;
 use mesh_portal_api::message::Message;
+use crate::mesh::serde::resource::command::common::StateSrc;
+use crate::mesh::Request;
+use crate::mesh::serde::id::Address;
 
 pub struct AppHost {
     skel: StarSkel,
@@ -40,41 +43,34 @@ impl Host for AppHost {
 
     async fn assign(
         &self,
-        assign: ResourceAssign<AssignResourceStateSrc>,
+        assign: ResourceAssign,
     ) -> Result<(), Error> {
         match assign.state {
-            AssignResourceStateSrc::Direct(data) => return Err("App cannot be stateful".into()),
-            AssignResourceStateSrc::Stateless => {
+            StateSrc::StatefulDirect(data) => return Err("App cannot be stateful".into()),
+            StateSrc::Stateless => {
             }
         }
 
-        /*
-        let app_config_artifact = match &assign.stub.archetype.config {
-            ConfigSrc::None => return Err("App requires a config".into() ),
-            ConfigSrc::Artifact(artifact) => {
-println!("artifact : {}", artifact.to_string());
-                artifact.clone()
-            }
-        };
+        unimplemented!()
 
-         */
+        /*
 
         let factory = self.skel.machine.get_proto_artifact_caches_factory().await?;
         let mut proto = factory.create();
         let app_config_artifact_ref = ArtifactRef::new(app_config_artifact.clone(), ArtifactKind::AppConfig );
         proto.cache(vec![app_config_artifact_ref]).await?;
         let caches = proto.to_caches().await?;
-//        let app_config = caches.app_configs.get(&app_config_artifact).ok_or::<Error>(format!("expected app_config").into())?;
 
         println!("App config loaded!");
 
-//        println!("main: {}", app_config.main.address.to_string() );
         self.apps.put( assign.stub.key.clone(), Status::Ready ).await;
 
         Ok(())
+
+         */
     }
 
-    fn handle(&self, delivery: Delivery<Message>) {
+    fn request(&self, request : Delivery<Request>) {
         todo!()
     }
 
@@ -117,8 +113,3 @@ println!("MECHTRON CREATED");
 
 }
 
-impl AppHost {
-    async fn create_from_args(&self, args: String) -> Result<DataSet<BinSrc>,Error> {
-        unimplemented!();
-    }
-}

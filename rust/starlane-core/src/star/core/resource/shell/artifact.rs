@@ -18,6 +18,7 @@ use crate::error::Error;
 use crate::mesh::serde::id::Address;
 use crate::message::delivery::Delivery;
 use mesh_portal_api::message::Message;
+use crate::mesh::serde::resource::command::common::StateSrc;
 
 /*
 =======
@@ -331,17 +332,20 @@ impl Host for ArtifactBundleHost {
 
     async fn assign(
         &self,
-        assign: ResourceAssign<AssignResourceStateSrc>,
+        assign: ResourceAssign,
     ) -> Result<(), Error> {
         let state = match assign.state {
-            AssignResourceStateSrc::Direct(data) => {
+            StateSrc::Direct(data) => {
                 data
             },
-            AssignResourceStateSrc::Stateless => {
+            StateSrc::Stateless => {
                 return Err("ArtifactBundle cannot be stateless".into())
             },
 
         };
+
+        // need to unzip and create Artifacts for each...
+
         self.store.put( assign.stub.address, state ).await?;
         Ok(())
     }

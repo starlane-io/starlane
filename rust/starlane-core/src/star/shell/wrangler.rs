@@ -70,6 +70,7 @@ impl StarWranglerApi {
     }
 }
 
+/*
 #[derive(Debug, Clone)]
 pub struct ResourceHostSelector {
     skel: StarSkel,
@@ -93,13 +94,10 @@ impl ResourceHostSelector {
             };
             Ok(Arc::new(host))
         } else {
-            let handler = self.skel.star_wrangler_api.as_ref().ok_or(format!(
-                "non-manager star {} does not have a shell star selector",
-                self.skel.info.kind.to_string()
-            ))?;
+
             let mut selector = StarSelector::new();
             selector.add(StarFieldSelection::Kind(StarKind::hosts(&resource_type)));
-            let handle = handler.next(selector).await?;
+            let handle = self.skel.star_wrangler_api.next(selector).await?;
 
             let host = RemoteResourceHost {
                 skel: self.skel.clone(),
@@ -110,6 +108,8 @@ impl ResourceHostSelector {
         }
     }
 }
+
+ */
 
 pub struct StarWrangle {
     pub key: StarKey,

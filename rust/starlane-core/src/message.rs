@@ -7,7 +7,7 @@ use tokio::sync::{broadcast, oneshot};
 use uuid::Uuid;
 
 use crate::error::Error;
-use crate::resource::{Kind, ResourceType, Specific, ResourceRecord};
+use crate::resource::{Kind, ResourceType, ResourceRecord};
 use crate::star::{StarCommand, StarKey};
 use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
 use crate::resources::message::ProtoRequest;

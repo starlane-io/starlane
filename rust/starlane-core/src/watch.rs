@@ -30,12 +30,12 @@ impl Watch {
 
 #[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct WatchResourceSelector {
-    pub resource: ResourceIdentifier,
+    pub resource: Address,
     pub property: Property
 }
 
 impl WatchResourceSelector {
-    pub fn new( resource: ResourceIdentifier, property: Property ) -> Self {
+    pub fn new( resource: Address, property: Property ) -> Self {
         Self {
             resource,
             property
