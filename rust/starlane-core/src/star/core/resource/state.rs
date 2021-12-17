@@ -30,29 +30,28 @@ impl StateStore {
         }
     }
 
-    pub async fn has(&self, address: Address) -> Result<bool, Fail> {
+    pub async fn has(&self, address: Address) -> Result<bool, Error> {
         let (tx, rx) = oneshot::channel();
 
         self.tx.send(ResourceStoreCommand::Has { address, tx }).await?;
 
-        Ok(rx.await?)
+        rx.await?
     }
 
     pub async fn put(
         &self,
         key: Address,
         state : Payload,
-    ) -> Result<(), Fail> {
+    ) -> Result<(), Error> {
         let (tx, rx) = oneshot::channel();
 
         self.tx
             .send(ResourceStoreCommand::Save { address: key, state, tx })
             .await?;
-        rx.await??;
-        Ok(())
+        rx.await?
     }
 
-    pub async fn get(&self, address: Address) -> Result<Payload, Fail> {
+    pub async fn get(&self, address: Address) -> Result<Payload, Error> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(ResourceStoreCommand::Get {
@@ -60,7 +59,7 @@ impl StateStore {
                 tx,
             })
             .await?;
-        Ok(rx.await??)
+        rx.await?
     }
 
     pub fn close(&self) {
@@ -85,7 +84,7 @@ pub enum ResourceStoreCommand {
     },
     Has {
         address: Address,
-        tx: oneshot::Sender<bool>,
+        tx: oneshot::Sender<Result<bool,Error>>,
     },
 }
 
@@ -159,7 +158,7 @@ impl StateStoreFS {
         Ok(payload)
     }
 
-    async fn has(&self, address: Address ) -> bool {
+    async fn has(&self, address: Address ) -> Result<bool,Error> {
 
         let state_path = Path::from_str(
             format!("/stars/{}/states/{}", self.skel.info.key.to_string(), address.to_string()).as_str(),
@@ -167,7 +166,7 @@ impl StateStoreFS {
 
         let machine_filesystem = self.skel.machine.machine_filesystem();
         let data_access = machine_filesystem.data_access();
-        data_access.exists( state_path ).await
+        Ok(data_access.exists( &state_path ).await?)
     }
 
     async fn process(&mut self, command: ResourceStoreCommand) {

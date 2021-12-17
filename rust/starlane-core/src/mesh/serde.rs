@@ -42,7 +42,7 @@ pub mod pattern {
     pub type SegmentPattern = pattern::SegmentPattern;
     pub type ExactSegment= pattern::ExactSegment;
     pub type Hop = pattern::Hop<ResourceType, Kind>;
-    pub type AddressKindPath = pattern::AddressKindPath<Kind>;
+    pub type AddressKindPath = pattern::AddressKindPath<ResourceType,Kind>;
     pub type AddressKindSegment = pattern::AddressKindSegment<Kind>;
 }
 
@@ -235,9 +235,10 @@ pub mod resource {
         pub mod query{
             use mesh_portal_serde::version::latest::generic;
             use crate::mesh::serde::id::Kind;
+            use crate::mesh::serde::id::ResourceType;
 
             pub type Query=generic::resource::command::query::Query;
-            pub type QueryResult=generic::resource::command::query::QueryResult<Kind>;
+            pub type QueryResult=generic::resource::command::query::QueryResult<ResourceType,Kind>;
         }
     }
 

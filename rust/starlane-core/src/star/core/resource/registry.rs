@@ -36,7 +36,6 @@ use crate::mesh::serde::resource::{ResourceStub, Status};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
 use crate::resource;
 use crate::star::{StarKey, StarSkel};
-use crate::star::core::resource::shell::HostCall;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::resource::{ResourceRecord, AssignResourceStateSrc, Resource, ResourceAssign, AssignKind, ResourceLocation, ResourceType};
 use crate::resources::message::{ProtoRequest, MessageFrom};
@@ -59,37 +58,37 @@ impl RegistryApi {
         Self { tx }
     }
 
-    pub async fn register( &self, registration: Registration ) -> Result<ResourceStub,Fail> {
+    pub async fn register( &self, registration: Registration ) -> Result<ResourceStub,Error> {
         let (tx,rx) = oneshot::channel();
         self.tx.send(RegistryCall::Register {registration, tx });
         rx.await?
     }
 
-    pub async fn select( &self, select: Select, address: Address) -> Result<PrimitiveList,Fail> {
+    pub async fn select( &self, select: Select, address: Address) -> Result<PrimitiveList,Error> {
         let (tx,rx) = oneshot::channel();
         self.tx.send(RegistryCall::Select{select, address, tx });
         rx.await?
     }
 
-    pub async fn query(&self, address: Address, query: Query ) -> Result<QueryResult,Fail> {
+    pub async fn query(&self, address: Address, query: Query ) -> Result<QueryResult,Error> {
         let (tx,rx) = oneshot::channel();
         self.tx.send(RegistryCall::Query {address, query, tx });
         rx.await?
     }
 
-    pub async fn set_status(&self, address: Address, status: Status ) -> Result<(),Fail> {
+    pub async fn set_status(&self, address: Address, status: Status ) -> Result<(),Error> {
         let (tx,rx) = oneshot::channel();
         self.tx.send(RegistryCall::SetStatus{address, status, tx });
         rx.await?
     }
 
-    pub async fn set_location(&self, address: Address, location: ResourceLocation) -> Result<(),Fail> {
+    pub async fn set_location(&self, address: Address, location: ResourceLocation) -> Result<(),Error> {
         let (tx,rx) = oneshot::channel();
         self.tx.send(RegistryCall::SetLocation{address, location, tx });
         rx.await?
     }
 
-    pub async fn locate(&self, address: Address) -> Result<ResourceRecord,Fail> {
+    pub async fn locate(&self, address: Address) -> Result<ResourceRecord,Error> {
         let (tx,rx) = oneshot::channel();
         self.tx.send(RegistryCall::Locate{address, tx });
         rx.await?
@@ -98,12 +97,12 @@ impl RegistryApi {
 }
 
 pub enum RegistryCall {
-    Register{registration:Registration, tx: oneshot::Sender<Result<ResourceStub,Fail>>},
-    Select{select: Select, address: Address, tx: oneshot::Sender<Result<PrimitiveList,Fail>>},
-    Query { address: Address, query: Query, tx: oneshot::Sender<Result<QueryResult,Fail>>},
-    SetStatus { address: Address, status: Status, tx: oneshot::Sender<Result<(),Fail>>},
-    SetLocation{ address: Address, location: ResourceLocation, tx: oneshot::Sender<Result<(),Fail>>},
-    Locate{ address: Address, tx: oneshot::Sender<Result<ResourceRecord,Fail>>},
+    Register{registration:Registration, tx: oneshot::Sender<Result<ResourceStub,Error>>},
+    Select{select: Select, address: Address, tx: oneshot::Sender<Result<PrimitiveList,Error>>},
+    Query { address: Address, query: Query, tx: oneshot::Sender<Result<QueryResult,Error>>},
+    SetStatus { address: Address, status: Status, tx: oneshot::Sender<Result<(),Error>>},
+    SetLocation{ address: Address, location: ResourceLocation, tx: oneshot::Sender<Result<(),Error>>},
+    Locate{ address: Address, tx: oneshot::Sender<Result<ResourceRecord,Error>>},
 }
 
 impl Call for RegistryCall {}
@@ -157,8 +156,8 @@ impl RegistryComponent {
 
 impl RegistryComponent {
 
-    fn set_status(&mut self, address: Address, status: Status, tx: oneshot::Sender<Result<(),Fail>>) {
-        fn process( conn: &Connection, address:Address, status: Status ) -> Result<(),Fail> {
+    fn set_status(&mut self, address: Address, status: Status, tx: oneshot::Sender<Result<(),Error>>) {
+        fn process( conn: &Connection, address:Address, status: Status ) -> Result<(),Error> {
             let parent = address.parent().ok_or("resource must have a parent")?.to_string();
             let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
             let status = status.to_string();
@@ -170,8 +169,8 @@ impl RegistryComponent {
         tx.send(process(&self.conn, address,status));
     }
 
-    fn set_location(&mut self, address: Address, location: ResourceLocation, tx: oneshot::Sender<Result<(),Fail>>) {
-        fn process( conn: &Connection, address:Address, location: ResourceLocation) -> Result<(),Fail> {
+    fn set_location(&mut self, address: Address, location: ResourceLocation, tx: oneshot::Sender<Result<(),Error>>) {
+        fn process( conn: &Connection, address:Address, location: ResourceLocation) -> Result<(),Error> {
             let parent = address.parent().ok_or("resource must have a parent")?.to_string();
             let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
             let host = location.host.to_string();
@@ -183,8 +182,8 @@ impl RegistryComponent {
         tx.send(process(&self.conn, address,location));
     }
 
-    fn locate(&mut self, address: Address, tx: oneshot::Sender<Result<ResourceRecord,Fail>>) {
-        fn process( conn: &Connection, address:Address) -> Result<ResourceRecord,Fail> {
+    fn locate(&mut self, address: Address, tx: oneshot::Sender<Result<ResourceRecord,Error>>) {
+        fn process( conn: &Connection, address:Address) -> Result<ResourceRecord,Error> {
             let statement = format!( "SELECT DISTINCT {} FROM resources as r WHERE parent=?1 AND address_segment=?2", RESOURCE_QUERY_FIELDS );
             let mut statement = conn.prepare(statement.as_str())?;
             let parent = address.parent().ok_or("expected a parent")?;
@@ -195,21 +194,21 @@ impl RegistryComponent {
         tx.send(process(&self.conn, address));
     }
 
-    fn query(&mut self, address: Address, query: Query, tx: oneshot::Sender<Result<QueryResult,Fail>>) {
-        async fn process<'a>(skel: StarSkel, trans:Transaction<'a>, address: Address) -> Result<QueryResult, Fail> {
+    fn query(&mut self, address: Address, query: Query, tx: oneshot::Sender<Result<QueryResult,Error>>) {
+        async fn process<'a>(skel: StarSkel, trans:Transaction<'a>, address: Address) -> Result<QueryResult, Error> {
 
             if address.segments.len() == 0 {
-                return Err(Fail::Starlane(StarlaneFailure::Error("cannot address_tks_path_query on Root".to_string())));
+                return Err("cannot address_tks_path_query on Root".into());
             }
             if address.segments.len() == 1 {
                 let segment = AddressKindSegment {
                     address_segment: address.last_segment().expect("expected at least one segment"),
                     kind: Kind::Space
                 };
-                return Ok(QueryResult::AddressKindPath(AddressKindPath {
-                    route: address.route.clone(),
-                    segments: vec![segment]
-                }));
+                return Ok(QueryResult::AddressKindPath(AddressKindPath::new(
+                    address.route.clone(),
+                     vec![segment]
+                )));
             }
 
             let parent = address.parent().expect("expecting parent since we have already established the segments are >= 2");
@@ -219,7 +218,10 @@ impl RegistryComponent {
             proto.entity(ReqEntity::Rc(Rc::new(Query::AddressKindPath.into() )));
             let response = skel.messaging_api.exchange(proto).await?;
 
-            let parent_kind_path:String = response.entity.ok_or()?.try_into()?.try_into()?;
+            let parent_kind_path = response.entity.ok_or()?;
+            let parent_kind_path: Primitive= parent_kind_path.try_into()?;
+            let parent_kind_path: String= parent_kind_path.try_into()?;
+
             let parent_kind_path = AddressKindPath::from_str(parent_kind_path.as_str())?;
 
 
@@ -232,7 +234,9 @@ impl RegistryComponent {
                 };
 
                 let path = parent_kind_path.push(segment);
-                Ok(path)
+                let result = QueryResult::AddressKindPath(path);
+
+                Ok(result)
         }
 
         match self.conn.transaction() {
@@ -243,19 +247,19 @@ impl RegistryComponent {
                 });
             }
             Err(err) => {
-                tx.send( Err(Fail::Starlane(StarlaneFailure::Error("address_tks_path_query could not create database transaction".to_string()))))
+                tx.send( Err("address_tks_path_query could not create database transaction".into()))
             }
         }
 
     }
 
-    fn register( &mut self, registration: Registration, tx: oneshot::Sender<Result<ResourceStub,Fail>>) {
-        fn register( registry: &mut RegistryComponent, registration: Registration ) -> Result<(),Fail> {
+    fn register( &mut self, registration: Registration, tx: oneshot::Sender<Result<ResourceStub,Error>>) {
+        fn register( registry: &mut RegistryComponent, registration: Registration ) -> Result<(),Error> {
             let trans = registry.conn.transaction()?;
             let params = RegistryParams::from_registration(&registration)?;
             trans.execute("INSERT INTO resources (address_segment,resource_type,kind,vendor,product,variant,version,version_pre,parent,status) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'Pending')", params![params.address_segment,params.resource_type,params.kind,params.vendor,params.product,params.variant,params.version,params.version_pre,params.parent])?;
 
-            fn set_properties(prefix: &str, params: &RegistryParams, props: &SetProperties, trans: &Transaction ) -> Result<(),Fail> {
+            fn set_properties(prefix: &str, params: &RegistryParams, props: &SetProperties, trans: &Transaction ) -> Result<(),Error> {
                 for (key, payload) in props.iter() {
                     match payload {
                         Payload::Primitive(primitive) => {
@@ -267,7 +271,7 @@ impl RegistryComponent {
                                     trans.execute("INSERT INTO properties (resource_id,key,value) VALUES ((SELECT id FROM resources WHERE parent=?1 AND address_segment=?2),?3,?4)", params![params.parent,params.address_segment,key.to_string(),address.to_string()])?;
                                 }
                                 found => {
-                                    return Err(Fail::Fail(fail::Fail::Resource(fail::resource::Fail::Create(fail::resource::Create::InvalidProperty { expected: "Text|Address|PayloadMap".to_string(), found: found.primitive_type().to_string() }))));
+                                    return Err(format!("expected: Text|Address|PayloadMap found: {}", found.primitive_type().to_string()).into());
                                 }
                             }
                         }
@@ -280,7 +284,7 @@ impl RegistryComponent {
                             set_properties(prefix.as_str(), params, map, &trans)?;
                         }
                         found => {
-                            return Err(Fail::Fail(fail::Fail::Resource(fail::resource::Fail::Create(fail::resource::Create::InvalidProperty { expected: "Text|Address|PayloadMap".to_string(), found: found.payload_type().to_string() }))));
+                            return Err(format!("expected: Text|Address|PayloadMap found: {}", found.payload_type().to_string()).into());
                         }
                     }
                 }
@@ -308,16 +312,16 @@ impl RegistryComponent {
 
     }
 
-    fn select(&mut self, select: Select, address: Address, tx: oneshot::Sender<Result<PrimitiveList,Fail>>) {
-        async fn initial(registry: &mut RegistryComponent, select: Select,address: Address  ) -> Result<PrimitiveList, Fail> {
+    fn select(&mut self, select: Select, address: Address, tx: oneshot::Sender<Result<PrimitiveList,Error>>) {
+        async fn initial(registry: &mut RegistryComponent, select: Select,address: Address  ) -> Result<PrimitiveList, Error> {
             if address != select.pattern.query_root() {
-                let fail = fail::Fail::Resource(fail::resource::Fail::Select(fail::resource::Select::WrongAddress {required:select.pattern.query_root(), found: address }));
-                return Err(Fail::Fail(fail));
+                //let fail = fail::Fail::Resource(fail::resource::Fail::Select(fail::resource::Select::WrongAddress {required:select.pattern.query_root(), found: address }));
+                return Err("WrongAddress".into());
             }
             let resource = registry.skel.resource_locator_api.locate(select.pattern.query_root()).await?;
             if resource.location.host != registry.skel.info.key {
                 let fail = fail::Fail::Resource(fail::resource::Fail::Select(fail::resource::Select::BadSelectRouting {required:resource.location.host.to_string(), found: registry.skel.info.key.to_string()}));
-                return Err(Fail::Fail(fail));
+                return Err("BadSelectRouting".into());
             }
 
             let address_kind_path = registry.skel.registry_api.query(address.clone(), Query::AddressKindPath ).await?.try_into()?;
@@ -329,7 +333,7 @@ impl RegistryComponent {
             Ok(list)
         }
 
-        async fn sub_select<'a>(skel: StarSkel, trans: Transaction<'a>,  selector: SubSelector) -> Result<PrimitiveList,Fail> {
+        async fn sub_select<'a>(skel: StarSkel, trans: Transaction<'a>,  selector: SubSelector) -> Result<PrimitiveList,Error> {
             let mut params: Vec<String> = vec![];
             let mut where_clause = String::new();
             let mut index = 1;
@@ -487,12 +491,12 @@ impl RegistryComponent {
                                 });
                             }
                             Err(err) => {
-                                tx.send( Err(Fail::Starlane(StarlaneFailure::Error(err.to_string()))));
+                                tx.send( Err(err.into()));
                             }
                         }
                     }
                     Err(error) => {
-                        tx.send( Err(Fail::Starlane(StarlaneFailure::Error(error.to_string()))));
+                        tx.send( Err(error.into()));
                     }
                 }
             }

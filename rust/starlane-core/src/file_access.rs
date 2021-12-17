@@ -53,6 +53,10 @@ pub enum FileCommand {
         tx: tokio::sync::oneshot::Sender<Result<(), Error>>,
     },
     Shutdown,
+    Exists{
+        path: Path,
+        tx: tokio::sync::oneshot::Sender<Result<bool, Error>>
+    }
 }
 
 #[derive(Clone)]
@@ -152,6 +156,12 @@ impl FileAccess {
     pub async fn walk(&self) -> Result<tokio::sync::mpsc::Receiver<FileEvent>, Error> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.tx.send(FileCommand::Walk { tx }).await?;
+        Ok(util::wait_for_it(rx).await?)
+    }
+
+    pub async fn exists(&self, path: &Path) -> Result<bool, Error> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.tx.send(FileCommand::Exists{ path: path.clone(), tx }).await?;
         Ok(util::wait_for_it(rx).await?)
     }
 
@@ -259,6 +269,9 @@ impl LocalFileAccess {
             FileCommand::Shutdown => {
                 // do nothing
             }
+            FileCommand::Exists { path, tx } => {
+                tx.send( self.exists(&path));
+            }
         }
         Ok(())
     }
@@ -298,6 +311,15 @@ impl LocalFileAccess {
 
         Ok(path)
     }
+
+    pub fn exists(&self, path: &Path) -> Result<bool, Error> {
+        let path = self.cat_path(path.to_relative().as_str())?;
+        Ok( match File::open(&path) {
+            Ok(_) => {true}
+            Err(_) => { false } }
+        )
+    }
+
 }
 
 impl LocalFileAccess {
@@ -329,6 +351,8 @@ impl LocalFileAccess {
 
         Ok(())
     }
+
+
 
     pub fn read(&self, path: &Path) -> Result<Arc<Vec<u8>>, Error> {
         let path = self.cat_path(path.to_relative().as_str())?;

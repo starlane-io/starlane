@@ -41,7 +41,7 @@ impl MessagingApi {
         proto: ProtoStarMessage,
         expect: ReplyKind,
         description: &str,
-    ) -> Result<Reply, Fail> {
+    ) -> Result<Reply, Error> {
         let (tx, rx) = oneshot::channel();
         let call = MessagingCall::Exchange {
             proto,
@@ -49,7 +49,7 @@ impl MessagingApi {
             description: description.to_string(),
             tx,
         };
-        self.tx.try_send(call)?;
+        self.tx.send(call).await?;
         rx.await?
     }
 
@@ -103,13 +103,13 @@ pub enum MessagingCall {
     Exchange {
         proto: ProtoStarMessage,
         expect: ReplyKind,
-        tx: oneshot::Sender<Result<Reply, Fail>>,
+        tx: oneshot::Sender<Result<Reply, Error>>,
         description: String,
     },
     TimeoutExchange(MessageId),
     FailExchange {
         id: MessageId,
-        fail: Fail,
+        fail: Error,
     },
     Reply(StarMessage),
 }

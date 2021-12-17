@@ -139,7 +139,6 @@ impl Into<ResourceStub> for ResourceRecord {
     PartialEq,
     Hash,
     strum_macros::Display,
-    strum_macros::EnumString,
 )]
 pub enum ResourceType {
     Root,
@@ -157,6 +156,35 @@ pub enum ResourceType {
     Artifact,
     Proxy,
     Credentials,
+}
+
+impl FromStr for ResourceType{
+    type Err = mesh_portal_serde::error::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(
+           match s  {
+               "Root" => Self::Root,
+               "Space" => Self::Space,
+               "Base" => Self::Base,
+               "User" => Self::User,
+               "App" => Self::App,
+               "Mechtron" => Self::Mechtron,
+               "FileSystem" => Self::FileSystem,
+               "File" => Self::File,
+               "Database" => Self::Database,
+               "Authenticator" => Self::Authenticator,
+               "ArtifactBundleSeries" => Self::ArtifactBundleSeries,
+               "ArtifactBundle" => Self::ArtifactBundle,
+               "Artifact" => Self::Artifact,
+               "Proxy" => Self::Proxy,
+               "Credentials" => Self::Credentials,
+               what => {
+                   return Err(format!("invalid ResourceType: '{}'", what).into());
+               }
+           }
+        )
+    }
 }
 
 #[derive(
@@ -236,7 +264,7 @@ impl TryFrom<KindParts> for Kind {
 }
 
 impl FromStr for Kind {
-    type Err = Error;
+    type Err = mesh_portal_serde::error::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok( consume_kind(s)? )

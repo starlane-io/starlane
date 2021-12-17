@@ -3,7 +3,7 @@ use std::convert::TryInto;
 
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{mpsc, oneshot};
-
+use std::str::FromStr;
 use crate::error::Error;
 use crate::fail::{Fail, StarlaneFailure};
 use crate::frame::{
@@ -25,10 +25,9 @@ use crate::mesh::Request;
 use crate::mesh::Response;
 use crate::message::delivery::Delivery;
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
-use crate::resource::{ArtifactKind, Kind, ResourceType};
+use crate::resource::{ArtifactKind, Kind, ResourceType,BaseKind};
 use crate::resource::{AssignKind, ResourceAssign, ResourceRecord};
 use crate::star::core::resource::registry::Registration;
-use crate::star::core::resource::shell::{HostCall, HostComponent};
 use crate::star::shell::wrangler::{ StarFieldSelection, StarSelector};
 use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
@@ -51,7 +50,7 @@ impl MessagingEndpointComponent {
     pub fn start(skel: StarSkel, rx: mpsc::Receiver<CoreMessageCall>) {
         let (resource_manager_tx, resource_manager_rx) = mpsc::channel(1024);
         let resource_manager_api= ResourceManagerApi::new(resource_manager_tx);
-        ResourceManagerComponent::new(skel.clone(), resourceManager_rx );
+        ResourceManagerComponent::new(skel.clone(), resource_manager_rx );
 
         AsyncRunner::new(
             Box::new(Self {
@@ -80,12 +79,12 @@ impl AsyncProcessor<CoreMessageCall> for MessagingEndpointComponent {
 }
 
 impl MessagingEndpointComponent {
-    async fn process_resource_message(&mut self, star_message: StarMessage) -> Result<(), Error> {
+    async fn process_resource_message(&'static mut self, star_message: StarMessage) -> Result<(), Error> {
         match &star_message.payload {
             StarMessagePayload::Request(request) => match &request.entity {
                 ReqEntity::Rc(rc) => {
                     let delivery = Delivery::new(rc.clone(), star_message, self.skel.clone());
-                    self.process_resource_command(delivery).await?;
+                    self.process_resource_command(delivery).await;
                 }
                 _ => {
                     let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
@@ -106,10 +105,10 @@ impl MessagingEndpointComponent {
         Ok(())
     }
 
-    async fn process_resource_command(&mut self, delivery: Delivery<Rc>) -> Result<(), Error> {
+    async fn process_resource_command(&'static mut self, delivery: Delivery<Rc>)  {
         let skel = self.skel.clone();
         tokio::spawn(async move {
-            async fn process(skel: StarSkel, resource_manager_api: ResourceManagerApi, rc: &Rc, to: Address) -> Result<(), Error> {
+            async fn process(skel: StarSkel, resource_manager_api: ResourceManagerApi, rc: &Rc, to: Address) -> Result<Payload, Error> {
                 match &rc.command {
                     RcCommand::Create(create) => {
                         let address = match &create.template.address.child_segment_template {
@@ -133,7 +132,7 @@ impl MessagingEndpointComponent {
                             skel: StarSkel,
                             stub: ResourceStub,
                             state: StateSrc,
-                        ) -> Result<(), Fail> {
+                        ) -> Result<(), Error> {
                             let star_kind = StarKind::hosts(&stub.kind.resource_type());
                             let mut star_selector = StarSelector::new();
                             star_selector.add(StarFieldSelection::Kind(star_kind.clone()));
@@ -141,19 +140,18 @@ impl MessagingEndpointComponent {
                             let mut proto = ProtoStarMessage::new();
                             proto.to(ProtoStarMessageTo::Star(wrangle.key.clone()));
                             let assign = ResourceAssign::new(AssignKind::Create, stub, state);
-                            proto.payload(StarMessagePayload::ResourceHost(
+                            proto.payload = StarMessagePayload::ResourceHost(
                                 ResourceHostAction::Assign(assign),
-                            ));
+                            );
                             skel.messaging_api
                                 .star_exchange(proto, ReplyKind::Empty, "assign resource to host")
                                 .await?;
                             Ok(())
                         }
 
-                        match assign(skel, stub, create.state.clone()).await {
+                        match assign(skel.clone(), stub, create.state.clone()).await {
                             Ok(_) => {
-                                delivery.ok(Payload::Empty);
-                                Ok(())
+                                Ok(Payload::Empty)
                             },
                             Err(fail) => {
                                 skel.registry_api
@@ -170,8 +168,7 @@ impl MessagingEndpointComponent {
                     }
                     RcCommand::Select(select) => {
                         let list = Payload::List( skel.registry_api.select(select.clone(), to).await? );
-                        delivery.ok( list );
-                        Ok(())
+                        Ok(list)
                     },
                     RcCommand::Update(_) => {
                         unimplemented!()
@@ -183,19 +180,16 @@ impl MessagingEndpointComponent {
                             .await?
                             .to_string(),
                          ));
-                        delivery.ok(result);
-                        Ok(())
+                        Ok(result)
                     },
                     RcCommand::Get => {
-                        resource_manager_api.get(  to).await;
-                        Ok(())
+                        resource_manager_api.get(  to).await
                     }
                 }
             }
-
-            delivery.result(process(skel,self.resource_manager_api.clone(), &delivery.item, delivery.to().expect("expected this to work since we have already established that the item is a Request")).await.into());
+            let result = process(skel,self.resource_manager_api.clone(), &delivery.item, delivery.to().expect("expected this to work since we have already established that the item is a Request")).await.into();
+            delivery.result(result);
         });
-        Ok(())
     }
 
 
@@ -204,32 +198,34 @@ impl MessagingEndpointComponent {
 
 
     pub async fn has_resource(&self, key: &Address) -> Result<bool, Error> {
-        Ok(self.resource_manager_api.has( key.clone() ).await)
+        Ok(self.resource_manager_api.has( key.clone() ).await?)
     }
 }
-pub fn match_kind(template: &KindTemplate) -> Result<Kind, Fail> {
+pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
     let resource_type: ResourceType = ResourceType::from_str(template.resource_type.as_str())?;
     Ok(match resource_type {
         ResourceType::Root => Kind::Root,
         ResourceType::Space => Kind::Space,
-        ResourceType::Base => Kind::Base,
+        ResourceType::Base => {
+            let kind = BaseKind::from_str(template.kind.ok_or(Err("BaseKind cannot be None")))?;
+            if template.specific.is_some() {
+                return Err("BaseKind cannot have a Specific".into());
+            }
+            Ok(kind)
+        },
         ResourceType::User => Kind::User,
         ResourceType::App => Kind::App,
         ResourceType::Mechtron => Kind::Mechtron,
         ResourceType::FileSystem => Kind::FileSystem,
         ResourceType::File => Kind::File,
         ResourceType::Database => {
-            unimplemented!("need to right a SpecificPattern matcher...")
+            unimplemented!("need to write a SpecificPattern matcher...")
         }
         ResourceType::Authenticator => Kind::Authenticator,
         ResourceType::ArtifactBundleSeries => Kind::ArtifactBundleSeries,
         ResourceType::ArtifactBundle => Kind::ArtifactBundle,
         ResourceType::Artifact => {
-            let artifact_kind = ArtifactKind::from_str(template.kind.ok_or(Err(Fail::Fail(
-                fail::Fail::Resource(fail::resource::Fail::BadRequest(BadRequest::Bad(
-                    fail::Bad::Kind("ArtifactKind cannot be None".to_string()),
-                ))),
-            ))))?;
+            let artifact_kind = ArtifactKind::from_str(template.kind.ok_or(Err("ArtifactKind cannot be None".into())))?;
             Kind::Artifact(artifact_kind)
         }
         ResourceType::Proxy => Kind::Proxy,

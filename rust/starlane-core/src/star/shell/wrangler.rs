@@ -44,7 +44,7 @@ impl StarWranglerApi {
         let result = tokio::time::timeout(Duration::from_secs(5), rx).await??;
         match result {
             StarWrangleResult::StarWrangles(handles) => Ok(handles),
-            _what => Err(Fail::expected("StarHandleResult::StarHandles(handles)").into()),
+            _what => Err("Fail::expected(StarHandleResult::StarHandles(handles)".into()),
         }
     }
 
@@ -54,7 +54,7 @@ impl StarWranglerApi {
         let result = tokio::time::timeout(Duration::from_secs(5), rx).await??;
         match result {
             StarWrangleResult::StarWrangle(handle) => Ok(handle),
-            _what => Err(Fail::expected("StarHandleResult::StarHandle(handle)").into()),
+            _what => Err("Fail::expected(StarHandleResult::StarHandle(handle)".into()),
         }
     }
 

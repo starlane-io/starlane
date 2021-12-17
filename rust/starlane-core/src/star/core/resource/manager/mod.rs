@@ -3,9 +3,9 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 
 use artifact::ArtifactBundleManager;
-use kube::KubeManager;
+use k8s::KubeManager;
 
-use crate::config::bind::Payload;
+use crate::mesh::serde::payload::Payload;
 use crate::error::Error;
 use crate::mesh::{Request, Response};
 use crate::mesh::serde::entity::request::Rc;
@@ -25,7 +25,7 @@ mod stateless;
 pub mod artifact;
 mod default;
 pub mod file_store;
-pub mod kube;
+pub mod k8s;
 pub mod mechtron;
 pub mod app;
 pub mod file;
@@ -46,10 +46,10 @@ impl ResourceManagerApi {
         rx.await?
     }
 
-    pub async fn has( &self, address: Address) -> bool {
+    pub async fn has( &self, address: Address) -> Result<bool,Error> {
         let (tx,rx) = oneshot::channel();
         self.tx.send(ResourceManagerCall::Has{address, tx });
-        rx.await?
+        Ok(rx.await?)
     }
 
     pub async fn request( &self, request: Delivery<Request>) {
@@ -122,10 +122,10 @@ impl ResourceManagerComponent{
 
     async fn request( &mut self, request: Delivery<Request>) {
 
-        async fn process( manager_component: &mut ResourceManagerComponent, request: delivery<Request>) -> Result<(),Error> {
+        async fn process( manager_component: &mut ResourceManagerComponent, request: Delivery<Request>) -> Result<(),Error> {
             let resource_type = manager_component.resources.get(&request.to ).ok_or("could not find resource".into() )?;
             let manager = manager_component.manager(resource_type ).await?;
-            manager.handle_request(requiest).await?;
+            manager.handle_request(request ).await?;
             Ok(())
         }
 

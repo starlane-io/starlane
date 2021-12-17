@@ -43,8 +43,8 @@ impl KubeManager {
             }
         };
 
-        let starlane_api: Api<crate::star::core::resource::manager::kube::Starlane> = Api::namespaced(client.clone(), namespace.as_str() );
-        let starlane: crate::star::core::resource::manager::kube::Starlane =  match starlane_api.get(kubernetes_instance_name.as_str()).await {
+        let starlane_api: Api<crate::star::core::resource::manager::k8s::Starlane> = Api::namespaced(client.clone(), namespace.as_str() );
+        let starlane: crate::star::core::resource::manager::k8s::Starlane =  match starlane_api.get(kubernetes_instance_name.as_str()).await {
             Ok(starlane) => starlane,
             Err(_err) => {
                 let message = format!("FATAL: could not access Kubernetes starlane instance named '{}'", kubernetes_instance_name);
