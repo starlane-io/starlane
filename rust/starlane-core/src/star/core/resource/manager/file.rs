@@ -21,6 +21,7 @@ use mesh_portal_api::message::Message;
 use mesh_portal_serde::version::v0_0_1::generic::entity::request::ReqEntity;
 use mesh_portal_serde::version::v0_0_1::generic::payload::Payload;
 use crate::mesh::serde::resource::command::common::StateSrc;
+use crate::mesh::Request;
 
 #[derive(Debug)]
 pub struct FileManager {
@@ -75,8 +76,9 @@ impl ResourceManager for FileManager {
         ResourceType::File
     }
 
-    fn handle_request(&self, delivery: Delivery<Message>) {
-        match &delivery.item {
+    fn handle_request(&self, delivery: Delivery<Request>) {
+        unimplemented!();
+/*        match &delivery.item {
             Message::Request(request) => {
                 match &request.entity {
                     ReqEntity::Rc(_) => {}
@@ -97,6 +99,8 @@ impl ResourceManager for FileManager {
             }
             Message::Response(response) => {}
         }
+
+ */
     }
 }
 
@@ -143,7 +147,7 @@ impl ResourceManager for FileSystemManager {
         }
     }
 
-    fn handle_request(&self, delivery: Delivery<Message>)  {
+    fn handle_request(&self, delivery: Delivery<Request>)  {
         unimplemented!()
         /*
         let record = self.skel.resource_locator_api.locate(key.into()).await?;

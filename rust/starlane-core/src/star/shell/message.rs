@@ -10,15 +10,17 @@ use crate::error::Error;
 use crate::frame::{ SimpleReply, StarMessage, StarMessagePayload};
 use crate::message::{MessageExpect, ProtoStarMessage, ProtoStarMessageTo, MessageId, ReplyKind, Reply};
 use crate::resource::ResourceRecord;
-use crate::star::StarSkel;
+use crate::star::{StarSkel, StarKey};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::fail::{Fail, StarlaneFailure};
-use crate::resources::message::ProtoRequest;
+use crate::resources::message::{ProtoRequest, MessageFrom};
 use crate::mesh::Response;
 use mesh_portal_serde::version::v0_0_1::messaging::ExchangeType;
 use crate::mesh::serde::messaging::Exchange;
 use mysql::uuid::Uuid;
 use std::convert::TryInto;
+use crate::mesh::serde::id::Address;
+use std::str::FromStr;
 
 #[derive(Clone)]
 pub struct MessagingApi {
@@ -53,34 +55,25 @@ impl MessagingApi {
         rx.await?
     }
 
-    pub async fn notify(&self, mut request: ProtoRequest){
-        request.exchange = ExchangeType::Notify;
-        let request = request.create()?;
-        let mut proto = ProtoStarMessage::new();
-        proto.to(ProtoStarMessageTo::Resource(request.to.ok_or("expected request.to must be set".into())?));
-        proto.payload(StarMessagePayload::Request(request));
+    pub async fn notify(&self, mut proto: ProtoRequest)->Result<(),Error>{
+        proto.exchange = ExchangeType::Notification;
 
-        self.star_notify( request.into() ).await;
+        let (tx,rx) = oneshot::channel();
+        let call = MessagingCall::Request {proto ,tx };
+        self.tx.send(call).await?;
+
+        Ok(())
     }
 
-    pub async fn exchange(&self, mut request: ProtoRequest) -> Result<Response,Fail>  {
-        request.exchange = ExchangeType::RequestResponse;
-        let request = request.create()?;
-        let mut proto = ProtoStarMessage::new();
-        proto.to(ProtoStarMessageTo::Resource(request.to.ok_or("expected request.to must be set".into())?));
-        proto.payload(StarMessagePayload::Request(request));
 
-        let reply = self.star_exchange( proto, ReplyKind::Response, "exchanging resource message" ).await?;
-        match reply {
-            Reply::Response(response) => {
-                Ok(response)
-            }
-            _ => {
-                Err(Fail::Starlane(StarlaneFailure::Error("expected message response".into())))
-            }
-        }
+    pub async fn exchange(&self, mut proto: ProtoRequest)->Result<Response,Error>{
+        proto.exchange = ExchangeType::RequestResponse;
+
+        let (tx,rx) = oneshot::channel();
+        let call = MessagingCall::Request {proto ,tx };
+        self.tx.send(call).await?;
+        Ok(rx.await??.ok_or("expectect response")?)
     }
-
 
     pub fn on_reply(&self, message: StarMessage) {
         if message.reply_to.is_none() {
@@ -92,7 +85,7 @@ impl MessagingApi {
         }
     }
 
-    pub fn fail_exchange(&self, id: MessageId, fail: Fail) {
+    pub fn fail_exchange(&self, id: MessageId, fail: Error) {
         let call = MessagingCall::FailExchange { id, fail };
         self.tx.try_send(call).unwrap_or_default();
     }
@@ -100,6 +93,10 @@ impl MessagingApi {
 
 pub enum MessagingCall {
     Send(ProtoStarMessage),
+    Request {
+        proto: ProtoRequest,
+        tx: oneshot::Sender<Result<Option<Response>, Error>>,
+    },
     Exchange {
         proto: ProtoStarMessage,
         expect: ReplyKind,
@@ -119,14 +116,17 @@ impl Call for MessagingCall {}
 pub struct MessagingComponent {
     skel: StarSkel,
     exchanges: HashMap<MessageId, MessageExchanger>,
+    address: Address
 }
 
 impl MessagingComponent {
     pub fn start(skel: StarSkel, rx: mpsc::Receiver<MessagingCall>) {
+        let address = Address::from_str(format!("<<{}>>::messaging",skel.info.key.to_string()).as_str() ).expect("expected messaging address to parse");
         AsyncRunner::new(
             Box::new(Self {
                 skel: skel.clone(),
                 exchanges: HashMap::new(),
+                address
             }),
             skel.messaging_api.tx.clone(),
             rx,
@@ -158,11 +158,47 @@ impl AsyncProcessor<MessagingCall> for MessagingComponent {
             MessagingCall::FailExchange { id, fail } => {
                 self.fail_exchange(id, fail);
             }
+            MessagingCall::Request { proto, tx } => {
+                self.request( proto, tx ).await;
+            }
         }
     }
 }
 
 impl MessagingComponent {
+
+    async fn request( &mut self, proto: ProtoRequest, tx: oneshot::Sender<Result<Option<Response>,Error>>) {
+        async fn process( messaging: &mut MessagingComponent, proto: ProtoRequest ) ->Result<Option<Response>,Error> {
+            let mut proto = proto;
+            let exchange_type = proto.exchange.clone();
+            if let Option::Some(MessageFrom::Inject) = proto.from {
+                proto.from = Option::Some(MessageFrom::Address(messaging.address.clone()));
+            }
+            let request = proto.create()?;
+            let mut proto = ProtoStarMessage::new();
+            proto.to = ProtoStarMessageTo::Resource(request.to.clone());
+            proto.payload = StarMessagePayload::Request(request.clone());
+            let (tx, rx) = oneshot::channel();
+            messaging.exchange(proto, ReplyKind::Response, tx, "resource request exchange".to_string() );
+            match exchange_type {
+                ExchangeType::Notification => {
+                    Ok(Option::None)
+                }
+                ExchangeType::RequestResponse => {
+                    let response = rx.await??;
+                    if let Reply::Response(response) = response {
+                        Ok(Option::Some(response))
+                    } else {
+                        Err("unexpected reply".into())
+                    }
+                }
+            }
+        }
+        tx.send(process(self, proto).await );
+    }
+
+
+
     fn on_reply(&mut self, message: StarMessage) {
         if let Option::Some(reply_to) = message.reply_to {
             if let StarMessagePayload::Reply(SimpleReply::Ack(_)) = &message.payload {
@@ -181,21 +217,21 @@ impl MessagingComponent {
                     StarMessagePayload::Reply(SimpleReply::Ok(reply)) => {
                         match exchanger.expect.is_match(&reply) {
                             true => Ok(reply),
-                            false => Err(Fail::Starlane(StarlaneFailure::Error(exchanger.expect.to_string()))),
+                            false => Err(format!("expected: {}",exchanger.expect.to_string()).into()),
                         }
                     }
-                    StarMessagePayload::Reply(SimpleReply::Fail(fail)) => Err(fail.into()),
+                    StarMessagePayload::Reply(SimpleReply::Fail(fail)) => Err("fail".into()),
 
                     _ => {
                         error!(
                             "unexpected response for message exchange with description: {}",
                             exchanger.description
                         );
-                        Err(Fail::Starlane(StarlaneFailure::Error(
+                        Err(
                             format!(
                                 "StarMessagePayload::Reply(Reply::Ok(Reply::{}))",
                                 exchanger.expect.to_string()
-                            )))
+                            )
 
                         .into())
                     }
@@ -213,14 +249,14 @@ impl MessagingComponent {
         }
     }
 
-    fn fail_exchange(&mut self, id: MessageId, fail: Fail) {
+    fn fail_exchange(&mut self, id: MessageId, fail: Error) {
         if let Option::Some(exchanger) = self.exchanges.remove(&id) {
             exchanger.tx.send(Err(fail.into()));
         }
     }
 
     async fn send(&self, proto: ProtoStarMessage) {
-        let id = MessageId::new_v4();
+        let id = Uuid::new_v4().to_string();
         self.send_with_id(proto, id).await;
     }
 
@@ -228,10 +264,10 @@ impl MessagingComponent {
         &mut self,
         mut proto: ProtoStarMessage,
         expect: ReplyKind,
-        tx: oneshot::Sender<Result<Reply, Fail>>,
+        tx: oneshot::Sender<Result<Reply, Error>>,
         description: String,
     ) {
-        let id = MessageId::new_v4();
+        let id = Uuid::new_v4().to_string();
         let (timeout_tx, mut timeout_rx) = mpsc::channel(1);
         self.exchanges.insert(
             id.clone(),
@@ -258,7 +294,7 @@ impl MessagingComponent {
                     }
                     Err(_) => {
                         messaging_tx
-                            .try_send(MessagingCall::TimeoutExchange(cancel_id))
+                            .try_send(MessagingCall::TimeoutExchange(cancel_id.clone()))
                             .unwrap_or_default();
                     }
                 }
@@ -288,7 +324,13 @@ impl MessagingComponent {
                             return;
                         }
                     };
-                    record.location.host
+                    match record.location.ok_or() {
+                        Ok(star) => {star}
+                        Err(_) => {
+                            error!("ProtoStarMessage to address cannot be None");
+                            return;
+                        }
+                    }
                 }
                 ProtoStarMessageTo::Star(star) => star.clone(),
             };
@@ -296,7 +338,7 @@ impl MessagingComponent {
             match proto.validate() {
                 Err(error) => {
                     skel.messaging_api
-                        .fail_exchange(id, Fail::Error("invalid proto message".to_string()));
+                        .fail_exchange(id, "invalid proto message".into() );
                     return;
                 }
                 _ => {}
@@ -319,7 +361,7 @@ impl MessagingComponent {
 
 struct MessageExchanger {
     pub expect: ReplyKind,
-    pub tx: oneshot::Sender<Result<Reply, Fail>>,
+    pub tx: oneshot::Sender<Result<Reply, Error>>,
     pub timeout_tx: mpsc::Sender<TimeoutCall>,
     pub description: String,
 }
@@ -332,7 +374,7 @@ pub enum TimeoutCall {
 impl MessageExchanger {
     pub fn new(
         expected: ReplyKind,
-        tx: oneshot::Sender<Result<Reply, Fail>>,
+        tx: oneshot::Sender<Result<Reply, Error>>,
         timeout_tx: mpsc::Sender<TimeoutCall>,
         description: String,
     ) -> Self {

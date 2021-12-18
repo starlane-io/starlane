@@ -216,7 +216,7 @@ pub enum StarWrangleResult {
     Ok,
     StarWrangles(Vec<StarWrangle>),
     StarWrangle(StarWrangle),
-    Fail(Fail),
+    Fail(Error),
     Satisfaction(StarWrangleSatisfaction),
 }
 
@@ -261,7 +261,7 @@ impl StarWrangleDB {
                 }
                 Err(fail) => {
                     eprintln!("{}", fail.to_string());
-                    request.tx.send(StarWrangleResult::Fail(fail.into()));
+                    request.tx.send(StarWrangleResult::Fail(fail));
                 }
             }
         }

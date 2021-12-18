@@ -13,7 +13,7 @@ use crate::resource::{AssignResourceStateSrc, Kind, ResourceAssign, ResourceType
 use crate::star::core::resource::manager::ResourceManager;
 use crate::star::StarSkel;
 
-pub struct KubeManager {
+pub struct K8sManager {
     skel: StarSkel,
     client: kube::Client,
     starlane_meta: ObjectMeta,
@@ -22,7 +22,7 @@ pub struct KubeManager {
     resource_type: ResourceType
 }
 
-impl KubeManager {
+impl K8sManager {
     pub async fn new(skel: StarSkel, resource_type: ResourceType ) -> Result<Self, Error> {
 
         let client = kube::Client::try_default().await?;
@@ -54,7 +54,7 @@ impl KubeManager {
         };
         let starlane_meta: ObjectMeta = starlane.metadata.clone();
 
-        let rtn = KubeManager {
+        let rtn = K8sManager {
             skel: skel,
             client: client,
             namespace: namespace,
@@ -69,13 +69,15 @@ impl KubeManager {
 
 
 #[async_trait]
-impl ResourceManager for KubeManager {
+impl ResourceManager for K8sManager {
 
      async fn assign(
             &self,
             assign: ResourceAssign,
-        ) -> Result<Payload, Error> {
+        ) -> Result<(), Error> {
+
 println!("Assigning Kube Resource Host....");
+         /*
         let provisioners: Api<StarlaneProvisioner> = Api::default_namespaced(self.client.clone() );
         let parts: KindParts = assign.stub.kind.into();
         let mut list_params = ListParams::default();
@@ -95,7 +97,7 @@ println!("Assigning Kube Resource Host....");
         //let provisioner:StarlaneProvisioner  = provisioners.items.get_mut(0).ok_or_else(||)?;
 
         if provisioners.items.is_empty() {
-           return Err(format!("no provisioner for: {} ", assign.stub.archetype.kind.to_string()).into() );
+           return Err(format!("no provisioner for: {} ", assign.stub.kind.to_string()).into() );
         }
 
         let provisioner:StarlaneProvisioner  = provisioners.items.remove(0);
@@ -122,6 +124,9 @@ println!("Assigning Kube Resource Host....");
         println!("STARLANE RESOURCE CREATED!");
 
         Ok(Payload::Empty)
+
+          */
+         unimplemented!()
     }
 
     async fn has(&self, address: Address) -> bool {

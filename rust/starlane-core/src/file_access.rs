@@ -418,7 +418,7 @@ impl LocalFileAccess {
                             let event = FileEvent {
                                 path: path.to_string(),
                                 event_kind: FileEventKind::Discovered,
-                                file_kind: FileKind::Directory,
+                                file_kind: FileKind::Dir,
                             };
                             let event_tx = event_tx.clone();
                             tokio_runtime.block_on(async move {
@@ -472,7 +472,7 @@ impl LocalFileAccess {
                         };
 
                         let file_kind = match path.is_dir() {
-                            true => FileKind::Directory,
+                            true => FileKind::Dir,
                             false => FileKind::File,
                         };
 

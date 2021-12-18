@@ -319,7 +319,7 @@ impl ArtifactBundleManager {
     pub async fn new(skel: StarSkel) -> Self {
         ArtifactBundleManager {
             skel: skel.clone(),
-            store: StateStore::new(skel).await,
+            store: StateStore::new(skel),
         }
     }
 }
@@ -335,7 +335,7 @@ impl ResourceManager for ArtifactBundleManager {
         assign: ResourceAssign,
     ) -> Result<(), Error> {
         let state = match assign.state {
-            StateSrc::Direct(data) => {
+            StateSrc::StatefulDirect(data) => {
                 data
             },
             StateSrc::Stateless => {

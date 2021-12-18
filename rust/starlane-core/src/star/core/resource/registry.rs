@@ -113,7 +113,7 @@ pub struct RegistryComponent {
 }
 
 impl RegistryComponent {
-    pub fn start(skel: StarSkel, rx: mpsc::Receiver<RegistryCall>) {
+    pub fn start(skel: StarSkel, mut rx: mpsc::Receiver<RegistryCall>) {
         tokio::spawn(async move {
 
             let mut conn = Connection::open_in_memory().expect("expected to get sqlite database connection");
@@ -124,7 +124,7 @@ impl RegistryComponent {
                 conn
             };
 
-            while let Option::Some(call) = rx.await {
+            while let Option::Some(call) = rx.recv().await {
                 registry.process(call);
             }
         });
@@ -227,7 +227,7 @@ impl RegistryComponent {
 
                 let statement = format!( "SELECT DISTINCT {} FROM resources as r WHERE parent=?1 AND address_segment=?2", RESOURCE_QUERY_FIELDS );
                 let mut statement = trans.prepare(statement.as_str())?;
-                let mut record = statement.query_row(params!(parent.to_string(),address_segment), RegistryComponent::process_resource_row_catch)?;
+                let mut record = statement.query_row(params!(parent.to_string(),address_segment.to_string()), RegistryComponent::process_resource_row)?;
                 let segment = AddressKindSegment {
                     address_segment: record.stub.address.last_segment().expect("expected at least one segment"),
                     kind: record.stub.kind
@@ -318,17 +318,13 @@ impl RegistryComponent {
                 //let fail = fail::Fail::Resource(fail::resource::Fail::Select(fail::resource::Select::WrongAddress {required:select.pattern.query_root(), found: address }));
                 return Err("WrongAddress".into());
             }
-            let resource = registry.skel.resource_locator_api.locate(select.pattern.query_root()).await?;
-            if resource.location.host != registry.skel.info.key {
-                let fail = fail::Fail::Resource(fail::resource::Fail::Select(fail::resource::Select::BadSelectRouting {required:resource.location.host.to_string(), found: registry.skel.info.key.to_string()}));
-                return Err("BadSelectRouting".into());
-            }
 
             let address_kind_path = registry.skel.registry_api.query(address.clone(), Query::AddressKindPath ).await?.try_into()?;
 
-            let sub_selector = select.sub_select(address, select.pattern.sub_select_hops(), address_kind_path);
+            let sub_select_hops = select.pattern.sub_select_hops();
+            let sub_selector = select.sub_select(address.clone(), sub_select_hops, address_kind_path);
 
-            let list = registry.skel.registry_api.select(sub_selector.into(),address.clone()).await?;
+            let list = registry.skel.registry_api.select(sub_selector.into(),address).await?;
 
             Ok(list)
         }
@@ -429,17 +425,17 @@ impl RegistryComponent {
                 let mut hops = selector.hops.clone();
                 hops.remove(0);
                 let mut futures = vec![];
-                for record in records {
+                for record in &records {
                     if let Option::Some(last_segment) = record.stub.address.last_segment() {
                         let address = selector.address.push_segment(last_segment.clone());
-                        let address_tks_path = selector.address_tks_path.push(AddressKindSegment {
+                        let address_tks_path = selector.address_kind_path.push(AddressKindSegment {
                             address_segment: last_segment,
                             kind: record.stub.kind.clone()
                         });
                         let sub_selector = selector.sub_select(address.clone(),hops.clone(), address_tks_path);
                         let select = sub_selector.into();
                         let mut proto = ProtoRequest::new();
-                        let parent = address.parent()?;
+                        let parent = address.parent().ok_or::<Error>("expecting address to have a parent".into())?;
                         proto.to(address);
                         proto.from(MessageFrom::Address(parent));
                         proto.entity(ReqEntity::Rc(Rc::new(RcCommand::Select(select))));
@@ -453,7 +449,7 @@ impl RegistryComponent {
                 // the records matched the present hop (which we needed for deeper searches) however
                 // they may not or may not match the ENTIRE pattern therefore they must be filtered
                 records.retain(|record| {
-                    let address_tks_path = selector.address_tks_path.push(AddressKindSegment {
+                    let address_tks_path = selector.address_kind_path.push(AddressKindSegment {
                         address_segment: record.stub.address.last_segment().expect("expecting at least one segment" ),
                         kind: record.stub.kind.clone()
                     });
@@ -514,7 +510,7 @@ impl RegistryComponent {
     }
 
     //    static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_pre,shell,status";
-    fn process_resource_row(row: &Row) -> Result<ResourceRecord, Error> {
+    fn process_resource_row(row: &Row) -> Result<ResourceRecord, rusqlite::Error> {
 
         fn opt( row: &Row, index: usize ) -> Result<Option<String>,Error>
         {
@@ -540,7 +536,7 @@ impl RegistryComponent {
 
         let address = Address::from_str(parent.as_str())?;
         let address = address.push( address_segment )?;
-        let resource_type = ResourceType::from_str(resource_type);
+        let resource_type = ResourceType::from_str(resource_type.as_str() )?;
         let specific = if let Option::Some(vendor) = vendor {
             if let Option::Some(product) = product {
                 if let Option::Some(variant) = variant {

@@ -61,16 +61,24 @@ impl ProtoRequest {
     }
 
     pub fn create(self) -> Result<Request, Error> {
-        if let &Option::None = &self.payload {
-            return Err("ResourceMessagePayload cannot be None".into());
+        if let &Option::None = &self.entity{
+            return Err("Request entity cannot be None".into());
         }
+        let from = match self.from.ok_or("need to set 'from' in ProtoRequest")? {
+            MessageFrom::Inject => {
+                Err("Inject must be replaced with a Star address before creating")
+            }
+            MessageFrom::Address(address) => {
+                Ok(address)
+            }
+        }?;
         Ok(Request{
             id: self.id.to_string(),
-            from: self.from.ok_or("need to set 'from' in ProtoMessage")?,
-            to: self.to.ok_or("need to set 'to' in ProtoMessage")?,
+            from,
+            to: self.to.ok_or("need to set 'to' in ProtoRequest")?,
             entity: self
                 .entity
-                .ok_or("need to set a payload in ProtoMessage")?,
+                .ok_or("need to set an entity in ProtoRequest")?,
             exchange: match self.exchange {
                 ExchangeType::Notification => {Exchange::Notification}
                 ExchangeType::RequestResponse => {
@@ -78,7 +86,6 @@ impl ProtoRequest {
                 }
             }
         })
-
     }
 
     pub fn to(&mut self, to: MessageTo) {

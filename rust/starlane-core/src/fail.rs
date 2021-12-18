@@ -8,6 +8,12 @@ pub enum Fail {
     Starlane(StarlaneFailure)
 }
 
+impl ToString for Fail {
+    fn to_string(&self) -> String {
+        "Fail".to_string()
+    }
+}
+
 #[derive(Debug,Clone,Serialize,Deserialize)]
 pub enum StarlaneFailure {
   Error(String)

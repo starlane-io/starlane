@@ -19,7 +19,7 @@ use crate::mesh::serde::resource::ResourceStub;
 use crate::mesh::serde::http::HttpResponse;
 use crate::resource::{ResourceType, ResourceAssign, AssignResourceStateSrc, ResourceRecord};
 use crate::mesh::serde::id::Address;
-use crate::fail::Fail;
+use crate::fail::{Fail, StarlaneFailure};
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum Frame {
@@ -309,7 +309,7 @@ impl StarMessage {
         let mut proto = ProtoStarMessage::new();
         proto.to = self.from.clone().into();
         proto.reply_to = Option::Some(self.id.clone());
-        proto.payload = StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error(err)));
+        proto.payload = StarMessagePayload::Reply(SimpleReply::Fail(Fail::Starlane(StarlaneFailure::Error(err))));
         proto
     }
 
@@ -386,7 +386,6 @@ pub enum ResourceRegistryRequest {
 impl ToString for ResourceRegistryRequest {
     fn to_string(&self) -> String {
         match self {
-            ResourceRegistryRequest::Register(_) => "Register".to_string(),
             ResourceRegistryRequest::Location(_) => "Location".to_string(),
             ResourceRegistryRequest::Find(_) => "Find".to_string(),
         }
@@ -561,13 +560,10 @@ impl fmt::Display for StarMessagePayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
             StarMessagePayload::None => "None".to_string(),
-            StarMessagePayload::Space(_) => "Space".to_string(),
             StarMessagePayload::Reply(reply) => format!("Reply({})", reply.to_string()),
             StarMessagePayload::ResourceRegistry(_) => "ResourceManager".to_string(),
             StarMessagePayload::ResourceHost(_) => "ResourceHost".to_string(),
-            StarMessagePayload::UniqueId(_) => "UniqueId".to_string(),
             StarMessagePayload::Request(_) => "MessagePayload".to_string(),
-            StarMessagePayload::Select(_) => "Select".to_string()
         };
         write!(f, "{}", r)
     }

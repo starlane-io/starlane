@@ -18,7 +18,6 @@ use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::error::Error;
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::generic::resource::ResourceStub;
-use crate::fail::Fail;
 use crate::mesh::serde::resource::Status;
 
 #[derive(Clone)]
@@ -71,7 +70,7 @@ impl ResourceLocatorApi {
         });
     }
 
-    pub fn filter(&self, result: Result<ResourceRecord, Fail>) -> Result<ResourceRecord, Fail> {
+    pub fn filter(&self, result: Result<ResourceRecord, Error>) -> Result<ResourceRecord, Error> {
 
         if let Result::Ok(record) = &result {
             self.found(record.clone());
@@ -83,12 +82,12 @@ impl ResourceLocatorApi {
 pub enum ResourceLocateCall {
     Locate {
         address: Address,
-        tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
+        tx: oneshot::Sender<Result<ResourceRecord, Error>>,
     },
     ExternalLocate {
         address: Address,
         star: StarKey,
-        tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
+        tx: oneshot::Sender<Result<ResourceRecord, Error>>,
     },
     Found(ResourceRecord),
 }
@@ -141,7 +140,7 @@ impl ResourceLocatorComponent {
     fn locate(
         &mut self,
         address: Address,
-        tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
+        tx: oneshot::Sender<Result<ResourceRecord, Error>>,
     ) {
         if self.has_cached_record(&address) {
             let result = match self
@@ -149,7 +148,7 @@ impl ResourceLocatorComponent {
                 .ok_or("expected resource record")
             {
                 Ok(record) => Ok(record),
-                Err(s) => Err(Fail::Error(s.to_string()).into()),
+                Err(s) => Err(s.to_string().into()),
             };
 
             tx.send(result).unwrap_or_default();
@@ -159,7 +158,7 @@ impl ResourceLocatorComponent {
                 async fn locate(
                     locator_api: ResourceLocatorApi,
                     address: Address,
-                ) -> Result<ResourceRecord, Fail> {
+                ) -> Result<ResourceRecord, Error> {
                     let parent_record = locator_api.filter(
                         locator_api
                             .locate(
@@ -170,7 +169,7 @@ impl ResourceLocatorComponent {
                             .await,
                     )?;
                     let rtn = locator_api
-                        .external_locate(address, parent_record.location.host)
+                        .external_locate(address, parent_record.location.ok_or()?)
                         .await?;
 
                     Ok(rtn)
@@ -197,14 +196,14 @@ impl ResourceLocatorComponent {
         &mut self,
         address: Address,
         star: StarKey,
-        tx: oneshot::Sender<Result<ResourceRecord, Fail>>,
+        tx: oneshot::Sender<Result<ResourceRecord, Error>>,
     ) {
         let (request, rx) = Request::new((address, star));
         self.request_resource_record_from_star(request).await;
         tokio::spawn(async move {
             async fn timeout(
-                rx: oneshot::Receiver<Result<ResourceRecord, Fail>>,
-            ) -> Result<ResourceRecord, Fail> {
+                rx: oneshot::Receiver<Result<ResourceRecord, Error>>,
+            ) -> Result<ResourceRecord, Error> {
                 Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
             }
             tx.send(timeout(rx).await).unwrap_or_default();

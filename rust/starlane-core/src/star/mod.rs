@@ -23,7 +23,6 @@ use shell::wrangler::{StarWrangle, StarWrangleSatisfaction, StarWranglerApi};
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::constellation::ConstellationStatus;
 use crate::error::Error;
-use crate::fail::Fail;
 use crate::file_access::FileAccess;
 use crate::frame::{Frame, ProtoFrame, StarMessage, StarPattern, TraversalAction};
 use crate::id::Id;
@@ -791,7 +790,7 @@ pub struct AddResourceLocation {
 
 pub struct Request<P: Debug, R> {
     pub payload: P,
-    pub tx: oneshot::Sender<Result<R, Fail>>,
+    pub tx: oneshot::Sender<Result<R, Error>>,
     pub log: bool,
 }
 
@@ -802,7 +801,7 @@ impl<P: Debug, R> Debug for Request<P, R> {
 }
 
 impl<P: Debug, R> Request<P, R> {
-    pub fn new(payload: P) -> (Self, oneshot::Receiver<Result<R, Fail>>) {
+    pub fn new(payload: P) -> (Self, oneshot::Receiver<Result<R, Error>>) {
         let (tx, rx) = oneshot::channel();
         (
             Request {

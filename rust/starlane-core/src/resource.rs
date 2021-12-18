@@ -65,6 +65,17 @@ impl ResourceLocation {
     pub fn root() -> Self {
         ResourceLocation::Host(StarKey::central())
     }
+
+    pub fn ok_or(&self)->Result<StarKey,Error> {
+        match self {
+            ResourceLocation::Unassigned => {
+                Err("ResourceLocation is unassigned".into())
+            }
+            ResourceLocation::Host(star) => {
+                Ok(star.clone())
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
@@ -104,6 +115,7 @@ pub struct ResourceRecord {
     pub location: ResourceLocation,
 }
 
+
 impl ResourceRecord {
     pub fn new(stub: ResourceStub, host: StarKey) -> Self {
         ResourceRecord {
@@ -123,6 +135,8 @@ impl ResourceRecord {
             location: ResourceLocation::root(),
         }
     }
+
+
 }
 
 impl Into<ResourceStub> for ResourceRecord {
@@ -187,7 +201,23 @@ impl FromStr for ResourceType{
     }
 }
 
+impl Into<String> for ResourceType {
+    fn into(self) -> String {
+        self.to_string()
+    }
+}
+
+impl TryFrom<String> for ResourceType {
+    type Error = mesh_portal_serde::error::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        ResourceType::from_str(value.as_str() )
+    }
+}
+
+
 #[derive(
+    Debug,
     Clone,
     Serialize,
     Deserialize,
@@ -438,7 +468,6 @@ pub enum ArtifactKind {
     MechtronConfig,
     BindConfig,
     Wasm,
-    HttpRouter,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -456,11 +485,11 @@ impl Resource {
     }
 
     pub fn address(&self) -> Address {
-        self.address.clone()
+        self.stub.address.clone()
     }
 
     pub fn resource_type(&self) -> ResourceType {
-        self.key.resource_type()
+        self.stub.kind.resource_type()
     }
 
     pub fn state_src(&self) -> Payload {
@@ -476,6 +505,7 @@ pub enum AssignResourceStateSrc {
 }
 
 
+#[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
 pub enum AssignKind {
     Create,
     // eventually we will have Move as well as Create

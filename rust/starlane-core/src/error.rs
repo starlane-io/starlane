@@ -25,6 +25,14 @@ pub struct Error {
     pub error: String,
 }
 
+impl Error {
+    pub fn new( message: &str ) -> Self {
+        Self {
+            error: message.to_string()
+        }
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.error)
@@ -316,11 +324,6 @@ impl<T> From<SendError<T>> for Error {
     }
 }
 
-impl Into<Fail> for Error {
-    fn into(self) -> Fail {
-        Fail::Error(self.error)
-    }
-}
 
 impl From<strum::ParseError> for Error {
     fn from(e: strum::ParseError) -> Self {
@@ -353,6 +356,8 @@ impl From<mesh_portal_serde::error::Error> for Error {
         }
     }
 }
+
+
 
 impl From<crate::mesh::serde::fail::Fail> for Error {
     fn from(e: crate::mesh::serde::fail::Fail) -> Self {

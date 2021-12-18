@@ -24,7 +24,6 @@ use std::future::Future;
 use nom::AsBytes;
 use crate::artifact::ArtifactRef;
 use crate::cache::ArtifactItem;
-use crate::config::http_router::HttpRouterConfig;
 use crate::html::HTML;
 use regex::Regex;
 use crate::mesh::serde::entity::request::Http;

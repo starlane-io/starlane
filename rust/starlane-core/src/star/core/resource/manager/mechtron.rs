@@ -18,7 +18,7 @@ use crate::mesh::serde::resource::Properties;
 use crate::fail::Fail;
 use crate::mesh::serde::generic::payload::{MapPattern, PayloadPattern};
 use mesh_portal_parse::pattern::consume_data_struct_def;
-use mesh_portal_serde::version::v0_0_1::util::ValueMatcher;
+use mesh_portal_serde::version::v0_0_1::util::{ValueMatcher, ConvertFrom};
 use mesh_portal_serde::version::v0_0_1::generic::payload::Primitive;
 use mesh_portal_serde::version::v0_0_1::parse::address;
 use crate::message::Reply;
@@ -28,7 +28,7 @@ use crate::mesh::serde::resource::command::common::StateSrc;
 lazy_static!{
 
 static ref MECHTRON_PROPERTIES_PATTERN : PayloadPattern= {
-             let (_,payload_pattern) = consume_data_struct_def("Map{config<Address>}" );
+             let (_,payload_pattern) = consume_data_struct_def("Map{config<Address>}" ).expect("could not parse PayloadPattern");
              payload_pattern
         };
 }
@@ -53,7 +53,7 @@ impl ResourceManager for MechtronManager {
     async fn assign(
         &self,
         assign: ResourceAssign,
-    ) -> Result<Payload, Error> {
+    ) -> Result<(), Error> {
         match assign.state {
             StateSrc::Stateless => {}
             _ => {
@@ -92,21 +92,18 @@ impl ResourceManager for MechtronManager {
         }
     }
 
-    fn handle_request(&self, delivery: Delivery<Request>) -> Result<(),Error>{
-
+    fn handle_request(&self, delivery: Delivery<Request>) {
         tokio::spawn( async move {
             info!("MECHTRON HOST RECEIVED DELIVERY");
-            let mechtron = self.mechtrons.get(delivery.to()).await?.ok_or(format!("could not deliver mechtron to {}", delivery.to().to_string()))?;
+            let mechtron = self.mechtrons.get(delivery.to.clone()).await?.ok_or(format!("could not deliver mechtron to {}", delivery.to.to_string()).into() )?;
             info!("GOT MECHTRON");
-            let reply = mechtron.handle_request(delivery.item.clone() ).await?;
+            let reply = mechtron.handle_request( delivery.item.into_outlet_request()? ).await?;
 
             if let Option::Some(response) = reply {
                 delivery.result(Ok(response));
                 info!("=====>> MECHTRON SENT REPLY");
             }
         });
-
-        Ok(())
     }
 
     fn resource_type(&self) -> ResourceType {

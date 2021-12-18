@@ -199,6 +199,6 @@ impl ArtifactRef {
     }
 
     pub fn trailing_path(&self) -> Result<Path,Error> {
-        Ok(Path::from_str(self.address.segments.last().as_ref().ok_or("expected one ResourcePath segment")?.as_str())?)
+        Ok(Path::from_str(self.address.segments.last().ok_or("expected one ResourcePath segment")?.to_string().as_str())?)
     }
 }

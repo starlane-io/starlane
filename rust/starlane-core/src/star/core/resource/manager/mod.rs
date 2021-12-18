@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 
 use artifact::ArtifactBundleManager;
-use k8s::KubeManager;
+use k8s::K8sManager;
 
 use crate::mesh::serde::payload::Payload;
 use crate::error::Error;
@@ -11,7 +11,7 @@ use crate::mesh::{Request, Response};
 use crate::mesh::serde::entity::request::Rc;
 use crate::mesh::serde::id::{Address, ResourceType};
 use crate::message::delivery::Delivery;
-use crate::resource;
+use crate::{resource, fail};
 use crate::resource::ResourceAssign;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, Call, AsyncRunner};
@@ -20,6 +20,7 @@ use crate::star::core::resource::manager::app::AppManager;
 use crate::star::core::resource::manager::mechtron::MechtronManager;
 use crate::star::core::resource::manager::file::{FileSystemManager, FileManager};
 use std::collections::HashMap;
+use std::future::Future;
 
 mod stateless;
 pub mod artifact;
@@ -83,13 +84,13 @@ pub struct ResourceManagerComponent {
 }
 
 impl ResourceManagerComponent {
-    pub fn new( skel: StarSkel, rx: mpsc::Receiver<ResourceManagerCall> ) {
+    pub fn new( skel: StarSkel, tx: mpsc::Sender<ResourceManagerCall>, rx: mpsc::Receiver<ResourceManagerCall> ) {
         AsyncRunner::new(
         Box::new(Self {
             skel,
             managers: HashMap::new(),
             resources: HashMap::new()
-        }),skel.resource_manager_api.tx.clone(), rx);
+        }),tx, rx);
     }
 }
 
@@ -112,7 +113,7 @@ impl ResourceManagerComponent{
     async fn assign( &mut self, assign: ResourceAssign, tx: mpsc::Sender<Result<(),Error>> ) {
 
        async fn process( manager_component: &mut ResourceManagerComponent, assign: ResourceAssign) -> Result<(),Error> {
-           let manager = manager_component.manager(&assign.kind.resource_type() ).await?;
+           let manager = manager_component.manager(&assign.stub.kind.resource_type() ).await?;
            manager_component.resources.insert( assign.stub.address.clone(), assign.stub.kind.resource_type() );
            manager.assign(assign).await
        }
@@ -121,22 +122,23 @@ impl ResourceManagerComponent{
     }
 
     async fn request( &mut self, request: Delivery<Request>) {
-
-        async fn process( manager_component: &mut ResourceManagerComponent, request: Delivery<Request>) -> Result<(),Error> {
-            let resource_type = manager_component.resources.get(&request.to ).ok_or("could not find resource".into() )?;
-            let manager = manager_component.manager(resource_type ).await?;
-            manager.handle_request(request ).await?;
+        async fn process( manager: &mut ResourceManagerComponent, request: Delivery<Request>) -> Result<(),Error> {
+            let resource_type = manager.resource_type(&request.to)?;
+            let manager = manager.manager(&resource_type ).await?;
+            manager.handle_request(request);
             Ok(())
         }
 
-        match process( self, request.clone() ).await {
-            Ok(_) => {
-                // no need to do anything
-            }
-            Err(err) => {
-                request.fail(err.into());
+        match process(self, request.clone()).await {
+            Ok(_) => {}
+            Err(error) => {
+                request.fail( crate::mesh::serde::fail::Fail::Mesh(crate::mesh::serde::fail::mesh::Fail::Error(error.to_string()) ))
             }
         }
+    }
+
+    fn resource_type(&mut self, address:&Address )->Result<ResourceType,Error> {
+        Ok(self.resources.get(address ).ok_or(Error::new("could not find resource") )?.clone())
     }
 
     async fn has( &mut self, address: Address, tx: mpsc::Sender<bool> ) {
@@ -146,7 +148,7 @@ impl ResourceManagerComponent{
     async fn manager(&mut self, rt: &ResourceType) -> Result<Arc<dyn ResourceManager>,Error> {
 
         if self.managers.contains_key(rt) {
-            Ok(self.managers.get(rt).cloned().ok_or("expected reference to shell".into()));
+            return Ok(self.managers.get(rt).cloned().expect("expected manager"));
         }
 
         let manager: Arc<dyn ResourceManager> = match rt {
@@ -155,11 +157,11 @@ impl ResourceManagerComponent{
             ResourceType::ArtifactBundle=> Arc::new(ArtifactBundleManager::new(self.skel.clone()).await),
             ResourceType::App=> Arc::new(AppManager::new(self.skel.clone()).await),
             ResourceType::Mechtron => Arc::new(MechtronManager::new(self.skel.clone()).await),
-            ResourceType::Database => Arc::new(KubeManager::new(self.skel.clone(), ResourceType::Database ).await.expect("KubeHost must be created without error")),
+            ResourceType::Database => Arc::new(K8sManager::new(self.skel.clone(), ResourceType::Database ).await.expect("K8sManager must be created without error")),
             ResourceType::FileSystem => Arc::new(FileSystemManager::new(self.skel.clone() ).await),
-            ResourceType::File => Arc::new(FileManager::new(self.skel.clone()).await),
+            ResourceType::File => Arc::new(FileManager::new(self.skel.clone())),
 
-            t => return Err(format!("no HOST implementation for type {}", t.to_string()).into()),
+            t => return Err(format!("no Manager implementation for type {}", t.to_string()).into()),
         };
 
         self.managers.insert(rt.clone(), manager.clone() );

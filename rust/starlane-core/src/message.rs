@@ -129,8 +129,8 @@ impl TryFrom<ProtoRequest> for ProtoStarMessage {
         let message = proto.create()?;
         let mut proto = ProtoStarMessage::new();
         proto.to = message.to.clone().into();
-        proto.trace = message.trace;
-        proto.log = message.log;
+        proto.trace = false;
+        proto.log = false;
         proto.payload = StarMessagePayload::Request(message.into());
         Ok(proto)
     }
@@ -340,7 +340,7 @@ impl From<Request> for ProtoStarMessage {
 impl From<Response> for ProtoStarMessage {
     fn from(response: Response ) -> Self {
         let mut proto = ProtoStarMessage::new();
-        proto.payload = StarMessagePayload::Request(response.into());
+        proto.payload = StarMessagePayload::Response(response.into());
         proto
     }
 }

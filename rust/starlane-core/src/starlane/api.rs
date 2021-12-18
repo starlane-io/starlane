@@ -49,7 +49,8 @@ pub struct StarlaneApi {
 impl StarlaneApi {
 
 
-    pub async fn create<API>(  &self, template: Template ) -> Creation<API> {
+    pub async fn create<API>(  &self, template: Template ) -> Creation<API>     where
+        API: TryFrom<ResourceApi>{
         let create = Create::new(template);
         Creation::new(self.clone(), create  )
     }
@@ -212,17 +213,10 @@ impl SpaceApi {
     }
 
     pub fn new(surface_api: SurfaceApi, stub: ResourceStub) -> Result<Self, Error> {
-        if stub.key.resource_type() != ResourceType::Space {
+        if stub.kind.resource_type() != ResourceType::Space {
             return Err(format!(
-                "wrong key resource type for SpaceApi: {}",
-                stub.key.resource_type().to_string()
-            )
-            .into());
-        }
-        if stub.archetype.kind.resource_type() != ResourceType::Space {
-            return Err(format!(
-                "wrong address resource type for SpaceApi: {}",
-                stub.archetype.kind.resource_type().to_string()
+                "wrong kind resource type for SpaceApi: {}",
+                stub.kind.resource_type().to_string()
             )
             .into());
         }
@@ -346,7 +340,7 @@ impl StarlaneApiRunner {
     async fn process(&self, action: StarlaneAction) {
         match action {
             StarlaneAction::GetState { address: identifier, tx } => {
-                tx.send(self.api.get_resource_state(identifier).await );
+                tx.send(self.api.get_state(identifier).await );
             }
         }
     }
