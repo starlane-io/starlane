@@ -133,13 +133,13 @@ impl RegistryComponent {
     async fn process(&mut self, call: RegistryCall) {
         match call {
             RegistryCall::Register { registration, tx } => {
-                self.register(registration,tx);
+                self.register(registration,tx).await;
             }
             RegistryCall::Select { select, address, tx} => {
-                self.select(select, address, tx);
+                self.select(select, address, tx).await;
             }
             RegistryCall::Query { address, query, tx } => {
-                self.query(address, query, tx)
+                self.query(address, query, tx).await
             }
             RegistryCall::SetStatus{ address,status,tx } => {
                 self.set_status(address, status, tx)
@@ -194,7 +194,7 @@ impl RegistryComponent {
         tx.send(process(&self.conn, address));
     }
 
-    fn query(&mut self, address: Address, query: Query, tx: oneshot::Sender<Result<QueryResult,Error>>) {
+    async fn query(&mut self, address: Address, query: Query, tx: oneshot::Sender<Result<QueryResult,Error>>) {
         async fn process<'a>(skel: StarSkel, trans:Transaction<'a>, address: Address) -> Result<QueryResult, Error> {
 
             if address.segments.len() == 0 {
@@ -227,7 +227,7 @@ impl RegistryComponent {
 
                 let statement = format!( "SELECT DISTINCT {} FROM resources as r WHERE parent=?1 AND address_segment=?2", RESOURCE_QUERY_FIELDS );
                 let mut statement = trans.prepare(statement.as_str())?;
-                let mut record = statement.query_row(params!(parent.to_string(),address_segment.to_string()), RegistryComponent::process_resource_row)?;
+                let mut record = statement.query_row(params!(parent.to_string(),address_segment.to_string()), RegistryComponent::process_resource_row_catch)?;
                 let segment = AddressKindSegment {
                     address_segment: record.stub.address.last_segment().expect("expected at least one segment"),
                     kind: record.stub.kind
@@ -242,18 +242,16 @@ impl RegistryComponent {
         match self.conn.transaction() {
             Ok(transaction) => {
                 let skel = self.skel.clone();
-                tokio::spawn( async move {
-                    tx.send(process(skel, transaction, address).await);
-                });
+                tx.send(process(skel, transaction, address).await);
             }
             Err(err) => {
-                tx.send( Err("address_tks_path_query could not create database transaction".into()))
+                tx.send( Err("address_tks_path_query could not create database transaction".into()));
             }
         }
 
     }
 
-    fn register( &mut self, registration: Registration, tx: oneshot::Sender<Result<ResourceStub,Error>>) {
+    async fn register( &mut self, registration: Registration, tx: oneshot::Sender<Result<ResourceStub,Error>>) {
         fn register( registry: &mut RegistryComponent, registration: Registration ) -> Result<(),Error> {
             let trans = registry.conn.transaction()?;
             let params = RegistryParams::from_registration(&registration)?;
@@ -300,19 +298,22 @@ impl RegistryComponent {
         let address = registration.address.clone();
         match register( self, registration ) {
             Ok(_) => {
-                let skel = self.skel.clone();
-                tokio::spawn(async move {
-                    tx.send(skel.registry_api.locate(address).await.into());
+                tx.send(match self.skel.registry_api.locate(address).await {
+                    Ok(record) => {
+                        Ok(record.into())
+                    }
+                    Err(err) => {
+                        Err("could not locate record".into())
+                    }
                 });
             }
             Err(err) => {
-                tx.send(Err(err))
+                tx.send(Err(err));
             }
         }
-
     }
 
-    fn select(&mut self, select: Select, address: Address, tx: oneshot::Sender<Result<PrimitiveList,Error>>) {
+    async fn select(&mut self, select: Select, address: Address, tx: oneshot::Sender<Result<PrimitiveList,Error>>) {
         async fn initial(registry: &mut RegistryComponent, select: Select,address: Address  ) -> Result<PrimitiveList, Error> {
             if address != select.pattern.query_root() {
                 //let fail = fail::Fail::Resource(fail::resource::Fail::Select(fail::resource::Select::WrongAddress {required:select.pattern.query_root(), found: address }));
@@ -474,7 +475,7 @@ impl RegistryComponent {
 
         match &select.kind {
             SelectionKind::Initial => {
-                tx.send( initial(self,select, address,));
+                tx.send( initial(self,select, address).await );
             }
             SelectionKind::SubSelector { .. } => {
                 match select.try_into() {
@@ -482,9 +483,7 @@ impl RegistryComponent {
                         match self.conn.transaction(){
                             Ok(trans) => {
                                 let skel = self.skel.clone();
-                                tokio::spawn(async move {
-                                    tx.send(sub_select(skel.clone(), trans, sub_selector).await);
-                                });
+                                tx.send(sub_select(skel.clone(), trans, sub_selector).await);
                             }
                             Err(err) => {
                                 tx.send( Err(err.into()));
@@ -499,61 +498,63 @@ impl RegistryComponent {
         }
     }
 
-    fn process_resource_row_catch(row: &Row) -> Result<ResourceRecord, Error> {
+    fn process_resource_row_catch(row: &Row) -> Result<ResourceRecord, rusqlite::Error> {
         match Self::process_resource_row(row) {
             Ok(ok) => Ok(ok),
             Err(error) => {
                 eprintln!("process_resource_rows: {}", error);
-                Err(error)
+                Err(error.into())
             }
         }
     }
 
     //    static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_pre,shell,status";
-    fn process_resource_row(row: &Row) -> Result<ResourceRecord, rusqlite::Error> {
-
-        fn opt( row: &Row, index: usize ) -> Result<Option<String>,Error>
-        {
-            if let ValueRef::Null = row.get_ref(index)? {
-                Ok(Option::None)
-            } else {
-                let specific: String = row.get(index)?;
-                Ok(Option::Some(specific))
+    fn process_resource_row(row: &Row) -> Result<ResourceRecord, Error> {
+            fn opt(row: &Row, index: usize) -> Result<Option<String>, Error>
+            {
+                if let ValueRef::Null = row.get_ref(index)? {
+                    Ok(Option::None)
+                } else {
+                    let specific: String = row.get(index)?;
+                    Ok(Option::Some(specific))
+                }
             }
-        }
 
-        let parent : String = row.get(1)?;
-        let address_segment:String = row.get(2)?;
-        let resource_type:String = row.get(3)?;
-        let kind: Option<String> = opt(row,4)?;
-        let vendor: Option<String> = opt(row,5)?;
-        let product: Option<String> = opt(row,6)?;
-        let variant: Option<String> = opt(row,7)?;
-        let version: Option<String> = opt(row,8)?;
-        let version_pre: Option<String> = opt(row,9)?;
-        let host: Option<String> = opt(row,10)?;
-        let status: String = row.get(11)?;
+            let parent: String = row.get(1)?;
+            let address_segment: String = row.get(2)?;
+            let resource_type: String = row.get(3)?;
+            let kind: Option<String> = opt(row, 4)?;
+            let vendor: Option<String> = opt(row, 5)?;
+            let product: Option<String> = opt(row, 6)?;
+            let variant: Option<String> = opt(row, 7)?;
+            let version: Option<String> = opt(row, 8)?;
+            let version_pre: Option<String> = opt(row, 9)?;
+            let host: Option<String> = opt(row, 10)?;
+            let status: String = row.get(11)?;
 
-        let address = Address::from_str(parent.as_str())?;
-        let address = address.push( address_segment )?;
-        let resource_type = ResourceType::from_str(resource_type.as_str() )?;
-        let specific = if let Option::Some(vendor) = vendor {
-            if let Option::Some(product) = product {
-                if let Option::Some(variant) = variant {
-                    if let Option::Some(version) = version {
-                        let version = if let Option::Some(version_pre) = version_pre{
-                            let version =  format!("{}-{}",version,version_pre);
-                            Version::from_str(version.as_str())?
+            let address = Address::from_str(parent.as_str())?;
+            let address = address.push(address_segment)?;
+            let resource_type = ResourceType::from_str(resource_type.as_str())?;
+            let specific = if let Option::Some(vendor) = vendor {
+                if let Option::Some(product) = product {
+                    if let Option::Some(variant) = variant {
+                        if let Option::Some(version) = version {
+                            let version = if let Option::Some(version_pre) = version_pre {
+                                let version = format!("{}-{}", version, version_pre);
+                                Version::from_str(version.as_str())?
+                            } else {
+                                Version::from_str(version.as_str())?
+                            };
+
+                            Option::Some(Specific {
+                                vendor,
+                                product,
+                                variant,
+                                version
+                            })
                         } else {
-                            Version::from_str(version.as_str())?
-                        };
-
-                        Option::Some(Specific {
-                            vendor,
-                            product,
-                            variant,
-                            version
-                        })
+                            Option::None
+                        }
                     } else {
                         Option::None
                     }
@@ -562,35 +563,33 @@ impl RegistryComponent {
                 }
             } else {
                 Option::None
-            }
-        } else {
-            Option::None
-        };
+            };
 
-        let kind = Kind::from( resource_type, kind, specific)?;
-        let host = match host {
-            Some(host) => {
-                ResourceLocation::Host(StarKey::from_str(host)?)
-            }
-            None => {
-                ResourceLocation::Unassigned
-            }
-        }?;
-        let status = Status::from_str(status)?;
+            let kind = Kind::from(resource_type, kind, specific)?;
+            let host = match host {
+                Some(host) => {
+                    ResourceLocation::Host(StarKey::from_str(host.as_str())?)
+                }
+                None => {
+                    ResourceLocation::Unassigned
+                }
+            };
+            let status = Status::from_str(status.as_str())?;
 
-        let stub = ResourceStub {
-            address,
-            kind,
-            properties: Default::default(), // not implemented yet...
-            status
-        };
+            let stub = ResourceStub {
+                address,
+                kind,
+                properties: Default::default(), // not implemented yet...
+                status
+            };
 
-        let record = ResourceRecord {
-            stub: stub,
-            location: ResourceLocation::Host( host ),
-        };
+            let record = ResourceRecord {
+                stub: stub,
+                location: host,
+            };
 
-        Ok(record)
+            Ok(record)
+
     }
 
 }

@@ -299,7 +299,7 @@ pub enum RejectKind {
     BadRequest,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
+#[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display, Eq, PartialEq)]
 pub enum ReplyKind{
     Empty,
     Record,
@@ -309,6 +309,8 @@ pub enum ReplyKind{
     AddressTksPath
 }
 
+
+
 #[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
 pub enum Reply{
     Empty,
@@ -317,6 +319,19 @@ pub enum Reply{
     Stubs(Vec<ResourceStub>),
     Response(Response),
     AddressTksPath(AddressKindPath)
+}
+
+impl Reply{
+    pub fn kind(&self)-> ReplyKind {
+        match self {
+            Reply::Empty => ReplyKind::Empty,
+            Reply::Record(_) => ReplyKind::Record,
+            Reply::Records(_) => ReplyKind::Records,
+            Reply::Stubs(_) => ReplyKind::Stubs,
+            Reply::Response(_) => ReplyKind::Response,
+            Reply::AddressTksPath(_) => ReplyKind::AddressTksPath
+        }
+    }
 }
 
 fn hash_to_string(hash: &HashSet<ResourceType>) -> String {

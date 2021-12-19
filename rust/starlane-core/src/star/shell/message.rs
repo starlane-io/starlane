@@ -215,7 +215,7 @@ impl MessagingComponent {
                     .unwrap_or_default();
                 let result = match message.payload {
                     StarMessagePayload::Reply(SimpleReply::Ok(reply)) => {
-                        match exchanger.expect.is_match(&reply) {
+                        match exchanger.expect == reply.kind() {
                             true => Ok(reply),
                             false => Err(format!("expected: {}",exchanger.expect.to_string()).into()),
                         }
@@ -245,7 +245,7 @@ impl MessagingComponent {
 
     fn timeout_exchange(&mut self, id: MessageId) {
         if let Option::Some(exchanger) = self.exchanges.remove(&id) {
-            exchanger.tx.send(Err(Fail::Timeout.into()));
+            exchanger.tx.send(Err("Fail::Timeout.into())".into()));
         }
     }
 

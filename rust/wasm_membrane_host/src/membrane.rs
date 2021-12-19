@@ -3,6 +3,7 @@ use std::sync::{Arc, RwLock, Weak};
 
 use crate::error::Error;
 use wasmer::{Module, Instance, WasmPtr, Array, WasmerEnv, imports, Function, RuntimeError, ImportObject, ChainableNamedResolver, NamedResolver};
+use std::ops::Deref;
 
 pub static VERSION: i32 = 1;
 
@@ -277,7 +278,7 @@ impl WasmBuffer
 
 
 
-struct WasmHost {
+pub struct WasmHost {
     membrane: Option<Weak<WasmMembrane>>,
 }
 
@@ -334,6 +335,8 @@ impl Env
         Ok(membrane)
     }
 }
+
+
 
 impl WasmMembrane {
     pub fn new(module: Arc<Module>) -> Result<Arc<Self>, Error> {
@@ -444,6 +447,7 @@ impl Drop for BufferLock
         self.release().unwrap_or(());
     }
 }
+
 
 
 

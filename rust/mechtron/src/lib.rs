@@ -19,12 +19,12 @@ use mesh_portal_serde::version::latest::portal::outlet::Frame;
 use wasm_bindgen::prelude::*;
 
 use error::Error;
-use mechtron_common::version::latest::guest;
-use mechtron_common::version::latest::host;
+use mechtron_common::version::latest::core;
+use mechtron_common::version::latest::shell;
 use wasm_membrane_guest::membrane::{log, membrane_consume_buffer, membrane_consume_string, membrane_guest_alloc_buffer, membrane_write_buffer, membrane_write_str};
 use mesh_portal_serde::version::latest::resource::Status;
 use mesh_portal_serde::version::latest::fail::Fail;
-use mechtron_common::version::v0_0_1::host::generic::Response;
+use mechtron_common::version::v0_0_1::shell::generic::Response;
 
 mod error;
 
@@ -48,8 +48,8 @@ extern "C"
 }
 
 
-pub fn mechtron_request_notify(request: host::Request ) -> Result<Option<guest::Response>,Error>{
-    let request = host::Request {
+pub fn mechtron_request_notify(request: shell::Request ) -> Result<Option<core::Response>,Error>{
+    let request = shell::Request {
         to: request.to,
         from: request.from,
         entity: request.entity,
@@ -58,8 +58,8 @@ pub fn mechtron_request_notify(request: host::Request ) -> Result<Option<guest::
     send_request(request)
 }
 
-pub fn mechtron_request_exchange(request: host::Request ) -> Result<guest::Response,Error> {
-    let request = host::Request {
+pub fn mechtron_request_exchange(request: shell::Request ) -> Result<core::Response,Error> {
+    let request = shell::Request {
         to: request.to,
         from: request.from,
         entity: request.entity,
@@ -68,7 +68,7 @@ pub fn mechtron_request_exchange(request: host::Request ) -> Result<guest::Respo
     let response = send_request(request);
     let response = match response {
         Ok(response) => {
-            let result:Result<guest::Response,Error> = response.ok_or("expected response from an exchange message request".into() );
+            let result:Result<core::Response,Error> = response.ok_or("expected response from an exchange message request".into() );
             let response = result?;
             Ok(response)
         }
@@ -77,8 +77,8 @@ pub fn mechtron_request_exchange(request: host::Request ) -> Result<guest::Respo
     response
 }
 
-fn send_request( request: host::Request ) -> Result<Option<guest::Response>,Error> {
-    let frame = host::Frame::Request(request);
+fn send_request(request: shell::Request ) -> Result<Option<core::Response>,Error> {
+    let frame = shell::Frame::Request(request);
     let buffer = bincode::serialize(&frame )?;
     let buffer = membrane_write_buffer(buffer );
     let response = unsafe {
@@ -90,7 +90,7 @@ fn send_request( request: host::Request ) -> Result<Option<guest::Response>,Erro
         return Err( "an error prevented message response".into() );
     }
     let response = membrane_consume_buffer(response )?;
-    let response: guest::Response = bincode::deserialize(response.as_slice() )?;
+    let response: core::Response = bincode::deserialize(response.as_slice() )?;
     Ok(Option::Some(response))
 }
 
@@ -110,15 +110,15 @@ pub fn mechtron_guest_frame(frame_buffer_id: i32 ) -> i32 {
     log("received mechtron call");
     fn mechtron_guest_frame_inner(frame_buffer_id: i32) -> Result<i32, Error> {
         let call = membrane_consume_buffer(frame_buffer_id)?;
-        let frame: guest::Frame = bincode::deserialize(call.as_slice())?;
+        let frame: core::Frame = bincode::deserialize(call.as_slice())?;
         match frame {
-            guest::Frame::Version(_) => {
+            core::Frame::Version(_) => {
                 unsafe {
                     mechtron_init();
                 }
                 Ok(0)
             }
-            guest::Frame::Create(info) => {
+            core::Frame::Create(info) => {
                 let factory: Arc<dyn MechtronFactory> = {
                     let read = FACTORIES.read()?;
                     read.get(info.archetype.config_src.as_ref().expect("mechtrons must have a config")).cloned().expect(format!("expected mechtron: ..." ).as_str())
@@ -138,7 +138,7 @@ pub fn mechtron_guest_frame(frame_buffer_id: i32 ) -> i32 {
 
                 Ok(0)
             }
-            guest::Frame::Assign(info) => {
+            core::Frame::Assign(info) => {
                 let factory: Arc<dyn MechtronFactory> = {
                     let read = FACTORIES.read()?;
                     read.get(info.archetype.config_src.as_ref().expect("mechtrons must have a config")).cloned().expect(format!("expected mechtron: ..." ).as_str())
@@ -157,7 +157,7 @@ pub fn mechtron_guest_frame(frame_buffer_id: i32 ) -> i32 {
 
                 Ok(0)
             }
-            guest::Frame::Destroy(address) => {
+            core::Frame::Destroy(address) => {
                 let mechtron = {
                     let mut write = MECHTRONS.write()?;
                     write.remove(&address )
@@ -168,7 +168,7 @@ pub fn mechtron_guest_frame(frame_buffer_id: i32 ) -> i32 {
                 }
                 Ok(0)
             }
-            guest::Frame::Request(request) => {
+            core::Frame::Request(request) => {
 
                 let address = match &request.to {
                     Identifier::Key(key) => {
@@ -200,7 +200,7 @@ pub fn mechtron_guest_frame(frame_buffer_id: i32 ) -> i32 {
                                        Ok(0)
                                    }
                                    Some(response) => {
-                                       let frame = host::Frame::Respond(response);
+                                       let frame = shell::Frame::Respond(response);
                                        let buffer = bincode::serialize(&frame )?;
                                        let buffer = membrane_write_buffer(buffer );
                                        let response = unsafe {
@@ -258,7 +258,7 @@ impl MechtronWrapper {
     }
 
 
-    pub fn handle(&self, request: guest::Request ) -> Result<Option<host::Response>,Fail> {
+    pub fn handle(&self, request: core::Request ) -> Result<Option<shell::Response>,Fail> {
         self.mechtron.handle(self, request )
     }
 
@@ -277,11 +277,11 @@ impl MechtronCtx for MechtronWrapper {
 pub trait MechtronCtx  {
     fn info(&self) -> &Info;
 
-    fn notify( &self, request: host::Request)  {
+    fn notify( &self, request: shell::Request)  {
         mechtron_request_notify(request).unwrap_or_default();
     }
 
-    fn exchange( &self, request: host::Request) -> Result<guest::Response,Error>  {
+    fn exchange(&self, request: shell::Request) -> Result<core::Response,Error>  {
         mechtron_request_exchange(request)
     }
 }
@@ -289,7 +289,7 @@ pub trait MechtronCtx  {
 
 pub trait Mechtron: Sync+Send+'static {
 
-    fn handle(&self, ctx: &dyn MechtronCtx, request: guest::Request ) -> Result<Option<host::Response>,Fail> {
+    fn handle(&self, ctx: &dyn MechtronCtx, request: core::Request ) -> Result<Option<shell::Response>,Fail> {
         Ok( Option::Some(request.ok(Payload::Empty)) )
     }
 

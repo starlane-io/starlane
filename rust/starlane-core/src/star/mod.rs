@@ -59,6 +59,15 @@ use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 use std::cmp;
 use std::fmt;
 use crate::star::core::resource::manager::ResourceManagerApi;
+use std::str::FromStr;
+use nom::sequence::{terminated, tuple, preceded};
+use nom::multi::many0;
+use nom::bytes::complete::tag;
+use nom::character::complete::digit1;
+use mesh_portal_serde::version::v0_0_1::parse::Res;
+use nom::branch::alt;
+use nom::combinator::all_consuming;
+use nom::error::{VerboseError, ParseError, ErrorKind};
 
 pub mod core;
 pub mod shell;
@@ -195,7 +204,6 @@ impl StarKind {
             ResourceType::Root => Self::Central,
             ResourceType::Space => Self::Central,
             ResourceType::User => Self::Space,
-            ResourceType::UserBase => Self::Space,
             ResourceType::App => Self::Space,
             ResourceType::Mechtron => Self::App,
             ResourceType::FileSystem => Self::Space,
@@ -970,8 +978,8 @@ pub enum StarSubGraphKey {
 impl ToString for StarSubGraphKey {
     fn to_string(&self) -> String {
         match self {
-            StarSubGraphKey::Big(n) => n.to_string(),
-            StarSubGraphKey::Small(n) => n.to_string(),
+            StarSubGraphKey::Big(n) => format!("b{}",n),
+            StarSubGraphKey::Small(n) => format!("s{}",n),
         }
     }
 }
@@ -1022,15 +1030,62 @@ impl ToString for StarKey {
         if self.subgraph.len() > 0 {
             let mut string = String::new();
             for (index, node) in self.subgraph.iter().enumerate() {
-                if index != 0 {
-                    string.push_str(":");
-                }
-                string.push_str(node.to_string().as_str());
+               string.push_str(node.to_string().as_str());
             }
             format!("{}:{}", string, self.index)
         } else {
             self.index.to_string()
         }
+    }
+}
+
+pub fn big_subgraph_key( input: &str ) -> Res<&str,StarSubGraphKey> {
+    let (next,key) = preceded(tag("b"),digit1)(input)?;
+    let key = match key.parse() {
+        Ok(key) => key,
+        Err(_)=>{
+            return Err(nom::Err::Error(VerboseError::from_error_kind(input,ErrorKind::Tag)));
+        }
+    };
+    Ok((next,StarSubGraphKey::Big(key)))
+}
+
+pub fn small_subgraph_key( input: &str ) -> Res<&str,StarSubGraphKey> {
+    let (next,key) = preceded(tag("s"),digit1)(input)?;
+    let key = match key.parse() {
+        Ok(key) => key,
+        Err(_)=>{
+            return Err(nom::Err::Error(VerboseError::from_error_kind(input,ErrorKind::Tag)));
+        }
+    };
+    Ok((next,StarSubGraphKey::Small(key)))
+}
+
+pub fn subgraph_key( input: &str ) -> Res<&str,StarSubGraphKey> {
+    alt( (big_subgraph_key,small_subgraph_key))(input)
+}
+
+pub fn index(input: &str ) -> Res<&str,u16> {
+    let (next,key) = digit1(input)?;
+    let key = match key.parse() {
+        Ok(key) => key,
+        Err(_)=>{
+            return Err(nom::Err::Error(VerboseError::from_error_kind(input,ErrorKind::Tag)));
+        }
+    };
+    Ok((next,key))
+}
+
+impl FromStr for StarKey {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(all_consuming(tuple( (many0(subgraph_key ), index)))(s).map( |(next,(subgraph,index))| {
+            (next,Self{
+                subgraph,
+                index
+            })
+        } )?.1)
     }
 }
 
