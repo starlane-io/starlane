@@ -25,7 +25,7 @@ use crate::mesh::Request;
 use crate::mesh::Response;
 use crate::message::delivery::Delivery;
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
-use crate::resource::{ArtifactKind, Kind, ResourceType,BaseKind};
+use crate::resource::{ArtifactKind, Kind, ResourceType,BaseKind, FileKind};
 use crate::resource::{AssignKind, ResourceAssign, ResourceRecord};
 use crate::star::core::resource::registry::Registration;
 use crate::star::shell::wrangler::{ StarFieldSelection, StarSelector};
@@ -49,8 +49,8 @@ pub struct MessagingEndpointComponent {
 impl MessagingEndpointComponent {
     pub fn start(skel: StarSkel, rx: mpsc::Receiver<CoreMessageCall>) {
         let (resource_manager_tx, resource_manager_rx) = mpsc::channel(1024);
-        let resource_manager_api= ResourceManagerApi::new(resource_manager_tx);
-        ResourceManagerComponent::new(skel.clone(), resource_manager_rx );
+        let resource_manager_api= ResourceManagerApi::new(resource_manager_tx.clone());
+        ResourceManagerComponent::new(skel.clone(), resource_manager_tx, resource_manager_rx );
 
         AsyncRunner::new(
             Box::new(Self {
@@ -207,17 +207,34 @@ pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
         ResourceType::Root => Kind::Root,
         ResourceType::Space => Kind::Space,
         ResourceType::Base => {
-            let kind = BaseKind::from_str(template.kind.ok_or(Err("BaseKind cannot be None")))?;
-            if template.specific.is_some() {
-                return Err("BaseKind cannot have a Specific".into());
+            match &template.kind {
+                None => {
+                    return Err("kind must be set for Base".into());
+                }
+                Some(kind) => {
+                    let kind = BaseKind::from_str(kind.as_str())?;
+                    if template.specific.is_some() {
+                        return Err("BaseKind cannot have a Specific".into());
+                    }
+                    return Ok(Kind::Base(kind));
+                }
             }
-            Ok(kind)
         },
         ResourceType::User => Kind::User,
         ResourceType::App => Kind::App,
         ResourceType::Mechtron => Kind::Mechtron,
         ResourceType::FileSystem => Kind::FileSystem,
-        ResourceType::File => Kind::File,
+        ResourceType::File => {
+            match &template.kind{
+                None => {
+                    return Err("expected kind for File".into())
+                }
+                Some(kind) => {
+                    let file_kind = FileKind::from_str(kind.as_str())?;
+                    return Ok(Kind::File(file_kind));
+                }
+            }
+        }
         ResourceType::Database => {
             unimplemented!("need to write a SpecificPattern matcher...")
         }
@@ -225,8 +242,15 @@ pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
         ResourceType::ArtifactBundleSeries => Kind::ArtifactBundleSeries,
         ResourceType::ArtifactBundle => Kind::ArtifactBundle,
         ResourceType::Artifact => {
-            let artifact_kind = ArtifactKind::from_str(template.kind.ok_or(Err("ArtifactKind cannot be None".into())))?;
-            Kind::Artifact(artifact_kind)
+            match &template.kind {
+                None => {
+                    return Err("expected kind for Artirtact".into());
+                }
+                Some(kind) => {
+                    let artifact_kind = ArtifactKind::from_str(kind.as_str())?;
+                    return Ok(Kind::Artifact(artifact_kind));
+                }
+            }
         }
         ResourceType::Proxy => Kind::Proxy,
         ResourceType::Credentials => Kind::Credentials,

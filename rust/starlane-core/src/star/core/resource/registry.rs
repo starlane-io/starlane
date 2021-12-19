@@ -162,7 +162,7 @@ impl RegistryComponent {
             let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
             let status = status.to_string();
             let statement = "UPDATE resources SET status=?1 WHERE parent=?2 AND address_segment=?3";
-            let mut statement = conn.prepare(statement.as_str())?;
+            let mut statement = conn.prepare(statement)?;
             statement.execute(params!(status,parent,address_segment))?;
             Ok(())
         }
@@ -173,9 +173,9 @@ impl RegistryComponent {
         fn process( conn: &Connection, address:Address, location: ResourceLocation) -> Result<(),Error> {
             let parent = address.parent().ok_or("resource must have a parent")?.to_string();
             let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
-            let host = location.host.to_string();
+            let host = location.ok_or()?.to_string();
             let statement = "UPDATE resources SET host=?1 WHERE parent=?2 AND address_segment=?3";
-            let mut statement = conn.prepare(statement.as_str())?;
+            let mut statement = conn.prepare(statement)?;
             statement.execute(params!(host,parent,address_segment))?;
             Ok(())
         }

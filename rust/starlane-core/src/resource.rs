@@ -256,21 +256,50 @@ impl TryFrom<KindParts> for Kind {
     fn try_from(parts: KindParts) -> Result<Self, Self::Error> {
         match parts.resource_type {
             ResourceType::Base => {
-                return Ok(Self::Base(BaseKind::from_str(parts.kind.ok_or("expected Kind for type Base".into())?)?))
+                let parts: String = match parts.kind {
+                    None => {
+                        return Err("expected parts".into());
+                    }
+                    Some(parts) => {
+                        return Ok(Self::Base(BaseKind::from_str(parts.as_str())?));
+                    }
+                };
             }
             ResourceType::Database => {
-                match parts.kind.ok_or("expected Kind for type Database".into())?.as_str()
+                match parts.kind
                 {
-                    "Relational" => {
-                        return Ok(Kind::Database(DatabaseKind::Relational(parts.specific.ok_or("expected Specific for Database<Relational>".into() )?)))
+                    None => {
+                        return Err("expected kind".into());
                     }
-                    what => {
-                        return Err(format!("Database type does not have a Kind {}", what).into());
+                    Some(kind) => {
+                        match kind.as_str() {
+                            "Relational" => {
+                                match parts.specific {
+                                    None => {
+                                        return Err("expected specific".into());
+                                    }
+                                    Some(specific) => {
+                                        return Ok(Kind::Database(DatabaseKind::Relational(specific)));
+                                    }
+                                }
+                            }
+                            what => {
+                                return Err(format!("Database type does not have a Kind {}", what).into());
+                            }
                     }
+                }
+
                 }
             }
             ResourceType::Artifact => {
-                return Ok(Self::Artifact(ArtifactKind::from_str(parts.kind.ok_or("expected Kind for type Artifact".into())?)?))
+                match parts.kind {
+                    None => {
+                        return Err("kind needs to be set".into())
+                    }
+                    Some(kind)  => {
+                        return Ok(Self::Artifact(ArtifactKind::from_str(kind.as_str())?))
+                    }
+                }
             }
             _ => {}
         }
@@ -282,7 +311,6 @@ impl TryFrom<KindParts> for Kind {
             ResourceType::App => {Self::App}
             ResourceType::Mechtron => {Self::Mechtron}
             ResourceType::FileSystem => {Self::FileSystem}
-            ResourceType::File => {Self::File}
             ResourceType::Authenticator => {Self::Authenticator}
             ResourceType::ArtifactBundleSeries => {Self::ArtifactBundleSeries}
             ResourceType::ArtifactBundle => {Self::ArtifactBundle}
@@ -364,28 +392,64 @@ impl Kind {
             ResourceType::Root => {Self::Root}
             ResourceType::Space => {Self::Space}
             ResourceType::Base => {
-                let kind = kind.ok_or("expected sub kind".into() )?;
-                Self::Base(BaseKind::from_str(kind)?)
+                match kind {
+                    None => {
+                        return Err("expected kind".into());
+                    }
+                    Some(kind) => {
+                        return Ok(Self::Base(BaseKind::from_str(kind.as_str())?));
+                    }
+                }
             }
             ResourceType::User => { Self::User}
             ResourceType::App => {Self::App}
             ResourceType::Mechtron => {Self::Mechtron}
             ResourceType::FileSystem => {Self::FileSystem}
-            ResourceType::File => {Self::File}
+            ResourceType::File => {
+                let kind = match kind.ok_or("expected sub kind".into() ){
+                    Ok(kind) => {
+                        return Ok(Self::File(FileKind::from_str(kind.as_str())?));
+                    }
+                    Err(err) => {
+                        return Err(err);
+                    }
+                };
+
+            }
             ResourceType::Database => {
-                let kind = kind.ok_or("expected sub kind".into() )?;
-                if "Relational" != kind.as_str() {
-                    return Err(format!("DatabaseKind is not recognized found: {}",kind).into());
+                match kind.ok_or("expected sub kind".into() )
+                {
+                    Ok(kind) => {
+                        if "Relational" != kind.as_str() {
+                            return Err(format!("DatabaseKind is not recognized found: {}",kind).into());
+                        }
+                        match specific.ok_or("expected specific".into() ) {
+                            Ok(specific) => {
+                                return Ok(Self::Database(DatabaseKind::Relational(specific)));
+                            }
+                            Err(err) => {
+                                return Err(err)
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        return Err(err);
+                    }
                 }
-                let specific = specific.ok_or("expected specific".into() )?;
-                Self::Database(DatabaseKind::Relational(specific))
+
             }
             ResourceType::Authenticator => {Self::Authenticator}
             ResourceType::ArtifactBundleSeries => {Self::ArtifactBundleSeries}
             ResourceType::ArtifactBundle => {Self::ArtifactBundle}
             ResourceType::Artifact => {
-                let kind = kind.ok_or("expected sub kind".into() )?;
-                Self::Artifact(ArtifactKind::from_str(kind)?)
+                match kind {
+                    None => {
+                        return Err("kind needs to be set".into());
+                    }
+                    Some(kind) => {
+                        return Ok(Self::Artifact(ArtifactKind::from_str(kind.as_str())?));
+                    }
+                };
             }
             ResourceType::Proxy => {Self::Proxy}
             ResourceType::Credentials => {Self::Credentials}
