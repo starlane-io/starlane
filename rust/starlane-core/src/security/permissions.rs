@@ -24,7 +24,7 @@ pub struct Grant {
     pub resource: Address
 }
 
-#[derive(Clone)]
+#[derive(Clone,Eq,PartialEq)]
 pub struct Permissions {
     pub create: bool,
     pub read: bool,
@@ -34,7 +34,7 @@ pub struct Permissions {
 
 impl Permissions {
     pub fn has( &self, require: Permissions ) -> bool {
-        (self & require) == require
+        (require.clone() & self) == require
     }
 }
 
@@ -50,6 +50,20 @@ impl ops::BitOr<Permissions> for Permissions {
         }
     }
 }
+
+impl ops::BitAnd<&Permissions> for Permissions {
+    type Output = Self;
+
+    fn bitand(self, rhs: &Permissions) -> Self::Output {
+        Self {
+            create: self.create & rhs.create,
+            read: self.read & rhs.read,
+            write: self.write & rhs.write,
+            execute: self.execute & rhs.execute,
+        }
+    }
+}
+
 
 impl ops::BitAnd<Permissions> for Permissions {
     type Output = Self;

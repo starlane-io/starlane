@@ -15,7 +15,7 @@ use crate::star::StarSkel;
 use crate::starlane::files::MachineFileSystem;
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::payload::Payload;
-use mesh_portal_parse::path::Path;
+use mesh_portal_serde::version::v0_0_1::path::Path;
 use crate::fail::Fail;
 
 #[derive(Clone, Debug)]

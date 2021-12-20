@@ -38,6 +38,7 @@ use crate::mesh::serde::resource::command::create::{Create, Strategy};
 use crate::mesh::serde::resource::command::create::AddressSegmentTemplate;
 use crate::mesh::serde::resource::command::select::Select;
 use crate::mesh::serde::resource::command::update::Update;
+use crate::mesh::serde::generic;
 use crate::message::{MessageExpect, ProtoStarMessage, ReplyKind};
 use crate::names::Name;
 use crate::resources::message::{MessageFrom, ProtoRequest};
@@ -146,6 +147,7 @@ impl Into<ResourceStub> for ResourceRecord {
 }
 
 #[derive(
+    Debug,
     Clone,
     Serialize,
     Deserialize,
@@ -247,6 +249,21 @@ impl ToString for Kind {
     fn to_string(&self) -> String {
         let parts: KindParts = self.clone().into();
         parts.to_string()
+    }
+}
+
+
+impl TryInto<mesh_portal_serde::version::latest::id::Kind> for Kind {
+    type Error =  mesh_portal_serde::error::Error;
+
+    fn try_into(self) -> Result<mesh_portal_serde::version::latest::id::Kind, Self::Error> {
+        let parts: KindParts = self.into();
+
+        Ok(mesh_portal_serde::version::latest::id::Kind {
+            resource_type: parts.resource_type.into(),
+            kind: parts.kind,
+            specific: parts.specific
+        })
     }
 }
 

@@ -53,7 +53,7 @@ impl AsyncProcessor<VariantCall> for WebVariant {
     async fn process(&mut self, call: VariantCall) {
         match call {
             VariantCall::Init(tx) => {
-                self.init(tx);
+                self.init_web(tx);
             }
             VariantCall::Frame { frame, session:_, tx } => {
                 tx.send(FrameVerdict::Handle(frame));
@@ -64,7 +64,7 @@ impl AsyncProcessor<VariantCall> for WebVariant {
 
 
 impl WebVariant {
-    fn init(&self, tx: tokio::sync::oneshot::Sender<Result<(), crate::error::Error>>) {
+    fn init_web(&self, tx: tokio::sync::oneshot::Sender<Result<(), crate::error::Error>>) {
         let api = StarlaneApi::new(self.skel.surface_api.clone());
 
         start(api,self.skel.clone());

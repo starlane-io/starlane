@@ -12,14 +12,13 @@ use crate::message::delivery::Delivery;
 use crate::mesh::serde::payload::Payload;
 use crate::mesh::serde::entity::request::{Msg, Http};
 use mesh_portal_api::message::Message;
-use mesh_portal_api_client::PortalCtrl;
 use crate::mesh::serde::id::Address;
 use crate::mesh::serde::resource::Properties;
 use crate::fail::Fail;
 use crate::mesh::serde::generic::payload::{MapPattern, PayloadPattern};
-use mesh_portal_parse::pattern::consume_data_struct_def;
 use mesh_portal_serde::version::v0_0_1::util::{ValueMatcher, ConvertFrom};
 use mesh_portal_serde::version::v0_0_1::generic::payload::Primitive;
+use mesh_portal_serde::version::v0_0_1::pattern::consume_data_struct_def;
 use mesh_portal_serde::version::v0_0_1::parse::address;
 use crate::message::Reply;
 use crate::mesh::Request;
@@ -93,17 +92,7 @@ impl ResourceManager for MechtronManager {
     }
 
     fn handle_request(&self, delivery: Delivery<Request>) {
-        tokio::spawn( async move {
-            info!("MECHTRON HOST RECEIVED DELIVERY");
-            let mechtron = self.mechtrons.get(delivery.to.clone()).await?.ok_or(format!("could not deliver mechtron to {}", delivery.to.to_string()).into() )?;
-            info!("GOT MECHTRON");
-            let reply = mechtron.handle_request( delivery.item.into_outlet_request()? ).await?;
-
-            if let Option::Some(response) = reply {
-                delivery.result(Ok(response));
-                info!("=====>> MECHTRON SENT REPLY");
-            }
-        });
+        unimplemented!()
     }
 
     fn resource_type(&self) -> ResourceType {
@@ -122,9 +111,8 @@ impl MechtronProperties {
 
     pub fn new( properties: Properties ) -> Result<Self,Error> {
 
-        let payload = properties.into();
-
-        MECHTRON_PROPERTIES_PATTERN.is_match(&payload)?;
+        // there's got to be a better way to do this --
+        MECHTRON_PROPERTIES_PATTERN.is_match(&properties.clone().into())?;
 
         Ok(Self{
             properties

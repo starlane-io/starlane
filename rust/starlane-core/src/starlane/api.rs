@@ -28,7 +28,7 @@ use crate::resources::message::{ProtoRequest, MessageFrom};
 use crate::mesh::serde::id::Address;
 use kube::ResourceExt;
 use crate::mesh::serde::resource::ResourceStub;
-use mesh_portal_parse::path::Path;
+use mesh_portal_serde::version::v0_0_1::path::Path;
 use crate::mesh::serde::bin::Bin;
 use crate::mesh::serde::resource::command::common::{StateSrc, SetLabel};
 use crate::mesh::serde::resource::command::create::{Create, Strategy, Template, AddressTemplate};

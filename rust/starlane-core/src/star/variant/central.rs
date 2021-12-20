@@ -34,7 +34,7 @@ impl AsyncProcessor<VariantCall> for CentralVariant {
     async fn process(&mut self, call: VariantCall) {
         match call {
             VariantCall::Init(tx) => {
-                self.init(tx);
+                self.init_variant(tx);
             }
             VariantCall::Frame { frame, session:_, tx } => {
                 tx.send(FrameVerdict::Handle(frame));
@@ -45,7 +45,7 @@ impl AsyncProcessor<VariantCall> for CentralVariant {
 
 
 impl CentralVariant {
-    fn init(&self, tx: oneshot::Sender<Result<(), Error>>) {
+    fn init_variant(&self, tx: oneshot::Sender<Result<(), Error>>) {
 
         let skel = self.skel.clone();
 

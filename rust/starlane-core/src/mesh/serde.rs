@@ -11,9 +11,6 @@ use mesh_portal_serde::version::latest::bin::Bin;
 
 pub type State = mesh_portal_serde::version::latest::State;
 
-pub type ArtifactRef = mesh_portal_serde::version::latest::ArtifactRef;
-pub type Artifact = mesh_portal_serde::version::latest::Artifact;
-pub type Port = mesh_portal_serde::version::latest::Port;
 
 pub mod id {
     use crate::resource;
@@ -117,15 +114,7 @@ pub mod config {
     use mesh_portal_serde::version::latest::config;
     use mesh_portal_serde::version::latest::generic;
 
-    pub type PortalKind = config::PortalKind;
-    pub type Info = generic::config::Info<Kind>;
-    pub type Config = config::Config;
-    pub type SchemaRef = config::SchemaRef;
-    pub type BindConfig = config::BindConfig;
-    pub type PortConfig = config::PortConfig;
-    pub type EntityConfig = config::EntityConfig;
-    pub type ResourceConfig = config::ResourceConfig;
-    pub type PayloadConfig = config::PayloadConfig;
+
 }
 
 pub mod entity {
@@ -323,6 +312,7 @@ pub mod generic {
 
         use mesh_portal_serde::version::latest::generic;
 
+        pub type KindParts<ResourceType> = generic::id::KindParts<ResourceType>;
         pub type AddressAndKind<KIND> = generic::id::AddressAndKind<KIND>;
         pub type AddressAndType<RESOURCE_TYPE> = generic::id::AddressAndType<RESOURCE_TYPE>;
     }
@@ -334,10 +324,8 @@ pub mod generic {
 
         use serde::{Deserialize, Serialize};
 
-        use mesh_portal_serde::version::latest::config::{Config, PortalKind};
         use mesh_portal_serde::version::latest::generic;
         use mesh_portal_serde::version::latest::generic::resource::Archetype;
-        use mesh_portal_serde::version::latest::ArtifactRef;
 
         pub type Info<KIND> = generic::config::Info<KIND>;
     }

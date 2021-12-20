@@ -171,19 +171,10 @@ impl AsyncProcessor<SurfaceCall> for SurfaceComponent {
                     .unwrap_or_default();
             }
             SurfaceCall::Watch { selector, tx } => {
-                        let selector = match self.skel.resource_locator_api.fetch_resource_key(selector.resource.clone()).await
-                        {
-                            Ok(key) => {
-                                WatchSelector{
-                                    topic: Topic::Resource(key),
-                                    property: selector.property
-                                }
-                            }
-                            Err(err) => {
-                                tx.send( Result::Err(err.into()) );
-                                return;
-                            }
-                        };
+                let selector = WatchSelector{
+                    topic: Topic::Resource(selector.resource),
+                    property: selector.property
+                };
 
                 let listener = self.skel.watch_api.listen( selector ).await;
 println!("SurfaceApi: go watch listener {}",listener.is_ok());

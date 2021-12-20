@@ -15,7 +15,7 @@ use tokio::sync::mpsc::error::{SendError, TrySendError};
 use tokio::time::error::Elapsed;
 use zip::result::ZipError;
 
-use wasmer::CompileError;
+use wasmer::{CompileError, ExportError, RuntimeError};
 use actix_web::ResponseError;
 use handlebars::RenderError;
 use crate::fail::Fail;
@@ -373,4 +373,20 @@ impl Into<crate::mesh::serde::fail::Fail> for Error {
     }
 }
 
+
+impl From<ExportError> for Error {
+    fn from(e: ExportError) -> Self {
+        Self {
+            error: e.to_string()
+        }
+    }
+}
+
+impl From<RuntimeError> for Error {
+    fn from(e: RuntimeError) -> Self {
+        Self {
+            error: e.to_string()
+        }
+    }
+}
 

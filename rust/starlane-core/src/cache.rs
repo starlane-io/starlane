@@ -27,7 +27,7 @@ use crate::starlane::api::StarlaneApi;
 use crate::starlane::StarlaneMachine;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
 use crate::mesh::serde::id::Address;
-use mesh_portal_parse::path::Path;
+use mesh_portal_serde::version::v0_0_1::path::Path;
 use crate::mesh::serde::bin::Bin;
 use crate::mesh::serde::payload::Payload;
 use crate::mesh::serde::payload::Primitive;

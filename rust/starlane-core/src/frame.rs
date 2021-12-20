@@ -563,7 +563,8 @@ impl fmt::Display for StarMessagePayload {
             StarMessagePayload::Reply(reply) => format!("Reply({})", reply.to_string()),
             StarMessagePayload::ResourceRegistry(_) => "ResourceManager".to_string(),
             StarMessagePayload::ResourceHost(_) => "ResourceHost".to_string(),
-            StarMessagePayload::Request(_) => "MessagePayload".to_string(),
+            StarMessagePayload::Request(_) => "Request".to_string(),
+            StarMessagePayload::Response(_) => "Response".to_string()
         };
         write!(f, "{}", r)
     }

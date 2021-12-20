@@ -215,6 +215,7 @@ impl StarKind {
             ResourceType::Artifact => Self::ArtifactStore,
             ResourceType::Proxy => Self::Space,
             ResourceType::Credentials => Self::Space,
+            ResourceType::Base => Self::Space
         }
     }
 

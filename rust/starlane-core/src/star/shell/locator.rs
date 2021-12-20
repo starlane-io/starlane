@@ -127,10 +127,8 @@ impl AsyncProcessor<ResourceLocateCall> for ResourceLocatorComponent {
                 self.external_locate(address, star, tx).await;
             }
             ResourceLocateCall::Found(record) => {
-                self.resource_address_to_key
-                    .put(record.stub.address.clone(), record.stub.key.clone());
                 self.resource_record_cache
-                    .put(record.stub.key.clone(), record);
+                    .put(record.stub.address.clone(), record);
             }
         }
     }

@@ -79,7 +79,7 @@ impl AsyncProcessor<CoreMessageCall> for MessagingEndpointComponent {
 }
 
 impl MessagingEndpointComponent {
-    async fn process_resource_message(&'static mut self, star_message: StarMessage) -> Result<(), Error> {
+    async fn process_resource_message(&mut self, star_message: StarMessage) -> Result<(), Error> {
         match &star_message.payload {
             StarMessagePayload::Request(request) => match &request.entity {
                 ReqEntity::Rc(rc) => {
@@ -105,8 +105,9 @@ impl MessagingEndpointComponent {
         Ok(())
     }
 
-    async fn process_resource_command(&'static mut self, delivery: Delivery<Rc>)  {
+    async fn process_resource_command(&mut self, delivery: Delivery<Rc>)  {
         let skel = self.skel.clone();
+        let resource_manager_api = self.resource_manager_api.clone();
         tokio::spawn(async move {
             async fn process(skel: StarSkel, resource_manager_api: ResourceManagerApi, rc: &Rc, to: Address) -> Result<Payload, Error> {
                 match &rc.command {
@@ -187,7 +188,7 @@ impl MessagingEndpointComponent {
                     }
                 }
             }
-            let result = process(skel,self.resource_manager_api.clone(), &delivery.item, delivery.to().expect("expected this to work since we have already established that the item is a Request")).await.into();
+            let result = process(skel,resource_manager_api.clone(), &delivery.item, delivery.to().expect("expected this to work since we have already established that the item is a Request")).await.into();
             delivery.result(result);
         });
     }

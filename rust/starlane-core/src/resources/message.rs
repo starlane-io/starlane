@@ -53,8 +53,8 @@ impl ProtoRequest {
             Err("ProtoMessage: RESOURCE to must be set".into())
         } else if self.from.is_none() {
             Err("ProtoMessage: from must be set".into())
-        } else if let Option::None = self.payload {
-            Err("ProtoMessage: message payload cannot be None".into())
+        } else if let Option::None = self.entity{
+            Err("ProtoMessage: message entity cannot be None".into())
         } else {
             Ok(())
         }
@@ -116,8 +116,8 @@ pub struct ProtoResponse {
 impl ProtoResponse {
 
     pub fn validate(&self) -> Result<(), Error> {
-        if self.reply_to.is_none() {
-            Err("ProtoMessageReply:reply_to must be set".into())
+        if self.exchange.is_none() {
+            Err("ProtoMessageReply:exchangemust be set".into())
         } else if self.from.is_none() {
             Err("ProtoMessageReply: from must be set".into())
         } else if let Option::None = self.entity {
@@ -147,7 +147,7 @@ impl ProtoResponse {
     }
 
     pub fn payload(&mut self, payload: Payload) {
-        self.payload = Option::Some(payload);
+        self.entity = Option::Some(RespEntity::Ok(payload));
     }
 }
 

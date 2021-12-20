@@ -5,7 +5,6 @@ use crate::config::wasm::Wasm;
 use crate::error::Error;
 use crate::mesh;
 use crate::starlane::api::StarlaneApi;
-use mechtron_common::version::latest::{core, shell};
 use mesh_portal_api::message::Message;
 use mesh_portal_serde::version::latest;
 use mesh_portal_serde::version::v0_0_1::util::ConvertFrom;
@@ -13,10 +12,8 @@ use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 use wasm_membrane_host::membrane::{WasmMembrane, WasmHost};
 
-use crate::mesh::serde::config::Info;
 use crate::mesh::serde::messaging::{Exchange, ExchangeId};
 use futures::SinkExt;
-use mesh_portal_api_client::{PortalCtrl, PortalSkel};
 use mesh_portal_serde::version::latest::portal::inlet;
 use mesh_portal_serde::version::latest::portal::outlet;
 use mesh_portal_serde::version::latest::util::unique_id;
@@ -36,6 +33,7 @@ use std::future::Future;
 use crate::util::AsyncHashMap;
 use std::ops::Deref;
 use mesh_portal_serde::version::v0_0_1::generic::payload::Payload;
+use mesh_portal_api_client::{ResourceCtrl, PortalSkel, ResourceCtrlFactory, ResourceSkel};
 
 #[derive(Clone)]
 pub struct MechtronShell {
@@ -56,24 +54,26 @@ impl MechtronShell {
 }
 
 #[async_trait]
-impl PortalCtrl for MechtronShell {
-    async fn handle_request(
+impl ResourceCtrl for MechtronShell {
+    async fn outlet_frame(
         &self,
-        request: outlet::Request,
+        frame: outlet::Frame
     ) -> Result<Option<inlet::Response>, anyhow::Error> {
         let (tx, rx) = oneshot::channel();
-        self.skel.tx.send(Call::CoreRequest { request, tx }).await?;
-        Ok(rx.await??)
+        self.skel.tx.send(Call::OutletFrame(frame)).await?;
+        Ok(rx.await?)
     }
 }
 
-enum Call {
+
+#[derive(Debug,Clone)]
+pub enum Call {
     InletFrame(inlet::Frame),
     OutletFrame(outlet::Frame)
 }
 
 struct ExchangeInfo {
-    pub tx: oneshot::Sender<core::Response>,
+    pub tx: oneshot::Sender<inlet::Response>,
     pub core_exchange_id: ExchangeId,
     pub requester: latest::id::Address,
     pub responder: latest::id::Address,
@@ -86,7 +86,7 @@ pub struct MechtronSkel {
     pub bind: ArtifactItem<BindConfig>,
     pub tx: mpsc::Sender<Call>,
     pub membrane: MembraneExt,
-    pub portal: PortalSkel,
+    pub resource_skel: ResourceSkel,
 }
 
 #[derive(Clone)]
@@ -102,7 +102,7 @@ impl MechtronTemplate {
         caches: &ArtifactCaches,
     ) -> Result<Self, Error> {
         let skel = Self {
-            config,
+            config: config.clone(),
             wasm: caches.wasms.get(&config.wasm.address).ok_or(format!(
                 "could not get referenced Wasm: {}",
                 config.wasm.address.to_string()
@@ -135,41 +135,21 @@ pub struct Factory {
     membrane: MembraneExt
 }
 
-impl Factory {
-    fn go(&self, portal: PortalSkel) -> Box<dyn PortalCtrl> {
+impl ResourceCtrlFactory for Factory {
+
+    fn create(&self, resource_skel: ResourceSkel) -> Result<Arc<dyn ResourceCtrl>, anyhow::Error> {
         let (tx, rx) = mpsc::channel(1024);
         let skel = MechtronSkel {
             config: self.template.config.clone(),
             wasm: self.template.wasm.clone(),
             bind: self.template.bind.clone(),
             tx,
-            membrane,
-            portal,
+            membrane: self.membrane.clone(),
+            resource_skel
         };
-        Box::new(MechtronShell::new(skel, rx))
+        Ok(Arc::new(MechtronShell::new(skel, rx)))
     }
 }
-
-impl FnOnce<PortalSkel> for Factory {
-    type Output = Box<dyn PortalCtrl>;
-
-    extern "rust-call" fn call_once(self, portal: PortalSkel) -> Self::Output {
-        self.go(portal)
-    }
-}
-
-impl FnMut<PortalSkel> for Factory {
-    extern "rust-call" fn call_mut(&mut self, portal: PortalSkel) -> Self::Output {
-        self.go(portal)
-    }
-}
-
-impl Fn<PortalSkel> for Factory {
-    extern "rust-call" fn call(&self, portal: PortalSkel) -> Self::Output {
-        self.go(portal)
-    }
-}
-
 
 
 pub struct MechtronRunner {
@@ -188,15 +168,15 @@ impl MechtronRunner {
     async fn process( &self, call: Call ) -> Result<(),Error> {
         match call {
             Call::InletFrame(frame) => {
-                self.skel.portal.inlet.send_frame(frame);
+                self.skel.resource_skel.portal.inlet.inlet_frame(frame);
             }
             Call::OutletFrame(frame) => {
                 let func = self.skel
                     .membrane
                     .instance
                     .exports
-                    .get_native_function::<i32, i32>("mechtron_core_frame")?;
-                if let Frame::Request(request) = &frame {
+                    .get_native_function::<i32, i32>("mechtron_outlet_frame")?;
+                if let outlet::Frame::Request(request) = &frame {
                     let frame = bincode::serialize(&frame )?;
                     let frame= self.skel.membrane.write_buffer(&frame)?;
                     let response: i32 = func.call(frame)?;
@@ -215,11 +195,11 @@ impl MechtronRunner {
         Ok(())
     }
 
-    pub async fn run(self) {
+    pub async fn run(mut self) {
         {
-            let mut exchanger = HashMap::new();
-            while let Option::Some(call) = rx.recv().await {
-                match self.process(call) {
+//            let mut exchanger = HashMap::new();
+            while let Option::Some(call) = self.rx.recv().await {
+                match self.process(call).await {
                     Ok(_) => {},
                     Err(err) => {
                         eprintln!("{}",err.to_string())
@@ -293,7 +273,7 @@ impl MembraneExt {
                                 let buffer = ext.membrane.consume_buffer(buffer)?;
                                 let frame: inlet::Frame = bincode::deserialize(buffer.as_slice())?;
                                 if let Option::Some(from) = frame.from() {
-                                    let tx = ext.map.get( request.from.clone() ).await?.ok_or("cannot find mechtron tx".into())?;
+                                    let tx = ext.map.get( from ).await?.ok_or::<Error>("cannot find mechtron tx".into())?;
                                     tx.send(Call::InletFrame(frame)).await;
                                 } else {
                                     match frame {
@@ -316,18 +296,20 @@ impl MembraneExt {
             });
         }
 
-        Ok(rtn)
+        Ok(ext)
     }
 
     pub fn add( &self, address: Address, tx: mpsc::Sender<Call>) {
+        let map = self.map.clone();
         tokio::spawn(async move {
-            self.map.put(address, tx).await;
+            map.put(address, tx).await;
         });
     }
 
     pub fn remove( &self, address: Address) {
+        let map = self.map.clone();
         tokio::spawn(async move {
-            self.map.remove(address ).await;
+            map.remove(address ).await;
         });
     }
 }

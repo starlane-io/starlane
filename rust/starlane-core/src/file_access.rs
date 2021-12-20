@@ -15,7 +15,7 @@ use walkdir::WalkDir;
 
 use crate::error::Error;
 use crate::resource::FileKind;
-use mesh_portal_parse::path::Path;
+use mesh_portal_serde::version::v0_0_1::path::Path;
 
 use crate::util;
 use std::convert::TryFrom;

@@ -52,7 +52,7 @@ impl ResourceManager for FileManager {
             }
         };
 
-        self.store.put(assign.stub.key.clone(), state.clone() ).await?;
+        self.store.put(assign.stub.address.clone(), state.clone() ).await?;
 
         let selector = WatchSelector{
             topic: Topic::Resource(assign.stub.address),
