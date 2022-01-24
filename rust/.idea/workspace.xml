@@ -7,33 +7,12 @@
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mechtron-common/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/mechtron-common/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mechtron-common/src/version/latest/mod.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/mechtron-common/src/version/mod.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/mechtron-common/src/version/v0_0_1/mod.rs" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/artifact.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/artifact.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/cache.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/cache.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/error.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/error.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/file_access.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/file_access.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/frame.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/frame.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/mechtron.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/mechtron.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/mesh/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/mesh/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/mesh/serde.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/mesh/serde.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/resources/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resources/message.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/security/permissions.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/security/permissions.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager/file.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager/file.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager/mechtron.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager/mechtron.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/state.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/state.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/shell/locator.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/shell/locator.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/surface.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/surface.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant/central.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/central.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant/web.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/web.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/main.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -68,6 +47,9 @@
   <component name="MacroExpansionManager">
     <option name="directoryName" value="1h4eivq0" />
   </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
   <component name="ProjectId" id="1wdEP6Uvsu2vCkNjQwUBDHCIOIR" />
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
@@ -98,7 +80,7 @@
       <recent name="$PROJECT_DIR$/starlane/src/resources.rs" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test starlane::test::tracing">
+  <component name="RunManager" selected="Cargo.Run">
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
       <option name="command" value="run  --bin starlane -- serve --with-external" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -263,7 +245,9 @@
       <workItem from="1636706841180" duration="59702000" />
       <workItem from="1637543276000" duration="33373000" />
       <workItem from="1637853168732" duration="67052000" />
-      <workItem from="1639035437383" duration="296598000" />
+      <workItem from="1639035437383" duration="303536000" />
+      <workItem from="1640372298770" duration="25000" />
+      <workItem from="1640373850612" duration="2409000" />
     </task>
     <servers />
   </component>
@@ -277,7 +261,6 @@
         </entry>
       </map>
     </option>
-    <option name="oldMeFiltersMigrated" value="true" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

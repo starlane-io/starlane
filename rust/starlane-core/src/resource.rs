@@ -34,7 +34,7 @@ use crate::mesh::serde::payload::{PayloadMap, Primitive, RcCommand};
 use crate::mesh::serde::payload::Payload;
 use crate::mesh::serde::resource::{Archetype, ResourceStub, Status};
 use crate::mesh::serde::resource::command::common::{SetProperties, SetRegistry, StateSrc};
-use crate::mesh::serde::resource::command::create::{Create, Strategy};
+use crate::mesh::serde::resource::command::create::{Create, Strategy, KindTemplate};
 use crate::mesh::serde::resource::command::create::AddressSegmentTemplate;
 use crate::mesh::serde::resource::command::select::Select;
 use crate::mesh::serde::resource::command::update::Update;
@@ -172,6 +172,7 @@ pub enum ResourceType {
     Artifact,
     Proxy,
     Credentials,
+    Control,
 }
 
 impl FromStr for ResourceType{
@@ -195,6 +196,7 @@ impl FromStr for ResourceType{
                "Artifact" => Self::Artifact,
                "Proxy" => Self::Proxy,
                "Credentials" => Self::Credentials,
+               "Control" => Self::Control,
                what => {
                    return Err(format!("invalid ResourceType: '{}'", what).into());
                }
@@ -243,6 +245,22 @@ pub enum Kind {
     Artifact(ArtifactKind),
     Proxy,
     Credentials,
+    Control
+}
+
+impl TryInto<KindTemplate> for Kind {
+    type Error = mesh_portal_serde::error::Error;
+
+    fn try_into(self) -> Result<KindTemplate, Self::Error> {
+        Ok(KindTemplate {
+            resource_type: self.resource_type().to_string(),
+            kind: self.sub_string(),
+            specific: match self.specific() {
+                None => None,
+                Some(specific) => Some(specific.try_into()?)
+            }
+        })
+    }
 }
 
 impl ToString for Kind {

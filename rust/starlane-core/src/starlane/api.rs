@@ -49,11 +49,6 @@ pub struct StarlaneApi {
 impl StarlaneApi {
 
 
-    pub async fn create<API>(  &self, template: Template ) -> Creation<API>     where
-        API: TryFrom<ResourceApi>{
-        let create = Create::new(template);
-        Creation::new(self.clone(), create  )
-    }
 
 }
 
@@ -112,7 +107,7 @@ impl StarlaneApi {
         Ok(self.surface_api.get_caches().await?)
     }
 
-    pub async fn create_resource(&self, create: Create) -> Result<ResourceRecord, Error> {
+    pub async fn create(&self, create: Create) -> Result<ResourceRecord, Error> {
 
         let mut proto = ProtoRequest::new();
         proto.to(create.template.address.parent.clone());
@@ -154,7 +149,7 @@ impl StarlaneApi {
         API: TryFrom<ResourceApi>,
     {
         let resource_api = ResourceApi {
-            stub: self.create_resource(create).await?.stub,
+            stub: self.create(create).await?.stub,
             surface_api: self.surface_api.clone(),
         };
 
