@@ -34,6 +34,7 @@ use crate::util::AsyncHashMap;
 use std::ops::Deref;
 use mesh_portal_serde::version::v0_0_1::generic::payload::Payload;
 use mesh_portal_api_client::{ResourceCtrl, PortalSkel, ResourceCtrlFactory, ResourceSkel};
+use mesh_portal_serde::version::v0_0_1::config::{Config, ResourceConfigBody};
 
 #[derive(Clone)]
 pub struct MechtronShell {
@@ -136,6 +137,9 @@ pub struct Factory {
 }
 
 impl ResourceCtrlFactory for Factory {
+    fn matches(&self, config: Config<ResourceConfigBody>) -> bool {
+        todo!()
+    }
 
     fn create(&self, resource_skel: ResourceSkel) -> Result<Arc<dyn ResourceCtrl>, anyhow::Error> {
         let (tx, rx) = mpsc::channel(1024);

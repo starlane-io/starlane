@@ -19,6 +19,7 @@ use wasmer::{CompileError, ExportError, RuntimeError};
 use actix_web::ResponseError;
 use handlebars::RenderError;
 use crate::fail::Fail;
+use crate::star::core::resource::registry::RegError;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Error {
@@ -85,6 +86,11 @@ impl From<serde_json::Error> for Error {
     }
 }
 
+impl Into<RegError> for Error{
+    fn into(self) -> RegError {
+        RegError::Error(self)
+    }
+}
 
 
 impl From<wasm_membrane_host::error::Error> for Error {
@@ -390,3 +396,15 @@ impl From<RuntimeError> for Error {
     }
 }
 
+impl From<RegError> for Error {
+    fn from(re: RegError) -> Self {
+        match re {
+            RegError::Dupe => {
+                Self{
+                    error: "Dupe".to_string()
+                }
+            }
+            RegError::Error(error) => {error}
+        }
+    }
+}

@@ -170,9 +170,9 @@ pub enum ResourceType {
     ArtifactBundleSeries,
     ArtifactBundle,
     Artifact,
+    Control,
     Proxy,
     Credentials,
-    Control,
 }
 
 impl FromStr for ResourceType{

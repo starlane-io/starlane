@@ -75,4 +75,6 @@ mesh-portal-serde = { path = "../../../mesh-portal/rust/mesh-portal-serde", vers
 mesh-portal-api-client= { path = "../../../mesh-portal/rust/mesh-portal-api-client", version="0.0.1"}
 mesh-portal-api-server = { path = "../../../mesh-portal/rust/mesh-portal-api-server", version="0.0.1"}
 mesh-portal-api = { path = "../../../mesh-portal/rust/mesh-portal-api", version="0.0.1"}
+mesh-portal-tcp-server = { path = "../../../mesh-portal/rust/mesh-portal-tcp-server", version="0.0.1"}
+mesh-portal-tcp-common = { path = "../../../mesh-portal/rust/mesh-portal-tcp-common", version="0.0.1"}
 starlane-macros = { path = "../starlane-macros", version= "0.1.0"}

@@ -17,7 +17,7 @@ use crate::mesh::serde::pattern::TksPattern;
 use crate::mesh::serde::payload::Payload;
 use crate::mesh::serde::payload::Primitive;
 use crate::mesh::serde::resource::command::common::StateSrc;
-use crate::mesh::serde::resource::command::create::{AddressSegmentTemplate, KindTemplate};
+use crate::mesh::serde::resource::command::create::{AddressSegmentTemplate, KindTemplate, Strategy};
 use crate::mesh::serde::resource::command::RcCommand;
 use crate::mesh::serde::resource::ResourceStub;
 use crate::mesh::serde::resource::Status;
@@ -27,12 +27,13 @@ use crate::message::delivery::Delivery;
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
 use crate::resource::{ArtifactKind, Kind, ResourceType,BaseKind, FileKind};
 use crate::resource::{AssignKind, ResourceAssign, ResourceRecord};
-use crate::star::core::resource::registry::Registration;
+use crate::star::core::resource::registry::{RegError, Registration};
 use crate::star::shell::wrangler::{ StarFieldSelection, StarSelector};
 use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use mesh_portal_serde::version::latest::fail::BadRequest;
 use std::future::Future;
+use mesh_portal_serde::version::v0_0_1::generic::payload::PayloadType::Primitive;
 use crate::star::core::resource::manager::{ResourceManagerApi, ResourceManagerComponent};
 
 pub enum CoreMessageCall {
@@ -112,22 +113,54 @@ impl MessagingEndpointComponent {
             async fn process(skel: StarSkel, resource_manager_api: ResourceManagerApi, rc: &Rc, to: Address) -> Result<Payload, Error> {
                 match &rc.command {
                     RcCommand::Create(create) => {
-                        let address = match &create.template.address.child_segment_template {
+                        let kind = match_kind(&create.template.kind)?;
+                        let stub = match &create.template.address.child_segment_template {
                             AddressSegmentTemplate::Exact(child_segment) => {
-                                create.template.address.parent.push(child_segment.clone())?
+                                let address = create.template.address.parent.push(child_segment.clone())?;
+                                let registration = Registration {
+                                    address: address.clone(),
+                                    kind: kind.clone(),
+                                    registry: create.registry.clone(),
+                                    properties: create.properties.clone(),
+                                };
+
+                                skel.registry_api.register(registration).await?
+
+                            }
+                            AddressSegmentTemplate::Pattern(pattern) => {
+                                if !pattern.contains("%") {
+                                    return Err("AddressSegmentTemplate::Pattern must have at least one '%' char for substitution".into());
+                                }
+                                loop {
+                                    let index = skel.registry_api.sequence(create.template.address.parent.clone()).await?;
+                                    let child_segment = pattern.replace( "%", index.as_str() );
+                                    let address = create.template.address.parent.push(child_segment.clone())?;
+                                    let registration = Registration {
+                                        address,
+                                        kind: kind.clone(),
+                                        registry: create.registry.clone(),
+                                        properties: create.properties.clone(),
+                                    };
+
+                                    match skel.registry_api.register(registration).await {
+                                        Ok(stub) => {
+                                            break stub;
+                                        },
+                                        Err(RegError::Dupe) => {
+                                            // continue loop
+                                        }
+                                        Err(RegError::Error(error)) => {
+                                            return Err(error);
+                                        }
+                                    }
+                                }
                             }
                         };
 
-                        let kind = match_kind(&create.template.kind)?;
+                        if Strategy::AlreadyHosted = create.strategy.clone() {
+                            return Ok(Payload::Primitive(Primitive::Stub(stub)));
+                        }
 
-                        let registration = Registration {
-                            address: address.clone(),
-                            kind: kind.clone(),
-                            registry: create.registry.clone(),
-                            properties: create.properties.clone(),
-                        };
-
-                        let stub = skel.registry_api.register(registration).await?;
 
                         async fn assign(
                             skel: StarSkel,
