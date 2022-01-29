@@ -281,13 +281,17 @@ impl RegistryComponent {
     }
 
     async fn register( &mut self, registration: Registration, tx: oneshot::Sender<Result<ResourceStub,RegError>>) {
-        fn register( registry: &mut RegistryComponent, registration: Registration ) -> Result<(),RegError> {
-            let trans = registry.conn.transaction()?;
-            let params = RegistryParams::from_registration(&registration)?;
+        fn check<'a>( registration: &Registration,  trans:&Transaction<'a>, ) -> Result<(),RegError> {
+            let params = RegistryParams::from_registration(registration)?;
             let count = trans.query_row("SELECT count(*) as count from resources WHERE parent=?1 AND address_segment=?2", params![params.parent, params.address_segment], RegistryComponent::count )?;
             if count > 0 {
-                return Err(RegError::Dupe);
+                Err(RegError::Dupe)
+            } else {
+                Ok(())
             }
+        }
+        fn register<'a>( registration: Registration,  trans:&Transaction<'a>,) -> Result<(),Error> {
+            let params = RegistryParams::from_registration(&registration)?;
             trans.execute("INSERT INTO resources (address_segment,resource_type,kind,vendor,product,variant,version,version_pre,parent,status) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'Pending')", params![params.address_segment,params.resource_type,params.kind,params.vendor,params.product,params.variant,params.version,params.version_pre,params.parent])?;
 
             fn set_properties(prefix: &str, params: &RegistryParams, props: &SetProperties, trans: &Transaction ) -> Result<(),Error> {
@@ -328,20 +332,36 @@ impl RegistryComponent {
            Ok(())
         }
 
+        let trans = match self.conn.transaction() {
+            Ok(trans) => trans,
+            Err(error) => {
+                tx.send(Err(RegError::Error(error.into())));
+                return;
+            }
+        };
         let address = registration.address.clone();
-        match register( self, registration ) {
+
+        match check( &registration, &trans ) {
+            Ok(_) => {}
+            Err(error) => {
+                tx.send( Err(error));
+                return;
+            }
+        }
+
+        match register(  registration, &trans ) {
             Ok(_) => {
                 tx.send(match self.skel.registry_api.locate(address).await {
                     Ok(record) => {
                         Ok(record.into())
                     }
                     Err(err) => {
-                        Err("could not locate record".into())
+                        Err(RegError::Error("could not locate record".into()))
                     }
                 });
             }
             Err(err) => {
-                tx.send(Err(err));
+                tx.send(Err(RegError::Error(err)));
             }
         }
     }
@@ -550,6 +570,7 @@ impl RegistryComponent {
     }
     fn count(row: &Row) -> Result<usize, rusqlite::Error> {
         let count: usize= row.get(0)?;
+        Ok(count)
     }
 
     //    static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_pre,shell,status";
@@ -817,4 +838,21 @@ pub enum RegError{
     Error(Error)
 }
 
+impl From<tokio::sync::oneshot::error::RecvError> for RegError {
+    fn from(e: tokio::sync::oneshot::error::RecvError) -> Self {
+        RegError::Error(Error {
+            error: format!("{}", e.to_string()),
+        })
+    }
+}
+impl From<Error> for RegError {
+    fn from(e: Error) -> Self {
+        RegError::Error(e)
+    }
+}
 
+impl From<rusqlite::Error> for RegError {
+    fn from(e: rusqlite::Error) -> Self {
+        RegError::Error(e.into())
+    }
+}

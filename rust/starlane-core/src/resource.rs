@@ -263,6 +263,31 @@ impl TryInto<KindTemplate> for Kind {
     }
 }
 
+impl TryFrom<String> for Kind {
+    type Error =mesh_portal_serde::error::Error;
+
+    fn try_from(kind: String) -> Result<Self, Self::Error> {
+        match Kind::from_str(kind.as_str()) {
+            Ok(kind) => {
+                Ok(kind)
+            }
+            Err(error) => {
+                Err(mesh_portal_serde::error::Error{
+                    message: error.to_string()
+                })
+            }
+        }
+    }
+}
+
+impl TryInto<String> for Kind {
+    type Error =mesh_portal_serde::error::Error;
+
+    fn try_into(self) -> Result<String, Self::Error> {
+        Ok(self.to_string())
+    }
+}
+
 impl ToString for Kind {
     fn to_string(&self) -> String {
         let parts: KindParts = self.clone().into();
@@ -284,6 +309,8 @@ impl TryInto<mesh_portal_serde::version::latest::id::Kind> for Kind {
         })
     }
 }
+
+
 
 impl TryFrom<KindParts> for Kind {
     type Error = mesh_portal_serde::error::Error;
@@ -392,6 +419,7 @@ impl Kind {
             Kind::Artifact(_) => ResourceType::Artifact,
             Kind::Proxy => ResourceType::Proxy,
             Kind::Credentials => ResourceType::Credentials,
+            Kind::Control => ResourceType::Control
         }
     }
 
@@ -488,6 +516,7 @@ impl Kind {
             }
             ResourceType::Proxy => {Self::Proxy}
             ResourceType::Credentials => {Self::Credentials}
+            ResourceType::Control => Self::Control
         })
     }
 }

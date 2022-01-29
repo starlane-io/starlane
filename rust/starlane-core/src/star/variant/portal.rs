@@ -91,8 +91,8 @@ pub struct StarlanePortalServer {
 impl StarlanePortalServer {
     pub fn new(skel: StarSkel) -> Self {
         Self {
-            skel,
-            request_handler: Arc::new(StarlanePortalRequestHandler::new() )
+            skel: skel.clone(),
+            request_handler: Arc::new(StarlanePortalRequestHandler::new(skel) )
         }
     }
 }
@@ -155,7 +155,7 @@ impl StarlanePortalRequestHandler {
 
 #[async_trait]
 impl PortalRequestHandler for StarlanePortalRequestHandler {
-    async fn handle_assign_request(&self, request: AssignRequest) -> Result<Assign, Error> {
+    async fn handle_assign_request(&self, request: AssignRequest) -> Result<Assign, anyhow::Error> {
         match request {
             AssignRequest::Control => {
                 let create = Create {

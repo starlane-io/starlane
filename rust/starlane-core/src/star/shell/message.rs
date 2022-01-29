@@ -22,6 +22,7 @@ use std::convert::{TryFrom, TryInto};
 use crate::mesh::serde::id::Address;
 use std::str::FromStr;
 use mesh_portal_api::message::Message;
+use mesh_portal_serde::version::v0_0_1::util::ConvertFrom;
 
 #[derive(Clone)]
 pub struct MessagingApi {
@@ -90,12 +91,12 @@ impl MessagingApi {
         match message {
             Message::Request(request) => {
                 let mut proto = ProtoStarMessage::new();
-                proto.payload = StarMessagePayload::Request(Request::try_from(request)?);
+                proto.payload = StarMessagePayload::Request(ConvertFrom::convert_from( request)?);
                 self.star_notify(proto);
             }
             Message::Response(response) => {
                 let mut proto = ProtoStarMessage::new();
-                proto.payload = StarMessagePayload::Response(Response::try_from(response)?);
+                proto.payload = StarMessagePayload::Response(ConvertFrom::convert_from(response)?);
                 self.star_notify(proto);
             }
         }

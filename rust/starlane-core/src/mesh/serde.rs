@@ -28,6 +28,7 @@ pub mod id {
     pub type KindParts = generic::id::KindParts<ResourceType>;
     pub type Meta = id::Meta;
     pub type HostKey=id::HostKey;
+
 }
 
 pub mod pattern {

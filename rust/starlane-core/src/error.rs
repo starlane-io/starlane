@@ -86,11 +86,6 @@ impl From<serde_json::Error> for Error {
     }
 }
 
-impl Into<RegError> for Error{
-    fn into(self) -> RegError {
-        RegError::Error(self)
-    }
-}
 
 
 impl From<wasm_membrane_host::error::Error> for Error {

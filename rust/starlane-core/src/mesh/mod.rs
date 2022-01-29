@@ -13,7 +13,9 @@ use crate::mesh::serde::messaging::{Exchange, ExchangeId};
 use crate::mesh::serde::entity::response::RespEntity;
 use ::serde::{Serialize,Deserialize};
 use std::convert::{TryInto, TryFrom};
+use mesh_portal_serde::mesh;
 use mesh_portal_serde::version::latest;
+use mesh_portal_serde::version::v0_0_1::util::ConvertFrom;
 use crate::resource::{Kind, ResourceType};
 use crate::error::Error;
 use crate::mesh::serde::generic::payload::RcCommand;
@@ -26,6 +28,18 @@ pub struct Request {
     pub from: Address,
     pub entity: ReqEntity,
     pub exchange: Exchange,
+}
+
+impl ConvertFrom<generic::Request> for Request {
+    fn convert_from(request: generic::Request) -> Result<Self, mesh_portal_serde::error::Error> {
+        Ok(Self {
+            id: request.id,
+            to: request.to,
+            from: request.from,
+            entity: ConvertFrom::convert_from(request.entity )?,
+            exchange: request.exchange
+        })
+    }
 }
 
 
@@ -46,21 +60,6 @@ impl Request {
     }
 }
 
-impl TryFrom<generic::Request> for Request {
-
-    type Error = Error;
-
-    fn try_from(request: generic::Request) -> Result<Self, Self::Error> {
-        Ok(Request {
-            id: request.id,
-            to: request.to,
-            from: request.from,
-            entity: request.entity.try_into()?,
-            exchange: request.exchange
-        })
-    }
-}
-
 #[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct Response{
     pub id: String,
@@ -70,22 +69,17 @@ pub struct Response{
     pub entity: RespEntity
 }
 
-
-impl TryFrom<generic::Response> for Response{
-
-    type Error = Error;
-
-    fn try_from(response: generic::Response) -> Result<Self, Self::Error> {
-        Ok(Response{
+impl ConvertFrom<generic::Response> for Response{
+    fn convert_from(response: generic::Response) -> Result<Self, mesh_portal_serde::error::Error> {
+        Ok(Self {
             id: response.id,
             to: response.to,
             from: response.from,
-            entity: response.entity.try_into()?,
-            exchange: response.exchange
+            exchange: response.exchange,
+            entity: ConvertFrom::convert_from(response.entity )?,
         })
     }
 }
-
 #[cfg(test)]
 pub mod test {
 

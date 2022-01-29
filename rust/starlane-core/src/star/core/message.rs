@@ -25,15 +25,14 @@ use crate::mesh::Request;
 use crate::mesh::Response;
 use crate::message::delivery::Delivery;
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
-use crate::resource::{ArtifactKind, Kind, ResourceType,BaseKind, FileKind};
+use crate::resource::{ArtifactKind, Kind, ResourceType, BaseKind, FileKind, ResourceLocation};
 use crate::resource::{AssignKind, ResourceAssign, ResourceRecord};
 use crate::star::core::resource::registry::{RegError, Registration};
 use crate::star::shell::wrangler::{ StarFieldSelection, StarSelector};
-use crate::star::{StarCommand, StarKind, StarSkel};
+use crate::star::{StarCommand, StarKey, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use mesh_portal_serde::version::latest::fail::BadRequest;
 use std::future::Future;
-use mesh_portal_serde::version::v0_0_1::generic::payload::PayloadType::Primitive;
 use crate::star::core::resource::manager::{ResourceManagerApi, ResourceManagerComponent};
 
 pub enum CoreMessageCall {
@@ -133,10 +132,10 @@ impl MessagingEndpointComponent {
                                 }
                                 loop {
                                     let index = skel.registry_api.sequence(create.template.address.parent.clone()).await?;
-                                    let child_segment = pattern.replace( "%", index.as_str() );
+                                    let child_segment = pattern.replace( "%", index.to_string().as_str() );
                                     let address = create.template.address.parent.push(child_segment.clone())?;
                                     let registration = Registration {
-                                        address,
+                                        address: address.clone(),
                                         kind: kind.clone(),
                                         registry: create.registry.clone(),
                                         properties: create.properties.clone(),
@@ -144,7 +143,14 @@ impl MessagingEndpointComponent {
 
                                     match skel.registry_api.register(registration).await {
                                         Ok(stub) => {
-                                            break stub;
+                                            if let Strategy::HostedBy(key) = &create.strategy {
+                                                let key = StarKey::from_str( key.as_str() )?;
+                                                let location = ResourceLocation::new(key);
+                                                skel.registry_api.set_location(address, location ).await?;
+                                                return Ok(Payload::Primitive(Primitive::Stub(stub)));
+                                            } else {
+                                                break stub;
+                                            }
                                         },
                                         Err(RegError::Dupe) => {
                                             // continue loop
@@ -157,9 +163,6 @@ impl MessagingEndpointComponent {
                             }
                         };
 
-                        if Strategy::AlreadyHosted = create.strategy.clone() {
-                            return Ok(Payload::Primitive(Primitive::Stub(stub)));
-                        }
 
 
                         async fn assign(
@@ -288,6 +291,7 @@ pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
         }
         ResourceType::Proxy => Kind::Proxy,
         ResourceType::Credentials => Kind::Credentials,
+        ResourceType::Control => Kind::Control
     })
 }
 pub struct WrappedHttpRequest {
