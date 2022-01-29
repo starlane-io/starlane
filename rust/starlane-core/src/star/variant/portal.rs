@@ -15,7 +15,6 @@ use tokio::runtime::Runtime;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use crate::error::Error;
 use bytes::BytesMut;
-use httparse::{Request, Header};
 use std::sync::Arc;
 use std::convert::TryInto;
 use handlebars::Handlebars;
@@ -25,12 +24,15 @@ use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 use anyhow::anyhow;
 use mesh_portal_api::message::Message;
 use mesh_portal_api_server::{MuxCall, PortalRequestHandler, Router};
-use mesh_portal_serde::version::v0_0_1::config::{Assign, Config, ResourceConfigBody};
-use mesh_portal_serde::version::v0_0_1::generic::entity::request::ReqEntity;
-use mesh_portal_serde::version::v0_0_1::generic::portal::inlet::AssignRequest;
-use mesh_portal_serde::version::v0_0_1::generic::resource::command::create::AddressSegmentTemplate;
-use mesh_portal_serde::version::v0_0_1::id::RouteSegment;
-use mesh_portal_serde::version::v0_0_1::resource::ResourceStub;
+use mesh_portal_serde::version::latest::command::common::StateSrc;
+use mesh_portal_serde::version::latest::config::{Assign, Config, ResourceConfigBody};
+use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, KindTemplate, Strategy, Template};
+use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand, ReqEntity};
+use mesh_portal_serde::version::latest::entity::response::RespEntity;
+use mesh_portal_serde::version::latest::id::{Address, AddressSegment, RouteSegment};
+use mesh_portal_serde::version::latest::messaging::{Message, Request};
+use mesh_portal_serde::version::latest::payload::{Payload, PayloadMap, Primitive};
+use mesh_portal_serde::version::latest::portal::inlet::AssignRequest;
 use mesh_portal_tcp_common::{PrimitiveFrameReader, PrimitiveFrameWriter};
 use mesh_portal_tcp_server::PortalServer;
 use nom::AsBytes;
@@ -177,6 +179,8 @@ impl PortalRequestHandler for StarlanePortalRequestHandler {
                     command: RcCommand::Create(create),
                     payload: Payload::Empty
                 });
+
+                let request = Request::new( entity, _, Address::from_str("space")?);
 
                 let mut proto = ProtoRequest::new();
                 proto.entity(entity);

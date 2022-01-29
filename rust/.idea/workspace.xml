@@ -6,13 +6,13 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/starlane-core/src/star/shell/sys.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/error.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/error.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/mesh/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/mesh/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/mesh/serde.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/mesh/serde.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/registry.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/registry.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/fail.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/fail.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/mesh/mod.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/mesh/serde.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/shell.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/shell.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/star/shell/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/shell/message.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant/portal.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/portal.rs" afterDir="false" />
     </list>
@@ -77,11 +77,11 @@
       <recent name="$PROJECT_DIR$/starlane-core/src/star/core/resource/host" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/starlane-core/src/star/shell" />
       <recent name="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager" />
       <recent name="$PROJECT_DIR$/starlane-core/src/pattern.rs" />
       <recent name="$PROJECT_DIR$/starlane/src/resources/property.rs" />
       <recent name="$PROJECT_DIR$/starlane/src/resources/parse.rs" />
-      <recent name="$PROJECT_DIR$/starlane/src/resources.rs" />
     </key>
   </component>
   <component name="RunManager" selected="Cargo.Run">
@@ -253,7 +253,7 @@
       <workItem from="1640372298770" duration="25000" />
       <workItem from="1640373850612" duration="2409000" />
       <workItem from="1643035095784" duration="30936000" />
-      <workItem from="1643461638888" duration="3520000" />
+      <workItem from="1643461638888" duration="10869000" />
     </task>
     <servers />
   </component>

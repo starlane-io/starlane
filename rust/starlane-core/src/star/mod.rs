@@ -18,7 +18,7 @@ use tokio::sync::oneshot;
 use shell::search::{
     SearchCommit, SearchHits, SearchInit, StarSearchTransaction, TransactionResult,
 };
-use shell::wrangler::{StarWrangle, StarWrangleSatisfaction, StarWranglerApi};
+use shell::wrangler::{StarWrangle, StarWranglerApi, StarWrangleSatisfaction};
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::constellation::ConstellationStatus;
@@ -30,7 +30,7 @@ use crate::lane::{
     ConnectorController, LaneCommand, LaneEnd, LaneIndex, LaneMeta, LaneWrapper, ProtoLaneEnd,
     UltimaLaneKey,
 };
-use crate::logger::{Flags, LogInfo, Logger};
+use crate::logger::{Flags, Logger, LogInfo};
 use crate::mesh::serde::generic::resource::ResourceStub;
 use crate::mesh::serde::id::{Address, ResourceType};
 use crate::mesh::serde::payload::Payload;
@@ -60,14 +60,14 @@ use std::cmp;
 use std::fmt;
 use crate::star::core::resource::manager::ResourceManagerApi;
 use std::str::FromStr;
-use nom::sequence::{terminated, tuple, preceded};
+use nom::sequence::{preceded, terminated, tuple};
 use nom::multi::many0;
 use nom::bytes::complete::tag;
 use nom::character::complete::digit1;
 use mesh_portal_serde::version::v0_0_1::parse::Res;
 use nom::branch::alt;
 use nom::combinator::all_consuming;
-use nom::error::{VerboseError, ParseError, ErrorKind};
+use nom::error::{ErrorKind, ParseError, VerboseError};
 
 pub mod core;
 pub mod shell;
@@ -1159,6 +1159,7 @@ pub struct StarSkel {
     pub info: StarInfo,
     pub star_tx: mpsc::Sender<StarCommand>,
     pub core_messaging_endpoint_tx: mpsc::Sender<CoreMessageCall>,
+    pub sys_api: SysApi,
     pub registry_api: RegistryApi,
     pub resource_locator_api: ResourceLocatorApi,
     pub star_search_api: StarSearchApi,

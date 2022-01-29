@@ -15,14 +15,13 @@ use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::fail::{Fail, StarlaneFailure};
 use crate::resources::message::{ProtoRequest, MessageFrom};
 use crate::mesh::{Request, Response};
-use mesh_portal_serde::version::v0_0_1::messaging::ExchangeType;
 use crate::mesh::serde::messaging::Exchange;
 use mysql::uuid::Uuid;
 use std::convert::{TryFrom, TryInto};
-use crate::mesh::serde::id::Address;
 use std::str::FromStr;
 use mesh_portal_api::message::Message;
-use mesh_portal_serde::version::v0_0_1::util::ConvertFrom;
+use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::messaging::{Message, Request, Response};
 
 #[derive(Clone)]
 pub struct MessagingApi {
@@ -57,24 +56,21 @@ impl MessagingApi {
         rx.await?
     }
 
-    pub async fn notify(&self, mut proto: ProtoRequest)->Result<(),Error>{
-        proto.exchange = ExchangeType::Notification;
-
-        let (tx,rx) = oneshot::channel();
-        let call = MessagingCall::Request {proto ,tx };
-        self.tx.send(call).await?;
-
+    pub async fn notify(&self, request: Request)->Result<(),Error>{
+        let mut proto = ProtoStarMessage::new();
+        proto.payload = StarMessagePayload::Request(request);
+        self.star_notify(proto).await?;
         Ok(())
     }
 
-
-    pub async fn exchange(&self, mut proto: ProtoRequest)->Result<Response,Error>{
-        proto.exchange = ExchangeType::RequestResponse;
-
-        let (tx,rx) = oneshot::channel();
-        let call = MessagingCall::Request {proto ,tx };
-        self.tx.send(call).await?;
-        Ok(rx.await??.ok_or("expectect response")?)
+    pub async fn exchange(&self, request: Request)->Result<Response,Error>{
+        let mut proto = ProtoStarMessage::new();
+        proto.payload = StarMessagePayload::Request(request);
+        if let Reply::Response(response) = self.star_exchange(proto, ReplyKind::Response, "request/response between resources").await? {
+            Ok(response)
+        } else {
+            Err("unexpected star reply".into())
+        }
     }
 
     pub fn on_reply(&self, message: StarMessage) {
@@ -87,22 +83,6 @@ impl MessagingApi {
         }
     }
 
-    pub fn message(&self, message: Message ) -> Result<(),Error> {
-        match message {
-            Message::Request(request) => {
-                let mut proto = ProtoStarMessage::new();
-                proto.payload = StarMessagePayload::Request(ConvertFrom::convert_from( request)?);
-                self.star_notify(proto);
-            }
-            Message::Response(response) => {
-                let mut proto = ProtoStarMessage::new();
-                proto.payload = StarMessagePayload::Response(ConvertFrom::convert_from(response)?);
-                self.star_notify(proto);
-            }
-        }
-       Ok(())
-    }
-
     pub fn fail_exchange(&self, id: MessageId, fail: Error) {
         let call = MessagingCall::FailExchange { id, fail };
         self.tx.try_send(call).unwrap_or_default();
@@ -111,10 +91,6 @@ impl MessagingApi {
 
 pub enum MessagingCall {
     Send(ProtoStarMessage),
-    Request {
-        proto: ProtoRequest,
-        tx: oneshot::Sender<Result<Option<Response>, Error>>,
-    },
     Exchange {
         proto: ProtoStarMessage,
         expect: ReplyKind,
@@ -176,15 +152,14 @@ impl AsyncProcessor<MessagingCall> for MessagingComponent {
             MessagingCall::FailExchange { id, fail } => {
                 self.fail_exchange(id, fail);
             }
-            MessagingCall::Request { proto, tx } => {
-                self.request( proto, tx ).await;
-            }
+
         }
     }
 }
 
 impl MessagingComponent {
 
+    /*
     async fn request( &mut self, proto: ProtoRequest, tx: oneshot::Sender<Result<Option<Response>,Error>>) {
         async fn process( messaging: &mut MessagingComponent, proto: ProtoRequest ) ->Result<Option<Response>,Error> {
             let mut proto = proto;
@@ -214,6 +189,8 @@ impl MessagingComponent {
         }
         tx.send(process(self, proto).await );
     }
+
+     */
 
 
 
