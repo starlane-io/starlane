@@ -29,7 +29,7 @@ use crate::mesh::serde::pattern::{AddressKindPattern, AddressKindPath, AddressKi
 use crate::mesh::serde::pattern::SegmentPattern;
 use crate::mesh::serde::payload::{Payload, Primitive};
 use crate::mesh::serde::resource::command::common::{SetProperties, SetRegistry};
-use crate::mesh::serde::resource::command::create::{AddressSegmentTemplate, Create, Strategy};
+use crate::mesh::serde::resource::command::create::{AddressSegmentTemplate, Create, Strategy, Template};
 use crate::mesh::serde::resource::command::select::{Select, SubSelector};
 use crate::mesh::serde::resource::command::query::{Query, QueryResult};
 use crate::mesh::serde::resource::{ResourceStub, Status};
@@ -58,7 +58,7 @@ impl RegistryApi {
         Self { tx }
     }
 
-    pub async fn register( &self, registration: Registration ) -> Result<ResourceStub,Error> {
+    pub async fn register( &self, registration: Registration ) -> Result<ResourceStub,RegError> {
         let (tx,rx) = oneshot::channel();
         self.tx.send(RegistryCall::Register {registration, tx });
         rx.await?
@@ -94,15 +94,23 @@ impl RegistryApi {
         rx.await?
     }
 
+    pub async fn sequence(&self, address: Address) -> Result<u64,Error> {
+        let (tx,rx) = oneshot::channel();
+        self.tx.send(RegistryCall::Sequence{address, tx });
+        rx.await?
+    }
+
+
 }
 
 pub enum RegistryCall {
-    Register{registration:Registration, tx: oneshot::Sender<Result<ResourceStub,Error>>},
+    Register{registration:Registration, tx: oneshot::Sender<Result<ResourceStub,RegError>>},
     Select{select: Select, address: Address, tx: oneshot::Sender<Result<PrimitiveList,Error>>},
     Query { address: Address, query: Query, tx: oneshot::Sender<Result<QueryResult,Error>>},
     SetStatus { address: Address, status: Status, tx: oneshot::Sender<Result<(),Error>>},
     SetLocation{ address: Address, location: ResourceLocation, tx: oneshot::Sender<Result<(),Error>>},
     Locate{ address: Address, tx: oneshot::Sender<Result<ResourceRecord,Error>>},
+    Sequence{ address: Address, tx: oneshot::Sender<Result<u64,Error>>},
 }
 
 impl Call for RegistryCall {}
@@ -150,6 +158,9 @@ impl RegistryComponent {
             RegistryCall::Locate { address, tx } => {
                 self.locate(address,tx );
             }
+            RegistryCall::Sequence { address, tx } => {
+                self.sequence(address,tx).await;
+            }
         }
     }
 }
@@ -192,6 +203,24 @@ impl RegistryComponent {
             Ok(record)
         }
         tx.send(process(&self.conn, address));
+    }
+
+    async fn sequence(&mut self, address: Address, tx: oneshot::Sender<Result<u64,Error>>) {
+        async fn process<'a>(skel: StarSkel, trans:Transaction<'a>, address: Address) -> Result<u64, Error> {
+            let parent = address.parent().ok_or("expecting parent since we have already established the segments are >= 2")?;
+            let address_segment = address.last_segment().ok_or("expecting a last_segment since we know segments are >= 2")?;
+            trans.execute("UPDATE resources SET sequence=sequence+1 WHERE parent=?1 AND address_segment=?2",params![parent.to_string(),address_segment.to_string()])?;
+            Ok(trans.query_row( "SELECT DISTINCT sequence FROM resources WHERE parent=?1 AND address_segment=?2",params![parent.to_string(),address_segment.to_string()], RegistryComponent::process_sequence)?)
+        }
+        match self.conn.transaction() {
+            Ok(transaction) => {
+                let skel = self.skel.clone();
+                tx.send(process(skel, transaction, address).await);
+            }
+            Err(err) => {
+                tx.send( Err("sequence could not create database transaction".into()));
+            }
+        }
     }
 
     async fn query(&mut self, address: Address, query: Query, tx: oneshot::Sender<Result<QueryResult,Error>>) {
@@ -251,10 +280,14 @@ impl RegistryComponent {
 
     }
 
-    async fn register( &mut self, registration: Registration, tx: oneshot::Sender<Result<ResourceStub,Error>>) {
-        fn register( registry: &mut RegistryComponent, registration: Registration ) -> Result<(),Error> {
+    async fn register( &mut self, registration: Registration, tx: oneshot::Sender<Result<ResourceStub,RegError>>) {
+        fn register( registry: &mut RegistryComponent, registration: Registration ) -> Result<(),RegError> {
             let trans = registry.conn.transaction()?;
             let params = RegistryParams::from_registration(&registration)?;
+            let count = trans.query_row("SELECT count(*) as count from resources WHERE parent=?1 AND address_segment=?2", params![params.parent, params.address_segment], RegistryComponent::count )?;
+            if count > 0 {
+                return Err(RegError::Dupe);
+            }
             trans.execute("INSERT INTO resources (address_segment,resource_type,kind,vendor,product,variant,version,version_pre,parent,status) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'Pending')", params![params.address_segment,params.resource_type,params.kind,params.vendor,params.product,params.variant,params.version,params.version_pre,params.parent])?;
 
             fn set_properties(prefix: &str, params: &RegistryParams, props: &SetProperties, trans: &Transaction ) -> Result<(),Error> {
@@ -346,6 +379,9 @@ impl RegistryComponent {
                         match exact {
                             ExactSegment::Address(address) => {
                                 params.push( address.to_string() );
+                            }
+                            ExactSegment::Version(version) => {
+                                params.push( version.to_string() );
                             }
                         }
                     }
@@ -498,6 +534,11 @@ impl RegistryComponent {
         }
     }
 
+    fn process_sequence(row: &Row) -> Result<u64, rusqlite::Error> {
+        let sequence: u64= row.get(0)?;
+        Ok(sequence)
+    }
+
     fn process_resource_row_catch(row: &Row) -> Result<ResourceRecord, rusqlite::Error> {
         match Self::process_resource_row(row) {
             Ok(ok) => Ok(ok),
@@ -506,6 +547,9 @@ impl RegistryComponent {
                 Err(error.into())
             }
         }
+    }
+    fn count(row: &Row) -> Result<usize, rusqlite::Error> {
+        let count: usize= row.get(0)?;
     }
 
     //    static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_pre,shell,status";
@@ -720,6 +764,7 @@ pub fn setup(conn: &mut Connection) -> Result<(), Error> {
          version_variant TEXT,
          shell TEXT,
          status TEXT NOT NULL,
+         sequence INTEGER DEFAULT 0,
          UNIQUE(parent,address_segment)
         )"#;
 
@@ -765,6 +810,11 @@ pub fn setup(conn: &mut Connection) -> Result<(), Error> {
     transaction.commit()?;
 
     Ok(())
+}
+
+pub enum RegError{
+    Dupe,
+    Error(Error)
 }
 
 

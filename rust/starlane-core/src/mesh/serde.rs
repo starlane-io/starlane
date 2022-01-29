@@ -27,6 +27,7 @@ pub mod id {
     pub type AddressAndType = generic::id::AddressAndType<ResourceType>;
     pub type KindParts = generic::id::KindParts<ResourceType>;
     pub type Meta = id::Meta;
+    pub type HostKey=id::HostKey;
 }
 
 pub mod pattern {
@@ -202,6 +203,7 @@ pub mod resource {
             use crate::mesh::serde::id::ResourceType;
             use crate::mesh::serde::pattern::TksPattern;
             use mesh_portal_serde::version::latest::generic;
+            use crate::star::StarKey;
 
             pub type Create = generic::resource::command::create::Create<Kind>;
             pub type AddressTemplate = generic::resource::command::create::AddressTemplate;
@@ -313,7 +315,7 @@ pub mod generic {
         use mesh_portal_serde::version::latest::generic;
 
         pub type KindParts<ResourceType> = generic::id::KindParts<ResourceType>;
-        pub type AddressAndKind<KIND> = generic::id::AddressAndKind<KIND>;
+        pub type AddressAndKind<ResourceType,KIND> = generic::id::AddressAndKind<ResourceType,KIND>;
         pub type AddressAndType<RESOURCE_TYPE> = generic::id::AddressAndType<RESOURCE_TYPE>;
     }
 
@@ -424,7 +426,7 @@ pub mod generic {
 
             pub type Request<Entity> = outlet::Request<Entity>;
             pub type Response<PAYLOAD> = outlet::Response<PAYLOAD>;
-            pub type Frame<KIND, PAYLOAD, ReqEntity> = outlet::Frame<KIND, PAYLOAD, ReqEntity>;
+            pub type Frame<PAYLOAD, ReqEntity> = outlet::Frame<PAYLOAD, ReqEntity>;
 
             pub mod exchange {
                 use std::fmt::Debug;

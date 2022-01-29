@@ -28,6 +28,7 @@ pub struct Request {
     pub exchange: Exchange,
 }
 
+
 impl Request {
     pub fn into_outlet_request(self) -> Result<latest::portal::outlet::Request,mesh_portal_serde::error::Error> where
            crate::mesh::serde::payload::Payload: TryInto<mesh_portal_serde::version::latest::payload::Payload,Error=mesh_portal_serde::error::Error>,
@@ -45,6 +46,21 @@ impl Request {
     }
 }
 
+impl TryFrom<generic::Request> for Request {
+
+    type Error = Error;
+
+    fn try_from(request: generic::Request) -> Result<Self, Self::Error> {
+        Ok(Request {
+            id: request.id,
+            to: request.to,
+            from: request.from,
+            entity: request.entity.try_into()?,
+            exchange: request.exchange
+        })
+    }
+}
+
 #[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct Response{
     pub id: String,
@@ -55,7 +71,20 @@ pub struct Response{
 }
 
 
+impl TryFrom<generic::Response> for Response{
 
+    type Error = Error;
+
+    fn try_from(response: generic::Response) -> Result<Self, Self::Error> {
+        Ok(Response{
+            id: response.id,
+            to: response.to,
+            from: response.from,
+            entity: response.entity.try_into()?,
+            exchange: response.exchange
+        })
+    }
+}
 
 #[cfg(test)]
 pub mod test {

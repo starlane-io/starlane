@@ -30,6 +30,7 @@ pub mod k8s;
 pub mod mechtron;
 pub mod app;
 pub mod file;
+pub mod portal;
 
 #[derive(Clone)]
 pub struct ResourceManagerApi {

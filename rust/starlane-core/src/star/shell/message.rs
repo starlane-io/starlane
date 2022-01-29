@@ -14,13 +14,14 @@ use crate::star::{StarSkel, StarKey};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::fail::{Fail, StarlaneFailure};
 use crate::resources::message::{ProtoRequest, MessageFrom};
-use crate::mesh::Response;
+use crate::mesh::{Request, Response};
 use mesh_portal_serde::version::v0_0_1::messaging::ExchangeType;
 use crate::mesh::serde::messaging::Exchange;
 use mysql::uuid::Uuid;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use crate::mesh::serde::id::Address;
 use std::str::FromStr;
+use mesh_portal_api::message::Message;
 
 #[derive(Clone)]
 pub struct MessagingApi {
@@ -83,6 +84,22 @@ impl MessagingApi {
                 .try_send(MessagingCall::Reply(message))
                 .unwrap_or_default();
         }
+    }
+
+    pub fn message(&self, message: Message ) -> Result<(),Error> {
+        match message {
+            Message::Request(request) => {
+                let mut proto = ProtoStarMessage::new();
+                proto.payload = StarMessagePayload::Request(Request::try_from(request)?);
+                self.star_notify(proto);
+            }
+            Message::Response(response) => {
+                let mut proto = ProtoStarMessage::new();
+                proto.payload = StarMessagePayload::Response(Response::try_from(response)?);
+                self.star_notify(proto);
+            }
+        }
+       Ok(())
     }
 
     pub fn fail_exchange(&self, id: MessageId, fail: Error) {
@@ -259,6 +276,9 @@ impl MessagingComponent {
         let id = Uuid::new_v4().to_string();
         self.send_with_id(proto, id).await;
     }
+
+
+
 
     async fn exchange(
         &mut self,

@@ -33,7 +33,7 @@ use crate::mesh::serde::bin::Bin;
 use crate::mesh::serde::resource::command::common::{StateSrc, SetLabel};
 use crate::mesh::serde::resource::command::create::{Create, Strategy, Template, AddressTemplate};
 use crate::mesh::serde::pattern::TksPattern;
-use crate::mesh::serde::payload::Payload;
+use crate::mesh::serde::payload::{Payload, PayloadMap};
 use crate::mesh::serde::entity::request::{ReqEntity, Rc};
 use crate::mesh::serde::payload::{RcCommand, Primitive};
 use crate::mesh::serde::resource::command::create::{AddressSegmentTemplate, KindTemplate};
@@ -174,9 +174,17 @@ impl StarlaneApi {
         };
 
         let template = Template::new(address_template,kind_template );
-        let mut creation = self.create(template).await;
-        creation.set_property("title", Payload::Primitive(Primitive::Text(title.to_string())) );
+        let mut properties = PayloadMap::new();
+        properties.insert( "title".to_string(), Payload::Primitive(Primitive::Text(title.to_string())));
+        let create = Create {
+            template,
+            state: StateSrc::Stateless,
+            properties,
+            strategy: Strategy::Create,
+            registry: Default::default()
+        };
 
+        let creation = Creation::new( self.clone(), create );
         Ok(creation)
     }
 

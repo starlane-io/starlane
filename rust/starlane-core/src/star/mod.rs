@@ -100,6 +100,7 @@ pub enum StarKind {
     Client,
     Web,
     K8s,
+    Portal
 }
 
 impl StarKind {
@@ -117,6 +118,7 @@ impl StarKind {
             StarKind::Web => false,
             StarKind::ArtifactStore => true,
             StarKind::K8s => true,
+            StarKind::Portal => true
         }
     }
 
@@ -134,6 +136,7 @@ impl StarKind {
             StarKind::Web => true,
             StarKind::ArtifactStore => true,
             StarKind::K8s => true,
+            StarKind::Portal => true
         }
     }
 
@@ -163,6 +166,7 @@ impl StarKind {
                 StarKind::Web => vec![],
                 StarKind::ArtifactStore => vec![],
                 StarKind::K8s => vec![],
+                StarKind::Portal => vec![]
             }
             .iter()
             .cloned(),
@@ -193,6 +197,7 @@ impl StarKind {
                 StarKind::FileStore => vec![ResourceType::File],
                 StarKind::ArtifactStore => vec![ResourceType::Artifact],
                 StarKind::K8s => vec![ResourceType::Database],
+                StarKind::Portal => vec![ResourceType::Control]
             }
             .iter()
             .cloned(),
@@ -215,7 +220,8 @@ impl StarKind {
             ResourceType::Artifact => Self::ArtifactStore,
             ResourceType::Proxy => Self::Space,
             ResourceType::Credentials => Self::Space,
-            ResourceType::Base => Self::Space
+            ResourceType::Base => Self::Space,
+            ResourceType::Control => Self::Portal
         }
     }
 
@@ -236,6 +242,7 @@ impl StarKind {
             ResourceType::Proxy => Self::Space,
             ResourceType::Credentials => Self::Space,
             ResourceType::Base => Self::Space,
+            ResourceType::Control => Self::Portal
         }
     }
 
@@ -265,6 +272,7 @@ impl StarKind {
                     ]
                 }
                 StarKind::K8s => vec![ResourceType::Database],
+                StarKind::Portal => vec![ResourceType::Control]
             }
             .iter()
             .cloned(),
