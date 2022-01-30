@@ -54,6 +54,7 @@ use std::cmp;
 use std::fmt;
 use crate::star::core::resource::manager::ResourceManagerApi;
 use std::str::FromStr;
+use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::resource::Status;
 use mesh_portal_versions::version::v0_0_1::parse::Res;
 use nom::sequence::{preceded, terminated, tuple};
@@ -1187,25 +1188,19 @@ impl Debug for StarSkel {
 pub struct StarInfo {
     pub key: StarKey,
     pub kind: StarKind,
+    pub address: Address
 }
 
 impl StarInfo {
     pub fn new(star: StarKey, kind: StarKind) -> Self {
+        let address = Address::from_str(format!("<<{}>>::star",star.to_string()).as_str() ).expect("expect to be able to create a simple star address");
         StarInfo {
-            key: star,
-            kind: kind,
+            key:star,
+            kind ,
+            address
         }
     }
 
-    pub fn mock() -> Self {
-        StarInfo {
-            key: StarKey {
-                subgraph: vec![],
-                index: 0,
-            },
-            kind: StarKind::Central,
-        }
-    }
 }
 
 impl LogInfo for StarInfo {

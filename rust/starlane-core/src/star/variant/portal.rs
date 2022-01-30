@@ -172,12 +172,8 @@ impl PortalRequestHandler for StarlanePortalRequestHandler {
                     payload: Payload::Empty
                 });
 
-                let request = Request::new( entity, _, Address::from_str("space")?);
-
-                let mut proto = ProtoRequest::new();
-                proto.entity(entity);
-                proto.to(Address::from_str("space")?);
-                let response = self.skel.messaging_api.exchange(proto).await?;
+                let request = Request::new( entity, self.skel.info.address.clone(), Address::from_str("space")?);
+                let response = self.skel.messaging_api.exchange(request ).await?;
 
                 match response.entity {
                     RespEntity::Ok(Payload::Primitive(Primitive::Stub(stub))) => {

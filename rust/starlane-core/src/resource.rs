@@ -297,6 +297,7 @@ impl ToString for Kind {
 }
 
 
+/*
 impl TryInto<mesh_portal_serde::version::latest::id::ResourceKind> for Kind {
     type Error =  mesh_portal_serde::error::Error;
 
@@ -310,7 +311,7 @@ impl TryInto<mesh_portal_serde::version::latest::id::ResourceKind> for Kind {
         })
     }
 }
-
+ */
 
 
 impl TryFrom<KindParts> for Kind {

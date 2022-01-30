@@ -150,10 +150,9 @@ impl ProtoStar {
                 match call {
                     StarCommand::GetStarInfo(tx) => match &self.star_key {
                         ProtoStarKey::Key(key) => {
-                            tx.send(Option::Some(StarInfo {
-                                key: key.clone(),
-                                kind: self.kind.clone(),
-                            }));
+                            tx.send(Option::Some(StarInfo::new(
+                                key.clone(),
+                                self.kind.clone())));
                         }
                         ProtoStarKey::RequestSubKeyExpansion(_) => {
                             tx.send(Option::None);

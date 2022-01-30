@@ -501,7 +501,7 @@ impl ArtifactBundleSrc {
         Ok(match self {
             ArtifactBundleSrc::STARLANE_API(api) => {
                                 let bundle: Primitive = api.get_state(address).await?.try_into()?;
-                                 bundle.try_into()?
+                                bundle.try_into()?
             }
             //            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(address).await,
         })
