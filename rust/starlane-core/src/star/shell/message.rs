@@ -14,12 +14,9 @@ use crate::star::{StarSkel, StarKey};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::fail::{Fail, StarlaneFailure};
 use crate::resources::message::{ProtoRequest, MessageFrom};
-use crate::mesh::{Request, Response};
-use crate::mesh::serde::messaging::Exchange;
 use mysql::uuid::Uuid;
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
-use mesh_portal_api::message::Message;
 use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::messaging::{Message, Request, Response};
 

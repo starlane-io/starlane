@@ -58,7 +58,11 @@ impl From<ZipError> for Error {
         }
     }
 }
-
+impl From<mesh_portal_serde::error::Error> for Error {
+    fn from(e: mesh_portal_serde::error::Error) -> Self {
+        e.to_string().into()
+    }
+}
 
 impl From<kube::Error> for Error {
     fn from(e: kube::Error) -> Self {
@@ -350,29 +354,7 @@ impl From<regex::Error> for Error {
     }
 }
 
-impl From<mesh_portal_serde::error::Error> for Error {
-    fn from(e: mesh_portal_serde::error::Error) -> Self {
-        Self {
-            error: e.to_string()
-        }
-    }
-}
 
-
-
-impl From<crate::mesh::serde::fail::Fail> for Error {
-    fn from(e: crate::mesh::serde::fail::Fail) -> Self {
-        Self {
-            error: e.to_string()
-        }
-    }
-}
-
-impl Into<crate::mesh::serde::fail::Fail> for Error {
-    fn into(self) -> crate::mesh::serde::fail::Fail {
-        crate::mesh::serde::fail::Fail::Mesh(crate::mesh::serde::fail::mesh::Fail::Error(self.to_string()))
-    }
-}
 
 
 impl From<ExportError> for Error {

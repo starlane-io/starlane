@@ -16,15 +16,8 @@ use crate::star::{StarCommand, StarSkel};
 use crate::util;
 use crate::fail::Fail;
 use crate::frame::{StarMessage, StarMessagePayload, SimpleReply};
-use crate::mesh::serde::id::Address;
-use crate::mesh::Request;
-use crate::mesh::serde::entity::response::RespEntity;
-use crate::mesh::serde::payload::Payload;
-use crate::mesh::Response;
 use mesh_portal_serde::version::latest::util::unique_id;
-use crate::mesh::serde::messaging::Exchange;
 use crate::message::Reply;
-use crate::mesh::serde::entity::request::Rc;
 use std::ops::Deref;
 use mesh_portal_serde::version::latest::entity::response::RespEntity;
 use mesh_portal_serde::version::latest::id::Address;
@@ -95,7 +88,7 @@ impl <M> Delivery<M> where M: Clone + Send + Sync + 'static
 
 impl Delivery<Request>
 {
-    pub fn result<E>( self, result: Result<Payload,E> ) where E: Into<crate::mesh::serde::fail::Fail> {
+    pub fn result<E>( self, result: Result<Payload,E> ) where E: Into<mesh_portal_serde::version::latest::fail::Fail> {
         match result {
             Ok(payload) => {
                 self.ok(payload);
@@ -130,7 +123,7 @@ impl Delivery<Request>
         }
     }
 
-    pub fn fail(self, fail: crate::mesh::serde::fail::Fail )  {
+    pub fn fail(self, fail: mesh_portal_serde::version::latest::fail::Fail )  {
 
         match self.get_request() {
             Ok(request) => {

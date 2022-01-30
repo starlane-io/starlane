@@ -1,6 +1,7 @@
 use std::sync::Arc;
+use mesh_portal_serde::version::latest::entity::request::create::AddressTemplate;
 use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::messaging::Response;
+use mesh_portal_serde::version::latest::messaging::{Request, Response};
 
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
@@ -16,11 +17,7 @@ use crate::star::shell::message::MessagingCall;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::watch::{WatchSelector, Notification, Topic, Watch, WatchResourceSelector, Watcher};
 use crate::star::shell::search::SearchHits;
-use crate::mesh::serde::resource::command::create::AddressTemplate;
-use crate::mesh::serde::id::Address;
 use crate::resources::message::ProtoRequest;
-use crate::mesh::Response;
-use crate::mesh::serde::messaging::ExchangeType;
 
 #[derive(Clone)]
 pub struct SurfaceApi {
@@ -43,11 +40,11 @@ impl SurfaceApi {
         Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
     }
 
-    pub fn notify( &self, mut request: ProtoRequest ) {
+    pub fn notify( &self, mut request: Request ) {
         self.tx.try_send(SurfaceCall::Notify(request));
     }
 
-    pub async fn exchange( &self, mut request: ProtoRequest ) -> Result<Response,Error> {
+    pub async fn exchange( &self, mut request: Request ) -> Result<Response,Error> {
         let (tx,rx) = oneshot::channel();
         self.tx.send(SurfaceCall::Exchange{request,tx}).await;
 
@@ -106,8 +103,8 @@ pub enum SurfaceCall {
         tx: oneshot::Sender<Result<Reply, Error>>,
         description: String,
     },
-    Notify(ProtoRequest),
-    Exchange{request: ProtoRequest, tx: oneshot::Sender<Result<Response,Error>>},
+    Notify(Request),
+    Exchange{request: Request, tx: oneshot::Sender<Result<Response,Error>>},
     Watch{ selector: WatchResourceSelector, tx: oneshot::Sender<Result<Watcher,Error>> },
     StarSearch{ star_pattern: StarPattern, tx: oneshot::Sender<Result<SearchHits,Error>>},
     RequestStarAddress { address_template: AddressTemplate, tx: oneshot::Sender<Result<Address,Error>> },

@@ -21,17 +21,17 @@ use std::convert::TryInto;
 use handlebars::Handlebars;
 use serde_json::json;
 use std::future::Future;
+use mesh_portal_serde::version::latest::entity::request::Http;
+use mesh_portal_serde::version::latest::id::Meta;
+use mesh_portal_serde::version::latest::payload::Payload;
 use nom::AsBytes;
 use crate::artifact::ArtifactRef;
 use crate::cache::ArtifactItem;
 use crate::html::HTML;
 use regex::Regex;
-use crate::mesh::serde::entity::request::Http;
-use crate::mesh::serde::payload::Payload;
 use crate::resource::ArtifactKind;
 use crate::resources::message::ProtoRequest;
 use serde::{Serialize,Deserialize};
-use crate::mesh::serde::id::Meta;
 
 
 pub struct WebVariant {

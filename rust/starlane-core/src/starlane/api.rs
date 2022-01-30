@@ -25,18 +25,15 @@ use crate::watch::{WatchResourceSelector, Watcher};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, ReplyKind, Reply};
 use crate::artifact::ArtifactBundle;
 use crate::resources::message::{ProtoRequest, MessageFrom};
-use crate::mesh::serde::id::Address;
 use kube::ResourceExt;
-use crate::mesh::serde::resource::ResourceStub;
-use mesh_portal_serde::version::v0_0_1::path::Path;
-use crate::mesh::serde::bin::Bin;
-use crate::mesh::serde::resource::command::common::{StateSrc, SetLabel};
-use crate::mesh::serde::resource::command::create::{Create, Strategy, Template, AddressTemplate};
-use crate::mesh::serde::pattern::TksPattern;
-use crate::mesh::serde::payload::{Payload, PayloadMap};
-use crate::mesh::serde::entity::request::{ReqEntity, Rc};
-use crate::mesh::serde::payload::{RcCommand, Primitive};
-use crate::mesh::serde::resource::command::create::{AddressSegmentTemplate, KindTemplate};
+use mesh_portal_serde::version::latest::command::common::{SetLabel, StateSrc};
+use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, KindTemplate, Strategy, Template};
+use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand, ReqEntity};
+use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::payload::{Payload, PayloadMap, Primitive};
+use mesh_portal_serde::version::latest::resource::ResourceStub;
+use mesh_portal_versions::version::v0_0_1::id::Tks;
+
 use crate::fail::{Fail, StarlaneFailure};
 use crate::cache::RootItemCacheCall::Get;
 
@@ -216,7 +213,7 @@ impl SpaceApi {
     }
 
     pub fn new(surface_api: SurfaceApi, stub: ResourceStub) -> Result<Self, Error> {
-        if stub.kind.resource_type() != ResourceType::Space {
+        if stub.kind.resource_type() != ResourceType::Space.to_string() {
             return Err(format!(
                 "wrong kind resource type for SpaceApi: {}",
                 stub.kind.resource_type().to_string()

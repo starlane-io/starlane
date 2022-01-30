@@ -15,11 +15,7 @@ use crate::resource::{Kind, ResourceType, ResourceRecord};
 use crate::star::{StarCommand, StarKey};
 use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
 use crate::resources::message::ProtoRequest;
-use crate::mesh::{Request, Response};
-use crate::mesh::serde::id::Address;
 use crate::frame::{StarMessagePayload, StarMessage, SimpleReply, MessageAck};
-use crate::mesh::serde::pattern::AddressKindPath;
-use crate::mesh::serde::resource::ResourceStub;
 
 pub mod delivery;
 

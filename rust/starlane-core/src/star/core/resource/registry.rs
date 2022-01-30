@@ -10,16 +10,12 @@ use mesh_portal_serde::version::latest::command::common::{SetProperties, SetRegi
 use mesh_portal_serde::version::latest::entity::request::query::{Query, QueryResult};
 use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand, ReqEntity};
 use mesh_portal_serde::version::latest::entity::request::select::{Select, SelectionKind, SubSelector};
-use mesh_portal_serde::version::latest::generic::pattern::{ExactSegment, KindPattern};
 use mesh_portal_serde::version::latest::id::{Address, Specific, Version};
 use mesh_portal_serde::version::latest::pattern::{AddressKindPath, AddressKindSegment, ExactSegment, KindPattern, ResourceTypePattern, SegmentPattern};
 use mesh_portal_serde::version::latest::pattern::specific::{ProductPattern, VariantPattern, VendorPattern};
 use mesh_portal_serde::version::latest::payload::{Payload, Primitive, PrimitiveList};
 use mesh_portal_serde::version::latest::resource::{ResourceStub, Status};
 use mesh_portal_serde::version::latest::util::ValuePattern;
-use crate::mesh::serde::payload::PrimitiveList;
-use mesh_portal_serde::version::v0_0_1::pattern::SpecificPattern;
-use mesh_portal_serde::version::v0_0_1::util::ValuePattern;
 use rusqlite::{Connection, params_from_iter, Row, Transaction};
 use  rusqlite::params;
 use rusqlite::types::ValueRef;
@@ -31,30 +27,15 @@ use crate::error::Error;
 use crate::fail::{Fail, StarlaneFailure};
 use crate::frame::StarMessagePayload;
 use crate::logger::LogInfo;
-use crate::mesh::serde::fail;
-use crate::mesh::serde::generic::resource::Archetype;
-use crate::mesh::serde::id::{Address, AddressSegment, Kind, Specific};
-use crate::mesh::serde::id::Version;
-use crate::mesh::serde::pattern::{AddressKindPattern, AddressKindPath, AddressKindSegment, Hop};
-use crate::mesh::serde::pattern::SegmentPattern;
-use crate::mesh::serde::payload::{Payload, Primitive};
-use crate::mesh::serde::resource::command::common::{SetProperties, SetRegistry};
-use crate::mesh::serde::resource::command::create::{AddressSegmentTemplate, Create, Strategy, Template};
-use crate::mesh::serde::resource::command::select::{Select, SubSelector};
-use crate::mesh::serde::resource::command::query::{Query, QueryResult};
-use crate::mesh::serde::resource::{ResourceStub, Status};
+
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
 use crate::resource;
 use crate::star::{StarKey, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::resource::{ResourceRecord, AssignResourceStateSrc, Resource, ResourceAssign, AssignKind, ResourceLocation, ResourceType, Kind};
 use crate::resources::message::{ProtoRequest, MessageFrom};
-use crate::mesh::serde::resource::command::select::SelectionKind;
-use crate::mesh::serde::entity::request::{ReqEntity, Rc};
-use crate::mesh::serde::generic::payload::RcCommand;
+
 use crate::security::permissions::Pattern;
-use mesh_portal_serde::version::v0_0_1::generic::pattern::ResourceTypePattern;
-use mesh_portal_serde::version::v0_0_1::pattern::specific::{VendorPattern, ProductPattern, VariantPattern};
 
 static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_pre,shell,status";
 

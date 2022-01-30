@@ -5,11 +5,7 @@ use tokio::sync::{mpsc, oneshot};
 use artifact::ArtifactBundleManager;
 use k8s::K8sManager;
 
-use crate::mesh::serde::payload::Payload;
 use crate::error::Error;
-use crate::mesh::{Request, Response};
-use crate::mesh::serde::entity::request::Rc;
-use crate::mesh::serde::id::{Address, ResourceType};
 use crate::message::delivery::Delivery;
 use crate::{resource, fail};
 use crate::resource::{ResourceAssign, ResourceType};
@@ -139,7 +135,7 @@ impl ResourceManagerComponent{
         match process(self, request.clone()).await {
             Ok(_) => {}
             Err(error) => {
-                request.fail( crate::mesh::serde::fail::Fail::Mesh(crate::mesh::serde::fail::mesh::Fail::Error(error.to_string()) ))
+                request.fail( mesh_portal_serde::version::latest::fail::Fail::Mesh(mesh_portal_serde::version::latest::fail::mesh::Fail::Error(error.to_string()) ))
             }
         }
     }

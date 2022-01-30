@@ -8,6 +8,7 @@ use std::str::FromStr;
 use async_trait::async_trait;
 use lru::LruCache;
 use mesh_portal_serde::version::latest::id::{Address, RouteSegment};
+use mesh_portal_serde::version::latest::resource::{ResourceStub, Status};
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use crate::frame::{ResourceRegistryRequest,  SimpleReply, StarMessagePayload};
@@ -18,9 +19,6 @@ use crate::star::{
 };
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::error::Error;
-use crate::mesh::serde::id::Address;
-use crate::mesh::serde::generic::resource::ResourceStub;
-use crate::mesh::serde::resource::Status;
 
 #[derive(Clone)]
 pub struct ResourceLocatorApi {
@@ -156,10 +154,13 @@ impl ResourceLocatorComponent {
             tx.send(result).unwrap_or_default();
         } else if let RouteSegment::Mesh(star) = &address.route {
             let star = StarKey::from_str(star.as_str())?;
-            let result = self.skel.resource_locator_api
-                .external_locate(address, star)
-                .await;
-            tx.send(result);
+            let skel = self.skel.clone();
+            tokio::spawn( async move {
+                let result = skel.resource_locator_api
+                    .external_locate(address, star)
+                    .await;
+                tx.send(result);
+            });
         }
         else if address.parent().is_some() {
             let locator_api = self.skel.resource_locator_api.clone();
@@ -191,7 +192,7 @@ impl ResourceLocatorComponent {
             let record = ResourceRecord::new(
                 ResourceStub {
                     address: Address::root(),
-                        kind: Kind::Root,
+                        kind: Kind::Root.to_resource_kind(),
                     properties: Default::default(),
                     status: Status::Ready
                 },

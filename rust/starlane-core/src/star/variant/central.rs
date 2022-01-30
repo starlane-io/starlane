@@ -1,5 +1,6 @@
 use std::str::FromStr;
 use std::sync::Arc;
+use mesh_portal_serde::version::latest::entity::request::create::Strategy;
 
 use tokio::sync::{mpsc, oneshot};
 
@@ -10,10 +11,6 @@ use crate::star::{StarKey, StarSkel};
 use crate::star::variant::{FrameVerdict, VariantCall};
 use crate::starlane::api::StarlaneApi;
 use crate::util::{AsyncProcessor, AsyncRunner};
-use crate::mesh::serde::generic::resource::ResourceStub;
-use crate::mesh::serde::id::Address;
-use crate::mesh::serde::resource::command::create::Strategy;
-use crate::mesh::serde::resource::Status;
 
 pub struct CentralVariant {
     skel: StarSkel,

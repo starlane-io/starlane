@@ -30,18 +30,12 @@ use crate::lane::{
     ConnectorController, LaneCommand, LaneEnd, LaneIndex, LaneMeta, LaneWrapper, ProtoLaneEnd,
     UltimaLaneKey,
 };
-use crate::logger::{Flags, Logger, LogInfo};
-use crate::mesh::serde::generic::resource::ResourceStub;
-use crate::mesh::serde::id::{Address, ResourceType};
-use crate::mesh::serde::payload::Payload;
-use crate::mesh::serde::resource::command::select::Select;
-use crate::mesh::serde::resource::command::update::Update;
-use crate::mesh::serde::resource::Status;
+
 use crate::message::{
     MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage,
     ProtoStarMessageTo, TrackerJob,
 };
-use crate::resource::ResourceRecord;
+use crate::resource::{ResourceRecord, ResourceType};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::core::resource::registry::RegistryApi;
 use crate::star::shell::golden::GoldenPathApi;
@@ -60,14 +54,16 @@ use std::cmp;
 use std::fmt;
 use crate::star::core::resource::manager::ResourceManagerApi;
 use std::str::FromStr;
+use mesh_portal_serde::version::latest::resource::Status;
+use mesh_portal_versions::version::v0_0_1::parse::Res;
 use nom::sequence::{preceded, terminated, tuple};
 use nom::multi::many0;
 use nom::bytes::complete::tag;
 use nom::character::complete::digit1;
-use mesh_portal_serde::version::v0_0_1::parse::Res;
 use nom::branch::alt;
 use nom::combinator::all_consuming;
 use nom::error::{ErrorKind, ParseError, VerboseError};
+use crate::logger::{Flags, Logger, LogInfo};
 use crate::star::shell::sys::SysApi;
 
 pub mod core;
@@ -396,6 +392,7 @@ impl StarKind {
             StarKind::FileStore => false,
             StarKind::ArtifactStore => false,
             StarKind::K8s => false,
+            StarKind::Portal => false
         }
     }
 }

@@ -183,6 +183,6 @@ impl SysComponent {
 }
 
 pub struct SysResource {
-    pub stub: ResouceStub,
+    pub stub: ResourceStub,
     pub tx: mpsc::Sender<Delivery<Request>>
 }

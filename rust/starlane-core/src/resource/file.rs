@@ -1,5 +1,7 @@
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
+use mesh_portal_serde::version::latest::command::common::StateSrc;
+use mesh_portal_serde::version::latest::id::Address;
 
 use serde::{Deserialize, Serialize};
 
@@ -7,8 +9,6 @@ use crate::error::Error;
 use crate::resource::{
      ResourceType,
 };
-use crate::mesh::serde::id::Address;
-use crate::mesh::serde::resource::command::common::StateSrc;
 
 #[derive(Clone)]
 pub struct File {

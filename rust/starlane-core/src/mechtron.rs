@@ -3,22 +3,16 @@ use crate::config::bind::BindConfig;
 use crate::config::mechtron::MechtronConfig;
 use crate::config::wasm::Wasm;
 use crate::error::Error;
-use crate::mesh;
 use crate::starlane::api::StarlaneApi;
-use mesh_portal_api::message::Message;
 use mesh_portal_serde::version::latest;
-use mesh_portal_serde::version::v0_0_1::util::ConvertFrom;
 use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 use wasm_membrane_host::membrane::{WasmMembrane, WasmHost};
 
-use crate::mesh::serde::messaging::{Exchange, ExchangeId};
 use futures::SinkExt;
 use mesh_portal_serde::version::latest::portal::inlet;
 use mesh_portal_serde::version::latest::portal::outlet;
 use mesh_portal_serde::version::latest::util::unique_id;
-use mesh_portal_serde::version::v0_0_1::id::Address;
-use mesh_portal_serde::version::v0_0_1::messaging::ExchangeType;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::sync::mpsc::Sender;
@@ -26,15 +20,14 @@ use std::time::Duration;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 use wasmer::{Function, Module, {imports, ImportObject}, Store};
-use mesh_portal_serde::version::v0_0_1::generic::id::KindParts;
-use mesh_portal_serde::version::v0_0_1::generic::entity::request::ReqEntity;
-use mesh_portal_serde::version::v0_0_1::generic::portal::inlet::{Request, Frame};
 use std::future::Future;
 use crate::util::AsyncHashMap;
 use std::ops::Deref;
-use mesh_portal_serde::version::v0_0_1::generic::payload::Payload;
 use mesh_portal_api_client::{ResourceCtrl, PortalSkel, ResourceCtrlFactory, ResourceSkel};
-use mesh_portal_serde::version::v0_0_1::config::{Config, ResourceConfigBody};
+use mesh_portal_serde::version::latest::config::{Config, ResourceConfigBody};
+use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::messaging::{ExchangeId, Response};
+use mesh_portal_serde::version::latest::portal::inlet::Frame;
 
 #[derive(Clone)]
 pub struct MechtronShell {
@@ -59,7 +52,7 @@ impl ResourceCtrl for MechtronShell {
     async fn outlet_frame(
         &self,
         frame: outlet::Frame
-    ) -> Result<Option<inlet::Response>, anyhow::Error> {
+    ) -> Result<Option<Response>, anyhow::Error> {
         let (tx, rx) = oneshot::channel();
         self.skel.tx.send(Call::OutletFrame(frame)).await?;
         Ok(rx.await?)
@@ -74,7 +67,7 @@ pub enum Call {
 }
 
 struct ExchangeInfo {
-    pub tx: oneshot::Sender<inlet::Response>,
+    pub tx: oneshot::Sender<Response>,
     pub core_exchange_id: ExchangeId,
     pub requester: latest::id::Address,
     pub responder: latest::id::Address,
@@ -186,7 +179,7 @@ impl MechtronRunner {
                     let response: i32 = func.call(frame)?;
                     if response > 0 {
                         let response = self.skel.membrane.consume_buffer(response).unwrap();
-                        let response: inlet::Response = bincode::deserialize(&response)?;
+                        let response: Response = bincode::deserialize(&response)?;
                         self.skel.tx.send( Call::InletFrame(inlet::Frame::Response(response))).await;
                     }
                 } else {

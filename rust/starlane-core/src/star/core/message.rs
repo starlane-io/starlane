@@ -9,20 +9,7 @@ use crate::fail::{Fail, StarlaneFailure};
 use crate::frame::{
     ResourceHostAction, ResourceRegistryRequest, SimpleReply, StarMessage, StarMessagePayload,
 };
-use crate::mesh::serde::entity::request::{Http, Msg, Rc, ReqEntity};
-use crate::mesh::serde::fail;
-use crate::mesh::serde::http::HttpRequest;
-use crate::mesh::serde::id::Address;
-use crate::mesh::serde::pattern::TksPattern;
-use crate::mesh::serde::payload::Payload;
-use crate::mesh::serde::payload::Primitive;
-use crate::mesh::serde::resource::command::common::StateSrc;
-use crate::mesh::serde::resource::command::create::{AddressSegmentTemplate, KindTemplate, Strategy};
-use crate::mesh::serde::resource::command::RcCommand;
-use crate::mesh::serde::resource::ResourceStub;
-use crate::mesh::serde::resource::Status;
-use crate::mesh::Request;
-use crate::mesh::Response;
+
 use crate::message::delivery::Delivery;
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
 use crate::resource::{ArtifactKind, Kind, ResourceType, BaseKind, FileKind, ResourceLocation};
@@ -178,7 +165,7 @@ impl MessagingEndpointComponent {
                             stub: ResourceStub,
                             state: StateSrc,
                         ) -> Result<(), Error> {
-                            let star_kind = StarKind::hosts(&stub.kind.resource_type());
+                            let star_kind = StarKind::hosts(&ResourceType::from_str(stub.kind.resource_type().as_str())?);
                             let mut star_selector = StarSelector::new();
                             star_selector.add(StarFieldSelection::Kind(star_kind.clone()));
                             let wrangle = skel.star_wrangler_api.next(star_selector).await?;

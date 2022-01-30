@@ -15,8 +15,7 @@ use mesh_portal_serde::version::latest::entity::request::create::KindTemplate;
 use mesh_portal_serde::version::latest::id::{Address, KindParts, ResourceKind, Specific};
 use mesh_portal_serde::version::latest::payload::Payload;
 use mesh_portal_serde::version::latest::resource::{ResourceStub, Status};
-use mesh_portal_serde::version::v0_0_1::generic::entity::request::ReqEntity;
-use mesh_portal_serde::version::v0_0_1::pattern::SegmentPattern;
+use mesh_portal_versions::version::v0_0_1::pattern::parse::consume_kind;
 use rusqlite::{Connection, params, params_from_iter, Row, ToSql, Transaction};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 use serde::{Deserialize, Serialize};
@@ -30,19 +29,7 @@ use crate::fail::Fail;
 use crate::file_access::FileAccess;
 use crate::frame::{ResourceHostAction, StarMessagePayload};
 use crate::logger::{elog, LogInfo, StaticLogInfo};
-use crate::mesh::serde::entity::request::Rc;
-use crate::mesh::serde::fail;
-use crate::mesh::serde::id::{Address, KindParts};
-use crate::mesh::serde::pattern::AddressKindPattern;
-use crate::mesh::serde::payload::{PayloadMap, Primitive, RcCommand};
-use crate::mesh::serde::payload::Payload;
-use crate::mesh::serde::resource::{Archetype, ResourceStub, Status};
-use crate::mesh::serde::resource::command::common::{SetProperties, SetRegistry, StateSrc};
-use crate::mesh::serde::resource::command::create::{Create, Strategy, KindTemplate};
-use crate::mesh::serde::resource::command::create::AddressSegmentTemplate;
-use crate::mesh::serde::resource::command::select::Select;
-use crate::mesh::serde::resource::command::update::Update;
-use crate::mesh::serde::generic;
+
 use crate::message::{MessageExpect, ProtoStarMessage, ReplyKind};
 use crate::names::Name;
 use crate::resources::message::{MessageFrom, ProtoRequest};
@@ -50,9 +37,6 @@ use crate::star::{StarInfo, StarKey, StarSkel};
 use crate::star::shell::wrangler::{StarWrangle};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
-use mesh_portal_serde::version::v0_0_1::pattern::parse::consume_kind;
-use mesh_portal_versions::version::v0_0_1::id::Tks;
-use mesh_portal_versions::version::v0_0_1::pattern::parse::consume_kind;
 
 pub mod artifact;
 pub mod config;
@@ -182,6 +166,7 @@ pub enum ResourceType {
     Credentials,
 }
 
+/*
 impl FromStr for ResourceType{
     type Err = mesh_portal_serde::error::Error;
 
@@ -211,6 +196,7 @@ impl FromStr for ResourceType{
         )
     }
 }
+ */
 
 impl Into<String> for ResourceType {
     fn into(self) -> String {
@@ -311,13 +297,13 @@ impl ToString for Kind {
 }
 
 
-impl TryInto<mesh_portal_serde::version::latest::id::Kind> for Kind {
+impl TryInto<mesh_portal_serde::version::latest::id::ResourceKind> for Kind {
     type Error =  mesh_portal_serde::error::Error;
 
-    fn try_into(self) -> Result<mesh_portal_serde::version::latest::id::Kind, Self::Error> {
+    fn try_into(self) -> Result<mesh_portal_serde::version::latest::id::ResourceKind, Self::Error> {
         let parts: KindParts = self.into();
 
-        Ok(mesh_portal_serde::version::latest::id::Kind {
+        Ok(mesh_portal_serde::version::latest::id::ResourceKind {
             resource_type: parts.resource_type.into(),
             kind: parts.kind,
             specific: parts.specific

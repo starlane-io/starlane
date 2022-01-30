@@ -1,10 +1,10 @@
 use core::ops;
 use std::str::FromStr;
+use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::pattern::AddressKindPattern;
 use nom::combinator::all_consuming;
 use crate::security::permissions::parse::permissions;
 use crate::error::Error;
-use crate::mesh::serde::id::Address;
-use crate::mesh::serde::pattern::AddressKindPattern;
 
 pub enum Pattern {
     None,
@@ -98,11 +98,11 @@ impl FromStr for Permissions {
 
 
 pub mod parse {
+    use mesh_portal_versions::version::v0_0_1::parse::Res;
     use nom::branch::alt;
     use nom::bytes::complete::tag;
     use crate::security::permissions::Permissions;
     use nom::sequence::tuple;
-    use mesh_portal_serde::version::v0_0_1::parse::Res;
 
     fn create(input: &str) -> Res<&str,bool> {
         alt( (tag("c"),tag("C")))(input).map( |(next,value):(&str,&str) | {

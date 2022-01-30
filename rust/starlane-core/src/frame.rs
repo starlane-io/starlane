@@ -16,11 +16,7 @@ use crate::message::{MessageExpect, MessageUpdate, ProtoStarMessage, MessageId, 
 use crate::message::delivery::ActorMessage;
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey};
 use crate::watch::{Notification, Watch, WatchKey};
-use crate::mesh;
-use crate::mesh::serde::resource::ResourceStub;
-use crate::mesh::serde::http::HttpResponse;
 use crate::resource::{ResourceType, ResourceAssign, AssignResourceStateSrc, ResourceRecord};
-use crate::mesh::serde::id::Address;
 use crate::fail::{Fail, StarlaneFailure};
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
