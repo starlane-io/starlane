@@ -1,3 +1,5 @@
+use mesh_portal_serde::version::latest::command::common::StateSrc;
+use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::v0_0_1::generic::resource::command::common::StateSrc;
 
 use crate::error::Error;

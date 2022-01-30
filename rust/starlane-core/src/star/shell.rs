@@ -18,4 +18,4 @@ pub mod router;
 pub mod search;
 pub mod golden;
 pub mod watch;
-mod sys;
+pub mod sys;

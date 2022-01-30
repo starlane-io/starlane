@@ -9,8 +9,12 @@ use std::iter::FromIterator;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use mesh_portal_serde::version::latest::command::common::StateSrc;
+use mesh_portal_serde::version::latest::entity::request::create::KindTemplate;
 
-use mesh_portal_serde::version::latest::id::Specific;
+use mesh_portal_serde::version::latest::id::{Address, KindParts, ResourceKind, Specific};
+use mesh_portal_serde::version::latest::payload::Payload;
+use mesh_portal_serde::version::latest::resource::{ResourceStub, Status};
 use mesh_portal_serde::version::v0_0_1::generic::entity::request::ReqEntity;
 use mesh_portal_serde::version::v0_0_1::pattern::SegmentPattern;
 use rusqlite::{Connection, params, params_from_iter, Row, ToSql, Transaction};
@@ -47,6 +51,8 @@ use crate::star::shell::wrangler::{StarWrangle};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
 use mesh_portal_serde::version::v0_0_1::pattern::parse::consume_kind;
+use mesh_portal_versions::version::v0_0_1::id::Tks;
+use mesh_portal_versions::version::v0_0_1::pattern::parse::consume_kind;
 
 pub mod artifact;
 pub mod config;
@@ -129,7 +135,7 @@ impl ResourceRecord {
         Self {
             stub: ResourceStub {
               address: Address::root(),
-              kind: Kind::Root,
+              kind: Kind::Root.to_resource_kind(),
               properties: Default::default(),
               status: Status::Ready
             },
@@ -155,6 +161,7 @@ impl Into<ResourceStub> for ResourceRecord {
     PartialEq,
     Hash,
     strum_macros::Display,
+    strum_macros::EnumString
 )]
 pub enum ResourceType {
     Root,
@@ -248,6 +255,14 @@ pub enum Kind {
     Control
 }
 
+impl Kind {
+
+    pub fn to_resource_kind(&self) -> ResourceKind {
+        self.into()
+    }
+
+}
+
 impl TryInto<KindTemplate> for Kind {
     type Error = mesh_portal_serde::error::Error;
 
@@ -316,7 +331,7 @@ impl TryFrom<KindParts> for Kind {
     type Error = mesh_portal_serde::error::Error;
 
     fn try_from(parts: KindParts) -> Result<Self, Self::Error> {
-        match parts.resource_type {
+        match ResourceType::from_str(parts.resource_type.as_str() )? {
             ResourceType::Base => {
                 let parts: String = match parts.kind {
                     None => {
@@ -366,7 +381,7 @@ impl TryFrom<KindParts> for Kind {
             _ => {}
         }
 
-        Ok(match parts.resource_type {
+        Ok(match ResourceType::from_str(parts.resource_type.as_str())? {
             ResourceType::Root => {Self::Root}
             ResourceType::Space => {Self::Space}
             ResourceType::User => {Self::User}
@@ -387,14 +402,15 @@ impl FromStr for Kind {
     type Err = mesh_portal_serde::error::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok( consume_kind(s)? )
+        let resource_kind = consume_kind(s)?;
+        Ok(resource_kind.try_into()?)
     }
 }
 
 impl Into<KindParts> for Kind {
     fn into(self) -> KindParts {
         KindParts {
-            resource_type: self.resource_type(),
+            resource_type: self.resource_type().to_string(),
             kind: self.sub_string(),
             specific: self.specific()
         }
@@ -614,10 +630,6 @@ impl Resource {
 
     pub fn address(&self) -> Address {
         self.stub.address.clone()
-    }
-
-    pub fn resource_type(&self) -> ResourceType {
-        self.stub.kind.resource_type()
     }
 
     pub fn state_src(&self) -> Payload {

@@ -3,9 +3,11 @@ use core::option::Option::{None, Some};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
 use core::time::Duration;
+use std::str::FromStr;
 
 use async_trait::async_trait;
 use lru::LruCache;
+use mesh_portal_serde::version::latest::id::{Address, RouteSegment};
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use crate::frame::{ResourceRegistryRequest,  SimpleReply, StarMessagePayload};
@@ -32,6 +34,8 @@ impl ResourceLocatorApi {
 
 
     pub async fn locate(&self, address: Address ) -> Result<ResourceRecord, Error> {
+
+
         let (tx, mut rx) = oneshot::channel();
         self.tx
             .send(ResourceLocateCall::Locate { address, tx })
@@ -150,7 +154,14 @@ impl ResourceLocatorComponent {
             };
 
             tx.send(result).unwrap_or_default();
-        } else if address.parent().is_some() {
+        } else if let RouteSegment::Mesh(star) = &address.route {
+            let star = StarKey::from_str(star.as_str())?;
+            let result = self.skel.resource_locator_api
+                .external_locate(address, star)
+                .await;
+            tx.send(result);
+        }
+        else if address.parent().is_some() {
             let locator_api = self.skel.resource_locator_api.clone();
             tokio::spawn(async move {
                 async fn locate(

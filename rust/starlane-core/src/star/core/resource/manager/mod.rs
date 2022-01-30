@@ -12,7 +12,7 @@ use crate::mesh::serde::entity::request::Rc;
 use crate::mesh::serde::id::{Address, ResourceType};
 use crate::message::delivery::Delivery;
 use crate::{resource, fail};
-use crate::resource::ResourceAssign;
+use crate::resource::{ResourceAssign, ResourceType};
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, Call, AsyncRunner};
 use crate::star::core::resource::manager::stateless::StatelessManager;
@@ -21,6 +21,11 @@ use crate::star::core::resource::manager::mechtron::MechtronManager;
 use crate::star::core::resource::manager::file::{FileSystemManager, FileManager};
 use std::collections::HashMap;
 use std::future::Future;
+use std::str::FromStr;
+use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::messaging::{Request, Response};
+use mesh_portal_serde::version::latest::payload::Payload;
+use mesh_portal_versions::version::v0_0_1::id::Tks;
 
 mod stateless;
 pub mod artifact;
@@ -114,8 +119,9 @@ impl ResourceManagerComponent{
     async fn assign( &mut self, assign: ResourceAssign, tx: mpsc::Sender<Result<(),Error>> ) {
 
        async fn process( manager_component: &mut ResourceManagerComponent, assign: ResourceAssign) -> Result<(),Error> {
-           let manager = manager_component.manager(&assign.stub.kind.resource_type() ).await?;
-           manager_component.resources.insert( assign.stub.address.clone(), assign.stub.kind.resource_type() );
+           let resource_type = ResourceType::from_str(assign.stub.kind.resource_type().as_str())?;
+           let manager = manager_component.manager(&resource_type ).await?;
+           manager_component.resources.insert( assign.stub.address.clone(), resource_type );
            manager.assign(assign).await
        }
 

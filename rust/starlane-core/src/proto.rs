@@ -31,6 +31,7 @@ use crate::star::shell::search::{StarSearchApi, StarSearchComponent, StarSearchT
 use crate::star::shell::message::{MessagingApi, MessagingComponent};
 use crate::star::shell::wrangler::StarWranglerApi;
 use crate::star::shell::router::{RouterApi, RouterComponent, RouterCall};
+use crate::star::shell::sys::{SysApi,SysComponent};
 use crate::star::surface::{SurfaceApi, SurfaceCall, SurfaceComponent};
 use crate::star::variant::{VariantApi, start_variant};
 use crate::star::{
@@ -185,6 +186,7 @@ impl ProtoStar {
                         let (variant_tx, variant_rx) = mpsc::channel(1024);
                         let (watch_tx, watch_rx) = mpsc::channel(1024);
                         let (registry_tx, registry_rx) = mpsc::channel(1024);
+                        let (sys_tx, sys_rx) = mpsc::channel(1024);
 
                         let resource_locator_api = ResourceLocatorApi::new(resource_locator_tx);
                         let star_search_api = StarSearchApi::new(star_locator_tx);
@@ -194,6 +196,7 @@ impl ProtoStar {
                         let variant_api = VariantApi::new(variant_tx);
                         let watch_api = WatchApi::new(watch_tx);
                         let registry_api = RegistryApi::new(registry_tx);
+                        let sys_api = SysApi::new(sys_tx);
 
 
                         let data_access = self
@@ -222,7 +225,8 @@ impl ProtoStar {
                             golden_path_api,
                             variant_api,
                             watch_api,
-                            registry_api
+                            registry_api,
+                            sys_api
                         };
 
                         start_variant(skel.clone(), variant_rx );
@@ -236,6 +240,7 @@ impl ProtoStar {
                         GoldenPathComponent::start(skel.clone(), golden_path_rx);
                         WatchComponent::start(skel.clone(), watch_rx);
                         RegistryComponent::start( skel.clone(), registry_rx );
+                        SysComponent::start( skel.clone(), sys_rx );
 
                         return Ok(Star::from_proto(
                             skel,

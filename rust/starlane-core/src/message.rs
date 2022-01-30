@@ -1,6 +1,10 @@
 use std::collections::HashSet;
 use std::convert::{Infallible, TryFrom, TryInto};
 use std::string::FromUtf8Error;
+use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::messaging::{Request, Response};
+use mesh_portal_serde::version::latest::pattern::AddressKindPath;
+use mesh_portal_serde::version::latest::resource::ResourceStub;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, oneshot};

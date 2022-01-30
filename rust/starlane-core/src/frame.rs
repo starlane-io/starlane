@@ -1,5 +1,7 @@
 use std::fmt;
 use std::fmt::{Debug, Formatter};
+use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::messaging::{Request, Response};
 
 use semver::SemVerError;
 use serde::{Deserialize, Serialize};
@@ -337,8 +339,8 @@ impl StarMessage {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum StarMessagePayload {
     None,
-    Request(crate::mesh::Request),
-    Response(crate::mesh::Response),
+    Request(Request),
+    Response(Response),
     ResourceRegistry(ResourceRegistryRequest),
     ResourceHost(ResourceHostAction),
 //    Space(SpaceMessage),

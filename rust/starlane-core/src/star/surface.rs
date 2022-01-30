@@ -1,4 +1,6 @@
 use std::sync::Arc;
+use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::messaging::Response;
 
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
@@ -42,12 +44,10 @@ impl SurfaceApi {
     }
 
     pub fn notify( &self, mut request: ProtoRequest ) {
-        request.exchange = ExchangeType::Notification;
         self.tx.try_send(SurfaceCall::Notify(request));
     }
 
     pub async fn exchange( &self, mut request: ProtoRequest ) -> Result<Response,Error> {
-        request.exchange = ExchangeType::RequestResponse;
         let (tx,rx) = oneshot::channel();
         self.tx.send(SurfaceCall::Exchange{request,tx}).await;
 

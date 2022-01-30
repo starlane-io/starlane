@@ -33,6 +33,14 @@ use crate::star::{StarCommand, StarKey, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use mesh_portal_serde::version::latest::fail::BadRequest;
 use std::future::Future;
+use mesh_portal_serde::version::latest::command::common::StateSrc;
+use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, KindTemplate, Strategy};
+use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand, ReqEntity};
+use mesh_portal_serde::version::latest::http::HttpRequest;
+use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::payload::{Payload, Primitive};
+use mesh_portal_serde::version::latest::resource::{ResourceStub, Status};
+use mesh_portal_versions::version::v0_0_1::id::Tks;
 use crate::star::core::resource::manager::{ResourceManagerApi, ResourceManagerComponent};
 
 pub enum CoreMessageCall {

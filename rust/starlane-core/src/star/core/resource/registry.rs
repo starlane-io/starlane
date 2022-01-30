@@ -6,7 +6,17 @@ use std::sync::Arc;
 
 use futures::future::join_all;
 use futures::SinkExt;
+use mesh_portal_serde::version::latest::command::common::{SetProperties, SetRegistry};
+use mesh_portal_serde::version::latest::entity::request::query::{Query, QueryResult};
+use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand, ReqEntity};
+use mesh_portal_serde::version::latest::entity::request::select::{Select, SelectionKind, SubSelector};
 use mesh_portal_serde::version::latest::generic::pattern::{ExactSegment, KindPattern};
+use mesh_portal_serde::version::latest::id::{Address, Specific, Version};
+use mesh_portal_serde::version::latest::pattern::{AddressKindPath, AddressKindSegment, ExactSegment, KindPattern, ResourceTypePattern, SegmentPattern};
+use mesh_portal_serde::version::latest::pattern::specific::{ProductPattern, VariantPattern, VendorPattern};
+use mesh_portal_serde::version::latest::payload::{Payload, Primitive, PrimitiveList};
+use mesh_portal_serde::version::latest::resource::{ResourceStub, Status};
+use mesh_portal_serde::version::latest::util::ValuePattern;
 use crate::mesh::serde::payload::PrimitiveList;
 use mesh_portal_serde::version::v0_0_1::pattern::SpecificPattern;
 use mesh_portal_serde::version::v0_0_1::util::ValuePattern;
@@ -37,7 +47,7 @@ use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
 use crate::resource;
 use crate::star::{StarKey, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use crate::resource::{ResourceRecord, AssignResourceStateSrc, Resource, ResourceAssign, AssignKind, ResourceLocation, ResourceType};
+use crate::resource::{ResourceRecord, AssignResourceStateSrc, Resource, ResourceAssign, AssignKind, ResourceLocation, ResourceType, Kind};
 use crate::resources::message::{ProtoRequest, MessageFrom};
 use crate::mesh::serde::resource::command::select::SelectionKind;
 use crate::mesh::serde::entity::request::{ReqEntity, Rc};
@@ -232,7 +242,7 @@ impl RegistryComponent {
             if address.segments.len() == 1 {
                 let segment = AddressKindSegment {
                     address_segment: address.last_segment().expect("expected at least one segment"),
-                    kind: Kind::Space
+                    kind: Kind::Space.into()
                 };
                 return Ok(QueryResult::AddressKindPath(AddressKindPath::new(
                     address.route.clone(),
