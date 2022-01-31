@@ -65,7 +65,7 @@ impl AsyncProcessor<VariantCall> for WebVariant {
 
 impl WebVariant {
     fn init_web(&self, tx: tokio::sync::oneshot::Sender<Result<(), crate::error::Error>>) {
-        let api = StarlaneApi::new(self.skel.surface_api.clone());
+        let api = StarlaneApi::new(self.skel.surface_api.clone(), self.skel.info.address.clone() );
 
         start(api,self.skel.clone());
 

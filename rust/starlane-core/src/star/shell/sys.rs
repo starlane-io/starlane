@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, Template};
 use mesh_portal_serde::version::latest::fail;
 use mesh_portal_serde::version::latest::id::{Address, RouteSegment};
-use mesh_portal_serde::version::latest::messaging::Request;
+use mesh_portal_serde::version::latest::messaging::{Message, Request};
 use mesh_portal_serde::version::latest::resource::{ResourceStub, Status};
 use tokio::sync::{mpsc, oneshot};
 use crate::error::Error;
@@ -25,9 +25,8 @@ impl SysApi {
         Self { tx }
     }
 
-    pub async fn create(&self, template: Template, messenger: mpsc::Sender<Delivery<Request>> ) -> Result<Address, Error> {
+    pub async fn create(&self, template: Template, messenger: mpsc::Sender<Message> ) -> Result<ResourceStub, Error> {
         let (tx, rx) = oneshot::channel();
-
         self.tx.send(SysCall::Create{template,messenger,tx}).await?;
         rx.await?
     }
@@ -48,7 +47,7 @@ impl SysApi {
 }
 
 pub enum SysCall {
-    Create{ template: Template, messenger: mpsc::Sender<Delivery<Request>>, tx: oneshot::Sender<Result<Address,Error>> },
+    Create{ template: Template, messenger: mpsc::Sender<Message>, tx: oneshot::Sender<Result<ResourceStub,Error>> },
     Delete(Address),
     Delivery(StarMessage),
     GetRecord{ address: Address, tx: oneshot::Sender<Result<ResourceRecord,Error>>}
@@ -99,12 +98,12 @@ impl AsyncProcessor<SysCall> for SysComponent {
                             };
 
                             let resource = SysResource {
-                                stub,
+                                stub:stub.clone(),
                                 tx: messenger
                             };
 
                             self.map.insert( address.clone(), resource );
-                            tx.send(Ok(address) );
+                            tx.send(Ok(stub) );
                             return;
                         }
                         AddressSegmentTemplate::Pattern(pattern) => {
@@ -128,12 +127,12 @@ impl AsyncProcessor<SysCall> for SysComponent {
                                     };
 
                                     let resource = SysResource {
-                                        stub,
+                                        stub: stub.clone(),
                                         tx: messenger
                                     };
 
                                     self.map.insert(address.clone(), resource );
-                                    tx.send(Ok(address));
+                                    tx.send(Ok(stub));
                                     return;
                                 }
                             }
@@ -148,13 +147,22 @@ impl AsyncProcessor<SysCall> for SysComponent {
             }
             SysCall::Delivery(message) => {
                 if let StarMessagePayload::Request(request) =  &message.payload {
-                    let delivery= Delivery::new(request.clone(), message, self.skel.clone() );
-                    match self.map.get( &delivery.to()? ) {
+                    match self.map.get( &request.to ) {
                         Some(resource) => {
-                            resource.tx.send(delivery).await;
+                            resource.tx.send(Message::Request(request.clone())).await;
                         },
                         None => {
-                            delivery.fail(Fail::Starlane(StarlaneFailure::Error("Not Found".to_string())));
+                            delivery.fail(mesh_portal_serde::version::latest::fail::Fail::Error("Not Found".to_string()));
+                        }
+                    }
+                }
+                else if let StarMessagePayload::Response(response) =  &message.payload {
+                    match self.map.get( &response.to ) {
+                        Some(resource) => {
+                            resource.tx.send(Message::Response(response.clone())).await;
+                        },
+                        None => {
+                            delivery.fail(mesh_portal_serde::version::latest::fail::Fail::Error("Not Found".to_string()));
                         }
                     }
                 }
@@ -184,5 +192,5 @@ impl SysComponent {
 
 pub struct SysResource {
     pub stub: ResourceStub,
-    pub tx: mpsc::Sender<Delivery<Request>>
+    pub tx: mpsc::Sender<Message>
 }

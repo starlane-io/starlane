@@ -25,6 +25,7 @@ use mesh_portal_serde::version::latest::entity::request::create::{AddressSegment
 use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand, ReqEntity};
 use mesh_portal_serde::version::latest::http::HttpRequest;
 use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::messaging::Request;
 use mesh_portal_serde::version::latest::payload::{Payload, Primitive};
 use mesh_portal_serde::version::latest::resource::{ResourceStub, Status};
 use mesh_portal_versions::version::v0_0_1::id::Tks;
@@ -78,7 +79,7 @@ impl MessagingEndpointComponent {
         match &star_message.payload {
             StarMessagePayload::Request(request) => match &request.entity {
                 ReqEntity::Rc(rc) => {
-                    let delivery = Delivery::new(rc.clone(), star_message, self.skel.clone());
+                    let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
                     self.process_resource_command(delivery).await;
                 }
                 _ => {
@@ -100,7 +101,7 @@ impl MessagingEndpointComponent {
         Ok(())
     }
 
-    async fn process_resource_command(&mut self, delivery: Delivery<Rc>)  {
+    async fn process_resource_command(&mut self, delivery: Delivery<Request>)  {
         let skel = self.skel.clone();
         let resource_manager_api = self.resource_manager_api.clone();
         tokio::spawn(async move {
@@ -219,7 +220,11 @@ impl MessagingEndpointComponent {
                     }
                 }
             }
-            let result = process(skel,resource_manager_api.clone(), &delivery.item, delivery.to().expect("expected this to work since we have already established that the item is a Request")).await.into();
+            let rc = match &delivery.item.entity {
+                ReqEntity::Rc(rc) => {rc}
+                _ => { panic!("should not get requests that are not Rc") }
+            };
+            let result = process(skel,resource_manager_api.clone(), rc, delivery.to().expect("expected this to work since we have already established that the item is a Request")).await.into();
             delivery.result(result);
         });
     }

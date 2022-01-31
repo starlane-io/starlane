@@ -37,6 +37,7 @@ use crate::template::{
     StarInConstellationTemplateSelector, StarKeyConstellationIndexTemplate,
     StarKeySubgraphTemplate, StarKeyTemplate, StarSelector, StarTemplate, StarTemplateHandle,
 };
+use crate::user::HyperUser;
 use crate::util::AsyncHashMap;
 
 pub mod api;
@@ -255,9 +256,9 @@ impl StarlaneMachineRunner {
 
                         let (_info, star_ctrl) = best.unwrap();
 
-                        tx.send(Ok(StarlaneApi::with_starlane_ctrl(
+                        tx.send(Ok(StarlaneApi::new(
                             star_ctrl.surface_api,
-                            self.command_tx.clone(),
+                            HyperUser::address(),
                         )));
                     }
                     StarlaneCommand::Shutdown => {
@@ -389,7 +390,7 @@ impl StarlaneMachineRunner {
                 self.star_controllers.put(star_template_id, star_ctrl).await;
 
                 if self.artifact_caches.is_none() {
-                    let api = StarlaneApi::new(surface_api.clone());
+                    let api = StarlaneApi::new(surface_api.clone(), HyperUser::address() );
                     let caches = Arc::new(ProtoArtifactCachesFactory::new(
                         api.into(),
                         self.cache_access.clone(),

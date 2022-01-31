@@ -34,6 +34,7 @@ use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::messaging::Request;
 use mesh_portal_serde::version::latest::payload::{Payload, PayloadMap, Primitive};
 use mesh_portal_serde::version::latest::resource::ResourceStub;
+use mesh_portal_versions::version::v0_0_1::command::common::{PropertyMod, SetProperties};
 use mesh_portal_versions::version::v0_0_1::id::Tks;
 
 use crate::fail::{Fail, StarlaneFailure};
@@ -104,12 +105,12 @@ impl StarlaneApi {
     }
 
     pub async fn create(&self, create: Create) -> Result<ResourceStub, Error> {
-        let request = Request::new(ReqEntity::Rc(Rc::new(RcCommand::Create(create))), self.agent.clone(), create.template.address.parent.clone() );
+        let request = Request::new(ReqEntity::Rc(Rc::new(RcCommand::Create(create.clone()))), self.agent.clone(), create.template.address.parent.clone() );
         let response = self.surface_api.exchange(request).await?;
         if let RespEntity::Ok( Payload::Primitive(Primitive::Stub(stub)) ) =  &response.entity {
             Ok(stub.clone())
         }
-        else if let RespEntity::Fail( _ ) = response {
+        else if let RespEntity::Fail( _ ) = response.entity {
             Err("Could not create".into())
         } else {
             Err("unexpected response".into())
@@ -139,7 +140,7 @@ impl StarlaneApi {
         API: TryFrom<ResourceApi>,
     {
         let resource_api = ResourceApi {
-            stub: self.create(create).await?.stub,
+            stub: self.create(create).await?,
             surface_api: self.surface_api.clone(),
             agent: self.agent.clone()
         };
@@ -165,8 +166,8 @@ impl StarlaneApi {
         };
 
         let template = Template::new(address_template,kind_template );
-        let mut properties = PayloadMap::new();
-        properties.insert( "title".to_string(), Payload::Primitive(Primitive::Text(title.to_string())));
+        let mut properties = SetProperties::new();
+        properties.push( PropertyMod::Set{name:"title".to_string(), value: title.to_string()});
         let create = Create {
             template,
             state: StateSrc::Stateless,
@@ -268,8 +269,8 @@ where
         self.create.registry.push(SetLabel::SetValue {key,value} );
     }
 
-    pub fn set_property( &mut self, key:&str, value: Payload ) {
-       self.create.properties.insert(key.to_string(), value );
+    pub fn set_property( &mut self, key:&str, value: &str) {
+       self.create.properties.push(PropertyMod::Set{ name: key.to_string(), value: value.to_string() });
     }
 }
 

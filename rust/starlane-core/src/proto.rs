@@ -171,10 +171,9 @@ impl ProtoStar {
                             _ => panic!("proto star not ready for proto star evolution because it does not have a star_key yet assigned")
                         };
 
-                        let info = StarInfo {
-                            key: star_key,
-                            kind: self.kind.clone(),
-                        };
+                        let info = StarInfo::new(
+                             star_key,
+                            self.kind.clone() );
 
                         let (core_messaging_endpoint_tx, core_messaging_endpoint_rx) =
                             mpsc::channel(1024);

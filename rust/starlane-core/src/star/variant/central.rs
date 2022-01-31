@@ -10,6 +10,7 @@ use crate::resource::{Kind, ResourceRecord,  ResourceLocation};
 use crate::star::{StarKey, StarSkel};
 use crate::star::variant::{FrameVerdict, VariantCall};
 use crate::starlane::api::StarlaneApi;
+use crate::user::HyperUser;
 use crate::util::{AsyncProcessor, AsyncRunner};
 
 pub struct CentralVariant {
@@ -47,6 +48,8 @@ impl CentralVariant {
         let skel = self.skel.clone();
 
         tokio::spawn(async move {
+            skel.sys_api.create( HyperUser::template(), HyperUser::messenger()  ).await;
+
             let starlane_api = StarlaneApi::new(skel.surface_api.clone(), skel.info.address.clone() );
             let result = Self::ensure(starlane_api).await;
             if let Result::Err(error) = result.as_ref() {

@@ -385,3 +385,9 @@ impl From<RegError> for Error {
         }
     }
 }
+
+impl Into<mesh_portal_serde::version::latest::fail::Fail> for Error {
+    fn into(self) -> mesh_portal_serde::version::latest::fail::Fail {
+        mesh_portal_serde::version::latest::fail::Fail::Error(self.to_string())
+    }
+}

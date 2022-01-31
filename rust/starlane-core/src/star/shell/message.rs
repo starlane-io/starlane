@@ -56,7 +56,7 @@ impl MessagingApi {
     pub async fn notify(&self, request: Request)->Result<(),Error>{
         let mut proto = ProtoStarMessage::new();
         proto.payload = StarMessagePayload::Request(request);
-        self.star_notify(proto).await?;
+        self.star_notify(proto);
         Ok(())
     }
 

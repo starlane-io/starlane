@@ -22,8 +22,8 @@ use serde_json::json;
 use std::future::Future;
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 use anyhow::anyhow;
-use mesh_portal_api_server::{MuxCall, PortalRequestHandler, Router};
-use mesh_portal_serde::version::latest::command::common::StateSrc;
+use mesh_portal_api_server::{MuxCall, PortalAssignRequestHandler, Router};
+use mesh_portal_serde::version::latest::command::common::{SetProperties, StateSrc};
 use mesh_portal_serde::version::latest::config::{Assign, Config, ResourceConfigBody};
 use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, KindTemplate, Strategy, Template};
 use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand, ReqEntity};
@@ -32,8 +32,9 @@ use mesh_portal_serde::version::latest::id::{Address, AddressSegment, RouteSegme
 use mesh_portal_serde::version::latest::messaging::{Message, Request};
 use mesh_portal_serde::version::latest::payload::{Payload, PayloadMap, Primitive};
 use mesh_portal_serde::version::latest::portal::inlet::AssignRequest;
+use mesh_portal_serde::version::latest::resource::ResourceStub;
 use mesh_portal_tcp_common::{PrimitiveFrameReader, PrimitiveFrameWriter};
-use mesh_portal_tcp_server::PortalServer;
+use mesh_portal_tcp_server::{PortalServer, PortalTcpServer, TcpServerCall};
 use nom::AsBytes;
 use crate::artifact::ArtifactRef;
 use crate::cache::ArtifactItem;
@@ -46,12 +47,13 @@ use serde::{Serialize,Deserialize};
 
 pub struct PortalVariant {
     skel: StarSkel,
+    server: Option<mpsc::Sender<TcpServerCall>>
 }
 
 impl PortalVariant {
     pub fn start(skel: StarSkel, rx: mpsc::Receiver<VariantCall>) {
         AsyncRunner::new(
-            Box::new(Self { skel: skel.clone() }),
+            Box::new(Self { skel: skel.clone(), server: Option::None }),
             skel.variant_api.tx.clone(),
             rx,
         );
@@ -63,7 +65,7 @@ impl AsyncProcessor<VariantCall> for PortalVariant {
     async fn process(&mut self, call: VariantCall) {
         match call {
             VariantCall::Init(tx) => {
-//                self.init_web(tx);
+                tx.send(self.init());
             }
             VariantCall::Frame { frame, session:_, tx } => {
                 tx.send(FrameVerdict::Handle(frame));
@@ -73,20 +75,23 @@ impl AsyncProcessor<VariantCall> for PortalVariant {
 }
 
 impl PortalVariant {
-    fn init(&self) {
-
+    fn init(&mut self) -> Result<(),Error> {
+        let port = 32354;
+        let server = PortalTcpServer::new(port, Box::new(StarlanePortalServer::new(self.skel.clone() )));
+        self.server = Option::Some(server);
+        Ok(())
     }
 }
 pub struct StarlanePortalServer {
     pub skel: StarSkel,
-    pub request_handler: Arc<dyn PortalRequestHandler>
+    pub request_assign_handler: Arc<dyn PortalAssignRequestHandler>
 }
 
 impl StarlanePortalServer {
     pub fn new(skel: StarSkel) -> Self {
         Self {
             skel: skel.clone(),
-            request_handler: Arc::new(StarlanePortalRequestHandler::new(skel) )
+            request_assign_handler: Arc::new(StarlanePortalAssignRequestHandler::new(skel) )
         }
     }
 }
@@ -114,8 +119,8 @@ impl PortalServer for StarlanePortalServer {
         Box::new(StarlaneRouter{ skel: self.skel.clone() })
     }
 
-    fn portal_request_handler(&self) -> Arc<dyn PortalRequestHandler> {
-        self.request_handler.clone()
+    fn portal_request_handler(&self) -> Arc<dyn PortalAssignRequestHandler> {
+        self.request_assign_handler.clone()
     }
 }
 
@@ -135,65 +140,55 @@ impl Router for StarlaneRouter {
 }
 
 #[derive(Debug)]
-pub struct StarlanePortalRequestHandler {
+pub struct StarlanePortalAssignRequestHandler {
     skel: StarSkel
 }
 
-impl StarlanePortalRequestHandler {
+impl StarlanePortalAssignRequestHandler {
     pub fn new(skel: StarSkel)-> Self {
-        StarlanePortalRequestHandler {
+        StarlanePortalAssignRequestHandler {
             skel
         }
     }
 }
 
 #[async_trait]
-impl PortalRequestHandler for StarlanePortalRequestHandler {
-    async fn handle_assign_request(&self, request: AssignRequest) -> Result<Assign, anyhow::Error> {
+impl PortalAssignRequestHandler for StarlanePortalAssignRequestHandler {
+    async fn handle_assign_request(&self, request: AssignRequest, mux_tx: &mpsc::Sender<MuxCall>) -> Result<Assign, anyhow::Error> {
         match request {
             AssignRequest::Control => {
-                let create = Create {
-                    template: Template {
-                        address: AddressTemplate { parent: Address { route: RouteSegment::Resource, segments: vec![AddressSegment::Space("space".to_string())] }, child_segment_template: AddressSegmentTemplate::Pattern("control-%".to_string()) },
-                        kind: KindTemplate {
-                            resource_type: "Control".to_string(),
-                            kind: None,
-                            specific: None
-                        }
-                    },
-                    state: StateSrc::Stateless,
-                    properties: PayloadMap { map: Default::default() },
-                    strategy: Strategy::HostedBy(self.skel.info.key.to_string()),
-                    registry: Default::default()
+                let template = Template {
+                    address: AddressTemplate { parent: Address { route: RouteSegment::Mesh(self.skel.info.address.to_string()), segments: vec![] }, child_segment_template: AddressSegmentTemplate::Pattern("control-%".to_string()) },
+                    kind: KindTemplate {
+                        resource_type: "Control".to_string(),
+                        kind: None,
+                        specific: None
+                    }
                 };
 
-                let entity = ReqEntity::Rc( Rc {
-                    command: RcCommand::Create(create),
-                    payload: Payload::Empty
-                });
+                let (messenger_tx,mut messenger_rx) = mpsc::channel(1024);
 
-                let request = Request::new( entity, self.skel.info.address.clone(), Address::from_str("space")?);
-                let response = self.skel.messaging_api.exchange(request ).await?;
+                let stub = self.skel.sys_api.create(template,messenger_tx).await?;
+                let config = Config {
+                    address: stub.address.clone(),
+                    body: ResourceConfigBody::Control
+                };
+                let assign = Assign {
+                    config,
+                    stub
+                };
 
-                match response.entity {
-                    RespEntity::Ok(Payload::Primitive(Primitive::Stub(stub))) => {
-                        let config = Config {
-                            address: Address::from_str("space:artifacts:1.0.0:/control.config")?,
-                            body: ResourceConfigBody::Control
-                        };
-                        let assign = Assign{
-                            stub: stub.try_into()?,
-                            config
-                        };
-                        Ok(assign)
-                    }
-                    RespEntity::Ok(_) => {
-                        Err("Unexpected response:  Expected Resource Stub".into())
-                    }
-                    RespEntity::Fail(fail) => {
-                        Err(fail.to_string().into())
-                    }
+                // forward messages to portal muxer
+                {
+                    let mux_tx = mux_tx.clone();
+                    tokio::spawn(async move {
+                        while let Option::Some(message) = messenger_rx.recv().await {
+                            mux_tx.send( MuxCall::MessageOut(message)).await;
+                        }
+                    });
                 }
+
+                Ok(assign)
             }
         }
     }

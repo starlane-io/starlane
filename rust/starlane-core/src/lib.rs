@@ -73,6 +73,7 @@ pub mod security;
 pub mod pattern;
 pub mod fail;
 pub mod command;
+pub mod user;
 
 lazy_static! {
     static ref VERSION: semver::Version = {
