@@ -11,11 +11,14 @@ use mesh_portal_serde::version::latest::entity::request::query::{Query, QueryRes
 use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand, ReqEntity};
 use mesh_portal_serde::version::latest::entity::request::select::{Select, SelectionKind, SubSelector};
 use mesh_portal_serde::version::latest::id::{Address, Specific, Version};
+use mesh_portal_serde::version::latest::messaging::Request;
 use mesh_portal_serde::version::latest::pattern::{AddressKindPath, AddressKindSegment, ExactSegment, KindPattern, ResourceTypePattern, SegmentPattern};
 use mesh_portal_serde::version::latest::pattern::specific::{ProductPattern, VariantPattern, VendorPattern};
 use mesh_portal_serde::version::latest::payload::{Payload, Primitive, PrimitiveList};
 use mesh_portal_serde::version::latest::resource::{ResourceStub, Status};
 use mesh_portal_serde::version::latest::util::ValuePattern;
+use mesh_portal_versions::version::v0_0_1::command::common::PropertyMod;
+use mesh_portal_versions::version::v0_0_1::util::unique_id;
 use rusqlite::{Connection, params_from_iter, Row, Transaction};
 use  rusqlite::params;
 use rusqlite::types::ValueRef;
@@ -233,10 +236,13 @@ impl RegistryComponent {
 
             let parent = address.parent().expect("expecting parent since we have already established the segments are >= 2");
             let address_segment = address.last_segment().expect("expecting a last_segment since we know segments are >= 2");
-            let mut proto = ProtoRequest::new();
-            proto.to(parent.clone());
-            proto.entity(ReqEntity::Rc(Rc::new(Query::AddressKindPath.into() )));
-            let response = skel.messaging_api.exchange(proto).await?;
+            let request= Request {
+                id: unique_id(),
+                from: skel.info.address.clone(),
+                to: parent.clone(),
+                entity: ReqEntity::Rc(Rc::new(Query::AddressKindPath.into() ))
+            };
+            let response = skel.messaging_api.exchange(request).await?;
 
             let parent_kind_path = response.entity.ok_or()?;
             let parent_kind_path: Primitive= parent_kind_path.try_into()?;
@@ -286,31 +292,13 @@ impl RegistryComponent {
             trans.execute("INSERT INTO resources (address_segment,resource_type,kind,vendor,product,variant,version,version_pre,parent,status) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'Pending')", params![params.address_segment,params.resource_type,params.kind,params.vendor,params.product,params.variant,params.version,params.version_pre,params.parent])?;
 
             fn set_properties(prefix: &str, params: &RegistryParams, props: &SetProperties, trans: &Transaction ) -> Result<(),Error> {
-                for (key, payload) in props.iter() {
-                    match payload {
-                        Payload::Primitive(primitive) => {
-                            match primitive {
-                                Primitive::Text(text) => {
-                                    trans.execute("INSERT INTO properties (resource_id,key,value) VALUES ((SELECT id FROM resources WHERE parent=?1 AND address_segment=?2),?3,?4)", params![params.parent,params.address_segment,key.to_string(),text.to_string()])?;
-                                }
-                                Primitive::Address(address) => {
-                                    trans.execute("INSERT INTO properties (resource_id,key,value) VALUES ((SELECT id FROM resources WHERE parent=?1 AND address_segment=?2),?3,?4)", params![params.parent,params.address_segment,key.to_string(),address.to_string()])?;
-                                }
-                                found => {
-                                    return Err(format!("expected: Text|Address|PayloadMap found: {}", found.primitive_type().to_string()).into());
-                                }
-                            }
+                for property_mod in props.iter() {
+                    match property_mod {
+                        PropertyMod::Set{ name, value } => {
+                            trans.execute("INSERT INTO properties (resource_id,key,value) VALUES ((SELECT id FROM resources WHERE parent=?1 AND address_segment=?2),?3,?4)", params![params.parent,params.address_segment,name.to_string(),value.to_string()])?;
                         }
-                        Payload::Map(map) => {
-                            let prefix = if prefix.len() == 0 {
-                                key.clone()
-                            } else {
-                                format!("{}.{}",prefix,key)
-                            };
-                            set_properties(prefix.as_str(), params, map, &trans)?;
-                        }
-                        found => {
-                            return Err(format!("expected: Text|Address|PayloadMap found: {}", found.payload_type().to_string()).into());
+                        PropertyMod::UnSet(name) => {
+                            trans.execute("DELETE FROM properties (resource_id,key,value) WHERE parent=?1 AND address_segment=?2 AND name=?3)", params![params.parent,params.address_segment,name.to_string()])?;
                         }
                     }
                 }
@@ -318,12 +306,11 @@ impl RegistryComponent {
             }
 
             set_properties("", &params, &registration.properties, &trans )?;
-            trans.commit()?;
 
            Ok(())
         }
 
-        let trans = match self.conn.transaction() {
+        let mut trans = match self.conn.transaction() {
             Ok(trans) => trans,
             Err(error) => {
                 tx.send(Err(RegError::Error(error.into())));
@@ -342,6 +329,7 @@ impl RegistryComponent {
 
         match register(  registration, &trans ) {
             Ok(_) => {
+                trans.commit();
                 tx.send(match self.skel.registry_api.locate(address).await {
                     Ok(record) => {
                         Ok(record.into())
@@ -411,12 +399,12 @@ impl RegistryComponent {
                 match &hop.tks.kind {
                     KindPattern::Any => {},
                     KindPattern::Exact(kind)=> {
-                        match kind.sub_string() {
+                        match &kind.kind {
                             None => {}
                             Some(sub) => {
                                 index = index+1;
                                 where_clause.push_str(format!(" AND kind=?{}", index).as_str());
-                                params.push(sub);
+                                params.push(sub.clone() );
                             }
                         }
                     }
@@ -634,7 +622,7 @@ impl RegistryComponent {
 
             let stub = ResourceStub {
                 address,
-                kind,
+                kind: kind.into(),
                 properties: Default::default(), // not implemented yet...
                 status
             };

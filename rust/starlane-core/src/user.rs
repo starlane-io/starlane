@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use mesh_portal_serde::version::latest::entity::request::create::{AddressTemplate, KindTemplate, Template};
 use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::messaging::Request;
+use mesh_portal_serde::version::latest::messaging::{Message, Request};
 use mesh_portal_versions::version::v0_0_1::entity::request::create::AddressSegmentTemplate;
 use mesh_portal_versions::version::v0_0_1::id::RouteSegment;
 use tokio::sync::mpsc;
@@ -29,7 +29,7 @@ impl HyperUser {
         }
     }
 
-    pub fn messenger() -> mpsc::Sender<Delivery<Request>> {
+    pub fn messenger() -> mpsc::Sender<Message> {
         let (messenger_tx,mut messenger_rx) = mpsc::channel(1024);
         tokio::spawn( async move {
             // right now we basically ignore messages to HyperUser

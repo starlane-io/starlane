@@ -24,7 +24,7 @@ fn select_command(input: &str) -> Res<&str, ProtoCommand> {
 }
 
 pub fn command(input: &str) -> Res<&str, ProtoCommand> {
-    alt( (create_command) )(input)
+    alt( (create_command,publish_command,select_command) )(input)
 }
 
 pub fn command_line(input: &str) -> Res<&str, ProtoCommand> {

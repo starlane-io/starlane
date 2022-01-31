@@ -17,7 +17,6 @@ use crate::frame::{StarMessagePayload, StarMessage};
 
 use std::str::FromStr;
 use std::sync::atomic::AtomicU32;
-use mesh_portal_api_server::PortalRequestHandler;
 use mesh_portal_serde::version::latest::command::common::StateSrc;
 use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::messaging::Request;

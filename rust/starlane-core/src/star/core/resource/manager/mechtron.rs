@@ -15,6 +15,7 @@ use mesh_portal_serde::version::latest::messaging::Request;
 use mesh_portal_serde::version::latest::payload::{Payload, PayloadPattern, Primitive};
 use mesh_portal_serde::version::latest::resource::Properties;
 use mesh_portal_versions::version::v0_0_1::pattern::consume_data_struct_def;
+use mesh_portal_versions::version::v0_0_1::util::ValueMatcher;
 
 use crate::fail::Fail;
 use crate::message::Reply;

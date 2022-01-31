@@ -30,6 +30,20 @@ impl MessagingApi {
         Self { tx }
     }
 
+    pub fn message(&self, message: Message ) {
+        let mut proto = ProtoStarMessage::new();
+        match message {
+            Message::Request(request) => {
+                proto.payload = StarMessagePayload::Request(request);
+            }
+            Message::Response(response) => {
+                proto.payload = StarMessagePayload::Response(response);
+            }
+        }
+        self.star_notify(proto);
+    }
+
+
     pub fn star_notify(&self, message: ProtoStarMessage) {
         self.tx
             .try_send(MessagingCall::Send(message))

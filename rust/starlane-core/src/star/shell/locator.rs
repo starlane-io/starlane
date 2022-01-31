@@ -153,14 +153,21 @@ impl ResourceLocatorComponent {
 
             tx.send(result).unwrap_or_default();
         } else if let RouteSegment::Mesh(star) = &address.route {
-            let star = StarKey::from_str(star.as_str())?;
-            let skel = self.skel.clone();
-            tokio::spawn( async move {
-                let result = skel.resource_locator_api
-                    .external_locate(address, star)
-                    .await;
-                tx.send(result);
-            });
+            match StarKey::from_str(star.as_str()) {
+                Ok(star) => {
+                    let skel = self.skel.clone();
+                    tokio::spawn( async move {
+                        let result = skel.resource_locator_api
+                            .external_locate(address, star)
+                            .await;
+                        tx.send(result);
+                    });
+                }
+                Err(error) => {
+                    eprintln!("invalid StarKey string: {}",error.to_string());
+                }
+            }
+
         }
         else if address.parent().is_some() {
             let locator_api = self.skel.resource_locator_api.clone();

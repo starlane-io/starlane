@@ -76,70 +76,67 @@ impl AsyncProcessor<SysCall> for SysComponent {
     async fn process(&mut self, call: SysCall) {
         match call {
             SysCall::Create{ template, messenger, tx }  => {
-                if let RouteSegment::Mesh(star) = template.address.parent.route {
-                    if star != self.skel.info.key.to_string() {
+                if let RouteSegment::Mesh(star) = &template.address.parent.route {
+                    if *star != self.skel.info.key.to_string() {
                         tx.send(Err("sys resource must have Mesh route with Star name".into()));
                         return;
                     }
-                    match template.child_segment_template {
-                        AddressSegmentTemplate::Exact(exact) => {
-                            let address: Address = template.address.parent.clone();
-                            let address = address.push( exact )?;
-                            if self.map.contains_key(&address) {
-                                tx.send(Err("sys resource already exists with that address".into()));
-                                return;
-                            }
+                    tx.send(handle(self, template, messenger ));
 
-                            let stub = ResourceStub {
-                                address: address.clone(),
-                                kind: template.kind.try_into()?,
-                                properties: Default::default(),
-                                status: Status::Unknown
-                            };
-
-                            let resource = SysResource {
-                                stub:stub.clone(),
-                                tx: messenger
-                            };
-
-                            self.map.insert( address.clone(), resource );
-                            tx.send(Ok(stub) );
-                            return;
-                        }
-                        AddressSegmentTemplate::Pattern(pattern) => {
-                            let pattern :String = pattern;
-                            if !pattern.contains("%") {
-                                tx.send(Err("pattern must contain one '%' char".into()));
-                                return;
-                            }
-                            let address: Address = template.address.parent.clone();
-                            loop {
-                                let index = self.counter.fetch_add(1, Ordering::Relaxed );
-                                let exact = pattern.replace("%",index.to_string().as_str());
+                    fn handle(sys: &mut SysComponent, template: Template, messenger: mpsc::Sender<Message>) -> Result<ResourceStub,Error>{
+                        match template.address.child_segment_template {
+                            AddressSegmentTemplate::Exact(exact) => {
+                                let address: Address = template.address.parent.clone();
                                 let address = address.push(exact)?;
-                                if !self.map.contains_key(&address) {
+                                if sys.map.contains_key(&address) {
+                                    return Err("sys resource already exists with that address".into());
+                                }
 
-                                    let stub = ResourceStub {
-                                        address: address.clone(),
-                                        kind: template.kind.try_into()?,
-                                        properties: Default::default(),
-                                        status: Status::Unknown
-                                    };
+                                let stub = ResourceStub {
+                                    address: address.clone(),
+                                    kind: template.kind.try_into()?,
+                                    properties: Default::default(),
+                                    status: Status::Unknown
+                                };
 
-                                    let resource = SysResource {
-                                        stub: stub.clone(),
-                                        tx: messenger
-                                    };
+                                let resource = SysResource {
+                                    stub: stub.clone(),
+                                    tx: messenger
+                                };
 
-                                    self.map.insert(address.clone(), resource );
-                                    tx.send(Ok(stub));
-                                    return;
+                                sys.map.insert(address.clone(), resource);
+                                return Ok(stub);
+                            }
+                            AddressSegmentTemplate::Pattern(pattern) => {
+                                let pattern: String = pattern;
+                                if !pattern.contains("%") {
+                                    return Err("pattern must contain one '%' char".into());
+                                }
+                                let address: Address = template.address.parent.clone();
+                                loop {
+                                    let index = sys.counter.fetch_add(1, Ordering::Relaxed);
+                                    let exact = pattern.replace("%", index.to_string().as_str());
+                                    let address = address.push(exact)?;
+                                    if !sys.map.contains_key(&address) {
+                                        let stub = ResourceStub {
+                                            address: address.clone(),
+                                            kind: template.kind.try_into()?,
+                                            properties: Default::default(),
+                                            status: Status::Unknown
+                                        };
+
+                                        let resource = SysResource {
+                                            stub: stub.clone(),
+                                            tx: messenger
+                                        };
+
+                                        sys.map.insert(address.clone(), resource);
+                                        return Ok(stub);
+                                    }
                                 }
                             }
                         }
                     }
-                } else {
-                    tx.send(Err("sys resource must have Mesh route with Star name".into())).await;
                 }
             }
             SysCall::Delete(address) => {
@@ -152,7 +149,6 @@ impl AsyncProcessor<SysCall> for SysComponent {
                             resource.tx.send(Message::Request(request.clone())).await;
                         },
                         None => {
-                            delivery.fail(mesh_portal_serde::version::latest::fail::Fail::Error("Not Found".to_string()));
                         }
                     }
                 }
@@ -162,7 +158,6 @@ impl AsyncProcessor<SysCall> for SysComponent {
                             resource.tx.send(Message::Response(response.clone())).await;
                         },
                         None => {
-                            delivery.fail(mesh_portal_serde::version::latest::fail::Fail::Error("Not Found".to_string()));
                         }
                     }
                 }

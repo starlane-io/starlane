@@ -208,7 +208,7 @@ impl TryFrom<String> for ResourceType {
     type Error = mesh_portal_serde::error::Error;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        ResourceType::from_str(value.as_str() )
+        Ok(ResourceType::from_str(value.as_str())?)
     }
 }
 
@@ -243,7 +243,7 @@ pub enum Kind {
 
 impl Kind {
 
-    pub fn to_resource_kind(&self) -> ResourceKind {
+    pub fn to_resource_kind(self) -> KindParts {
         self.into()
     }
 

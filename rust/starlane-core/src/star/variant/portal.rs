@@ -168,27 +168,33 @@ impl PortalAssignRequestHandler for StarlanePortalAssignRequestHandler {
 
                 let (messenger_tx,mut messenger_rx) = mpsc::channel(1024);
 
-                let stub = self.skel.sys_api.create(template,messenger_tx).await?;
-                let config = Config {
-                    address: stub.address.clone(),
-                    body: ResourceConfigBody::Control
-                };
-                let assign = Assign {
-                    config,
-                    stub
-                };
-
-                // forward messages to portal muxer
+                match self.skel.sys_api.create(template,messenger_tx).await
                 {
-                    let mux_tx = mux_tx.clone();
-                    tokio::spawn(async move {
-                        while let Option::Some(message) = messenger_rx.recv().await {
-                            mux_tx.send( MuxCall::MessageOut(message)).await;
-                        }
-                    });
-                }
+                    Ok(stub) => {
+                        let config = Config {
+                            address: stub.address.clone(),
+                            body: ResourceConfigBody::Control
+                        };
+                        let assign = Assign {
+                            config,
+                            stub
+                        };
 
-                Ok(assign)
+                        // forward messages to portal muxer
+                        {
+                            let mux_tx = mux_tx.clone();
+                            tokio::spawn(async move {
+                                while let Option::Some(message) = messenger_rx.recv().await {
+                                    mux_tx.send( MuxCall::MessageOut(message)).await;
+                                }
+                            });
+                        }
+                        Ok(assign)
+                    }
+                    Err(err) => {
+                        Err(anyhow!("Error"))
+                    }
+                }
             }
         }
     }
