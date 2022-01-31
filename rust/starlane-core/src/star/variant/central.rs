@@ -47,7 +47,7 @@ impl CentralVariant {
         let skel = self.skel.clone();
 
         tokio::spawn(async move {
-            let starlane_api = StarlaneApi::new(skel.surface_api.clone());
+            let starlane_api = StarlaneApi::new(skel.surface_api.clone(), skel.info.address.clone() );
             let result = Self::ensure(starlane_api).await;
             if let Result::Err(error) = result.as_ref() {
                 error!("Central Init Error: {}", error.to_string());
