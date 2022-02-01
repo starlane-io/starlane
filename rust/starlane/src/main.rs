@@ -26,10 +26,17 @@ use std::convert::TryInto;
 use starlane_core::star::shell::sys::SysCall::Create;
 
 
-mod cli;
-mod resource;
+pub mod cli;
+pub mod resource;
+pub mod control;
+
 
 fn main() -> Result<(), Error> {
+    let rt = Runtime::new().unwrap();
+    rt.block_on( async move { go() })
+}
+
+fn go() -> Result<(),Error> {
     let subscriber = FmtSubscriber::default();
     set_global_default(subscriber.into()).expect("setting global default tracer failed");
 
@@ -44,15 +51,13 @@ fn main() -> Result<(), Error> {
         .about("A Resource Mesh").subcommands(vec![SubCommand::with_name("serve").usage("serve a starlane machine instance").arg(Arg::with_name("with-external").long("with-external").takes_value(false).required(false)).display_order(0),
                                                             SubCommand::with_name("config").subcommands(vec![SubCommand::with_name("set-shell").usage("set the shell that the starlane CLI connects to").arg(Arg::with_name("hostname").required(true).help("the hostname of the starlane instance you wish to connect to")).display_order(0),
                                                                                                                             SubCommand::with_name("get-shell").usage("get the shell that the starlane CLI connects to")]).usage("read or manipulate the cli config").display_order(1).display_order(1),
-                                                            SubCommand::with_name("create").usage("create a resource").args(vec![Arg::with_name("address-and-kind").required(true).help("the address and kind")].as_slice()),
-                                                            SubCommand::with_name("publish").usage("publish an artifact bundle").args(vec![Arg::with_name("dir").required(true).help("the source directory for this bundle"),Arg::with_name("address").required(true).help("the publish address of this bundle i.e. 'space:sub_space:bundle:1.0.0'")].as_slice()),
+                                                            SubCommand::with_name("exec").usage("execute a command").args(vec![Arg::with_name("command").required(true).help("command to execute")].as_slice()),
+
     ]);
 
     let matches = clap_app.clone().get_matches();
 
     if let Option::Some(serve) = matches.subcommand_matches("serve") {
-        let rt = Runtime::new().unwrap();
-        rt.block_on(async move {
             let starlane = StarlaneMachine::new("server".to_string()).unwrap();
             let layout = match serve.is_present("with-external") {
                 false => ConstellationLayout::standalone().unwrap(),
@@ -65,7 +70,6 @@ fn main() -> Result<(), Error> {
                 .unwrap();
             starlane.listen().await.expect("expected listen to work");
             starlane.join().await;
-        });
     } else if let Option::Some(matches) = matches.subcommand_matches("config") {
         if let Option::Some(_) = matches.subcommand_matches("get-shell") {
             let config = crate::cli::CLI_CONFIG.lock()?;
@@ -80,17 +84,9 @@ fn main() -> Result<(), Error> {
         } else {
             clap_app.print_long_help().unwrap_or_default();
         }
-    } else if let Option::Some(args) = matches.subcommand_matches("create") {
+    } else if let Option::Some(args) = matches.subcommand_matches("exec") {
         let rt = Runtime::new().unwrap();
-        rt.block_on(async {
-            create(args.clone()).await.unwrap();
-        });
-        shutdown();
-    } else if let Option::Some(args) = matches.subcommand_matches("publish") {
-        let rt = Runtime::new().unwrap();
-        rt.block_on(async {
-            publish(args.clone()).await.unwrap();
-        });
+        create(args.clone()).await.unwrap();
         shutdown();
     } else {
         clap_app.print_long_help().unwrap_or_default();
@@ -99,12 +95,9 @@ fn main() -> Result<(), Error> {
     Ok(())
 }
 
-async fn create(args: ArgMatches<'_>) -> Result<(), Error> {
-    let address_and_kind= AddressAndKind::from_str(args.value_of("address-and-kind").ok_or("expected address and kind (address<Kind>)")?)?;
-    let template = address_and_kind.try_into()?;
-    let api = starlane_api().await?;
-    let create = Create::new(template);
-    api.create(create).await?;
+async fn exec(args: ArgMatches<'_>) -> Result<(), Error> {
+    let command = args.value_of("command").ok_or("expected command")?;
+
     Ok(())
 }
 

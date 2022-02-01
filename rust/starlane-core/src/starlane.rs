@@ -883,6 +883,12 @@ impl StarlaneInnerFlags {
     }
 }
 
+#[derive(Clone,strum_macros::Display,strum_macros::EnumString)]
+pub enum ServiceSelection {
+    Gateway,
+    Cli
+}
+
 #[cfg(test)]
 mod test {
     use std::convert::TryInto;

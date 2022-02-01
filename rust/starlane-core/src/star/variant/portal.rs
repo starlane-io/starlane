@@ -45,6 +45,10 @@ use crate::resources::message::ProtoRequest;
 use serde::{Serialize,Deserialize};
 
 
+lazy_static! {
+    pub static ref DEFAULT_PORT: usize = std::env::var("STARLANE_PORTAL_PORT").unwrap_or("4344".to_string()).parse::<usize>().unwrap_or(4344);
+}
+
 pub struct PortalVariant {
     skel: StarSkel,
     server: Option<mpsc::Sender<TcpServerCall>>
@@ -76,8 +80,7 @@ impl AsyncProcessor<VariantCall> for PortalVariant {
 
 impl PortalVariant {
     fn init(&mut self) -> Result<(),Error> {
-        let port = 32354;
-        let server = PortalTcpServer::new(port, Box::new(StarlanePortalServer::new(self.skel.clone() )));
+        let server = PortalTcpServer::new(DEFAULT_PORT.clone(), Box::new(StarlanePortalServer::new(self.skel.clone() )));
         self.server = Option::Some(server);
         Ok(())
     }
