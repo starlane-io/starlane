@@ -54,16 +54,9 @@ impl RegistryApi {
 
     pub async fn register( &self, registration: Registration ) -> Result<ResourceStub,RegError> {
         let (tx,rx) = oneshot::channel();
-println!("REGISTRY TX STATUS: closed? {}", tx.is_closed() );
         self.tx.send(RegistryCall::Register {registration, tx }).await?;
 
         let result = rx.await;
-match &result {
-    Ok(_) => {}
-    Err(err) => {
-        println!("REGISTRY rx recv error");
-    }
-}
         result?
     }
 
@@ -142,16 +135,13 @@ impl RegistryComponent {
                 conn
             };
 
-println!("REGISTRY COMPONNET STARTED!!!!");
             while let Option::Some(call) = rx.recv().await {
                 registry.process(call).await;
             }
-println!("REGISTRY COMPONNET END!!!!");
         });
     }
 
     async fn process(&mut self, call: RegistryCall) {
-println!("Registry Component processing call." );
         match call {
             RegistryCall::Register { registration, tx } => {
                 self.register(registration,tx).await;
@@ -293,7 +283,6 @@ impl RegistryComponent {
 
 
     async fn register( &mut self, registration: Registration, tx: oneshot::Sender<Result<ResourceStub,RegError>>) {
-println!("REGISTER enter");
         fn check<'a>( registration: &Registration,  trans:&Transaction<'a>, ) -> Result<(),RegError> {
             let params = RegistryParams::from_registration(registration)?;
             let count = trans.query_row("SELECT count(*) as count from resources WHERE parent=?1 AND address_segment=?2", params![params.parent, params.address_segment], RegistryComponent::count )?;
@@ -328,7 +317,6 @@ println!("REGISTER enter");
 
         let address = registration.address.clone();
         let result = {
-println!("~~ STARTING REGISTRATION process");
             let mut conn = self.conn.lock().await;
             let mut trans = match conn.transaction() {
                 Ok(trans) => trans,
@@ -355,18 +343,14 @@ println!("~~ STARTING REGISTRATION process");
                     trans.rollback();
                 }
             }
-println!("~~ REGISTRATION COMMITED TO DATABASE ? {}", !result.is_err());
             result
         };
-println!("~~~ HI!");
         match result {
             Ok(_) => {
-println!("~~~ SENDING... !");
                 let (otx,rx) = oneshot::channel();
                 self.locate(address,otx).await;
                 tx.send(match rx.await {
                     Ok(Ok(record)) => {
-println!("~~~ located resource record...{}",record.stub.address.to_string());
                         Ok(record.into())
                     }
                     Ok(Err(err)) => {
@@ -375,13 +359,11 @@ println!("~~~ located resource record...{}",record.stub.address.to_string());
                     }
 
                     Err(err) => {
-println!("~~~ could not locate record...");
                         Err("could not locate record".into())
                     }
                 });
             }
             Err(err) => {
-println!("~~~ ERROR...{}", err.to_string() );
                 tx.send(Err(RegError::Error(err)));
             }
         }
@@ -615,7 +597,6 @@ println!("~~~ ERROR...{}", err.to_string() );
             let host: Option<String> = opt(row, 9)?;
             let status: String = row.get(10)?;
 
-println!("parent: {}", parent );
             let address = Address::from_str(parent.as_str())?;
             let address = address.push(address_segment)?;
             let resource_type = ResourceType::from_str(resource_type.as_str())?;
@@ -848,7 +829,6 @@ fn setup(conn: &mut Connection) -> Result<(), Error> {
     transaction.execute(properties, [])?;
     transaction.execute(address_index, [])?;
     transaction.commit()?;
-println!("*** REGISTER DATABASE SETUP COMPLETE *** ");
     Ok(())
 }
 

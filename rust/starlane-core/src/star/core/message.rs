@@ -89,9 +89,13 @@ impl MessagingEndpointComponent {
             },
 
             StarMessagePayload::ResourceHost(action) => {
+println!("RECEIVED ResourceHost Action");
                 match action {
                     ResourceHostAction::Assign(assign) => {
+println!("RECEIVED ResourceHost ASSIGN");
                         self.resource_manager_api.assign(assign.clone()).await;
+                        let reply = star_message.ok(Reply::Empty);
+                        self.skel.messaging_api.star_notify(reply);
                     }
                     ResourceHostAction::Init(_) => {}
                 }
@@ -108,13 +112,10 @@ impl MessagingEndpointComponent {
             async fn process(skel: StarSkel, resource_manager_api: ResourceManagerApi, rc: &Rc, to: Address) -> Result<Payload, Error> {
                 match &rc.command {
                     RcCommand::Create(create) => {
-println!("RECEIVED CREATE COMMAND");
                         let kind = match_kind(&create.template.kind)?;
-println!("kind matched....{}", kind.to_string());
                         let stub = match &create.template.address.child_segment_template {
                             AddressSegmentTemplate::Exact(child_segment) => {
 
-println!("RC CREATE exact: '{}'", child_segment.to_string());
                                 let address = create.template.address.parent.push(child_segment.clone());
                                 match &address {
                                     Ok(_) => {}
@@ -123,7 +124,6 @@ println!("RC CREATE exact: '{}'", child_segment.to_string());
                                     }
                                 }
                                 let address = address?;
-println!("RC CREATE address: '{}'", address.to_string());
                                 let registration = Registration {
                                     address: address.clone(),
                                     kind: kind.clone(),
@@ -131,16 +131,7 @@ println!("RC CREATE address: '{}'", address.to_string());
                                     properties: create.properties.clone(),
                                 };
 
-println!("RC CREATE: register...");
                                 let result = skel.registry_api.register(registration).await;
-println!("RC CREATE: REGISTERED!");
-match &result {
-Ok(_) => {}
-Err(err) => {
-    eprintln!("RC CREATE register error: {}", err.to_string() );
-}
-}
-
                                 result?
                             }
                             AddressSegmentTemplate::Pattern(pattern) => {
@@ -181,8 +172,6 @@ Err(err) => {
                         };
 
 
-println!("RC CREATE got stub...");
-
 
                         async fn assign(
                             skel: StarSkel,
@@ -194,13 +183,16 @@ println!("RC CREATE assigning...");
                             let star_kind = StarKind::hosts(&ResourceType::from_str(stub.kind.resource_type().as_str())?);
                             let mut star_selector = StarSelector::new();
                             star_selector.add(StarFieldSelection::Kind(star_kind.clone()));
+println!("RC CREATE assign pre wrangle...");
                             let wrangle = skel.star_wrangler_api.next(star_selector).await?;
+println!("RC CREATE assign post wrangle...{}",wrangle.key.to_string());
                             let mut proto = ProtoStarMessage::new();
                             proto.to(ProtoStarMessageTo::Star(wrangle.key.clone()));
                             let assign = ResourceAssign::new(AssignKind::Create, stub, state);
                             proto.payload = StarMessagePayload::ResourceHost(
                                 ResourceHostAction::Assign(assign),
                             );
+println!("RC CREATE assign resource to host...");
                             skel.messaging_api
                                 .star_exchange(proto, ReplyKind::Empty, "assign resource to host")
                                 .await?;
@@ -213,6 +205,7 @@ println!("RC CREATE assigned.");
                                 Ok(Payload::Empty)
                             },
                             Err(fail) => {
+                                eprintln!("{}",fail.to_string() );
                                 skel.registry_api
                                     .set_status(
                                         to,

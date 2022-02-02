@@ -44,6 +44,7 @@ impl ResourceManager for StatelessManager {
             }
         };
 
+println!("...STATELESS ASSIGN...");
         Ok(())
     }
 

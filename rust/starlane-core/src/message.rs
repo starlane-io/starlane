@@ -305,7 +305,6 @@ pub enum ReplyKind{
     Record,
     Records,
     Stubs,
-    Response,
     AddressTksPath
 }
 
@@ -317,7 +316,6 @@ pub enum Reply{
     Record(ResourceRecord),
     Records(Vec<ResourceRecord>),
     Stubs(Vec<ResourceStub>),
-    Response(Response),
     AddressTksPath(AddressKindPath)
 }
 
@@ -328,7 +326,6 @@ impl Reply{
             Reply::Record(_) => ReplyKind::Record,
             Reply::Records(_) => ReplyKind::Records,
             Reply::Stubs(_) => ReplyKind::Stubs,
-            Reply::Response(_) => ReplyKind::Response,
             Reply::AddressTksPath(_) => ReplyKind::AddressTksPath
         }
     }

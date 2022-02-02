@@ -45,24 +45,24 @@ impl ResourceManagerApi {
 
     pub async fn assign( &self, assign: ResourceAssign) -> Result<(),Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(ResourceManagerCall::Assign{assign, tx });
+        self.tx.send(ResourceManagerCall::Assign{assign, tx }).await;
         rx.await?
     }
 
     pub async fn has( &self, address: Address) -> Result<bool,Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(ResourceManagerCall::Has{address, tx });
+        self.tx.send(ResourceManagerCall::Has{address, tx }).await;
         Ok(rx.await?)
     }
 
     pub async fn request( &self, request: Delivery<Request>) {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(ResourceManagerCall::Request{request, tx });
+        self.tx.send(ResourceManagerCall::Request{request, tx }).await;
     }
 
     pub async fn get( &self, address: Address ) -> Result<Payload,Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(ResourceManagerCall::Get{address, tx });
+        self.tx.send(ResourceManagerCall::Get{address, tx }).await;
         rx.await?
     }
 }
@@ -101,7 +101,7 @@ impl AsyncProcessor<ResourceManagerCall> for ResourceManagerComponent{
     async fn process(&mut self, call: ResourceManagerCall) {
         match call {
             ResourceManagerCall::Assign { assign, tx } => {
-
+                self.assign(assign,tx).await;
             }
             ResourceManagerCall::Has { address, tx } => {}
             ResourceManagerCall::Request { request, tx } => {}
@@ -112,7 +112,9 @@ impl AsyncProcessor<ResourceManagerCall> for ResourceManagerComponent{
 
 impl ResourceManagerComponent{
 
-    async fn assign( &mut self, assign: ResourceAssign, tx: mpsc::Sender<Result<(),Error>> ) {
+    async fn assign( &mut self, assign: ResourceAssign, tx: oneshot::Sender<Result<(),Error>> ) {
+
+println!("Assign called.");
 
        async fn process( manager_component: &mut ResourceManagerComponent, assign: ResourceAssign) -> Result<(),Error> {
            let resource_type = ResourceType::from_str(assign.stub.kind.resource_type().as_str())?;

@@ -90,7 +90,10 @@ impl AsyncProcessor<RouterCall> for RouterComponent {
                 if message.to == skel.info.key {
                     if message.reply_to.is_some() {
                         skel.messaging_api.on_reply(message);
-                    } else {
+                    } else if let StarMessagePayload::Response(response) = &message.payload {
+                        skel.messaging_api.on_response(response.clone());
+                    }
+                    else {
                         skel.core_messaging_endpoint_tx
                             .try_send(CoreMessageCall::Message(message))
                             .unwrap_or_default();
