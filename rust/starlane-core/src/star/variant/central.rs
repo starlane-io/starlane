@@ -15,12 +15,14 @@ use crate::util::{AsyncProcessor, AsyncRunner};
 
 pub struct CentralVariant {
     skel: StarSkel,
+    initialized: bool
 }
 
 impl CentralVariant {
     pub fn start(skel: StarSkel, rx: mpsc::Receiver<VariantCall>) {
         AsyncRunner::new(
-            Box::new(Self { skel: skel.clone() }),
+            Box::new(Self { skel: skel.clone(),
+            initialized: false}),
             skel.variant_api.tx.clone(),
             rx,
         );
@@ -43,7 +45,13 @@ impl AsyncProcessor<VariantCall> for CentralVariant {
 
 
 impl CentralVariant {
-    fn init_variant(&self, tx: oneshot::Sender<Result<(), Error>>) {
+    fn init_variant(&mut self, tx: oneshot::Sender<Result<(), Error>>) {
+        if self.initialized == true {
+            tx.send(Ok(()));
+            return;
+        } else {
+            self.initialized = true;
+        }
 
         let skel = self.skel.clone();
 
@@ -62,13 +70,9 @@ impl CentralVariant {
 
 impl CentralVariant {
     async fn ensure(starlane_api: StarlaneApi) -> Result<(), Error> {
-eprintln!("CENTRAL::ensure() enter");
         let mut creation = starlane_api.create_space("space", "Space").await?;
         creation.set_strategy(Strategy::Ensure);
         creation.submit().await?;
-
-eprintln!("CENTRAL::ensure() exit");
-
         Ok(())
     }
 }

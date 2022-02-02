@@ -100,7 +100,6 @@ impl Delivery<Request>
     }
 
     pub fn ok(self, payload: Payload)  {
-
         match self.get_request() {
             Ok(request) => {
                     let entity = RespEntity::Ok(payload);
@@ -115,6 +114,7 @@ impl Delivery<Request>
                     let proto = self
                         .star_message
                         .reply(StarMessagePayload::Response(response));
+
                     self.skel.messaging_api.star_notify(proto);
             }
             Err(err) => {

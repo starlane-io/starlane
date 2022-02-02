@@ -43,8 +43,6 @@ impl ResourceManager for StatelessManager {
                 return Err("must be stateless".into());
             }
         };
-
-println!("...STATELESS ASSIGN...");
         Ok(())
     }
 

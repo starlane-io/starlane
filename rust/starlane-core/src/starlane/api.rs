@@ -114,7 +114,7 @@ impl StarlaneApi {
         if let RespEntity::Ok( Payload::Primitive(Primitive::Stub(stub)) ) =  &response.entity {
             Ok(stub.clone())
         }
-        else if let RespEntity::Fail( _ ) = response.entity {
+        else if let RespEntity::Fail( fail ) = response.entity {
             Err("Could not create".into())
         } else {
             Err("unexpected response".into())

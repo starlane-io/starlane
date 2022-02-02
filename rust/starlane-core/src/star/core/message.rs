@@ -29,6 +29,7 @@ use mesh_portal_serde::version::latest::messaging::Request;
 use mesh_portal_serde::version::latest::payload::{Payload, Primitive};
 use mesh_portal_serde::version::latest::resource::{ResourceStub, Status};
 use mesh_portal_versions::version::v0_0_1::id::Tks;
+use serde::de::Unexpected::Str;
 use crate::star::core::resource::manager::{ResourceManagerApi, ResourceManagerComponent};
 
 pub enum CoreMessageCall {
@@ -89,10 +90,8 @@ impl MessagingEndpointComponent {
             },
 
             StarMessagePayload::ResourceHost(action) => {
-println!("RECEIVED ResourceHost Action");
                 match action {
                     ResourceHostAction::Assign(assign) => {
-println!("RECEIVED ResourceHost ASSIGN");
                         self.resource_manager_api.assign(assign.clone()).await;
                         let reply = star_message.ok(Reply::Empty);
                         self.skel.messaging_api.star_notify(reply);
@@ -131,7 +130,15 @@ println!("RECEIVED ResourceHost ASSIGN");
                                     properties: create.properties.clone(),
                                 };
 
-                                let result = skel.registry_api.register(registration).await;
+                                let mut result = skel.registry_api.register(registration).await;
+
+                                // if strategy is ensure then a dupe is GOOD!
+                                if create.strategy == Strategy::Ensure {
+                                    if let Err(RegError::Dupe) = result {
+                                        result = Ok(skel.resource_locator_api.locate(address).await?.stub);
+                                    }
+                                }
+
                                 result?
                             }
                             AddressSegmentTemplate::Pattern(pattern) => {
@@ -179,30 +186,25 @@ println!("RECEIVED ResourceHost ASSIGN");
                             state: StateSrc,
                         ) -> Result<(), Error> {
 
-println!("RC CREATE assigning...");
                             let star_kind = StarKind::hosts(&ResourceType::from_str(stub.kind.resource_type().as_str())?);
                             let mut star_selector = StarSelector::new();
                             star_selector.add(StarFieldSelection::Kind(star_kind.clone()));
-println!("RC CREATE assign pre wrangle...");
                             let wrangle = skel.star_wrangler_api.next(star_selector).await?;
-println!("RC CREATE assign post wrangle...{}",wrangle.key.to_string());
                             let mut proto = ProtoStarMessage::new();
                             proto.to(ProtoStarMessageTo::Star(wrangle.key.clone()));
                             let assign = ResourceAssign::new(AssignKind::Create, stub, state);
                             proto.payload = StarMessagePayload::ResourceHost(
                                 ResourceHostAction::Assign(assign),
                             );
-println!("RC CREATE assign resource to host...");
                             skel.messaging_api
                                 .star_exchange(proto, ReplyKind::Empty, "assign resource to host")
                                 .await?;
-println!("RC CREATE assigned.");
                             Ok(())
                         }
 
-                        match assign(skel.clone(), stub, create.state.clone()).await {
+                        match assign(skel.clone(), stub.clone(), create.state.clone()).await {
                             Ok(_) => {
-                                Ok(Payload::Empty)
+                                Ok(Payload::Primitive(Primitive::Stub(stub)))
                             },
                             Err(fail) => {
                                 eprintln!("{}",fail.to_string() );
@@ -244,14 +246,10 @@ println!("RC CREATE assigned.");
                 _ => { panic!("should not get requests that are not Rc") }
             };
             let result = process(skel,resource_manager_api.clone(), rc, delivery.to().expect("expected this to work since we have already established that the item is a Request")).await.into();
+
             delivery.result(result);
         });
     }
-
-
-
-
-
 
     pub async fn has_resource(&self, key: &Address) -> Result<bool, Error> {
         Ok(self.resource_manager_api.has( key.clone() ).await?)

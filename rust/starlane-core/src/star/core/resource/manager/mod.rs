@@ -114,8 +114,6 @@ impl ResourceManagerComponent{
 
     async fn assign( &mut self, assign: ResourceAssign, tx: oneshot::Sender<Result<(),Error>> ) {
 
-println!("Assign called.");
-
        async fn process( manager_component: &mut ResourceManagerComponent, assign: ResourceAssign) -> Result<(),Error> {
            let resource_type = ResourceType::from_str(assign.stub.kind.resource_type().as_str())?;
            let manager = manager_component.manager(&resource_type ).await?;
