@@ -347,7 +347,6 @@ println!("SERVICE SELECTION {} ", selection );
                             ServiceSelection::Cli => {
                                 let command_tx = self.command_tx.clone();
                                 tokio::spawn( async move {
-                                    println!("Selected CLI service!!!");
                                     async fn get_api(command_tx: mpsc::Sender<StarlaneCommand>) -> Result<StarlaneApi,Error>
                                     {
                                         let (tx, rx) = oneshot::channel();
@@ -357,11 +356,9 @@ println!("SERVICE SELECTION {} ", selection );
 
                                     match get_api(command_tx).await {
                                         Ok(api) => {
-                                            println!("GOT API");
                                             CliServer::new(api, stream).await;
                                         }
                                         Err(err) => {
-                                            println!("API ERROR");
                                             eprintln!("{}", err.to_string());
                                         }
                                     }

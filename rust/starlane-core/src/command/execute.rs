@@ -29,12 +29,14 @@ impl CommandExecutor {
            output_tx,
            line
        };
-       let output_tx = executor.output_tx.clone();
-       executor.parse().await;
+       tokio::task::spawn_blocking(move || {
+           tokio::spawn( async move {
+               executor.parse().await;
+           })
+       }).await;
    }
 
     async fn parse( &self ) {
-println!("REceived command line: {}", self.line);
         match command_line(self.line.as_str() )
         {
             Ok((_,op)) => {
@@ -62,11 +64,7 @@ println!("REceived command line: {}", self.line);
             Ok(response) => {
                 match response.entity {
                     RespEntity::Ok(_) => {
-println!("Space Created.");
-println!("sending output frame....{}", self.output_tx.is_closed());
-                            self.output_tx.send(outlet::Frame::StdErr("Space Created".to_string())).await;
-                            self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
-println!("all done....");
+                        self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
                     }
                     RespEntity::Fail(fail) => {
                         self.output_tx.send(outlet::Frame::StdErr( fail.to_string() ) ).await;

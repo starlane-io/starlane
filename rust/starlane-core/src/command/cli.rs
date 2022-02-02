@@ -87,7 +87,6 @@ pub struct CliServer {
 
 impl CliServer {
     pub async fn new( api: StarlaneApi, mut stream: TcpStream ) -> Result<(),Error> {
-println!("NEW CLI SERVER...");
         let template = Template {
             address: AddressTemplate {
                 parent: Address::root(),
@@ -123,9 +122,7 @@ println!("NEW CLI SERVER...");
             tokio::task::spawn_blocking(move || {
                 tokio::spawn(async move {
 
-println!("listening for frames...");
                     while let Ok(frame) = reader.read().await {
-println!("RECEIVED inlet::FRAME");
                         match frame {
                             inlet::Frame::CommandLine(line) => {
                                 CommandExecutor::execute(line, output_tx.clone(), stub.clone(), api.clone() ).await;
@@ -136,19 +133,14 @@ println!("RECEIVED inlet::FRAME");
             });
         }
 
-output_tx.send( outlet::Frame::StdOut("Hello".to_string())).await;
 
         {
             tokio::task::spawn_blocking(move || {
                 tokio::spawn(async move {
-println!("Staring outlet frames...");
                     while let Some(frame) = output_rx.recv().await {
-println!("received outlet frame: {}", frame.to_string());
                         let frame:outlet::Frame = frame;
                         writer.write(frame).await;
                     }
-println!("output_rx no longer receiving..." );
-
                 })
             });
         }
