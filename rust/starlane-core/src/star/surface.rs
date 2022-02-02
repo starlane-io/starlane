@@ -1,7 +1,8 @@
 use std::sync::Arc;
-use mesh_portal_serde::version::latest::entity::request::create::AddressTemplate;
+use mesh_portal_serde::version::latest::entity::request::create::{AddressTemplate, Template};
 use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::messaging::{Request, Response};
+use mesh_portal_serde::version::latest::messaging::{Message, Request, Response};
+use mesh_portal_serde::version::latest::resource::ResourceStub;
 
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
@@ -32,6 +33,12 @@ impl SurfaceApi {
     pub fn init(&self)->Result<(),Error> {
         self.tx.try_send(SurfaceCall::Init)?;
         Ok(())
+    }
+
+    pub async fn create_sys_resource( &self, template: Template, messenger_tx: mpsc::Sender<Message> ) -> Result<ResourceStub,Error> {
+        let (tx, rx) = oneshot::channel();
+        self.tx.send(SurfaceCall::CreateSysResource {template, messenger_tx, tx }).await;
+        Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
     }
 
     pub async fn locate(&self, address: Address ) -> Result<ResourceRecord, Error> {
@@ -108,6 +115,7 @@ pub enum SurfaceCall {
     Watch{ selector: WatchResourceSelector, tx: oneshot::Sender<Result<Watcher,Error>> },
     StarSearch{ star_pattern: StarPattern, tx: oneshot::Sender<Result<SearchHits,Error>>},
     RequestStarAddress { address_template: AddressTemplate, tx: oneshot::Sender<Result<Address,Error>> },
+    CreateSysResource{template:Template, messenger_tx: mpsc::Sender<Message>, tx:oneshot::Sender<Result<ResourceStub,Error>>}
 
 }
 
@@ -186,6 +194,9 @@ println!("SurfaceApi: go watch listener {}",listener.is_ok());
             }
             SurfaceCall::Exchange { request, tx } => {
                 tx.send(self.skel.messaging_api.exchange(request).await.into());
+            }
+            SurfaceCall::CreateSysResource{template,messenger_tx, tx} => {
+                tx.send(self.skel.sys_api.create(template, messenger_tx).await);
             }
         }
     }

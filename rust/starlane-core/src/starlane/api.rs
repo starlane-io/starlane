@@ -31,7 +31,7 @@ use mesh_portal_serde::version::latest::entity::request::create::{AddressSegment
 use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand, ReqEntity};
 use mesh_portal_serde::version::latest::entity::response::RespEntity;
 use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::messaging::Request;
+use mesh_portal_serde::version::latest::messaging::{Message, Request, Response};
 use mesh_portal_serde::version::latest::payload::{Payload, PayloadMap, Primitive};
 use mesh_portal_serde::version::latest::resource::ResourceStub;
 use mesh_portal_versions::version::v0_0_1::command::common::{PropertyMod, SetProperties};
@@ -71,6 +71,10 @@ impl StarlaneApi {
             starlane_tx,
             agent
         }
+    }
+
+    pub async fn exchange( &self, request: Request ) -> Result<Response,Error> {
+        self.surface_api.exchange(request).await
     }
 
     pub fn shutdown(&self) -> Result<(), Error> {
@@ -115,6 +119,10 @@ impl StarlaneApi {
         } else {
             Err("unexpected response".into())
         }
+    }
+
+    pub async fn create_sys_resource( &self, template: Template, messenger_tx: mpsc::Sender<Message> ) -> Result<ResourceStub,Error> {
+       self.surface_api.create_sys_resource(template,messenger_tx).await
     }
 
     pub async fn star_search(

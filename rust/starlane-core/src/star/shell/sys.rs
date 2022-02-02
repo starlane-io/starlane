@@ -75,15 +75,16 @@ impl SysComponent {
 impl AsyncProcessor<SysCall> for SysComponent {
     async fn process(&mut self, call: SysCall) {
         match call {
-            SysCall::Create{ template, messenger, tx }  => {
-                if let RouteSegment::Mesh(star) = &template.address.parent.route {
-                    if *star != self.skel.info.key.to_string() {
-                        tx.send(Err("sys resource must have Mesh route with Star name".into()));
-                        return;
-                    }
+            SysCall::Create{ mut template, messenger, tx }  => {
+
+                    template.address.parent.route = RouteSegment::Mesh(self.skel.info.key.to_string());
+
                     tx.send(handle(self, template, messenger ));
 
                     fn handle(sys: &mut SysComponent, template: Template, messenger: mpsc::Sender<Message>) -> Result<ResourceStub,Error>{
+
+
+
                         match template.address.child_segment_template {
                             AddressSegmentTemplate::Exact(exact) => {
                                 let address: Address = template.address.parent.clone();
@@ -138,7 +139,6 @@ impl AsyncProcessor<SysCall> for SysComponent {
                         }
                     }
                 }
-            }
             SysCall::Delete(address) => {
                 self.map.remove(&address);
             }

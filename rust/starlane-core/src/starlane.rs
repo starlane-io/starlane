@@ -7,14 +7,16 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use futures::future::join_all;
-use futures::{FutureExt, StreamExt};
+use futures::{FutureExt, StreamExt, TryFutureExt};
 
 use serde::{Deserialize, Serialize};
+use tokio::io::AsyncReadExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
 use tokio::sync::{broadcast, mpsc};
 
 use crate::cache::ProtoArtifactCachesFactory;
+use crate::command::cli::CliServer;
 use crate::constellation::{Constellation, ConstellationStatus};
 use crate::error::Error;
 use crate::file_access::FileAccess;
@@ -189,6 +191,15 @@ impl StarlaneMachineRunner {
         })
     }
 
+    pub async fn get_starlane_api(&self) -> Result<StarlaneApi, Error> {
+        let (tx, rx) = oneshot::channel();
+        self.command_tx
+            .send(StarlaneCommand::StarlaneApiSelectBest(tx))
+            .await?;
+        rx.await?
+    }
+
+
     pub fn run(mut self) -> broadcast::Sender<()> {
         let command_tx = self.command_tx.clone();
         tokio::spawn(async move {
@@ -290,23 +301,56 @@ impl StarlaneMachineRunner {
                     StarlaneCommand::Listen(tx) => {
                         self.listen(tx);
                     }
-                    StarlaneCommand::AddStream(stream) => {
-                        match self.select_star_kind(&StarKind::Gateway).await {
-                            Ok(Option::Some(star_ctrl)) => {
-                                match self.add_server_side_lane_ctrl(star_ctrl, stream,OnCloseAction::Remove).await {
-                                    Ok(_result) => {}
-                                    Err(error) => {
-                                        error!("{}", error);
+                    StarlaneCommand::AddStream(mut stream) => {
+
+                        fn service_select( stream: &mut TcpStream ) -> Result<ServiceSelection,Error> {
+                            let size = stream.read_u32().await? as usize;
+                            let mut vec= vec![0 as u8; size];
+                            let buf = vec.as_mut_slice();
+                            stream.read_exact(buf).await?;
+                            let selection = String::from_utf8(vec)?;
+println!("SERVICE SELECTION {} ", selection );
+                            let selection = ServiceSelection::from_str( selection.as_str() )?;
+                            Ok(selection)
+                        }
+
+                        let service = service_select( & mut stream );
+                        if service.is_err() {
+                            eprintln!("bad service selection");
+                            return;
+                        }
+
+                        let service = service.expect("expected service selection")
+
+                        match service {
+                            ServiceSelection::Gateway => {
+                                match self.select_star_kind(&StarKind::Gateway).await {
+                                    Ok(Option::Some(star_ctrl)) => {
+                                        match self.add_server_side_lane_ctrl(star_ctrl, stream,OnCloseAction::Remove).await {
+                                            Ok(_result) => {}
+                                            Err(error) => {
+                                                error!("{}", error);
+                                            }
+                                        }
+                                    }
+                                    Ok(Option::None) => {
+                                        error!("cannot find StarController for kind: StarKind::Gateway");
+                                    }
+                                    Err(err) => {
+                                        error!("{}", err);
                                     }
                                 }
-                            }
-                            Ok(Option::None) => {
-                                error!("cannot find StarController for kind: StarKind::Gateway");
-                            }
-                            Err(err) => {
-                                error!("{}", err);
+                            },
+                            ServiceSelection::Cli => {
+                                match self.get_starlane_api().await {
+                                    Ok(api) => {
+                                        CliServer::new(api, stream ).await;
+                                    }
+                                    Err(_) => {}
+                                }
                             }
                         }
+
                     }
                     StarlaneCommand::GetProtoArtifactCachesFactory(tx) => {
                         match self.artifact_caches.as_ref() {

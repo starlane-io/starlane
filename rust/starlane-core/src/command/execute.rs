@@ -10,24 +10,26 @@ use crate::command::cli::outlet;
 use crate::command::compose::CommandOp;
 use crate::command::parse::command_line;
 use crate::star::StarSkel;
+use crate::starlane::api::StarlaneApi;
 
 pub struct CommandExecutor
 {
-    skel: StarSkel,
+    api: StarlaneApi,
     stub: ResourceStub,
     line: String,
     output_tx: mpsc::Sender<outlet::Frame>
 }
 
 impl CommandExecutor {
-   pub async fn execute( line: String, output_tx: mpsc::Sender<outlet::Frame>, stub: ResourceStub, skel: StarSkel ) {
+
+   pub async fn execute( line: String, output_tx: mpsc::Sender<outlet::Frame>, stub: ResourceStub, api: StarlaneApi) {
        let executor = Self {
-           skel,
+           api,
            stub,
            output_tx,
            line
        };
-       executor.parse();
+       executor.parse().await;
    }
 
     async fn parse( &self ) {
@@ -36,7 +38,7 @@ impl CommandExecutor {
             Ok((_,op)) => {
                 match op {
                     CommandOp::Create(create) => {
-                        self.exec_create(create);
+                        self.exec_create(create).await;
                     }
                     CommandOp::Select(select) => {}
                     CommandOp::Publish(create_op) => {}
@@ -54,7 +56,7 @@ impl CommandExecutor {
         let parent = create.template.address.parent.clone();
         let entity = ReqEntity::Rc(Rc::new(RcCommand::Create(create)));
         let request = Request::new( entity, self.stub.address.clone(), parent );
-        match self.skel.messaging_api.exchange(request).await {
+        match self.api.exchange(request).await {
             Ok(response) => {
                 match response.entity {
                     RespEntity::Ok(_) => {

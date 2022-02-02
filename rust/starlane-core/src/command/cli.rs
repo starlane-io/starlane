@@ -9,6 +9,7 @@ use mesh_portal_tcp_common::{PrimitiveFrameReader, PrimitiveFrameWriter};
 use mesh_portal_versions::version::v0_0_1::entity::request::create::AddressTemplate;
 use mesh_portal_versions::version::v0_0_1::id::RouteSegment;
 use mesh_portal_versions::version::v0_0_1::parse::Res;
+use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use crate::command::cli::outlet::Frame;
@@ -17,6 +18,8 @@ use crate::command::parse::command_line;
 use crate::error::Error;
 use crate::star::shell::sys::SysResource;
 use crate::star::StarSkel;
+use crate::starlane::api::StarlaneApi;
+use crate::starlane::ServiceSelection;
 
 
 pub mod inlet {
@@ -61,16 +64,16 @@ pub mod outlet{
     }
 }
 
-pub struct CliService {
+pub struct CliServer {
 
 }
 
 
-impl CliService {
-    pub async fn new( skel: StarSkel, mut stream: TcpStream ) -> Result<(),Error> {
+impl CliServer {
+    pub async fn new( api: StarlaneApi, mut stream: TcpStream ) -> Result<(),Error> {
         let template = Template {
             address: AddressTemplate {
-                parent: Address::root_with_route(RouteSegment::Mesh(skel.info.key.to_string())),
+                parent: Address::root(),
                 child_segment_template: AddressSegmentTemplate::Pattern("control-%".to_string())
             },
             kind: KindTemplate {
@@ -89,7 +92,7 @@ impl CliService {
         });
 
 
-        let stub = skel.sys_api.create(template,messenger_tx).await?;
+        let stub = api.create_sys_resource(template,messenger_tx).await?;
 
         let (reader,writer) = stream.into_split();
 
@@ -98,14 +101,13 @@ impl CliService {
         let (output_tx,mut output_rx) = mpsc::channel(1024);
 
         {
-            let skel = skel.clone();
             let stub = stub.clone();
             tokio::task::spawn_blocking(move || {
                 tokio::spawn(async move {
                     while let Ok(frame) = reader.read().await {
                         match frame {
                             inlet::Frame::CommandLine(line) => {
-                                CommandExecutor::execute(line, output_tx.clone(), stub.clone(), skel.clone() ).await;
+                                CommandExecutor::execute(line, output_tx.clone(), stub.clone(), api.clone() ).await;
                             }
                         }
                     }
@@ -125,9 +127,102 @@ impl CliService {
 
         Ok(())
     }
-
-
 }
+
+pub struct CliClient {
+    reader: FrameReader<outlet::Frame>,
+    writer: FrameWriter<inlet::Frame>
+}
+
+impl CliClient {
+
+    pub fn new( host: String ) -> Result<Self,Error> {
+        let mut stream = TcpStream::connect(host.clone()).await?;
+
+        // first select service
+        let service = ServiceSelection::Cli.to_string();
+        stream.write_u32(service.len() as u32 )?;
+        stream.write_all( service.as_bytes() )?;
+
+        let (reader,writer) = stream.into_split();
+        let mut reader : FrameReader<outlet::Frame> = FrameReader::new( PrimitiveFrameReader::new( reader ));
+        let mut writer : FrameWriter<inlet::Frame>  = FrameWriter::new( PrimitiveFrameWriter::new( writer ));
+
+        Ok(Self {
+            reader,
+            writer
+        })
+    }
+
+    pub async fn send( mut self, command_line: String ) -> Result<CommandExchange,Error> {
+        let writer = &mut self.writer
+
+        let result = tokio::task::spawn_blocking( move || {
+            tokio::spawn(async move {
+                writer.write( inlet::Frame::CommandLine(command_line)).await
+            } )
+        }).await?.await?;
+
+        Ok(self.into())
+    }
+}
+
+impl Into<CommandExchange> for CliClient {
+    fn into(self) -> CommandExchange{
+        CommandExchange {
+            reader: self.reader,
+            writer: self.writer,
+            complete: false
+        }
+    }
+}
+
+impl Into<CliClient> for CommandExchange{
+    fn into(self) -> CliClient{
+        CliClient{
+            reader: self.reader,
+            writer: self.writer
+        }
+    }
+}
+
+
+pub struct CommandExchange {
+    reader: FrameReader<outlet::Frame>,
+    writer: FrameWriter<inlet::Frame>,
+    complete: bool
+}
+
+impl CommandExchange {
+    pub async fn read( &mut self ) -> Option<Result<outlet::Frame,Error>> {
+        if self.complete {
+            return Option::None;
+        }
+
+        let reader = &mut self.reader;
+        let frame = tokio::task::spawn_blocking( move || {
+           tokio::spawn(async move {
+               reader.read().await
+           } )
+        }).await?.await??;
+
+        if let outlet::Frame::EndOfCommand(code) = frame {
+            self.complete = true;
+        }
+
+        Option::Some(Ok(frame))
+    }
+}
+
+pub enum Output {
+    StdOut(String),
+    StdErr(String),
+    End(i32)
+}
+
+
+
+
 pub struct FrameWriter<FRAME> where FRAME: TryInto<PrimitiveFrame> {
     stream: PrimitiveFrameWriter,
     phantom: PhantomData<FRAME>
