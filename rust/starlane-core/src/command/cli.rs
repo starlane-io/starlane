@@ -23,7 +23,7 @@ use crate::starlane::ServiceSelection;
 
 
 pub mod inlet {
-    use std::convert::TryFrom;
+    use std::convert::{TryFrom, TryInto};
     use mesh_portal_serde::version::latest::frame::PrimitiveFrame;
     use serde::{Serialize, Deserialize};
     use crate::error::Error;
@@ -40,10 +40,18 @@ pub mod inlet {
             Ok(bincode::deserialize(value.data.as_slice() )?)
         }
     }
+
+    impl TryInto<PrimitiveFrame> for Frame {
+        type Error = Error;
+
+        fn try_into(self) -> Result<PrimitiveFrame, Self::Error> {
+            Ok(PrimitiveFrame { data: bincode::serialize(&self )? })
+        }
+    }
 }
 
 pub mod outlet{
-    use std::convert::TryFrom;
+    use std::convert::{TryFrom, TryInto};
     use mesh_portal_serde::version::latest::frame::PrimitiveFrame;
     use serde::{Serialize, Deserialize};
     use crate::error::Error;
@@ -60,6 +68,14 @@ pub mod outlet{
 
         fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
             Ok(bincode::deserialize(value.data.as_slice() )?)
+        }
+    }
+
+    impl TryInto<PrimitiveFrame> for Frame {
+        type Error = Error;
+
+        fn try_into(self) -> Result<PrimitiveFrame, Self::Error> {
+            Ok(PrimitiveFrame { data: bincode::serialize(&self )? })
         }
     }
 }
@@ -97,8 +113,8 @@ impl CliServer {
         let (reader,writer) = stream.into_split();
 
         let mut reader :FrameReader<inlet::Frame> = FrameReader::new( PrimitiveFrameReader::new( reader ));
-        let mut writer = FrameWriter::new( PrimitiveFrameWriter::new( writer ));
-        let (output_tx,mut output_rx) = mpsc::channel(1024);
+        let mut writer: FrameWriter<outlet::Frame> = FrameWriter::new( PrimitiveFrameWriter::new( writer ));
+        let (output_tx,mut output_rx):(mpsc::Sender<outlet::Frame>, mpsc::Receiver<outlet::Frame>) = mpsc::channel(1024);
 
         {
             let stub = stub.clone();
@@ -119,6 +135,7 @@ impl CliServer {
             tokio::task::spawn_blocking(move || {
                 tokio::spawn(async move {
                     while let Some(frame) = output_rx.recv().await {
+                        let frame:outlet::Frame = frame;
                         writer.write(frame).await;
                     }
                 })
@@ -136,13 +153,13 @@ pub struct CliClient {
 
 impl CliClient {
 
-    pub fn new( host: String ) -> Result<Self,Error> {
+    pub async fn new( host: String ) -> Result<Self,Error> {
         let mut stream = TcpStream::connect(host.clone()).await?;
 
         // first select service
         let service = ServiceSelection::Cli.to_string();
-        stream.write_u32(service.len() as u32 )?;
-        stream.write_all( service.as_bytes() )?;
+        stream.write_u32(service.len() as u32 );
+        stream.write_all( service.as_bytes() );
 
         let (reader,writer) = stream.into_split();
         let mut reader : FrameReader<outlet::Frame> = FrameReader::new( PrimitiveFrameReader::new( reader ));
@@ -155,15 +172,14 @@ impl CliClient {
     }
 
     pub async fn send( mut self, command_line: String ) -> Result<CommandExchange,Error> {
-        let writer = &mut self.writer
-
-        let result = tokio::task::spawn_blocking( move || {
+        let exchange = tokio::task::spawn_blocking( move || {
             tokio::spawn(async move {
-                writer.write( inlet::Frame::CommandLine(command_line)).await
+                self.writer.write( inlet::Frame::CommandLine(command_line)).await;
+                self.into()
             } )
         }).await?.await?;
 
-        Ok(self.into())
+        Ok(exchange)
     }
 }
 
@@ -199,18 +215,16 @@ impl CommandExchange {
             return Option::None;
         }
 
-        let reader = &mut self.reader;
-        let frame = tokio::task::spawn_blocking( move || {
-           tokio::spawn(async move {
-               reader.read().await
-           } )
-        }).await?.await??;
+        async fn handle( exchange: &mut CommandExchange ) -> Result<outlet::Frame,Error> {
+            let frame = exchange.reader.read().await?;
 
-        if let outlet::Frame::EndOfCommand(code) = frame {
-            self.complete = true;
+            if let outlet::Frame::EndOfCommand(code) = frame {
+                exchange.complete = true;
+            }
+            Ok(frame)
         }
 
-        Option::Some(Ok(frame))
+        Option::Some(handle(self).await)
     }
 }
 

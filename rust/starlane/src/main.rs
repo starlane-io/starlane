@@ -23,20 +23,22 @@ use starlane_core::util::shutdown;
 use starlane_core::util;
 use starlane_core::starlane::api::StarlaneApi;
 use std::convert::TryInto;
+use starlane_core::command::cli::{CliClient, outlet};
+use starlane_core::command::cli::outlet::Frame;
 use starlane_core::star::shell::sys::SysCall::Create;
 
 
 pub mod cli;
 pub mod resource;
-pub mod control;
 
 
 fn main() -> Result<(), Error> {
     let rt = Runtime::new().unwrap();
-    rt.block_on( async move { go() })
+    rt.block_on( async move { go() });
+    Ok(())
 }
 
-fn go() -> Result<(),Error> {
+async fn go() -> Result<(),Error> {
     let subscriber = FmtSubscriber::default();
     set_global_default(subscriber.into()).expect("setting global default tracer failed");
 
@@ -51,7 +53,7 @@ fn go() -> Result<(),Error> {
         .about("A Resource Mesh").subcommands(vec![SubCommand::with_name("serve").usage("serve a starlane machine instance").arg(Arg::with_name("with-external").long("with-external").takes_value(false).required(false)).display_order(0),
                                                             SubCommand::with_name("config").subcommands(vec![SubCommand::with_name("set-shell").usage("set the shell that the starlane CLI connects to").arg(Arg::with_name("hostname").required(true).help("the hostname of the starlane instance you wish to connect to")).display_order(0),
                                                                                                                             SubCommand::with_name("get-shell").usage("get the shell that the starlane CLI connects to")]).usage("read or manipulate the cli config").display_order(1).display_order(1),
-                                                            SubCommand::with_name("exec").usage("execute a command").args(vec![Arg::with_name("command").required(true).help("command to execute")].as_slice()),
+                                                            SubCommand::with_name("exec").usage("execute a command").args(vec![Arg::with_name("command_line").required(true).help("command line to execute")].as_slice()),
 
     ]);
 
@@ -85,9 +87,7 @@ fn go() -> Result<(),Error> {
             clap_app.print_long_help().unwrap_or_default();
         }
     } else if let Option::Some(args) = matches.subcommand_matches("exec") {
-        let rt = Runtime::new().unwrap();
-        create(args.clone()).await.unwrap();
-        shutdown();
+        exec(args.clone()).await.unwrap();
     } else {
         clap_app.print_long_help().unwrap_or_default();
     }
@@ -96,7 +96,24 @@ fn go() -> Result<(),Error> {
 }
 
 async fn exec(args: ArgMatches<'_>) -> Result<(), Error> {
-    let command = args.value_of("command").ok_or("expected command")?;
+    let mut client = client().await?;
+    let command_line = args.value_of("command_line").ok_or("expected command line")?.to_string();
+
+    let mut exchange = client.send(command_line).await?;
+
+    while let Option::Some(Ok(frame)) = exchange.read().await {
+        match frame {
+            outlet::Frame::StdOut(line) => {
+                println!("{}", line);
+            }
+            outlet::Frame::StdErr(line) => {
+                eprintln!("{}", line);
+            }
+            outlet::Frame::EndOfCommand(code) => {
+                std::process::exit(code);
+            }
+        }
+    }
 
     Ok(())
 }
@@ -208,14 +225,10 @@ async fn cp(args: ArgMatches<'_>) -> Result<(), Error> {
 
 
 
-pub async fn starlane_api() -> Result<StarlaneApi, Error> {
-    let starlane = StarlaneMachine::new("client".to_string()).unwrap();
-    let mut layout = ConstellationLayout::client("shell".to_string())?;
+pub async fn client() -> Result<CliClient, Error> {
     let host = {
         let config = crate::cli::CLI_CONFIG.lock()?;
         config.hostname.clone()
     };
-    layout.set_machine_host_address("shell".to_string(), host);
-    starlane.create_constellation("client", layout).await?;
-    Ok(starlane.get_starlane_api().await?)
+    CliClient::new(host).await
 }

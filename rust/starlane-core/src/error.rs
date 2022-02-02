@@ -18,6 +18,7 @@ use zip::result::ZipError;
 use wasmer::{CompileError, ExportError, RuntimeError};
 use actix_web::ResponseError;
 use handlebars::RenderError;
+use tokio::task::JoinError;
 use crate::fail::Fail;
 use crate::star::core::resource::registry::RegError;
 
@@ -389,5 +390,21 @@ impl From<RegError> for Error {
 impl Into<mesh_portal_serde::version::latest::fail::Fail> for Error {
     fn into(self) -> mesh_portal_serde::version::latest::fail::Fail {
         mesh_portal_serde::version::latest::fail::Fail::Error(self.to_string())
+    }
+}
+
+impl From<anyhow::Error> for Error {
+    fn from(error: anyhow::Error) -> Self {
+        Error {
+            error: error.to_string()
+        }
+    }
+}
+
+impl From<JoinError> for Error {
+    fn from(error: JoinError) -> Self {
+        Error {
+            error: error.to_string()
+        }
     }
 }

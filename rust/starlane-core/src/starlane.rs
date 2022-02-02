@@ -1,6 +1,7 @@
 use std::cell::Cell;
 
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use std::sync::{Arc, Mutex};
 
@@ -303,24 +304,26 @@ impl StarlaneMachineRunner {
                     }
                     StarlaneCommand::AddStream(mut stream) => {
 
-                        fn service_select( stream: &mut TcpStream ) -> Result<ServiceSelection,Error> {
+                        async fn service_select( stream: &mut TcpStream ) -> Result<ServiceSelection,Error> {
                             let size = stream.read_u32().await? as usize;
+
                             let mut vec= vec![0 as u8; size];
                             let buf = vec.as_mut_slice();
                             stream.read_exact(buf).await?;
+
                             let selection = String::from_utf8(vec)?;
 println!("SERVICE SELECTION {} ", selection );
                             let selection = ServiceSelection::from_str( selection.as_str() )?;
                             Ok(selection)
                         }
 
-                        let service = service_select( & mut stream );
+                        let service = service_select( & mut stream ).await;
                         if service.is_err() {
                             eprintln!("bad service selection");
                             return;
                         }
 
-                        let service = service.expect("expected service selection")
+                        let service = service.expect("expected service selection");
 
                         match service {
                             ServiceSelection::Gateway => {
@@ -927,10 +930,22 @@ impl StarlaneInnerFlags {
     }
 }
 
-#[derive(Clone,strum_macros::Display,strum_macros::EnumString)]
+#[derive(Clone,strum_macros::Display)]
 pub enum ServiceSelection {
     Gateway,
     Cli
+}
+
+impl FromStr for ServiceSelection {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Gateway" => Ok(Self::Gateway),
+            "Cli" => Ok(Self::Cli),
+            what => Err(format!("invalid service selection: {}",what).into())
+        }
+    }
 }
 
 #[cfg(test)]

@@ -24,7 +24,7 @@ impl CliConfig {
                 "localhost:{}",
                 starlane_core::starlane::DEFAULT_PORT.clone(),
             ),
-            portal: portal!(
+            portal: format!(
                 "localhost:{}",
                 starlane_core::star::variant::portal::DEFAULT_PORT.clone(),
             ),
