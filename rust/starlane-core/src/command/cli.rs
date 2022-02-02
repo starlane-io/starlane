@@ -56,7 +56,7 @@ pub mod outlet{
     use serde::{Serialize, Deserialize};
     use crate::error::Error;
 
-    #[derive(Debug,Clone,Serialize,Deserialize)]
+    #[derive(Debug,Clone,Serialize,Deserialize, strum_macros::Display)]
     pub enum Frame {
         StdOut(String),
         StdErr(String),
@@ -87,6 +87,7 @@ pub struct CliServer {
 
 impl CliServer {
     pub async fn new( api: StarlaneApi, mut stream: TcpStream ) -> Result<(),Error> {
+println!("NEW CLI SERVER...");
         let template = Template {
             address: AddressTemplate {
                 parent: Address::root(),
@@ -118,9 +119,13 @@ impl CliServer {
 
         {
             let stub = stub.clone();
+            let output_tx = output_tx.clone();
             tokio::task::spawn_blocking(move || {
                 tokio::spawn(async move {
+
+println!("listening for frames...");
                     while let Ok(frame) = reader.read().await {
+println!("RECEIVED inlet::FRAME");
                         match frame {
                             inlet::Frame::CommandLine(line) => {
                                 CommandExecutor::execute(line, output_tx.clone(), stub.clone(), api.clone() ).await;
@@ -131,13 +136,19 @@ impl CliServer {
             });
         }
 
+output_tx.send( outlet::Frame::StdOut("Hello".to_string())).await;
+
         {
             tokio::task::spawn_blocking(move || {
                 tokio::spawn(async move {
+println!("Staring outlet frames...");
                     while let Some(frame) = output_rx.recv().await {
+println!("received outlet frame: {}", frame.to_string());
                         let frame:outlet::Frame = frame;
                         writer.write(frame).await;
                     }
+println!("output_rx no longer receiving..." );
+
                 })
             });
         }
@@ -158,8 +169,8 @@ impl CliClient {
 
         // first select service
         let service = ServiceSelection::Cli.to_string();
-        stream.write_u32(service.len() as u32 );
-        stream.write_all( service.as_bytes() );
+        stream.write_u32(service.len() as u32 ).await;
+        stream.write_all( service.as_bytes() ).await;
 
         let (reader,writer) = stream.into_split();
         let mut reader : FrameReader<outlet::Frame> = FrameReader::new( PrimitiveFrameReader::new( reader ));

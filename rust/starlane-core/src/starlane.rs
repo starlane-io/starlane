@@ -345,12 +345,27 @@ println!("SERVICE SELECTION {} ", selection );
                                 }
                             },
                             ServiceSelection::Cli => {
-                                match self.get_starlane_api().await {
-                                    Ok(api) => {
-                                        CliServer::new(api, stream ).await;
+                                let command_tx = self.command_tx.clone();
+                                tokio::spawn( async move {
+                                    println!("Selected CLI service!!!");
+                                    async fn get_api(command_tx: mpsc::Sender<StarlaneCommand>) -> Result<StarlaneApi,Error>
+                                    {
+                                        let (tx, rx) = oneshot::channel();
+                                        command_tx.send(StarlaneCommand::StarlaneApiSelectBest(tx)).await?;
+                                        rx.await?
                                     }
-                                    Err(_) => {}
-                                }
+
+                                    match get_api(command_tx).await {
+                                        Ok(api) => {
+                                            println!("GOT API");
+                                            CliServer::new(api, stream).await;
+                                        }
+                                        Err(err) => {
+                                            println!("API ERROR");
+                                            eprintln!("{}", err.to_string());
+                                        }
+                                    }
+                                });
                             }
                         }
 

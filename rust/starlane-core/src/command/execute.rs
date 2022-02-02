@@ -29,10 +29,12 @@ impl CommandExecutor {
            output_tx,
            line
        };
+       let output_tx = executor.output_tx.clone();
        executor.parse().await;
    }
 
     async fn parse( &self ) {
+println!("REceived command line: {}", self.line);
         match command_line(self.line.as_str() )
         {
             Ok((_,op)) => {
@@ -60,7 +62,11 @@ impl CommandExecutor {
             Ok(response) => {
                 match response.entity {
                     RespEntity::Ok(_) => {
-                        self.output_tx.send( outlet::Frame::EndOfCommand(0)).await;
+println!("Space Created.");
+println!("sending output frame....{}", self.output_tx.is_closed());
+                            self.output_tx.send(outlet::Frame::StdErr("Space Created".to_string())).await;
+                            self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
+println!("all done....");
                     }
                     RespEntity::Fail(fail) => {
                         self.output_tx.send(outlet::Frame::StdErr( fail.to_string() ) ).await;
