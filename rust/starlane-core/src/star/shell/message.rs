@@ -34,9 +34,11 @@ impl MessagingApi {
         let mut proto = ProtoStarMessage::new();
         match message {
             Message::Request(request) => {
+                proto.to = ProtoStarMessageTo::Resource(request.to.clone());
                 proto.payload = StarMessagePayload::Request(request);
             }
             Message::Response(response) => {
+                proto.to = ProtoStarMessageTo::Resource(response.to.clone());
                 proto.payload = StarMessagePayload::Response(response);
             }
         }
@@ -69,6 +71,7 @@ impl MessagingApi {
 
     pub async fn notify(&self, request: Request)->Result<(),Error>{
         let mut proto = ProtoStarMessage::new();
+        proto.to = ProtoStarMessageTo::Resource(request.to.clone());
         proto.payload = StarMessagePayload::Request(request);
         self.star_notify(proto);
         Ok(())
@@ -76,6 +79,7 @@ impl MessagingApi {
 
     pub async fn exchange(&self, request: Request)->Result<Response,Error>{
         let mut proto = ProtoStarMessage::new();
+        proto.to = ProtoStarMessageTo::Resource(request.to.clone());
         proto.payload = StarMessagePayload::Request(request);
         if let Reply::Response(response) = self.star_exchange(proto, ReplyKind::Response, "request/response between resources").await? {
             Ok(response)

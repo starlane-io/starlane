@@ -34,7 +34,7 @@ pub mod resource;
 
 fn main() -> Result<(), Error> {
     let rt = Runtime::new().unwrap();
-    rt.block_on( async move { go() });
+    rt.block_on( async move { go().await });
     Ok(())
 }
 
