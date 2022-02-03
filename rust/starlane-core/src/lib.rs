@@ -33,6 +33,8 @@ extern crate tracing;
 extern crate validate;
 #[macro_use]
 extern crate wasmer;
+#[macro_use]
+extern crate async_recursion;
 
 
 use std::str::FromStr;

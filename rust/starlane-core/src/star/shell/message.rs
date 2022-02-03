@@ -86,6 +86,8 @@ impl MessagingApi {
     }
 
     pub fn on_reply(&self, message: StarMessage) {
+println!("on_reply() {} payload: {}", message.to.to_string(), message.payload.to_string() );
+
         if message.reply_to.is_none() {
             error!("received an on_reply message which has no reply_to");
         } else {
@@ -304,6 +306,8 @@ impl MessagingComponent {
         tx: oneshot::Sender<Result<Reply, Error>>,
         description: String,
     ) {
+println!("STAR MESSAGE EXCHANGE: {}", proto.to.to_string());
+
         let id = Uuid::new_v4().to_string();
         let (timeout_tx, mut timeout_rx) = mpsc::channel(1);
         self.exchanges.insert(
@@ -349,13 +353,15 @@ impl MessagingComponent {
                     error!("ProtoStarMessage to address cannot be None");
                     return;
                 }
-                ProtoStarMessageTo::Resource(ident) => {
-                    let record = match skel.resource_locator_api.locate(ident.clone()).await {
+                ProtoStarMessageTo::Resource(address) => {
+println!("resolving : {} ", address.to_string() );
+                    let record = match skel.resource_locator_api.locate(address.clone()).await {
                         Ok(record) => record,
                         Err(fail) => {
+                            eprintln!("{}", fail.to_string());
                             error!(
-                                "locator could not find resource record: {}",
-                                ident.to_string()
+                                "locator could not find resource record for: '{}'",
+                                address.to_string()
                             );
                             skel.messaging_api.fail_exchange(id, fail.into());
                             return;
@@ -391,6 +397,7 @@ impl MessagingComponent {
                 log: proto.log,
             };
 
+println!("Sending to ROUTER (kind): {}", skel.info.kind.to_string() );
             skel.router_api.route(message).unwrap_or_default();
         });
     }

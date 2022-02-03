@@ -18,6 +18,7 @@ use mesh_portal_serde::version::latest::payload::{Payload, Primitive, PrimitiveL
 use mesh_portal_serde::version::latest::resource::{ResourceStub, Status};
 use mesh_portal_serde::version::latest::util::ValuePattern;
 use mesh_portal_versions::version::v0_0_1::command::common::PropertyMod;
+use mesh_portal_versions::version::v0_0_1::id::AddressSegment;
 use mesh_portal_versions::version::v0_0_1::util::unique_id;
 use rusqlite::{Connection, params_from_iter, Row, Transaction};
 use  rusqlite::params;
@@ -25,6 +26,7 @@ use rusqlite::types::ValueRef;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, Mutex};
 use tokio::sync::oneshot;
+use async_recursion::async_recursion;
 
 use crate::error::Error;
 use crate::fail::{Fail, StarlaneFailure};
@@ -59,6 +61,13 @@ impl RegistryApi {
         let result = rx.await;
         result?
     }
+
+    pub async fn assign( &self, address: Address, host: StarKey) -> Result<(),Error> {
+        let (tx,rx) = oneshot::channel();
+        self.tx.send(RegistryCall::Assign{address, host, tx }).await?;
+        rx.await?
+    }
+
 
     pub async fn select( &self, select: Select, address: Address) -> Result<PrimitiveList,Error> {
         let (tx,rx) = oneshot::channel();
@@ -100,6 +109,7 @@ impl RegistryApi {
 }
 
 pub enum RegistryCall {
+    Assign{address:Address, host: StarKey, tx: oneshot::Sender<Result<(),Error>>},
     Register{registration:Registration, tx: oneshot::Sender<Result<ResourceStub,RegError>>},
     Select{select: Select, address: Address, tx: oneshot::Sender<Result<PrimitiveList,Error>>},
     Query { address: Address, query: Query, tx: oneshot::Sender<Result<QueryResult,Error>>},
@@ -113,7 +123,7 @@ impl Call for RegistryCall {}
 
 pub struct RegistryComponent {
     skel: StarSkel,
-    conn: Mutex<Connection>
+    conn: Arc<Mutex<Connection>>
 }
 
 impl RegistryComponent {
@@ -128,7 +138,7 @@ impl RegistryComponent {
                 }
             }
 
-            let conn = Mutex::new(conn);
+            let conn = Arc::new(Mutex::new(conn));
 
             let mut registry = RegistryComponent{
                 skel,
@@ -164,6 +174,9 @@ impl RegistryComponent {
             RegistryCall::Sequence { address, tx } => {
                 self.sequence(address,tx).await;
             }
+            RegistryCall::Assign { address, host, tx } => {
+                self.assign(address,host, tx).await;
+            }
         }
     }
 }
@@ -171,7 +184,7 @@ impl RegistryComponent {
 impl RegistryComponent {
 
     async fn set_status(&mut self, address: Address, status: Status, tx: oneshot::Sender<Result<(),Error>>) {
-        async fn process( conn: &Mutex<Connection>, address:Address, status: Status ) -> Result<(),Error> {
+        async fn process( conn: Arc<Mutex<Connection>>, address:Address, status: Status ) -> Result<(),Error> {
             let parent = address.parent().ok_or("resource must have a parent")?.to_string();
             let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
             let status = status.to_string();
@@ -183,11 +196,11 @@ impl RegistryComponent {
             }
             Ok(())
         }
-        tx.send(process(&self.conn, address,status).await );
+        tx.send(process(self.conn.clone(), address,status).await );
     }
 
     async fn set_location(&mut self, address: Address, location: ResourceLocation, tx: oneshot::Sender<Result<(),Error>>) {
-        async fn process( conn: &Mutex<Connection>, address:Address, location: ResourceLocation) -> Result<(),Error> {
+        async fn process( conn: Arc<Mutex<Connection>>, address:Address, location: ResourceLocation) -> Result<(),Error> {
             let parent = address.parent().ok_or("resource must have a parent")?.to_string();
             let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
             let host = location.ok_or()?.to_string();
@@ -199,11 +212,12 @@ impl RegistryComponent {
             }
             Ok(())
         }
-        tx.send(process(&self.conn, address,location).await );
+        tx.send(process(self.conn.clone(), address,location).await );
     }
 
     async fn locate(&mut self, address: Address, tx: oneshot::Sender<Result<ResourceRecord,Error>>) {
-        async fn process( conn: &Mutex<Connection>, address:Address) -> Result<ResourceRecord,Error> {
+println!("Locating {} star_kind {}", address.to_string(), self.skel.info.kind.to_string() );
+        async fn process( conn: Arc<Mutex<Connection>>, address:Address) -> Result<ResourceRecord,Error> {
             let conn = conn.lock().await;
             let statement = format!( "SELECT DISTINCT {} FROM resources as r WHERE parent=?1 AND address_segment=?2", RESOURCE_QUERY_FIELDS );
             let mut statement = conn.prepare(statement.as_str())?;
@@ -212,27 +226,48 @@ impl RegistryComponent {
             let record = statement.query_row(params!(parent.to_string(),address_segment), RegistryComponent::process_resource_row_catch)?;
             Ok(record)
         }
-        tx.send(process(&self.conn, address).await );
+        tx.send(process(self.conn.clone(), address).await );
     }
 
     async fn sequence(&mut self, address: Address, tx: oneshot::Sender<Result<u64,Error>>) {
-        async fn process(skel: StarSkel, conn:&Mutex<Connection>, address: Address) -> Result<u64, Error> {
+        async fn process(skel: StarSkel, conn:Arc<Mutex<Connection>>, address: Address) -> Result<u64, Error> {
             let conn = conn.lock().await;
             let parent = address.parent().ok_or("expecting parent since we have already established the segments are >= 2")?;
             let address_segment = address.last_segment().ok_or("expecting a last_segment since we know segments are >= 2")?;
             conn.execute("UPDATE resources SET sequence=sequence+1 WHERE parent=?1 AND address_segment=?2",params![parent.to_string(),address_segment.to_string()])?;
             Ok(conn.query_row( "SELECT DISTINCT sequence FROM resources WHERE parent=?1 AND address_segment=?2",params![parent.to_string(),address_segment.to_string()], RegistryComponent::process_sequence)?)
         }
-        tx.send(process(self.skel.clone(), &self.conn, address).await);
+        tx.send(process(self.skel.clone(), self.conn.clone(), address).await);
     }
 
+    async fn assign(&mut self, address: Address, host: StarKey, tx: oneshot::Sender<Result<(),Error>>) {
+        async fn process( conn:Arc<Mutex<Connection>>, address: Address, host: StarKey) -> Result<(), Error> {
+            let conn = conn.lock().await;
+            let parent = address.parent().ok_or("expecting parent since we have already established the segments are >= 2")?;
+            let address_segment = address.last_segment().ok_or("expecting a last_segment since we know segments are >= 2")?;
+            conn.execute("UPDATE resources SET shell=?1 WHERE parent=?2 AND address_segment=?3",params![host.to_string(),parent.to_string(),address_segment.to_string()])?;
+            Ok(())
+        }
+        tx.send(process(self.conn.clone(), address, host).await);
+    }
+
+
     async fn query(&mut self, address: Address, query: Query, tx: oneshot::Sender<Result<QueryResult,Error>>) {
-        async fn process(skel: StarSkel, conn:&Mutex<Connection>, address: Address) -> Result<QueryResult, Error> {
+        async fn process(skel: StarSkel, conn:Arc<Mutex<Connection>>, address: Address) -> Result<QueryResult, Error> {
 
             if address.segments.len() == 0 {
-                return Err("cannot address_tks_path_query on Root".into());
+/*                let segment = AddressKindSegment {
+                    address_segment: AddressSegment::Root,
+                    kind: Kind::Root.into()
+                };
+
+ */
+                return Ok(QueryResult::AddressKindPath(AddressKindPath::new(
+                    address.route.clone(),
+                    vec![]
+                )));
             }
-            if address.segments.len() == 1 {
+            else if address.segments.len() == 1 {
                 let segment = AddressKindSegment {
                     address_segment: address.last_segment().expect("expected at least one segment"),
                     kind: Kind::Space.into()
@@ -278,7 +313,7 @@ impl RegistryComponent {
         }
 
                 let skel = self.skel.clone();
-                tx.send(process(skel, &self.conn, address).await);
+                tx.send(process(skel, self.conn.clone(), address).await);
         }
 
 
@@ -370,23 +405,36 @@ impl RegistryComponent {
     }
 
     async fn select(&mut self, select: Select, address: Address, tx: oneshot::Sender<Result<PrimitiveList,Error>>) {
-        async fn initial(skel: StarSkel, select: Select,address: Address  ) -> Result<PrimitiveList, Error> {
+println!("REG SELECT:");
+        #[async_recursion]
+        async fn initial(reg: & mut RegistryComponent, skel: StarSkel, select: Select,address: Address  ) -> Result<PrimitiveList, Error> {
+println!("REG SELECT: initial");
             if address != select.pattern.query_root() {
                 //let fail = fail::Fail::Resource(fail::resource::Fail::Select(fail::resource::Select::WrongAddress {required:select.pattern.query_root(), found: address }));
                 return Err("WrongAddress".into());
             }
 
-            let address_kind_path = skel.registry_api.query(address.clone(), Query::AddressKindPath ).await?.try_into()?;
+println!("REG SELECT: pre query");
+            let (tx,rx) = oneshot::channel();
+            reg.query(address.clone(), Query::AddressKindPath,tx ).await;
+            let address_kind_path = rx.await??.try_into()?;
+println!("REG SELECT: post query");
 
             let sub_select_hops = select.pattern.sub_select_hops();
             let sub_selector = select.sub_select(address.clone(), sub_select_hops, address_kind_path);
 
-            let list = skel.registry_api.select(sub_selector.into(),address).await?;
+println!("REG SELECT: pre select()...");
+            let (tx,rx) = oneshot::channel();
+            reg.select(sub_selector.into(),address,tx).await;
+            let list = rx.await??;
+
+println!("REG SELECT: post select()...");
 
             Ok(list)
         }
 
-        async fn sub_select(skel: StarSkel, conn: &Mutex<Connection>,  selector: SubSelector) -> Result<PrimitiveList,Error> {
+        async fn sub_select(skel: StarSkel, conn: Arc<Mutex<Connection>>,  selector: SubSelector) -> Result<PrimitiveList,Error> {
+println!("REG SELECT: sub_select");
             let mut params: Vec<String> = vec![];
             let mut where_clause = String::new();
             let mut index = 1;
@@ -498,6 +546,7 @@ impl RegistryComponent {
                         let sub_selector = selector.sub_select(address.clone(),hops.clone(), address_tks_path);
                         let select = sub_selector.into();
                         let mut proto = ProtoRequest::new();
+
                         let parent = address.parent().ok_or::<Error>("expecting address to have a parent".into())?;
                         proto.to(address);
                         proto.from(MessageFrom::Address(parent));
@@ -507,7 +556,9 @@ impl RegistryComponent {
                     }
                 }
 
+println!("JOIN ALL pre");
                 let futures =  join_all(futures).await;
+println!("JOIN ALL post");
 
                 // the records matched the present hop (which we needed for deeper searches) however
                 // they may not or may not match the ENTIRE pattern therefore they must be filtered
@@ -537,13 +588,22 @@ impl RegistryComponent {
 
             match &select.kind {
                 SelectionKind::Initial => {
-                    initial(self.skel.clone(), select, address).await;
+                    match initial(self, self.skel.clone(), select, address).await {
+                        Ok(_) => {}
+                        Err(error) => {
+                            eprintln!("{}", error.to_string());
+                        }
+                    }
                 }
                 SelectionKind::SubSelector { .. } => {
                     match select.try_into() {
                         Ok(sub_selector) => {
-                            let result = sub_select(self.skel.clone(), &self.conn, sub_selector).await;
-                            tx.send(result);
+                            let skel = self.skel.clone();
+                            let conn = self.conn.clone();
+                                tokio::spawn(async move {
+                                    let result = sub_select(skel, conn, sub_selector).await;
+                                    tx.send(result);
+                                });
                         }
                         Err(error) => {
                             tx.send(Err(error.into()));

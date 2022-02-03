@@ -1,12 +1,13 @@
 use std::convert::{TryFrom, TryInto};
 use std::marker::PhantomData;
+use mesh_portal_serde::version::latest::bin::Bin;
 use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, KindTemplate, Template};
 use mesh_portal_serde::version::latest::frame::PrimitiveFrame;
 use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::messaging::Message;
 use mesh_portal_serde::version::latest::resource::ResourceStub;
 use mesh_portal_tcp_common::{PrimitiveFrameReader, PrimitiveFrameWriter};
-use mesh_portal_versions::version::v0_0_1::entity::request::create::AddressTemplate;
+use mesh_portal_versions::version::v0_0_1::entity::request::create::{AddressTemplate, Fulfillment};
 use mesh_portal_versions::version::v0_0_1::id::RouteSegment;
 use mesh_portal_versions::version::v0_0_1::parse::Res;
 use tokio::io::AsyncWriteExt;
@@ -24,13 +25,16 @@ use crate::starlane::ServiceSelection;
 
 pub mod inlet {
     use std::convert::{TryFrom, TryInto};
+    use mesh_portal_serde::version::latest::bin::Bin;
     use mesh_portal_serde::version::latest::frame::PrimitiveFrame;
     use serde::{Serialize, Deserialize};
     use crate::error::Error;
 
     #[derive(Debug,Clone,Serialize,Deserialize)]
     pub enum Frame {
-        CommandLine(String)
+        CommandLine(String),
+        TransferFile{ name: String, content: Bin },
+        EndRequires
     }
 
     impl TryFrom<PrimitiveFrame> for Frame {
@@ -125,7 +129,11 @@ impl CliServer {
                     while let Ok(frame) = reader.read().await {
                         match frame {
                             inlet::Frame::CommandLine(line) => {
-                                CommandExecutor::execute(line, output_tx.clone(), stub.clone(), api.clone() ).await;
+                                let mut fulfillments = vec![];
+                                CommandExecutor::execute(line, output_tx.clone(), stub.clone(), api.clone(), fulfillments ).await;
+                            }
+                            _ =>  {
+                                eprintln!( "can only handle CommandLine frames until an executor has been selected");
                             }
                         }
                     }
@@ -184,6 +192,8 @@ impl CliClient {
 
         Ok(exchange)
     }
+
+
 }
 
 impl Into<CommandExchange> for CliClient {
@@ -213,6 +223,31 @@ pub struct CommandExchange {
 }
 
 impl CommandExchange {
+
+    /*
+    pub async fn file( &mut self, name: String, content: Bin ) -> Result<(),Error> {
+        tokio::task::spawn_blocking( move || {
+            tokio::spawn(async move {
+                self.writer.write( inlet::Frame::TransferFile{name,content}).await;
+            } )
+        }).await?.await?;
+
+        Ok(())
+    }
+
+    pub async fn end_requires( &mut self ) -> Result<(),Error> {
+        tokio::task::spawn_blocking( move || {
+            tokio::spawn(async move {
+                self.writer.write( inlet::Frame::EndRequires).await;
+            } )
+        }).await?.await?;
+
+        Ok(())
+    }
+
+     */
+
+
     pub async fn read( &mut self ) -> Option<Result<outlet::Frame,Error>> {
         if self.complete {
             return Option::None;

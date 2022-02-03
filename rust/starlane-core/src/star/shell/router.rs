@@ -71,24 +71,41 @@ impl AsyncProcessor<RouterCall> for RouterComponent {
         fn route(&self, message: StarMessage) {
             let skel = self.skel.clone();
             tokio::spawn(async move {
-                if let StarMessagePayload::ResourceRegistry(ResourceRegistryRequest::Find(address)) = &message.payload {
-                   if let RouteSegment::Mesh(_) = &address.route  {
-                       let result = skel.sys_api.get_record(address.clone() ).await;
-                       match result {
-                           Ok(record) => {
-                               let reply = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Record(record))));
-                               skel.messaging_api.star_notify(reply);
-                           }
-                           Err(err) => {
-                               let reply = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Starlane(StarlaneFailure::Error("Not Found".to_string())))));
-                               skel.messaging_api.star_notify(reply);
-                           }
-                       }
-                       return;
-                   }
-                }
+
                 if message.to == skel.info.key {
-                    if let StarMessagePayload::Response(response) = &message.payload {
+                    if let StarMessagePayload::ResourceRegistry(ResourceRegistryRequest::Find(address)) = &message.payload {
+                        if let RouteSegment::Mesh(_) = &address.route  {
+                            let result = skel.sys_api.get_record(address.clone() ).await;
+                            match result {
+                                Ok(record) => {
+                                    let reply = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Record(record))));
+                                    skel.messaging_api.star_notify(reply);
+                                }
+                                Err(err) => {
+                                    let reply = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Starlane(StarlaneFailure::Error("Not Found".to_string())))));
+                                    skel.messaging_api.star_notify(reply);
+                                }
+                            }
+                            return;
+                        } else {
+
+                            println!("GETTRING FROM REGISTRY... : '{}' star kind : {}", address.to_string(), skel.info.kind.to_string() );
+                            let result = skel.registry_api.locate( address.clone() ).await;
+                            match result {
+                                Ok(record) => {
+                                    println!("RECORD FOUND: {} LOCATION: {}", record.stub.address.to_string(), record.location.to_string());
+                                    let reply = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Record(record))));
+                                    skel.messaging_api.star_notify(reply);
+                                }
+                                Err(err) => {
+                                    println!("ROUTER ERROR: {}", err.to_string());
+                                    let reply = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Starlane(StarlaneFailure::Error("Not Found".to_string())))));
+                                    skel.messaging_api.star_notify(reply);
+                                }
+                            }
+                        }
+                    }
+                    else if let StarMessagePayload::Response(response) = &message.payload {
                         skel.messaging_api.on_response(response.clone());
                     }
                     else if message.reply_to.is_some() {

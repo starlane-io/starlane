@@ -187,15 +187,22 @@ impl MessagingEndpointComponent {
                         ) -> Result<(), Error> {
 
                             let star_kind = StarKind::hosts(&ResourceType::from_str(stub.kind.resource_type().as_str())?);
-                            let mut star_selector = StarSelector::new();
-                            star_selector.add(StarFieldSelection::Kind(star_kind.clone()));
-                            let wrangle = skel.star_wrangler_api.next(star_selector).await?;
+                            let key = if skel.info.kind == star_kind {
+                                skel.info.key.clone()
+                            }
+                            else {
+                                let mut star_selector = StarSelector::new();
+                                star_selector.add(StarFieldSelection::Kind(star_kind.clone()));
+                                let wrangle = skel.star_wrangler_api.next(star_selector).await?;
+                                wrangle.key
+                            };
                             let mut proto = ProtoStarMessage::new();
-                            proto.to(ProtoStarMessageTo::Star(wrangle.key.clone()));
-                            let assign = ResourceAssign::new(AssignKind::Create, stub, state);
+                            proto.to(ProtoStarMessageTo::Star(key.clone()));
+                            let assign = ResourceAssign::new(AssignKind::Create, stub.clone(), state);
                             proto.payload = StarMessagePayload::ResourceHost(
                                 ResourceHostAction::Assign(assign),
                             );
+                            skel.registry_api.assign(stub.address, key).await?;
                             skel.messaging_api
                                 .star_exchange(proto, ReplyKind::Empty, "assign resource to host")
                                 .await?;

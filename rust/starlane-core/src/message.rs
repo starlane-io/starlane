@@ -28,6 +28,16 @@ pub enum ProtoStarMessageTo {
     Resource(Address),
 }
 
+impl ToString for ProtoStarMessageTo {
+    fn to_string(&self) -> String {
+        match self {
+            ProtoStarMessageTo::None => {"None".to_string()}
+            ProtoStarMessageTo::Star(star) => {star.to_string()}
+            ProtoStarMessageTo::Resource(address) => {address.to_string()}
+        }
+    }
+}
+
 impl ProtoStarMessageTo {
     pub fn is_none(&self) -> bool {
         match self {

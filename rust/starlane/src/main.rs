@@ -23,8 +23,11 @@ use starlane_core::util::shutdown;
 use starlane_core::util;
 use starlane_core::starlane::api::StarlaneApi;
 use std::convert::TryInto;
+use mesh_portal_serde::version::latest::entity::request::create::Require;
+use tokio::io::AsyncReadExt;
 use starlane_core::command::cli::{CliClient, outlet};
 use starlane_core::command::cli::outlet::Frame;
+use starlane_core::command::compose::CommandOp;
 use starlane_core::star::shell::sys::SysCall::Create;
 
 
@@ -97,9 +100,31 @@ async fn go() -> Result<(),Error> {
 
 async fn exec(args: ArgMatches<'_>) -> Result<(), Error> {
     let mut client = client().await?;
-    let command_line = args.value_of("command_line").ok_or("expected command line")?.to_string();
+    let line = args.value_of("command_line").ok_or("expected command line")?.to_string();
 
-    let mut exchange = client.send(command_line).await?;
+    let op = CommandOp::from_str(line.as_str() )?;
+    let requires = op.requires();
+
+    let mut exchange = client.send(line).await?;
+
+    /*
+    for require in requires {
+        match require {
+            Require::File(name) => {
+                println!("transfering: {}",name.as_str());
+                let mut file = File::open(name.clone()).unwrap();
+                let mut buf = vec![];
+                file.read_to_end(&mut buf)?;
+                let bin = Arc::new(buf);
+                exchange.file( name, bin).await?;
+            }
+        }
+    }
+
+
+    exchange.end_requires().await?;
+
+     */
 
     while let Option::Some(Ok(frame)) = exchange.read().await {
         match frame {

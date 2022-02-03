@@ -49,6 +49,20 @@ pub enum ResourceLocation {
     Host(StarKey)
 }
 
+impl ToString for ResourceLocation {
+    fn to_string(&self) -> String {
+        match self {
+            ResourceLocation::Unassigned => {
+                "Unassigned".to_string()
+            }
+            ResourceLocation::Host(host) => {
+                host.to_string()
+            }
+        }
+    }
+}
+
+
 impl ResourceLocation {
     pub fn new(star: StarKey) -> Self {
         ResourceLocation::Host( star )
