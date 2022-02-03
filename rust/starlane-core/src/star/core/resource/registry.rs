@@ -9,7 +9,6 @@ use futures::SinkExt;
 use mesh_portal_serde::version::latest::command::common::{SetProperties, SetRegistry};
 use mesh_portal_serde::version::latest::entity::request::query::{Query, QueryResult};
 use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand, ReqEntity};
-use mesh_portal_serde::version::latest::entity::request::select::{Select, SelectionKind, SubSelector};
 use mesh_portal_serde::version::latest::id::{Address, Specific, Version};
 use mesh_portal_serde::version::latest::messaging::Request;
 use mesh_portal_serde::version::latest::pattern::{AddressKindPath, AddressKindSegment, ExactSegment, KindPattern, ResourceTypePattern, SegmentPattern};
@@ -27,6 +26,8 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, Mutex};
 use tokio::sync::oneshot;
 use async_recursion::async_recursion;
+use mesh_portal_serde::version::latest::entity::response::RespEntity;
+use mesh_portal_versions::version::v0_0_1::entity::request::select::{Select, SelectKind, SubSelect};
 
 use crate::error::Error;
 use crate::fail::{Fail, StarlaneFailure};
@@ -69,10 +70,20 @@ impl RegistryApi {
     }
 
 
-    pub async fn select( &self, select: Select, address: Address) -> Result<PrimitiveList,Error> {
+    pub async fn select(&self, select: Select) -> Result<PrimitiveList,Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(RegistryCall::Select{select, address, tx }).await;
-        rx.await?
+        self.tx.send(RegistryCall::Selector {select, tx }).await;
+        let mut selector = rx.await?;
+        let result = selector.select().await;
+        match &result {
+            Ok(_) => {
+                println!("Select Ok");
+            }
+            Err(err) => {
+                println!("Select Err: {}", err.to_string());
+            }
+        }
+        result
     }
 
     pub async fn query(&self, address: Address, query: Query ) -> Result<QueryResult,Error> {
@@ -111,7 +122,7 @@ impl RegistryApi {
 pub enum RegistryCall {
     Assign{address:Address, host: StarKey, tx: oneshot::Sender<Result<(),Error>>},
     Register{registration:Registration, tx: oneshot::Sender<Result<ResourceStub,RegError>>},
-    Select{select: Select, address: Address, tx: oneshot::Sender<Result<PrimitiveList,Error>>},
+    Selector {select: Select, tx: oneshot::Sender<Selector>},
     Query { address: Address, query: Query, tx: oneshot::Sender<Result<QueryResult,Error>>},
     SetStatus { address: Address, status: Status, tx: oneshot::Sender<Result<(),Error>>},
     SetLocation{ address: Address, location: ResourceLocation, tx: oneshot::Sender<Result<(),Error>>},
@@ -156,8 +167,13 @@ impl RegistryComponent {
             RegistryCall::Register { registration, tx } => {
                 self.register(registration,tx).await;
             }
-            RegistryCall::Select { select, address, tx} => {
-                self.select(select, address, tx).await;
+            RegistryCall::Selector { select,  tx} => {
+                let selector = Selector {
+                    conn: self.conn.clone(),
+                    skel: self.skel.clone(),
+                    select
+                };
+                tx.send(selector);
             }
             RegistryCall::Query { address, query, tx } => {
                 self.query(address, query, tx).await
@@ -216,19 +232,20 @@ impl RegistryComponent {
     }
 
     async fn locate(&mut self, address: Address, tx: oneshot::Sender<Result<ResourceRecord,Error>>) {
-println!("Locating {} star_kind {}", address.to_string(), self.skel.info.kind.to_string() );
-        async fn process( conn: Arc<Mutex<Connection>>, address:Address) -> Result<ResourceRecord,Error> {
-            let conn = conn.lock().await;
-            let statement = format!( "SELECT DISTINCT {} FROM resources as r WHERE parent=?1 AND address_segment=?2", RESOURCE_QUERY_FIELDS );
-            let mut statement = conn.prepare(statement.as_str())?;
-            let parent = address.parent().ok_or("expected a parent")?;
-            let address_segment = address.last_segment().ok_or("expected last address_segment")?.to_string();
-            let record = statement.query_row(params!(parent.to_string(),address_segment), RegistryComponent::process_resource_row_catch)?;
-            Ok(record)
-        }
-        tx.send(process(self.conn.clone(), address).await );
+println!("Locating '{}' star_kind '{}'", address.to_string(), self.skel.info.kind.to_string() );
+
+        tx.send(Self::locate_inner(self.conn.clone(), address).await );
     }
 
+    async fn locate_inner( conn: Arc<Mutex<Connection>>, address:Address) -> Result<ResourceRecord,Error> {
+        let conn = conn.lock().await;
+        let statement = format!( "SELECT DISTINCT {} FROM resources as r WHERE parent=?1 AND address_segment=?2", RESOURCE_QUERY_FIELDS );
+        let mut statement = conn.prepare(statement.as_str())?;
+        let parent = address.parent().ok_or("expected a parent")?;
+        let address_segment = address.last_segment().ok_or("expected last address_segment")?.to_string();
+        let record = statement.query_row(params!(parent.to_string(),address_segment), RegistryComponent::process_resource_row_catch)?;
+        Ok(record)
+    }
     async fn sequence(&mut self, address: Address, tx: oneshot::Sender<Result<u64,Error>>) {
         async fn process(skel: StarSkel, conn:Arc<Mutex<Connection>>, address: Address) -> Result<u64, Error> {
             let conn = conn.lock().await;
@@ -404,216 +421,6 @@ println!("Locating {} star_kind {}", address.to_string(), self.skel.info.kind.to
         }
     }
 
-    async fn select(&mut self, select: Select, address: Address, tx: oneshot::Sender<Result<PrimitiveList,Error>>) {
-println!("REG SELECT:");
-        #[async_recursion]
-        async fn initial(reg: & mut RegistryComponent, skel: StarSkel, select: Select,address: Address  ) -> Result<PrimitiveList, Error> {
-println!("REG SELECT: initial");
-            if address != select.pattern.query_root() {
-                //let fail = fail::Fail::Resource(fail::resource::Fail::Select(fail::resource::Select::WrongAddress {required:select.pattern.query_root(), found: address }));
-                return Err("WrongAddress".into());
-            }
-
-println!("REG SELECT: pre query");
-            let (tx,rx) = oneshot::channel();
-            reg.query(address.clone(), Query::AddressKindPath,tx ).await;
-            let address_kind_path = rx.await??.try_into()?;
-println!("REG SELECT: post query");
-
-            let sub_select_hops = select.pattern.sub_select_hops();
-            let sub_selector = select.sub_select(address.clone(), sub_select_hops, address_kind_path);
-
-println!("REG SELECT: pre select()...");
-            let (tx,rx) = oneshot::channel();
-            reg.select(sub_selector.into(),address,tx).await;
-            let list = rx.await??;
-
-println!("REG SELECT: post select()...");
-
-            Ok(list)
-        }
-
-        async fn sub_select(skel: StarSkel, conn: Arc<Mutex<Connection>>,  selector: SubSelector) -> Result<PrimitiveList,Error> {
-println!("REG SELECT: sub_select");
-            let mut params: Vec<String> = vec![];
-            let mut where_clause = String::new();
-            let mut index = 1;
-            where_clause.push_str( "parent=?1" );
-            params.push( selector.address.to_string() );
-
-            if let Option::Some(hop) = selector.hops.first()
-            {
-                match &hop.segment {
-                    SegmentPattern::Exact(exact) => {
-                        index = index+1;
-                        where_clause.push_str( format!(" AND address_segment=?{}",index).as_str() );
-                        match exact {
-                            ExactSegment::Address(address) => {
-                                params.push( address.to_string() );
-                            }
-                            ExactSegment::Version(version) => {
-                                params.push( version.to_string() );
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-
-                match &hop.tks.resource_type {
-                    ResourceTypePattern::Any => {},
-                    ResourceTypePattern::Exact(resource_type)=> {
-                        index = index+1;
-                        where_clause.push_str( format!(" AND resource_type=?{}",index).as_str() );
-                        params.push( resource_type.to_string() );
-                    },
-                }
-
-                match &hop.tks.kind {
-                    KindPattern::Any => {},
-                    KindPattern::Exact(kind)=> {
-                        match &kind.kind {
-                            None => {}
-                            Some(sub) => {
-                                index = index+1;
-                                where_clause.push_str(format!(" AND kind=?{}", index).as_str());
-                                params.push(sub.clone() );
-                            }
-                        }
-                    }
-                }
-
-                match &hop.tks.specific {
-                    ValuePattern::Any => {}
-                    ValuePattern::None => {}
-                    ValuePattern::Pattern(specific) => {
-                        match &specific.vendor {
-                            VendorPattern::Any => {}
-                            VendorPattern::Exact(vendor) => {
-                                index = index+1;
-                                where_clause.push_str(format!(" AND vendor=?{}", index).as_str());
-                                params.push(vendor.clone() );
-                            }
-                        }
-                        match &specific.product{
-                            ProductPattern::Any => {}
-                            ProductPattern::Exact(product) => {
-                                index = index+1;
-                                where_clause.push_str(format!(" AND product=?{}", index).as_str());
-                                params.push(product.clone() );
-                            }
-                        }
-                        match &specific.variant{
-                            VariantPattern::Any => {}
-                            VariantPattern::Exact(variant) => {
-                                index = index+1;
-                                where_clause.push_str(format!(" AND variant=?{}", index).as_str());
-                                params.push(variant.clone());
-                            }
-                        }
-                    }
-                }
-            }
-
-            let statement = format!(
-                "SELECT DISTINCT {} FROM resources as r WHERE {}",
-                RESOURCE_QUERY_FIELDS, where_clause
-            );
-
-            let mut records = vec![];
-            {
-                let conn = conn.lock().await;
-                let mut statement = conn.prepare(statement.as_str())?;
-                let mut rows = statement.query(params_from_iter(params.iter()))?;
-
-
-                while let Option::Some(row) = rows.next()? {
-                    records.push(RegistryComponent::process_resource_row_catch(row)?);
-                }
-            }
-
-            // next IF there are more hops, must coordinate with possible other stars...
-            if !selector.hops.is_empty() {
-                let mut hops = selector.hops.clone();
-                hops.remove(0);
-                let mut futures = vec![];
-                for record in &records {
-                    if let Option::Some(last_segment) = record.stub.address.last_segment() {
-                        let address = selector.address.push_segment(last_segment.clone());
-                        let address_tks_path = selector.address_kind_path.push(AddressKindSegment {
-                            address_segment: last_segment,
-                            kind: record.stub.kind.clone()
-                        });
-                        let sub_selector = selector.sub_select(address.clone(),hops.clone(), address_tks_path);
-                        let select = sub_selector.into();
-                        let mut proto = ProtoRequest::new();
-
-                        let parent = address.parent().ok_or::<Error>("expecting address to have a parent".into())?;
-                        proto.to(address);
-                        proto.from(MessageFrom::Address(parent));
-                        proto.entity(ReqEntity::Rc(Rc::new(RcCommand::Select(select))));
-                        let proto = proto.try_into()?;
-                        futures.push(skel.messaging_api.star_exchange(proto, ReplyKind::Records, "sub-select" ));
-                    }
-                }
-
-println!("JOIN ALL pre");
-                let futures =  join_all(futures).await;
-println!("JOIN ALL post");
-
-                // the records matched the present hop (which we needed for deeper searches) however
-                // they may not or may not match the ENTIRE pattern therefore they must be filtered
-                records.retain(|record| {
-                    let address_tks_path = selector.address_kind_path.push(AddressKindSegment {
-                        address_segment: record.stub.address.last_segment().expect("expecting at least one segment" ),
-                        kind: record.stub.kind.clone()
-                    });
-                    selector.pattern.matches(&address_tks_path)
-                });
-
-                // here we already know that the child sub_select should have filtered it's
-                // not matching addresses so we can add all the results
-                for future in futures {
-                    let reply = future?;
-                    if let Reply::Records(mut more_records) =reply {
-                        records.append(  & mut more_records );
-                    }
-                }
-            }
-
-            let stubs: Vec<ResourceStub> = records.into_iter().map(|record|record.into()).collect();
-            let stubs = selector.into_payload.to_primitive(stubs)?;
-
-            Ok(stubs)
-        }
-
-            match &select.kind {
-                SelectionKind::Initial => {
-                    match initial(self, self.skel.clone(), select, address).await {
-                        Ok(_) => {}
-                        Err(error) => {
-                            eprintln!("{}", error.to_string());
-                        }
-                    }
-                }
-                SelectionKind::SubSelector { .. } => {
-                    match select.try_into() {
-                        Ok(sub_selector) => {
-                            let skel = self.skel.clone();
-                            let conn = self.conn.clone();
-                                tokio::spawn(async move {
-                                    let result = sub_select(skel, conn, sub_selector).await;
-                                    tx.send(result);
-                                });
-                        }
-                        Err(error) => {
-                            tx.send(Err(error.into()));
-                        }
-                    }
-                }
-            };
-
-    }
-
     fn process_sequence(row: &Row) -> Result<u64, rusqlite::Error> {
         let sequence: u64= row.get(0)?;
         Ok(sequence)
@@ -721,7 +528,7 @@ println!("JOIN ALL post");
 
 /*
 #[derive(Debug,Clone,Serialize,Deserialize)]
-pub struct SubSelector {
+pub struct SubSelect {
     pub pattern: AddressKindPattern,
     pub address: Address,
     pub hops: Vec<Hop>,
@@ -938,5 +745,222 @@ impl <T> From<mpsc::error::SendError<T>> for RegError {
 impl From<&str> for RegError {
     fn from(e: &str) -> Self {
         RegError::Error(e.into())
+    }
+}
+
+#[derive(Clone)]
+pub struct Selector {
+    conn: Arc<Mutex<Connection>>,
+    skel: StarSkel,
+    select: Select
+}
+
+
+impl Selector {
+    pub fn from( mut self, select: Select ) -> Self {
+        self.select = select;
+        self
+    }
+
+    async fn select(mut self) -> Result<PrimitiveList,Error> {
+        println!("REG SELECT:");
+
+        #[async_recursion]
+        async fn initial(mut selector: Selector) -> Result<PrimitiveList, Error> {
+            let select = selector.select;
+            let address = select.pattern.query_root();
+            println!("REG SELECT: initial");
+            if address != select.pattern.query_root() {
+                //let fail = fail::Fail::Resource(fail::resource::Fail::Select(fail::resource::Select::WrongAddress {required:select.pattern.query_root(), found: address }));
+                return Err("WrongAddress".into());
+            }
+
+            println!("REG SELECT: pre query");
+            let address_kind_path = selector.skel.registry_api.query( address.clone(), Query::AddressKindPath ).await?.try_into()?;
+            println!("REG SELECT: post query");
+
+            let sub_select_hops = select.pattern.sub_select_hops();
+            let sub_select = select.sub_select(address.clone(), sub_select_hops, address_kind_path);
+
+            println!("REG SELECT: pre select()...");
+            let select = sub_select.into();
+            selector.select = select;
+            let list = selector.select().await?;
+
+            println!("REG SELECT: post select()... {}", list.len() );
+            for l in &list.list {
+                if let Primitive::Stub(stub) = l {
+                    println!("-> FOUND: {}", stub.address.to_string());
+                }
+            }
+
+            Ok(list)
+        }
+
+        async fn sub_select(mut selector: Selector) -> Result<PrimitiveList,Error> {
+            println!("REG SELECT: sub_select");
+            let sub_select :SubSelect = selector.select.clone().try_into()?;
+            let mut params: Vec<String> = vec![];
+            let mut where_clause = String::new();
+            let mut index = 1;
+            where_clause.push_str( "parent=?1" );
+            params.push( sub_select.address.to_string() );
+
+            if let Option::Some(hop) = sub_select.hops.first()
+            {
+                match &hop.segment {
+                    SegmentPattern::Exact(exact) => {
+                        index = index+1;
+                        where_clause.push_str( format!(" AND address_segment=?{}",index).as_str() );
+                        match exact {
+                            ExactSegment::Address(address) => {
+                                params.push( address.to_string() );
+                            }
+                            ExactSegment::Version(version) => {
+                                params.push( version.to_string() );
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+
+                match &hop.tks.resource_type {
+                    ResourceTypePattern::Any => {},
+                    ResourceTypePattern::Exact(resource_type)=> {
+                        index = index+1;
+                        where_clause.push_str( format!(" AND resource_type=?{}",index).as_str() );
+                        params.push( resource_type.to_string() );
+                    },
+                }
+
+                match &hop.tks.kind {
+                    KindPattern::Any => {},
+                    KindPattern::Exact(kind)=> {
+                        match &kind.kind {
+                            None => {}
+                            Some(sub) => {
+                                index = index+1;
+                                where_clause.push_str(format!(" AND kind=?{}", index).as_str());
+                                params.push(sub.clone() );
+                            }
+                        }
+                    }
+                }
+
+                match &hop.tks.specific {
+                    ValuePattern::Any => {}
+                    ValuePattern::None => {}
+                    ValuePattern::Pattern(specific) => {
+                        match &specific.vendor {
+                            VendorPattern::Any => {}
+                            VendorPattern::Exact(vendor) => {
+                                index = index+1;
+                                where_clause.push_str(format!(" AND vendor=?{}", index).as_str());
+                                params.push(vendor.clone() );
+                            }
+                        }
+                        match &specific.product{
+                            ProductPattern::Any => {}
+                            ProductPattern::Exact(product) => {
+                                index = index+1;
+                                where_clause.push_str(format!(" AND product=?{}", index).as_str());
+                                params.push(product.clone() );
+                            }
+                        }
+                        match &specific.variant{
+                            VariantPattern::Any => {}
+                            VariantPattern::Exact(variant) => {
+                                index = index+1;
+                                where_clause.push_str(format!(" AND variant=?{}", index).as_str());
+                                params.push(variant.clone());
+                            }
+                        }
+                    }
+                }
+            }
+
+            let statement = format!(
+                "SELECT DISTINCT {} FROM resources as r WHERE {}",
+                RESOURCE_QUERY_FIELDS, where_clause
+            );
+
+            let mut stubs:Vec<ResourceStub> = vec![];
+            {
+                let conn = selector.conn.lock().await;
+                let mut statement = conn.prepare(statement.as_str())?;
+                let mut rows = statement.query(params_from_iter(params.iter()))?;
+
+
+                while let Option::Some(row) = rows.next()? {
+                    stubs.push(RegistryComponent::process_resource_row_catch(row)?.into() );
+                }
+            }
+
+            // next IF there are more hops, must coordinate with possible other stars...
+            if !sub_select.hops.is_empty() {
+                let mut hops = sub_select.hops.clone();
+                hops.remove(0);
+                let mut futures = vec![];
+                for stub in &stubs {
+                    if let Option::Some(last_segment) = stub.address.last_segment() {
+                        let address = sub_select.address.push_segment(last_segment.clone());
+                        let address_tks_path = sub_select.address_kind_path.push(AddressKindSegment {
+                            address_segment: last_segment,
+                            kind: stub.kind.clone()
+                        });
+                        let sub_select = selector.select.clone().sub_select(address.clone(), hops.clone(), address_tks_path);
+                        let select = sub_select.into();
+
+                        let parent = address.parent().ok_or::<Error>("expecting address to have a parent".into())?;
+                        let request = Request::new(ReqEntity::Rc(Rc::new(RcCommand::Select(select))), address.clone(), parent.clone() );
+                        futures.push(selector.skel.messaging_api.exchange(request));
+                    }
+                }
+
+                println!("JOIN ALL pre");
+                let futures =  join_all(futures).await;
+                println!("JOIN ALL post");
+
+                // the records matched the present hop (which we needed for deeper searches) however
+                // they may not or may not match the ENTIRE pattern therefore they must be filtered
+                stubs.retain(|stub| {
+                    let address_tks_path = sub_select.address_kind_path.push(AddressKindSegment {
+                        address_segment: stub.address.last_segment().expect("expecting at least one segment" ),
+                        kind: stub.kind.clone()
+                    });
+                    sub_select.pattern.matches(&address_tks_path)
+                });
+
+                // here we already know that the child sub_select should have filtered it's
+                // not matching addresses so we can add all the results
+                for future in futures {
+                    let response = future?;
+                    if let RespEntity::Ok( Payload::List(more_stubs)) =response.entity{
+                        let mut new_stubs = vec![];
+                        for stub in more_stubs.list.into_iter() {
+                            if let Primitive::Stub(stub) = stub {
+                                new_stubs.push(stub);
+                            }
+                        }
+                        stubs.append(  & mut new_stubs );
+                    }
+                }
+            }
+
+            let stubs: Vec<ResourceStub> = stubs.into_iter().map(|record|record.into()).collect();
+            let stubs = sub_select.into_payload.to_primitive(stubs)?;
+
+            Ok(stubs)
+        }
+
+        match &self.select.kind {
+            SelectKind::Initial => {
+                initial(self.clone() ).await
+            }
+            SelectKind::SubSelect { .. } => {
+                sub_select(self.clone()).await
+            }
+        }
+
     }
 }

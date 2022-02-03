@@ -156,7 +156,7 @@ impl ResourceManagerComponent{
 
         let manager: Arc<dyn ResourceManager> = match rt {
             ResourceType::Space => Arc::new(StatelessManager::new(self.skel.clone(), ResourceType::Space ).await),
-            ResourceType::Base=> Arc::new(StatelessManager::new(self.skel.clone(), ResourceType::Base ).await),
+            ResourceType::Base => Arc::new(StatelessManager::new(self.skel.clone(), ResourceType::Base ).await),
             ResourceType::ArtifactBundleSeries => Arc::new(StatelessManager::new(self.skel.clone(), ResourceType::ArtifactBundleSeries).await),
             ResourceType::ArtifactBundle=> Arc::new(ArtifactBundleManager::new(self.skel.clone()).await),
             ResourceType::App=> Arc::new(AppManager::new(self.skel.clone()).await),

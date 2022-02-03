@@ -228,7 +228,7 @@ impl MessagingEndpointComponent {
                         }
                     }
                     RcCommand::Select(select) => {
-                        let list = Payload::List( skel.registry_api.select(select.clone(), to).await? );
+                        let list = Payload::List( skel.registry_api.select(select.clone()).await? );
                         Ok(list)
                     },
                     RcCommand::Update(_) => {

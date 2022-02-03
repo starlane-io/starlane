@@ -111,16 +111,19 @@ println!("select all done.");
                         self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
                     }
                     RespEntity::Ok(_) => {
+println!("ok, but unexpected");
                         self.output_tx.send(outlet::Frame::StdErr( "unexpected response".to_string() ) ).await;
                         self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
                     }
                     RespEntity::Fail(fail) => {
+println!("fail: {}",fail.to_string());
                         self.output_tx.send(outlet::Frame::StdErr( fail.to_string() ) ).await;
                         self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
                     }
                 }
             }
             Err(err) => {
+println!("err : {}",err.to_string());
                 self.output_tx.send(outlet::Frame::StdErr( err.to_string() ) ).await;
                 self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
             }
