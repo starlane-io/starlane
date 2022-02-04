@@ -195,7 +195,6 @@ impl ResourceLocatorComponent {
             });
         } else {
 
-println!(" LOCATED ROOT....");
             let record = ResourceRecord::new(
                 ResourceStub {
                     address: Address::root(),

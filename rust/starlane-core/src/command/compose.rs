@@ -2,6 +2,7 @@ use std::str::FromStr;
 use mesh_portal_serde::version::latest::entity::request::create::{Create, CreateOp, Require};
 use mesh_portal_serde::version::latest::entity::request::select::Select;
 use mesh_portal_versions::version::v0_0_1::entity::request::create::Fulfillment;
+use mesh_portal_versions::version::v0_0_1::entity::request::set::Set;
 use nom::combinator::all_consuming;
 use crate::command::parse::command_line;
 use crate::error::Error;
@@ -9,7 +10,8 @@ use crate::error::Error;
 pub enum CommandOp {
     Create(Create),
     Select(Select),
-    Publish(CreateOp)
+    Publish(CreateOp),
+    Set(Set)
 }
 
 impl FromStr for CommandOp  {
@@ -29,6 +31,7 @@ impl CommandOp {
             CommandOp::Publish(publish) => {
                 publish.requirements.clone()
             }
+            CommandOp::Set(_) => {vec![]}
         }
     }
 

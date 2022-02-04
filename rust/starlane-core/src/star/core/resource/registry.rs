@@ -98,9 +98,9 @@ impl RegistryApi {
         rx.await?
     }
 
-    pub async fn set_location(&self, address: Address, location: ResourceLocation) -> Result<(),Error> {
+    pub async fn set_properties(&self, address: Address, properties: SetProperties) -> Result<(),Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(RegistryCall::SetLocation{address, location, tx }).await;
+        self.tx.send(RegistryCall::SetProperties {address, properties, tx }).await;
         rx.await?
     }
 
@@ -125,7 +125,7 @@ pub enum RegistryCall {
     Selector {select: Select, tx: oneshot::Sender<Selector>},
     Query { address: Address, query: Query, tx: oneshot::Sender<Result<QueryResult,Error>>},
     SetStatus { address: Address, status: Status, tx: oneshot::Sender<Result<(),Error>>},
-    SetLocation{ address: Address, location: ResourceLocation, tx: oneshot::Sender<Result<(),Error>>},
+    SetProperties { address: Address, properties: SetProperties, tx: oneshot::Sender<Result<(),Error>>},
     Locate{ address: Address, tx: oneshot::Sender<Result<ResourceRecord,Error>>},
     Sequence{ address: Address, tx: oneshot::Sender<Result<u64,Error>>},
 }
@@ -181,8 +181,8 @@ impl RegistryComponent {
             RegistryCall::SetStatus{ address,status,tx } => {
                 self.set_status(address, status, tx).await;
             }
-            RegistryCall::SetLocation { address, location, tx } => {
-                self.set_location(address, location, tx).await;
+            RegistryCall::SetProperties { address, properties, tx } => {
+                self.set_properties(address, properties, tx).await;
             }
             RegistryCall::Locate { address, tx } => {
                 self.locate(address,tx ).await;
@@ -215,20 +215,36 @@ impl RegistryComponent {
         tx.send(process(self.conn.clone(), address,status).await );
     }
 
-    async fn set_location(&mut self, address: Address, location: ResourceLocation, tx: oneshot::Sender<Result<(),Error>>) {
-        async fn process( conn: Arc<Mutex<Connection>>, address:Address, location: ResourceLocation) -> Result<(),Error> {
+    async fn set_properties(&mut self, address: Address, properties: SetProperties, tx: oneshot::Sender<Result<(),Error>>) {
+
+        async fn process( conn: Arc<Mutex<Connection>>, address:Address, properties: SetProperties) -> Result<(),Error> {
+            let conn = conn.lock().await;
             let parent = address.parent().ok_or("resource must have a parent")?.to_string();
             let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
-            let host = location.ok_or()?.to_string();
-            let statement = "UPDATE resources SET host=?1 WHERE parent=?2 AND address_segment=?3";
-            {
-                let conn = conn.lock().await;
-                let mut statement = conn.prepare(statement)?;
-                statement.execute(params!(host,parent,address_segment))?;
+
+            for property_mod in properties.iter() {
+                match property_mod {
+                    PropertyMod::Set { name, value } => {
+                        conn.execute("INSERT INTO properties (resource_id,key,value) VALUES ((SELECT id FROM resources WHERE parent=?1 AND address_segment=?2),?3,?4) ON CONFLICT(resource_id,key) DO UPDATE SET value=?4", params![parent,address_segment,name.to_string(),value.to_string()])?;
+                    }
+                    PropertyMod::UnSet(name) => {
+                        conn.execute("DELETE FROM properties WHERE parent=?1 AND address_segment=?2 AND key=?3)", params![parent,address_segment,name.to_string()])?;
+                    }
+                }
             }
             Ok(())
         }
-        tx.send(process(self.conn.clone(), address,location).await );
+
+        let result = process(self.conn.clone(), address,properties).await;
+
+        match &result {
+            Ok(_) => { }
+            Err(err) => {
+                eprintln!("Set Properties error: {}", err.to_string());
+            }
+        }
+
+        tx.send(result);
     }
 
     async fn locate(&mut self, address: Address, tx: oneshot::Sender<Result<ResourceRecord,Error>>) {
@@ -346,7 +362,7 @@ impl RegistryComponent {
             let params = RegistryParams::from_registration(&registration)?;
             trans.execute("INSERT INTO resources (address_segment,resource_type,kind,vendor,product,variant,version,version_variant,parent,status) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'Pending')", params![params.address_segment,params.resource_type,params.kind,params.vendor,params.product,params.variant,params.version,params.version_variant,params.parent])?;
 
-            fn set_properties(prefix: &str, params: &RegistryParams, props: &SetProperties, trans: &Transaction ) -> Result<(),Error> {
+            fn set_properties(params: &RegistryParams, props: &SetProperties, trans: &Transaction ) -> Result<(),Error> {
                 for property_mod in props.iter() {
                     match property_mod {
                         PropertyMod::Set{ name, value } => {
@@ -360,7 +376,7 @@ impl RegistryComponent {
                 Ok(())
             }
 
-            set_properties("", &params, &registration.properties, &trans )?;
+            set_properties(&params, &registration.properties, &trans )?;
 
            Ok(())
         }

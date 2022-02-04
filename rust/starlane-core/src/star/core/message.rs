@@ -111,7 +111,6 @@ impl MessagingEndpointComponent {
             async fn process(skel: StarSkel, resource_manager_api: ResourceManagerApi, rc: &Rc, to: Address) -> Result<Payload, Error> {
                 match &rc.command {
                     RcCommand::Create(create) => {
-println!("RC CREATE TO {}", to.to_string() );
                         let kind = match_kind(&create.template.kind)?;
                         let stub = match &create.template.address.child_segment_template {
                             AddressSegmentTemplate::Exact(child_segment) => {
@@ -124,7 +123,6 @@ println!("RC CREATE TO {}", to.to_string() );
                                     }
                                 }
                                 let address = address?;
-println!("CREATED ADDRESS: {}", address.to_string() );
                                 let registration = Registration {
                                     address: address.clone(),
                                     kind: kind.clone(),
@@ -162,8 +160,8 @@ println!("CREATED ADDRESS: {}", address.to_string() );
                                         Ok(stub) => {
                                             if let Strategy::HostedBy(key) = &create.strategy {
                                                 let key = StarKey::from_str( key.as_str() )?;
-                                                let location = ResourceLocation::new(key);
-                                                skel.registry_api.set_location(address, location ).await?;
+//                                                let location = ResourceLocation::new(key);
+                                                skel.registry_api.assign(address, key).await?;
                                                 return Ok(Payload::Primitive(Primitive::Stub(stub)));
                                             } else {
                                                 break stub;
@@ -199,7 +197,6 @@ println!("CREATED ADDRESS: {}", address.to_string() );
                                 wrangle.key
                             };
                             skel.registry_api.assign(stub.address.clone(), key.clone()).await?;
-println!("RC CREATE assigned: {}", stub.address.to_string() );
                             let mut proto = ProtoStarMessage::new();
                             proto.to(ProtoStarMessageTo::Star(key.clone()));
                             let assign = ResourceAssign::new(AssignKind::Create, stub.clone(), state);
@@ -249,6 +246,12 @@ println!("RC CREATE assigned: {}", stub.address.to_string() );
                     RcCommand::Get => {
                         resource_manager_api.get(  to).await
                     }
+                    RcCommand::Set(set) => {
+                        let set = set.clone();
+                        skel.registry_api.set_properties(set.address, set.properties).await?;
+                        Ok(Payload::Empty)
+                    }
+
                 }
             }
             let rc = match &delivery.item.entity {

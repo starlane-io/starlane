@@ -1,4 +1,4 @@
-use mesh_portal_serde::version::latest::entity::request::create::{Create, CreateOp};
+use mesh_portal_serde::version::latest::entity::request::create::{Create, CreateOp, Set};
 use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand};
 use mesh_portal_serde::version::latest::entity::request::select::Select;
 use mesh_portal_serde::version::latest::messaging::{Request, Response};
@@ -46,7 +46,6 @@ impl CommandExecutor {
         match command_line(self.line.as_str() )
         {
             Ok((_,op)) => {
-println!("PARSED...");
                 match op {
                     CommandOp::Create(create) => {
                         self.exec_create(create).await;
@@ -56,6 +55,9 @@ println!("PARSED...");
                     }
                     CommandOp::Publish(create_op) => {
                         self.exec_publish(create_op).await;
+                    }
+                    CommandOp::Set(set) => {
+                        self.exec_set(set).await;
                     }
                 }
             }
@@ -69,7 +71,6 @@ println!("PARSED...");
 
     async fn exec_create( &self, create: Create  ) {
 
-println!("EXEC CREATE!");
         let parent = create.template.address.parent.clone();
         let entity = ReqEntity::Rc(Rc::new(RcCommand::Create(create)));
         let request = Request::new( entity, self.stub.address.clone(), parent );
@@ -161,6 +162,30 @@ println!("EXEC CREATE!");
             self.output_tx.send(outlet::Frame::StdErr( "Expected TransferFile fulfillment for publish".to_string() ) ).await;
             self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
             return;
+        }
+    }
+
+    async fn exec_set( &self, set: Set) {
+
+        let to = set.address.parent().clone().expect("expect parent");
+        let entity = ReqEntity::Rc(Rc::new(RcCommand::Set(set)));
+        let request = Request::new( entity, self.stub.address.clone(), to );
+        match self.api.exchange(request).await {
+            Ok(response) => {
+                match response.entity {
+                    RespEntity::Ok(_) => {
+                        self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
+                    }
+                    RespEntity::Fail(fail) => {
+                        self.output_tx.send(outlet::Frame::StdErr( fail.to_string() ) ).await;
+                        self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
+                    }
+                }
+            }
+            Err(err) => {
+                self.output_tx.send(outlet::Frame::StdErr( err.to_string() ) ).await;
+                self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
+            }
         }
     }
 }
