@@ -2,8 +2,8 @@
 use std::sync::Arc;
 use serde_json::json;
 use handlebars::Handlebars;
+use mesh_portal_serde::version::latest::http::HttpResponse;
 use crate::error::Error;
-use crate::star::variant::web::HttpResponse;
 
 lazy_static! {
   pub static ref HTML: Handlebars<'static> = {
