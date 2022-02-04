@@ -104,6 +104,12 @@ impl RegistryApi {
         rx.await?
     }
 
+    pub async fn get_properties(&self, address: Address, keys: Vec<String>) -> Result<Vec<(String,String)>,Error> {
+        let (tx,rx) = oneshot::channel();
+        self.tx.send(RegistryCall::GetProperties {address, keys, tx }).await;
+        rx.await?
+    }
+
     pub async fn locate(&self, address: Address) -> Result<ResourceRecord,Error> {
         let (tx,rx) = oneshot::channel();
         self.tx.send(RegistryCall::Locate{address, tx }).await;
@@ -126,6 +132,7 @@ pub enum RegistryCall {
     Query { address: Address, query: Query, tx: oneshot::Sender<Result<QueryResult,Error>>},
     SetStatus { address: Address, status: Status, tx: oneshot::Sender<Result<(),Error>>},
     SetProperties { address: Address, properties: SetProperties, tx: oneshot::Sender<Result<(),Error>>},
+    GetProperties { address: Address, keys: Vec<String>, tx: oneshot::Sender<Result<Vec<(String,String)>,Error>>},
     Locate{ address: Address, tx: oneshot::Sender<Result<ResourceRecord,Error>>},
     Sequence{ address: Address, tx: oneshot::Sender<Result<u64,Error>>},
 }
@@ -193,6 +200,9 @@ impl RegistryComponent {
             RegistryCall::Assign { address, host, tx } => {
                 self.assign(address,host, tx).await;
             }
+            RegistryCall::GetProperties { address, keys, tx } => {
+                self.get_properties(address, keys, tx).await;
+            }
         }
     }
 }
@@ -214,6 +224,37 @@ impl RegistryComponent {
         }
         tx.send(process(self.conn.clone(), address,status).await );
     }
+
+    async fn get_properties(&mut self, address: Address, keys: Vec<String>, tx: oneshot::Sender<Result<Vec<(String,String)>,Error>>) {
+
+        async fn process( conn: Arc<Mutex<Connection>>, address:Address, keys: Vec<String>) -> Result<Vec<(String,String)>,Error> {
+            let conn = conn.lock().await;
+            let parent = address.parent().ok_or("resource must have a parent")?.to_string();
+            let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
+
+            let mut properties = vec![];
+            for key in keys {
+                let property = conn.query_row("SELECT key,value FROM properties WHERE parent=?1 AND address_segment=?2 AND key=?3", params![parent,address_segment,key], RegistryComponent::process_property )?;
+                if property.is_some() {
+                    properties.push(property.expect("property"));
+                }
+            }
+
+            Ok(properties)
+        }
+
+        let result = process(self.conn.clone(), address,keys).await;
+
+        match &result {
+            Ok(_) => { }
+            Err(err) => {
+                eprintln!("Set Properties error: {}", err.to_string());
+            }
+        }
+
+        tx.send(result);
+    }
+
 
     async fn set_properties(&mut self, address: Address, properties: SetProperties, tx: oneshot::Sender<Result<(),Error>>) {
 
@@ -449,6 +490,27 @@ impl RegistryComponent {
             }
         }
     }
+
+    fn process_property(row: &Row) -> Result<Option<(String,String)>, rusqlite::Error> {
+            fn opt(row: &Row, index: usize) -> Result<Option<String>, Error>
+            {
+                if let ValueRef::Null = row.get_ref(index)? {
+                   Ok(Option::None)
+                } else {
+                   let specific: String = row.get(index)?;
+                   Ok(Option::Some(specific))
+                }
+            }
+
+            let key= opt(row,0)?;
+            let value= opt(row,1)?;
+            if key.is_some() && value.is_some() {
+                Ok(Option::Some((key.expect("key"), value.expect("value"))))
+            } else {
+                Ok(Option::None)
+            }
+    }
+
     fn count(row: &Row) -> Result<usize, rusqlite::Error> {
         let count: usize= row.get(0)?;
         Ok(count)

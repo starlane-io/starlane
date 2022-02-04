@@ -1,5 +1,5 @@
 use mesh_portal_versions::version::v0_0_1::entity::request::set::Set;
-use mesh_portal_versions::version::v0_0_1::parse::{create, publish, Res, select, set};
+use mesh_portal_versions::version::v0_0_1::parse::{create, get, publish, Res, select, set};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{multispace0, space1};
@@ -31,8 +31,15 @@ fn set_command(input: &str) -> Res<&str, CommandOp> {
     })
 }
 
+fn get_command(input: &str) -> Res<&str, CommandOp> {
+    tuple((tag("get"),space1,get))(input).map( |(next,(_,_,get))|{
+        (next, CommandOp::Get(get))
+    })
+}
+
+
 pub fn command(input: &str) -> Res<&str, CommandOp> {
-    alt( (create_command,publish_command,select_command,set_command) )(input)
+    alt( (create_command,publish_command,select_command,set_command,get_command) )(input)
 }
 
 pub fn command_line(input: &str) -> Res<&str, CommandOp> {

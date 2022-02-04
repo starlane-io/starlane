@@ -29,16 +29,17 @@ use kube::ResourceExt;
 use mesh_portal_serde::version::latest::command::common::{SetLabel, StateSrc};
 use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, KindTemplate, Strategy, Template};
 use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand, ReqEntity};
+use mesh_portal_serde::version::latest::entity::request::get::Get;
 use mesh_portal_serde::version::latest::entity::response::RespEntity;
 use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::messaging::{Message, Request, Response};
 use mesh_portal_serde::version::latest::payload::{Payload, PayloadMap, Primitive};
 use mesh_portal_serde::version::latest::resource::ResourceStub;
 use mesh_portal_versions::version::v0_0_1::command::common::{PropertyMod, SetProperties};
+use mesh_portal_versions::version::v0_0_1::entity::request::get::GetOp;
 use mesh_portal_versions::version::v0_0_1::id::Tks;
 
 use crate::fail::{Fail, StarlaneFailure};
-use crate::cache::RootItemCacheCall::Get;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
@@ -194,7 +195,11 @@ impl StarlaneApi {
     }
 
     pub async fn get_state( &self, address: Address ) -> Result<Payload,Error> {
-        let request = Request::new(ReqEntity::Rc(Rc::new(RcCommand::Get )), self.agent.clone(), address);
+        let get = Get {
+            address: address.clone(),
+            op: GetOp::State
+        };
+        let request = Request::new(ReqEntity::Rc(Rc::new(RcCommand::Get(get) )), self.agent.clone(), address);
         let response = self.surface_api.exchange(request).await?;
         Ok(response.entity.ok_or()?)
     }

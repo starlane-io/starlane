@@ -23,11 +23,13 @@ use std::future::Future;
 use mesh_portal_serde::version::latest::command::common::StateSrc;
 use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, KindTemplate, Strategy};
 use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand, ReqEntity};
+use mesh_portal_serde::version::latest::fail;
 use mesh_portal_serde::version::latest::http::HttpRequest;
 use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::messaging::Request;
 use mesh_portal_serde::version::latest::payload::{Payload, Primitive};
 use mesh_portal_serde::version::latest::resource::{ResourceStub, Status};
+use mesh_portal_versions::version::v0_0_1::entity::request::get::GetOp;
 use mesh_portal_versions::version::v0_0_1::id::Tks;
 use serde::de::Unexpected::Str;
 use crate::star::core::resource::manager::{ResourceManagerApi, ResourceManagerComponent};
@@ -97,6 +99,18 @@ impl MessagingEndpointComponent {
                         self.skel.messaging_api.star_notify(reply);
                     }
                     ResourceHostAction::Init(_) => {}
+                    ResourceHostAction::GetState(address) => {
+                        match self.resource_manager_api.get(address.clone()).await {
+                            Ok(payload) => {
+                                let reply = star_message.ok(Reply::Payload(payload));
+                                self.skel.messaging_api.star_notify(reply);
+                            }
+                            Err(err) => {
+                                let reply = star_message.fail(Fail::Starlane(StarlaneFailure::Error("could not get state".to_string())));
+                                self.skel.messaging_api.star_notify(reply);
+                            }
+                        }
+                    }
                 }
             }
             _ => {}
@@ -197,6 +211,7 @@ impl MessagingEndpointComponent {
                                 wrangle.key
                             };
                             skel.registry_api.assign(stub.address.clone(), key.clone()).await?;
+
                             let mut proto = ProtoStarMessage::new();
                             proto.to(ProtoStarMessageTo::Star(key.clone()));
                             let assign = ResourceAssign::new(AssignKind::Create, stub.clone(), state);
@@ -243,8 +258,35 @@ impl MessagingEndpointComponent {
                          ));
                         Ok(result)
                     },
-                    RcCommand::Get => {
-                        resource_manager_api.get(  to).await
+                    RcCommand::Get(get) => {
+                        match &get.op {
+                            GetOp::State => {
+                                let mut proto = ProtoStarMessage::new();
+                                proto.to(ProtoStarMessageTo::Resource(get.address.clone()));
+                                proto.payload = StarMessagePayload::ResourceHost(ResourceHostAction::GetState(get.address.clone()));
+                                if let Reply::Payload(payload) = skel.messaging_api
+                                    .star_exchange(proto, ReplyKind::Payload, "get state from manager")
+                                    .await? {
+                                    Ok(payload)
+                                } else {
+                                    Err("could not get state".into())
+                                }
+                            }
+                            GetOp::Properties(keys) => {
+                                let properties = skel.registry_api.get_properties(get.address.clone(), keys.clone() ).await?;
+                                let mut rtn = String::new();
+                                rtn.push_str(get.address.to_string().as_str() );
+                                rtn.push_str("{ ");
+                                for (index,property) in properties.iter().enumerate() {
+                                    rtn.push_str(property.0.as_str() );
+                                    rtn.push_str("=" );
+                                    rtn.push_str(property.1.as_str());
+                                }
+                                rtn.push_str(" }");
+
+                                Ok(Payload::Primitive(Primitive::Text(rtn)))
+                            }
+                        }
                     }
                     RcCommand::Set(set) => {
                         let set = set.clone();

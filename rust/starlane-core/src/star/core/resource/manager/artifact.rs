@@ -301,7 +301,6 @@ impl ResourceManager for ArtifactManager{
                             return Err("Artifact cannot be stateless".into())
                         },
                     };
-println!("ARTIFACT Saving state for: {}", assign.stub.address.to_string() );
                     self.store.put( assign.stub.address.clone(), state ).await?;
                     Ok(())
                 }
@@ -315,4 +314,9 @@ println!("ARTIFACT Saving state for: {}", assign.stub.address.to_string() );
         async fn has(&self, address: Address) -> bool {
         false
     }
+
+    async fn get(&self, address: Address) -> Result<Payload,Error> {
+        self.store.get(address).await
+    }
+
 }

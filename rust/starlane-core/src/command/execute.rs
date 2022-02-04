@@ -1,5 +1,7 @@
+use std::string::FromUtf8Error;
 use mesh_portal_serde::version::latest::entity::request::create::{Create, CreateOp, Set};
 use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand};
+use mesh_portal_serde::version::latest::entity::request::get::Get;
 use mesh_portal_serde::version::latest::entity::request::select::Select;
 use mesh_portal_serde::version::latest::messaging::{Request, Response};
 use mesh_portal_serde::version::latest::payload::{Payload, Primitive};
@@ -58,6 +60,9 @@ impl CommandExecutor {
                     }
                     CommandOp::Set(set) => {
                         self.exec_set(set).await;
+                    }
+                    CommandOp::Get(get) => {
+                        self.exec_get(get).await;
                     }
                 }
             }
@@ -175,6 +180,48 @@ impl CommandExecutor {
                 match response.entity {
                     RespEntity::Ok(_) => {
                         self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
+                    }
+                    RespEntity::Fail(fail) => {
+                        self.output_tx.send(outlet::Frame::StdErr( fail.to_string() ) ).await;
+                        self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
+                    }
+                }
+            }
+            Err(err) => {
+                self.output_tx.send(outlet::Frame::StdErr( err.to_string() ) ).await;
+                self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
+            }
+        }
+    }
+
+
+
+    async fn exec_get( &self, get: Get) {
+        let to = get.address.parent().clone().expect("expect parent");
+        let entity = ReqEntity::Rc(Rc::new(RcCommand::Get(get)));
+        let request = Request::new( entity, self.stub.address.clone(), to );
+        match self.api.exchange(request).await {
+            Ok(response) => {
+                match response.entity {
+                    RespEntity::Ok(Payload::Primitive(Primitive::Bin(bin))) => {
+                        match String::from_utf8((*bin).clone() ) {
+                            Ok(text) => {
+                                self.output_tx.send(outlet::Frame::StdOut(text)).await;
+                                self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
+                            }
+                            Err(err) => {
+                                self.output_tx.send(outlet::Frame::StdErr( "Bin File Cannot be displayed on console".to_string()) ).await;
+                                self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
+                            }
+                        }
+                    }
+                    RespEntity::Ok(Payload::Primitive(Primitive::Text(text))) => {
+                      self.output_tx.send(outlet::Frame::StdOut(text)).await;
+                      self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
+                    }
+                    RespEntity::Ok(_) => {
+                        self.output_tx.send(outlet::Frame::StdErr( "unexpected payload response format".to_string()) ).await;
+                        self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
                     }
                     RespEntity::Fail(fail) => {
                         self.output_tx.send(outlet::Frame::StdErr( fail.to_string() ) ).await;

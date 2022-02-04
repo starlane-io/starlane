@@ -399,6 +399,7 @@ impl LocalFileAccess {
         let path = self.cat_path(path.to_relative().as_str())?;
         let mut builder = DirBuilder::new();
         builder.recursive(true);
+println!("Creating path: {} ", path.to_string() );
         builder.create(path.clone())?;
         Ok(())
     }

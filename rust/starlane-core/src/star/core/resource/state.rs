@@ -130,13 +130,15 @@ impl StateStoreFS {
         state: Payload,
     ) -> Result<(), Error> {
 
-
-        let state_path = Path::from_str(
-            format!("/stars/{}/states/{}", self.skel.info.key.to_string(), address.to_string()).as_str(),
+        let parent_path= Path::from_str(
+            format!("/stars/{}/states/{}", self.skel.info.key.to_string(), address.to_safe_filename()).as_str(),
+        )?;
+        let state_path= Path::from_str(
+            format!("/stars/{}/states/{}/payload.bin", self.skel.info.key.to_string(), address.to_safe_filename()).as_str(),
         )?;
         let machine_filesystem = self.skel.machine.machine_filesystem();
         let mut data_access = machine_filesystem.data_access();
-        data_access.mkdir(&state_path).await?;
+        data_access.mkdir(&parent_path).await;
 
         let data_access = self.skel.machine.machine_filesystem().data_access();
         data_access.write(&state_path,Arc::new(bincode::serialize(&state)?)).await?;
@@ -149,7 +151,7 @@ impl StateStoreFS {
         let mut data_access = machine_filesystem.data_access();
 
         let state_path = Path::from_str(
-            format!("/stars/{}/states/{}", self.skel.info.key.to_string(), address.to_string()).as_str(),
+            format!("/stars/{}/states/{}/payload.bin", self.skel.info.key.to_string(), address.to_safe_filename()).as_str(),
         )?;
 
 
@@ -161,8 +163,9 @@ impl StateStoreFS {
     async fn has(&self, address: Address ) -> Result<bool,Error> {
 
         let state_path = Path::from_str(
-            format!("/stars/{}/states/{}", self.skel.info.key.to_string(), address.to_string()).as_str(),
+            format!("/stars/{}/states/{}/payload.bin", self.skel.info.key.to_string(), address.to_safe_filename()).as_str(),
         )?;
+
 
         let machine_filesystem = self.skel.machine.machine_filesystem();
         let data_access = machine_filesystem.data_access();

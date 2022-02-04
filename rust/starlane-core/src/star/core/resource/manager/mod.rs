@@ -106,7 +106,9 @@ impl AsyncProcessor<ResourceManagerCall> for ResourceManagerComponent{
             }
             ResourceManagerCall::Has { address, tx } => {}
             ResourceManagerCall::Request { request, tx } => {}
-            ResourceManagerCall::Get { address, tx } => {}
+            ResourceManagerCall::Get { address, tx } => {
+                self.get(address,tx).await;
+            }
         }
     }
 }
@@ -124,6 +126,18 @@ impl ResourceManagerComponent{
 
        tx.send( process(self,assign).await );
     }
+
+
+    async fn get( &mut self, address: Address, tx: oneshot::Sender<Result<Payload,Error>> ) {
+        async fn process( manager : &mut ResourceManagerComponent, address: Address) -> Result<Payload,Error> {
+            let resource_type = manager.resource_type(&address )?;
+            let manager = manager.manager(&resource_type ).await?;
+            manager.get(address).await
+        }
+
+        tx.send( process(self,address).await );
+    }
+
 
     async fn request( &mut self, request: Delivery<Request>) {
         async fn process( manager: &mut ResourceManagerComponent, request: Delivery<Request>) -> Result<(),Error> {
@@ -192,6 +206,10 @@ pub trait ResourceManager: Send + Sync {
     }
 
     async fn has(&self, address: Address) -> bool;
+
+    async fn get(&self, address: Address) -> Result<Payload,Error> {
+        Err("Stateless".into())
+    }
 
     fn shutdown(&self) {}
 

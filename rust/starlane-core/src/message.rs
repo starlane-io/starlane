@@ -1,9 +1,11 @@
 use std::collections::HashSet;
 use std::convert::{Infallible, TryFrom, TryInto};
 use std::string::FromUtf8Error;
+use mesh_portal_serde::version::latest::bin::Bin;
 use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::messaging::{Request, Response};
 use mesh_portal_serde::version::latest::pattern::AddressKindPath;
+use mesh_portal_serde::version::latest::payload::Payload;
 use mesh_portal_serde::version::latest::resource::ResourceStub;
 
 use serde::{Deserialize, Serialize};
@@ -315,7 +317,8 @@ pub enum ReplyKind{
     Record,
     Records,
     Stubs,
-    AddressTksPath
+    AddressTksPath,
+    Payload
 }
 
 
@@ -326,7 +329,8 @@ pub enum Reply{
     Record(ResourceRecord),
     Records(Vec<ResourceRecord>),
     Stubs(Vec<ResourceStub>),
-    AddressTksPath(AddressKindPath)
+    AddressTksPath(AddressKindPath),
+    Payload(Payload)
 }
 
 impl Reply{
@@ -336,7 +340,8 @@ impl Reply{
             Reply::Record(_) => ReplyKind::Record,
             Reply::Records(_) => ReplyKind::Records,
             Reply::Stubs(_) => ReplyKind::Stubs,
-            Reply::AddressTksPath(_) => ReplyKind::AddressTksPath
+            Reply::AddressTksPath(_) => ReplyKind::AddressTksPath,
+            Reply::Payload(_) => ReplyKind::Payload
         }
     }
 }

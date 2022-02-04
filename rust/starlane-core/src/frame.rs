@@ -373,6 +373,7 @@ pub enum ResourceHostAction {
     //IsHosting(Address),
     Assign(ResourceAssign),
     Init(Address),
+    GetState(Address)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
