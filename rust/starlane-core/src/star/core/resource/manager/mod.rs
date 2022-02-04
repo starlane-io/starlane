@@ -160,7 +160,7 @@ impl ResourceManagerComponent{
             ResourceType::Base => Arc::new(StatelessManager::new(self.skel.clone(), ResourceType::Base ).await),
             ResourceType::ArtifactBundleSeries => Arc::new(StatelessManager::new(self.skel.clone(), ResourceType::ArtifactBundleSeries).await),
             ResourceType::ArtifactBundle=> Arc::new(ArtifactBundleManager::new(self.skel.clone()).await),
-            ResourceType::Artifact => Arc::new(ArtifactManager::new() ),
+            ResourceType::Artifact => Arc::new(ArtifactManager::new(self.skel.clone()).await ),
             ResourceType::App=> Arc::new(AppManager::new(self.skel.clone()).await),
             ResourceType::Mechtron => Arc::new(MechtronManager::new(self.skel.clone()).await),
             ResourceType::Database => Arc::new(K8sManager::new(self.skel.clone(), ResourceType::Database ).await.expect("K8sManager must be created without error")),

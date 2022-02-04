@@ -1,8 +1,8 @@
 use std::cmp::Ordering;
 use std::collections::{HashSet, HashMap};
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::iter::FromIterator;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -10,7 +10,7 @@ use std::sync::Arc;
 use tempdir::TempDir;
 use tokio::sync::Mutex;
 
-use crate::resource::{ResourceType, AssignResourceStateSrc, ResourceAssign};
+use crate::resource::{ResourceType, AssignResourceStateSrc, ResourceAssign, Kind, ArtifactKind};
 use crate::star::core::resource::manager::ResourceManager;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
@@ -27,6 +27,7 @@ use mesh_portal_serde::version::latest::payload::{Payload, Primitive};
 use mesh_portal_versions::version::v0_0_1::entity::request::create::KindTemplate;
 use mesh_portal_versions::version::v0_0_1::entity::request::ReqEntity;
 use mesh_portal_versions::version::v0_0_1::entity::response::RespEntity;
+use zip::result::ZipResult;
 use crate::file_access::FileAccess;
 
 
@@ -93,7 +94,23 @@ impl ResourceManager for ArtifactBundleManager {
 
 println!("$??????? ASSIGNING ARTIFACT BUNDLE!!!!");
         if let Payload::Primitive( Primitive::Bin(zip) ) = state.clone() {
-            let artifacts = get_artifacts(zip)?;
+
+            let temp_dir = TempDir::new("zipcheck")?;
+            let temp_path = temp_dir.path().clone();
+            let file_path = temp_path.with_file_name("file.zip");
+            let mut file = File::create(file_path.as_path())?;
+            file.write_all(zip.as_slice())?;
+
+            let file = File::open(file_path.as_path())?;
+            let mut archive = zip::ZipArchive::new(file)?;
+            let mut artifacts = vec![];
+            for i in 0..archive.len() {
+               let file = archive.by_index(i).unwrap();
+                if !file.name().ends_with("/") {
+                            artifacts.push(file.name().to_string())
+                }
+             }
+
             let mut address_and_kind_set = HashSet::new();
             for artifact in artifacts {
                 let mut path = String::new();
@@ -152,40 +169,74 @@ println!("?~ ROOT: {}", root_address_and_kind.address.to_string() );
                         println!("~~ ARTIFACT ADDRESS: {}", address_and_kind.address.to_string());
                         println!("... last seg {}", address_and_kind.address.last_segment().expect("expected final segment").to_string());
                         let parent = address_and_kind.address.parent().expect("expected parent");
-
-                        println!("... parent seg {}", parent.to_string());
-                        let create = Create {
-                            template: Template {
-                                address: AddressTemplate { parent: parent.clone(), child_segment_template: AddressSegmentTemplate::Exact(address_and_kind.address.last_segment().expect("expected final segment").to_string()) },
-                                kind: KindTemplate { resource_type: address_and_kind.kind.resource_type.clone(), kind: address_and_kind.kind.kind.clone(), specific: None }
-                            },
-                            state: StateSrc::Stateless,
-                            properties: vec![],
-                            strategy: Strategy::Create,
-                            registry: Default::default()
-                        };
-
-                        println!("SENDING REQUEST TO PARENT: {}", parent.to_string());
-                        let request = Request::new(ReqEntity::Rc(Rc::empty_payload(RcCommand::Create(create))), assign.stub.address.clone(), parent);
-                        let response = skel.messaging_api.exchange(request).await;
-                        match response {
-                            Ok(response) => {
-                                match response.entity {
-                                    RespEntity::Ok(_) => {
-                                        println!("added artifact: {}", address_and_kind.address.to_string());
+                        let result:Result<Kind,mesh_portal_versions::error::Error> = TryFrom::try_from(address_and_kind.kind.clone());
+                        match result {
+                            Ok(kind) => {
+                                let state = match kind {
+                                    Kind::Artifact(ArtifactKind::Dir) => {
+                                        StateSrc::Stateless
                                     }
-                                    RespEntity::Fail(_) => {
-                                        println!("FAILED to add artifact: {}", address_and_kind.address.to_string());
+                                    Kind::Artifact(_) => {
+                                        let path = address_and_kind.address.filepath().expect("expecting non Dir artifact to have a filepath");
+println!("PATH : {} ", path );
+                                        match archive.by_name(path.as_str()) {
+                                            Ok(mut file) => {
+                                                let mut buf = vec![];
+                                                file.read_to_end(&mut buf);
+                                                let bin = Arc::new(buf);
+                                                let payload = Payload::Primitive(Primitive::Bin(bin));
+                                                StateSrc::StatefulDirect(payload)
+                                            }
+                                            Err(err) => {
+                                                eprintln!("Artifact archive error: {}", err.to_string() );
+                                                StateSrc::Stateless
+                                            }
+                                        }
+                                    }
+                                    _ => {panic!("unexpected knd");}
+                                };
+
+                                println!("... parent seg {}", parent.to_string());
+                                let create = Create {
+                                    template: Template {
+                                        address: AddressTemplate { parent: parent.clone(), child_segment_template: AddressSegmentTemplate::Exact(address_and_kind.address.last_segment().expect("expected final segment").to_string()) },
+                                        kind: KindTemplate { resource_type: address_and_kind.kind.resource_type.clone(), kind: address_and_kind.kind.kind.clone(), specific: None }
+                                    },
+                                    state,
+                                    properties: vec![],
+                                    strategy: Strategy::Create,
+                                    registry: Default::default()
+                                };
+
+                                println!("SENDING REQUEST TO PARENT: {}", parent.to_string());
+                                let request = Request::new(ReqEntity::Rc(Rc::empty_payload(RcCommand::Create(create))), assign.stub.address.clone(), parent);
+                                let response = skel.messaging_api.exchange(request).await;
+                                match response {
+                                    Ok(response) => {
+                                        match response.entity {
+                                            RespEntity::Ok(_) => {
+                                                eprintln!("added artifact: {}", address_and_kind.address.to_string());
+                                            }
+                                            RespEntity::Fail(_) => {
+                                                eprintln!("FAILED to add artifact: {}", address_and_kind.address.to_string());
+                                            }
+                                        }
+                                    }
+                                    _ => {
+                                        eprintln!("unexpected result");
                                     }
                                 }
                             }
-                            _ => {
-                                println!("unexpected result");
+                            Err(err) => {
+                                eprintln!("Artifact Kind Error: {}", err.to_string());
                             }
-                        }
+                        };
                     }
                 });
             }
+        }
+        else {
+            return Err("ArtifactBundle Manager expected Bin payload".into())
         }
 
         self.store.put( assign.stub.address, state ).await?;
@@ -207,16 +258,21 @@ println!("?~ ROOT: {}", root_address_and_kind.address.to_string() );
 
 }
 
-
+#[derive(Debug)]
 pub struct ArtifactManager {
-
+    skel: StarSkel,
+    store: StateStore,
 }
 
-impl ArtifactManager {
-    pub fn new() -> Self {
-        Self {}
+impl ArtifactManager{
+    pub async fn new(skel: StarSkel) -> Self {
+        Self {
+            skel: skel.clone(),
+            store: StateStore::new(skel),
+        }
     }
 }
+
 
 #[async_trait]
 impl ResourceManager for ArtifactManager{
@@ -224,11 +280,39 @@ impl ResourceManager for ArtifactManager{
         ResourceType::Artifact
     }
 
-    async fn assign(&self, assign: ResourceAssign) -> Result<(), Error> {
-        Ok(())
-    }
+    async fn assign(
+        &self,
+        assign: ResourceAssign,
+    ) -> Result<(), Error> {
+        let kind : Kind = TryFrom::try_from(assign.stub.kind)?;
+        if let Kind::Artifact(artifact_kind) = kind
+        {
+            match artifact_kind {
+                ArtifactKind::Dir => {
+                    // stateless
+                    Ok(())
+                }
+                _ => {
+                    let state = match &assign.state {
+                        StateSrc::StatefulDirect(data) => {
+                            data.clone()
+                        },
+                        StateSrc::Stateless => {
+                            return Err("Artifact cannot be stateless".into())
+                        },
+                    };
+println!("ARTIFACT Saving state for: {}", assign.stub.address.to_string() );
+                    self.store.put( assign.stub.address.clone(), state ).await?;
+                    Ok(())
+                }
+            }
+        } else {
+            Err("Artifact Manager unexpected kind".into() )
+        }
+    } // assign
 
-    async fn has(&self, address: Address) -> bool {
+
+        async fn has(&self, address: Address) -> bool {
         false
     }
 }
