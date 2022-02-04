@@ -140,7 +140,6 @@ impl ResourceLocatorComponent {
         address: Address,
         tx: oneshot::Sender<Result<ResourceRecord, Error>>,
     ) {
-println!("LOCATING: {}", address.to_string() );
         if self.has_cached_record(&address) {
             let result = match self
                 .get_cached_record(&address)
@@ -169,7 +168,6 @@ println!("LOCATING: {}", address.to_string() );
 
         }
         else if address.parent().is_some() {
-println!("PARENT is_some()");
             let locator_api = self.skel.resource_locator_api.clone();
             tokio::spawn(async move {
                 async fn locate(
@@ -242,14 +240,12 @@ println!(" LOCATED ROOT....");
         locate: Request<(Address, StarKey), ResourceRecord>,
     ) {
         let (address, star) = locate.payload.clone();
-println!("request_resource_record_from_star... address: {} star: {}", address.to_string(), star.to_string() );
         let mut proto = ProtoStarMessage::new();
         proto.to = star.clone().into();
         proto.payload = StarMessagePayload::ResourceRegistry(ResourceRegistryRequest::Find(address));
         proto.log = locate.log;
         let skel = self.skel.clone();
         tokio::spawn(async move {
-println!("performing STAR EXCHANGE...");
             let result = skel
                 .messaging_api
                 .star_exchange(
@@ -260,12 +256,10 @@ println!("performing STAR EXCHANGE...");
                 .await;
             match result {
                 Ok(Reply::Record(record)) => {
-println!("FOUND : '{}'", record.stub.address.to_string() );
                     skel.resource_locator_api.found(record.clone());
                     locate.tx.send(Ok(record)).unwrap_or_default();
                 }
                 Err(fail) => {
-println!("LOCATE FAILED {}", fail.to_string() );
                     locate.tx.send(Err(fail)).unwrap_or_default();
                 }
                 _ => unimplemented!(

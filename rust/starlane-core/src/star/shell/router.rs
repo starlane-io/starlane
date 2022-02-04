@@ -89,16 +89,14 @@ impl AsyncProcessor<RouterCall> for RouterComponent {
                             return;
                         } else {
 
-                            println!("GETTRING FROM REGISTRY... : '{}' star kind : {}", address.to_string(), skel.info.kind.to_string() );
                             let result = skel.registry_api.locate( address.clone() ).await;
                             match result {
                                 Ok(record) => {
-                                    println!("RECORD FOUND: {} LOCATION: {}", record.stub.address.to_string(), record.location.to_string());
                                     let reply = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Record(record))));
                                     skel.messaging_api.star_notify(reply);
                                 }
                                 Err(err) => {
-                                    println!("ROUTER ERROR: {}", err.to_string());
+println!("ROUTER ERROR: {}", err.to_string());
                                     let reply = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Starlane(StarlaneFailure::Error("Not Found".to_string())))));
                                     skel.messaging_api.star_notify(reply);
                                 }

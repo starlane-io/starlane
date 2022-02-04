@@ -165,6 +165,7 @@ impl ProtoArtifactCaches {
                 }
 
  */
+                ArtifactKind::Dir => {}
             }
         }
 
@@ -211,14 +212,17 @@ impl ProtoArtifactCacheProc {
 
         for artifact in artifacts {
             println!(".... CACHING... {}", artifact.clone().address.to_string());
-            let claim = root_caches.claim(artifact).await?;
+            let claim = root_caches.claim(artifact).await;
             println!("claimed...");
-            let references = claim.references();
-            claims.put(claim.artifact.clone(), claim).await?;
-            println!("put...");
-            for reference in references {
-                if !claims.contains(reference.clone()).await? {
-                    more.push(reference);
+            if let Some(claim) = claim {
+                let claim = claim?;
+                let references = claim.references();
+                claims.put(claim.artifact.clone(), claim).await?;
+                println!("put...");
+                for reference in references {
+                    if !claims.contains(reference.clone()).await? {
+                        more.push(reference);
+                    }
                 }
             }
             println!("processed artifact...");
@@ -959,8 +963,7 @@ impl RootArtifactCaches {
 
         }
     }
-
-    async fn claim(&self, artifact: ArtifactRef) -> Result<Claim, Error> {
+    async fn core_claim(&self, artifact: ArtifactRef) -> Result<Claim, Error> {
         let claim = match artifact.kind {
             ArtifactKind::AppConfig=> self.app_configs.cache(artifact).await?.into(),
             ArtifactKind::MechtronConfig=> self.mechtron_configs.cache(artifact).await?.into(),
@@ -968,9 +971,20 @@ impl RootArtifactCaches {
             ArtifactKind::Raw => self.raw.cache(artifact).await?.into(),
             ArtifactKind::Wasm=> self.wasms.cache(artifact).await?.into(),
 //            ArtifactKind::HttpRouter => self.http_router_configs.cache(artifact).await?.into(),
+            ArtifactKind::Dir => {
+                panic!("DIr is not a coreclaim")
+            }
         };
 
         Ok(claim)
+    }
+
+    async fn claim(&self, artifact: ArtifactRef) -> Option<Result<Claim, Error>> {
+        if let ArtifactKind::Dir = artifact.kind {
+            None
+        } else {
+            Some( self.core_claim(artifact).await )
+        }
     }
 }
 

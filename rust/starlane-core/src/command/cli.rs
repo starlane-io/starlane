@@ -1,4 +1,5 @@
 use std::convert::{TryFrom, TryInto};
+use std::fmt::write;
 use std::marker::PhantomData;
 use mesh_portal_serde::version::latest::bin::Bin;
 use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, KindTemplate, Template};
@@ -130,6 +131,20 @@ impl CliServer {
                         match frame {
                             inlet::Frame::CommandLine(line) => {
                                 let mut fulfillments = vec![];
+
+                                while let Ok(frame) = reader.read().await {
+                                    match frame {
+                                        inlet::Frame::TransferFile { name, content } => {
+                                            fulfillments.push( Fulfillment::File {name,content});
+                                        }
+                                        inlet::Frame::EndRequires => {break;}
+                                        _ => {
+                                            eprintln!("cannot have this type of frame when sending requirements.");
+                                            return;
+                                        }
+                                    }
+                                }
+
                                 CommandExecutor::execute(line, output_tx.clone(), stub.clone(), api.clone(), fulfillments ).await;
                             }
                             _ =>  {
@@ -224,29 +239,13 @@ pub struct CommandExchange {
 
 impl CommandExchange {
 
-    /*
     pub async fn file( &mut self, name: String, content: Bin ) -> Result<(),Error> {
-        tokio::task::spawn_blocking( move || {
-            tokio::spawn(async move {
-                self.writer.write( inlet::Frame::TransferFile{name,content}).await;
-            } )
-        }).await?.await?;
-
-        Ok(())
+        self.write( inlet::Frame::TransferFile{name,content}).await
     }
 
     pub async fn end_requires( &mut self ) -> Result<(),Error> {
-        tokio::task::spawn_blocking( move || {
-            tokio::spawn(async move {
-                self.writer.write( inlet::Frame::EndRequires).await;
-            } )
-        }).await?.await?;
-
-        Ok(())
+        self.write( inlet::Frame::EndRequires ).await
     }
-
-     */
-
 
     pub async fn read( &mut self ) -> Option<Result<outlet::Frame,Error>> {
         if self.complete {
@@ -263,6 +262,11 @@ impl CommandExchange {
         }
 
         Option::Some(handle(self).await)
+    }
+
+    pub async fn write( &mut self, frame: inlet::Frame ) -> Result<(),Error> {
+       self.writer.write(frame).await?;
+       Ok(())
     }
 }
 

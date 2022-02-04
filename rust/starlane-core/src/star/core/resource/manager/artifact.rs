@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::{HashSet, HashMap};
 use std::convert::TryInto;
 use std::fs::File;
@@ -18,267 +19,19 @@ use crate::error::Error;
 
 use crate::message::delivery::Delivery;
 use mesh_portal_serde::version::latest::command::common::StateSrc;
-use mesh_portal_serde::version::latest::id::Address;
-
-/*
-=======
-use crate::resource::state_store::StateStore;
-use crate::star::core::component::resource::shell::Host;
-use crate::star::StarSkel;
-use crate::util;
-
->>>>>>> f2361a20ec5930eab8327e64fbc6e3b3d95d08d0:rust/starlane-core/src/core/artifact.rs
-pub struct ArtifactHost {
-    skel: StarSkel,
-    file_access: FileAccess,
-    store: StateStore,
-    mutex: Arc<Mutex<u8>>,
-}
-
-impl ArtifactHost {
-    pub async fn new(skel: StarSkel, file_access: FileAccess) -> Result<Self, Error> {
-        let file_access = file_access.with_path("bundles".to_string())?;
-        let rtn = ArtifactHost {
-            skel: skel.clone(),
-            file_access: file_access,
-            store: StateStore::new(skel).await,
-            mutex: Arc::new(Mutex::new(0)),
-        };
-
-        Ok(rtn)
-    }
+use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, Strategy, Template};
+use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand};
+use mesh_portal_serde::version::latest::id::{Address, AddressAndKind, KindParts, RouteSegment};
+use mesh_portal_serde::version::latest::messaging::Request;
+use mesh_portal_serde::version::latest::payload::{Payload, Primitive};
+use mesh_portal_versions::version::v0_0_1::entity::request::create::KindTemplate;
+use mesh_portal_versions::version::v0_0_1::entity::request::ReqEntity;
+use mesh_portal_versions::version::v0_0_1::entity::response::RespEntity;
+use crate::file_access::FileAccess;
 
 
-
-    fn bundle_key(key: ResourceKey) -> Result<ArtifactBundleKey, Fail> {
-        let bundle_key = match key {
-            ResourceKey::ArtifactBundle(key) => key,
-            ResourceKey::Artifact(artifact) => artifact.parent().unwrap().try_into()?,
-            key => {
-                return Err(Fail::WrongResourceType {
-                    expected: HashSet::from_iter(vec![
-                        ResourceType::ArtifactBundle,
-                        ResourceType::Artifact,
-                    ]),
-                    received: key.resource_type(),
-                })
-            }
-        };
-
-        Ok(bundle_key)
-    }
-
-    fn bundle_path(key: ResourceKey) -> Result<Path, Fail> {
-        Ok(Path::from_str(
-            format!("/{}", key.to_snake_case().as_str()).as_str(),
-        )?)
-    }
-
-    fn zip_bundle_path(key: ResourceKey) -> Result<Path, Fail> {
-        let bundle_path = Self::bundle_path(key)?;
-        Ok(bundle_path.cat(&Path::from_str("bundle.zip")?)?)
-    }
-
-    async fn ensure_bundle_dir(&mut self, key: ResourceKey) -> Result<(), Fail> {
-        if key.resource_type() == ResourceType::ArtifactBundleVersions {
-            return Ok(());
-        }
-
-        let path = Self::bundle_path(key)?;
-        self.file_access.mkdir(&path).await?;
-        Ok(())
-    }
-
-    fn validate(assign: &ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>) -> Result<(), Fail> {
-        match &assign.stub.key {
-            ResourceKey::ArtifactBundle(_) => Ok(()),
-            ResourceKey::Artifact(_) => Ok(()),
-            ResourceKey::ArtifactBundleVersions(_) => Ok(()),
-            key => {
-                Err(Fail::WrongResourceType {
-                    expected: HashSet::from_iter(vec![
-                        ResourceType::ArtifactBundle,
-                        ResourceType::Artifact,
-                    ]),
-                    received: key.resource_type(),
-                })
-            }
-        }
-
-    }
-
-    async fn ensure_artifact(
-        parent: ResourceStub,
-        artifact_path: String,
-        skel: StarSkel,
-    ) -> Result<(), Error> {
-        let archetype = ResourceArchetype {
-            kind: ResourceKind::Artifact(ArtifactKind::Raw),
-            specific: None,
-            config: None,
-        };
-
-        let create = ResourceCreate {
-            key: KeyCreationSrc::None,
-            parent: parent.key.clone().into(),
-            archetype: archetype,
-            address: AddressCreationSrc::Append(artifact_path),
-            state_src: AssignResourceStateSrc::AlreadyHosted,
-            registry_info: Option::None,
-            owner: Option::None,
-            strategy: ResourceCreateStrategy::Ensure,
-        };
-
-        let rx = ResourceCreationChamber::new(parent, create, skel.clone()).await;
-
-        let assign = util::wait_for_it_whatever(rx).await??;
-        let stub = assign.stub.clone();
-        let (action,rx) = StarCoreAction::new(StarCoreCommand::Assign(assign.try_into()?));
-/*
-        skel.core_tx.send( action ).await;
-
-        util::wait_for_it_whatever(rx).await??;
-
-        let resource_record = ResourceRecord::new(stub, skel.info.key.clone() );
-        let registration = ResourceRegistration::new(resource_record, Option::None );
-        skel.registry.as_ref().expect("expected resource register to be available on ArtifactStore").register(registration).await;
-
-        Ok(())
-        joj
- */
-        unimplemented!()
-    }
-}
-
-#[async_trait]
-impl Host for ArtifactHost {
-    async fn assign(
-        &self,
-        assign: ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>,
-    ) -> Result<(), Fail> {
-
-        Self::validate(&assign)?;
-
-        // if there is Initialization to do for assignment THIS is where we do it
-        self.ensure_bundle_dir(assign.stub.key.clone()).await?;
-
-        let artifacts = match assign.stub.key.resource_type() {
-            ResourceType::ArtifactBundle => {
-                match &assign.state_src {
-                    AssignResourceStateSrc::Direct(state_set_src) => {
-
-                        let src = state_set_src.get(&"content".to_string() ).cloned().ok_or("expected content state aspect for ArtifactBundle")?;
-                        let content= src.to_bin(self.skel.machine.bin_context() )?;
-                        let artifacts = get_artifacts(content.clone() )?;
-                        let path = Self::bundle_path(assign.key())?;
-                        let mut file_access = self.file_access.with_path(path.to_relative())?;
-                        file_access
-                            .write(&Path::from_str("/bundle.zip")?, content)
-                            .await?;
-
-                        artifacts
-                    }
-                    AssignResourceStateSrc::AlreadyHosted => {
-                        // do nothing, the file should already be present in the filesystem detected by the watcher and
-                        // this call to assign is just making sure the database registry is updated
-                        vec![]
-                    }
-                    AssignResourceStateSrc::None => {
-                        return Err(Fail::Error(
-                            "ArtifactBundle state should never be None".to_string(),
-                        ));
-                    }
-                    AssignResourceStateSrc::CreateArgs(_) => {
-                        return Err(Fail::Error(
-                            "ArtifactBundle cannot be created from CreateArgs".to_string(),
-                        ));
-                    }
-                }
-            }
-            ResourceType::Artifact => {
-                vec![]
-            }
-            ResourceType::ArtifactBundleVersions=> {
-                vec![]
-            }
-            rt => {
-                return Err(Fail::WrongResourceType {
-                    expected: HashSet::from_iter(vec![
-                        ResourceType::ArtifactBundle,
-                        ResourceType::Artifact,
-                    ]),
-                    received: rt,
-                });
-            }
-        };
-
-
-        let assign = ResourceAssign {
-            stub: assign.stub.clone(),
-            state_src: DataSet::new(),
-        };
-
-        self.store.put(assign.clone()).await?;
-
-        Ok(())
-    }
-
-    async fn has(&self, key: ResourceKey) -> bool {
-        todo!()
-    }
-
-    async fn get(&self, key: ResourceKey) -> Result<Option<DataSet<BinSrc>>, Fail> {
-        self.store.get(key).await
-    }
-
-    /*
-    async fn state(&self, key: ResourceKey) -> Result<DataSet<BinSrc>, Fail> {
-        if let Ok(Option::Some(resource)) = self.store.get(key.clone()).await {
-            match key.resource_type() {
-                ResourceType::File => {
-                    let filesystem_key: FileSystemKey = resource
-                        .key()
-                        .ancestor_of_type(ResourceType::FileSystem)?
-                        .try_into()?;
-                    let filesystem_path =
-                        Path::from_str(format!("/{}", filesystem_key.to_string().as_str()).as_str())?;
-                    let path = format!(
-                        "{}{}",
-                        filesystem_path.to_string(),
-                        resource.address().last_to_string()
-                    );
-                    let data = self
-                        .file_access
-                        .read(&Path::from_str(path.as_str())?)
-                        .await?;
-                    let mut state = DataSet::new();
-                    state.insert("content".to_string(), BinSrc::Memory(data) );
-                    Ok(state)
-                }
-                _ => Ok(DataSet::new()),
-            }
-        } else {
-            Err(Fail::ResourceNotFound(key.into()))
-        }
-    }
-
-     */
-
-    async fn delete(&self, _identifier: ResourceKey) -> Result<(), Fail> {
-        unimplemented!("I don't know how to DELETE yet.");
-        Ok(())
-    }
-
-    fn shutdown(&self) {
-        self.store.close();
-        self.file_access.close();
-    }
-
-}
-
-fn get_artifacts(data: Arc<Vec<u8>>) -> Result<Vec<String>, Fail> {
+fn get_artifacts(data: Arc<Vec<u8>>) -> Result<Vec<String>, Error> {
     let temp_dir = TempDir::new("zipcheck")?;
-
     let temp_path = temp_dir.path().clone();
     let file_path = temp_path.with_file_name("file.zip");
     let mut file = File::create(file_path.as_path())?;
@@ -297,17 +50,11 @@ fn get_artifacts(data: Arc<Vec<u8>>) -> Result<Vec<String>, Fail> {
             }
             Ok(artifacts)
         }
-        Err(_error) => Err(Fail::InvalidResourceState(
-            "ArtifactBundle must be a properly formatted Zip file.".to_string(),
-        )),
+        Err(_error) => Err(
+            "ArtifactBundle must be a properly formatted Zip file.".into(),
+        ),
     }
 }
-
-
-
- */
-
-
 
 #[derive(Debug)]
 pub struct ArtifactBundleManager {
@@ -334,9 +81,9 @@ impl ResourceManager for ArtifactBundleManager {
         &self,
         assign: ResourceAssign,
     ) -> Result<(), Error> {
-        let state = match assign.state {
+        let state = match &assign.state {
             StateSrc::StatefulDirect(data) => {
-                data
+                data.clone()
             },
             StateSrc::Stateless => {
                 return Err("ArtifactBundle cannot be stateless".into())
@@ -344,9 +91,109 @@ impl ResourceManager for ArtifactBundleManager {
 
         };
 
-        // need to unzip and create Artifacts for each...
+println!("$??????? ASSIGNING ARTIFACT BUNDLE!!!!");
+        if let Payload::Primitive( Primitive::Bin(zip) ) = state.clone() {
+            let artifacts = get_artifacts(zip)?;
+            let mut address_and_kind_set = HashSet::new();
+            for artifact in artifacts {
+                let mut path = String::new();
+                let segments = artifact.split("/");
+                let segments :Vec<&str> = segments.collect();
+                for (index,segment) in segments.iter().enumerate() {
+                    path.push_str(segment);
+                    if index < segments.len()-1 {
+                        path.push_str("/");
+                    }
+                    let address = Address::from_str( format!( "{}:/{}",assign.stub.address.to_string(), path.as_str()).as_str() )?;
+                    let kind = if index < segments.len()-1 {
+                        KindParts { resource_type: "Artifact".to_string(), kind: Option::Some("Dir".to_string()), specific: None }
+                    }  else {
+                        KindParts { resource_type: "Artifact".to_string(), kind: Option::Some("Raw".to_string()), specific: None }
+                    };
+                    let address_and_kind = AddressAndKind {
+                        address,
+                        kind
+                    };
+                    address_and_kind_set.insert( address_and_kind );
+                }
+
+            }
+
+            let root_address_and_kind = AddressAndKind {
+               address: Address::from_str( format!( "{}:/",assign.stub.address.to_string()).as_str())?,
+               kind: KindParts { resource_type: "Artifact".to_string(), kind: Option::Some("Dir".to_string()), specific: None }
+            };
+
+println!("?~ ROOT: {}", root_address_and_kind.address.to_string() );
+
+            address_and_kind_set.insert( root_address_and_kind );
+
+            let mut address_and_kind_set: Vec<AddressAndKind>  = address_and_kind_set.into_iter().collect();
+
+            // shortest first will ensure that dirs are created before files
+            address_and_kind_set.sort_by(|a,b|{
+                if a.address.to_string().len() > b.address.to_string().len() {
+                    Ordering::Greater
+                } else if a.address.to_string().len() < b.address.to_string().len() {
+                    Ordering::Less
+                } else {
+                    Ordering::Equal
+                }
+            });
+            for address_and_kind in &address_and_kind_set {
+                println!("?~ ARTIFACT ADDRESS: {}", address_and_kind.address.to_string() );
+            }
+
+            {
+                let skel = self.skel.clone();
+                let assign = assign.clone();
+                tokio::spawn(async move {
+                    for address_and_kind in address_and_kind_set {
+                        println!("~~ ARTIFACT ADDRESS: {}", address_and_kind.address.to_string());
+                        println!("... last seg {}", address_and_kind.address.last_segment().expect("expected final segment").to_string());
+                        let parent = address_and_kind.address.parent().expect("expected parent");
+
+                        println!("... parent seg {}", parent.to_string());
+                        let create = Create {
+                            template: Template {
+                                address: AddressTemplate { parent: parent.clone(), child_segment_template: AddressSegmentTemplate::Exact(address_and_kind.address.last_segment().expect("expected final segment").to_string()) },
+                                kind: KindTemplate { resource_type: address_and_kind.kind.resource_type.clone(), kind: address_and_kind.kind.kind.clone(), specific: None }
+                            },
+                            state: StateSrc::Stateless,
+                            properties: vec![],
+                            strategy: Strategy::Create,
+                            registry: Default::default()
+                        };
+
+                        println!("SENDING REQUEST TO PARENT: {}", parent.to_string());
+                        let request = Request::new(ReqEntity::Rc(Rc::empty_payload(RcCommand::Create(create))), assign.stub.address.clone(), parent);
+                        let response = skel.messaging_api.exchange(request).await;
+                        match response {
+                            Ok(response) => {
+                                match response.entity {
+                                    RespEntity::Ok(_) => {
+                                        println!("added artifact: {}", address_and_kind.address.to_string());
+                                    }
+                                    RespEntity::Fail(_) => {
+                                        println!("FAILED to add artifact: {}", address_and_kind.address.to_string());
+                                    }
+                                }
+                            }
+                            _ => {
+                                println!("unexpected result");
+                            }
+                        }
+                    }
+                });
+            }
+        }
 
         self.store.put( assign.stub.address, state ).await?;
+
+        // need to unzip and create Artifacts for each...
+
+
+
         Ok(())
     }
 
@@ -358,4 +205,30 @@ impl ResourceManager for ArtifactBundleManager {
         }
     }
 
+}
+
+
+pub struct ArtifactManager {
+
+}
+
+impl ArtifactManager {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait]
+impl ResourceManager for ArtifactManager{
+    fn resource_type(&self) -> ResourceType {
+        ResourceType::Artifact
+    }
+
+    async fn assign(&self, assign: ResourceAssign) -> Result<(), Error> {
+        Ok(())
+    }
+
+    async fn has(&self, address: Address) -> bool {
+        false
+    }
 }

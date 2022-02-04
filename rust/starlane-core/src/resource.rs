@@ -613,6 +613,7 @@ pub enum ArtifactKind {
     MechtronConfig,
     BindConfig,
     Wasm,
+    Dir,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

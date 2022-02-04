@@ -22,6 +22,7 @@ use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::messaging::{Request, Response};
 use mesh_portal_serde::version::latest::payload::Payload;
 use mesh_portal_versions::version::v0_0_1::id::Tks;
+use crate::star::core::resource::manager::artifact::ArtifactManager;
 
 mod stateless;
 pub mod artifact;
@@ -159,6 +160,7 @@ impl ResourceManagerComponent{
             ResourceType::Base => Arc::new(StatelessManager::new(self.skel.clone(), ResourceType::Base ).await),
             ResourceType::ArtifactBundleSeries => Arc::new(StatelessManager::new(self.skel.clone(), ResourceType::ArtifactBundleSeries).await),
             ResourceType::ArtifactBundle=> Arc::new(ArtifactBundleManager::new(self.skel.clone()).await),
+            ResourceType::Artifact => Arc::new(ArtifactManager::new() ),
             ResourceType::App=> Arc::new(AppManager::new(self.skel.clone()).await),
             ResourceType::Mechtron => Arc::new(MechtronManager::new(self.skel.clone()).await),
             ResourceType::Database => Arc::new(K8sManager::new(self.skel.clone(), ResourceType::Database ).await.expect("K8sManager must be created without error")),

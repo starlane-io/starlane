@@ -86,7 +86,6 @@ impl MessagingApi {
     }
 
     pub fn on_reply(&self, message: StarMessage) {
-println!("on_reply() {} payload: {}", message.to.to_string(), message.payload.to_string() );
 
         if message.reply_to.is_none() {
             error!("received an on_reply message which has no reply_to");
@@ -306,7 +305,6 @@ impl MessagingComponent {
         tx: oneshot::Sender<Result<Reply, Error>>,
         description: String,
     ) {
-println!("STAR MESSAGE EXCHANGE: {}", proto.to.to_string());
 
         let id = Uuid::new_v4().to_string();
         let (timeout_tx, mut timeout_rx) = mpsc::channel(1);
@@ -354,7 +352,6 @@ println!("STAR MESSAGE EXCHANGE: {}", proto.to.to_string());
                     return;
                 }
                 ProtoStarMessageTo::Resource(address) => {
-println!("resolving : {} ", address.to_string() );
                     let record = match skel.resource_locator_api.locate(address.clone()).await {
                         Ok(record) => record,
                         Err(fail) => {
@@ -397,7 +394,6 @@ println!("resolving : {} ", address.to_string() );
                 log: proto.log,
             };
 
-println!("Sending to ROUTER (kind): {}", skel.info.kind.to_string() );
             skel.router_api.route(message).unwrap_or_default();
         });
     }

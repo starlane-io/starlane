@@ -107,11 +107,10 @@ async fn exec(args: ArgMatches<'_>) -> Result<(), Error> {
 
     let mut exchange = client.send(line).await?;
 
-    /*
     for require in requires {
         match require {
             Require::File(name) => {
-                println!("transfering: {}",name.as_str());
+                println!("transfering: '{}'",name.as_str());
                 let mut file = File::open(name.clone()).unwrap();
                 let mut buf = vec![];
                 file.read_to_end(&mut buf)?;
@@ -121,10 +120,7 @@ async fn exec(args: ArgMatches<'_>) -> Result<(), Error> {
         }
     }
 
-
     exchange.end_requires().await?;
-
-     */
 
     while let Option::Some(Ok(frame)) = exchange.read().await {
         match frame {

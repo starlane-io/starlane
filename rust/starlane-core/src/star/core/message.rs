@@ -111,6 +111,7 @@ impl MessagingEndpointComponent {
             async fn process(skel: StarSkel, resource_manager_api: ResourceManagerApi, rc: &Rc, to: Address) -> Result<Payload, Error> {
                 match &rc.command {
                     RcCommand::Create(create) => {
+println!("RC CREATE TO {}", to.to_string() );
                         let kind = match_kind(&create.template.kind)?;
                         let stub = match &create.template.address.child_segment_template {
                             AddressSegmentTemplate::Exact(child_segment) => {
@@ -123,6 +124,7 @@ impl MessagingEndpointComponent {
                                     }
                                 }
                                 let address = address?;
+println!("CREATED ADDRESS: {}", address.to_string() );
                                 let registration = Registration {
                                     address: address.clone(),
                                     kind: kind.clone(),
@@ -196,13 +198,14 @@ impl MessagingEndpointComponent {
                                 let wrangle = skel.star_wrangler_api.next(star_selector).await?;
                                 wrangle.key
                             };
+                            skel.registry_api.assign(stub.address.clone(), key.clone()).await?;
+println!("RC CREATE assigned: {}", stub.address.to_string() );
                             let mut proto = ProtoStarMessage::new();
                             proto.to(ProtoStarMessageTo::Star(key.clone()));
                             let assign = ResourceAssign::new(AssignKind::Create, stub.clone(), state);
                             proto.payload = StarMessagePayload::ResourceHost(
                                 ResourceHostAction::Assign(assign),
                             );
-                            skel.registry_api.assign(stub.address, key).await?;
                             skel.messaging_api
                                 .star_exchange(proto, ReplyKind::Empty, "assign resource to host")
                                 .await?;

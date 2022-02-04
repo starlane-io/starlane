@@ -232,8 +232,6 @@ impl RegistryComponent {
     }
 
     async fn locate(&mut self, address: Address, tx: oneshot::Sender<Result<ResourceRecord,Error>>) {
-println!("Locating '{}' star_kind '{}'", address.to_string(), self.skel.info.kind.to_string() );
-
         tx.send(Self::locate_inner(self.conn.clone(), address).await );
     }
 
@@ -889,7 +887,6 @@ impl Selector {
                 let conn = selector.conn.lock().await;
                 let mut statement = conn.prepare(statement.as_str())?;
                 let mut rows = statement.query(params_from_iter(params.iter()))?;
-
 
                 while let Option::Some(row) = rows.next()? {
                     stubs.push(RegistryComponent::process_resource_row_catch(row)?.into() );
