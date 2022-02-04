@@ -234,7 +234,7 @@ impl RegistryComponent {
 
             let mut properties = vec![];
             for key in keys {
-                let property = conn.query_row("SELECT key,value FROM properties WHERE parent=?1 AND address_segment=?2 AND key=?3", params![parent,address_segment,key], RegistryComponent::process_property )?;
+                let property = conn.query_row("SELECT key,value FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=?1 AND address_segment=?2) AND key=?3", params![parent,address_segment,key], RegistryComponent::process_property )?;
                 if property.is_some() {
                     properties.push(property.expect("property"));
                 }
@@ -248,7 +248,7 @@ impl RegistryComponent {
         match &result {
             Ok(_) => { }
             Err(err) => {
-                eprintln!("Set Properties error: {}", err.to_string());
+                eprintln!("Get Properties error: {}", err.to_string());
             }
         }
 
