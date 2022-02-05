@@ -138,9 +138,7 @@ impl ProtoResponse {
         self.from = Option::Some(from);
     }
 
-    pub fn payload(&mut self, payload: Payload) {
-        self.entity = Option::Some(RespEntity::Ok(payload));
-    }
+
 }
 
 

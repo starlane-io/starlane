@@ -81,12 +81,12 @@ impl CommandExecutor {
         let request = Request::new( entity, self.stub.address.clone(), parent );
         match self.api.exchange(request).await {
             Ok(response) => {
-                match response.entity {
-                    RespEntity::Ok(_) => {
+                match response.entity.payload() {
+                    Ok(_) => {
                         self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
                     }
-                    RespEntity::Fail(fail) => {
-                        self.output_tx.send(outlet::Frame::StdErr( fail.to_string() ) ).await;
+                    Err(err) => {
+                        self.output_tx.send(outlet::Frame::StdErr( err.to_string() ) ).await;
                         self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
                     }
                 }
@@ -104,8 +104,8 @@ impl CommandExecutor {
         let request = Request::new(entity, self.stub.address.clone(), query_root);
         match self.api.exchange(request).await {
             Ok(response) => {
-                match response.entity {
-                    RespEntity::Ok(Payload::List(list)) => {
+                match response.entity.payload() {
+                    Ok(Payload::List(list)) => {
                         for stub in list.iter() {
                             if let Primitive::Stub(stub) = stub {
                                 self.output_tx.send(outlet::Frame::StdOut( stub.clone().address_and_kind().to_string() ) ).await;
@@ -113,11 +113,11 @@ impl CommandExecutor {
                         }
                         self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
                     }
-                    RespEntity::Ok(_) => {
+                    Ok(_) => {
                         self.output_tx.send(outlet::Frame::StdErr( "unexpected response".to_string() ) ).await;
                         self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
                     }
-                    RespEntity::Fail(fail) => {
+                    Err(fail) => {
                         self.output_tx.send(outlet::Frame::StdErr( fail.to_string() ) ).await;
                         self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
                     }
@@ -147,11 +147,11 @@ impl CommandExecutor {
             let request = Request::new( entity, self.stub.address.clone(), parent );
             match self.api.exchange(request).await {
                 Ok(response) => {
-                    match response.entity {
-                        RespEntity::Ok(_) => {
+                    match response.entity.payload() {
+                        Ok(_) => {
                             self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
                         }
-                        RespEntity::Fail(fail) => {
+                        Err(fail) => {
                             self.output_tx.send(outlet::Frame::StdErr( fail.to_string() ) ).await;
                             self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
                         }
@@ -177,11 +177,11 @@ impl CommandExecutor {
         let request = Request::new( entity, self.stub.address.clone(), to );
         match self.api.exchange(request).await {
             Ok(response) => {
-                match response.entity {
-                    RespEntity::Ok(_) => {
+                match response.entity.payload() {
+                    Ok(_) => {
                         self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
                     }
-                    RespEntity::Fail(fail) => {
+                    Err(fail) => {
                         self.output_tx.send(outlet::Frame::StdErr( fail.to_string() ) ).await;
                         self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
                     }
@@ -202,8 +202,8 @@ impl CommandExecutor {
         let request = Request::new( entity, self.stub.address.clone(), to );
         match self.api.exchange(request).await {
             Ok(response) => {
-                match response.entity {
-                    RespEntity::Ok(Payload::Primitive(Primitive::Bin(bin))) => {
+                match response.entity.payload() {
+                    Ok(Payload::Primitive(Primitive::Bin(bin))) => {
                         match String::from_utf8((*bin).clone() ) {
                             Ok(text) => {
                                 self.output_tx.send(outlet::Frame::StdOut(text)).await;
@@ -215,15 +215,15 @@ impl CommandExecutor {
                             }
                         }
                     }
-                    RespEntity::Ok(Payload::Primitive(Primitive::Text(text))) => {
+                    Ok(Payload::Primitive(Primitive::Text(text))) => {
                       self.output_tx.send(outlet::Frame::StdOut(text)).await;
                       self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
                     }
-                    RespEntity::Ok(_) => {
+                    Ok(_) => {
                         self.output_tx.send(outlet::Frame::StdErr( "unexpected payload response format".to_string()) ).await;
                         self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
                     }
-                    RespEntity::Fail(fail) => {
+                    Err(fail) => {
                         self.output_tx.send(outlet::Frame::StdErr( fail.to_string() ) ).await;
                         self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
                     }

@@ -26,6 +26,7 @@ use crate::message::{ProtoStarMessage, ProtoStarMessageTo, ReplyKind, Reply};
 use crate::artifact::ArtifactBundle;
 use crate::resources::message::{ProtoRequest, MessageFrom};
 use kube::ResourceExt;
+use mesh_portal_serde::error;
 use mesh_portal_serde::version::latest::command::common::{SetLabel, StateSrc};
 use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, KindTemplate, Strategy, Template};
 use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand, ReqEntity};
@@ -112,10 +113,10 @@ impl StarlaneApi {
     pub async fn create(&self, create: Create) -> Result<ResourceStub, Error> {
         let request = Request::new(ReqEntity::Rc(Rc::new(RcCommand::Create(create.clone()))), self.agent.clone(), create.template.address.parent.clone() );
         let response = self.surface_api.exchange(request).await?;
-        if let RespEntity::Ok( Payload::Primitive(Primitive::Stub(stub)) ) =  &response.entity {
+        if let Ok( Payload::Primitive(Primitive::Stub(stub)) ) =  &response.entity.payload() {
             Ok(stub.clone())
         }
-        else if let RespEntity::Fail( fail ) = response.entity {
+        else if response.entity.is_fail() {
             Err("Could not create".into())
         } else {
             Err("unexpected response".into())
@@ -201,7 +202,7 @@ impl StarlaneApi {
         };
         let request = Request::new(ReqEntity::Rc(Rc::new(RcCommand::Get(get) )), self.agent.clone(), address);
         let response = self.surface_api.exchange(request).await?;
-        Ok(response.entity.ok_or()?)
+        Ok(response.entity.payload()?)
     }
 }
 

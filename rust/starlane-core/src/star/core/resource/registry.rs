@@ -360,7 +360,7 @@ impl RegistryComponent {
             };
             let response = skel.messaging_api.exchange(request).await?;
 
-            let parent_kind_path = response.entity.ok_or()?;
+            let parent_kind_path = response.entity.payload()?;
             let parent_kind_path: Primitive= parent_kind_path.try_into()?;
             let parent_kind_path: String= parent_kind_path.try_into()?;
 
@@ -1010,7 +1010,7 @@ impl Selector {
                 // not matching addresses so we can add all the results
                 for future in futures {
                     let response = future?;
-                    if let RespEntity::Ok( Payload::List(more_stubs)) =response.entity{
+                    if let Ok( Payload::List(more_stubs)) =response.entity.payload() {
                         let mut new_stubs = vec![];
                         for stub in more_stubs.list.into_iter() {
                             if let Primitive::Stub(stub) = stub {

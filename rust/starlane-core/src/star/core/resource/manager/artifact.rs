@@ -213,11 +213,11 @@ println!("PATH : {} ", path );
                                 let response = skel.messaging_api.exchange(request).await;
                                 match response {
                                     Ok(response) => {
-                                        match response.entity {
-                                            RespEntity::Ok(_) => {
+                                        match response.entity.payload() {
+                                            Ok(_) => {
                                                 eprintln!("added artifact: {}", address_and_kind.address.to_string());
                                             }
-                                            RespEntity::Fail(_) => {
+                                            Err(_) => {
                                                 eprintln!("FAILED to add artifact: {}", address_and_kind.address.to_string());
                                             }
                                         }

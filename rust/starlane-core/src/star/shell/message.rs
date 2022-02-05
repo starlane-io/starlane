@@ -18,7 +18,9 @@ use mysql::uuid::Uuid;
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::messaging::{Message, Request, Response};
+use mesh_portal_serde::version::latest::messaging::{Message, ProtoResponse, Request, Response};
+use mesh_portal_serde::version::latest::util::unique_id;
+use mesh_portal_versions::version::v0_0_1::parse::Res;
 use tokio::sync::oneshot::Sender;
 
 #[derive(Clone)]
@@ -102,8 +104,8 @@ impl MessagingApi {
         self.tx.try_send(call).unwrap_or_default();
     }
 
-    pub fn fail_exchange(&self, id: MessageId, fail: Error) {
-        let call = MessagingCall::FailExchange { id, fail };
+    pub fn fail_exchange(&self, id: MessageId, proto: ProtoStarMessage, fail: Error) {
+        let call = MessagingCall::FailExchange { id, proto, fail };
         self.tx.try_send(call).unwrap_or_default();
     }
 }
@@ -119,6 +121,7 @@ pub enum MessagingCall {
     TimeoutExchange(MessageId),
     FailExchange {
         id: MessageId,
+        proto: ProtoStarMessage,
         fail: Error,
     },
     Reply(StarMessage),
@@ -172,8 +175,8 @@ impl AsyncProcessor<MessagingCall> for MessagingComponent {
             MessagingCall::Reply(message) => {
                 self.on_reply(message);
             }
-            MessagingCall::FailExchange { id, fail } => {
-                self.fail_exchange(id, fail);
+            MessagingCall::FailExchange { id, proto, fail } => {
+                self.fail_exchange(id, proto, fail);
             }
 
             MessagingCall::ExchangeRequest { request, tx } => {
@@ -284,9 +287,21 @@ impl MessagingComponent {
         }
     }
 
-    fn fail_exchange(&mut self, id: MessageId, fail: Error) {
+    fn fail_exchange(&mut self, id: MessageId, proto: ProtoStarMessage, fail: Error) {
         if let Option::Some(exchanger) = self.exchanges.remove(&id) {
             exchanger.tx.send(Err(fail.into()));
+        }
+        if let StarMessagePayload::Request(request) = &proto.payload {
+            if let Option::Some(exchanger) = self.resource_exchange.remove(&request.id) {
+                let response = Response {
+                    id: unique_id(),
+                    to: request.from.clone(),
+                    from: self.skel.info.address.clone(),
+                    entity: request.entity.not_found(),
+                    response_to: request.id.clone()
+                };
+                exchanger.send(response);
+            }
         }
     }
 
@@ -360,7 +375,7 @@ impl MessagingComponent {
                                 "locator could not find resource record for: '{}'",
                                 address.to_string()
                             );
-                            skel.messaging_api.fail_exchange(id, fail.into());
+                            skel.messaging_api.fail_exchange(id.clone(), proto, fail.into());
                             return;
                         }
                     };
@@ -378,7 +393,7 @@ impl MessagingComponent {
             match proto.validate() {
                 Err(error) => {
                     skel.messaging_api
-                        .fail_exchange(id, "invalid proto message".into() );
+                        .fail_exchange(id, proto, "invalid proto message".into() );
                     return;
                 }
                 _ => {}

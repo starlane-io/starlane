@@ -150,7 +150,7 @@ impl ResourceManagerComponent{
         match process(self, request.clone()).await {
             Ok(_) => {}
             Err(error) => {
-                request.fail( mesh_portal_serde::version::latest::fail::Fail::Mesh(mesh_portal_serde::version::latest::fail::mesh::Fail::Error(error.to_string()) ))
+                request.fail( mesh_portal_serde::version::latest::fail::Fail::Mesh(mesh_portal_serde::version::latest::fail::mesh::Fail::Error(error.to_string()) ));
             }
         }
     }

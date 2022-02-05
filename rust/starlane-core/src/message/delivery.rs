@@ -99,53 +99,42 @@ impl Delivery<Request>
         }
     }
 
-    pub fn ok(self, payload: Payload)  {
-        match self.get_request() {
-            Ok(request) => {
-                    let entity = RespEntity::Ok(payload);
-                    let response = Response {
-                        id: unique_id(),
-                        to: request.from.clone(),
-                        from: request.to.clone(),
-                        entity,
-                        response_to: self.item.id
-                    };
+    pub fn ok(self, payload: Payload) -> Result<(),Error> {
+        let request = self.get_request()? ;
+        let entity = request.entity.ok(payload)?;
+        let response = Response {
+            id: unique_id(),
+            to: request.from.clone(),
+            from: request.to.clone(),
+            entity,
+            response_to: self.item.id
+        };
 
-                    let proto = self
-                        .star_message
-                        .reply(StarMessagePayload::Response(response));
+        let proto = self
+            .star_message
+            .reply(StarMessagePayload::Response(response));
 
-                    self.skel.messaging_api.star_notify(proto);
-            }
-            Err(err) => {
-                eprintln!("{}",err.to_string())
-            }
-        }
+        self.skel.messaging_api.star_notify(proto);
+        Ok(())
     }
 
-    pub fn fail(self, fail: mesh_portal_serde::version::latest::fail::Fail )  {
+    pub fn fail(self, fail: mesh_portal_serde::version::latest::fail::Fail ) ->Result<(),Error> {
 
-        match self.get_request() {
-            Ok(request) => {
-                    let entity = RespEntity::Fail(fail);
-                    let response = Response {
-                        id: unique_id(),
-                        to: request.from,
-                        from: request.to,
-                        entity,
-                        response_to: request.id
-                    };
+        let request = self.get_request()?;
+        let entity = request.entity.fail(fail)?;
+        let response = Response {
+            id: unique_id(),
+            to: request.from,
+            from: request.to,
+            entity,
+            response_to: request.id
+        };
 
-                    let proto = self
-                        .star_message
-                        .reply(StarMessagePayload::Response(response));
-                    self.skel.messaging_api.star_notify(proto);
-
-            }
-            Err(err) => {
-                eprintln!("{}",err.to_string())
-            }
-        }
+        let proto = self
+            .star_message
+            .reply(StarMessagePayload::Response(response));
+        self.skel.messaging_api.star_notify(proto);
+        Ok(())
     }
 }
 

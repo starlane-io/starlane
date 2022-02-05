@@ -24,8 +24,10 @@ use serde_json::json;
 use std::future::Future;
 use mesh_portal_serde::version::latest::entity::request::Http;
 use mesh_portal_serde::version::latest::http::HttpResponse;
-use mesh_portal_serde::version::latest::id::Meta;
+use mesh_portal_serde::version::latest::id::{Address, Meta};
+use mesh_portal_serde::version::latest::messaging;
 use mesh_portal_serde::version::latest::payload::{HttpMethod, Payload, Primitive};
+use mesh_portal_versions::version::v0_0_1::entity::request::ReqEntity;
 use nom::AsBytes;
 use crate::artifact::ArtifactRef;
 use crate::cache::ArtifactItem;
@@ -90,7 +92,7 @@ fn start(api: StarlaneApi,skel: StarSkel) {
                         let skel = skel.clone();
                         tokio::task::spawn_blocking(move || {
                             tokio::spawn(async move {
-                                match process_request(stream, api.clone(), skel).await {
+                                match process_stream(stream, api.clone(), skel).await {
                                     Ok(_) => {
                                         info!("ok");
                                     }
@@ -110,7 +112,7 @@ fn start(api: StarlaneApi,skel: StarSkel) {
     });
 }
 
-async fn process_request( mut stream: TcpStream, api: StarlaneApi, skel: StarSkel ) -> Result<(),Error>{
+async fn process_stream(mut stream: TcpStream, api: StarlaneApi, skel: StarSkel ) -> Result<(),Error>{
     info!("received HTTP Stream...");
 
     let mut request_buf: Vec<u8> = vec![];
@@ -150,12 +152,13 @@ info!("method: {}", req.method.expect("method"));
                     body
                 };
             } else {
-                println!("incomplete parse... ");
+eprintln!("incomplete parse...");
+                return Ok(())
             }
         }
     };
 
-    match create_response(request,api,skel).await {
+    match process_request(request, api, skel).await {
         Ok(response) => {
             stream.write(format!("HTTP/1.1 {} OK\r\n\r\n",response.code).as_bytes() ).await?;
 
@@ -178,23 +181,22 @@ async fn error_response( mut stream: TcpStream, code: usize, message: &str)  {
     stream.write(HTML.render("error-code-page", &messages ).unwrap().as_bytes() ).await.unwrap();
 }
 
-async fn create_response( request: Http, api: StarlaneApi, skel: StarSkel ) -> Result<HttpResponse,Error> {
+async fn process_request(http_request: Http, api: StarlaneApi, skel: StarSkel ) -> Result<HttpResponse,Error> {
 
-    // 
+    let host_and_port = host_and_port(http_request.headers.get("Host").ok_or("Missing HOST")?.as_str())?.1;
+    let entity = ReqEntity::Http(http_request);
+    let to = Address::from_str( host_and_port.host.as_str() )?;
+    let from = skel.info.address;
+    let request = messaging::Request::new( entity, from, to );
+    let response = skel.messaging_api.exchange(request).await?;
+    let mut response = response.entity.http()?;
 
-
-
-    let host_and_port = host_and_port(request.headers.get("Host").ok_or("Missing HOST")?.as_str())?.1;
-    let error = format!("Space '{}' has not been created.", host_and_port.host );
-    let messages = json!({"title": "ERROR", "message": error});
-    let body  = HTML.render("error-code-page", &messages )?;
-    let body = Option::Some(Arc::new(body.as_bytes().to_vec()));
-
-    let response = HttpResponse {
-        code: 404,
-        body,
-        headers: Default::default()
-    };
+    if response.code == 404 {
+        let error = "Not Found".to_string();
+        let messages = json!({"title": "404", "message": error});
+        let body  = HTML.render("error-code-page", &messages )?;
+        response.body = Option::Some(Arc::new(body.as_bytes().to_vec()));
+    }
 
     Ok(response)
 }
