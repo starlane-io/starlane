@@ -948,12 +948,12 @@ impl<C: Cacheable> RootItemCacheProc<C> {
         bundle_cache: ArtifactBundleCache,
     ) -> Result<Arc<X>, Error> {
         println!("root: cache_artifact: {}", artifact.address.to_string());
-        let address: Address = artifact.address.parent().ok_or("expected parent for artifact")?.into();
+        let address: Address = artifact.address.clone().to_bundle()?;
         bundle_cache.download(address.try_into()?).await?;
         println!("bundle cached : parsing: {}", artifact.address.to_string());
         let file_access = ArtifactBundleCache::with_bundle_files_path(
             bundle_cache.file_access(),
-            artifact.address.parent().ok_or("expected parent")?.try_into()?,
+            artifact.address.clone().to_bundle()?,
         )?;
         println!(
             "file acces scached : parsing: {}",

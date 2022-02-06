@@ -190,10 +190,16 @@ async fn process_request(http_request: Http, api: StarlaneApi, skel: StarSkel ) 
     let request = messaging::Request::new( entity, from, to );
     let response = skel.messaging_api.exchange(request).await?;
     let mut response = response.entity.http()?;
-
+println!("GOT RESPONSE!");
     if response.code == 404 {
         let error = "Not Found".to_string();
         let messages = json!({"title": "404", "message": error});
+        let body  = HTML.render("error-code-page", &messages )?;
+        response.body = Payload::Primitive(Primitive::Bin(Arc::new(body.as_bytes().to_vec())));
+    }
+    else if response.code == 500 {
+        let error = "Internal Server Error".to_string();
+        let messages = json!({"title": "500", "message": error});
         let body  = HTML.render("error-code-page", &messages )?;
         response.body = Payload::Primitive(Primitive::Bin(Arc::new(body.as_bytes().to_vec())));
     }

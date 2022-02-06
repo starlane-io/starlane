@@ -31,7 +31,7 @@ use mesh_portal_serde::version::latest::fail;
 use mesh_portal_serde::version::latest::http::{HttpRequest, HttpResponse};
 use mesh_portal_serde::version::latest::id::{Address, Meta};
 use mesh_portal_serde::version::latest::messaging::{Message, Request, Response};
-use mesh_portal_serde::version::latest::payload::{Payload, Primitive};
+use mesh_portal_serde::version::latest::payload::{Payload, PayloadMap, Primitive, PrimitiveList};
 use mesh_portal_serde::version::latest::resource::{ResourceStub, Status};
 use mesh_portal_versions::version::v0_0_1::config::bind::{PipelineSegment, PipelineStep, PipelineStop, Selector, StepKind};
 use mesh_portal_versions::version::v0_0_1::entity::request::get::GetOp;
@@ -93,18 +93,29 @@ impl MessagingEndpointComponent {
     async fn handle_request(&mut self, delivery: Delivery<Request>)
     {
         async fn get_bind_config( end: &mut MessagingEndpointComponent, address: Address ) -> Result<ArtifactItem<CachedConfig<BindConfig>>,Error> {
-            let bind_address = end.skel.registry_api.get_properties(address, vec!["bind".to_string()]).await?;
-            if let Some((_, bind_address)) = bind_address.last() {
-println!("BIND ADDRESS is {}", bind_address);
-                let bind_address = Address::from_str(bind_address.as_str())?;
-                let mut cache = end.skel.machine.get_proto_artifact_caches_factory().await?.create();
-                let artifact = ArtifactRef::new(bind_address, ArtifactKind::BindConfig);
-                cache.cache(vec![artifact.clone()]).await?;
-                let cache = cache.to_caches().await?;
-                Ok(cache.bind_configs.get(&artifact.address).ok_or(format!("could not cache bind {}", artifact.address.to_string()).as_str())?)
+println!("GETTING BIND ADDRESS for '{}'", address.to_string() );
+            let get = ReqEntity::Rc( Rc::new(RcCommand::Get( Get{ address:address.clone(), op: GetOp::Properties(vec!["bind".to_string()])})));
+            let request = Request::new( get, address.clone(), address.parent().unwrap() );
+println!("sending GET property for '{}'", address.to_string() );
+            let response = end.skel.messaging_api.exchange(request).await?;
+println!("got BIND property for '{}'", address.to_string() );
+
+            if let Payload::Map(map) = response.entity.payload()? {
+                if let Payload::Primitive(Primitive::Text(bind_address ))= map.get(&"bind".to_string()  ).ok_or("bind is not set" )?
+                {
+println!("BIND ADDRESS IS {}", bind_address.to_string() );
+                    let bind_address = Address::from_str(bind_address.as_str())?;
+                    let mut cache = end.skel.machine.get_proto_artifact_caches_factory().await?.create();
+                    let artifact = ArtifactRef::new(bind_address, ArtifactKind::BindConfig);
+                    cache.cache(vec![artifact.clone()]).await?;
+                    let cache = cache.to_caches().await?;
+                    return Ok(cache.bind_configs.get(&artifact.address).ok_or(format!("could not cache bind {}", artifact.address.to_string()).as_str())?);
+                }
+                else {
+                    return Err("unexpected response".into());
+                }
             } else {
-eprintln!("NO BIND ADDRESS" );
-                Err("no bind".into())
+                return Err("unexpected response".into());
             }
         }
 
@@ -133,6 +144,7 @@ eprintln!("NO BIND ADDRESS" );
                 execute(self, bind_config, delivery );
             }
             Err(_) => {
+println!("FAILED TO GET BIND");
                 delivery.fail(fail::Fail::Error("resource has no bind config".into()));
             }
         }
@@ -320,6 +332,7 @@ eprintln!("NO BIND ADDRESS" );
                         Ok(result)
                     },
                     RcCommand::Get(get) => {
+println!("RC GET...");
                         match &get.op {
                             GetOp::State => {
                                 let mut proto = ProtoStarMessage::new();
@@ -334,18 +347,17 @@ eprintln!("NO BIND ADDRESS" );
                                 }
                             }
                             GetOp::Properties(keys) => {
+println!("GET properties");
                                 let properties = skel.registry_api.get_properties(get.address.clone(), keys.clone() ).await?;
-                                let mut rtn = String::new();
-                                rtn.push_str(get.address.to_string().as_str() );
-                                rtn.push_str("{ ");
+                                let mut map = PayloadMap::new();
                                 for (index,property) in properties.iter().enumerate() {
-                                    rtn.push_str(property.0.as_str() );
-                                    rtn.push_str("=" );
-                                    rtn.push_str(property.1.as_str());
-                                }
-                                rtn.push_str(" }");
 
-                                Ok(Payload::Primitive(Primitive::Text(rtn)))
+println!("adding property {} value {}", property.0, property.1);
+
+                                    map.insert( property.0.clone(), Payload::Primitive(Primitive::Text(property.1.clone())));
+                                }
+
+                                Ok(Payload::Map(map))
                             }
                         }
                     }
