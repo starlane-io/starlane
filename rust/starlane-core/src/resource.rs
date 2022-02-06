@@ -577,6 +577,7 @@ pub enum BaseKind {
     App,
     Mechtron,
     Database,
+    Repo,
     Any,
 }
 

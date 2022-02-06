@@ -1,5 +1,4 @@
-use crate::cache::{ArtifactCaches, ArtifactItem};
-use crate::config::bind::BindConfig;
+use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
 use crate::config::mechtron::MechtronConfig;
 use crate::config::wasm::Wasm;
 use crate::error::Error;
@@ -25,6 +24,7 @@ use crate::util::AsyncHashMap;
 use std::ops::Deref;
 use mesh_portal_api_client::{ResourceCtrl, PortalSkel, ResourceCtrlFactory, ResourceSkel};
 use mesh_portal_serde::version::latest::config::{Config, ResourceConfigBody};
+use mesh_portal_serde::version::latest::config::bind::BindConfig;
 use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::messaging::{ExchangeId, Response};
 use mesh_portal_serde::version::latest::portal::inlet::Frame;
@@ -77,7 +77,7 @@ struct ExchangeInfo {
 pub struct MechtronSkel {
     pub config: ArtifactItem<MechtronConfig>,
     pub wasm: ArtifactItem<Wasm>,
-    pub bind: ArtifactItem<BindConfig>,
+    pub bind: ArtifactItem<CachedConfig<BindConfig>>,
     pub tx: mpsc::Sender<Call>,
     pub membrane: MembraneExt,
     pub resource_skel: ResourceSkel,
@@ -87,7 +87,7 @@ pub struct MechtronSkel {
 pub struct MechtronTemplate {
     pub config: ArtifactItem<MechtronConfig>,
     pub wasm: ArtifactItem<Wasm>,
-    pub bind: ArtifactItem<BindConfig>,
+    pub bind: ArtifactItem<CachedConfig<BindConfig>>,
 }
 
 impl MechtronTemplate {

@@ -88,6 +88,21 @@ impl <M> Delivery<M> where M: Clone + Send + Sync + 'static
 
 impl Delivery<Request>
 {
+    pub fn response( self, entity: RespEntity ) {
+        let response = Response {
+            id: unique_id(),
+            to: self.item.from,
+            from: self.item.to,
+            entity,
+            response_to: self.item.id
+        };
+        let proto = self
+            .star_message
+            .reply(StarMessagePayload::Response(response));
+
+        self.skel.messaging_api.star_notify(proto);
+    }
+
     pub fn result<E>( self, result: Result<Payload,E> ) where E: Into<mesh_portal_serde::version::latest::fail::Fail> {
         match result {
             Ok(payload) => {

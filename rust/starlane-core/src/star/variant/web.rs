@@ -143,7 +143,7 @@ info!("method: {}", req.method.expect("method"));
                 for index in body_offset..request_buf.len() {
                     body.push( request_buf.get(index).unwrap().clone() );
                 }
-                let body =  Option::Some(Arc::new(body));
+                let body =  Payload::Primitive(Primitive::Bin(Arc::new(body)));
 
                 break Http{
                     path: req.path.expect("expected path").to_string(),
@@ -163,7 +163,7 @@ eprintln!("incomplete parse...");
             stream.write(format!("HTTP/1.1 {} OK\r\n\r\n",response.code).as_bytes() ).await?;
 
             if response.body.is_some() {
-                stream.write( response.body.expect("expected response body").as_bytes() ).await?;
+                stream.write( response.body.to_bin()?.as_slice() ).await?;
             }
         }
         Err(e) => {
@@ -195,7 +195,7 @@ async fn process_request(http_request: Http, api: StarlaneApi, skel: StarSkel ) 
         let error = "Not Found".to_string();
         let messages = json!({"title": "404", "message": error});
         let body  = HTML.render("error-code-page", &messages )?;
-        response.body = Option::Some(Arc::new(body.as_bytes().to_vec()));
+        response.body = Payload::Primitive(Primitive::Bin(Arc::new(body.as_bytes().to_vec())));
     }
 
     Ok(response)

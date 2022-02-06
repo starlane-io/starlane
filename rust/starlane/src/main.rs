@@ -28,6 +28,7 @@ use tokio::io::AsyncReadExt;
 use starlane_core::command::cli::{CliClient, outlet};
 use starlane_core::command::cli::outlet::Frame;
 use starlane_core::command::compose::CommandOp;
+use starlane_core::command::parse::{command_line, rec_script_line};
 use starlane_core::star::shell::sys::SysCall::Create;
 
 
@@ -57,6 +58,7 @@ async fn go() -> Result<(),Error> {
                                                             SubCommand::with_name("config").subcommands(vec![SubCommand::with_name("set-shell").usage("set the shell that the starlane CLI connects to").arg(Arg::with_name("hostname").required(true).help("the hostname of the starlane instance you wish to connect to")).display_order(0),
                                                                                                                             SubCommand::with_name("get-shell").usage("get the shell that the starlane CLI connects to")]).usage("read or manipulate the cli config").display_order(1).display_order(1),
                                                             SubCommand::with_name("exec").usage("execute a command").args(vec![Arg::with_name("command_line").required(true).help("command line to execute")].as_slice()),
+                                                            SubCommand::with_name("script").usage("execute commands in a script").args(vec![Arg::with_name("script_file").required(true).help("the script file to execute")].as_slice()),
 
     ]);
 
@@ -91,6 +93,15 @@ async fn go() -> Result<(),Error> {
         }
     } else if let Option::Some(args) = matches.subcommand_matches("exec") {
         exec(args.clone()).await.unwrap();
+    } else if let Option::Some(args) = matches.subcommand_matches("script") {
+        match script(args.clone()).await {
+            Ok(_) => {
+                println!("Script OK");
+            }
+            Err(err) => {
+                eprintln!("Script Error {}", err.to_string() );
+            }
+        }
     } else {
         clap_app.print_long_help().unwrap_or_default();
     }
@@ -98,10 +109,7 @@ async fn go() -> Result<(),Error> {
     Ok(())
 }
 
-async fn exec(args: ArgMatches<'_>) -> Result<(), Error> {
-    let mut client = client().await?;
-    let line = args.value_of("command_line").ok_or("expected command line")?.to_string();
-
+async fn exec_command_line(client: CliClient, line: String) -> Result<(CliClient,i32), Error> {
     let op = CommandOp::from_str(line.as_str() )?;
     let requires = op.requires();
 
@@ -131,119 +139,50 @@ async fn exec(args: ArgMatches<'_>) -> Result<(), Error> {
                 eprintln!("{}", line);
             }
             outlet::Frame::EndOfCommand(code) => {
-                std::process::exit(code);
+                return Ok((exchange.into(), code) );
             }
         }
     }
+    Err("client disconnected unexpect".into())
+}
+
+
+async fn exec(args: ArgMatches<'_>) -> Result<(), Error> {
+    let mut client = client().await?;
+    let line = args.value_of("command_line").ok_or("expected command line")?.to_string();
+
+    let (_,code) = exec_command_line(client,line).await?;
+
+    std::process::exit(code);
 
     Ok(())
 }
 
-async fn publish(args: ArgMatches<'_>) -> Result<(), Error> {
-    unimplemented!();
-    /*
-    let bundle = Address::from_str(args.value_of("address").ok_or("expected address")?)?;
+async fn script(args: ArgMatches<'_>) -> Result<(), Error> {
+    let mut client = client().await?;
+    let script_file = args.value_of("script_file").ok_or("expected script filename")?.to_string();
 
-    let input = Path::new(args.value_of("dir").ok_or("expected directory")?);
+    let mut file = File::open(script_file ).unwrap();
+    let mut buf = vec![];
+    file.read_to_end(&mut buf)?;
+    let mut script = String::from_utf8(buf)?;
+    loop {
+        let (next,line)  = rec_script_line(script.as_str() )?;
+        println!("{}",line);
+        let (c,code) = exec_command_line(client, line.to_string() ).await?;
+        client = c;
+        if code != 0 {
+            std::process::exit(code);
+        }
+        script = next.to_string();
 
-    let mut zipfile = if input.is_dir() {
-        let zipfile = tempfile::NamedTempFile::new()?;
-        util::zip(
-            args.value_of("dir")
-                .expect("expected directory")
-                .to_string()
-                .as_str(),
-            &zipfile.reopen()?,
-            zip::CompressionMethod::Deflated,
-        )?;
-        zipfile.reopen()?
-    } else {
-        File::open(input)?
-    };
-
-    let mut data = Vec::with_capacity(zipfile.metadata()?.len() as _);
-    zipfile.read_to_end(&mut data).unwrap();
-    let data = Arc::new(data);
-
-    let starlane_api = starlane_api().await?;
-
-
-    let template = Template::new()
-    let create = starlane_api.create()
-    create.submit().await?;
-
-    Ok(())
-
-     */
-}
-
-/*
-async fn cp(args: ArgMatches<'_>) -> Result<(), Error> {
-
-    let starlane_api = starlane_api().await?;
-
-    let src = args.value_of("src").ok_or("expected src")?;
-    let dst = args.value_of("dst").ok_or( "expected dst")?;
-
-    if dst.contains(":") {
-        let dst = ResourcePath::from_str(dst)?;
-        let src = Path::new(src );
-        // copying from src to dst
-        let mut src = File::open(src )?;
-        let mut content= Vec::with_capacity(src.metadata()?.len() as _);
-        src.read_to_end(&mut content ).unwrap();
-        let content = Arc::new(content);
-        let content = BinSrc::Memory(content);
-        let mut state = DataSet::new();
-        state.insert("content".to_string(), content );
-
-        let meta = Meta::new();
-        let meta = BinSrc::Memory(Arc::new(meta.bin()?));
-        state.insert("meta".to_string(), meta );
-
-        let create = ResourceCreate {
-            parent: dst
-                .parent()
-                .ok_or("must have an address with a parent")?
-                .into(),
-            key: KeyCreationSrc::None,
-            address: AddressCreationSrc::Exact(dst),
-            archetype: ResourceArchetype {
-                kind: ResourceKind::File(FileKind::File),
-                specific: None,
-                config: ConfigSrc::None,
-            },
-            state_src: AssignResourceStateSrc::Direct(state),
-            registry_info: Option::None,
-            owner: Option::None,
-            strategy: ResourceCreateStrategy::CreateOrUpdate,
-            from: MessageFrom::Inject
-        };
-
-        starlane_api.create_resource(create).await?;
-
-        starlane_api.shutdown();
-
-    } else  if src.contains(":") {
-      let src = ResourcePath::from_str(src)?;
-      let content = starlane_api.get_resource_state(src.into()).await?.remove("content").expect("expected 'content' state aspect");
-      let filename = dst.clone();
-      let dst = Path::new(dst );
-      let mut dst = File::create(dst).expect(format!("could not open file for writing: {}", filename ).as_str() );
-      match content {
-          BinSrc::Memory(bin) => {
-              dst.write_all(bin.as_slice() ).expect(format!("could not write to file: {}", filename ).as_str() )
-          }
-      }
-    } else {
-        unimplemented!("copy from starlane to local not yet supported")
+        if script.is_empty() {
+            break;
+        }
     }
 
-    Ok(())
+    std::process::exit(0);
 }
-
- */
-
 
 
 pub async fn client() -> Result<CliClient, Error> {

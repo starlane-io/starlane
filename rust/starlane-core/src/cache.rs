@@ -8,6 +8,8 @@ use std::thread;
 
 use futures::FutureExt;
 use mesh_portal_serde::version::latest::bin::Bin;
+use mesh_portal_serde::version::latest::config::bind::BindConfig;
+use mesh_portal_serde::version::latest::config::Config;
 use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::path::Path;
 use mesh_portal_serde::version::latest::payload::Primitive;
@@ -19,7 +21,7 @@ use wasmer::{Cranelift, Store, Universal};
 
 use crate::artifact::ArtifactRef;
 use crate::config::app::{AppConfig, AppConfigParser};
-use crate::config::bind::{BindConfig, BindConfigParser };
+use crate::config::bind::BindConfigParser;
 use crate::config::mechtron::{MechtronConfig, MechtronConfigParser};
 use crate::config::wasm::{Wasm, WasmCompiler};
 use crate::error::Error;
@@ -37,6 +39,30 @@ pub type ZipFile = Address;
 pub trait Cacheable: Send + Sync + 'static {
     fn artifact(&self) -> ArtifactRef;
     fn references(&self) -> Vec<ArtifactRef>;
+}
+
+pub struct CachedConfig<T> where T: Send+Sync+'static{
+    pub artifact_ref: ArtifactRef,
+    pub item: T,
+    pub references: Vec<ArtifactRef>
+}
+
+impl <T> Deref for CachedConfig<T> where T: Send+Sync+'static{
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.item
+    }
+}
+
+impl <T> Cacheable for CachedConfig<T> where T: Send+Sync+'static{
+    fn artifact(&self) -> ArtifactRef {
+        self.artifact_ref.clone()
+    }
+
+    fn references(&self) -> Vec<ArtifactRef> {
+        self.references.clone()
+    }
 }
 
 pub struct ProtoArtifactCachesFactory {
@@ -64,7 +90,7 @@ pub struct ArtifactCaches {
     pub raw: ArtifactItemCache<Raw>,
     pub app_configs: ArtifactItemCache<AppConfig>,
     pub mechtron_configs: ArtifactItemCache<MechtronConfig>,
-    pub bind_configs: ArtifactItemCache<BindConfig>,
+    pub bind_configs: ArtifactItemCache<CachedConfig<BindConfig>>,
     pub wasms: ArtifactItemCache<Wasm>,
 //    pub http_router_config: ArtifactItemCache<HttpRouterConfig>,
 }
@@ -944,7 +970,7 @@ struct RootArtifactCaches {
     raw: RootItemCache<Raw>,
     app_configs: RootItemCache<AppConfig>,
     mechtron_configs: RootItemCache<MechtronConfig>,
-    bind_configs: RootItemCache<BindConfig>,
+    bind_configs: RootItemCache<CachedConfig<BindConfig>>,
     wasms: RootItemCache<Wasm>,
 //    http_router_configs: RootItemCache<HttpRouterConfig>
 }

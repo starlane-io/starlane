@@ -20,18 +20,29 @@ use crate::star::{StarCommand, StarKey, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use mesh_portal_serde::version::latest::fail::BadRequest;
 use std::future::Future;
+use std::sync::Arc;
 use mesh_portal_serde::version::latest::command::common::StateSrc;
+use mesh_portal_serde::version::latest::config::bind::{BindConfig, Pipeline};
+use mesh_portal_serde::version::latest::config::Config;
 use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, KindTemplate, Strategy};
-use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand, ReqEntity};
+use mesh_portal_serde::version::latest::entity::request::{Msg, Rc, RcCommand, ReqEntity};
+use mesh_portal_serde::version::latest::entity::request::get::Get;
 use mesh_portal_serde::version::latest::fail;
-use mesh_portal_serde::version::latest::http::HttpRequest;
-use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::messaging::Request;
+use mesh_portal_serde::version::latest::http::{HttpRequest, HttpResponse};
+use mesh_portal_serde::version::latest::id::{Address, Meta};
+use mesh_portal_serde::version::latest::messaging::{Message, Request, Response};
 use mesh_portal_serde::version::latest::payload::{Payload, Primitive};
 use mesh_portal_serde::version::latest::resource::{ResourceStub, Status};
+use mesh_portal_versions::version::v0_0_1::config::bind::{PipelineSegment, PipelineStep, PipelineStop, Selector, StepKind};
 use mesh_portal_versions::version::v0_0_1::entity::request::get::GetOp;
+use mesh_portal_versions::version::v0_0_1::entity::response::{PayloadResponse, RespEntity};
 use mesh_portal_versions::version::v0_0_1::id::Tks;
+use mesh_portal_versions::version::v0_0_1::pattern::{Block, HttpPattern};
+use mesh_portal_versions::version::v0_0_1::payload::CallKind;
+use regex::Regex;
 use serde::de::Unexpected::Str;
+use crate::artifact::ArtifactRef;
+use crate::cache::{ArtifactItem, CachedConfig};
 use crate::star::core::resource::manager::{ResourceManagerApi, ResourceManagerComponent};
 
 pub enum CoreMessageCall {
@@ -78,6 +89,56 @@ impl AsyncProcessor<CoreMessageCall> for MessagingEndpointComponent {
 }
 
 impl MessagingEndpointComponent {
+
+    async fn handle_request(&mut self, delivery: Delivery<Request>)
+    {
+        async fn get_bind_config( end: &mut MessagingEndpointComponent, address: Address ) -> Result<ArtifactItem<CachedConfig<BindConfig>>,Error> {
+            let bind_address = end.skel.registry_api.get_properties(address, vec!["bind".to_string()]).await?;
+            if let Some((_, bind_address)) = bind_address.last() {
+println!("BIND ADDRESS is {}", bind_address);
+                let bind_address = Address::from_str(bind_address.as_str())?;
+                let mut cache = end.skel.machine.get_proto_artifact_caches_factory().await?.create();
+                let artifact = ArtifactRef::new(bind_address, ArtifactKind::BindConfig);
+                cache.cache(vec![artifact.clone()]).await?;
+                let cache = cache.to_caches().await?;
+                Ok(cache.bind_configs.get(&artifact.address).ok_or(format!("could not cache bind {}", artifact.address.to_string()).as_str())?)
+            } else {
+eprintln!("NO BIND ADDRESS" );
+                Err("no bind".into())
+            }
+        }
+
+        fn execute( end: &mut MessagingEndpointComponent, config: ArtifactItem<CachedConfig<BindConfig>>, delivery: Delivery<Request> ) -> Result<(),Error> {
+            match &delivery.item.entity {
+                ReqEntity::Rc(_) => {panic!("rc should be filtered");}
+                ReqEntity::Msg(msg) => {
+                   let selector = config.msg.find_match(msg)?;
+                   let regex = Regex::new(selector.pattern.path_regex.as_str() )?;
+                   let exec = PipelineExecutor::new( delivery, end.skel.clone(), end.resource_manager_api.clone(), selector.pipeline, regex );
+                   exec.execute();
+                   Ok(())
+                }
+                ReqEntity::Http(http) => {
+                    let selector = config.http.find_match(http)?;
+                    let regex = Regex::new(selector.pattern.path_regex.as_str() )?;
+                    let exec = PipelineExecutor::new( delivery, end.skel.clone(), end.resource_manager_api.clone(), selector.pipeline, regex );
+                    exec.execute();
+                    Ok(())
+                }
+            }
+        }
+
+        match get_bind_config(self, delivery.to.clone() ).await {
+            Ok(bind_config) => {
+                execute(self, bind_config, delivery );
+            }
+            Err(_) => {
+                delivery.fail(fail::Fail::Error("resource has no bind config".into()));
+            }
+        }
+
+    }
+
     async fn process_resource_message(&mut self, star_message: StarMessage) -> Result<(), Error> {
         match &star_message.payload {
             StarMessagePayload::Request(request) => match &request.entity {
@@ -87,7 +148,7 @@ impl MessagingEndpointComponent {
                 }
                 _ => {
                     let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
-                    self.resource_manager_api.request(delivery).await;
+                    self.handle_request(delivery).await;
                 }
             },
 
@@ -369,4 +430,155 @@ pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
 pub struct WrappedHttpRequest {
     pub resource: Address,
     pub request: HttpRequest,
+}
+
+pub struct PipelineExecutor {
+    pub delivery: Delivery<Request>,
+    pub skel: StarSkel,
+    pub resource_manager_api: ResourceManagerApi,
+    pub pipeline: Pipeline,
+    pub path_regex: Regex
+}
+
+impl  PipelineExecutor {
+  pub fn new( delivery: Delivery<Request>, skel: StarSkel, resource_manager_api: ResourceManagerApi, pipeline: Pipeline, path_regex: Regex ) -> Self {
+      Self {
+          delivery,
+          skel,
+          resource_manager_api,
+          pipeline,
+          path_regex
+      }
+  }
+}
+
+impl PipelineExecutor {
+
+    pub fn execute( mut self ) {
+       tokio::spawn( async move {
+           async fn process( exec: &mut PipelineExecutor) -> Result<RespEntity,Error> {
+               let mut message = Message::Request( exec.delivery.item.clone() );
+               while let Option::Some(segment) = exec.pipeline.consume() {
+                   message = exec.execute_step(message, &segment.step )?;
+                   message = exec.execute_stop(message, &segment.stop ).await?;
+               }
+
+               match message {
+                   Message::Request(_) => {
+                       Err("Expecting a Response entity at the end of this pipeline".into() )
+                   }
+                   Message::Response(response) => {
+                       Ok(response.entity)
+                   }
+               }
+           }
+           match process(&mut self ).await {
+               Ok(entity) => {
+                   self.delivery.response(entity);
+               }
+               Err(error) => {
+                   self.delivery.fail(fail::Fail::Error(error.to_string()));
+               }
+           }
+       });
+    }
+
+    async fn execute_stop( &self, mut message: Message, stop: &PipelineStop ) -> Result<Message,Error> {
+       match stop {
+           PipelineStop::Internal => {
+               self.resource_manager_api.request(self.delivery.clone()).await;
+           }
+           PipelineStop::Call(call) => {
+               match &call.kind {
+                   CallKind::Rc(_) => {}
+                   CallKind::Msg(msg) => {
+                       let msg = Msg {
+                           action: msg.action.clone(),
+                           path: msg.path.clone(),
+                           payload: message.payload()?
+                       };
+                       let entity = ReqEntity::Msg(msg);
+                       let request = Request::new( entity, self.delivery.to.clone(), call.address.clone() );
+                       let response = self.skel.messaging_api.exchange(request).await?;
+                       message = Message::Response(response);
+                   }
+                   CallKind::Http(http) => {
+                       let http= HttpRequest{
+                           headers: Meta::new(),
+                           method: http.method.clone(),
+                           path: http.path.clone(),
+                           body: message.payload()?
+                       };
+                       let entity = ReqEntity::Http(http);
+                       let request = Request::new( entity, self.delivery.to.clone(), call.address.clone() );
+                       let response = self.skel.messaging_api.exchange(request).await?;
+                       message = Message::Response(response);
+                   }
+               }
+           }
+           PipelineStop::Return => {
+
+           }
+           PipelineStop::CaptureAddress(address) => {
+               let path = self.delivery.item.entity.path();
+               let captures = self.path_regex.captures( path.as_str() ).ok_or("cannot find regex captures" )?;
+               let address = address.clone().to_address(captures)?;
+               let get = ReqEntity::Rc( Rc::new(RcCommand::Get( Get{ address:address.clone(), op: GetOp::State})));
+               let request = Request::new( get, self.delivery.item.to.clone(), address.clone() );
+               let response = self.skel.messaging_api.exchange(request).await?;
+               message = Message::Response(response);
+           }
+       }
+       Ok(message)
+    }
+
+
+    fn execute_step( &self, mut message: Message, step: &PipelineStep ) -> Result<Message,Error> {
+        match &step.kind {
+            StepKind::Request => {
+                for block in &step.blocks {
+                    message = self.execute_block(message, block)?;
+                }
+            }
+            StepKind::Response => {}
+        }
+        Ok(message)
+    }
+
+    fn execute_block( &self, mut message: Message, block: &Block ) -> Result<Message,Error> {
+        match block {
+            Block::Upload(_) => {
+                return Err("upload block can only be used on the command line".into());
+            }
+            Block::RequestPattern(pattern) => {
+                if let Message::Request(request) = &message{
+                    let payload = request.entity.payload();
+                    pattern.is_match(payload)?;
+                } else {
+                    return Err("expected Request".into())
+                }
+            }
+            Block::ResponsePattern(pattern) => {
+                if let Message::Response(response) = &message{
+                    let payload = response.entity.payload()?;
+                    pattern.is_match(&payload)?;
+                } else {
+                    return Err("expected Response".into());
+                }
+            }
+            Block::CreatePayload(payload) => {
+                message = match message {
+                    Message::Request(mut request) => {
+                        request.entity = request.entity.with_new_payload(payload.clone());
+                        Message::Request(request)
+                    }
+                    Message::Response(mut response) => {
+                        response.entity = response.entity.with_new_payload(payload.clone());
+                        Message::Response(response)
+                    }
+                };
+            }
+        }
+        Ok(message)
+    }
 }
