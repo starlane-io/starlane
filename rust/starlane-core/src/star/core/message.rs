@@ -130,9 +130,12 @@ println!("BIND ADDRESS IS {}", bind_address.to_string() );
                    Ok(())
                 }
                 ReqEntity::Http(http) => {
+println!("SELECTING HTTP...");
                     let selector = config.http.find_match(http)?;
+println!("Selection made..." );
                     let regex = Regex::new(selector.pattern.path_regex.as_str() )?;
                     let exec = PipelineExecutor::new( delivery, end.skel.clone(), end.resource_manager_api.clone(), selector.pipeline, regex );
+println!("Prepping to exec pipeline...");
                     exec.execute();
                     Ok(())
                 }
@@ -141,6 +144,7 @@ println!("BIND ADDRESS IS {}", bind_address.to_string() );
 
         match get_bind_config(self, delivery.to.clone() ).await {
             Ok(bind_config) => {
+println!("GOT BIND !");
                 execute(self, bind_config, delivery );
             }
             Err(_) => {
@@ -486,6 +490,7 @@ impl PipelineExecutor {
            }
            match process(&mut self ).await {
                Ok(entity) => {
+
                    self.delivery.response(entity);
                }
                Err(error) => {
@@ -535,6 +540,7 @@ impl PipelineExecutor {
                let path = self.delivery.item.entity.path();
                let captures = self.path_regex.captures( path.as_str() ).ok_or("cannot find regex captures" )?;
                let address = address.clone().to_address(captures)?;
+println!("NEW ADDRESS: {}",address.to_string() );
                let get = ReqEntity::Rc( Rc::new(RcCommand::Get( Get{ address:address.clone(), op: GetOp::State})));
                let request = Request::new( get, self.delivery.item.to.clone(), address.clone() );
                let response = self.skel.messaging_api.exchange(request).await?;

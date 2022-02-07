@@ -256,6 +256,11 @@ println!("PATH : {} ", path );
         }
     }
 
+    async fn get(&self, address: Address) -> Result<Payload,Error> {
+        self.store.get(address).await
+    }
+
+
 }
 
 #[derive(Debug)]

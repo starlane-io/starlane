@@ -301,6 +301,7 @@ impl RegistryComponent {
         let record = statement.query_row(params!(parent.to_string(),address_segment), RegistryComponent::process_resource_row_catch)?;
         Ok(record)
     }
+
     async fn sequence(&mut self, address: Address, tx: oneshot::Sender<Result<u64,Error>>) {
         async fn process(skel: StarSkel, conn:Arc<Mutex<Connection>>, address: Address) -> Result<u64, Error> {
             let conn = conn.lock().await;

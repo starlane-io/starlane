@@ -147,7 +147,6 @@ impl StateStoreFS {
     }
 
     async fn get(&self, address: Address ) -> Result<Payload, Error> {
-println!("getting address: '{}'", address.to_string() );
         let machine_filesystem = self.skel.machine.machine_filesystem();
         let mut data_access = machine_filesystem.data_access();
 
@@ -155,19 +154,15 @@ println!("getting address: '{}'", address.to_string() );
             format!("/stars/{}/states/{}/payload.bin", self.skel.info.key.to_string(), address.to_safe_filename()).as_str(),
         )?;
 
-println!("state path: '{}'", state_path.to_string() );
-
         let bin = data_access.read(&state_path).await?;
         let payload: Payload = bincode::deserialize(bin.as_slice())?;
         Ok(payload)
     }
 
     async fn has(&self, address: Address ) -> Result<bool,Error> {
-
         let state_path = Path::from_str(
             format!("/stars/{}/states/{}/payload.bin", self.skel.info.key.to_string(), address.to_safe_filename()).as_str(),
         )?;
-
 
         let machine_filesystem = self.skel.machine.machine_filesystem();
         let data_access = machine_filesystem.data_access();

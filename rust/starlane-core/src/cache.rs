@@ -241,8 +241,15 @@ impl ProtoArtifactCacheProc {
             let claim = root_caches.claim(artifact).await;
             println!("claimed...");
             if let Some(claim) = claim {
+                match &claim {
+                    Ok(_) => {}
+                    Err(err) => {
+                        println!("CLAIM ERROR: {}", err.to_string() );
+                    }
+                }
                 let claim = claim?;
                 let references = claim.references();
+                println!("pre put...");
                 claims.put(claim.artifact.clone(), claim).await?;
                 println!("put...");
                 for reference in references {
@@ -250,6 +257,8 @@ impl ProtoArtifactCacheProc {
                         more.push(reference);
                     }
                 }
+            } else {
+                println!("NO claim");
             }
             println!("processed artifact...");
         }
@@ -396,6 +405,13 @@ impl ArtifactBundleCacheRunner {
                     }
                 }
                 ArtifactBundleCacheCommand::Result { bundle, result } => {
+println!("~~ CACHE NOTIFYING OF RESULT: {} ",result.is_err() );
+match &result {
+    Ok(_) => {}
+    Err(err) => {
+        eprintln!("CACHE ERROR: {}",err.to_string() );
+    }
+}
                     let notifiers = self.notify.remove(&bundle);
                     if let Option::Some(mut notifiers) = notifiers {
                         for notifier in notifiers.drain(..) {
@@ -428,7 +444,6 @@ impl ArtifactBundleCacheRunner {
         machine: StarlaneMachine,
         logger: AuditLogger,
     ) -> Result<(), Error> {
-        let bundle: Address = bundle.into();
         println!("download&extract src.fetch_resource_record...");
         let record = src.fetch_resource_record(bundle.clone()).await?;
         println!("download&extract src.fetch_resource_record DONE");
@@ -530,8 +545,8 @@ impl ArtifactBundleSrc {
     ) -> Result<Bin, Error> {
         Ok(match self {
             ArtifactBundleSrc::STARLANE_API(api) => {
-                                let bundle: Primitive = api.get_state(address).await?.try_into()?;
-                                bundle.try_into()?
+                                let payload = api.get_state(address).await?;
+                                payload.to_bin()?
             }
             //            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(address).await,
         })
@@ -889,6 +904,7 @@ impl<C: Cacheable> AsyncProcessor<RootItemCacheCall<C>> for RootItemCacheProc<C>
                 }
             }
             RootItemCacheCall::Signal { artifact, result } => {
+println!("SIGNAL! {}", result.is_ok());
                 if let Option::Some(txs) = self.signal_map.remove(&artifact) {
                     for tx in txs {
                         tx.send(result.clone());
@@ -959,7 +975,7 @@ impl<C: Cacheable> RootItemCacheProc<C> {
             "file acces scached : parsing: {}",
             artifact.address.to_string()
         );
-        let data = file_access.read(&artifact.trailing_path()?).await?;
+        let data = file_access.read(&Path::from_str(&artifact.address.filepath().ok_or("must be an address with a filesystem")?.to_string().as_str())? ).await?;
         println!("root: parsing: {}", artifact.address.to_string());
         parser.parse(artifact, data)
     }
