@@ -16,16 +16,13 @@ use crate::star::{StarCommand, StarSkel};
 use crate::util;
 use crate::fail::Fail;
 use crate::frame::{StarMessage, StarMessagePayload, SimpleReply};
-use crate::mesh::serde::id::Address;
-use crate::mesh::Request;
-use crate::mesh::serde::entity::response::RespEntity;
-use crate::mesh::serde::payload::Payload;
-use crate::mesh::Response;
 use mesh_portal_serde::version::latest::util::unique_id;
-use crate::mesh::serde::messaging::Exchange;
 use crate::message::Reply;
-use crate::mesh::serde::entity::request::Rc;
 use std::ops::Deref;
+use mesh_portal_serde::version::latest::entity::response::RespEntity;
+use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::messaging::{Request, Response};
+use mesh_portal_serde::version::latest::payload::Payload;
 
 #[derive(Clone)]
 pub struct Delivery<M>
@@ -89,9 +86,24 @@ impl <M> Delivery<M> where M: Clone + Send + Sync + 'static
   }
 }
 
-impl <M> Delivery<M> where M: Clone + Send + Sync + 'static
+impl Delivery<Request>
 {
-    pub fn result<E>( self, result: Result<Payload,E> ) where E: Into<crate::mesh::serde::fail::Fail> {
+    pub fn response( self, entity: RespEntity ) {
+        let response = Response {
+            id: unique_id(),
+            to: self.item.from,
+            from: self.item.to,
+            entity,
+            response_to: self.item.id
+        };
+        let proto = self
+            .star_message
+            .reply(StarMessagePayload::Response(response));
+
+        self.skel.messaging_api.star_notify(proto);
+    }
+
+    pub fn result<E>( self, result: Result<Payload,E> ) where E: Into<mesh_portal_serde::version::latest::fail::Fail> {
         match result {
             Ok(payload) => {
                 self.ok(payload);
@@ -102,62 +114,42 @@ impl <M> Delivery<M> where M: Clone + Send + Sync + 'static
         }
     }
 
-    pub fn ok(self, payload: Payload)  {
+    pub fn ok(self, payload: Payload) -> Result<(),Error> {
+        let request = self.get_request()? ;
+        let entity = request.entity.ok(payload)?;
+        let response = Response {
+            id: unique_id(),
+            to: request.from.clone(),
+            from: request.to.clone(),
+            entity,
+            response_to: self.item.id
+        };
 
-        match self.get_request() {
-            Ok(request) => {
-                if let Exchange::RequestResponse( exchange ) = request.exchange {
+        let proto = self
+            .star_message
+            .reply(StarMessagePayload::Response(response));
 
-                    let entity = RespEntity::Ok(payload);
-                    let response = Response {
-                        id: unique_id(),
-                        to: request.from.clone(),
-                        from: request.to.clone(),
-                        entity,
-                        exchange,
-                    };
-
-                    let proto = self
-                        .star_message
-                        .reply(StarMessagePayload::Response(response));
-                    self.skel.messaging_api.star_notify(proto);
-                } else {
-                    eprintln!("cannot respond to a Notification exchange")
-                }
-            }
-            Err(err) => {
-                eprintln!("{}",err.to_string())
-            }
-        }
+        self.skel.messaging_api.star_notify(proto);
+        Ok(())
     }
 
-    pub fn fail(self, fail: crate::mesh::serde::fail::Fail )  {
+    pub fn fail(self, fail: mesh_portal_serde::version::latest::fail::Fail ) ->Result<(),Error> {
 
-        match self.get_request() {
-            Ok(request) => {
-                if let Exchange::RequestResponse( exchange ) = request.exchange {
+        let request = self.get_request()?;
+        let entity = request.entity.fail(fail)?;
+        let response = Response {
+            id: unique_id(),
+            to: request.from,
+            from: request.to,
+            entity,
+            response_to: request.id
+        };
 
-                    let entity = RespEntity::Fail(fail);
-                    let response = Response {
-                        id: unique_id(),
-                        to: request.from.clone(),
-                        from: request.to.clone(),
-                        entity,
-                        exchange,
-                    };
-
-                    let proto = self
-                        .star_message
-                        .reply(StarMessagePayload::Response(response));
-                    self.skel.messaging_api.star_notify(proto);
-                } else {
-                    eprintln!("cannot respond to a Notification exchange")
-                }
-            }
-            Err(err) => {
-                eprintln!("{}",err.to_string())
-            }
-        }
+        let proto = self
+            .star_message
+            .reply(StarMessagePayload::Response(response));
+        self.skel.messaging_api.star_notify(proto);
+        Ok(())
     }
 }
 

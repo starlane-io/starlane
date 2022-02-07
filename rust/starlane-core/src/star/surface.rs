@@ -1,12 +1,16 @@
 use std::sync::Arc;
+use mesh_portal_serde::version::latest::entity::request::create::{AddressTemplate, Template};
+use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::messaging::{Message, Request, Response};
+use mesh_portal_serde::version::latest::resource::ResourceStub;
 
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
-use crate::frame::{StarPattern};
-use crate::message::{ProtoStarMessage, ReplyKind, Reply};
+use crate::frame::{StarMessagePayload, StarPattern};
+use crate::message::{ProtoStarMessage, ReplyKind, Reply, ProtoStarMessageTo};
 use crate::resource::{ResourceRecord };
 use crate::star::{StarCommand, StarSkel, StarInfo};
 use crate::star::shell::locator::ResourceLocateCall;
@@ -14,11 +18,7 @@ use crate::star::shell::message::MessagingCall;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::watch::{WatchSelector, Notification, Topic, Watch, WatchResourceSelector, Watcher};
 use crate::star::shell::search::SearchHits;
-use crate::mesh::serde::resource::command::create::AddressTemplate;
-use crate::mesh::serde::id::Address;
 use crate::resources::message::ProtoRequest;
-use crate::mesh::Response;
-use crate::mesh::serde::messaging::ExchangeType;
 
 #[derive(Clone)]
 pub struct SurfaceApi {
@@ -35,23 +35,26 @@ impl SurfaceApi {
         Ok(())
     }
 
+    pub async fn create_sys_resource( &self, template: Template, messenger_tx: mpsc::Sender<Message> ) -> Result<ResourceStub,Error> {
+        let (tx, rx) = oneshot::channel();
+        self.tx.send(SurfaceCall::CreateSysResource {template, messenger_tx, tx }).await;
+        Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
+    }
+
     pub async fn locate(&self, address: Address ) -> Result<ResourceRecord, Error> {
         let (tx, rx) = oneshot::channel();
         self.tx.try_send(SurfaceCall::Locate { address: address, tx })?;
         Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
     }
 
-    pub fn notify( &self, mut request: ProtoRequest ) {
-        request.exchange = ExchangeType::Notification;
+    pub fn notify( &self, mut request: Request ) {
         self.tx.try_send(SurfaceCall::Notify(request));
     }
 
-    pub async fn exchange( &self, mut request: ProtoRequest ) -> Result<Response,Error> {
-        request.exchange = ExchangeType::RequestResponse;
+    pub async fn exchange( &self, request: Request ) -> Result<Response,Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(SurfaceCall::Exchange{request,tx}).await;
-
-        Ok(rx.await??)
+        self.tx.send( SurfaceCall::Request {request, tx }).await;
+        rx.await?
     }
 
 
@@ -106,12 +109,12 @@ pub enum SurfaceCall {
         tx: oneshot::Sender<Result<Reply, Error>>,
         description: String,
     },
-    Notify(ProtoRequest),
-    Exchange{request: ProtoRequest, tx: oneshot::Sender<Result<Response,Error>>},
+    Notify(Request),
     Watch{ selector: WatchResourceSelector, tx: oneshot::Sender<Result<Watcher,Error>> },
     StarSearch{ star_pattern: StarPattern, tx: oneshot::Sender<Result<SearchHits,Error>>},
     RequestStarAddress { address_template: AddressTemplate, tx: oneshot::Sender<Result<Address,Error>> },
-
+    CreateSysResource{template:Template, messenger_tx: mpsc::Sender<Message>, tx:oneshot::Sender<Result<ResourceStub,Error>>},
+    Request{ request: Request, tx:oneshot::Sender<Result<Response,Error>>}
 }
 
 impl Call for SurfaceCall {}
@@ -187,8 +190,14 @@ println!("SurfaceApi: go watch listener {}",listener.is_ok());
             SurfaceCall::Notify(request) => {
                 self.skel.messaging_api.notify(request).await;
             }
-            SurfaceCall::Exchange { request, tx } => {
-                tx.send(self.skel.messaging_api.exchange(request).await.into());
+            SurfaceCall::CreateSysResource{template,messenger_tx, tx} => {
+                tx.send(self.skel.sys_api.create(template, messenger_tx).await);
+            }
+            SurfaceCall::Request { request, tx  } => {
+                let skel = self.skel.clone();
+                tokio::spawn ( async move {
+                     tx.send(skel.messaging_api.exchange(request).await);
+                });
             }
         }
     }

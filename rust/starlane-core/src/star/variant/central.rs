@@ -1,5 +1,6 @@
 use std::str::FromStr;
 use std::sync::Arc;
+use mesh_portal_serde::version::latest::entity::request::create::Strategy;
 
 use tokio::sync::{mpsc, oneshot};
 
@@ -9,20 +10,19 @@ use crate::resource::{Kind, ResourceRecord,  ResourceLocation};
 use crate::star::{StarKey, StarSkel};
 use crate::star::variant::{FrameVerdict, VariantCall};
 use crate::starlane::api::StarlaneApi;
+use crate::user::HyperUser;
 use crate::util::{AsyncProcessor, AsyncRunner};
-use crate::mesh::serde::generic::resource::ResourceStub;
-use crate::mesh::serde::id::Address;
-use crate::mesh::serde::resource::command::create::Strategy;
-use crate::mesh::serde::resource::Status;
 
 pub struct CentralVariant {
     skel: StarSkel,
+    initialized: bool
 }
 
 impl CentralVariant {
     pub fn start(skel: StarSkel, rx: mpsc::Receiver<VariantCall>) {
         AsyncRunner::new(
-            Box::new(Self { skel: skel.clone() }),
+            Box::new(Self { skel: skel.clone(),
+            initialized: false}),
             skel.variant_api.tx.clone(),
             rx,
         );
@@ -45,12 +45,20 @@ impl AsyncProcessor<VariantCall> for CentralVariant {
 
 
 impl CentralVariant {
-    fn init_variant(&self, tx: oneshot::Sender<Result<(), Error>>) {
+    fn init_variant(&mut self, tx: oneshot::Sender<Result<(), Error>>) {
+        if self.initialized == true {
+            tx.send(Ok(()));
+            return;
+        } else {
+            self.initialized = true;
+        }
 
         let skel = self.skel.clone();
 
         tokio::spawn(async move {
-            let starlane_api = StarlaneApi::new(skel.surface_api.clone());
+            skel.sys_api.create( HyperUser::template(), HyperUser::messenger()  ).await;
+
+            let starlane_api = StarlaneApi::new(skel.surface_api.clone(), skel.info.address.clone() );
             let result = Self::ensure(starlane_api).await;
             if let Result::Err(error) = result.as_ref() {
                 error!("Central Init Error: {}", error.to_string());
@@ -62,11 +70,9 @@ impl CentralVariant {
 
 impl CentralVariant {
     async fn ensure(starlane_api: StarlaneApi) -> Result<(), Error> {
-
         let mut creation = starlane_api.create_space("space", "Space").await?;
         creation.set_strategy(Strategy::Ensure);
         creation.submit().await?;
-
         Ok(())
     }
 }

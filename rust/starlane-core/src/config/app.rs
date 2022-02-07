@@ -9,7 +9,7 @@ use crate::error::Error;
 use crate::config::app::yaml::AppConfigYaml;
 use std::str::FromStr;
 use std::convert::TryInto;
-use crate::mesh::serde::id::Address;
+use mesh_portal_serde::version::latest::id::Address;
 
 pub struct AppConfig {
     artifact: Address,

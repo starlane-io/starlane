@@ -2,21 +2,16 @@ use std::collections::HashSet;
 use std::convert::{Infallible, TryInto};
 use std::iter::FromIterator;
 use std::string::FromUtf8Error;
+use mesh_portal_serde::version::latest::entity::request::ReqEntity;
+use mesh_portal_serde::version::latest::entity::response::RespEntity;
+use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::messaging::{ExchangeId, ExchangeType, Request, Response};
+use mesh_portal_serde::version::latest::payload::Payload;
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-
-
 use crate::error::Error;
-use crate::mesh::serde::entity::request::ReqEntity;
-use crate::mesh::serde::entity::response::RespEntity;
-use crate::mesh::serde::messaging::ExchangeType;
-use crate::mesh::serde::messaging::Exchange;
-use crate::mesh::serde::messaging::ExchangeId;
-use crate::mesh::Request;
-use crate::mesh::Response;
-use crate::mesh::serde::id::Address;
-use crate::mesh::serde::payload::Payload;
+
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
 use crate::frame::StarMessagePayload;
 
@@ -79,12 +74,6 @@ impl ProtoRequest {
             entity: self
                 .entity
                 .ok_or("need to set an entity in ProtoRequest")?,
-            exchange: match self.exchange {
-                ExchangeType::Notification => {Exchange::Notification}
-                ExchangeType::RequestResponse => {
-                    Exchange::RequestResponse(uuid::Uuid::new_v4().to_string())
-                }
-            }
         })
     }
 
@@ -128,8 +117,9 @@ impl ProtoResponse {
     }
 
     pub fn create(self) -> Result<Response, Error> {
+        unimplemented!();
 
-        Ok(Response{
+/*        Ok(Response{
             id: self.id.to_string(),
             to: self.to,
             from: self.from.ok_or("need to set 'from' in ProtoMessageReply")?,
@@ -140,15 +130,15 @@ impl ProtoResponse {
                 entity
                 .ok_or("need to set an entity in ProtoMessageReply")?,
         })
+
+ */
     }
 
     pub fn from(&mut self, from: Address ) {
         self.from = Option::Some(from);
     }
 
-    pub fn payload(&mut self, payload: Payload) {
-        self.entity = Option::Some(RespEntity::Ok(payload));
-    }
+
 }
 
 

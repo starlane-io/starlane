@@ -1,4 +1,4 @@
-use crate::mesh::serde::fail;
+use mesh_portal_serde::version::latest::fail;
 
 use serde::{Serialize,Deserialize};
 

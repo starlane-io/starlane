@@ -9,20 +9,16 @@ use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util::AsyncHashMap;
 use crate::message::delivery::Delivery;
-use crate::mesh::serde::payload::Payload;
-use crate::mesh::serde::entity::request::{Msg, Http};
-use mesh_portal_api::message::Message;
-use crate::mesh::serde::id::Address;
-use crate::mesh::serde::resource::Properties;
+use mesh_portal_serde::version::latest::command::common::StateSrc;
+use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::messaging::Request;
+use mesh_portal_serde::version::latest::payload::{Payload, PayloadPattern, Primitive};
+use mesh_portal_serde::version::latest::resource::Properties;
+use mesh_portal_versions::version::v0_0_1::pattern::consume_data_struct_def;
+use mesh_portal_versions::version::v0_0_1::util::ValueMatcher;
+
 use crate::fail::Fail;
-use crate::mesh::serde::generic::payload::{MapPattern, PayloadPattern};
-use mesh_portal_serde::version::v0_0_1::util::{ValueMatcher, ConvertFrom};
-use mesh_portal_serde::version::v0_0_1::generic::payload::Primitive;
-use mesh_portal_serde::version::v0_0_1::pattern::consume_data_struct_def;
-use mesh_portal_serde::version::v0_0_1::parse::address;
 use crate::message::Reply;
-use crate::mesh::Request;
-use crate::mesh::serde::resource::command::common::StateSrc;
 
 lazy_static!{
 

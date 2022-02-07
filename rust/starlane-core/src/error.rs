@@ -18,6 +18,7 @@ use zip::result::ZipError;
 use wasmer::{CompileError, ExportError, RuntimeError};
 use actix_web::ResponseError;
 use handlebars::RenderError;
+use tokio::task::JoinError;
 use crate::fail::Fail;
 use crate::star::core::resource::registry::RegError;
 
@@ -58,7 +59,11 @@ impl From<ZipError> for Error {
         }
     }
 }
-
+impl From<mesh_portal_serde::error::Error> for Error {
+    fn from(e: mesh_portal_serde::error::Error) -> Self {
+        e.to_string().into()
+    }
+}
 
 impl From<kube::Error> for Error {
     fn from(e: kube::Error) -> Self {
@@ -350,29 +355,7 @@ impl From<regex::Error> for Error {
     }
 }
 
-impl From<mesh_portal_serde::error::Error> for Error {
-    fn from(e: mesh_portal_serde::error::Error) -> Self {
-        Self {
-            error: e.to_string()
-        }
-    }
-}
 
-
-
-impl From<crate::mesh::serde::fail::Fail> for Error {
-    fn from(e: crate::mesh::serde::fail::Fail) -> Self {
-        Self {
-            error: e.to_string()
-        }
-    }
-}
-
-impl Into<crate::mesh::serde::fail::Fail> for Error {
-    fn into(self) -> crate::mesh::serde::fail::Fail {
-        crate::mesh::serde::fail::Fail::Mesh(crate::mesh::serde::fail::mesh::Fail::Error(self.to_string()))
-    }
-}
 
 
 impl From<ExportError> for Error {
@@ -400,6 +383,28 @@ impl From<RegError> for Error {
                 }
             }
             RegError::Error(error) => {error}
+        }
+    }
+}
+
+impl Into<mesh_portal_serde::version::latest::fail::Fail> for Error {
+    fn into(self) -> mesh_portal_serde::version::latest::fail::Fail {
+        mesh_portal_serde::version::latest::fail::Fail::Error(self.to_string())
+    }
+}
+
+impl From<anyhow::Error> for Error {
+    fn from(error: anyhow::Error) -> Self {
+        Error {
+            error: error.to_string()
+        }
+    }
+}
+
+impl From<JoinError> for Error {
+    fn from(error: JoinError) -> Self {
+        Error {
+            error: error.to_string()
         }
     }
 }

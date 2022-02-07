@@ -4,11 +4,10 @@ use std::sync::Arc;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use kube::api::{ListParams, PostParams};
 use kube::Api;
+use mesh_portal_serde::version::latest::id::Address;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
-use crate::mesh::serde::id::{Address, KindParts};
-use crate::mesh::serde::payload::Payload;
 use crate::resource::{AssignResourceStateSrc, Kind, ResourceAssign, ResourceType};
 use crate::star::core::resource::manager::ResourceManager;
 use crate::star::StarSkel;

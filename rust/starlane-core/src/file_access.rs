@@ -15,11 +15,11 @@ use walkdir::WalkDir;
 
 use crate::error::Error;
 use crate::resource::FileKind;
-use mesh_portal_serde::version::v0_0_1::path::Path;
 
 use crate::util;
 use std::convert::TryFrom;
 use std::convert::TryInto;
+use mesh_portal_serde::version::latest::path::Path;
 use tokio::fs::ReadDir;
 
 pub enum FileCommand {
@@ -295,9 +295,7 @@ impl LocalFileAccess {
     }
 
     pub fn cat_path(&self, path: &str) -> Result<String, Error> {
-        if path.len() < 1 {
-            return Err("path cannot be empty".into());
-        }
+println!("PATH '{}'", path );
 
         let mut path_str = path.to_string();
         if path_str.starts_with("/") {
@@ -356,6 +354,7 @@ impl LocalFileAccess {
 
     pub fn read(&self, path: &Path) -> Result<Arc<Vec<u8>>, Error> {
         let path = self.cat_path(path.to_relative().as_str())?;
+println!("READING PATH: {}", path );
         let mut buf = vec![];
         let mut file = match File::open(&path) {
             Ok(file) => {file}
@@ -369,10 +368,12 @@ impl LocalFileAccess {
 
     pub fn write(&mut self, path: &Path, data: Arc<Vec<u8>>) -> Result<(), Error> {
         if let Option::Some(parent) = path.parent() {
+println!("MKDIR... {}", parent.to_string() );
             self.mkdir(&parent)?;
         }
 
-        let path = self.cat_path(path.to_relative().as_str())?;
+println!("WRITE PATH: {} to_relative() {}", path.to_string(), path.to_relative() );
+        let path = self.cat_path(path.to_string().as_str())?;
         let mut file = File::create(&path)?;
         file.write(data.as_slice()).unwrap();
 
@@ -399,6 +400,7 @@ impl LocalFileAccess {
         let path = self.cat_path(path.to_relative().as_str())?;
         let mut builder = DirBuilder::new();
         builder.recursive(true);
+println!("Creating path: {} ", path.to_string() );
         builder.create(path.clone())?;
         Ok(())
     }

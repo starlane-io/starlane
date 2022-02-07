@@ -1,5 +1,7 @@
 use std::fmt;
 use std::fmt::{Debug, Formatter};
+use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::messaging::{Request, Response};
 
 use semver::SemVerError;
 use serde::{Deserialize, Serialize};
@@ -14,11 +16,7 @@ use crate::message::{MessageExpect, MessageUpdate, ProtoStarMessage, MessageId, 
 use crate::message::delivery::ActorMessage;
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey};
 use crate::watch::{Notification, Watch, WatchKey};
-use crate::mesh;
-use crate::mesh::serde::resource::ResourceStub;
-use crate::mesh::serde::http::HttpResponse;
 use crate::resource::{ResourceType, ResourceAssign, AssignResourceStateSrc, ResourceRecord};
-use crate::mesh::serde::id::Address;
 use crate::fail::{Fail, StarlaneFailure};
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
@@ -337,8 +335,8 @@ impl StarMessage {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum StarMessagePayload {
     None,
-    Request(crate::mesh::Request),
-    Response(crate::mesh::Response),
+    Request(Request),
+    Response(Response),
     ResourceRegistry(ResourceRegistryRequest),
     ResourceHost(ResourceHostAction),
 //    Space(SpaceMessage),
@@ -375,6 +373,7 @@ pub enum ResourceHostAction {
     //IsHosting(Address),
     Assign(ResourceAssign),
     Init(Address),
+    GetState(Address)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

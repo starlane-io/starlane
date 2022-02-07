@@ -6,8 +6,8 @@ use std::sync::Arc;
 use crate::error::Error;
 use std::str::FromStr;
 use std::convert::TryInto;
+use mesh_portal_serde::version::latest::id::Address;
 use wasmer::{Cranelift, Universal, Store, Module};
-use crate::mesh::serde::id::Address;
 
 pub struct Wasm {
     pub artifact: Address,

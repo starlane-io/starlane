@@ -1,20 +1,23 @@
 use std::cell::Cell;
 
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use std::sync::{Arc, Mutex};
 
 use std::time::Duration;
 
 use futures::future::join_all;
-use futures::{FutureExt, StreamExt};
+use futures::{FutureExt, StreamExt, TryFutureExt};
 
 use serde::{Deserialize, Serialize};
+use tokio::io::AsyncReadExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
 use tokio::sync::{broadcast, mpsc};
 
 use crate::cache::ProtoArtifactCachesFactory;
+use crate::command::cli::CliServer;
 use crate::constellation::{Constellation, ConstellationStatus};
 use crate::error::Error;
 use crate::file_access::FileAccess;
@@ -37,6 +40,7 @@ use crate::template::{
     StarInConstellationTemplateSelector, StarKeyConstellationIndexTemplate,
     StarKeySubgraphTemplate, StarKeyTemplate, StarSelector, StarTemplate, StarTemplateHandle,
 };
+use crate::user::HyperUser;
 use crate::util::AsyncHashMap;
 
 pub mod api;
@@ -188,6 +192,15 @@ impl StarlaneMachineRunner {
         })
     }
 
+    pub async fn get_starlane_api(&self) -> Result<StarlaneApi, Error> {
+        let (tx, rx) = oneshot::channel();
+        self.command_tx
+            .send(StarlaneCommand::StarlaneApiSelectBest(tx))
+            .await?;
+        rx.await?
+    }
+
+
     pub fn run(mut self) -> broadcast::Sender<()> {
         let command_tx = self.command_tx.clone();
         tokio::spawn(async move {
@@ -255,9 +268,9 @@ impl StarlaneMachineRunner {
 
                         let (_info, star_ctrl) = best.unwrap();
 
-                        tx.send(Ok(StarlaneApi::with_starlane_ctrl(
+                        tx.send(Ok(StarlaneApi::new(
                             star_ctrl.surface_api,
-                            self.command_tx.clone(),
+                            HyperUser::address(),
                         )));
                     }
                     StarlaneCommand::Shutdown => {
@@ -289,23 +302,70 @@ impl StarlaneMachineRunner {
                     StarlaneCommand::Listen(tx) => {
                         self.listen(tx);
                     }
-                    StarlaneCommand::AddStream(stream) => {
-                        match self.select_star_kind(&StarKind::Gateway).await {
-                            Ok(Option::Some(star_ctrl)) => {
-                                match self.add_server_side_lane_ctrl(star_ctrl, stream,OnCloseAction::Remove).await {
-                                    Ok(_result) => {}
-                                    Err(error) => {
-                                        error!("{}", error);
+                    StarlaneCommand::AddStream(mut stream) => {
+
+                        async fn service_select( stream: &mut TcpStream ) -> Result<ServiceSelection,Error> {
+                            let size = stream.read_u32().await? as usize;
+
+                            let mut vec= vec![0 as u8; size];
+                            let buf = vec.as_mut_slice();
+                            stream.read_exact(buf).await?;
+
+                            let selection = String::from_utf8(vec)?;
+println!("SERVICE SELECTION {} ", selection );
+                            let selection = ServiceSelection::from_str( selection.as_str() )?;
+                            Ok(selection)
+                        }
+
+                        let service = service_select( & mut stream ).await;
+                        if service.is_err() {
+                            eprintln!("bad service selection");
+                            return;
+                        }
+
+                        let service = service.expect("expected service selection");
+
+                        match service {
+                            ServiceSelection::Gateway => {
+                                match self.select_star_kind(&StarKind::Gateway).await {
+                                    Ok(Option::Some(star_ctrl)) => {
+                                        match self.add_server_side_lane_ctrl(star_ctrl, stream,OnCloseAction::Remove).await {
+                                            Ok(_result) => {}
+                                            Err(error) => {
+                                                error!("{}", error);
+                                            }
+                                        }
+                                    }
+                                    Ok(Option::None) => {
+                                        error!("cannot find StarController for kind: StarKind::Gateway");
+                                    }
+                                    Err(err) => {
+                                        error!("{}", err);
                                     }
                                 }
-                            }
-                            Ok(Option::None) => {
-                                error!("cannot find StarController for kind: StarKind::Gateway");
-                            }
-                            Err(err) => {
-                                error!("{}", err);
+                            },
+                            ServiceSelection::Cli => {
+                                let command_tx = self.command_tx.clone();
+                                tokio::spawn( async move {
+                                    async fn get_api(command_tx: mpsc::Sender<StarlaneCommand>) -> Result<StarlaneApi,Error>
+                                    {
+                                        let (tx, rx) = oneshot::channel();
+                                        command_tx.send(StarlaneCommand::StarlaneApiSelectBest(tx)).await?;
+                                        rx.await?
+                                    }
+
+                                    match get_api(command_tx).await {
+                                        Ok(api) => {
+                                            CliServer::new(api, stream).await;
+                                        }
+                                        Err(err) => {
+                                            eprintln!("{}", err.to_string());
+                                        }
+                                    }
+                                });
                             }
                         }
+
                     }
                     StarlaneCommand::GetProtoArtifactCachesFactory(tx) => {
                         match self.artifact_caches.as_ref() {
@@ -389,7 +449,7 @@ impl StarlaneMachineRunner {
                 self.star_controllers.put(star_template_id, star_ctrl).await;
 
                 if self.artifact_caches.is_none() {
-                    let api = StarlaneApi::new(surface_api.clone());
+                    let api = StarlaneApi::new(surface_api.clone(), HyperUser::address() );
                     let caches = Arc::new(ProtoArtifactCachesFactory::new(
                         api.into(),
                         self.cache_access.clone(),
@@ -878,6 +938,24 @@ impl StarlaneInnerFlags {
         Self {
             shutdown: false,
             listening: false,
+        }
+    }
+}
+
+#[derive(Clone,strum_macros::Display)]
+pub enum ServiceSelection {
+    Gateway,
+    Cli
+}
+
+impl FromStr for ServiceSelection {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Gateway" => Ok(Self::Gateway),
+            "Cli" => Ok(Self::Cli),
+            what => Err(format!("invalid service selection: {}",what).into())
         }
     }
 }

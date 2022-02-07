@@ -1,7 +1,7 @@
-use mesh_portal_serde::version::v0_0_1::generic::resource::command::common::StateSrc;
+use mesh_portal_serde::version::latest::command::common::StateSrc;
+use mesh_portal_serde::version::latest::id::Address;
 
 use crate::error::Error;
-use crate::mesh::serde::id::Address;
 use crate::resource::{ResourceAssign, ResourceType};
 use crate::star::core::resource::manager::ResourceManager;
 use crate::star::core::resource::state::StateStore;
@@ -43,7 +43,6 @@ impl ResourceManager for StatelessManager {
                 return Err("must be stateless".into());
             }
         };
-
         Ok(())
     }
 

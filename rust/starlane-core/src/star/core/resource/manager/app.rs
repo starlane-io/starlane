@@ -16,10 +16,9 @@ use std::collections::HashMap;
 use crate::util::AsyncHashMap;
 use mesh_portal_serde::version::latest::resource::Status;
 use crate::message::delivery::Delivery;
-use mesh_portal_api::message::Message;
-use crate::mesh::serde::resource::command::common::StateSrc;
-use crate::mesh::Request;
-use crate::mesh::serde::id::Address;
+use mesh_portal_serde::version::latest::command::common::StateSrc;
+use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::messaging::Request;
 
 pub struct AppManager {
     skel: StarSkel,

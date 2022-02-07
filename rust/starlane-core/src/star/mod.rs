@@ -18,7 +18,7 @@ use tokio::sync::oneshot;
 use shell::search::{
     SearchCommit, SearchHits, SearchInit, StarSearchTransaction, TransactionResult,
 };
-use shell::wrangler::{StarWrangle, StarWrangleSatisfaction, StarWranglerApi};
+use shell::wrangler::{StarWrangle, StarWranglerApi, StarWrangleSatisfaction};
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::constellation::ConstellationStatus;
@@ -30,18 +30,12 @@ use crate::lane::{
     ConnectorController, LaneCommand, LaneEnd, LaneIndex, LaneMeta, LaneWrapper, ProtoLaneEnd,
     UltimaLaneKey,
 };
-use crate::logger::{Flags, LogInfo, Logger};
-use crate::mesh::serde::generic::resource::ResourceStub;
-use crate::mesh::serde::id::{Address, ResourceType};
-use crate::mesh::serde::payload::Payload;
-use crate::mesh::serde::resource::command::select::Select;
-use crate::mesh::serde::resource::command::update::Update;
-use crate::mesh::serde::resource::Status;
+
 use crate::message::{
     MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage,
     ProtoStarMessageTo, TrackerJob,
 };
-use crate::resource::ResourceRecord;
+use crate::resource::{ResourceRecord, ResourceType};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::core::resource::registry::RegistryApi;
 use crate::star::shell::golden::GoldenPathApi;
@@ -60,19 +54,23 @@ use std::cmp;
 use std::fmt;
 use crate::star::core::resource::manager::ResourceManagerApi;
 use std::str::FromStr;
-use nom::sequence::{terminated, tuple, preceded};
+use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::resource::Status;
+use mesh_portal_versions::version::v0_0_1::parse::Res;
+use nom::sequence::{preceded, terminated, tuple};
 use nom::multi::many0;
 use nom::bytes::complete::tag;
 use nom::character::complete::digit1;
-use mesh_portal_serde::version::v0_0_1::parse::Res;
 use nom::branch::alt;
 use nom::combinator::all_consuming;
-use nom::error::{VerboseError, ParseError, ErrorKind};
+use nom::error::{ErrorKind, ParseError, VerboseError};
+use crate::logger::{Flags, Logger, LogInfo};
+use crate::star::shell::sys::SysApi;
 
 pub mod core;
-pub mod shell;
 pub mod surface;
 pub mod variant;
+pub mod shell;
 
 #[derive(
     PartialEq,
@@ -395,6 +393,7 @@ impl StarKind {
             StarKind::FileStore => false,
             StarKind::ArtifactStore => false,
             StarKind::K8s => false,
+            StarKind::Portal => false
         }
     }
 }
@@ -1159,6 +1158,7 @@ pub struct StarSkel {
     pub info: StarInfo,
     pub star_tx: mpsc::Sender<StarCommand>,
     pub core_messaging_endpoint_tx: mpsc::Sender<CoreMessageCall>,
+    pub sys_api: SysApi,
     pub registry_api: RegistryApi,
     pub resource_locator_api: ResourceLocatorApi,
     pub star_search_api: StarSearchApi,
@@ -1188,25 +1188,19 @@ impl Debug for StarSkel {
 pub struct StarInfo {
     pub key: StarKey,
     pub kind: StarKind,
+    pub address: Address
 }
 
 impl StarInfo {
     pub fn new(star: StarKey, kind: StarKind) -> Self {
+        let address = Address::from_str(format!("<<{}>>::star",star.to_string()).as_str() ).expect("expect to be able to create a simple star address");
         StarInfo {
-            key: star,
-            kind: kind,
+            key:star,
+            kind ,
+            address
         }
     }
 
-    pub fn mock() -> Self {
-        StarInfo {
-            key: StarKey {
-                subgraph: vec![],
-                index: 0,
-            },
-            kind: StarKind::Central,
-        }
-    }
 }
 
 impl LogInfo for StarInfo {

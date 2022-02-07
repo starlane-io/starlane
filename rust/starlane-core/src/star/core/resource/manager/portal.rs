@@ -17,14 +17,10 @@ use crate::frame::{StarMessagePayload, StarMessage};
 
 use std::str::FromStr;
 use std::sync::atomic::AtomicU32;
-use crate::mesh::serde::id::Address;
-use mesh_portal_api::message::Message;
-use mesh_portal_api_server::PortalRequestHandler;
-use mesh_portal_serde::version::v0_0_1::generic::entity::request::ReqEntity;
-use mesh_portal_serde::version::v0_0_1::generic::payload::Payload;
+use mesh_portal_serde::version::latest::command::common::StateSrc;
+use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::messaging::Request;
 use mesh_portal_tcp_server::PortalServer;
-use crate::mesh::serde::resource::command::common::StateSrc;
-use crate::mesh::Request;
 
 #[derive(Debug)]
 pub struct PortalManager {
