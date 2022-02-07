@@ -7,13 +7,7 @@
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/cache.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/cache.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/config/bind.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/config/bind.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/file_access.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/file_access.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager/artifact.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager/artifact.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/registry.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/registry.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/state.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/state.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -253,7 +247,7 @@
       <workItem from="1640373850612" duration="2409000" />
       <workItem from="1643035095784" duration="30936000" />
       <workItem from="1643461638888" duration="76608000" />
-      <workItem from="1643807673961" duration="143036000" />
+      <workItem from="1643807673961" duration="143662000" />
     </task>
     <servers />
   </component>

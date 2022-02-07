@@ -490,8 +490,14 @@ impl PipelineExecutor {
            }
            match process(&mut self ).await {
                Ok(entity) => {
-
-                   self.delivery.response(entity);
+                   match entity.payload() {
+                       Ok(payload) => {
+                           self.delivery.ok(payload);
+                       }
+                       Err(err) => {
+                           self.delivery.fail(fail::Fail::Error(err.to_string()));
+                       }
+                   }
                }
                Err(error) => {
                    self.delivery.fail(fail::Fail::Error(error.to_string()));
