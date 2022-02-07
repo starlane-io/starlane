@@ -55,7 +55,7 @@ impl Parser<MechtronConfig> for MechtronConfigParser {
 
         let bind = yaml.spec.bind.replace("{bundle}", bundle_address.to_string().as_str() );
         let bind= Address::from_str(bind.as_str() )?;
-        let bind = ArtifactRef::new(bind.try_into()?,ArtifactKind::BindConfig);
+        let bind = ArtifactRef::new(bind.try_into()?,ArtifactKind::Bind);
 
         let wasm = yaml.spec.wasm.replace("{bundle}", bundle_address.to_string().as_str() );
         let wasm= Address::from_str(wasm.as_str() )?;

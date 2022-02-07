@@ -106,7 +106,7 @@ println!("got BIND property for '{}'", address.to_string() );
 println!("BIND ADDRESS IS {}", bind_address.to_string() );
                     let bind_address = Address::from_str(bind_address.as_str())?;
                     let mut cache = end.skel.machine.get_proto_artifact_caches_factory().await?.create();
-                    let artifact = ArtifactRef::new(bind_address, ArtifactKind::BindConfig);
+                    let artifact = ArtifactRef::new(bind_address, ArtifactKind::Bind);
                     cache.cache(vec![artifact.clone()]).await?;
                     let cache = cache.to_caches().await?;
                     return Ok(cache.bind_configs.get(&artifact.address).ok_or(format!("could not cache bind {}", artifact.address.to_string()).as_str())?);

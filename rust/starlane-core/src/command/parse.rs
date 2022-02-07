@@ -4,6 +4,7 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{multispace0, space1};
 use nom::combinator::{all_consuming, opt, recognize};
+use nom::multi::many0;
 use nom::sequence::{terminated, tuple};
 use crate::command::compose::CommandOp;
 
@@ -52,6 +53,10 @@ pub fn script_line(input: &str) -> Res<&str, CommandOp> {
     tuple( (multispace0,command,multispace0,tag(";"),multispace0))(input).map(|(next,(_,command,_,_,_))|{
         (next,command)
     })
+}
+
+pub fn script(input: &str) -> Res<&str,Vec<CommandOp>> {
+    many0(script_line)(input)
 }
 
 pub fn consume_command_line(input: &str) -> Res<&str, CommandOp> {

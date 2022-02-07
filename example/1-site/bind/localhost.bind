@@ -1,0 +1,9 @@
+Bind {
+
+  Http {
+
+    <Get>/(.*) -> localhost:repo:site:1.0.0:/html/$1 => &;
+
+  }
+
+}

@@ -7,7 +7,7 @@ use k8s::K8sManager;
 
 use crate::error::Error;
 use crate::message::delivery::Delivery;
-use crate::{resource, fail};
+use crate::{resource};
 use crate::resource::{ResourceAssign, ResourceType};
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, Call, AsyncRunner};
@@ -18,6 +18,7 @@ use crate::star::core::resource::manager::file::{FileSystemManager, FileManager}
 use std::collections::HashMap;
 use std::future::Future;
 use std::str::FromStr;
+use mesh_portal_serde::version::latest::fail;
 use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::messaging::{Request, Response};
 use mesh_portal_serde::version::latest::payload::Payload;
@@ -27,7 +28,6 @@ use crate::star::core::resource::manager::artifact::ArtifactManager;
 mod stateless;
 pub mod artifact;
 mod default;
-pub mod file_store;
 pub mod k8s;
 pub mod mechtron;
 pub mod app;
@@ -201,11 +201,13 @@ pub trait ResourceManager: Send + Sync {
     ) -> Result<(),Error>;
 
 
-    fn handle_request(&self, request: Delivery<Request> ) {
-        // delivery.fail(fail::Undeliverable)
+    fn handle_request(&self, delivery: Delivery<Request> ) {
+        delivery.fail(fail::Fail::Error("Not implemented".to_string()));
     }
 
-    async fn has(&self, address: Address) -> bool;
+    async fn has(&self, address: Address) -> bool {
+        false
+    }
 
     async fn get(&self, address: Address) -> Result<Payload,Error> {
         Err("Stateless".into())

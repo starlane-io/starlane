@@ -180,7 +180,7 @@ impl ProtoArtifactCaches {
                 ArtifactKind::MechtronConfig => {
                     caches.mechtron_configs.add( self.root_caches.mechtron_configs.get(artifact).await? );
                 }
-                ArtifactKind::BindConfig => {
+                ArtifactKind::Bind => {
                     caches.bind_configs.add( self.root_caches.bind_configs.get(artifact).await? );
                 }
                 ArtifactKind::Wasm=> {
@@ -1009,7 +1009,7 @@ impl RootArtifactCaches {
         let claim = match artifact.kind {
             ArtifactKind::AppConfig=> self.app_configs.cache(artifact).await?.into(),
             ArtifactKind::MechtronConfig=> self.mechtron_configs.cache(artifact).await?.into(),
-            ArtifactKind::BindConfig=> self.bind_configs.cache(artifact).await?.into(),
+            ArtifactKind::Bind => self.bind_configs.cache(artifact).await?.into(),
             ArtifactKind::Raw => self.raw.cache(artifact).await?.into(),
             ArtifactKind::Wasm=> self.wasms.cache(artifact).await?.into(),
 //            ArtifactKind::HttpRouter => self.http_router_configs.cache(artifact).await?.into(),

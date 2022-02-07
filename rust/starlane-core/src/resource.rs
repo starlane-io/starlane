@@ -610,9 +610,8 @@ pub enum FileKind {
 )]
 pub enum ArtifactKind {
     Raw,
-    AppConfig,
-    MechtronConfig,
-    BindConfig,
+    ResourceConfig,
+    Bind,
     Wasm,
     Dir,
 }

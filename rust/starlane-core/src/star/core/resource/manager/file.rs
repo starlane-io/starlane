@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
 use clap::{App, AppSettings};
@@ -6,7 +6,7 @@ use yaml_rust::Yaml;
 
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
-use crate::resource::{ArtifactKind, ResourceType, ResourceAssign, AssignResourceStateSrc};
+use crate::resource::{ArtifactKind, ResourceType, ResourceAssign, AssignResourceStateSrc, Kind, FileKind};
 use crate::star::core::resource::manager::ResourceManager;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
@@ -17,7 +17,9 @@ use crate::frame::{StarMessagePayload, StarMessage};
 
 use std::str::FromStr;
 use mesh_portal_serde::version::latest::command::common::StateSrc;
-use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, KindTemplate, Strategy, Template};
+use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand, ReqEntity};
+use mesh_portal_serde::version::latest::id::{Address, AddressAndKind, KindParts};
 use mesh_portal_serde::version::latest::messaging::Request;
 
 #[derive(Debug)]
@@ -41,22 +43,38 @@ impl ResourceManager for FileManager {
         &self,
         assign: ResourceAssign,
     ) -> Result<(), Error> {
-        let state = match assign.state {
-            StateSrc::StatefulDirect(data) => data,
-            StateSrc::Stateless => return Err("File cannot be stateless".into()),
-            _ => {
-                return Err("File must specify Direct state".into() )
+
+        let kind : Kind = TryFrom::try_from(assign.stub.kind)?;
+        if let Kind::File(file_kind) = kind
+        {
+            match file_kind {
+                FileKind::Dir => {
+                    // stateless
+                }
+                _ => {
+                    let state = match &assign.state {
+                        StateSrc::StatefulDirect(data) => {
+                            data.clone()
+                        },
+                        StateSrc::Stateless => {
+                            return Err("Artifact cannot be stateless".into())
+                        },
+                    };
+                    self.store.put( assign.stub.address.clone(), state.clone() ).await?;
+
+                    let selector = WatchSelector{
+                        topic: Topic::Resource(assign.stub.address),
+                        property: Property::State
+                    };
+
+                    self.skel.watch_api.fire( Notification::new(selector, Change::State(state) ));
+
+                }
             }
-        };
+        } else {
+            return Err("File Manager unexpected kind".into() );
+        }
 
-        self.store.put(assign.stub.address.clone(), state.clone() ).await?;
-
-        let selector = WatchSelector{
-            topic: Topic::Resource(assign.stub.address),
-            property: Property::State
-        };
-
-        self.skel.watch_api.fire( Notification::new(selector, Change::State(state) ));
 
         Ok(())
     }
@@ -73,32 +91,6 @@ impl ResourceManager for FileManager {
         ResourceType::File
     }
 
-    fn handle_request(&self, delivery: Delivery<Request>) {
-        unimplemented!();
-/*        match &delivery.item {
-            Message::Request(request) => {
-                match &request.entity {
-                    ReqEntity::Rc(_) => {}
-                    ReqEntity::Msg(_) => {}
-                    ReqEntity::Http(http) => {
-                        unimplemented!()
-                        /*
-                        let state = self.store.get(key).await?.ok_or("expected state to be in the store")?;
-                        let content = state.get("content").ok_or("expected file to have content")?.clone();
-                        let mut response = HttpResponse::new();
-                        response.status = 200;
-                        response.body = Option::Some(content);
-                        delivery.reply(Reply::HttpResponse(response));
-
-                         */
-                    }
-                }
-            }
-            Message::Response(response) => {}
-        }
-
- */
-    }
 }
 
 
@@ -134,36 +126,29 @@ impl ResourceManager for FileSystemManager {
             }
         };
 
-        Ok(())
-    }
 
-    async fn has(&self, key: Address) -> bool {
-        match self.store.has(key).await {
-            Ok(v) => v,
-            Err(_) => false,
-        }
-    }
-
-    fn handle_request(&self, delivery: Delivery<Request>)  {
-        unimplemented!()
-        /*
-        let record = self.skel.resource_locator_api.locate(key.into()).await?;
-
-        let filepath = if delivery.entity.payload.path.ends_with("/") {
-            format!("{}:{}index.html", record.stub.address.to_string(),delivery.entity.payload.path )
-        } else {
-            format!("{}:{}", record.stub.address.to_string(),delivery.entity.payload.path )
+        let root_address_and_kind = AddressAndKind {
+            address: Address::from_str( format!( "{}:/",assign.stub.address.to_string()).as_str())?,
+            kind: KindParts { resource_type: "File".to_string(), kind: Option::Some("Dir".to_string()), specific: None }
         };
 
-        eprintln!("FILEPATH: {}", filepath );
-        let filepath = ResourcePath::from_str(filepath.as_str())?;
-        let mut message = delivery.entity.clone();
-        message.to = filepath.into();
-        let mut star_message:StarMessage = delivery.into();
-        star_message.payload = StarMessagePayload::MessagePayload(MessagePayload::HttpRequest(message));
-        self.skel.router_api.route(star_message);
+        let skel = self.skel.clone();
+        tokio::spawn( async move {
+            let create = Create {
+                template: Template {
+                    address: AddressTemplate { parent: assign.stub.address.clone(), child_segment_template: AddressSegmentTemplate::Exact(root_address_and_kind.address.last_segment().expect("expected final segment").to_string()) },
+                    kind: KindTemplate { resource_type: root_address_and_kind.kind.resource_type.clone(), kind: root_address_and_kind.kind.kind.clone(), specific: None }
+                },
+                state: StateSrc::Stateless,
+                properties: vec![],
+                strategy: Strategy::Create,
+                registry: Default::default()
+            };
+
+            let request = Request::new(ReqEntity::Rc(Rc::empty_payload(RcCommand::Create(create))), assign.stub.address.clone(), assign.stub.address.clone());
+            let response = skel.messaging_api.exchange(request).await;
+        });
         Ok(())
-         */
     }
 
 

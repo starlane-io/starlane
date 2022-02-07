@@ -38,10 +38,36 @@ impl CommandOp {
         }
     }
 
+    pub fn to_command(self) -> Result<Command,Error>{
+        if self.requires().is_empty() {
+            match self {
+                CommandOp::Create(create) => {
+                    Ok(Command::Create(create))
+                }
+                CommandOp::Select(select) => {
+                    Ok(Command::Select(select))
+                }
+                CommandOp::Set(set) => {
+                    Ok(Command::Set(set))
+                }
+                CommandOp::Get(get) => {
+                    Ok(Command::Get(get))
+                }
+                _ => {
+                    Err("cannon converted a CommandOp to a Command if it has requirements.".into() )
+                }
+            }
+        } else {
+            Err("cannon converted a CommandOp to a Command if it has requirements.".into() )
+        }
+    }
+
 }
 
 pub enum Command {
     Create(Create),
-    Select(Select)
+    Select(Select),
+    Set(Set),
+    Get(Get)
 }
 
