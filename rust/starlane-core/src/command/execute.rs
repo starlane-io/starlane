@@ -198,7 +198,7 @@ impl CommandExecutor {
 
     async fn exec_get( &self, get: Get) {
         let to = get.address.parent().clone().expect("expect parent");
-        let entity = ReqEntity::Rc(Rc::new(RcCommand::Get(get)));
+        let entity = ReqEntity::Rc(Rc::new(RcCommand::Get(get.clone())));
         let request = Request::new( entity, self.stub.address.clone(), to );
         match self.api.exchange(request).await {
             Ok(response) => {
@@ -219,6 +219,25 @@ impl CommandExecutor {
                       self.output_tx.send(outlet::Frame::StdOut(text)).await;
                       self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
                     }
+                    Ok(Payload::Map(map)) => {
+                        let mut rtn = String::new();
+                        rtn.push_str(get.address.to_string().as_str());
+                        rtn.push_str("{ " );
+                        for (index,(key,payload)) in map.iter().enumerate() {
+                            if let Payload::Primitive(Primitive::Text(value)) = payload {
+                                rtn.push_str(key.as_str());
+                                rtn.push_str("=");
+                                rtn.push_str(value.as_str());
+                                if index != map.len()-1 {
+                                    rtn.push_str(", ");
+                                }
+                            }
+                        }
+                        rtn.push_str(" }" );
+                        self.output_tx.send(outlet::Frame::StdOut(rtn)).await;
+                        self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
+                    }
+
                     Ok(_) => {
                         self.output_tx.send(outlet::Frame::StdErr( "unexpected payload response format".to_string()) ).await;
                         self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
