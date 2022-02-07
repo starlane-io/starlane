@@ -21,7 +21,7 @@ use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use mesh_portal_serde::version::latest::fail::BadRequest;
 use std::future::Future;
 use std::sync::Arc;
-use mesh_portal_serde::version::latest::command::common::StateSrc;
+use mesh_portal_serde::version::latest::command::common::{SetProperties, StateSrc};
 use mesh_portal_serde::version::latest::config::bind::{BindConfig, Pipeline};
 use mesh_portal_serde::version::latest::config::Config;
 use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, KindTemplate, Strategy};
@@ -42,7 +42,8 @@ use mesh_portal_versions::version::v0_0_1::payload::CallKind;
 use regex::Regex;
 use serde::de::Unexpected::Str;
 use crate::artifact::ArtifactRef;
-use crate::cache::{ArtifactItem, CachedConfig};
+use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
+use crate::config::config::{ContextualConfig, ResourceConfig};
 use crate::star::core::resource::manager::{ResourceManagerApi, ResourceManagerComponent};
 
 pub enum CoreMessageCall {
@@ -214,6 +215,8 @@ println!("FAILED TO GET BIND");
                                     }
                                 }
                                 let address = address?;
+
+
                                 let registration = Registration {
                                     address: address.clone(),
                                     kind: kind.clone(),

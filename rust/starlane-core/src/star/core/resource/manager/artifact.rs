@@ -249,12 +249,6 @@ println!("PATH : {} ", path );
     }
 
 
-    async fn has(&self, address: Address) -> bool {
-        match self.store.has(address).await {
-            Ok(v) => v,
-            Err(_) => false,
-        }
-    }
 
     async fn get(&self, address: Address) -> Result<Payload,Error> {
         self.store.get(address).await
@@ -316,9 +310,6 @@ impl ResourceManager for ArtifactManager{
     } // assign
 
 
-        async fn has(&self, address: Address) -> bool {
-        false
-    }
 
     async fn get(&self, address: Address) -> Result<Payload,Error> {
         self.store.get(address).await

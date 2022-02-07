@@ -20,9 +20,9 @@ use wasmer::{Cranelift, Store, Universal};
 
 
 use crate::artifact::ArtifactRef;
-use crate::config::app::{AppConfig, AppConfigParser};
 use crate::config::bind::BindConfigParser;
-use crate::config::mechtron::{MechtronConfig, MechtronConfigParser};
+use crate::config::config::ResourceConfig;
+use crate::config::parse::ResourceConfigParser;
 use crate::config::wasm::{Wasm, WasmCompiler};
 use crate::error::Error;
 use crate::file_access::FileAccess;
@@ -88,8 +88,7 @@ impl ProtoArtifactCachesFactory {
 
 pub struct ArtifactCaches {
     pub raw: ArtifactItemCache<Raw>,
-    pub app_configs: ArtifactItemCache<AppConfig>,
-    pub mechtron_configs: ArtifactItemCache<MechtronConfig>,
+    pub resource_configs: ArtifactItemCache<ResourceConfig>,
     pub bind_configs: ArtifactItemCache<CachedConfig<BindConfig>>,
     pub wasms: ArtifactItemCache<Wasm>,
 //    pub http_router_config: ArtifactItemCache<HttpRouterConfig>,
@@ -99,8 +98,7 @@ impl ArtifactCaches {
     fn new() -> Self {
         ArtifactCaches {
             raw: ArtifactItemCache::new(),
-            app_configs: ArtifactItemCache::new(),
-            mechtron_configs: ArtifactItemCache::new(),
+            resource_configs: ArtifactItemCache::new(),
             bind_configs: ArtifactItemCache::new(),
             wasms: ArtifactItemCache::new(),
  //           http_router_config: ArtifactItemCache::new()
@@ -169,16 +167,11 @@ impl ProtoArtifactCaches {
 
         for (artifact, _claim) in claims {
             match artifact.kind {
-                ArtifactKind::AppConfig => {
-                    caches
-                        .app_configs
-                        .add(self.root_caches.app_configs.get(artifact).await?);
-                }
                 ArtifactKind::Raw => {
                     caches.raw.add(self.root_caches.raw.get(artifact).await?);
                 }
-                ArtifactKind::MechtronConfig => {
-                    caches.mechtron_configs.add( self.root_caches.mechtron_configs.get(artifact).await? );
+                ArtifactKind::ResourceConfig=> {
+                    caches.resource_configs.add( self.root_caches.resource_configs.get(artifact).await? );
                 }
                 ArtifactKind::Bind => {
                     caches.bind_configs.add( self.root_caches.bind_configs.get(artifact).await? );
@@ -984,8 +977,7 @@ impl<C: Cacheable> RootItemCacheProc<C> {
 struct RootArtifactCaches {
     bundle_cache: ArtifactBundleCache,
     raw: RootItemCache<Raw>,
-    app_configs: RootItemCache<AppConfig>,
-    mechtron_configs: RootItemCache<MechtronConfig>,
+    resource_configs: RootItemCache<ResourceConfig>,
     bind_configs: RootItemCache<CachedConfig<BindConfig>>,
     wasms: RootItemCache<Wasm>,
 //    http_router_configs: RootItemCache<HttpRouterConfig>
@@ -997,8 +989,7 @@ impl RootArtifactCaches {
         Self {
             bundle_cache: bundle_cache.clone(),
             raw: RootItemCache::new(bundle_cache.clone(), Arc::new(RawParser::new())),
-            app_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(AppConfigParser::new())),
-            mechtron_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(MechtronConfigParser::new())),
+            resource_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(ResourceConfigParser::new())),
             bind_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(BindConfigParser::new())),
             wasms: RootItemCache::new(bundle_cache.clone(), Arc::new(WasmCompiler::new())),
 //            http_router_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(HttpRouterConfigParser::new())),
@@ -1007,8 +998,7 @@ impl RootArtifactCaches {
     }
     async fn core_claim(&self, artifact: ArtifactRef) -> Result<Claim, Error> {
         let claim = match artifact.kind {
-            ArtifactKind::AppConfig=> self.app_configs.cache(artifact).await?.into(),
-            ArtifactKind::MechtronConfig=> self.mechtron_configs.cache(artifact).await?.into(),
+            ArtifactKind::ResourceConfig=> self.resource_configs.cache(artifact).await?.into(),
             ArtifactKind::Bind => self.bind_configs.cache(artifact).await?.into(),
             ArtifactKind::Raw => self.raw.cache(artifact).await?.into(),
             ArtifactKind::Wasm=> self.wasms.cache(artifact).await?.into(),

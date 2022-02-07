@@ -79,13 +79,6 @@ impl ResourceManager for FileManager {
         Ok(())
     }
 
-    async fn has(&self, key: Address) -> bool {
-        match self.store.has(key).await {
-            Ok(v) => v,
-            Err(_) => false,
-        }
-    }
-
 
     fn resource_type(&self) -> ResourceType {
         ResourceType::File

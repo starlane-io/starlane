@@ -12,7 +12,6 @@ use crate::resource::{ResourceAssign, ResourceType};
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, Call, AsyncRunner};
 use crate::star::core::resource::manager::stateless::StatelessManager;
-use crate::star::core::resource::manager::app::AppManager;
 use crate::star::core::resource::manager::mechtron::MechtronManager;
 use crate::star::core::resource::manager::file::{FileSystemManager, FileManager};
 use std::collections::HashMap;
@@ -27,10 +26,8 @@ use crate::star::core::resource::manager::artifact::ArtifactManager;
 
 mod stateless;
 pub mod artifact;
-mod default;
 pub mod k8s;
 pub mod mechtron;
-pub mod app;
 pub mod file;
 pub mod portal;
 
@@ -175,8 +172,8 @@ impl ResourceManagerComponent{
             ResourceType::ArtifactBundleSeries => Arc::new(StatelessManager::new(self.skel.clone(), ResourceType::ArtifactBundleSeries).await),
             ResourceType::ArtifactBundle=> Arc::new(ArtifactBundleManager::new(self.skel.clone()).await),
             ResourceType::Artifact => Arc::new(ArtifactManager::new(self.skel.clone()).await ),
-            ResourceType::App=> Arc::new(AppManager::new(self.skel.clone()).await),
-            ResourceType::Mechtron => Arc::new(MechtronManager::new(self.skel.clone()).await),
+            ResourceType::App => Arc::new(MechtronManager::new(self.skel.clone(), ResourceType::App).await),
+            ResourceType::Mechtron => Arc::new(MechtronManager::new(self.skel.clone(), ResourceType::Mechtron).await),
             ResourceType::Database => Arc::new(K8sManager::new(self.skel.clone(), ResourceType::Database ).await.expect("K8sManager must be created without error")),
             ResourceType::FileSystem => Arc::new(FileSystemManager::new(self.skel.clone() ).await),
             ResourceType::File => Arc::new(FileManager::new(self.skel.clone())),
@@ -194,19 +191,13 @@ pub trait ResourceManager: Send + Sync {
 
     fn resource_type(&self) -> resource::ResourceType;
 
-
     async fn assign(
         &self,
         assign: ResourceAssign,
     ) -> Result<(),Error>;
 
-
     fn handle_request(&self, delivery: Delivery<Request> ) {
         delivery.fail(fail::Fail::Error("Not implemented".to_string()));
-    }
-
-    async fn has(&self, address: Address) -> bool {
-        false
     }
 
     async fn get(&self, address: Address) -> Result<Payload,Error> {

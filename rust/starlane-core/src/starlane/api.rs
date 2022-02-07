@@ -177,7 +177,7 @@ impl StarlaneApi {
 
         let template = Template::new(address_template,kind_template );
         let mut properties = SetProperties::new();
-        properties.push( PropertyMod::Set{name:"title".to_string(), value: title.to_string()});
+        properties.push( PropertyMod::Set{ key:"title".to_string(), value: title.to_string(), lock: false});
         let create = Create {
             template,
             state: StateSrc::Stateless,
@@ -284,7 +284,7 @@ where
     }
 
     pub fn set_property( &mut self, key:&str, value: &str) {
-       self.create.properties.push(PropertyMod::Set{ name: key.to_string(), value: value.to_string() });
+       self.create.properties.push(PropertyMod::Set{ key: key.to_string(), value: value.to_string(), lock: false });
     }
 }
 

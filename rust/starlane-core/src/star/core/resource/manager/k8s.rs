@@ -128,9 +128,6 @@ println!("Assigning Kube Resource Host....");
          unimplemented!()
     }
 
-    async fn has(&self, address: Address) -> bool {
-        todo!()
-    }
 
     fn resource_type(&self) -> ResourceType {
         self.resource_type.clone()

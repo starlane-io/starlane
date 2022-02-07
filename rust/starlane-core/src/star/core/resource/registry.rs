@@ -14,7 +14,7 @@ use mesh_portal_serde::version::latest::messaging::Request;
 use mesh_portal_serde::version::latest::pattern::{AddressKindPath, AddressKindSegment, ExactSegment, KindPattern, ResourceTypePattern, SegmentPattern};
 use mesh_portal_serde::version::latest::pattern::specific::{ProductPattern, VariantPattern, VendorPattern};
 use mesh_portal_serde::version::latest::payload::{Payload, Primitive, PrimitiveList};
-use mesh_portal_serde::version::latest::resource::{ResourceStub, Status};
+use mesh_portal_serde::version::latest::resource::{Property, ResourceStub, Status};
 use mesh_portal_serde::version::latest::util::ValuePattern;
 use mesh_portal_versions::version::v0_0_1::command::common::PropertyMod;
 use mesh_portal_versions::version::v0_0_1::id::AddressSegment;
@@ -263,13 +263,17 @@ impl RegistryComponent {
             let parent = address.parent().ok_or("resource must have a parent")?.to_string();
             let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
 
-            for property_mod in properties.iter() {
+            for (_,property_mod) in properties.iter() {
                 match property_mod {
-                    PropertyMod::Set { name, value } => {
-                        conn.execute("INSERT INTO properties (resource_id,key,value) VALUES ((SELECT id FROM resources WHERE parent=?1 AND address_segment=?2),?3,?4) ON CONFLICT(resource_id,key) DO UPDATE SET value=?4", params![parent,address_segment,name.to_string(),value.to_string()])?;
+                    PropertyMod::Set { key, value ,lock } => {
+                        let lock = match *lock {
+                            true => 1,
+                            false => 0
+                        };
+                        conn.execute("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM resources WHERE parent=?1 AND address_segment=?2),?3,?4,?5) ON CONFLICT(resource_id,key) DO UPDATE SET value=?4 WHERE lock=0", params![parent,address_segment,key.to_string(),value.to_string(),lock])?;
                     }
-                    PropertyMod::UnSet(name) => {
-                        conn.execute("DELETE FROM properties WHERE parent=?1 AND address_segment=?2 AND key=?3)", params![parent,address_segment,name.to_string()])?;
+                    PropertyMod::UnSet(key) => {
+                        conn.execute("DELETE FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=?1 AND address_segment=?2) AND key=?3 AND lock=0", params![parent,address_segment,key.to_string()])?;
                     }
                 }
             }
@@ -298,7 +302,21 @@ impl RegistryComponent {
         let mut statement = conn.prepare(statement.as_str())?;
         let parent = address.parent().ok_or("expected a parent")?;
         let address_segment = address.last_segment().ok_or("expected last address_segment")?.to_string();
-        let record = statement.query_row(params!(parent.to_string(),address_segment), RegistryComponent::process_resource_row_catch)?;
+        let mut record = statement.query_row(params!(parent.to_string(),address_segment), RegistryComponent::process_resource_row_catch)?;
+        let mut statement = conn.prepare("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=?1 AND address_segment=?2)")?;
+        let mut rows = statement.query(params!(parent.to_string(),address_segment))?;
+        while let Option::Some(row) = rows.next()? {
+            let key: String = row.get(0)?;
+            let value: String = row.get(1)?;
+            let locked: usize= row.get(2)?;
+            let locked = match locked {
+                0 => false,
+                _ => true
+            };
+            let property = Property {key,value,locked};
+            record.stub.properties.insert( property.key.clone(), property );
+        }
+
         Ok(record)
     }
 
@@ -405,13 +423,17 @@ impl RegistryComponent {
             trans.execute("INSERT INTO resources (address_segment,resource_type,kind,vendor,product,variant,version,version_variant,parent,status) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'Pending')", params![params.address_segment,params.resource_type,params.kind,params.vendor,params.product,params.variant,params.version,params.version_variant,params.parent])?;
 
             fn set_properties(params: &RegistryParams, props: &SetProperties, trans: &Transaction ) -> Result<(),Error> {
-                for property_mod in props.iter() {
+                for (_,property_mod) in props.iter() {
                     match property_mod {
-                        PropertyMod::Set{ name, value } => {
-                            trans.execute("INSERT INTO properties (resource_id,key,value) VALUES ((SELECT id FROM resources WHERE parent=?1 AND address_segment=?2),?3,?4)", params![params.parent,params.address_segment,name.to_string(),value.to_string()])?;
+                        PropertyMod::Set{ key, value,lock } => {
+                            let lock:usize = match lock {
+                                true => 1,
+                                false => 0
+                            };
+                            trans.execute("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM resources WHERE parent=?1 AND address_segment=?2),?3,?4,?5)", params![params.parent,params.address_segment,key.to_string(),value.to_string(),lock])?;
                         }
-                        PropertyMod::UnSet(name) => {
-                            trans.execute("DELETE FROM properties (resource_id,key,value) WHERE parent=?1 AND address_segment=?2 AND name=?3)", params![params.parent,params.address_segment,name.to_string()])?;
+                        PropertyMod::UnSet(key) => {
+                            trans.execute("DELETE FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=?1 AND address_segment=?2) AND key=?3 AND lock=0", params![params.parent,params.address_segment,key.to_string()])?;
                         }
                     }
                 }
@@ -760,6 +782,7 @@ fn setup(conn: &mut Connection) -> Result<(), Error> {
 	     resource_id INTEGER NOT NULL,
          key TEXT NOT NULL,
          value TEXT NOT NULL,
+         lock INTEGER NOT NULL,
          FOREIGN KEY (resource_id) REFERENCES resources (id),
          UNIQUE(resource_id,key)
         )"#;

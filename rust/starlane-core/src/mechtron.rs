@@ -1,5 +1,4 @@
 use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
-use crate::config::mechtron::MechtronConfig;
 use crate::config::wasm::Wasm;
 use crate::error::Error;
 use crate::starlane::api::StarlaneApi;
@@ -28,6 +27,7 @@ use mesh_portal_serde::version::latest::config::bind::BindConfig;
 use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::messaging::{ExchangeId, Response};
 use mesh_portal_serde::version::latest::portal::inlet::Frame;
+use crate::config::config::{MechtronConfig, ResourceConfig};
 
 #[derive(Clone)]
 pub struct MechtronShell {
@@ -36,7 +36,7 @@ pub struct MechtronShell {
 
 impl MechtronShell {
 
-    pub fn new(skel: MechtronSkel, rx: mpsc::Receiver<Call>) -> Self {
+    pub fn new(config: MechtronConfig, caches: ArtifactCaches) -> Self {
 
         let runner = MechtronRunner::new(skel.clone(),rx);
         tokio::spawn(async move {
@@ -75,7 +75,7 @@ struct ExchangeInfo {
 
 #[derive(Clone)]
 pub struct MechtronSkel {
-    pub config: ArtifactItem<MechtronConfig>,
+    pub config: MechtronConfig,
     pub wasm: ArtifactItem<Wasm>,
     pub bind: ArtifactItem<CachedConfig<BindConfig>>,
     pub tx: mpsc::Sender<Call>,
@@ -85,19 +85,19 @@ pub struct MechtronSkel {
 
 #[derive(Clone)]
 pub struct MechtronTemplate {
-    pub config: ArtifactItem<MechtronConfig>,
+    pub config: ArtifactItem<ResourceConfig>,
     pub wasm: ArtifactItem<Wasm>,
     pub bind: ArtifactItem<CachedConfig<BindConfig>>,
 }
 
 impl MechtronTemplate {
     pub fn new(
-        config: ArtifactItem<MechtronConfig>,
+        config: ArtifactItem<ResourceConfig>,
         caches: &ArtifactCaches,
     ) -> Result<Self, Error> {
-        let skel = Self {
+        let template = Self {
             config: config.clone(),
-            wasm: caches.wasms.get(&config.wasm.address).ok_or(format!(
+            wasm: caches.wasms.get(&config.wasm_src()?).ok_or(format!(
                 "could not get referenced Wasm: {}",
                 config.wasm.address.to_string()
             ))?,
@@ -107,13 +107,13 @@ impl MechtronTemplate {
                 .ok_or::<Error>(
                     format!(
                         "could not get referenced BindConfig: {}",
-                        config.wasm.address.to_string()
+                        config.wasm_src()?.to_string()
                     )
                     .into(),
                 )?,
         };
 
-        Ok(skel)
+        Ok(template)
     }
 }
 
@@ -193,7 +193,7 @@ impl MechtronRunner {
     }
 
     pub async fn run(mut self) {
-        {
+    {
 //            let mut exchanger = HashMap::new();
             while let Option::Some(call) = self.rx.recv().await {
                 match self.process(call).await {
@@ -204,8 +204,6 @@ impl MechtronRunner {
                 }
             }
         }
-
-
     }
 }
 

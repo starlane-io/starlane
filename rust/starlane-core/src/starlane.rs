@@ -9,14 +9,16 @@ use std::time::Duration;
 
 use futures::future::join_all;
 use futures::{FutureExt, StreamExt, TryFutureExt};
+use mesh_portal_serde::version::latest::id::Address;
 
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
 use tokio::sync::{broadcast, mpsc};
+use crate::artifact::ArtifactRef;
 
-use crate::cache::ProtoArtifactCachesFactory;
+use crate::cache::{ArtifactCaches, ProtoArtifactCachesFactory};
 use crate::command::cli::CliServer;
 use crate::constellation::{Constellation, ConstellationStatus};
 use crate::error::Error;
@@ -79,6 +81,12 @@ impl StarlaneMachine {
         };
 
         Result::Ok(starlane)
+    }
+
+    pub async fn cache( &self, artifact: &ArtifactRef)  -> Result<ArtifactCaches,Error> {
+        let mut cache = self.get_proto_artifact_caches_factory().await?.create();
+        cache.cache(vec![artifact.clone()]).await?;
+        Ok(cache.to_caches().await?)
     }
 
     pub async fn get_proto_artifact_caches_factory(

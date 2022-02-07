@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
@@ -16,29 +17,28 @@ use mesh_portal_serde::version::latest::payload::{Payload, PayloadPattern, Primi
 use mesh_portal_serde::version::latest::resource::Properties;
 use mesh_portal_versions::version::v0_0_1::pattern::consume_data_struct_def;
 use mesh_portal_versions::version::v0_0_1::util::ValueMatcher;
+use crate::command::cli::outlet;
+use crate::command::cli::outlet::Frame;
+use crate::command::execute::CommandExecutor;
+use crate::config::config::MechtronConfig;
+use crate::config::parse::replace::substitute;
 
 use crate::fail::Fail;
 use crate::message::Reply;
-
-lazy_static!{
-
-static ref MECHTRON_PROPERTIES_PATTERN : PayloadPattern= {
-             let (_,payload_pattern) = consume_data_struct_def("Map{config<Address>}" ).expect("could not parse PayloadPattern");
-             payload_pattern
-        };
-}
-
+use crate::starlane::api::StarlaneApi;
 
 pub struct MechtronManager {
     skel: StarSkel,
-    mechtrons: AsyncHashMap<Address, MechtronShell>
+    mechtrons: AsyncHashMap<Address, MechtronShell>,
+    resource_type: ResourceType
 }
 
 impl MechtronManager {
-    pub async fn new(skel: StarSkel) -> Self {
+    pub async fn new(skel: StarSkel, resource_type:ResourceType) -> Self {
         MechtronManager {
             skel: skel.clone(),
-            mechtrons: AsyncHashMap::new()
+            mechtrons: AsyncHashMap::new(),
+            resource_type
         }
     }
 }
@@ -56,35 +56,46 @@ impl ResourceManager for MechtronManager {
             }
         };
 
-        let properties = MechtronProperties::new(assign.stub.properties.clone())?;
-        let mechtron_config_artifact = properties.config().ok_or("expected mechtron config")?;
+        let config_address = assign.stub.properties.get(&"config".to_string() ).ok_or(format!("'config' property required to be set for {}", self.resource_type.to_string() ))?.value.as_str();
+        let config_address = Address::from_str(config_address)?;
 
-        let factory = self.skel.machine.get_proto_artifact_caches_factory().await?;
-        let mut proto = factory.create();
-        let mechtron_config_artifact_ref = ArtifactRef::new(mechtron_config_artifact.clone(), ArtifactKind::MechtronConfig );
-        proto.cache(vec![mechtron_config_artifact_ref]).await?;
-        let caches = proto.to_caches().await?;
-        let mechtron_config = caches.mechtron_configs.get(&mechtron_config_artifact).ok_or::<Error>(format!("expected mechtron_config").into())?;
+        let config_artifact_ref = ArtifactRef {
+          address:config_address.clone(),
+          kind: ArtifactKind::ResourceConfig
+        };
+
+        let caches = self.skel.machine.cache( &config_artifact_ref ).await?;
+        let config = caches.resource_configs.get(&config_address).ok_or::<Error>(format!("expected mechtron_config").into())?;
+        let config = MechtronConfig::new(config, assign.stub.address.clone() );
+
+        let api = StarlaneApi::new( self.skel.surface_api.clone(), assign.stub.address.clone() );
+        let substitution_map = config.substitution_map()?;
+        for mut command_line in config.install {
+            command_line = substitute(command_line.as_str(), &substitution_map)?;
+            println!("INSTALL: '{}'",command_line);
+            let mut output_rx = CommandExecutor::exec_simple(command_line,assign.stub.clone(), api.clone() );
+            while let Some(frame) = output_rx.recv().await {
+                match frame {
+                    outlet::Frame::StdOut(out) => {
+                        println!("{}",out);
+                    }
+                    outlet::Frame::StdErr(out) => {
+                        eprintln!("{}", out);
+                    }
+                    outlet::Frame::EndOfCommand(code) => {
+                        if code != 0 {
+                            eprintln!("install error code: {}",code);
+                        }
+                    }
+                }
+            }
+        }
 
 
-        unimplemented!();
-        /*
-        let mechtron = MechtronShell::new(mechtron_config, &caches)?;
+        let mechtron = MechtronShell::new(mechtron_config, caches)?;
         self.mechtrons.put( assign.stub.key.clone(), mechtron ).await?;
 
-        println!("ASSIGN MECHTRON!");
-
-
-        Ok(DataSet::new())
-
-         */
-    }
-
-    async fn has(&self, address: Address) -> bool {
-        match self.mechtrons.contains(address).await {
-            Ok(flag) => {flag}
-            Err(_) => {false}
-        }
+        Ok(())
     }
 
     fn handle_request(&self, delivery: Delivery<Request>) {
@@ -92,46 +103,7 @@ impl ResourceManager for MechtronManager {
     }
 
     fn resource_type(&self) -> ResourceType {
-        ResourceType::Mechtron
+        self.resource_type.clone()
     }
 }
 
-pub struct MechtronProperties {
-    properties: Properties
-}
-
-
-
-
-impl MechtronProperties {
-
-    pub fn new( properties: Properties ) -> Result<Self,Error> {
-
-        // there's got to be a better way to do this --
-        MECHTRON_PROPERTIES_PATTERN.is_match(&properties.clone().into())?;
-
-        Ok(Self{
-            properties
-        })
-    }
-
-    pub fn config(&self) -> Option<Address> {
-        match self.properties.get("config") {
-            None => {None}
-            Some(config) => {
-                match config {
-                    Payload::Primitive(config) => {
-                        match config {
-                            Primitive::Address(address) => {
-                                Option::Some(address.clone())
-                            }
-                            _ => {None}
-                        }
-                    }
-                    _ => {None}
-                }
-            }
-        }
-    }
-
-}

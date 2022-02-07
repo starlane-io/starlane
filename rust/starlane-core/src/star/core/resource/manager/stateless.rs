@@ -46,11 +46,5 @@ impl ResourceManager for StatelessManager {
         Ok(())
     }
 
-    async fn has(&self, address: Address ) -> bool {
-        match self.store.has(address).await {
-            Ok(v) => v,
-            Err(_) => false,
-        }
-    }
 
 }

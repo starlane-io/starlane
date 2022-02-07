@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::sync::Arc;
 use mesh_portal_serde::version::latest::command::common::SetProperties;
 use mesh_portal_versions::version::v0_0_1::parse::{camel_case, domain, Res, set_properties};
 use mesh_portal_versions::version::v0_0_1::pattern::parse::kind;
@@ -7,16 +8,36 @@ use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag, take_until};
 use nom::character::complete::multispace0;
 use nom::combinator::all_consuming;
-use nom::multi::many0;
+use nom::multi::{many0, separated_list0};
 use nom::sequence::{delimited, preceded, tuple};
 use crate::artifact::ArtifactRef;
+use crate::cache::Data;
 use crate::command::compose::{Command, CommandOp};
 use crate::command::parse::{script, script_line};
 use crate::config::config::ResourceConfig;
 use crate::error::Error;
+use crate::resource::config::Parser;
 use crate::resource::Kind;
 
-pub fn config( input: &str, artifact_ref: ArtifactRef  ) -> Result<ResourceConfig,Error> {
+
+pub struct ResourceConfigParser;
+
+impl ResourceConfigParser {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Parser<ResourceConfig> for ResourceConfigParser {
+    fn parse(&self, artifact: ArtifactRef, _data: Data) -> Result<Arc<ResourceConfig>, Error> {
+        let raw = String::from_utf8(_data.to_vec() )?;
+        let config = resource_config(raw.as_str(), artifact)?;
+        Ok(Arc::new(config))
+    }
+}
+
+
+pub fn resource_config(input: &str, artifact_ref: ArtifactRef  ) -> Result<ResourceConfig,Error> {
     let (next,(_,(kind,(_,sections)),_)) = all_consuming(tuple( (multispace0, tuple((kind, tuple((multispace0,delimited(tag("{"),sections, tag("}")))))),multispace0)) )(input)?;
 
     let kind: Kind = TryFrom::try_from(kind)?;
@@ -32,11 +53,7 @@ pub fn config( input: &str, artifact_ref: ArtifactRef  ) -> Result<ResourceConfi
         match section {
             Section::SetProperties(properties) => {config.properties = properties}
             Section::Install(ops) => {
-                let mut commands = vec![];
-                for op in ops {
-                    commands.push(op.to_command()?);
-                }
-                config.install=commands}
+               config.install=ops}
         }
     }
 
@@ -57,15 +74,22 @@ fn properties_section( input: &str) -> Res<&str,Section> {
     })
 }
 
+fn rec_command_lines( input: &str ) -> Res<&str,Vec<String>> {
+    separated_list0(tag(";"), take_until(";") )(input).map( |(next,lines) | {
+        let lines : Vec<String> = lines.into_iter().map(|line| line.to_string() ).collect();
+        (next,lines)
+    })
+}
+
 fn install_section( input: &str) -> Res<&str,Section> {
-   let (next,(_,(_,ops),_)) = tuple( (multispace0, preceded(tag("Install"), tuple((multispace0,delimited(tag("{"),script, tag("}"))))),multispace0) )(input)?;
+   let (next,(_,(_,ops),_)) = tuple( (multispace0, preceded(tag("Install"), tuple((multispace0,delimited(tag("{"),rec_command_lines, tag("}"))))),multispace0) )(input)?;
 
     Ok((next,Section::Install(ops)))
 }
 
 pub enum Section {
     SetProperties(SetProperties),
-    Install(Vec<CommandOp>)
+    Install(Vec<String>)
 }
 
 
@@ -89,7 +113,7 @@ pub mod replace {
         delimited(tag("$("), domain ,tag(")") )(input)
     }
 
-    pub fn replace(input:&str, map: HashMap<String,String>) -> Result<String,Error> {
+    pub fn substitute(input:&str, map: &HashMap<String,String>) -> Result<String,Error> {
         let mut rtn = String::new();
         let mut next = input;
         let mut chunk = Option::None;
@@ -117,8 +141,8 @@ pub mod test {
     use std::str::FromStr;
     use mesh_portal_serde::version::latest::id::Address;
     use crate::artifact::ArtifactRef;
-    use crate::config::parse::{config, properties_section};
-    use crate::config::parse::replace::replace;
+    use crate::config::parse::{resource_config, properties_section};
+    use crate::config::parse::replace::substitute;
     use crate::error::Error;
     use crate::resource::ArtifactKind;
 
@@ -142,7 +166,7 @@ pub mod test {
         map.insert( "self".to_string(), "localhost:app".to_string());
         map.insert( "self.config.bundle".to_string(), "localhost:repo:site:1.0.0".to_string());
 
-        let rtn = replace( config_src, map )?;
+        let rtn = substitute(config_src, map )?;
 
         println!("{}",rtn);
 
@@ -150,7 +174,7 @@ pub mod test {
             address: Address::from_str("localhost:app")?,
             kind: ArtifactKind::ResourceConfig
         };
-        let config = config(rtn.as_str(), artifact_ref )?;
+        let config = resource_config(rtn.as_str(), artifact_ref )?;
 
         Ok(())
     }

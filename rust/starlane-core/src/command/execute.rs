@@ -29,6 +29,14 @@ pub struct CommandExecutor
 
 impl CommandExecutor {
 
+   pub fn exec_simple( line: String, stub: ResourceStub, api: StarlaneApi ) -> mpsc::Receiver<outlet::Frame> {
+       let (output_tx,output_rx) = mpsc::channel(1024);
+       tokio::spawn(async move {
+           CommandExecutor::execute(line, output_tx, stub, api, vec![] );
+       });
+      output_rx
+   }
+
    pub async fn execute( line: String, output_tx: mpsc::Sender<outlet::Frame>, stub: ResourceStub, api: StarlaneApi, fulfillments: Vec<Fulfillment>) {
        let executor = Self {
            api,
