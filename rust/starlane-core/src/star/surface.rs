@@ -18,7 +18,6 @@ use crate::star::shell::message::MessagingCall;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::watch::{WatchSelector, Notification, Topic, Watch, WatchResourceSelector, Watcher};
 use crate::star::shell::search::SearchHits;
-use crate::resources::message::ProtoRequest;
 
 #[derive(Clone)]
 pub struct SurfaceApi {

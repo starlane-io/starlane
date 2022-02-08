@@ -32,7 +32,6 @@ use crate::logger::{elog, LogInfo, StaticLogInfo};
 
 use crate::message::{MessageExpect, ProtoStarMessage, ReplyKind};
 use crate::names::Name;
-use crate::resources::message::{MessageFrom, ProtoRequest};
 use crate::star::{StarInfo, StarKey, StarSkel};
 use crate::star::shell::wrangler::{StarWrangle};
 use crate::starlane::api::StarlaneApi;

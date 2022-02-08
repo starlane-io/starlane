@@ -166,7 +166,7 @@ pub mod test {
         map.insert( "self".to_string(), "localhost:app".to_string());
         map.insert( "self.config.bundle".to_string(), "localhost:repo:site:1.0.0".to_string());
 
-        let rtn = substitute(config_src, map )?;
+        let rtn = substitute(config_src, &map )?;
 
         println!("{}",rtn);
 

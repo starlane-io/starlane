@@ -13,7 +13,6 @@ use crate::resource::ResourceRecord;
 use crate::star::{StarSkel, StarKey};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::fail::{Fail, StarlaneFailure};
-use crate::resources::message::{ProtoRequest, MessageFrom};
 use mysql::uuid::Uuid;
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
@@ -297,7 +296,7 @@ impl MessagingComponent {
                     id: unique_id(),
                     to: request.from.clone(),
                     from: self.skel.info.address.clone(),
-                    entity: request.entity.not_found(),
+                    core: request.core.not_found(),
                     response_to: request.id.clone()
                 };
                 exchanger.send(response);

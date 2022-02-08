@@ -92,8 +92,8 @@ impl ResourceManager for MechtronManager {
         }
 
 
-        let mechtron = MechtronShell::new(mechtron_config, caches)?;
-        self.mechtrons.put( assign.stub.key.clone(), mechtron ).await?;
+//        let mechtron = MechtronShell::new(mechtron_config, caches)?;
+//        self.mechtrons.put( assign.stub.key.clone(), mechtron ).await?;
 
         Ok(())
     }

@@ -1,14 +1,13 @@
 use std::string::FromUtf8Error;
 use mesh_portal_serde::version::latest::entity::request::create::{Create, CreateOp, Set};
-use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand};
+use mesh_portal_serde::version::latest::entity::request::{Action, Rc};
 use mesh_portal_serde::version::latest::entity::request::get::Get;
 use mesh_portal_serde::version::latest::entity::request::select::Select;
 use mesh_portal_serde::version::latest::messaging::{Request, Response};
 use mesh_portal_serde::version::latest::payload::{Payload, Primitive};
 use mesh_portal_serde::version::latest::resource::ResourceStub;
+use mesh_portal_versions::error::Error;
 use mesh_portal_versions::version::v0_0_1::entity::request::create::{Fulfillment, KindTemplate};
-use mesh_portal_versions::version::v0_0_1::entity::request::ReqEntity;
-use mesh_portal_versions::version::v0_0_1::entity::response::RespEntity;
 use mesh_portal_versions::version::v0_0_1::parse::Res;
 use tokio::sync::mpsc;
 use crate::command::cli::outlet;
@@ -85,11 +84,11 @@ impl CommandExecutor {
     async fn exec_create( &self, create: Create  ) {
 
         let parent = create.template.address.parent.clone();
-        let entity = ReqEntity::Rc(Rc::new(RcCommand::Create(create)));
-        let request = Request::new( entity, self.stub.address.clone(), parent );
+        let action = Action::Rc(Rc::Create(create));
+        let request = Request::new( action.into(), self.stub.address.clone(), parent );
         match self.api.exchange(request).await {
             Ok(response) => {
-                match response.entity.payload() {
+                match response.ok_or() {
                     Ok(_) => {
                         self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
                     }
@@ -108,12 +107,24 @@ impl CommandExecutor {
 
     async fn exec_select( &self, select: Select) {
         let query_root = select.pattern.query_root();
-        let entity = ReqEntity::Rc(Rc::new(RcCommand::Select(select)) );
-        let request = Request::new(entity, self.stub.address.clone(), query_root);
-        match self.api.exchange(request).await {
+        let action = Action::Rc(Rc::Select(select));
+        let core = action.into();
+        let request = Request::new(core, self.stub.address.clone(), query_root);
+        let response = self.api.exchange(request).await;
+        match response {
             Ok(response) => {
-                match response.entity.payload() {
-                    Ok(Payload::List(list)) => {
+                let response = match response.ok_or() {
+                    Ok(response) => {
+                        response
+                    }
+                    Err(fail) => {
+                        self.output_tx.send(outlet::Frame::StdErr( fail.to_string() ) ).await;
+                        self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
+                        return;
+                    }
+                };
+                match &response.core.body {
+                    Payload::List(list) => {
                         for stub in list.iter() {
                             if let Primitive::Stub(stub) = stub {
                                 self.output_tx.send(outlet::Frame::StdOut( stub.clone().address_and_kind().to_string() ) ).await;
@@ -121,12 +132,8 @@ impl CommandExecutor {
                         }
                         self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
                     }
-                    Ok(_) => {
+                    _ => {
                         self.output_tx.send(outlet::Frame::StdErr( "unexpected response".to_string() ) ).await;
-                        self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
-                    }
-                    Err(fail) => {
-                        self.output_tx.send(outlet::Frame::StdErr( fail.to_string() ) ).await;
                         self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
                     }
                 }
@@ -151,11 +158,12 @@ impl CommandExecutor {
             } ;
 
             let parent = create.template.address.parent.clone();
-            let entity = ReqEntity::Rc(Rc::new(RcCommand::Create(create)));
-            let request = Request::new( entity, self.stub.address.clone(), parent );
+            let action= Action::Rc(Rc::Create(create));
+            let core = action.into();
+            let request = Request::new( core, self.stub.address.clone(), parent );
             match self.api.exchange(request).await {
                 Ok(response) => {
-                    match response.entity.payload() {
+                    match response.ok_or(){
                         Ok(_) => {
                             self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
                         }
@@ -181,11 +189,12 @@ impl CommandExecutor {
     async fn exec_set( &self, set: Set) {
 
         let to = set.address.parent().clone().expect("expect parent");
-        let entity = ReqEntity::Rc(Rc::new(RcCommand::Set(set)));
-        let request = Request::new( entity, self.stub.address.clone(), to );
+        let action = Action::Rc(Rc::Set(set));
+        let core = action.into();
+        let request = Request::new( core, self.stub.address.clone(), to );
         match self.api.exchange(request).await {
             Ok(response) => {
-                match response.entity.payload() {
+                match response.ok_or() {
                     Ok(_) => {
                         self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
                     }
@@ -206,12 +215,13 @@ impl CommandExecutor {
 
     async fn exec_get( &self, get: Get) {
         let to = get.address.parent().clone().expect("expect parent");
-        let entity = ReqEntity::Rc(Rc::new(RcCommand::Get(get.clone())));
-        let request = Request::new( entity, self.stub.address.clone(), to );
+        let action = Action::Rc(Rc::Get(get.clone()));
+        let core = action.into();
+        let request = Request::new( core, self.stub.address.clone(), to );
         match self.api.exchange(request).await {
             Ok(response) => {
-                match response.entity.payload() {
-                    Ok(Payload::Primitive(Primitive::Bin(bin))) => {
+                match response.core.body {
+                    Payload::Primitive(Primitive::Bin(bin)) => {
                         match String::from_utf8((*bin).clone() ) {
                             Ok(text) => {
                                 self.output_tx.send(outlet::Frame::StdOut(text)).await;
@@ -223,11 +233,11 @@ impl CommandExecutor {
                             }
                         }
                     }
-                    Ok(Payload::Primitive(Primitive::Text(text))) => {
+                    Payload::Primitive(Primitive::Text(text)) => {
                       self.output_tx.send(outlet::Frame::StdOut(text)).await;
                       self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
                     }
-                    Ok(Payload::Map(map)) => {
+                    Payload::Map(map) => {
                         let mut rtn = String::new();
                         rtn.push_str(get.address.to_string().as_str());
                         rtn.push_str("{ " );
@@ -246,14 +256,11 @@ impl CommandExecutor {
                         self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
                     }
 
-                    Ok(_) => {
+                    _ => {
                         self.output_tx.send(outlet::Frame::StdErr( "unexpected payload response format".to_string()) ).await;
                         self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
                     }
-                    Err(fail) => {
-                        self.output_tx.send(outlet::Frame::StdErr( fail.to_string() ) ).await;
-                        self.output_tx.send( outlet::Frame::EndOfCommand(1)).await;
-                    }
+
                 }
             }
             Err(err) => {

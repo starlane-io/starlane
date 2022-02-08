@@ -47,15 +47,10 @@ impl ResourceManagerApi {
         rx.await?
     }
 
-    pub async fn has( &self, address: Address) -> Result<bool,Error> {
-        let (tx,rx) = oneshot::channel();
-        self.tx.send(ResourceManagerCall::Has{address, tx }).await;
-        Ok(rx.await?)
-    }
-
-    pub async fn request( &self, request: Delivery<Request>) {
+    pub async fn request( &self, request: Request) -> Result<Response,Error> {
         let (tx,rx) = oneshot::channel();
         self.tx.send(ResourceManagerCall::Request{request, tx }).await;
+        rx.await?
     }
 
     pub async fn get( &self, address: Address ) -> Result<Payload,Error> {
@@ -67,8 +62,7 @@ impl ResourceManagerApi {
 
 pub enum ResourceManagerCall {
     Assign{ assign:ResourceAssign, tx: oneshot::Sender<Result<(),Error>> },
-    Has { address: Address, tx: oneshot::Sender<bool> },
-    Request { request: Delivery<Request>, tx: oneshot::Sender<Result<Option<Response>,Error>>},
+    Request { request: Request, tx: oneshot::Sender<Result<Response,Error>>},
     Get{ address: Address, tx: oneshot::Sender<Result<Payload,Error>>}
 }
 
@@ -101,7 +95,6 @@ impl AsyncProcessor<ResourceManagerCall> for ResourceManagerComponent{
             ResourceManagerCall::Assign { assign, tx } => {
                 self.assign(assign,tx).await;
             }
-            ResourceManagerCall::Has { address, tx } => {}
             ResourceManagerCall::Request { request, tx } => {}
             ResourceManagerCall::Get { address, tx } => {
                 self.get(address,tx).await;
@@ -136,18 +129,19 @@ impl ResourceManagerComponent{
     }
 
 
-    async fn request( &mut self, request: Delivery<Request>) {
-        async fn process( manager: &mut ResourceManagerComponent, request: Delivery<Request>) -> Result<(),Error> {
+    async fn request( &mut self, request: Request) -> Response {
+        async fn process( manager: &mut ResourceManagerComponent, request: Request) -> Result<Response,Error> {
             let resource_type = manager.resource_type(&request.to)?;
             let manager = manager.manager(&resource_type ).await?;
-            manager.handle_request(request);
-            Ok(())
+            Ok(manager.handle_request(request))
         }
 
-        match process(self, request.clone()).await {
-            Ok(_) => {}
+        match process(self, request.clone() ).await {
+            Ok(response) => {
+                response
+            }
             Err(error) => {
-                request.fail( mesh_portal_serde::version::latest::fail::Fail::Mesh(mesh_portal_serde::version::latest::fail::mesh::Fail::Error(error.to_string()) ));
+                request.fail(error.to_string())
             }
         }
     }
@@ -196,8 +190,8 @@ pub trait ResourceManager: Send + Sync {
         assign: ResourceAssign,
     ) -> Result<(),Error>;
 
-    fn handle_request(&self, delivery: Delivery<Request> ) {
-        delivery.fail(fail::Fail::Error("Not implemented".to_string()));
+    async fn handle_request(&self, request: Request ) -> Response {
+        unimplemented!()
     }
 
     async fn get(&self, address: Address) -> Result<Payload,Error> {

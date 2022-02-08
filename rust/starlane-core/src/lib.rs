@@ -70,7 +70,6 @@ pub mod watch;
 pub mod mechtron;
 pub mod parse;
 pub mod html;
-pub mod resources;
 pub mod security;
 pub mod pattern;
 pub mod fail;

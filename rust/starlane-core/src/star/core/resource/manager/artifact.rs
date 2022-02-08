@@ -18,15 +18,13 @@ use crate::util;
 use crate::error::Error;
 
 use crate::message::delivery::Delivery;
-use mesh_portal_serde::version::latest::command::common::StateSrc;
+use mesh_portal_serde::version::latest::command::common::{SetProperties, StateSrc};
 use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, Strategy, Template};
-use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand};
+use mesh_portal_serde::version::latest::entity::request::{Action, Rc};
 use mesh_portal_serde::version::latest::id::{Address, AddressAndKind, KindParts, RouteSegment};
 use mesh_portal_serde::version::latest::messaging::Request;
 use mesh_portal_serde::version::latest::payload::{Payload, Primitive};
 use mesh_portal_versions::version::v0_0_1::entity::request::create::KindTemplate;
-use mesh_portal_versions::version::v0_0_1::entity::request::ReqEntity;
-use mesh_portal_versions::version::v0_0_1::entity::response::RespEntity;
 use zip::result::ZipResult;
 use crate::file_access::FileAccess;
 
@@ -203,17 +201,19 @@ println!("PATH : {} ", path );
                                         kind: KindTemplate { resource_type: address_and_kind.kind.resource_type.clone(), kind: address_and_kind.kind.kind.clone(), specific: None }
                                     },
                                     state,
-                                    properties: vec![],
+                                    properties: SetProperties::new(),
                                     strategy: Strategy::Create,
                                     registry: Default::default()
                                 };
 
                                 println!("SENDING REQUEST TO PARENT: {}", parent.to_string());
-                                let request = Request::new(ReqEntity::Rc(Rc::empty_payload(RcCommand::Create(create))), assign.stub.address.clone(), parent);
+                                let action = Action::Rc(Rc::Create(create));
+                                let core = action.into();
+                                let request = Request::new(core, assign.stub.address.clone(), parent);
                                 let response = skel.messaging_api.exchange(request).await;
                                 match response {
                                     Ok(response) => {
-                                        match response.entity.payload() {
+                                        match response.core.body {
                                             Ok(_) => {
                                                 eprintln!("added artifact: {}", address_and_kind.address.to_string());
                                             }

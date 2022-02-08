@@ -22,19 +22,16 @@ use std::convert::TryInto;
 use handlebars::Handlebars;
 use serde_json::json;
 use std::future::Future;
-use mesh_portal_serde::version::latest::entity::request::Http;
-use mesh_portal_serde::version::latest::http::HttpResponse;
+use mesh_portal_serde::version::latest::http::{HttpRequest, HttpResponse};
 use mesh_portal_serde::version::latest::id::{Address, Meta};
 use mesh_portal_serde::version::latest::messaging;
 use mesh_portal_serde::version::latest::payload::{HttpMethod, Payload, Primitive};
-use mesh_portal_versions::version::v0_0_1::entity::request::ReqEntity;
 use nom::AsBytes;
 use crate::artifact::ArtifactRef;
 use crate::cache::ArtifactItem;
 use crate::html::HTML;
 use regex::Regex;
 use crate::resource::ArtifactKind;
-use crate::resources::message::ProtoRequest;
 use serde::{Serialize,Deserialize};
 use crate::star::variant::web::parse::host_and_port;
 
@@ -143,9 +140,9 @@ info!("method: {}", req.method.expect("method"));
                 for index in body_offset..request_buf.len() {
                     body.push( request_buf.get(index).unwrap().clone() );
                 }
-                let body =  Payload::Primitive(Primitive::Bin(Arc::new(body)));
+                let body =  Arc::new(body);
 
-                break Http{
+                break HttpRequest{
                     path: req.path.expect("expected path").to_string(),
                     method: method,
                     headers: http_headers,
@@ -162,9 +159,7 @@ eprintln!("incomplete parse...");
         Ok(response) => {
             stream.write(format!("HTTP/1.1 {} OK\r\n\r\n",response.code).as_bytes() ).await?;
 
-            if response.body.is_some() {
-                stream.write( response.body.to_bin()?.as_slice() ).await?;
-            }
+                stream.write( response.body.as_slice() ).await?;
         }
         Err(e) => {
 eprintln!("ERROR: {}", e.to_string() );
@@ -181,27 +176,28 @@ async fn error_response( mut stream: TcpStream, code: usize, message: &str)  {
     stream.write(HTML.render("error-code-page", &messages ).unwrap().as_bytes() ).await.unwrap();
 }
 
-async fn process_request(http_request: Http, api: StarlaneApi, skel: StarSkel ) -> Result<HttpResponse,Error> {
+async fn process_request(http_request: HttpRequest, api: StarlaneApi, skel: StarSkel ) -> Result<HttpResponse,Error> {
 
     let host_and_port = host_and_port(http_request.headers.get("Host").ok_or("Missing HOST")?.as_str())?.1;
-    let entity = ReqEntity::Http(http_request);
+
+    let core = http_request.into();
     let to = Address::from_str( host_and_port.host.as_str() )?;
     let from = skel.info.address;
-    let request = messaging::Request::new( entity, from, to );
+    let request = messaging::Request::new( core, from, to );
     let response = skel.messaging_api.exchange(request).await?;
-    let mut response = response.entity.http()?;
+    let mut response:HttpResponse = response.core.try_into()?;
 println!("GOT RESPONSE!");
     if response.code == 404 {
         let error = "Not Found".to_string();
         let messages = json!({"title": "404", "message": error});
         let body  = HTML.render("error-code-page", &messages )?;
-        response.body = Payload::Primitive(Primitive::Bin(Arc::new(body.as_bytes().to_vec())));
+        response.body = Arc::new(body.as_bytes().to_vec());
     }
     else if response.code == 500 {
         let error = "Internal Server Error".to_string();
         let messages = json!({"title": "500", "message": error});
         let body  = HTML.render("error-code-page", &messages )?;
-        response.body = Payload::Primitive(Primitive::Bin(Arc::new(body.as_bytes().to_vec())));
+        response.body = Arc::new(body.as_bytes().to_vec());
     }
 
     Ok(response)

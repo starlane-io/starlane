@@ -8,7 +8,7 @@ use futures::future::join_all;
 use futures::SinkExt;
 use mesh_portal_serde::version::latest::command::common::{SetProperties, SetRegistry};
 use mesh_portal_serde::version::latest::entity::request::query::{Query, QueryResult};
-use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand, ReqEntity};
+use mesh_portal_serde::version::latest::entity::request::{Action, Rc};
 use mesh_portal_serde::version::latest::id::{Address, Specific, Version};
 use mesh_portal_serde::version::latest::messaging::Request;
 use mesh_portal_serde::version::latest::pattern::{AddressKindPath, AddressKindSegment, ExactSegment, KindPattern, ResourceTypePattern, SegmentPattern};
@@ -26,7 +26,6 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, Mutex};
 use tokio::sync::oneshot;
 use async_recursion::async_recursion;
-use mesh_portal_serde::version::latest::entity::response::RespEntity;
 use mesh_portal_versions::version::v0_0_1::entity::request::select::{Select, SelectKind, SubSelect};
 
 use crate::error::Error;
@@ -39,7 +38,6 @@ use crate::resource;
 use crate::star::{StarKey, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::resource::{ResourceRecord, AssignResourceStateSrc, Resource, ResourceAssign, AssignKind, ResourceLocation, ResourceType, Kind};
-use crate::resources::message::{ProtoRequest, MessageFrom};
 
 use crate::security::permissions::Pattern;
 
@@ -375,11 +373,11 @@ impl RegistryComponent {
                 id: unique_id(),
                 from: skel.info.address.clone(),
                 to: parent.clone(),
-                entity: ReqEntity::Rc(Rc::new(Query::AddressKindPath.into() ))
+                core: Action::Rc(Rc::Query(Query::AddressKindPath)).into()
             };
             let response = skel.messaging_api.exchange(request).await?;
 
-            let parent_kind_path = response.entity.payload()?;
+            let parent_kind_path = response.core.body;
             let parent_kind_path: Primitive= parent_kind_path.try_into()?;
             let parent_kind_path: String= parent_kind_path.try_into()?;
 
@@ -1011,7 +1009,9 @@ impl Selector {
                         let select = sub_select.into();
 
                         let parent = address.parent().ok_or::<Error>("expecting address to have a parent".into())?;
-                        let request = Request::new(ReqEntity::Rc(Rc::new(RcCommand::Select(select))), address.clone(), parent.clone() );
+                        let action = Action::Rc(Rc::Select(select));
+                        let core = action.into();
+                        let request = Request::new(core, address.clone(), parent.clone() );
                         futures.push(selector.skel.messaging_api.exchange(request));
                     }
                 }
@@ -1034,7 +1034,7 @@ impl Selector {
                 // not matching addresses so we can add all the results
                 for future in futures {
                     let response = future?;
-                    if let Ok( Payload::List(more_stubs)) =response.entity.payload() {
+                    if let Ok( Payload::List(more_stubs)) =response.core.body {
                         let mut new_stubs = vec![];
                         for stub in more_stubs.list.into_iter() {
                             if let Primitive::Stub(stub) = stub {

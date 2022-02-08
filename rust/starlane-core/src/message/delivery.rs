@@ -19,10 +19,10 @@ use crate::frame::{StarMessage, StarMessagePayload, SimpleReply};
 use mesh_portal_serde::version::latest::util::unique_id;
 use crate::message::Reply;
 use std::ops::Deref;
-use mesh_portal_serde::version::latest::entity::response::RespEntity;
+use mesh_portal_serde::version::latest::entity::response::ResponseCore;
 use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::messaging::{Request, Response};
-use mesh_portal_serde::version::latest::payload::Payload;
+use mesh_portal_serde::version::latest::payload::{Payload, Primitive};
 
 #[derive(Clone)]
 pub struct Delivery<M>
@@ -88,12 +88,12 @@ impl <M> Delivery<M> where M: Clone + Send + Sync + 'static
 
 impl Delivery<Request>
 {
-    pub fn response( self, entity: RespEntity ) {
+    pub fn respond(self, core: ResponseCore ) {
         let response = Response {
             id: unique_id(),
             to: self.item.from,
             from: self.item.to,
-            entity,
+            core,
             response_to: self.item.id
         };
         let proto = self
@@ -103,25 +103,18 @@ impl Delivery<Request>
         self.skel.messaging_api.star_notify(proto);
     }
 
-    pub fn result<E>( self, result: Result<Payload,E> ) where E: Into<mesh_portal_serde::version::latest::fail::Fail> {
-        match result {
-            Ok(payload) => {
-                self.ok(payload);
-            }
-            Err(fail) => {
-                self.fail(fail.into());
-            }
-        }
-    }
-
-    pub fn ok(self, payload: Payload) -> Result<(),Error> {
+   pub fn ok(self, payload: Payload) -> Result<(),Error> {
         let request = self.get_request()? ;
-        let entity = request.entity.ok(payload)?;
+        let core = ResponseCore {
+            headers: Default::default(),
+            code: 200,
+            body: payload
+        };
         let response = Response {
             id: unique_id(),
             to: request.from.clone(),
             from: request.to.clone(),
-            entity,
+            core,
             response_to: self.item.id
         };
 
@@ -133,15 +126,19 @@ impl Delivery<Request>
         Ok(())
     }
 
-    pub fn fail(self, fail: mesh_portal_serde::version::latest::fail::Fail ) ->Result<(),Error> {
+    pub fn fail(self, fail: String ) ->Result<(),Error> {
 
         let request = self.get_request()?;
-        let entity = request.entity.fail(fail)?;
+        let core = ResponseCore {
+            headers: Default::default(),
+            code: 500,
+            body: Payload::Primitive(Primitive::Text(fail))
+        };
         let response = Response {
             id: unique_id(),
             to: request.from,
             from: request.to,
-            entity,
+            core,
             response_to: request.id
         };
 
