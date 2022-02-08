@@ -1,3 +1,6 @@
+pub mod process;
+pub mod server;
+
 use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
 use crate::config::wasm::Wasm;
 use crate::error::Error;
@@ -38,7 +41,7 @@ impl MechtronShell {
 
     pub fn new(config: MechtronConfig, caches: ArtifactCaches) -> Self {
 
-        let runner = MechtronRunner::new(skel.clone(),rx);
+        let runner = WasmRunner::new(skel.clone(), rx);
         tokio::spawn(async move {
             runner.run().await;
         });
@@ -79,7 +82,7 @@ pub struct MechtronSkel {
     pub wasm: ArtifactItem<Wasm>,
     pub bind: ArtifactItem<CachedConfig<BindConfig>>,
     pub tx: mpsc::Sender<Call>,
-    pub membrane: MembraneExt,
+    pub membrane: WasmMembraneExt,
     pub resource_skel: ResourceSkel,
 }
 
@@ -124,12 +127,12 @@ impl MechtronSkel {
 
 }
 
-pub struct Factory {
+pub struct MechtronFactory {
     template: MechtronTemplate,
-    membrane: MembraneExt
+    membrane: WasmMembraneExt
 }
 
-impl ResourceCtrlFactory for Factory {
+impl ResourceCtrlFactory for MechtronFactory {
     fn matches(&self, config: Config<ResourceConfigBody>) -> bool {
         todo!()
     }
@@ -149,12 +152,12 @@ impl ResourceCtrlFactory for Factory {
 }
 
 
-pub struct MechtronRunner {
+pub struct WasmRunner {
     skel: MechtronSkel,
     rx: mpsc::Receiver<Call>,
 }
 
-impl MechtronRunner {
+impl WasmRunner {
     pub fn new(skel: MechtronSkel, rx: mpsc::Receiver<Call>)-> Self {
         Self {
             skel,
@@ -219,12 +222,12 @@ pub enum MembraneExtCall {
 
 
 #[derive(Clone)]
-pub struct MembraneExt {
+pub struct WasmMembraneExt {
     pub membrane: Arc<WasmMembrane>,
     pub map: AsyncHashMap<Address,mpsc::Sender<Call>>
 }
 
-impl Deref for MembraneExt {
+impl Deref for WasmMembraneExt {
     type Target = Arc<WasmMembrane>;
 
     fn deref(&self) -> &Self::Target {
@@ -232,7 +235,7 @@ impl Deref for MembraneExt {
     }
 }
 
-impl MembraneExt {
+impl WasmMembraneExt {
     pub fn new(module: Arc<Module>) -> Result<Self,Error>{
         let map = AsyncHashMap::new();
         let (tx,mut rx) = mpsc::channel(1024);
@@ -264,7 +267,7 @@ impl MembraneExt {
                 while let Option::Some(call) = rx.recv().await {
                     match call {
                         MembraneExtCall::InletFrame(buffer) => {
-                            async fn process( ext: &MembraneExt, buffer: i32 ) -> Result<(),Error> {
+                            async fn process(ext: &WasmMembraneExt, buffer: i32 ) -> Result<(),Error> {
                                 let buffer = ext.membrane.consume_buffer(buffer)?;
                                 let frame: inlet::Frame = bincode::deserialize(buffer.as_slice())?;
                                 if let Option::Some(from) = frame.from() {

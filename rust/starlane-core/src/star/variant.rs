@@ -19,6 +19,7 @@ pub mod central;
 pub mod gateway;
 pub mod web;
 pub mod portal;
+pub mod mechtron;
 
 
 #[derive(Clone)]
