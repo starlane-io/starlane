@@ -33,7 +33,6 @@ use crate::starlane::api::StarlaneApi;
 use crate::starlane::StarlaneMachine;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
 
-pub type Data = Arc<Vec<u8>>;
 pub type ZipFile = Address;
 
 pub trait Cacheable: Send + Sync + 'static {
@@ -1251,12 +1250,12 @@ mod test {
  */
 
 pub struct Raw {
-    data: Data,
+    data: Bin,
     artifact: ArtifactRef,
 }
 
 impl Raw {
-    pub fn data(&self) -> Data {
+    pub fn data(&self) -> Bin{
         self.data.clone()
     }
 }
@@ -1280,7 +1279,7 @@ impl RawParser {
 }
 
 impl Parser<Raw> for RawParser {
-    fn parse(&self, artifact: ArtifactRef, data: Data) -> Result<Arc<Raw>, Error> {
+    fn parse(&self, artifact: ArtifactRef, data: Bin ) -> Result<Arc<Raw>, Error> {
         Ok(Arc::new(Raw {
             artifact: artifact,
             data: data,

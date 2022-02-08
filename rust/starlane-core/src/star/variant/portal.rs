@@ -5,7 +5,7 @@ use std::thread;
 
 use url::Url;
 
-use crate::star::{StarSkel};
+use crate::star::{PortalEvent, StarSkel};
 use crate::starlane::api::{StarlaneApi, StarlaneApiRelay};
 use tokio::sync::{oneshot, mpsc};
 use crate::star::variant::{VariantCall, FrameVerdict};
@@ -33,7 +33,7 @@ use mesh_portal_serde::version::latest::payload::{Payload, PayloadMap, Primitive
 use mesh_portal_serde::version::latest::portal::inlet::AssignRequest;
 use mesh_portal_serde::version::latest::resource::ResourceStub;
 use mesh_portal_tcp_common::{PrimitiveFrameReader, PrimitiveFrameWriter};
-use mesh_portal_tcp_server::{PortalServer, PortalTcpServer, TcpServerCall};
+use mesh_portal_tcp_server::{Event, PortalServer, PortalTcpServer, TcpServerCall};
 use nom::AsBytes;
 use crate::artifact::ArtifactRef;
 use crate::cache::ArtifactItem;
@@ -79,6 +79,27 @@ impl AsyncProcessor<VariantCall> for PortalVariant {
 impl PortalVariant {
     fn init(&mut self) -> Result<(),Error> {
         let server = PortalTcpServer::new(DEFAULT_PORT.clone(), Box::new(StarlanePortalServer::new(self.skel.clone() )));
+        let skel = self.skel.clone();
+        tokio::spawn( async move {
+            async fn process(skel: &StarSkel, server: mpsc::Sender<TcpServerCall>) -> Result<(),Error> {
+                let (tx,rx) = oneshot::channel();
+                server.send( TcpServerCall::ListenEvents(tx)).await;
+                let mut server_broadcast_rx = rx.await?;
+                while let Ok(event) = server_broadcast_rx.recv().await {
+                    match event {
+                        Event::Added(portal_info) => {
+                            skel.portal_event_tx.send( PortalEvent::Added(portal_info));
+                        }
+                        Event::Removed(portal_info) => {
+                            skel.portal_event_tx.send( PortalEvent::Removed(portal_info));
+                        }
+                        _ => {}
+                    }
+                }
+                Ok(())
+            }
+
+        });
         self.server = Option::Some(server);
         Ok(())
     }

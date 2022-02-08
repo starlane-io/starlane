@@ -67,7 +67,6 @@ pub mod starlane;
 pub mod template;
 pub mod util;
 pub mod watch;
-pub mod mechtron;
 pub mod parse;
 pub mod html;
 pub mod security;
@@ -75,6 +74,7 @@ pub mod pattern;
 pub mod fail;
 pub mod command;
 pub mod user;
+pub mod mechtron;
 
 lazy_static! {
     static ref VERSION: semver::Version = {

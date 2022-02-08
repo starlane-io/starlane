@@ -34,11 +34,7 @@ use crate::star::shell::router::{RouterApi, RouterComponent, RouterCall};
 use crate::star::shell::sys::{SysApi,SysComponent};
 use crate::star::surface::{SurfaceApi, SurfaceCall, SurfaceComponent};
 use crate::star::variant::{VariantApi, start_variant};
-use crate::star::{
-    ConstellationBroadcast, FrameHold, FrameTimeoutInner, Persistence,
-     Star, StarCommand, StarController,
-    StarInfo, StarKernel, StarKey, StarKind, StarSkel,
-};
+use crate::star::{ConstellationBroadcast, FrameHold, FrameTimeoutInner, Persistence, PortalEvent, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarSkel};
 use crate::starlane::StarlaneMachine;
 use crate::template::StarKeyConstellationIndex;
 use crate::star::shell::locator::{ResourceLocatorApi, ResourceLocatorComponent};
@@ -70,7 +66,8 @@ pub struct ProtoStar {
     machine: StarlaneMachine,
     lane_muxer_api: LaneMuxerApi,
     router_tx: mpsc::Sender<RouterCall>,
-    router_booster_rx: RouterCallBooster
+    router_booster_rx: RouterCallBooster,
+    portal_event_tx: broadcast::Sender<PortalEvent>
 }
 
 impl ProtoStar {
@@ -90,6 +87,7 @@ impl ProtoStar {
         let (router_tx,router_rx) = mpsc::channel(1024);
         let router_booster_rx = RouterCallBooster { router_rx };
         let lane_muxer_api = LaneMuxer::start(router_tx.clone());
+        let (portal_event_tx,_) = broadcast::channel(1024);
         (
 
             ProtoStar {
@@ -115,7 +113,8 @@ impl ProtoStar {
                 surface_rx,
                 lane_muxer_api,
                 router_tx,
-                router_booster_rx
+                router_booster_rx,
+                portal_event_tx
             },
             StarController {
                 star_tx,
@@ -224,7 +223,8 @@ impl ProtoStar {
                             variant_api,
                             watch_api,
                             registry_api,
-                            sys_api
+                            sys_api,
+                            portal_event_tx: self.portal_event_tx
                         };
 
                         start_variant(skel.clone(), variant_rx );

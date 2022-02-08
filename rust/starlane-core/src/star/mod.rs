@@ -56,6 +56,7 @@ use crate::star::core::resource::manager::ResourceManagerApi;
 use std::str::FromStr;
 use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::resource::Status;
+use mesh_portal_tcp_common::PortalInfo;
 use mesh_portal_versions::version::v0_0_1::parse::Res;
 use nom::sequence::{preceded, terminated, tuple};
 use nom::multi::many0;
@@ -1176,6 +1177,7 @@ pub struct StarSkel {
     pub persistence: Persistence,
     pub data_access: FileAccess,
     pub machine: StarlaneMachine,
+    pub portal_event_tx: broadcast::Sender<PortalEvent>
 }
 
 impl Debug for StarSkel {
@@ -1278,4 +1280,9 @@ impl<T> ToString for LogId<T> {
     fn to_string(&self) -> String {
         "log-id".to_string()
     }
+}
+
+pub enum PortalEvent {
+    Added(PortalInfo),
+    Removed(PortalInfo)
 }
