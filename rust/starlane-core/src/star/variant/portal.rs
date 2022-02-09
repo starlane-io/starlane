@@ -21,6 +21,8 @@ use handlebars::Handlebars;
 use serde_json::json;
 use std::future::Future;
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+use std::sync::mpsc::RecvError;
+use std::time::Duration;
 use anyhow::anyhow;
 use mesh_portal_api_server::{MuxCall, PortalAssignRequestHandler, Router};
 use mesh_portal_serde::version::latest::command::common::{SetProperties, StateSrc};
@@ -28,7 +30,7 @@ use mesh_portal_serde::version::latest::config::{Assign, Config, ResourceConfigB
 use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, KindTemplate, Strategy, Template};
 use mesh_portal_serde::version::latest::entity::request::Rc;
 use mesh_portal_serde::version::latest::id::{Address, AddressSegment, RouteSegment};
-use mesh_portal_serde::version::latest::messaging::{Message, Request};
+use mesh_portal_serde::version::latest::messaging::{Message, Request, Response};
 use mesh_portal_serde::version::latest::payload::{Payload, PayloadMap, Primitive};
 use mesh_portal_serde::version::latest::portal::inlet::AssignRequest;
 use mesh_portal_serde::version::latest::resource::ResourceStub;
@@ -41,6 +43,7 @@ use crate::html::HTML;
 use regex::Regex;
 use crate::resource::ArtifactKind;
 use serde::{Serialize,Deserialize};
+use tokio::time::error::Elapsed;
 
 
 lazy_static! {
@@ -88,10 +91,31 @@ impl PortalVariant {
                 while let Ok(event) = server_broadcast_rx.recv().await {
                     match event {
                         Event::Added(portal_info) => {
-                            skel.portal_event_tx.send( PortalEvent::Added(portal_info));
+                            let (output_tx,mut output_rx) = mpsc::channel(1024);
+                            let server = server.clone();
+                            tokio::spawn( async move {
+                                while let Some(request) = output_rx.recv().await {
+                                    let (tx,mut rx) = oneshot::channel();
+                                    server.send( TcpServerCall::Request{ request: request.request.clone(), tx } ).await;
+                                    let response = tokio::time::timeout( Duration::from_secs(30),  rx ).await;
+                                    match response {
+                                        Ok(Ok(response)) => {
+                                            tx.send(response);
+                                        }
+                                        Ok(Err(err)) => {
+                                            tx.send( request.request.fail(err.to_string()) );
+                                        }
+                                        Err(err) => {
+                                            tx.send( request.request.fail("timeout".to_string()) );
+                                        }
+                                    }
+                                }
+                            });
+                            skel.portal_event_tx.send( PortalEvent::PortalAdded {info: portal_info, output_tx});
+
                         }
                         Event::Removed(portal_info) => {
-                            skel.portal_event_tx.send( PortalEvent::Removed(portal_info));
+                            skel.portal_event_tx.send( PortalEvent::PortalRemoved(portal_info));
                         }
                         _ => {}
                     }

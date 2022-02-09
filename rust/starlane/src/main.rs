@@ -24,11 +24,14 @@ use starlane_core::util;
 use starlane_core::starlane::api::StarlaneApi;
 use std::convert::TryInto;
 use mesh_portal_serde::version::latest::entity::request::create::Require;
+use mesh_portal_serde::version::latest::id::Address;
 use tokio::io::AsyncReadExt;
 use starlane_core::command::cli::{CliClient, outlet};
 use starlane_core::command::cli::outlet::Frame;
 use starlane_core::command::compose::CommandOp;
 use starlane_core::command::parse::{command_line, rec_script_line};
+use starlane_core::mechtron::portal_client::launch_mechtron_client;
+use starlane_core::mechtron::process::launch_mechtron_process;
 use starlane_core::star::shell::sys::SysCall::Create;
 
 
@@ -59,6 +62,9 @@ async fn go() -> Result<(),Error> {
                                                                                                                             SubCommand::with_name("get-shell").usage("get the shell that the starlane CLI connects to")]).usage("read or manipulate the cli config").display_order(1).display_order(1),
                                                             SubCommand::with_name("exec").usage("execute a command").args(vec![Arg::with_name("command_line").required(true).help("command line to execute")].as_slice()),
                                                             SubCommand::with_name("script").usage("execute commands in a script").args(vec![Arg::with_name("script_file").required(true).help("the script file to execute")].as_slice()),
+                                                            SubCommand::with_name("mechtron").usage("launch a mechtron portal client").args(vec![Arg::with_name("server").required(true).help("the portal server to connect to"),
+                                                                                                                                                       Arg::with_name("wasm_src").required(true).help("the address of the wasm source"),
+                                                                                                                                                      ].as_slice()),
 
     ]);
 
@@ -102,6 +108,8 @@ async fn go() -> Result<(),Error> {
                 eprintln!("Script Error {}", err.to_string() );
             }
         }
+    } else if let Option::Some(args) = matches.subcommand_matches("mechtron") {
+        mechtron(args.clone()).await.unwrap();
     } else {
         clap_app.print_long_help().unwrap_or_default();
     }
@@ -182,6 +190,15 @@ async fn script(args: ArgMatches<'_>) -> Result<(), Error> {
     }
 
     std::process::exit(0);
+}
+
+
+async fn mechtron(args: ArgMatches<'_>) -> Result<(), Error> {
+   let server = args.value_of("server").ok_or("expected server hostname")?.to_string();
+   let wasm_src = args.value_of("wasm_src").ok_or("expected Wasm source")?.to_string();
+   let wasm_src = Address::from_str(wasm_src.as_str())?;
+   launch_mechtron_client( server, wasm_src ).await;
+   Ok(())
 }
 
 

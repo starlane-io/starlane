@@ -1,10 +1,11 @@
 use std::convert::TryInto;
 use std::sync::Arc;
+use mesh_portal_serde::version::latest::bin::Bin;
 use mesh_portal_serde::version::latest::config::bind::BindConfig;
 use mesh_portal_serde::version::latest::config::Config;
 use mesh_portal_versions::version::v0_0_1::config::bind::parse::bind;
 use crate::artifact::ArtifactRef;
-use crate::cache::{CachedConfig, Data};
+use crate::cache::{CachedConfig};
 use crate::error::Error;
 use crate::resource::config::Parser;
 
@@ -17,7 +18,7 @@ impl BindConfigParser {
 }
 
 impl Parser<CachedConfig<BindConfig>> for BindConfigParser {
-    fn parse(&self, artifact: ArtifactRef, _data: Data) -> Result<Arc<CachedConfig<BindConfig>>, Error> {
+    fn parse(&self, artifact: ArtifactRef, _data: Bin ) -> Result<Arc<CachedConfig<BindConfig>>, Error> {
         let raw = String::from_utf8(_data.to_vec() )?;
 println!("PARSING: {}", raw );
         let bind = bind(raw.as_str())?.1;

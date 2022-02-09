@@ -81,3 +81,4 @@ mesh-portal-tcp-server = { path = "../../../mesh-portal/rust/mesh-portal-tcp-ser
 mesh-portal-tcp-common = { path = "../../../mesh-portal/rust/mesh-portal-tcp-common", version="0.0.1"}
 starlane-macros = { path = "../starlane-macros", version= "0.1.0"}
 async-recursion = "1.0.0"
+dashmap = "4.0.2"

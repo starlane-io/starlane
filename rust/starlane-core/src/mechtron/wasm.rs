@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::mechtron::portal_client::MechtronSkel;
 use crate::util::AsyncHashMap;
-use mesh_portal_api_client::{PortalSkel, ResourceSkel};
+use mesh_portal_api_client::{Inlet, PortalSkel, PrePortalSkel, ResourceSkel};
 use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::messaging::{Request, Response};
 use mesh_portal_serde::version::latest::portal;
@@ -15,7 +15,7 @@ use wasm_membrane_host::membrane::WasmMembrane;
 use wasmer::{Function, Module};
 
 #[derive(Debug, Clone)]
-pub enum Call {
+pub enum MechtronCall {
     In(mechtron_common::inlet::Frame),
     Out(mechtron_common::outlet::Frame),
     Request {
@@ -24,19 +24,26 @@ pub enum Call {
     },
 }
 
+pub struct MechtronRequest {
+    pub request: Request,
+    pub tx: oneshot::Sender<Response>
+}
+
+
 #[derive(Clone)]
 pub struct WasmSkel {
-    pub portal_skel: PortalSkel,
+    pub pre_portal_skel: PrePortalSkel,
     pub tx: mpsc::Sender<MembraneExtCall>,
 }
 
 impl Deref for WasmSkel {
-    type Target = PortalSkel;
+    type Target = PrePortalSkel;
 
     fn deref(&self) -> &Self::Target {
-        &self.portal_skel
+        &self.pre_portal_skel
     }
 }
+
 
 #[derive(Clone, WasmerEnv)]
 pub struct Env {
@@ -63,10 +70,10 @@ impl Deref for WasmMembraneExt {
 }
 
 impl WasmMembraneExt {
-    pub fn new(module: Arc<Module>, skel: PortalSkel) -> Result<Self, Error> {
+    pub fn new(module: Arc<Module>, skel: PrePortalSkel ) -> Result<Self, Error> {
         let (tx, mut rx) = mpsc::channel(1024);
         let skel = WasmSkel {
-            portal_skel: skel,
+            pre_portal_skel,
             tx: tx.clone(),
         };
         let env = Env { tx };
@@ -99,7 +106,6 @@ impl WasmMembraneExt {
 
         {
             let ext = ext.clone();
-            let skel = skel.clone();
             tokio::spawn(async move {
                 while let Option::Some(call) = rx.recv().await {
                     match call {

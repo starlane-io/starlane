@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
+use mesh_portal_serde::version::latest::bin::Bin;
 use mesh_portal_serde::version::latest::command::common::SetProperties;
 use mesh_portal_versions::version::v0_0_1::parse::{camel_case, domain, Res, set_properties};
 use mesh_portal_versions::version::v0_0_1::pattern::parse::kind;
@@ -11,7 +12,6 @@ use nom::combinator::all_consuming;
 use nom::multi::{many0, separated_list0};
 use nom::sequence::{delimited, preceded, tuple};
 use crate::artifact::ArtifactRef;
-use crate::cache::Data;
 use crate::command::compose::{Command, CommandOp};
 use crate::command::parse::{script, script_line};
 use crate::config::config::ResourceConfig;
@@ -29,7 +29,7 @@ impl ResourceConfigParser {
 }
 
 impl Parser<ResourceConfig> for ResourceConfigParser {
-    fn parse(&self, artifact: ArtifactRef, _data: Data) -> Result<Arc<ResourceConfig>, Error> {
+    fn parse(&self, artifact: ArtifactRef, _data: Bin) -> Result<Arc<ResourceConfig>, Error> {
         let raw = String::from_utf8(_data.to_vec() )?;
         let config = resource_config(raw.as_str(), artifact)?;
         Ok(Arc::new(config))

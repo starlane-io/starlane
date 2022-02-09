@@ -1,6 +1,6 @@
 use crate::resource::{Kind, ArtifactKind};
 use crate::artifact::ArtifactRef;
-use crate::cache::{Cacheable, Data};
+use crate::cache::Cacheable;
 use std::sync::Arc;
 use crate::error::Error;
 use std::str::FromStr;

@@ -67,7 +67,6 @@ pub struct ProtoStar {
     lane_muxer_api: LaneMuxerApi,
     router_tx: mpsc::Sender<RouterCall>,
     router_booster_rx: RouterCallBooster,
-    portal_event_tx: broadcast::Sender<PortalEvent>
 }
 
 impl ProtoStar {
@@ -87,7 +86,6 @@ impl ProtoStar {
         let (router_tx,router_rx) = mpsc::channel(1024);
         let router_booster_rx = RouterCallBooster { router_rx };
         let lane_muxer_api = LaneMuxer::start(router_tx.clone());
-        let (portal_event_tx,_) = broadcast::channel(1024);
         (
 
             ProtoStar {
@@ -114,7 +112,6 @@ impl ProtoStar {
                 lane_muxer_api,
                 router_tx,
                 router_booster_rx,
-                portal_event_tx
             },
             StarController {
                 star_tx,
@@ -224,7 +221,6 @@ impl ProtoStar {
                             watch_api,
                             registry_api,
                             sys_api,
-                            portal_event_tx: self.portal_event_tx
                         };
 
                         start_variant(skel.clone(), variant_rx );

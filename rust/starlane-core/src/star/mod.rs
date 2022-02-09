@@ -54,7 +54,9 @@ use std::cmp;
 use std::fmt;
 use crate::star::core::resource::manager::ResourceManagerApi;
 use std::str::FromStr;
+use mesh_portal_api_server::PortalMuxerEvent;
 use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::portal;
 use mesh_portal_serde::version::latest::resource::Status;
 use mesh_portal_tcp_common::PortalInfo;
 use mesh_portal_versions::version::v0_0_1::parse::Res;
@@ -66,6 +68,7 @@ use nom::branch::alt;
 use nom::combinator::all_consuming;
 use nom::error::{ErrorKind, ParseError, VerboseError};
 use crate::logger::{Flags, Logger, LogInfo};
+use crate::mechtron::wasm::MechtronRequest;
 use crate::star::shell::sys::SysApi;
 
 pub mod core;
@@ -1177,7 +1180,6 @@ pub struct StarSkel {
     pub persistence: Persistence,
     pub data_access: FileAccess,
     pub machine: StarlaneMachine,
-    pub portal_event_tx: broadcast::Sender<PortalEvent>
 }
 
 impl Debug for StarSkel {
@@ -1282,7 +1284,3 @@ impl<T> ToString for LogId<T> {
     }
 }
 
-pub enum PortalEvent {
-    Added(PortalInfo),
-    Removed(PortalInfo)
-}

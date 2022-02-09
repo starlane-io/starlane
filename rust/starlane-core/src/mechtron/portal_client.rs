@@ -1,6 +1,6 @@
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
-use mesh_portal_api_client::{ResourceCtrl, ResourceCtrlFactory, ResourceSkel};
+use mesh_portal_api_client::{Inlet, PrePortalSkel, ResourceCtrl, ResourceCtrlFactory, ResourceSkel};
 use mesh_portal_serde::error::Error;
 use mesh_portal_serde::version::latest::artifact::ArtifactRequest;
 use mesh_portal_serde::version::latest::config::{Config, ResourceConfigBody};
@@ -9,24 +9,32 @@ use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::messaging::Response;
 use mesh_portal_serde::version::latest::portal;
 use mesh_portal_serde::version::latest::portal::{Exchanger, initin, initout};
-use mesh_portal_tcp_client::PortalClient;
+use mesh_portal_serde::version::latest::portal::initin::PortalAuth;
+use mesh_portal_tcp_client::{PortalClient, PortalTcpClient};
 use mesh_portal_tcp_common::{FrameReader, FrameWriter, PrimitiveFrameReader, PrimitiveFrameWriter};
-use mesh_portal_tcp_server::ClientIdent;
 use tokio::sync::mpsc;
 use crate::artifact::ArtifactRef;
 use crate::config::wasm::{Wasm, WasmCompiler};
-use crate::mechtron::wasm::{Call, WasmMembraneExt};
-use crate::mechtron::WasmMembraneExt;
+use crate::mechtron::wasm::{MechtronCall, WasmMembraneExt};
 use crate::resource::ArtifactKind;
 use crate::resource::config::Parser;
 
+
+pub async fn launch_mechtron_client(server: String, wasm_src: Address ) -> Result<(),Error> {
+    let client = Box::new( MechtronPortalClient::new(wasm_src) );
+    let client = PortalTcpClient::new(server, client).await.unwrap();
+    let mut close_rx = client.close_tx.subscribe();
+    close_rx.recv().await;
+    Ok(())
+}
+
 pub struct MechtronPortalClient {
-    pub wasm_address: Address,
+    pub wasm_src: Address,
 }
 
 impl MechtronPortalClient {
     pub fn new(wasm_address: Address) -> Self {
-        Self { wasm_address }
+        Self { wasm_src: wasm_address }
     }
 }
 
@@ -36,19 +44,11 @@ impl PortalClient for MechtronPortalClient {
         return "mechtron".to_string();
     }
 
-    async fn auth(
-        &self,
-        reader: &mut PrimitiveFrameReader,
-        writer: &mut PrimitiveFrameWriter,
-    ) -> Result<(), anyhow::Error> {
-        let client_ident = ClientIdent {
+    fn auth(&self) -> PortalAuth {
+        PortalAuth {
             user: "none".to_string(),
-            portal_key: Option::Some(self.wasm_address.to_string())
-        };
-        let frame = bincode::serialize(&client_ident )?;
-        let frame : PrimitiveFrame = From::from(frame);
-        writer.write(frame).await?;
-        Ok(())
+            portal_key: Option::Some(self.wasm_src.to_string())
+        }
     }
 
 
@@ -59,9 +59,9 @@ impl PortalClient for MechtronPortalClient {
         logger
     }
 
-    async fn init( &self, reader: & mut FrameReader<initout::Frame>, writer: & mut FrameWriter<initin::Frame> ) -> Result<Arc< dyn ResourceCtrlFactory >,Error> {
+    async fn init( &self, reader: & mut FrameReader<initout::Frame>, writer: & mut FrameWriter<initin::Frame>, skel: PrePortalSkel ) -> Result<Arc< dyn ResourceCtrlFactory >,Error> {
         let artifact = ArtifactRequest {
-            address: self.wasm_address.clone(),
+            address: self.wasm_src.clone(),
         };
         let request = Exchanger::new(artifact);
         writer.write(initin::Frame::Artifact(request)).await;
@@ -69,16 +69,16 @@ impl PortalClient for MechtronPortalClient {
         if let initout::Frame::Artifact(response) = reader.read().await? {
             let compiler = WasmCompiler::new();
             let artifact_ref = ArtifactRef{
-                address: self.wasm_address.clone(),
+                address: self.wasm_src.clone(),
                 kind: ArtifactKind::Wasm
             };
 
             let wasm = compiler.parse( artifact_ref, response.payload.bin.clone() )?;
-            let wasm_membrane_ext = WasmMembraneExt::new( wasm.module.clone() )?;
+            let wasm_membrane_ext = WasmMembraneExt::new( wasm.module.clone(), skel )?;
             Ok(Arc::new(MechtronResourceCtrlFactory {wasm_membrane_ext}))
 
         } else {
-            return Err(format!("was not able to exchange artifact: '{}'",self.wasm_address.to_string()).into())
+            return Err(format!("was not able to exchange artifact: '{}'",self.wasm_src.to_string()).into())
         }
 
     }
@@ -111,7 +111,7 @@ impl ResourceCtrlFactory for MechtronResourceCtrlFactory {
 
 #[derive(Clone)]
 pub struct MechtronSkel {
-    pub tx: mpsc::Sender<Call>,
+    pub tx: mpsc::Sender<MechtronCall>,
     pub membrane: WasmMembraneExt,
     pub resource_skel: ResourceSkel,
 }

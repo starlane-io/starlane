@@ -79,15 +79,22 @@ impl MessagingApi {
         Ok(())
     }
 
-    pub async fn exchange(&self, request: Request)->Result<Response,Error>{
+    pub async fn exchange(&self, request: Request)->Response {
         let (tx,rx) = oneshot::channel();
-        let call = MessagingCall::ExchangeRequest{ request, tx };
+        let call = MessagingCall::ExchangeRequest{ request:request.clone(), tx };
         self.tx.send(call).await;
-        Ok(rx.await?)
+        match tokio::time::timeout( Duration::from_secs(30), rx ).await {
+            Ok(Ok(response)) => {
+                response
+            }
+            _ => {
+                let response = request.fail("timeout".to_string() );
+                response
+            }
+        }
     }
 
     pub fn on_reply(&self, message: StarMessage) {
-
         if message.reply_to.is_none() {
             error!("received an on_reply message which has no reply_to");
         } else {

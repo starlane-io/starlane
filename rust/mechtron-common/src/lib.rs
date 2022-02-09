@@ -91,7 +91,7 @@ pub mod outlet {
             match self {
                 Frame::Assign(assign) => {
                     let assign = Exchanger::new(assign);
-                    portal::outlet::Frame::Assign(request)
+                    portal::outlet::Frame::Assign(assign)
                 }
                 Frame::ArtifactResponse(response) => {
                     portal::outlet::Frame::Artifact(response)
