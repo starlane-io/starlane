@@ -6,10 +6,14 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 use std::time::Duration;
+use dashmap::DashMap;
 
 use futures::future::join_all;
 use futures::{FutureExt, StreamExt, TryFutureExt};
+use mesh_portal_api_server::Portal;
 use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_tcp_client::PortalTcpClient;
+use mesh_portal_tcp_server::{PortalTcpServer, TcpServerCall};
 
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
@@ -26,6 +30,7 @@ use crate::file_access::FileAccess;
 
 use crate::lane::{ClientSideTunnelConnector, LocalTunnelConnector, ProtoLaneEnd, ServerSideTunnelConnector, OnCloseAction};
 use crate::logger::{Flags, Logger};
+use crate::mechtron::portal_client::MechtronPortalClient;
 
 use crate::proto::{
     local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoTunnel,
@@ -34,6 +39,7 @@ use crate::proto::{
 use crate::star::surface::SurfaceApi;
 use crate::star::{ConstellationBroadcast, StarKind, StarStatus};
 use crate::star::{Request, Star, StarCommand, StarController, StarInfo, StarKey, StarTemplateId};
+use crate::star::core::resource::manager::mechtron::MechtronPortalServer;
 use crate::starlane::api::StarlaneApi;
 use crate::starlane::files::MachineFileSystem;
 use crate::template::{
@@ -53,6 +59,7 @@ lazy_static! {
     pub static ref DEFAULT_PORT: usize = std::env::var("STARLANE_PORT").unwrap_or("4343".to_string()).parse::<usize>().unwrap_or(4343);
 
     pub static ref VERSION: VersionFrame = VersionFrame{ product: "Starlane".to_string(), version: "1.0.0".to_string() };
+    pub static ref STARLANE_MECHTRON_PORT: usize = std::env::var("STARLANE_MECHTRON_PORT").unwrap_or("4345".to_string()).parse::<usize>().unwrap_or(4345);
 }
 
 #[derive(Clone)]
@@ -60,6 +67,7 @@ pub struct StarlaneMachine {
     tx: mpsc::Sender<StarlaneCommand>,
     run_complete_signal_tx: broadcast::Sender<()>,
     machine_filesystem: Arc<MachineFileSystem>,
+    portals: Arc<DashMap<String,Portal>>
 }
 
 impl StarlaneMachine {
@@ -78,6 +86,7 @@ impl StarlaneMachine {
             tx: tx,
             run_complete_signal_tx: run_complete_signal_tx,
             machine_filesystem: Arc::new(MachineFileSystem::new()?),
+            portals: Arc::new(DashMap::new())
         };
 
         Result::Ok(starlane)
@@ -100,6 +109,13 @@ impl StarlaneMachine {
 
     }
 
+    pub async fn start_mechtron_portal_server( &self ) -> Result<mpsc::Sender<TcpServerCall>,Error> {
+        let (tx,rx) = oneshot::channel();
+        self.tx
+            .send(StarlaneCommand::StartMechtronPortal(tx))
+            .await?;
+        Ok(rx.await??)
+    }
 
     pub fn machine_filesystem(&self) -> Arc<MachineFileSystem> {
         self.machine_filesystem.clone()
@@ -385,6 +401,9 @@ println!("SERVICE SELECTION {} ", selection );
                             }
                         }
                     }
+                    StarlaneCommand::StartMechtronPortal(tx) => {
+                        self.start_mechtron_portal_server(tx).await;
+                    }
                 }
             }
             run_complete_signal_tx.send(());
@@ -661,6 +680,23 @@ println!("SERVICE SELECTION {} ", selection );
         Ok(())
     }
 
+    async fn start_mechtron_portal_server(&mut self, result_tx: oneshot::Sender<Result<mpsc::Sender<TcpServerCall>,Error>>) {
+        {
+            async fn process( runner: &mut StarlaneMachineRunner) -> Result<mpsc::Sender<TcpServerCall>,Error> {
+                let starlane_api = runner.get_starlane_api().await?;
+                let mut inner_flags = runner.inner_flags.lock().unwrap();
+                let flags = inner_flags.get_mut();
+                if let Some(serve_tx) = &flags.mechtron_portal_server {
+                    Ok(serve_tx.clone() )
+                } else {
+                    let server_tx = PortalTcpServer::new( STARLANE_MECHTRON_PORT.clone() , Box::new(MechtronPortalServer::new(starlane_api ) ) );
+                    flags.mechtron_portal_server = Option::Some(server_tx.clone());
+                    Ok(server_tx)
+                }
+            }
+            result_tx.send(process(self).await);
+        }
+    }
     fn listen(&mut self, result_tx: oneshot::Sender<Result<(), Error>>) {
         {
             let mut inner_flags = self.inner_flags.lock().unwrap();
@@ -879,6 +915,7 @@ pub enum StarlaneCommand {
     Listen(oneshot::Sender<Result<(), Error>>),
     AddStream(TcpStream),
     GetProtoArtifactCachesFactory(oneshot::Sender<Option<Arc<ProtoArtifactCachesFactory>>>),
+    StartMechtronPortal(oneshot::Sender<Result<mpsc::Sender<TcpServerCall>,Error>>),
     Shutdown,
 }
 
@@ -939,6 +976,7 @@ pub enum StarAddress {
 struct StarlaneInnerFlags {
     pub shutdown: bool,
     pub listening: bool,
+    pub mechtron_portal_server: Option<mpsc::Sender<TcpServerCall>>
 }
 
 impl StarlaneInnerFlags {
@@ -946,6 +984,7 @@ impl StarlaneInnerFlags {
         Self {
             shutdown: false,
             listening: false,
+            mechtron_portal_server: Option::None
         }
     }
 }

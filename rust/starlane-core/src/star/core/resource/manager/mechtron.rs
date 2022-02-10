@@ -1,11 +1,14 @@
 use std::collections::HashMap;
+use std::future::Future;
 use std::process::Child;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use anyhow::anyhow;
 use dashmap::DashMap;
 use dashmap::mapref::one::Ref;
-use mesh_portal_api_server::{Portal, PortalRequestHandler};
+use mesh_portal_api_server::{Portal, PortalApi, PortalEvent, PortalRequestHandler, PortalResourceApi};
+use mesh_portal_serde::version::latest::artifact::{ArtifactRequest, ArtifactResponse};
 
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
@@ -29,7 +32,7 @@ use mesh_portal_tcp_server::{PortalServer, PortalTcpServer, TcpServerCall};
 use mesh_portal_versions::version::v0_0_1::config::ResourceConfigBody;
 use mesh_portal_versions::version::v0_0_1::pattern::consume_data_struct_def;
 use mesh_portal_versions::version::v0_0_1::util::ValueMatcher;
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot::error::RecvError;
@@ -44,43 +47,80 @@ use crate::mechtron::process::launch_mechtron_process;
 use crate::message::Reply;
 use crate::starlane::api::StarlaneApi;
 
-lazy_static! {
-    pub static ref STARLANE_MECHTRON_PORT: usize = std::env::var("STARLANE_MECHTRON_PORT").unwrap_or("4345".to_string()).parse::<usize>().unwrap_or(4345);
-}
 
 pub struct MechtronManager {
     skel: StarSkel,
     processes: DashMap<String, Child>,
-    portals: Arc<DashMap<String,Portal>>,
-    mechtrons: AsyncHashMap<Address, String>,
+    inner: Arc<RwLock<MechtronManagerInner>>,
     resource_type: ResourceType,
-    server: Sender<TcpServerCall>,
-    portal_added_broadcast_tx: broadcast::Sender<String>,
+    mechtron_portal_server_tx: Sender<TcpServerCall>,
 }
 
 impl MechtronManager {
-    pub async fn new(skel: StarSkel, resource_type:ResourceType) -> Self {
-        let portals = Arc::new(DashMap::new());
-        let (portal_added_broadcast_tx,_) = broadcast::channel(1024);
-        let server = PortalTcpServer::new(STARLANE_MECHTRON_PORT.clone(), Box::new(MechtronPortalServer::new(skel.clone(), portals.clone(), portal_added_broadcast_tx.clone() )));
-        let mut rtn = MechtronManager {
+    pub async fn new(skel: StarSkel, resource_type:ResourceType) -> Result<Self,Error> {
+
+        let mechtron_portal_server_tx = skel.machine.start_mechtron_portal_server().await?;
+
+        let inner = Arc::new( RwLock::new(MechtronManagerInner::new() ) );
+
+        {
+            let mechtron_portal_server_tx = mechtron_portal_server_tx.clone();
+            let inner = inner.clone();
+            tokio::spawn( async move {
+                match MechtronManager::get_portal_broadcast_tx(&mechtron_portal_server_tx).await {
+                    Ok(mut portal_broadcast_rx) => {
+                        while let Ok(event)  = portal_broadcast_rx.recv().await {
+                            let mut inner = inner.write().await;
+                            match event {
+                                PortalEvent::PortalAdded(portal) => {
+                                    inner.portals.insert(portal.info.portal_key.clone(),portal.clone() );
+                                    if let Some(exchanges) = inner.portal_exchange.remove( &portal.info.portal_key) {
+                                        for tx in exchanges {
+                                            tx.send( portal.clone() );
+                                        }
+                                    }
+                               }
+                                PortalEvent::PortalRemoved(key) => {
+                                    inner.portals.remove(&key);
+                                }
+                                PortalEvent::ResourceAdded(resource) => {
+                                    let address = resource.stub.address.clone();
+                                    inner.mechtrons.insert( address.clone() , resource.clone() );
+                                    if let Some(exchanges) = inner.mechtron_exchange.remove( &address ) {
+                                        for tx in exchanges {
+                                            tx.send( resource.clone() );
+                                        }
+                                    }
+                                }
+                                PortalEvent::ResourceRemoved(address) => {
+                                    inner.mechtrons.remove(&address);
+                                }
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        error!("{}", err.to_string());
+                    }
+                }
+            });
+        }
+
+        Ok(MechtronManager {
             skel: skel.clone(),
             processes: DashMap::new(),
-            portals,
-            mechtrons: AsyncHashMap::new(),
+            inner,
             resource_type,
-            server,
-            portal_added_broadcast_tx
-        };
-        rtn.init();
-        rtn
+            mechtron_portal_server_tx,
+        })
     }
 }
 
 impl MechtronManager {
-    fn init(&mut self) {
-
-    }
+   async fn get_portal_broadcast_tx(mechtron_portal_server_tx: &mpsc::Sender<TcpServerCall>) -> Result<broadcast::Receiver<PortalEvent>,Error> {
+       let (tx, rx) = oneshot::channel();
+       mechtron_portal_server_tx.send(TcpServerCall::GetPortalEvents(tx)).await;
+       Ok(rx.await?)
+   }
 }
 
 #[async_trait]
@@ -135,82 +175,42 @@ impl ResourceManager for MechtronManager {
         }
 
         let wasm_src = config.wasm_src()?;
-        if let Option::Some(portal) = self.portals.get(&wasm_src.to_string() ) {
-            let portal_assign = Assign {
-                config: Config {
-                    body: ResourceConfigBody::Named(config.mechtron_name()?),
-                    address: assign.stub.address.clone()
-                },
-                stub: assign.stub.clone()
-            };
-            portal.assign(portal_assign);
-            self.mechtrons.put(assign.stub.address.clone(), portal.info.portal_key.clone() );
-        } else {
-            let mut portal_added_broadcast_tx = self.portal_added_broadcast_tx.subscribe();
-            let handle = {
-                let wasm_src = wasm_src.clone();
-                tokio::spawn(async move {
-                    while let Ok(portal_key) = portal_added_broadcast_tx.recv().await {
-                        if portal_key == wasm_src.to_string() {
-                            break;
-                        }
-                    }
-                })
-            };
+        let portal_key = wasm_src.to_string();
 
-            if !self.processes.contains_key(&wasm_src.to_string() ) {
-                let child = launch_mechtron_process(wasm_src.clone())?;
-                self.processes.insert( wasm_src.to_string(), child );
-            }
+        let portal_rx = {
+           let mut inner = self.inner.write().await;
+           inner.exchange_portal(&portal_key)
+        };
 
-            tokio::time::timeout( Duration::from_secs(60),handle ).await??;
+        let portal = portal_rx.await?;
 
-            if let Option::Some(portal) = self.portals.get(&wasm_src.to_string() ) {
-                let portal_assign = Assign {
-                    config: Config {
-                        body: ResourceConfigBody::Named(config.mechtron_name()?),
-                        address: assign.stub.address.clone()
-                    },
-                    stub: assign.stub.clone()
-                };
-                portal.assign(portal_assign);
-                self.mechtrons.put(assign.stub.address.clone(), portal.info.portal_key.clone() );
-            } else {
-                return Err(format!("expected portal to be available: '{}'", wasm_src.to_string() ).into());
-            }
-        }
+        let portal_assign = Assign {
+            config: Config {
+                body: ResourceConfigBody::Named(config.mechtron_name()?),
+                address: assign.stub.address.clone()
+            },
+            stub: assign.stub.clone()
+        };
+        portal.assign(portal_assign);
 
         Ok(())
     }
 
     async fn handle_request(&self, request: Request ) -> Response {
 
-            match self.mechtrons.get(request.to.clone() ).await {
-                Ok(Some(portal_key)) => {
-                    match self.portals.get(&portal_key ) {
-                        Some(portal) => {
-                            match tokio::time::timeout( Duration::from_secs(30), portal.handle_request(request.clone()) ).await {
-                                Ok(response) => {
-                                    response
-                                }
-                                _ => {
-                                    request.fail("timeout".to_string() )
-                                }
-                            }
-                        }
-                        None => {
-                            request.fail(format!("portal not found: '{}'",portal_key).into() )
-                        }
-                    }
-                }
-                Ok(None) => {
-                    let to = request.to.to_string();
-                    request.fail(format!("not found: '{}'",to ).into() )
-                }
-                Err(err) => {
-                    request.fail(err.to_string().into() )
-                }
+        let mechtron_rx = {
+            let mut inner = self.inner.write().await;
+            inner.exchange_mechtron(&request.to)
+        };
+
+        match mechtron_rx.await {
+            Ok(mechtron) => {
+                mechtron.handle_request(request).await
             }
+            Err(err) => {
+                request.fail(err.to_string().into() )
+            }
+        }
     }
 
 
@@ -219,20 +219,78 @@ impl ResourceManager for MechtronManager {
     }
 }
 
+struct MechtronManagerInner{
+    pub portals: HashMap<String,PortalApi>,
+    pub mechtrons: HashMap<Address, PortalResourceApi>,
+    pub portal_exchange: HashMap<String,Vec<oneshot::Sender<PortalApi>>>,
+    pub mechtron_exchange: HashMap<Address,Vec<oneshot::Sender<PortalResourceApi>>>,
+}
+
+impl MechtronManagerInner {
+    pub fn new() -> Self {
+        Self {
+            portals: Default::default(),
+            mechtrons: Default::default(),
+            portal_exchange: Default::default(),
+            mechtron_exchange: Default::default()
+        }
+    }
+
+    pub fn exchange_portal( &mut self, portal_key: &String ) -> oneshot::Receiver<PortalApi> {
+
+        let (tx,rx) = oneshot::channel();
+
+        if let Some(portal) = self.portals.get(portal_key) {
+            tx.send(portal.clone());
+            return rx;
+        }
+
+        let vec_tx: &mut Vec<oneshot::Sender<PortalApi>> = match self.portal_exchange.get_mut(portal_key ) {
+            None => {
+                self.portal_exchange.insert(portal_key.clone(), vec![]);
+                self.portal_exchange.get_mut( portal_key ).expect("expected vec")
+            }
+            Some(vec_tx) => vec_tx
+        };
+
+        vec_tx.push(tx);
+
+        rx
+    }
+
+    pub fn exchange_mechtron( &mut self, address: &Address ) -> oneshot::Receiver<PortalResourceApi> {
+        let (tx,rx) = oneshot::channel();
+        if let Some(mechtron) = self.mechtrons.get(address) {
+            tx.send(mechtron.clone() );
+            return rx;
+        }
+
+        let vec_tx: &mut Vec<oneshot::Sender<PortalResourceApi>> = match self.mechtron_exchange.get_mut(address ) {
+            None => {
+                self.mechtron_exchange.insert(address.clone(), vec![]);
+                self.mechtron_exchange.get_mut( address).expect("expected vec")
+            }
+            Some(vec_tx) => vec_tx
+        };
+
+        vec_tx.push(tx);
+
+        rx
+    }
+}
+
 pub struct MechtronPortalServer {
-    pub skel: StarSkel,
+    pub api: StarlaneApi,
     pub request_assign_handler: Arc<dyn PortalRequestHandler>,
     portals: Arc<DashMap<String, Portal>>,
-    portal_added_broadcast_tx: broadcast::Sender<String>,
 }
 
 impl MechtronPortalServer {
-    pub fn new(skel: StarSkel, portals: Arc<DashMap<String, Portal>>, portal_added_broadcast_tx: broadcast::Sender<String>) -> Self {
+    pub fn new(api: StarlaneApi) -> Self {
         Self {
-            skel: skel.clone(),
-            request_assign_handler: Arc::new(MechtronPortalRequestHandler::new(skel) ),
-            portals,
-            portal_added_broadcast_tx
+            api: api.clone(),
+            request_assign_handler: Arc::new(MechtronPortalRequestHandler::new(api) ),
+            portals: Arc::new(DashMap::new() ),
         }
     }
 }
@@ -254,7 +312,6 @@ impl PortalServer for MechtronPortalServer {
     fn add_portal(&self, portal: Portal) {
         let portal_key = portal.info.portal_key.clone();
         self.portals.insert( portal_key.clone(), portal );
-        self.portal_added_broadcast_tx.send( portal_key );
     }
 }
 
@@ -263,19 +320,15 @@ fn test_logger(message: &str) {
     println!("{}", message);
 }
 
-pub struct StarlaneMeshRouter {
-    skel: StarSkel,
-}
 
-#[derive(Debug)]
 pub struct MechtronPortalRequestHandler {
-    skel: StarSkel
+    api: StarlaneApi
 }
 
 impl MechtronPortalRequestHandler {
-    pub fn new(skel: StarSkel)-> Self {
+    pub fn new(api: StarlaneApi)-> Self {
         MechtronPortalRequestHandler {
-            skel
+            api
         }
     }
 }
@@ -283,6 +336,24 @@ impl MechtronPortalRequestHandler {
 #[async_trait]
 impl PortalRequestHandler for MechtronPortalRequestHandler {
     async fn route_to_mesh(&self, request: Request) -> Response {
-        self.skel.messaging_api.exchange(request).await
+        self.api.exchange(request).await
     }
+
+    async fn handle_artifact_request(
+        &self,
+        request: ArtifactRequest,
+    ) -> Result<ArtifactResponse, anyhow::Error> {
+
+        let artifact_ref = ArtifactRef {
+            address: request.address.clone(),
+            kind: ArtifactKind::Raw
+        };
+        let caches = self.api.cache( &artifact_ref).await?;
+        let artifact = caches.raw.get(&request.address).ok_or(anyhow!("could not get raw artifact: '{}'",request.address.to_string()))?;
+        Ok(ArtifactResponse{
+            to: request.address.clone(),
+            payload: artifact.data()
+        })
+    }
+
 }

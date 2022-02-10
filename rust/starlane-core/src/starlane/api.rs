@@ -12,7 +12,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 
-use crate::cache::ProtoArtifactCachesFactory;
+use crate::cache::{ArtifactCaches, ProtoArtifactCachesFactory};
 use crate::error::Error;
 use crate::frame::{StarPattern, TraversalAction, ResourceRegistryRequest, StarMessagePayload};
 use crate::resource::{Kind, ResourceType, AssignResourceStateSrc, ResourceRecord};
@@ -23,7 +23,7 @@ use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
 use crate::watch::{WatchResourceSelector, Watcher};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, ReplyKind, Reply};
-use crate::artifact::ArtifactBundle;
+use crate::artifact::{ArtifactBundle, ArtifactRef};
 use kube::ResourceExt;
 use mesh_portal_serde::error;
 use mesh_portal_serde::version::latest::command::common::{SetLabel, StateSrc};
@@ -102,6 +102,13 @@ impl StarlaneApi {
         address: Address,
     ) -> Result<ResourceRecord, Error> {
         self.surface_api.locate(address).await
+    }
+
+
+    pub async fn cache( &self, artifact: &ArtifactRef)  -> Result<ArtifactCaches,Error> {
+        let mut cache = self.get_caches().await?.create();
+        cache.cache(vec![artifact.clone()]).await?;
+        Ok(cache.to_caches().await?)
     }
 
     pub async fn get_caches(&self) -> Result<Arc<ProtoArtifactCachesFactory>, Error> {

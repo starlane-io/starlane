@@ -8,9 +8,10 @@ use mesh_portal_versions::version::v0_0_1::pattern::parse::kind;
 use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag, take_until};
 use nom::character::complete::multispace0;
-use nom::combinator::all_consuming;
+use nom::combinator::{all_consuming, recognize};
+use nom::error::context;
 use nom::multi::{many0, separated_list0};
-use nom::sequence::{delimited, preceded, tuple};
+use nom::sequence::{delimited, preceded, terminated, tuple};
 use crate::artifact::ArtifactRef;
 use crate::command::compose::{Command, CommandOp};
 use crate::command::parse::{script, script_line};
@@ -74,17 +75,23 @@ fn properties_section( input: &str) -> Res<&str,Section> {
     })
 }
 
-fn rec_command_lines( input: &str ) -> Res<&str,Vec<String>> {
-    separated_list0(tag(";"), take_until(";") )(input).map( |(next,lines) | {
-        let lines : Vec<String> = lines.into_iter().map(|line| line.to_string() ).collect();
+fn rec_command_line( input: &str ) -> Res<&str,&str> {
+    terminated( tuple( (multispace0,take_until(";"),multispace0) ), tag(";") )(input).map( |(next,(_,line,_))| {
+        (next,line)
+    } )
+}
+
+fn rec_command_lines( input: &str ) -> Res<&str,Vec<&str>> {
+    tuple( (many0(rec_command_line), multispace0 ) )(input).map( |(next,(lines,_))| {
         (next,lines)
-    })
+    } )
 }
 
 fn install_section( input: &str) -> Res<&str,Section> {
-   let (next,(_,(_,ops),_)) = tuple( (multispace0, preceded(tag("Install"), tuple((multispace0,delimited(tag("{"),rec_command_lines, tag("}"))))),multispace0) )(input)?;
+   let (next,(_,(_,ops),_)) = context("Install Section", tuple( (multispace0, preceded(tag("Install"), tuple((multispace0,delimited(tag("{"),rec_command_lines, tag("}"))))),multispace0)) )(input)?;
 
-    Ok((next,Section::Install(ops)))
+//    Ok((next,Section::Install(ops)))
+Ok((next,Section::Install(vec![])))
 }
 
 pub enum Section {
@@ -140,8 +147,9 @@ pub mod test {
     use std::collections::HashMap;
     use std::str::FromStr;
     use mesh_portal_serde::version::latest::id::Address;
+    use nom::combinator::all_consuming;
     use crate::artifact::ArtifactRef;
-    use crate::config::parse::{resource_config, properties_section};
+    use crate::config::parse::{resource_config, properties_section, rec_command_lines, rec_command_line};
     use crate::config::parse::replace::substitute;
     use crate::error::Error;
     use crate::resource::ArtifactKind;
@@ -197,4 +205,29 @@ pub mod test {
         Ok(())
     }
 
+
+    #[test]
+    pub fn test_rec_command_line() -> Result<(),Error>{
+
+
+        let (_,line) = all_consuming(rec_command_line)("create $(self):users<Base<User>>;")?;
+        let (_,line) = all_consuming(rec_command_line)("        create $(self):users<Base<User>>;")?;
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_rec_command_lines() -> Result<(),Error>{
+        let config_src = r#"
+
+    create $(self):users<Base<User>>;
+    create $(self):files<FileSystem>;
+
+"#;
+
+        let (_,section) = all_consuming(rec_command_lines)(config_src)?;
+
+        assert_eq!(section.len(),2);
+        Ok(())
+    }
 }

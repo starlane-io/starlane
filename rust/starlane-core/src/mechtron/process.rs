@@ -1,7 +1,7 @@
 use mesh_portal_serde::version::latest::id::Address;
 use std::process::{Child, Command};
 use crate::error::Error;
-use crate::star::core::resource::manager::mechtron::STARLANE_MECHTRON_PORT;
+use crate::starlane::STARLANE_MECHTRON_PORT;
 
 pub fn launch_mechtron_process(wasm_src: Address ) -> Result<Child,Error> {
     let host = format!("localhost:{}",STARLANE_MECHTRON_PORT.to_string());

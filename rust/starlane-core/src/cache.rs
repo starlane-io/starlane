@@ -116,8 +116,8 @@ impl<C: Cacheable> ArtifactItemCache<C> {
         }
     }
 
-    pub fn get(&self, artifact: &Address) -> Option<ArtifactItem<C>> {
-        self.map.get(&artifact).cloned()
+    pub fn get(&self, address: &Address) -> Option<ArtifactItem<C>> {
+        self.map.get(&address).cloned()
     }
 
     fn add(&mut self, item: ArtifactItem<C>) {
