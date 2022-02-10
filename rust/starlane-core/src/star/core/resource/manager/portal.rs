@@ -40,7 +40,7 @@ impl PortalManager {
 #[async_trait]
 impl ResourceManager for PortalManager {
     async fn assign(
-        &self,
+        &mut self,
         assign: ResourceAssign,
     ) -> Result<(), Error> {
         let state = match assign.state {

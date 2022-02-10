@@ -41,7 +41,7 @@ impl FileManager {
 #[async_trait]
 impl ResourceManager for FileManager {
     async fn assign(
-        &self,
+        &mut self,
         assign: ResourceAssign,
     ) -> Result<(), Error> {
 
@@ -110,7 +110,7 @@ impl ResourceManager for FileSystemManager {
     }
 
     async fn assign(
-        &self,
+        &mut self,
         assign: ResourceAssign,
     ) -> Result<(), Error> {
         match assign.state {

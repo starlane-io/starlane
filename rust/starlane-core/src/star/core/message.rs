@@ -62,7 +62,12 @@ impl MessagingEndpointComponent {
     pub fn start(skel: StarSkel, rx: mpsc::Receiver<CoreMessageCall>) {
         let (resource_manager_tx, resource_manager_rx) = mpsc::channel(1024);
         let resource_manager_api= ResourceManagerApi::new(resource_manager_tx.clone());
-        ResourceManagerComponent::new(skel.clone(), resource_manager_tx, resource_manager_rx );
+        {
+            let skel = skel.clone();
+            tokio::spawn(async move {
+                ResourceManagerComponent::new(skel, resource_manager_tx, resource_manager_rx).await;
+            });
+        }
 
         AsyncRunner::new(
             Box::new(Self {

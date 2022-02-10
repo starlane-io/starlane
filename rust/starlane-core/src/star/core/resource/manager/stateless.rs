@@ -33,7 +33,7 @@ impl ResourceManager for StatelessManager {
 
 
     async fn assign(
-        &self,
+        &mut self,
         assign: ResourceAssign,
     ) -> Result<(), Error> {
         match assign.state {

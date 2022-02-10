@@ -50,7 +50,7 @@ use crate::starlane::api::StarlaneApi;
 
 pub struct MechtronManager {
     skel: StarSkel,
-    processes: DashMap<String, Child>,
+    processes: HashMap<String, Child>,
     inner: Arc<RwLock<MechtronManagerInner>>,
     resource_type: ResourceType,
     mechtron_portal_server_tx: Sender<TcpServerCall>,
@@ -107,7 +107,7 @@ impl MechtronManager {
 
         Ok(MechtronManager {
             skel: skel.clone(),
-            processes: DashMap::new(),
+            processes: HashMap::new(),
             inner,
             resource_type,
             mechtron_portal_server_tx,
@@ -129,7 +129,7 @@ impl ResourceManager for MechtronManager {
 
 
     async fn assign(
-        &self,
+        &mut self,
         assign: ResourceAssign,
     ) -> Result<(), Error> {
         match assign.state {
@@ -177,8 +177,13 @@ impl ResourceManager for MechtronManager {
         let wasm_src = config.wasm_src()?;
         let portal_key = wasm_src.to_string();
 
+
+
         let portal_rx = {
            let mut inner = self.inner.write().await;
+           if !inner.portals.contains_key(&portal_key )  {
+               self.processes.insert( portal_key.clone(), launch_mechtron_process(wasm_src.clone())? );
+           }
            inner.exchange_portal(&portal_key)
         };
 

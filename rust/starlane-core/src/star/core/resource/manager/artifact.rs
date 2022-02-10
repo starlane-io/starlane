@@ -77,7 +77,7 @@ impl ResourceManager for ArtifactBundleManager {
     }
 
     async fn assign(
-        &self,
+        &mut self,
         assign: ResourceAssign,
     ) -> Result<(), Error> {
         let state = match &assign.state {
@@ -273,7 +273,7 @@ impl ResourceManager for ArtifactManager{
     }
 
     async fn assign(
-        &self,
+        &mut self,
         assign: ResourceAssign,
     ) -> Result<(), Error> {
         let kind : Kind = TryFrom::try_from(assign.stub.kind)?;
