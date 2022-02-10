@@ -12,14 +12,11 @@ use crate::star::{StarCommand, StarKind, StarSkel};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::time::Duration;
-use crate::star::variant::portal::PortalVariant;
 use crate::util::{AsyncRunner, AsyncProcessor, Call};
 
 pub mod central;
 pub mod gateway;
 pub mod web;
-pub mod portal;
-pub mod mechtron;
 
 
 #[derive(Clone)]
@@ -96,7 +93,6 @@ pub fn start_variant( skel: StarSkel, rx: mpsc::Receiver<VariantCall>) {
         StarKind::Central => CentralVariant::start(skel, rx),
         StarKind::Gateway => GatewayVariant::start(skel, rx),
         StarKind::Web => WebVariant::start(skel, rx),
-        StarKind::Portal => PortalVariant::start(skel, rx),
         _ => NoVariant::start(skel, rx)
     }
 }

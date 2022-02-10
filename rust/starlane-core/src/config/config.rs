@@ -70,7 +70,7 @@ impl ContextualConfig {
     pub fn substitution_map(&self) -> Result<HashMap<String,String>,Error> {
       let mut map = HashMap::new();
       map.insert( "self".to_string(), self.address.to_string() );
-      map.insert( "self.config.bundle".to_string(), self.config.artifact_ref.address.to_bundle()?.to_string() );
+      map.insert( "self.config.bundle".to_string(), self.config.artifact_ref.address.clone().to_bundle()?.to_string() );
       Ok(map)
   }
 

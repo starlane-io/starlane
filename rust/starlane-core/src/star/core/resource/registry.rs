@@ -375,7 +375,7 @@ impl RegistryComponent {
                 to: parent.clone(),
                 core: Action::Rc(Rc::Query(Query::AddressKindPath)).into()
             };
-            let response = skel.messaging_api.exchange(request).await?;
+            let response = skel.messaging_api.exchange(request).await;
 
             let parent_kind_path = response.core.body;
             let parent_kind_path: Primitive= parent_kind_path.try_into()?;
@@ -1033,8 +1033,8 @@ impl Selector {
                 // here we already know that the child sub_select should have filtered it's
                 // not matching addresses so we can add all the results
                 for future in futures {
-                    let response = future?;
-                    if let Ok( Payload::List(more_stubs)) =response.core.body {
+                    let response = future;
+                    if let Payload::List(more_stubs) =response.core.body {
                         let mut new_stubs = vec![];
                         for stub in more_stubs.list.into_iter() {
                             if let Primitive::Stub(stub) = stub {

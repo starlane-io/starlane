@@ -211,19 +211,12 @@ println!("PATH : {} ", path );
                                 let core = action.into();
                                 let request = Request::new(core, assign.stub.address.clone(), parent);
                                 let response = skel.messaging_api.exchange(request).await;
-                                match response {
-                                    Ok(response) => {
-                                        match response.core.body {
-                                            Ok(_) => {
-                                                eprintln!("added artifact: {}", address_and_kind.address.to_string());
-                                            }
-                                            Err(_) => {
-                                                eprintln!("FAILED to add artifact: {}", address_and_kind.address.to_string());
-                                            }
-                                        }
+                                match response.core.is_ok() {
+                                    true => {
+                                        eprintln!("added artifact: {}", address_and_kind.address.to_string());
                                     }
-                                    _ => {
-                                        eprintln!("unexpected result");
+                                    false => {
+                                        eprintln!("FAILED to add artifact: {}", address_and_kind.address.to_string());
                                     }
                                 }
                             }

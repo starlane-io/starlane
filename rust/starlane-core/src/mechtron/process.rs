@@ -4,7 +4,7 @@ use crate::error::Error;
 use crate::star::core::resource::manager::mechtron::STARLANE_MECHTRON_PORT;
 
 pub fn launch_mechtron_process(wasm_src: Address ) -> Result<Child,Error> {
-    let host = format!("localhost:{}",STARLANE_MECHTRON_PORT);
+    let host = format!("localhost:{}",STARLANE_MECHTRON_PORT.to_string());
     let child = Command::new("starlane")
         .arg("mechtron")
         .arg(host.as_str())

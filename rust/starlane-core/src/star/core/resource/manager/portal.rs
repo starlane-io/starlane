@@ -19,7 +19,7 @@ use std::str::FromStr;
 use std::sync::atomic::AtomicU32;
 use mesh_portal_serde::version::latest::command::common::StateSrc;
 use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::messaging::Request;
+use mesh_portal_serde::version::latest::messaging::{Request, Response};
 use mesh_portal_tcp_server::PortalServer;
 
 #[derive(Debug)]
@@ -68,32 +68,6 @@ impl ResourceManager for PortalManager {
         ResourceType::File
     }
 
-    fn handle_request(&self, delivery: Delivery<Request>) {
-        unimplemented!();
-/*        match &delivery.item {
-            Message::Request(request) => {
-                match &request.entity {
-                    ReqEntity::Rc(_) => {}
-                    ReqEntity::Msg(_) => {}
-                    ReqEntity::Http(http) => {
-                        unimplemented!()
-                        /*
-                        let state = self.store.get(key).await?.ok_or("expected state to be in the store")?;
-                        let content = state.get("content").ok_or("expected file to have content")?.clone();
-                        let mut response = HttpResponse::new();
-                        response.status = 200;
-                        response.body = Option::Some(content);
-                        delivery.reply(Reply::HttpResponse(response));
-
-                         */
-                    }
-                }
-            }
-            Message::Response(response) => {}
-        }
-
- */
-    }
 }
 
 

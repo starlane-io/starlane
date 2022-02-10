@@ -14,21 +14,6 @@ use tokio::sync::{mpsc, oneshot};
 use wasm_membrane_host::membrane::WasmMembrane;
 use wasmer::{Function, Module};
 
-#[derive(Debug, Clone)]
-pub enum MechtronCall {
-    In(mechtron_common::inlet::Frame),
-    Out(mechtron_common::outlet::Frame),
-    Request {
-        request: Request,
-        tx: oneshot::Sender<Result<Option<Response>, Error>>,
-    },
-}
-
-pub struct MechtronRequest {
-    pub request: Request,
-    pub tx: oneshot::Sender<Response>
-}
-
 
 #[derive(Clone)]
 pub struct WasmSkel {
@@ -70,7 +55,7 @@ impl Deref for WasmMembraneExt {
 }
 
 impl WasmMembraneExt {
-    pub fn new(module: Arc<Module>, skel: PrePortalSkel ) -> Result<Self, Error> {
+    pub fn new(module: Arc<Module>, pre_portal_skel: PrePortalSkel ) -> Result<Self, Error> {
         let (tx, mut rx) = mpsc::channel(1024);
         let skel = WasmSkel {
             pre_portal_skel,
@@ -79,15 +64,14 @@ impl WasmMembraneExt {
         let env = Env { tx };
 
         let mechtron_send_request =
-            Function::new_native_with_env(module.store(), env, |env: &Env, request: i32| {
-                let (tx, rx) = oneshot::channel();
+            Function::new_native_with_env(module.store(), env.clone(), |env: &Env, request: i32| {
                 env.tx.try_send(MembraneExtCall::InRequest(request));
             });
 
         let imports = imports! {
                 "env" => {
 
-            "mechtron_inlet_frame"=>Function::new_native_with_env(module.store(),env,|env:&Env,frame:i32| {
+            "mechtron_inlet_frame"=>Function::new_native_with_env(module.store(),env.clone(),|env:&Env,frame:i32| {
                     let env = env.clone();
                     tokio::spawn( async move {
                        env.tx.send( MembraneExtCall::InFrame(frame) ).await;
@@ -131,7 +115,7 @@ impl WasmMembraneExt {
                         MembraneExtCall::InRequest(request) => {
                             let ext = ext.clone();
                             tokio::spawn( async move {
-                                fn process(
+                                async fn process(
                                     ext: &WasmMembraneExt,
                                     request: i32,
                                 ) -> Result<(), Error> {
@@ -149,7 +133,7 @@ impl WasmMembraneExt {
                                     Ok(())
                                 }
 
-                                match process(&ext,  request) {
+                                match process(&ext,  request).await {
                                     Ok(_) => {}
                                     Err(error) => {
                                         println!("error: {}", error.to_string());

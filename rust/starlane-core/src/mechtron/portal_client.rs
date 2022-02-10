@@ -1,21 +1,24 @@
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
+use anyhow::anyhow;
 use mesh_portal_api_client::{Inlet, PrePortalSkel, ResourceCtrl, ResourceCtrlFactory, ResourceSkel};
 use mesh_portal_serde::error::Error;
 use mesh_portal_serde::version::latest::artifact::ArtifactRequest;
 use mesh_portal_serde::version::latest::config::{Config, ResourceConfigBody};
+use mesh_portal_serde::version::latest::entity::response::ResponseCore;
 use mesh_portal_serde::version::latest::frame::PrimitiveFrame;
 use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::messaging::Response;
+use mesh_portal_serde::version::latest::messaging::{Request, Response};
 use mesh_portal_serde::version::latest::portal;
 use mesh_portal_serde::version::latest::portal::{Exchanger, initin, initout};
 use mesh_portal_serde::version::latest::portal::initin::PortalAuth;
+use mesh_portal_serde::version::latest::portal::initout::Frame;
 use mesh_portal_tcp_client::{PortalClient, PortalTcpClient};
 use mesh_portal_tcp_common::{FrameReader, FrameWriter, PrimitiveFrameReader, PrimitiveFrameWriter};
 use tokio::sync::mpsc;
 use crate::artifact::ArtifactRef;
 use crate::config::wasm::{Wasm, WasmCompiler};
-use crate::mechtron::wasm::{MechtronCall, WasmMembraneExt};
+use crate::mechtron::wasm::WasmMembraneExt;
 use crate::resource::ArtifactKind;
 use crate::resource::config::Parser;
 
@@ -59,7 +62,8 @@ impl PortalClient for MechtronPortalClient {
         logger
     }
 
-    async fn init( &self, reader: & mut FrameReader<initout::Frame>, writer: & mut FrameWriter<initin::Frame>, skel: PrePortalSkel ) -> Result<Arc< dyn ResourceCtrlFactory >,Error> {
+    async fn init(&self, reader: &mut FrameReader<Frame>, writer: &mut FrameWriter<initin::Frame>, skel: PrePortalSkel) -> Result<Arc<dyn ResourceCtrlFactory>, anyhow::Error> {
+
         let artifact = ArtifactRequest {
             address: self.wasm_src.clone(),
         };
@@ -73,12 +77,12 @@ impl PortalClient for MechtronPortalClient {
                 kind: ArtifactKind::Wasm
             };
 
-            let wasm = compiler.parse( artifact_ref, response.payload.bin.clone() )?;
+            let wasm = compiler.parse( artifact_ref, response.payload.clone() )?;
             let wasm_membrane_ext = WasmMembraneExt::new( wasm.module.clone(), skel )?;
             Ok(Arc::new(MechtronResourceCtrlFactory {wasm_membrane_ext}))
 
         } else {
-            return Err(format!("was not able to exchange artifact: '{}'",self.wasm_src.to_string()).into())
+            return Err(anyhow!("was not able to exchange artifact: '{}'",self.wasm_src.to_string()).into())
         }
 
     }
@@ -94,11 +98,9 @@ impl ResourceCtrlFactory for MechtronResourceCtrlFactory {
         true
     }
 
-    fn create(&self, skel: ResourceSkel) -> Result<Arc<dyn ResourceCtrl>, Error> {
+    fn create(&self, skel: ResourceSkel) -> Result<Arc<dyn ResourceCtrl>, anyhow::Error> {
 
-        let (tx,rx) = mpsc::channel(1024);
         let skel = MechtronSkel {
-            tx ,
             membrane: self.wasm_membrane_ext.clone(),
             resource_skel: skel
         };
@@ -111,7 +113,6 @@ impl ResourceCtrlFactory for MechtronResourceCtrlFactory {
 
 #[derive(Clone)]
 pub struct MechtronSkel {
-    pub tx: mpsc::Sender<MechtronCall>,
     pub membrane: WasmMembraneExt,
     pub resource_skel: ResourceSkel,
 }
@@ -127,24 +128,19 @@ impl MechtronResourceCtrl {
     }
 
     pub fn log( &self, message: String) {
-        println!("{} => {}", self.name, message );
+        println!("{} => {}", self.skel.resource_skel.stub.address.to_string(), message );
     }
 }
 
 #[async_trait]
 impl ResourceCtrl for MechtronResourceCtrl {
-    async fn init(&self) -> Result<(), Error> {
+    async fn init(&self) -> Result<(), anyhow::Error> {
         Ok(())
     }
 
-    async fn handle(&self, frame: portal::outlet::Frame ) -> Result<Option<Response>,Error> {
-        let frame: mechtron_common::outlet::Frame = TryFrom::try_from(frame)?;
-        if let portal::outlet::Frame::Request(request) = frame {
-            Ok(Option::Some(self.skel.membrane.handle_request(request)).await)
-        } else {
-            self.skel.membrane.handle_frame(frame.try_into()?)
-        }
-
-        Ok(Option::None)
+    async fn handle_request( &self, request: Request ) -> ResponseCore {
+        let response = self.skel.membrane.handle_request(request).await;
+        response.core
     }
+
 }

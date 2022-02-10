@@ -100,7 +100,7 @@ println!("GETTING BIND ADDRESS for '{}'", address.to_string() );
             let core = action.into();
             let request = Request::new( core, address.clone(), address.parent().unwrap() );
 println!("sending GET property for '{}'", address.to_string() );
-            let response = end.skel.messaging_api.exchange(request).await?;
+            let response = end.skel.messaging_api.exchange(request).await;
 println!("got BIND property for '{}'", address.to_string() );
 
             if let Payload::Map(map) = response.core.body {
@@ -347,9 +347,9 @@ println!("RC GET...");
                                 let mut proto = ProtoStarMessage::new();
                                 proto.to(ProtoStarMessageTo::Resource(get.address.clone()));
                                 proto.payload = StarMessagePayload::ResourceHost(ResourceHostAction::GetState(get.address.clone()));
-                                if let Reply::Payload(payload) = skel.messaging_api
+                                if let Ok(Reply::Payload(payload)) = skel.messaging_api
                                     .star_exchange(proto, ReplyKind::Payload, "get state from manager")
-                                    .await? {
+                                    .await {
                                     Ok(payload)
                                 } else {
                                     Err("could not get state".into())
@@ -527,7 +527,7 @@ impl PipelineExecutor {
                let action = Action::Rc(Rc::Get(Get{ address:address.clone(), op: GetOp::State}));
                let core = action.into();
                let request = Request::new( core, self.traversal.to(), address.clone() );
-               let response = self.skel.messaging_api.exchange(request).await?.ok_or()?;
+               let response = self.skel.messaging_api.exchange(request).await;
                self.traversal.push( Message::Response(response));
            }
        }
@@ -579,11 +579,11 @@ pub struct Traversal {
 impl Traversal {
     pub fn new( initial_request: Delivery<Request> ) -> Self {
         Self {
-            initial_request,
             action: initial_request.core.action.clone(),
             body: initial_request.item.core.body.clone(),
             path: initial_request.item.core.path.clone(),
             headers: initial_request.item.core.headers.clone(),
+            initial_request,
             code: 200
         }
     }
@@ -638,7 +638,8 @@ impl Traversal {
     }
 
     pub fn respond(self) {
-        self.initial_request.respond( self.response_core() );
+        let core = self.response_core();
+        self.initial_request.respond( core );
     }
 
     pub fn fail(self,error:String) {

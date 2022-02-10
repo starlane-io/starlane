@@ -184,7 +184,7 @@ async fn process_request(http_request: HttpRequest, api: StarlaneApi, skel: Star
     let to = Address::from_str( host_and_port.host.as_str() )?;
     let from = skel.info.address;
     let request = messaging::Request::new( core, from, to );
-    let response = skel.messaging_api.exchange(request).await?;
+    let response = skel.messaging_api.exchange(request).await;
     let mut response:HttpResponse = response.core.try_into()?;
 println!("GOT RESPONSE!");
     if response.code == 404 {

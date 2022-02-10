@@ -113,7 +113,7 @@ pub mod replace {
         delimited(tag("$("), domain ,tag(")") )(input)
     }
 
-    pub fn substitute(input:&str, map: &HashMap<String,String>) -> Result<String,Error> {
+    pub fn substitute(input: &str, map: &HashMap<String,String>) -> Result<String,Error> {
         let mut rtn = String::new();
         let mut next = input;
         let mut chunk = Option::None;

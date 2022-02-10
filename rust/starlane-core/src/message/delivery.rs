@@ -24,7 +24,6 @@ use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::messaging::{Request, Response};
 use mesh_portal_serde::version::latest::payload::{Payload, Primitive};
 
-#[derive(Clone)]
 pub struct Delivery<M>
 where
     M: Clone,
@@ -88,6 +87,18 @@ impl <M> Delivery<M> where M: Clone + Send + Sync + 'static
 
 impl Delivery<Request>
 {
+    pub fn result( self, result: Result<Payload,Error>) {
+        match result {
+            Ok(payload) => {
+                let request = self.item.core.clone();
+                self.respond(request.ok(payload));
+            }
+            Err(err) => {
+                self.fail(err.to_string());
+            }
+        }
+    }
+
     pub fn respond(self, core: ResponseCore ) {
         let response = Response {
             id: unique_id(),

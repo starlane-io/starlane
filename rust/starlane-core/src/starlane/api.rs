@@ -73,7 +73,7 @@ impl StarlaneApi {
         }
     }
 
-    pub async fn exchange( &self, request: Request ) -> Result<Response,Error> {
+    pub async fn exchange( &self, request: Request ) -> Response {
         self.surface_api.exchange(request).await
     }
 
@@ -112,7 +112,7 @@ impl StarlaneApi {
         let action = Action::Rc(Rc::Create(create.clone()));
         let core = action.into();
         let request = Request::new(core, self.agent.clone(), create.template.address.parent.clone() );
-        let response = self.surface_api.exchange(request).await?.ok_or()?;
+        let response = self.surface_api.exchange(request).await.ok_or()?;
         if let Payload::Primitive(Primitive::Stub(stub)) =  &response.core.body {
             Ok(stub.clone())
         } else {
@@ -199,9 +199,12 @@ impl StarlaneApi {
         };
         let action = Action::Rc(Rc::Get(get));
         let core = action.into();
-        let request = Request::new(core, self.agent.clone(), address);
-        let response = self.surface_api.exchange(request).await?;
-        Ok(response.core.body)
+        let request = Request::new(core, self.agent.clone(), address.clone());
+        let response = self.surface_api.exchange(request).await;
+        match response.core.is_ok() {
+            true => Ok(response.core.body),
+            false => Err(format!("could not get state for: '{}'",address.to_string()).into())
+        }
     }
 }
 

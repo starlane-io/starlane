@@ -133,7 +133,7 @@ impl ResourceManagerComponent{
         async fn process( manager: &mut ResourceManagerComponent, request: Request) -> Result<Response,Error> {
             let resource_type = manager.resource_type(&request.to)?;
             let manager = manager.manager(&resource_type ).await?;
-            Ok(manager.handle_request(request))
+            Ok(manager.handle_request(request).await)
         }
 
         match process(self, request.clone() ).await {
@@ -191,7 +191,7 @@ pub trait ResourceManager: Send + Sync {
     ) -> Result<(),Error>;
 
     async fn handle_request(&self, request: Request ) -> Response {
-        unimplemented!()
+        request.fail(format!("resource '{}' does not handle requests",self.resource_type().to_string()))
     }
 
     async fn get(&self, address: Address) -> Result<Payload,Error> {
