@@ -26,6 +26,7 @@ impl Cacheable for ResourceConfig {
 
     fn references(&self) -> Vec<ArtifactRef> {
 
+        /*
         let mut refs = vec![];
 
         if let Some(property) = self.properties.get(&"bind".to_string() ) {
@@ -51,6 +52,9 @@ impl Cacheable for ResourceConfig {
         }
 
         refs
+
+         */
+        vec![]
     }
 }
 

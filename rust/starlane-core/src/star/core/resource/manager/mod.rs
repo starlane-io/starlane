@@ -148,7 +148,7 @@ impl ResourceManagerComponent{
                 response
             }
             Err(error) => {
-                request.fail(error.to_string())
+                request.fail(error.to_string().as_str() )
             }
         }
     }
@@ -198,7 +198,7 @@ pub trait ResourceManager: Send + Sync {
     ) -> Result<(),Error>;
 
     async fn handle_request(&self, request: Request ) -> Response {
-        request.fail(format!("resource '{}' does not handle requests",self.resource_type().to_string()))
+        request.fail(format!("resource '{}' does not handle requests",self.resource_type().to_string()).as_str())
     }
 
     async fn get(&self, address: Address) -> Result<Payload,Error> {

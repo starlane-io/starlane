@@ -181,9 +181,10 @@ impl WasmMembraneExt {
             Ok(())
         }
 
+        let ext = self.clone();
         let pool = self.pool.lock().expect("expected ThreadPool");
         pool.execute( move || {
-            match process(self, frame) {
+            match process(&ext, frame) {
                 Ok(_) => {},
                 Err(err) => {
                     eprintln!("{}", err.to_string());
@@ -218,7 +219,7 @@ impl WasmMembraneExt {
                 let response = match process(&ext, request.clone()) {
                     Ok(response) => response,
                     Err(err) => {
-                        let response = request.fail(err.to_string());
+                        let response = request.fail(err.to_string().as_str());
                         response
                     }
                 };
@@ -228,7 +229,7 @@ impl WasmMembraneExt {
 
         match rx.await {
             Ok(response) => response,
-            Err(err) => request.fail(err.to_string() )
+            Err(err) => request.fail(err.to_string().as_str() )
         }
     }
 

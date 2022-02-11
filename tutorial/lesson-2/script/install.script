@@ -1,0 +1,8 @@
+create localhost<Space>;
+create localhost:repo<Base<Repo>>;
+create localhost:repo:tutorial<ArtifactBundleSeries>;
+publish ^[ bundle.zip ]-> localhost:repo:tutorial:2.0.0;
+set localhost{ +bind=localhost:repo:site:2.0.0:/config/localhost.bind };
+create localhost:my-app<App>{ +config=localhost:repo:site:2.0.0:/config/my-app.app };
+
+

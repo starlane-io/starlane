@@ -175,7 +175,9 @@ println!("?~ ROOT: {}", root_address_and_kind.address.to_string() );
                                         StateSrc::Stateless
                                     }
                                     Kind::Artifact(_) => {
-                                        let path = address_and_kind.address.filepath().expect("expecting non Dir artifact to have a filepath");
+                                        let mut path = address_and_kind.address.filepath().expect("expecting non Dir artifact to have a filepath");
+                                        // convert to relative path
+                                        path.remove(0);
 println!("PATH : {} ", path );
                                         match archive.by_name(path.as_str()) {
                                             Ok(mut file) => {

@@ -56,7 +56,7 @@ impl SurfaceApi {
         match rx.await {
             Ok(response) => response,
             Err(err) => {
-                request.fail(err.to_string())
+                request.fail(err.to_string().as_str() )
             }
         }
     }

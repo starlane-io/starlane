@@ -22,7 +22,7 @@ use mesh_portal_serde::version::latest::command::common::StateSrc;
 use mesh_portal_serde::version::latest::config;
 use mesh_portal_serde::version::latest::config::{Assign, Config};
 use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::messaging::{Request, RequestExchange, Response};
+use mesh_portal_serde::version::latest::messaging::{Request, Response};
 use mesh_portal_serde::version::latest::payload::{Payload, PayloadPattern, Primitive};
 use mesh_portal_serde::version::latest::portal;
 use mesh_portal_serde::version::latest::portal::Exchanger;
@@ -139,6 +139,8 @@ impl ResourceManager for MechtronManager {
             }
         };
 
+println!("Assigning Mechtron...");
+
         let config_address = assign.stub.properties.get(&"config".to_string() ).ok_or(format!("'config' property required to be set for {}", self.resource_type.to_string() ))?.value.as_str();
         let config_address = Address::from_str(config_address)?;
 
@@ -150,6 +152,8 @@ impl ResourceManager for MechtronManager {
         let caches = self.skel.machine.cache( &config_artifact_ref ).await?;
         let config = caches.resource_configs.get(&config_address).ok_or::<Error>(format!("expected mechtron_config").into())?;
         let config = MechtronConfig::new(config, assign.stub.address.clone() );
+
+println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
 
         let api = StarlaneApi::new( self.skel.surface_api.clone(), assign.stub.address.clone() );
         let substitution_map = config.substitution_map()?;
@@ -213,7 +217,7 @@ impl ResourceManager for MechtronManager {
                 mechtron.handle_request(request).await
             }
             Err(err) => {
-                request.fail(err.to_string().into() )
+                request.fail(err.to_string().as_str() )
             }
         }
     }

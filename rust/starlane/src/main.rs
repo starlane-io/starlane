@@ -91,7 +91,9 @@ async fn go() -> Result<(),Error> {
                 .create_constellation("standalone", layout)
                 .await
                 .unwrap();
+println!("CALLING LISTEN...");
             starlane.listen().await.expect("expected listen to work");
+println!("BACK FROM LISTEN...");
             starlane.join().await;
     } else if let Option::Some(matches) = matches.subcommand_matches("config") {
         if let Option::Some(_) = matches.subcommand_matches("get-shell") {

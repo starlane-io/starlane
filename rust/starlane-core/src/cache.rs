@@ -902,6 +902,7 @@ println!("SIGNAL! {}", result.is_ok());
                         tx.send(result.clone());
                     }
                 }
+                // convert to relative path
             }
             RootItemCacheCall::Get { artifact, tx } => {
                 tx.send(self.get(artifact));

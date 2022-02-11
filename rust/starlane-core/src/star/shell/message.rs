@@ -88,7 +88,7 @@ impl MessagingApi {
                 response
             }
             _ => {
-                let response = request.fail("timeout".to_string() );
+                let response = request.fail("timeout".to_string().as_str() );
                 response
             }
         }
