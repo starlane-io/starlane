@@ -96,9 +96,7 @@ impl WasmMembraneExt {
         );
 
         let imports = imports! {
-                "env" => {
-
-
+          "env" => {
             "mechtron_inlet_frame"=>Function::new_native_with_env(module.store(),env.clone(),|env:&Env,frame:i32| {
                     let env = env.clone();
                     tokio::spawn( async move {
@@ -112,8 +110,7 @@ impl WasmMembraneExt {
                     let unique_id = ext.membrane.write_string( mesh_portal_unique_id().as_str() ).expect("write_string");
                     unique_id
                 }),
-            },
-
+           },
         };
         let membrane = WasmMembrane::new_with_init_and_imports(
             module,

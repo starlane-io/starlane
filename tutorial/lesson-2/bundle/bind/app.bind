@@ -1,7 +1,8 @@
 Bind {
 
   Http {
-
+    
+    <Get>/index.html -> {{ }} => &;
 
   }
 

@@ -346,7 +346,6 @@ println!("FAILED TO GET BIND");
                         Ok(result)
                     },
                     Rc::Get(get) => {
-println!("RC GET...");
                         match &get.op {
                             GetOp::State => {
                                 let mut proto = ProtoStarMessage::new();
@@ -520,7 +519,31 @@ impl PipelineExecutor {
                self.traversal.push( Message::Response(response));
            }
            PipelineStop::Call(call) => {
-               unimplemented!()
+               let path = self.traversal.path.clone();
+               let captures = self.path_regex.captures( path.as_str() ).ok_or("cannot find regex captures" )?;
+               let address = call.address.clone().to_address(captures)?;
+
+               let captures = self.path_regex.captures( path.as_str() ).ok_or("cannot find regex captures" )?;
+               let (action,path) = match &call.kind {
+                   CallKind::Msg(msg) => {
+                       let mut path = String::new();
+                       captures.expand( msg.path.as_str(), & mut path );
+                       (Action::Msg(msg.action.clone()),path)
+
+                   }
+                   CallKind::Http(http) => {
+                       let mut path = String::new();
+                       captures.expand( http.path.as_str(), & mut path );
+                       (Action::Http(http.method.clone()),path)
+                   }
+               };
+               let mut core :RequestCore= action.into();
+               core.body = self.traversal.body.clone();
+               core.headers = self.traversal.headers.clone();
+               core.path = path;
+               let request = Request::new( core, self.traversal.to(), address.clone() );
+               let response = self.skel.messaging_api.exchange(request).await;
+               self.traversal.push( Message::Response(response));
            }
            PipelineStop::Return => {
                // while loop will trigger a response
