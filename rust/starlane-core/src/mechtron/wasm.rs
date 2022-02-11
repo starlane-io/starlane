@@ -34,7 +34,6 @@ impl Deref for WasmSkel {
 #[derive(Clone, WasmerEnv)]
 pub struct Env {
     pub tx: mpsc::Sender<MembraneExtCall>,
-    pub ext: Option<WasmMembraneExt>,
 }
 
 pub enum MembraneExtCall {
@@ -44,6 +43,11 @@ pub enum MembraneExtCall {
         mutex: Arc<Mutex<i32>>,
         condvar: Arc<Condvar>,
     },
+    WriteString{
+        string: String,
+        mutex: Arc<Mutex<i32>>,
+        condvar: Arc<Condvar>,
+    }
 }
 
 #[derive(Clone)]
@@ -68,7 +72,7 @@ impl WasmMembraneExt {
             pre_portal_skel,
             tx: tx.clone(),
         };
-        let mut env = Env { tx, ext: None };
+        let mut env = Env { tx };
 
         let mechtron_inlet_request = Function::new_native_with_env(
             module.store(),
@@ -95,6 +99,28 @@ impl WasmMembraneExt {
             },
         );
 
+        let mechtron_unique_id = Function::new_native_with_env(module.store(),env.clone(), |env:&Env| -> i32 {
+            let unique_id = uuid::Uuid::new_v4().to_string();
+            let mutex = Arc::new(Mutex::new(0));
+            let condvar = Arc::new(Condvar::new());
+            match env.tx.try_send(MembraneExtCall::WriteString{
+                string: unique_id,
+                mutex: mutex.clone(),
+                condvar: condvar.clone(),
+            }) {
+                Ok(_) => {
+                    let mut lock = mutex.lock().unwrap();
+                    while *lock == 0 {
+                        lock = condvar.wait(lock).unwrap();
+                    }
+                    return lock.deref().clone();
+                }
+                Err(_) => {
+                    return -1;
+                }
+            }
+        });
+
         let imports = imports! {
           "env" => {
             "mechtron_inlet_frame"=>Function::new_native_with_env(module.store(),env.clone(),|env:&Env,frame:i32| {
@@ -104,12 +130,7 @@ impl WasmMembraneExt {
                     });
                 }),
              "mechtron_inlet_request"=>mechtron_inlet_request,
-             "mechtron_unique_id"=>Function::new_native_with_env(module.store(),env.clone(),|env:&Env| -> i32 {
-                    let env = env.clone();
-                    let ext = env.ext.expect("mechtron_unique_id WasmMembraneExt");
-                    let unique_id = ext.membrane.write_string( mesh_portal_unique_id().as_str() ).expect("write_string");
-                    unique_id
-                }),
+             "mechtron_unique_id"=>mechtron_unique_id
            },
         };
         let membrane = WasmMembrane::new_with_init_and_imports(
@@ -182,12 +203,40 @@ impl WasmMembraneExt {
                                 condvar.notify_one();
                             });
                         }
+                        MembraneExtCall::WriteString{
+                            string,
+                            mutex,
+                            condvar,
+                        } => {
+                            let ext = ext.clone();
+                            tokio::spawn(async move {
+                                async fn process(
+                                    ext: &WasmMembraneExt,
+                                    string: String,
+                                ) -> Result<i32, Error> {
+                                    let string = ext.membrane.write_string(string.as_str())?;
+                                   Ok(string)
+                                }
+                                let buffer_id = match process(&ext, string).await {
+                                    Ok(buffer_id) => buffer_id,
+                                    Err(error) => {
+                                        println!("error: {}", error.to_string());
+                                        -1
+                                    }
+                                };
+
+                                let mut rtn = mutex.lock().unwrap();
+                                *rtn = buffer_id;
+                                // We notify the condvar that the value has changed.
+                                condvar.notify_one();
+                            });
+                        }
                     }
                 }
             });
         }
 
-        env.ext = Option::Some(ext.clone());
+        ext.membrane.init();
 
         Ok(ext)
     }
@@ -197,6 +246,10 @@ impl WasmMembraneExt {
             ext: &WasmMembraneExt,
             frame: mechtron_common::outlet::Frame,
         ) -> Result<(), Error> {
+if let mechtron_common::outlet::Frame::Assign(_) = frame {
+    println!("OUTLET FRAME: ASSIGN!");
+}
+
             let func = ext
                 .membrane
                 .instance

@@ -49,8 +49,12 @@ impl ResourceManagerApi {
 
     pub async fn request( &self, request: Request) -> Result<Response,Error> {
         let (tx,rx) = oneshot::channel();
+println!("Manager mod request....");
         self.tx.send(ResourceManagerCall::Request{request, tx }).await;
-        rx.await?
+println!("Manager mod requesxt .. waiting" );
+        let rtn = rx.await?;
+println!("Manager mod RETURNING" );
+        rtn
     }
 
     pub async fn get( &self, address: Address ) -> Result<Payload,Error> {
@@ -102,7 +106,27 @@ impl AsyncProcessor<ResourceManagerCall> for ResourceManagerComponent{
             ResourceManagerCall::Assign { assign, tx } => {
                 self.assign(assign,tx).await;
             }
-            ResourceManagerCall::Request { request, tx } => {}
+            ResourceManagerCall::Request { request, tx } => {
+                match self.resources.get(&request.to ) {
+                    Some(resource_type) => {
+                        match self.managers.get(resource_type) {
+                            Some(manager) => {
+                                tx.send(Ok(manager.handle_request(request).await));
+                            }
+                            None => {
+                                let message = format!("cannot find manager for '{}' for address '{}'" , resource_type.to_string(), request.to.to_string());
+                                error!("{}",message);
+                                request.fail(message.as_str());
+                            }
+                        };
+                    }
+                    None => {
+                        let message = format!("manager does not contain resource '{}'" ,  request.to.to_string());
+                        error!("{}",message);
+                        request.fail(message.as_str());
+                    }
+                }
+            }
             ResourceManagerCall::Get { address, tx } => {
                 self.get(address,tx).await;
             }

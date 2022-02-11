@@ -108,20 +108,24 @@ pub fn mechtron_outlet_frame(frame_buffer_id: i32) {
                 Ok(())
             }
             outlet::Frame::Assign(assign) => {
+log( format!("assigning mechtron: {}",assign.stub.address.to_string()).as_str() );
                 match assign.config.body {
                     ResourceConfigBody::Control => {
                         log("mechtron framework cannot create a Control")
                     }
                     ResourceConfigBody::Named(mechtron_name) => {
+log( format!("assigning mechtron NAMED: {}",mechtron_name).as_str() );
                         let factory: Arc<dyn MechtronFactory> = {
                             let factories = FACTORIES.read()?;
                             factories.get(&mechtron_name).ok_or(format!(""))?.clone()
                         };
 
                         let mechtron = factory.create(assign.stub.clone())?;
+log( format!("created mechtron: {}",assign.stub.address.to_string()).as_str() );
                         let mechtron = MechtronWrapper::new(assign.stub.clone(), mechtron);
                         {
                             let mut write = MECHTRONS.write()?;
+log( format!("added mechtron : {}",assign.stub.address.to_string()).as_str() );
                             write.insert(assign.stub.address.clone(), Arc::new(mechtron));
                         }
                     }
@@ -157,13 +161,15 @@ fn mechtron_send_inlet_request(request: Request) -> Response {
 }
 
 pub fn mechtron_register(factory: Arc<dyn MechtronFactory>) {
+    {
+        let mut lock = FACTORIES.write().unwrap();
+        lock.insert(factory.mechtron_name(), factory);
+    }
+
     log(format!(
         "REGISTERED MECHTRON FACTORY: '{}'",
-        factory.mechtron_name()
-    )
-    .as_str());
-    let mut lock = FACTORIES.write().unwrap();
-    lock.insert(factory.mechtron_name(), factory);
+        factory.mechtron_name()).as_str()
+    );
 }
 
 fn mechtron_get(address: Address) -> Result<Arc<MechtronWrapper>, Error> {

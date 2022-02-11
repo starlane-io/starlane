@@ -3,7 +3,7 @@ use std::sync::{Arc, mpsc};
 use anyhow::anyhow;
 use mesh_portal_api_client::{Inlet, PrePortalSkel, ResourceCtrl, ResourceCtrlFactory, ResourceSkel};
 use mesh_portal_serde::version::latest::artifact::ArtifactRequest;
-use mesh_portal_serde::version::latest::config::{Config, ResourceConfigBody};
+use mesh_portal_serde::version::latest::config::{Assign, Config, ResourceConfigBody};
 use mesh_portal_serde::version::latest::entity::response::ResponseCore;
 use mesh_portal_serde::version::latest::frame::PrimitiveFrame;
 use mesh_portal_serde::version::latest::id::Address;
@@ -132,13 +132,16 @@ impl MechtronResourceCtrl {
     }
 
     pub fn log( &self, message: String) {
-        println!("{} => {}", self.skel.resource_skel.stub.address.to_string(), message );
+        println!("{} => {}", self.skel.resource_skel.assign.stub.address.to_string(), message );
     }
 }
 
 #[async_trait]
 impl ResourceCtrl for MechtronResourceCtrl {
     async fn init(&self) -> Result<(), anyhow::Error> {
+        let assign = self.skel.resource_skel.assign.clone();
+        let frame = mechtron_common::outlet::Frame::Assign(assign);
+        self.skel.membrane.handle_outlet_frame(frame);
         Ok(())
     }
 

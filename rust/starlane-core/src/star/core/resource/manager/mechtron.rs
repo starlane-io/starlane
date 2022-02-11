@@ -84,6 +84,8 @@ impl MechtronManager {
                                     inner.portals.remove(&key);
                                 }
                                 PortalEvent::ResourceAdded(resource) => {
+
+println!("Resource ADDDED: '{}'", resource.stub.address.to_string() );
                                     let address = resource.stub.address.clone();
                                     inner.mechtrons.insert( address.clone() , resource.clone() );
                                     if let Some(exchanges) = inner.mechtron_exchange.remove( &address ) {
@@ -202,6 +204,7 @@ println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
             },
             stub: assign.stub.clone()
         };
+
         portal.assign(portal_assign);
 
         Ok(())
@@ -209,16 +212,22 @@ println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
 
     async fn handle_request(&self, request: Request ) -> Response {
 
+info!("handling request");
+
         let mechtron_rx = {
             let mut inner = self.inner.write().await;
             inner.exchange_mechtron(&request.to)
         };
 
+        info!("found mechtron_rx");
+
         match mechtron_rx.await {
             Ok(mechtron) => {
+                info!("got mechtron");
                 mechtron.handle_request(request).await
             }
             Err(err) => {
+                error!("{}",err.to_string());
                 request.fail(err.to_string().as_str() )
             }
         }

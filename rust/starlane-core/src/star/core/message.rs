@@ -496,6 +496,7 @@ impl PipelineExecutor {
                    self.respond();
                }
                Err(error) => {
+                   error!("{}",error.to_string());
                    self.fail(error.to_string())
                }
            }
@@ -514,8 +515,10 @@ impl PipelineExecutor {
     async fn execute_stop( &mut self, stop: &PipelineStop ) -> Result<(),Error> {
        match stop {
            PipelineStop::Internal => {
+println!("Sending Request to INTERNAL.");
                let request = self.traversal.request();
                let response = self.resource_manager_api.request(request).await?.ok_or()?;
+println!("Internal Response code: {}", response.core.code );
                self.traversal.push( Message::Response(response));
            }
            PipelineStop::Call(call) => {
@@ -541,6 +544,7 @@ impl PipelineExecutor {
                core.body = self.traversal.body.clone();
                core.headers = self.traversal.headers.clone();
                core.path = path;
+println!("forwarding to ADDRESS: {}", address.to_string() );
                let request = Request::new( core, self.traversal.to(), address.clone() );
                let response = self.skel.messaging_api.exchange(request).await;
                self.traversal.push( Message::Response(response));
