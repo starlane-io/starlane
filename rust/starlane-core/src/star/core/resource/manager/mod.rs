@@ -84,7 +84,12 @@ impl ResourceManagerComponent {
             managers: HashMap::new(),
             resources: HashMap::new()
         };
-        component.init().await;
+        match component.init().await {
+            Ok(_) => {}
+            Err(err) => {
+                error!("{}",err.to_string());
+            }
+        }
         AsyncRunner::new(
         Box::new(component),tx, rx);
     }
@@ -158,8 +163,12 @@ impl ResourceManagerComponent{
 
     async fn init(&mut self ) -> Result<(),Error>
     {
-        for resource_type in self.skel.info.kind.manages() {
-            let manager: Box<dyn ResourceManager> = match resource_type {
+        for resource_type in self.skel.info.kind.hosted() {
+            let manager: Box<dyn ResourceManager> = match resource_type.clone() {
+                ResourceType::Root => Box::new(StatelessManager::new(self.skel.clone(), ResourceType::Root ).await),
+                ResourceType::User => Box::new(StatelessManager::new(self.skel.clone(), ResourceType::User ).await),
+                ResourceType::Control => Box::new(StatelessManager::new(self.skel.clone(), ResourceType::Control ).await),
+                ResourceType::Proxy=> Box::new(StatelessManager::new(self.skel.clone(), ResourceType::Proxy).await),
                 ResourceType::Space => Box::new(StatelessManager::new(self.skel.clone(), ResourceType::Space ).await),
                 ResourceType::Base => Box::new(StatelessManager::new(self.skel.clone(), ResourceType::Base ).await),
                 ResourceType::ArtifactBundleSeries => Box::new(StatelessManager::new(self.skel.clone(), ResourceType::ArtifactBundleSeries).await),
@@ -167,11 +176,10 @@ impl ResourceManagerComponent{
                 ResourceType::Artifact => Box::new(ArtifactManager::new(self.skel.clone()).await ),
                 ResourceType::App => Box::new(MechtronManager::new(self.skel.clone(), ResourceType::App).await?),
                 ResourceType::Mechtron => Box::new(MechtronManager::new(self.skel.clone(), ResourceType::Mechtron).await?),
-                ResourceType::Database => Box::new(K8sManager::new(self.skel.clone(), ResourceType::Database ).await.expect("K8sManager must be created without error")),
+                ResourceType::Database => Box::new(K8sManager::new(self.skel.clone(), ResourceType::Database ).await?),
                 ResourceType::FileSystem => Box::new(FileSystemManager::new(self.skel.clone() ).await),
                 ResourceType::File => Box::new(FileManager::new(self.skel.clone())),
-
-                t => return Err(format!("no Manager implementation for type {}", t.to_string()).into()),
+                t => Box::new(StatelessManager::new(self.skel.clone(), t ).await)
             };
             self.managers.insert( resource_type, manager );
         }

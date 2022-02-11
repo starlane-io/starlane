@@ -1,5 +1,5 @@
 use std::convert::{TryFrom, TryInto};
-use std::sync::Arc;
+use std::sync::{Arc, mpsc};
 use anyhow::anyhow;
 use mesh_portal_api_client::{Inlet, PrePortalSkel, ResourceCtrl, ResourceCtrlFactory, ResourceSkel};
 use mesh_portal_serde::error::Error;
@@ -15,7 +15,6 @@ use mesh_portal_serde::version::latest::portal::initin::PortalAuth;
 use mesh_portal_serde::version::latest::portal::initout::Frame;
 use mesh_portal_tcp_client::{PortalClient, PortalTcpClient};
 use mesh_portal_tcp_common::{FrameReader, FrameWriter, PrimitiveFrameReader, PrimitiveFrameWriter};
-use tokio::sync::mpsc;
 use crate::artifact::ArtifactRef;
 use crate::config::wasm::{Wasm, WasmCompiler};
 use crate::mechtron::wasm::WasmMembraneExt;
@@ -139,7 +138,7 @@ impl ResourceCtrl for MechtronResourceCtrl {
     }
 
     async fn handle_request( &self, request: Request ) -> ResponseCore {
-        let response = self.skel.membrane.handle_request(request).await;
+        let response = self.skel.membrane.handle_outlet_request(request).await;
         response.core
     }
 

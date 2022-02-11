@@ -139,7 +139,7 @@ impl StarKind {
         }
     }
 
-    pub fn conscripts(&self) -> HashSet<StarWrangleKind> {
+    pub fn wrangles(&self) -> HashSet<StarWrangleKind> {
         HashSet::from_iter(
             match self {
                 StarKind::Central => vec![StarWrangleKind::req(StarKind::Space)],
@@ -590,7 +590,7 @@ impl Star {
             self.set_status(StarStatus::Pending);
         }
 
-        for conscript_kind in self.skel.info.kind.conscripts() {
+        for conscript_kind in self.skel.info.kind.wrangles() {
             let search = SearchInit::new(
                 StarPattern::StarKind(conscript_kind.kind.clone()),
                 TraversalAction::SearchHits,
@@ -649,7 +649,7 @@ impl Star {
     async fn check_status(&mut self) {
         if self.status == StarStatus::Pending {
                 let satisfied = self.skel.star_wrangler_api
-                    .satisfied(self.skel.info.kind.conscripts())
+                    .satisfied(self.skel.info.kind.wrangles())
                     .await;
                 if let Result::Ok(StarWrangleSatisfaction::Ok) = satisfied {
                     self.set_status(StarStatus::Pending);
@@ -709,7 +709,7 @@ impl Star {
         match diagnose {
             Diagnose::HandlersSatisfied(satisfied) => {
                     if let Result::Ok(satisfaction) = self.skel.star_wrangler_api
-                        .satisfied(self.skel.info.kind.conscripts())
+                        .satisfied(self.skel.info.kind.wrangles())
                         .await
                     {
                         satisfied.tx.send(satisfaction);

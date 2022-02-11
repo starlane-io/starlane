@@ -8,9 +8,11 @@ use mesh_portal_serde::version::latest::portal;
 use std::convert::TryFrom;
 use std::future::Future;
 use std::ops::Deref;
-use std::sync::Arc;
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread::Thread;
+use threadpool::ThreadPool;
 use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc::error::TrySendError;
 use wasm_membrane_host::membrane::WasmMembrane;
 use wasmer::{Function, Module};
 
@@ -37,13 +39,14 @@ pub struct Env {
 
 pub enum MembraneExtCall {
     InFrame(i32),
-    InRequest(i32),
+    InRequest{ request: i32, mutex: Arc<Mutex<i32>>, condvar: Arc<Condvar>  },
 }
 
 #[derive(Clone)]
 pub struct WasmMembraneExt {
     pub membrane: Arc<WasmMembrane>,
     pub skel: WasmSkel,
+    pub pool: Arc<Mutex<ThreadPool>>
 }
 
 impl Deref for WasmMembraneExt {
@@ -63,9 +66,23 @@ impl WasmMembraneExt {
         };
         let env = Env { tx };
 
-        let mechtron_send_request =
-            Function::new_native_with_env(module.store(), env.clone(), |env: &Env, request: i32| {
-                env.tx.try_send(MembraneExtCall::InRequest(request));
+        let mechtron_inlet_request =
+            Function::new_native_with_env(module.store(), env.clone(), |env: &Env, request: i32| -> i32 {
+                let mutex = Arc::new(Mutex::new(0));
+                let condvar= Arc::new(Condvar::new());
+                match env.tx.try_send(MembraneExtCall::InRequest{ request, mutex: mutex.clone(), condvar: condvar.clone() })
+                {
+                    Ok(_) => {
+                        let mut lock = mutex.lock().unwrap();
+                        while *lock == 0 {
+                            lock = condvar.wait(lock).unwrap();
+                        }
+                        return lock.deref().clone()
+                    }
+                    Err(_) => {
+                        return -1;
+                    }
+                }
             });
 
         let imports = imports! {
@@ -77,7 +94,7 @@ impl WasmMembraneExt {
                        env.tx.send( MembraneExtCall::InFrame(frame) ).await;
                     });
                 }),
-              "mechtron_send_request"=>mechtron_send_request
+             "mechtron_inlet_request"=>mechtron_inlet_request
             },
 
         };
@@ -86,7 +103,8 @@ impl WasmMembraneExt {
             "mechtron_init".to_string(),
             Option::Some(imports),
         )?;
-        let ext = Self { membrane, skel };
+        let pool = Arc::new( Mutex::new(ThreadPool::new(10)));
+        let ext = Self { membrane, skel, pool };
 
         {
             let ext = ext.clone();
@@ -112,33 +130,33 @@ impl WasmMembraneExt {
                                 }
                             }
                         }
-                        MembraneExtCall::InRequest(request) => {
+                        MembraneExtCall::InRequest{ request, mutex, condvar } => {
                             let ext = ext.clone();
                             tokio::spawn( async move {
                                 async fn process(
                                     ext: &WasmMembraneExt,
                                     request: i32,
-                                ) -> Result<(), Error> {
+                                ) -> Result<i32, Error> {
                                     let request = ext.membrane.consume_buffer(request)?;
                                     let request: Request = bincode::deserialize(request.as_slice())?;
                                     let response = ext.skel.api().exchange(request).await;
-                                    let func = ext
-                                        .membrane
-                                        .instance
-                                        .exports
-                                        .get_native_function::<i32, ()>("mechtron_handle_response")?;
                                     let response = bincode::serialize(&response)?;
                                     let response = ext.membrane.write_buffer(&response)?;
-                                    func.call(response)?;
-                                    Ok(())
+                                    Ok(response)
                                 }
 
-                                match process(&ext,  request).await {
-                                    Ok(_) => {}
+                                let response = match process(&ext,  request).await {
+                                    Ok(response) => {response}
                                     Err(error) => {
                                         println!("error: {}", error.to_string());
+                                        -1
                                     }
-                                }
+                                };
+
+                                let mut rtn= mutex.lock().unwrap();
+                                *rtn = response;
+                                // We notify the condvar that the value has changed.
+                                condvar.notify_one();
                             });
                         }
                     }
@@ -149,33 +167,39 @@ impl WasmMembraneExt {
         Ok(ext)
     }
 
-    pub fn handle_frame(&self, frame: mechtron_common::outlet::Frame){
+    pub fn handle_outlet_frame(&self, frame: mechtron_common::outlet::Frame){
+
         fn process(ext: &WasmMembraneExt, frame: mechtron_common::outlet::Frame) -> Result<(), Error> {
             let func = ext
                 .membrane
                 .instance
                 .exports
-                .get_native_function::<i32, ()>("mechtron_handle_frame")?;
+                .get_native_function::<i32, ()>("mechtron_outlet_frame")?;
             let frame = bincode::serialize(&frame)?;
             let frame = ext.membrane.write_buffer(&frame)?;
             func.call(frame)?;
             Ok(())
         }
-        match process(self, frame) {
-            Ok(_) => {},
-            Err(err) => {
-                eprintln!("{}",err.to_string());
+
+        let pool = self.pool.lock().expect("expected ThreadPool");
+        pool.execute( move || {
+            match process(self, frame) {
+                Ok(_) => {},
+                Err(err) => {
+                    eprintln!("{}", err.to_string());
+                }
             }
-        }
+        });
     }
 
-    pub async fn handle_request(&self, request: Request) -> Response {
+    pub async fn handle_outlet_request(&self, request: Request) -> Response {
+
         fn process(ext: &WasmMembraneExt, request: Request) -> Result<Response, Error> {
             let func = ext
                 .membrane
                 .instance
                 .exports
-                .get_native_function::<i32, i32>("mechtron_handle_request")?;
+                .get_native_function::<i32, i32>("mechtron_outlet_request")?;
             let request = bincode::serialize(&request)?;
             let request = ext.membrane.write_buffer(&request)?;
             let response: i32 = func.call(request)?;
@@ -183,12 +207,28 @@ impl WasmMembraneExt {
             let response: Response = bincode::deserialize(&response)?;
             Ok(response)
         }
-        match process(self, request.clone()) {
+
+        let (tx,rx) = oneshot::channel();
+
+        {
+            let ext = self.clone();
+            let pool = self.pool.lock().expect("expected ThreadPool");
+            let request = request.clone();
+            pool.execute( move || {
+                let response = match process(&ext, request.clone()) {
+                    Ok(response) => response,
+                    Err(err) => {
+                        let response = request.fail(err.to_string());
+                        response
+                    }
+                };
+                tx.send(response);
+            });
+        }
+
+        match rx.await {
             Ok(response) => response,
-            Err(err) => {
-                let response = request.fail(err.to_string());
-                response
-            }
+            Err(err) => request.fail(err.to_string() )
         }
     }
 

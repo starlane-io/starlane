@@ -74,11 +74,14 @@ impl ConstellationTemplate {
             StarKind::ArtifactStore,
             "artifact_store".into(),
         );
+        /*
         let mut portal= StarTemplate::new(
             StarKeyTemplate::central_geodesic(9),
             StarKind::Portal,
             "portal".into(),
         );
+
+         */
 
 
         ConstellationTemplate::connect(&mut central, &mut mesh);
@@ -89,7 +92,7 @@ impl ConstellationTemplate {
         ConstellationTemplate::connect(&mut web, &mut mesh);
         ConstellationTemplate::connect(&mut gateway, &mut mesh);
         ConstellationTemplate::connect(&mut artifact_store, &mut mesh);
-        ConstellationTemplate::connect(&mut portal, &mut mesh);
+//        ConstellationTemplate::connect(&mut portal, &mut mesh);
 
         template.add_star(central);
         template.add_star(mesh);
@@ -100,7 +103,7 @@ impl ConstellationTemplate {
         template.add_star(web);
         template.add_star(gateway);
         template.add_star(artifact_store);
-        template.add_star(portal );
+//        template.add_star(portal );
 
         template
     }
@@ -306,6 +309,7 @@ pub struct ConstellationLayout {
 }
 
 impl ConstellationLayout {
+
     pub fn standalone() -> Result<Self, Error> {
         let mut standalone = ProtoConstellationLayout::new(ConstellationTemplate::new_basic());
         standalone.set_default_machine("server".to_string());

@@ -74,6 +74,7 @@ pub mod outlet {
     use mesh_portal_serde::error::Error;
     use mesh_portal_serde::version::latest::artifact::ArtifactResponse;
     use mesh_portal_serde::version::latest::config::Assign;
+    use mesh_portal_serde::version::latest::id::Version;
     use mesh_portal_serde::version::latest::messaging::{Request, Response};
     use mesh_portal_serde::version::latest::portal;
     use mesh_portal_serde::version::latest::portal::Exchanger;
@@ -82,6 +83,7 @@ pub mod outlet {
 
     #[derive(Debug,Clone,Serialize,Deserialize)]
     pub enum Frame {
+        Init,
         Assign(Assign),
         ArtifactResponse(Exchanger<ArtifactResponse>),
     }
@@ -95,6 +97,9 @@ pub mod outlet {
                 }
                 Frame::ArtifactResponse(response) => {
                     portal::outlet::Frame::Artifact(response)
+                }
+                Frame::Init => {
+                    portal::outlet::Frame::Init
                 }
             }
         }
@@ -111,7 +116,11 @@ pub mod outlet {
                 portal::outlet::Frame::Artifact(response) => {
                     Ok(Frame::ArtifactResponse(response))
                 }
-              _ => {
+                portal::outlet::Frame::Init => {
+                    Ok(Frame::Init)
+                }
+
+                _ => {
                     Err("no matching mechtron Frame".into())
                 }
             }

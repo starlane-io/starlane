@@ -20,7 +20,8 @@ serde = { version="1.0.69", features=['derive','rc'] }
 serde_yaml = "0.8.19"
 #serde_json = "1.0"
 serde_json = "1.0.61"
-futures = "0.3.13"
+futures = {version = "0.3.21", default-features = false }
+threadpool = "1.8.1"
 log = "0.4.14"
 async-trait = "0.1.48"
 url = "2.2.1"

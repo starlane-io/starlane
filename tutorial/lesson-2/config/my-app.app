@@ -6,9 +6,4 @@ App {
     +bind=${self.config.bundle}:/bind/app.bind
   }
 
-  Install {
-    create ${self}:users<Base<User>>;
-    create ${self}:files<FileSystem>;
-  }
-
 }

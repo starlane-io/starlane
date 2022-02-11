@@ -57,7 +57,7 @@ async fn go() -> Result<(),Error> {
     let mut clap_app = App::new("Starlane")
         .version("0.1.0")
         .author("Scott Williams <scott@mightydevco.com>")
-        .about("A Resource Mesh").subcommands(vec![SubCommand::with_name("serve").usage("serve a starlane machine instance").arg(Arg::with_name("with-external").long("with-external").takes_value(false).required(false)).display_order(0),
+        .about("A Resource Mesh").subcommands(vec![SubCommand::with_name("serve").usage("serve a starlane machine instance").arg(Arg::with_name("with-external").long("with-external").takes_value(false).required(false).default_value("false")).display_order(0),
                                                             SubCommand::with_name("config").subcommands(vec![SubCommand::with_name("set-shell").usage("set the shell that the starlane CLI connects to").arg(Arg::with_name("hostname").required(true).help("the hostname of the starlane instance you wish to connect to")).display_order(0),
                                                                                                                             SubCommand::with_name("get-shell").usage("get the shell that the starlane CLI connects to")]).usage("read or manipulate the cli config").display_order(1).display_order(1),
                                                             SubCommand::with_name("exec").usage("execute a command").args(vec![Arg::with_name("command_line").required(true).help("command line to execute")].as_slice()),
@@ -72,9 +72,19 @@ async fn go() -> Result<(),Error> {
 
     if let Option::Some(serve) = matches.subcommand_matches("serve") {
             let starlane = StarlaneMachine::new("server".to_string()).unwrap();
-            let layout = match serve.is_present("with-external") {
-                false => ConstellationLayout::standalone().unwrap(),
-                true => ConstellationLayout::standalone_with_external().unwrap(),
+
+            let layout = match serve.value_of("with-external") {
+                Some(value) => {
+                    match bool::from_str(value ) {
+                        Ok(true) => {
+                                ConstellationLayout::standalone_with_external().unwrap()
+                        }
+                        _ =>{
+                            ConstellationLayout::standalone().unwrap()
+                        }
+                    }
+                },
+                None=> ConstellationLayout::standalone().unwrap()
             };
 
             starlane

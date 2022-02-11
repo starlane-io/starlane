@@ -9,7 +9,7 @@ pub static VERSION: i32 = 1;
 
 pub struct WasmMembrane {
     pub instance: Instance,
-    init: String
+    init: String,
 }
 
 impl WasmMembrane {
