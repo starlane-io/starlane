@@ -120,8 +120,14 @@ impl ResourceManagerComponent{
            manager_component.resources.insert( assign.stub.address.clone(), resource_type );
            manager.assign(assign).await
        }
-
-       tx.send( process(self,assign).await );
+       let result = process(self,assign).await;
+        match &result {
+            Ok(_) => {}
+            Err(err) => {
+                error!("Resource Assign Error: {}", err.to_string());
+            }
+        }
+       tx.send( result );
     }
 
 

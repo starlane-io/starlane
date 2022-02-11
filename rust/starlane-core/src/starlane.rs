@@ -1,6 +1,7 @@
 use std::cell::Cell;
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::str::FromStr;
 
 use std::sync::{Arc, Mutex};
@@ -12,6 +13,7 @@ use futures::future::join_all;
 use futures::{FutureExt, StreamExt, TryFutureExt};
 use mesh_portal_api_server::Portal;
 use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::path;
 use mesh_portal_tcp_client::PortalTcpClient;
 use mesh_portal_tcp_server::{PortalTcpServer, TcpServerCall};
 
@@ -158,11 +160,9 @@ impl StarlaneMachine {
     }
 
     pub async fn listen(&self) -> Result<(), Error> {
-println!("LISTEN CALLED...");
         let command_tx = self.tx.clone();
         let (tx, rx) = oneshot::channel();
         command_tx.send(StarlaneCommand::Listen(tx)).await;
-println!("LISTEN AWAIT...");
         rx.await?
     }
 
@@ -199,6 +199,34 @@ impl StarlaneMachineRunner {
     ) -> Result<Self, Error> {
 
         let (command_tx, command_rx) = mpsc::channel(32);
+        let data_access = FileAccess::new(
+            std::env::var("STARLANE_DATA_DIR").unwrap_or("data".to_string()),
+        )?;
+        let cache_access = FileAccess::new(
+            std::env::var("STARLANE_CACHE_DIR").unwrap_or("cache".to_string()),
+        )?;
+
+        // presently we favor deletion since the persistence is not really working
+        let delete_cache_on_start = std::env::var("STARLANE_DELETE_CACHE_ON_START").unwrap_or("true".to_string()).parse::<bool>().unwrap_or(true);
+        let delete_data_on_start = std::env::var("STARLANE_DELETE_DATA_ON_START").unwrap_or("true".to_string()).parse::<bool>().unwrap_or(true);
+
+        {
+            let cache_access = cache_access.clone();
+            let data_access = data_access.clone();
+            tokio::spawn(async move {
+                if delete_cache_on_start {
+                    let path = path::Path::from_str("/").expect("expected root path");
+                    cache_access.remove_dir(&path).await;
+                }
+
+                if delete_data_on_start {
+                    let path = path::Path::from_str("/").expect("expected root path");
+                    data_access.remove_dir(&path).await;
+                }
+            });
+        }
+
+
         Ok(StarlaneMachineRunner {
             name: machine,
             star_controllers: AsyncHashMap::new(),
@@ -207,12 +235,8 @@ impl StarlaneMachineRunner {
             //            star_core_ext_factory: Arc::new(ExampleStarCoreExtFactory::new() ),
             logger: Logger::new(),
             flags: Flags::new(),
-            data_access: FileAccess::new(
-                std::env::var("STARLANE_DATA").unwrap_or("data".to_string()),
-            )?,
-            cache_access: FileAccess::new(
-                std::env::var("STARLANE_CACHE").unwrap_or("cache".to_string()),
-            )?,
+            data_access,
+            cache_access,
             artifact_caches: artifact_caches,
             port: DEFAULT_PORT.clone(),
             constellations: HashMap::new(),
@@ -280,9 +304,7 @@ impl StarlaneMachineRunner {
         let run_complete_signal_tx_rtn = run_complete_signal_tx.clone();
 
         tokio::spawn(async move {
-println!("STARLANE RUNNER!");
             while let Option::Some(command) = self.command_rx.recv().await {
-println!("processing command {}",command.to_string() );
                 match command {
                     StarlaneCommand::ConstellationCreate(command) => {
                         let result = self
@@ -325,7 +347,6 @@ println!("processing command {}",command.to_string() );
                         break;
                     }
                     StarlaneCommand::Listen(tx) => {
-println!("StarlaneCommand::Listen()");
                         self.listen(tx);
                     }
                     StarlaneCommand::AddStream(mut stream) => {
@@ -338,7 +359,6 @@ println!("StarlaneCommand::Listen()");
                             stream.read_exact(buf).await?;
 
                             let selection = String::from_utf8(vec)?;
-println!("SERVICE SELECTION {} ", selection );
                             let selection = ServiceSelection::from_str( selection.as_str() )?;
                             Ok(selection)
                         }
@@ -685,7 +705,6 @@ println!("SERVICE SELECTION {} ", selection );
 
     async fn start_mechtron_portal_server(&mut self, result_tx: oneshot::Sender<Result<mpsc::Sender<TcpServerCall>,Error>>) {
         {
-println!("start_mechtron_portal_server enter");
             async fn process( runner: &mut StarlaneMachineRunner) -> Result<mpsc::Sender<TcpServerCall>,Error> {
                 let starlane_api = runner.get_starlane_api().await?;
                 let mut inner_flags = runner.inner_flags.lock().unwrap();
@@ -699,11 +718,9 @@ println!("start_mechtron_portal_server enter");
                 }
             }
             result_tx.send(process(self).await);
-println!("start_mechtron_portal_server exit");
         }
     }
     fn listen(&mut self, result_tx: oneshot::Sender<Result<(), Error>>) {
-println!("LISTEN CALLED!");
         {
             let mut inner_flags = self.inner_flags.lock().unwrap();
             let flags = inner_flags.get_mut();

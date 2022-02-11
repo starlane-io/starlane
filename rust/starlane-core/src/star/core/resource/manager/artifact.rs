@@ -90,7 +90,6 @@ impl ResourceManager for ArtifactBundleManager {
 
         };
 
-println!("$??????? ASSIGNING ARTIFACT BUNDLE!!!!");
         if let Payload::Primitive( Primitive::Bin(zip) ) = state.clone() {
 
             let temp_dir = TempDir::new("zipcheck")?;
@@ -139,7 +138,6 @@ println!("$??????? ASSIGNING ARTIFACT BUNDLE!!!!");
                kind: KindParts { resource_type: "Artifact".to_string(), kind: Option::Some("Dir".to_string()), specific: None }
             };
 
-println!("?~ ROOT: {}", root_address_and_kind.address.to_string() );
 
             address_and_kind_set.insert( root_address_and_kind );
 
@@ -155,17 +153,12 @@ println!("?~ ROOT: {}", root_address_and_kind.address.to_string() );
                     Ordering::Equal
                 }
             });
-            for address_and_kind in &address_and_kind_set {
-                println!("?~ ARTIFACT ADDRESS: {}", address_and_kind.address.to_string() );
-            }
 
             {
                 let skel = self.skel.clone();
                 let assign = assign.clone();
                 tokio::spawn(async move {
                     for address_and_kind in address_and_kind_set {
-                        println!("~~ ARTIFACT ADDRESS: {}", address_and_kind.address.to_string());
-                        println!("... last seg {}", address_and_kind.address.last_segment().expect("expected final segment").to_string());
                         let parent = address_and_kind.address.parent().expect("expected parent");
                         let result:Result<Kind,mesh_portal_versions::error::Error> = TryFrom::try_from(address_and_kind.kind.clone());
                         match result {
@@ -178,7 +171,6 @@ println!("?~ ROOT: {}", root_address_and_kind.address.to_string() );
                                         let mut path = address_and_kind.address.filepath().expect("expecting non Dir artifact to have a filepath");
                                         // convert to relative path
                                         path.remove(0);
-println!("PATH : {} ", path );
                                         match archive.by_name(path.as_str()) {
                                             Ok(mut file) => {
                                                 let mut buf = vec![];
@@ -196,7 +188,6 @@ println!("PATH : {} ", path );
                                     _ => {panic!("unexpected knd");}
                                 };
 
-                                println!("... parent seg {}", parent.to_string());
                                 let create = Create {
                                     template: Template {
                                         address: AddressTemplate { parent: parent.clone(), child_segment_template: AddressSegmentTemplate::Exact(address_and_kind.address.last_segment().expect("expected final segment").to_string()) },
@@ -208,19 +199,11 @@ println!("PATH : {} ", path );
                                     registry: Default::default()
                                 };
 
-                                println!("SENDING REQUEST TO PARENT: {}", parent.to_string());
                                 let action = Action::Rc(Rc::Create(create));
                                 let core = action.into();
                                 let request = Request::new(core, assign.stub.address.clone(), parent);
                                 let response = skel.messaging_api.exchange(request).await;
-                                match response.core.is_ok() {
-                                    true => {
-                                        eprintln!("added artifact: {}", address_and_kind.address.to_string());
-                                    }
-                                    false => {
-                                        eprintln!("FAILED to add artifact: {}", address_and_kind.address.to_string());
-                                    }
-                                }
+
                             }
                             Err(err) => {
                                 eprintln!("Artifact Kind Error: {}", err.to_string());

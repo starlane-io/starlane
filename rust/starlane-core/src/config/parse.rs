@@ -147,7 +147,9 @@ pub mod test {
     use std::collections::HashMap;
     use std::str::FromStr;
     use mesh_portal_serde::version::latest::id::Address;
-    use nom::combinator::all_consuming;
+    use mesh_portal_versions::version::v0_0_1::command::common::PropertyMod;
+    use mesh_portal_versions::version::v0_0_1::parse::{property_mod, property_value, property_value_not_space_or_comma, set_properties};
+    use nom::combinator::{all_consuming, recognize};
     use crate::artifact::ArtifactRef;
     use crate::config::parse::{resource_config, properties_section, rec_command_lines, rec_command_line};
     use crate::config::parse::replace::substitute;
@@ -186,25 +188,67 @@ pub mod test {
 
         Ok(())
     }
+    #[test]
+    pub fn test_replace_property() -> Result<(),Error>{
+        let config_src = r#"$(self.config.bundle):/wasm/my-app.wasm"#;
+        let mut map = HashMap::new();
+        map.insert( "self".to_string(), "localhost:app".to_string());
+        map.insert( "self.config.bundle".to_string(), "localhost:repo:site:1.0.0".to_string());
 
+        let rtn = substitute(config_src, &map )?;
+
+        println!("{}",rtn);
+
+        let config = property_value(rtn.as_str() )?;
+
+        Ok(())
+    }
 
     #[test]
     pub fn test_set() -> Result<(),Error>{
-        let config_src = r#"
-
-  Set {
-    +wasm.src=localhost:files:/wasm/my-app.wasm
-    +wasm.name=my-app
+        let config_src = r#"Set {
+    +wasm.src=localhost:files:/wasm/my-app.wasm,
+    +wasm.name=my-app,
     +bind=localhost:files:/bind/app.bind
-  }
-
-"#;
+  }"#;
 
         let (_,section) = properties_section(config_src)?;
 
         Ok(())
     }
 
+    #[test]
+    pub fn test_set_properties() -> Result<(),Error>{
+        let config_src = r#"
+    +wasm.src=localhost:files:/wasm/my-app.wasm,
+    +wasm.name=my-app,
+    +bind=localhost:files:/bind/app.bind
+  "#;
+
+        let (_,section) = set_properties(config_src)?;
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_property_valu3() -> Result<(),Error>{
+        let config_src = "+some=blah,";
+
+        let (next,property) = property_mod(config_src)?;
+
+        match property.clone() {
+            PropertyMod::Set { key, value, lock } => {
+                assert_eq!(key,"some".to_string());
+                assert_eq!(value,"blah".to_string());
+            }
+            PropertyMod::UnSet(_) => {
+                assert!(false);
+            }
+        }
+        assert_eq!(next, ",");
+
+        Ok(())
+    }
 
     #[test]
     pub fn test_rec_command_line() -> Result<(),Error>{
@@ -230,4 +274,5 @@ pub mod test {
         assert_eq!(section.len(),2);
         Ok(())
     }
+
 }

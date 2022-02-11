@@ -52,6 +52,7 @@ use crate::template::StarTemplateHandle;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 use std::cmp;
 use std::fmt;
+use std::future::Future;
 use crate::star::core::resource::manager::ResourceManagerApi;
 use std::str::FromStr;
 use mesh_portal_serde::version::latest::id::Address;
@@ -557,6 +558,16 @@ impl Star {
                         self.proto_lanes.clear();
 
                         break;
+                    }
+                    StarCommand::GetCaches(tx)=> {
+                        match self.skel.machine.get_proto_artifact_caches_factory().await {
+                            Ok(caches) => {
+                                tx.send(caches);
+                            }
+                            Err(err) => {
+                                error!("{}",err.to_string());
+                            }
+                        }
                     }
                     _ => {
                         unimplemented!("cannot process command: {}", command.to_string());

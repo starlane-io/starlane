@@ -150,9 +150,13 @@ println!("Assigning Mechtron...");
         };
 
         let caches = self.skel.machine.cache( &config_artifact_ref ).await?;
+
+println!("MECHTRON: got caches" );
         let config = caches.resource_configs.get(&config_address).ok_or::<Error>(format!("expected mechtron_config").into())?;
+println!("MECHTRON: got config" );
         let config = MechtronConfig::new(config, assign.stub.address.clone() );
 
+println!("MechtronConfig.wasm_src().is_ok() {}", config.wasm_src().is_ok() );
 println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
 
         let api = StarlaneApi::new( self.skel.surface_api.clone(), assign.stub.address.clone() );
@@ -180,8 +184,6 @@ println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
 
         let wasm_src = config.wasm_src()?;
         let portal_key = wasm_src.to_string();
-
-
 
         let portal_rx = {
            let mut inner = self.inner.write().await;

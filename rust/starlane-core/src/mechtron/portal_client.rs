@@ -2,7 +2,6 @@ use std::convert::{TryFrom, TryInto};
 use std::sync::{Arc, mpsc};
 use anyhow::anyhow;
 use mesh_portal_api_client::{Inlet, PrePortalSkel, ResourceCtrl, ResourceCtrlFactory, ResourceSkel};
-use mesh_portal_serde::error::Error;
 use mesh_portal_serde::version::latest::artifact::ArtifactRequest;
 use mesh_portal_serde::version::latest::config::{Config, ResourceConfigBody};
 use mesh_portal_serde::version::latest::entity::response::ResponseCore;
@@ -17,6 +16,7 @@ use mesh_portal_tcp_client::{PortalClient, PortalTcpClient};
 use mesh_portal_tcp_common::{FrameReader, FrameWriter, PrimitiveFrameReader, PrimitiveFrameWriter};
 use crate::artifact::ArtifactRef;
 use crate::config::wasm::{Wasm, WasmCompiler};
+use crate::error::Error;
 use crate::mechtron::wasm::WasmMembraneExt;
 use crate::resource::ArtifactKind;
 use crate::resource::config::Parser;
@@ -24,7 +24,7 @@ use crate::resource::config::Parser;
 
 pub async fn launch_mechtron_client(server: String, wasm_src: Address ) -> Result<(),Error> {
     let client = Box::new( MechtronPortalClient::new(wasm_src) );
-    let client = PortalTcpClient::new(server, client).await.unwrap();
+    let client = PortalTcpClient::new(server, client).await?;
     let mut close_rx = client.close_tx.subscribe();
     close_rx.recv().await;
     Ok(())
@@ -67,20 +67,25 @@ impl PortalClient for MechtronPortalClient {
             address: self.wasm_src.clone(),
         };
         let request = Exchanger::new(artifact);
-        writer.write(initin::Frame::Artifact(request)).await;
+        writer.write(initin::Frame::Artifact(request)).await?;
+println!("client init: Artifact Requested.");
 
         if let initout::Frame::Artifact(response) = reader.read().await? {
+println!("client init: Artifact received.");
             let compiler = WasmCompiler::new();
             let artifact_ref = ArtifactRef{
                 address: self.wasm_src.clone(),
                 kind: ArtifactKind::Wasm
             };
 
+println!("client init:parsing wasm: ");
             let wasm = compiler.parse( artifact_ref, response.payload.clone() )?;
             let wasm_membrane_ext = WasmMembraneExt::new( wasm.module.clone(), skel )?;
+println!("client init: wasm parsed ");
             Ok(Arc::new(MechtronResourceCtrlFactory {wasm_membrane_ext}))
 
         } else {
+            eprintln!("was not able to exchange artifact: '{}'",self.wasm_src.to_string());
             return Err(anyhow!("was not able to exchange artifact: '{}'",self.wasm_src.to_string()).into())
         }
 

@@ -96,7 +96,7 @@ impl AsyncProcessor<RouterCall> for RouterComponent {
                                     skel.messaging_api.star_notify(reply);
                                 }
                                 Err(err) => {
-println!("ROUTER ERROR: {}", err.to_string());
+println!("ROUTER ERROR: {} address: {}", err.to_string(), address.to_string() );
                                     let reply = message.reply(StarMessagePayload::Reply(SimpleReply::Fail(Fail::Starlane(StarlaneFailure::Error("Not Found".to_string())))));
                                     skel.messaging_api.star_notify(reply);
                                 }

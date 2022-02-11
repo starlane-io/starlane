@@ -33,6 +33,7 @@ use crate::starlane::api::StarlaneApi;
 use crate::starlane::StarlaneMachine;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
 
+
 pub type ZipFile = Address;
 
 pub trait Cacheable: Send + Sync + 'static {
@@ -229,9 +230,7 @@ impl ProtoArtifactCacheProc {
         let mut more = vec![];
 
         for artifact in artifacts {
-            println!(".... CACHING... {}", artifact.clone().address.to_string());
             let claim = root_caches.claim(artifact).await;
-            println!("claimed...");
             if let Some(claim) = claim {
                 match &claim {
                     Ok(_) => {}
@@ -241,9 +240,7 @@ impl ProtoArtifactCacheProc {
                 }
                 let claim = claim?;
                 let references = claim.references();
-                println!("pre put...");
                 claims.put(claim.artifact.clone(), claim).await?;
-                println!("put...");
                 for reference in references {
                     if !claims.contains(reference.clone()).await? {
                         more.push(reference);
@@ -252,9 +249,7 @@ impl ProtoArtifactCacheProc {
             } else {
                 println!("NO claim");
             }
-            println!("processed artifact...");
         }
-        println!("more is_empty(): {}", more.is_empty());
         if !more.is_empty() {
             let (sub_tx, sub_rx) = oneshot::channel();
             proc_tx
@@ -436,14 +431,11 @@ match &result {
         machine: StarlaneMachine,
         logger: AuditLogger,
     ) -> Result<(), Error> {
-        println!("download&extract src.fetch_resource_record...");
         let record = src.fetch_resource_record(bundle.clone()).await?;
-        println!("download&extract src.fetch_resource_record DONE");
 
         let zip = src.get_bundle_zip(bundle.clone()).await?;
 
 
-println!("Pre FileAccess");
         let mut file_access =
             ArtifactBundleCache::with_bundle_path(file_access, record.stub.address.clone().try_into()?)?;
         let bundle_zip_path = Path::from_str("/bundle.zip")?;
@@ -453,15 +445,11 @@ println!("Pre FileAccess");
             Arc::new(record.stub.address.to_string().as_bytes().to_vec()),
         );
 
-println!("WRITING...{}", bundle_zip_path.to_string());
         file_access.write(&bundle_zip_path, zip).await?;
-println!("DONE WRITING...");
 
-println!("extracting files...");
         file_access
             .unzip("bundle.zip".to_string(), "files".to_string())
             .await?;
-println!("done extracting files......");
 
         let ready_file = Path::from_str("/.ready")?;
         file_access
@@ -472,7 +460,6 @@ println!("done extracting files......");
             .await?;
 
         logger.log(Audit::Download(bundle.try_into()?));
-println!("cache DONE");
 
         Ok(())
     }
@@ -896,7 +883,6 @@ impl<C: Cacheable> AsyncProcessor<RootItemCacheCall<C>> for RootItemCacheProc<C>
                 }
             }
             RootItemCacheCall::Signal { artifact, result } => {
-println!("SIGNAL! {}", result.is_ok());
                 if let Option::Some(txs) = self.signal_map.remove(&artifact) {
                     for tx in txs {
                         tx.send(result.clone());
@@ -956,20 +942,13 @@ impl<C: Cacheable> RootItemCacheProc<C> {
         parser: Arc<dyn Parser<X>>,
         bundle_cache: ArtifactBundleCache,
     ) -> Result<Arc<X>, Error> {
-        println!("root: cache_artifact: {}", artifact.address.to_string());
         let address: Address = artifact.address.clone().to_bundle()?;
         bundle_cache.download(address.try_into()?).await?;
-        println!("bundle cached : parsing: {}", artifact.address.to_string());
         let file_access = ArtifactBundleCache::with_bundle_files_path(
             bundle_cache.file_access(),
             artifact.address.clone().to_bundle()?,
         )?;
-        println!(
-            "file acces scached : parsing: {}",
-            artifact.address.to_string()
-        );
         let data = file_access.read(&Path::from_str(&artifact.address.filepath().ok_or("must be an address with a filesystem")?.to_string().as_str())? ).await?;
-        println!("root: parsing: {}", artifact.address.to_string());
         parser.parse(artifact, data)
     }
 }
