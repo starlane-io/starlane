@@ -18,9 +18,10 @@ use crate::frame::{StarMessagePayload, StarMessage};
 use std::str::FromStr;
 use mesh_portal_serde::version::latest::command::common::StateSrc;
 use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, KindTemplate, Strategy, Template};
-use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand, ReqEntity};
+use mesh_portal_serde::version::latest::entity::request::{Action, Rc};
 use mesh_portal_serde::version::latest::id::{Address, AddressAndKind, KindParts};
 use mesh_portal_serde::version::latest::messaging::Request;
+use mesh_portal_versions::version::v0_0_1::command::common::SetProperties;
 
 #[derive(Debug)]
 pub struct FileManager {
@@ -40,7 +41,7 @@ impl FileManager {
 #[async_trait]
 impl ResourceManager for FileManager {
     async fn assign(
-        &self,
+        &mut self,
         assign: ResourceAssign,
     ) -> Result<(), Error> {
 
@@ -109,7 +110,7 @@ impl ResourceManager for FileSystemManager {
     }
 
     async fn assign(
-        &self,
+        &mut self,
         assign: ResourceAssign,
     ) -> Result<(), Error> {
         match assign.state {
@@ -133,12 +134,14 @@ impl ResourceManager for FileSystemManager {
                     kind: KindTemplate { resource_type: root_address_and_kind.kind.resource_type.clone(), kind: root_address_and_kind.kind.kind.clone(), specific: None }
                 },
                 state: StateSrc::Stateless,
-                properties: vec![],
+                properties: SetProperties::new(),
                 strategy: Strategy::Create,
                 registry: Default::default()
             };
 
-            let request = Request::new(ReqEntity::Rc(Rc::empty_payload(RcCommand::Create(create))), assign.stub.address.clone(), assign.stub.address.clone());
+            let action = Action::Rc(Rc::Create(create));
+            let core = action.into();
+            let request = Request::new(core, assign.stub.address.clone(), assign.stub.address.clone());
             let response = skel.messaging_api.exchange(request).await;
         });
         Ok(())

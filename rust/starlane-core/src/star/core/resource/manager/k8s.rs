@@ -71,7 +71,7 @@ impl K8sManager {
 impl ResourceManager for K8sManager {
 
      async fn assign(
-            &self,
+            &mut self,
             assign: ResourceAssign,
         ) -> Result<(), Error> {
 

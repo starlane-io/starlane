@@ -16,7 +16,6 @@ use crate::error::Error;
 use crate::resource::{Kind, ResourceType, ResourceRecord};
 use crate::star::{StarCommand, StarKey};
 use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
-use crate::resources::message::ProtoRequest;
 use crate::frame::{StarMessagePayload, StarMessage, SimpleReply, MessageAck};
 
 pub mod delivery;
@@ -132,21 +131,7 @@ impl ProtoStarMessage {
     }
 }
 
-impl TryFrom<ProtoRequest> for ProtoStarMessage {
 
-    type Error = Error;
-
-    fn try_from(proto: ProtoRequest) -> Result<Self, Self::Error> {
-        proto.validate()?;
-        let message = proto.create()?;
-        let mut proto = ProtoStarMessage::new();
-        proto.to = message.to.clone().into();
-        proto.trace = false;
-        proto.log = false;
-        proto.payload = StarMessagePayload::Request(message.into());
-        Ok(proto)
-    }
-}
 
 pub struct MessageReplyTracker {
     pub reply_to: MessageId,

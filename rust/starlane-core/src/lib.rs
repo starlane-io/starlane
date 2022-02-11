@@ -40,6 +40,7 @@ extern crate async_recursion;
 use std::str::FromStr;
 
 use semver;
+use uuid::Uuid;
 
 pub mod actor;
 pub mod artifact;
@@ -67,21 +68,26 @@ pub mod starlane;
 pub mod template;
 pub mod util;
 pub mod watch;
-pub mod mechtron;
 pub mod parse;
 pub mod html;
-pub mod resources;
 pub mod security;
 pub mod pattern;
 pub mod fail;
 pub mod command;
 pub mod user;
+pub mod mechtron;
 
 lazy_static! {
     static ref VERSION: semver::Version = {
         semver::Version::from_str("0.1.0-alpha")
             .expect("expected starlane::VERSION semver string to parse.")
     };
+}
+
+#[no_mangle]
+pub extern "C" fn mesh_portal_unique_id() -> String
+{
+    Uuid::new_v4().to_string()
 }
 
 #[cfg(test)]

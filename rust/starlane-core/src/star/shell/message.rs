@@ -13,12 +13,11 @@ use crate::resource::ResourceRecord;
 use crate::star::{StarSkel, StarKey};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::fail::{Fail, StarlaneFailure};
-use crate::resources::message::{ProtoRequest, MessageFrom};
 use mysql::uuid::Uuid;
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::messaging::{Message, ProtoResponse, Request, Response};
+use mesh_portal_serde::version::latest::messaging::{Message,  Request, Response};
 use mesh_portal_serde::version::latest::util::unique_id;
 use mesh_portal_versions::version::v0_0_1::parse::Res;
 use tokio::sync::oneshot::Sender;
@@ -80,15 +79,22 @@ impl MessagingApi {
         Ok(())
     }
 
-    pub async fn exchange(&self, request: Request)->Result<Response,Error>{
+    pub async fn exchange(&self, request: Request)->Response {
         let (tx,rx) = oneshot::channel();
-        let call = MessagingCall::ExchangeRequest{ request, tx };
+        let call = MessagingCall::ExchangeRequest{ request:request.clone(), tx };
         self.tx.send(call).await;
-        Ok(rx.await?)
+        match tokio::time::timeout( Duration::from_secs(30), rx ).await {
+            Ok(Ok(response)) => {
+                response
+            }
+            _ => {
+                let response = request.fail("timeout".to_string().as_str() );
+                response
+            }
+        }
     }
 
     pub fn on_reply(&self, message: StarMessage) {
-
         if message.reply_to.is_none() {
             error!("received an on_reply message which has no reply_to");
         } else {
@@ -297,7 +303,7 @@ impl MessagingComponent {
                     id: unique_id(),
                     to: request.from.clone(),
                     from: self.skel.info.address.clone(),
-                    entity: request.entity.not_found(),
+                    core: request.core.not_found(),
                     response_to: request.id.clone()
                 };
                 exchanger.send(response);

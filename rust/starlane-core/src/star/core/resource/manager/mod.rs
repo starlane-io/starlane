@@ -47,15 +47,14 @@ impl ResourceManagerApi {
         rx.await?
     }
 
-    pub async fn has( &self, address: Address) -> Result<bool,Error> {
+    pub async fn request( &self, request: Request) -> Result<Response,Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(ResourceManagerCall::Has{address, tx }).await;
-        Ok(rx.await?)
-    }
-
-    pub async fn request( &self, request: Delivery<Request>) {
-        let (tx,rx) = oneshot::channel();
+println!("Manager mod request....");
         self.tx.send(ResourceManagerCall::Request{request, tx }).await;
+println!("Manager mod requesxt .. waiting" );
+        let rtn = rx.await?;
+println!("Manager mod RETURNING" );
+        rtn
     }
 
     pub async fn get( &self, address: Address ) -> Result<Payload,Error> {
@@ -67,8 +66,7 @@ impl ResourceManagerApi {
 
 pub enum ResourceManagerCall {
     Assign{ assign:ResourceAssign, tx: oneshot::Sender<Result<(),Error>> },
-    Has { address: Address, tx: oneshot::Sender<bool> },
-    Request { request: Delivery<Request>, tx: oneshot::Sender<Result<Option<Response>,Error>>},
+    Request { request: Request, tx: oneshot::Sender<Result<Response,Error>>},
     Get{ address: Address, tx: oneshot::Sender<Result<Payload,Error>>}
 }
 
@@ -79,18 +77,25 @@ impl Call for ResourceManagerCall {}
 
 pub struct ResourceManagerComponent {
     pub skel: StarSkel,
-    managers: HashMap<ResourceType,Arc<dyn ResourceManager>>,
+    managers: HashMap<ResourceType,Box<dyn ResourceManager>>,
     resources: HashMap<Address,ResourceType>
 }
 
 impl ResourceManagerComponent {
-    pub fn new( skel: StarSkel, tx: mpsc::Sender<ResourceManagerCall>, rx: mpsc::Receiver<ResourceManagerCall> ) {
-        AsyncRunner::new(
-        Box::new(Self {
+    pub async fn new( skel: StarSkel, tx: mpsc::Sender<ResourceManagerCall>, rx: mpsc::Receiver<ResourceManagerCall> ) {
+        let mut component = Self {
             skel,
             managers: HashMap::new(),
             resources: HashMap::new()
-        }),tx, rx);
+        };
+        match component.init().await {
+            Ok(_) => {}
+            Err(err) => {
+                error!("{}",err.to_string());
+            }
+        }
+        AsyncRunner::new(
+        Box::new(component),tx, rx);
     }
 }
 
@@ -101,8 +106,27 @@ impl AsyncProcessor<ResourceManagerCall> for ResourceManagerComponent{
             ResourceManagerCall::Assign { assign, tx } => {
                 self.assign(assign,tx).await;
             }
-            ResourceManagerCall::Has { address, tx } => {}
-            ResourceManagerCall::Request { request, tx } => {}
+            ResourceManagerCall::Request { request, tx } => {
+                match self.resources.get(&request.to ) {
+                    Some(resource_type) => {
+                        match self.managers.get(resource_type) {
+                            Some(manager) => {
+                                tx.send(Ok(manager.handle_request(request).await));
+                            }
+                            None => {
+                                let message = format!("cannot find manager for '{}' for address '{}'" , resource_type.to_string(), request.to.to_string());
+                                error!("{}",message);
+                                request.fail(message.as_str());
+                            }
+                        };
+                    }
+                    None => {
+                        let message = format!("manager does not contain resource '{}'" ,  request.to.to_string());
+                        error!("{}",message);
+                        request.fail(message.as_str());
+                    }
+                }
+            }
             ResourceManagerCall::Get { address, tx } => {
                 self.get(address,tx).await;
             }
@@ -116,19 +140,25 @@ impl ResourceManagerComponent{
 
        async fn process( manager_component: &mut ResourceManagerComponent, assign: ResourceAssign) -> Result<(),Error> {
            let resource_type = ResourceType::from_str(assign.stub.kind.resource_type().as_str())?;
-           let manager = manager_component.manager(&resource_type ).await?;
+           let manager:&mut Box<dyn ResourceManager> = manager_component.managers.get_mut(&resource_type ).ok_or(format!("could not get manager for {}",resource_type.to_string()))?;
            manager_component.resources.insert( assign.stub.address.clone(), resource_type );
            manager.assign(assign).await
        }
-
-       tx.send( process(self,assign).await );
+       let result = process(self,assign).await;
+        match &result {
+            Ok(_) => {}
+            Err(err) => {
+                error!("Resource Assign Error: {}", err.to_string());
+            }
+        }
+       tx.send( result );
     }
 
 
     async fn get( &mut self, address: Address, tx: oneshot::Sender<Result<Payload,Error>> ) {
         async fn process( manager : &mut ResourceManagerComponent, address: Address) -> Result<Payload,Error> {
             let resource_type = manager.resource_type(&address )?;
-            let manager = manager.manager(&resource_type ).await?;
+            let manager = manager.managers.get(&resource_type ).ok_or(format!("could not get manager for {}",resource_type.to_string()))?;
             manager.get(address).await
         }
 
@@ -136,18 +166,19 @@ impl ResourceManagerComponent{
     }
 
 
-    async fn request( &mut self, request: Delivery<Request>) {
-        async fn process( manager: &mut ResourceManagerComponent, request: Delivery<Request>) -> Result<(),Error> {
+    async fn request( &mut self, request: Request) -> Response {
+        async fn process( manager: &mut ResourceManagerComponent, request: Request) -> Result<Response,Error> {
             let resource_type = manager.resource_type(&request.to)?;
-            let manager = manager.manager(&resource_type ).await?;
-            manager.handle_request(request);
-            Ok(())
+            let manager = manager.managers.get(&resource_type ).ok_or(format!("could not get manager for {}",resource_type.to_string()))?;
+            Ok(manager.handle_request(request).await)
         }
 
-        match process(self, request.clone()).await {
-            Ok(_) => {}
+        match process(self, request.clone() ).await {
+            Ok(response) => {
+                response
+            }
             Err(error) => {
-                request.fail( mesh_portal_serde::version::latest::fail::Fail::Mesh(mesh_portal_serde::version::latest::fail::mesh::Fail::Error(error.to_string()) ));
+                request.fail(error.to_string().as_str() )
             }
         }
     }
@@ -160,29 +191,29 @@ impl ResourceManagerComponent{
         tx.send( self.resources.contains_key(&address)  );
     }
 
-    async fn manager(&mut self, rt: &ResourceType) -> Result<Arc<dyn ResourceManager>,Error> {
-
-        if self.managers.contains_key(rt) {
-            return Ok(self.managers.get(rt).cloned().expect("expected manager"));
+    async fn init(&mut self ) -> Result<(),Error>
+    {
+        for resource_type in self.skel.info.kind.hosted() {
+            let manager: Box<dyn ResourceManager> = match resource_type.clone() {
+                ResourceType::Root => Box::new(StatelessManager::new(self.skel.clone(), ResourceType::Root ).await),
+                ResourceType::User => Box::new(StatelessManager::new(self.skel.clone(), ResourceType::User ).await),
+                ResourceType::Control => Box::new(StatelessManager::new(self.skel.clone(), ResourceType::Control ).await),
+                ResourceType::Proxy=> Box::new(StatelessManager::new(self.skel.clone(), ResourceType::Proxy).await),
+                ResourceType::Space => Box::new(StatelessManager::new(self.skel.clone(), ResourceType::Space ).await),
+                ResourceType::Base => Box::new(StatelessManager::new(self.skel.clone(), ResourceType::Base ).await),
+                ResourceType::ArtifactBundleSeries => Box::new(StatelessManager::new(self.skel.clone(), ResourceType::ArtifactBundleSeries).await),
+                ResourceType::ArtifactBundle=> Box::new(ArtifactBundleManager::new(self.skel.clone()).await),
+                ResourceType::Artifact => Box::new(ArtifactManager::new(self.skel.clone()).await ),
+                ResourceType::App => Box::new(MechtronManager::new(self.skel.clone(), ResourceType::App).await?),
+                ResourceType::Mechtron => Box::new(MechtronManager::new(self.skel.clone(), ResourceType::Mechtron).await?),
+                ResourceType::Database => Box::new(K8sManager::new(self.skel.clone(), ResourceType::Database ).await?),
+                ResourceType::FileSystem => Box::new(FileSystemManager::new(self.skel.clone() ).await),
+                ResourceType::File => Box::new(FileManager::new(self.skel.clone())),
+                t => Box::new(StatelessManager::new(self.skel.clone(), t ).await)
+            };
+            self.managers.insert( resource_type, manager );
         }
-
-        let manager: Arc<dyn ResourceManager> = match rt {
-            ResourceType::Space => Arc::new(StatelessManager::new(self.skel.clone(), ResourceType::Space ).await),
-            ResourceType::Base => Arc::new(StatelessManager::new(self.skel.clone(), ResourceType::Base ).await),
-            ResourceType::ArtifactBundleSeries => Arc::new(StatelessManager::new(self.skel.clone(), ResourceType::ArtifactBundleSeries).await),
-            ResourceType::ArtifactBundle=> Arc::new(ArtifactBundleManager::new(self.skel.clone()).await),
-            ResourceType::Artifact => Arc::new(ArtifactManager::new(self.skel.clone()).await ),
-            ResourceType::App => Arc::new(MechtronManager::new(self.skel.clone(), ResourceType::App).await),
-            ResourceType::Mechtron => Arc::new(MechtronManager::new(self.skel.clone(), ResourceType::Mechtron).await),
-            ResourceType::Database => Arc::new(K8sManager::new(self.skel.clone(), ResourceType::Database ).await.expect("K8sManager must be created without error")),
-            ResourceType::FileSystem => Arc::new(FileSystemManager::new(self.skel.clone() ).await),
-            ResourceType::File => Arc::new(FileManager::new(self.skel.clone())),
-
-            t => return Err(format!("no Manager implementation for type {}", t.to_string()).into()),
-        };
-
-        self.managers.insert(rt.clone(), manager.clone() );
-        Ok(manager)
+        Ok(())
     }
 }
 
@@ -192,12 +223,12 @@ pub trait ResourceManager: Send + Sync {
     fn resource_type(&self) -> resource::ResourceType;
 
     async fn assign(
-        &self,
+        &mut self,
         assign: ResourceAssign,
     ) -> Result<(),Error>;
 
-    fn handle_request(&self, delivery: Delivery<Request> ) {
-        delivery.fail(fail::Fail::Error("Not implemented".to_string()));
+    async fn handle_request(&self, request: Request ) -> Response {
+        request.fail(format!("resource '{}' does not handle requests",self.resource_type().to_string()).as_str())
     }
 
     async fn get(&self, address: Address) -> Result<Payload,Error> {

@@ -52,6 +52,10 @@ pub enum FileCommand {
         target: String,
         tx: tokio::sync::oneshot::Sender<Result<(), Error>>,
     },
+    RemoveDir {
+        path: Path,
+        tx: tokio::sync::oneshot::Sender<Result<(), Error>>,
+    },
     Shutdown,
     Exists{
         path: Path,
@@ -78,6 +82,18 @@ impl FileAccess {
             .to_string();
         Ok(FileAccess { path: path, tx: tx })
     }
+
+    pub async fn remove_dir(&self, path: &Path) -> Result<(), Error> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(FileCommand::RemoveDir {
+                path: path.clone(),
+                tx: tx,
+            })
+            .await?;
+        Ok(util::wait_for_it(rx).await?)
+    }
+
 
     pub async fn list(&self, path: &Path) -> Result<Vec<Path>, Error> {
         let (tx, rx) = tokio::sync::oneshot::channel();
@@ -272,6 +288,9 @@ impl LocalFileAccess {
             FileCommand::Exists { path, tx } => {
                 tx.send( self.exists(&path));
             }
+            FileCommand::RemoveDir { path, tx } => {
+                tx.send( self.remove_dir(&path) );
+            }
         }
         Ok(())
     }
@@ -295,8 +314,6 @@ impl LocalFileAccess {
     }
 
     pub fn cat_path(&self, path: &str) -> Result<String, Error> {
-println!("PATH '{}'", path );
-
         let mut path_str = path.to_string();
         if path_str.starts_with("/") {
             path_str.remove(0);
@@ -354,7 +371,6 @@ impl LocalFileAccess {
 
     pub fn read(&self, path: &Path) -> Result<Arc<Vec<u8>>, Error> {
         let path = self.cat_path(path.to_relative().as_str())?;
-println!("READING PATH: {}", path );
         let mut buf = vec![];
         let mut file = match File::open(&path) {
             Ok(file) => {file}
@@ -368,11 +384,9 @@ println!("READING PATH: {}", path );
 
     pub fn write(&mut self, path: &Path, data: Arc<Vec<u8>>) -> Result<(), Error> {
         if let Option::Some(parent) = path.parent() {
-println!("MKDIR... {}", parent.to_string() );
             self.mkdir(&parent)?;
         }
 
-println!("WRITE PATH: {} to_relative() {}", path.to_string(), path.to_relative() );
         let path = self.cat_path(path.to_string().as_str())?;
         let mut file = File::create(&path)?;
         file.write(data.as_slice()).unwrap();
@@ -400,10 +414,16 @@ println!("WRITE PATH: {} to_relative() {}", path.to_string(), path.to_relative()
         let path = self.cat_path(path.to_relative().as_str())?;
         let mut builder = DirBuilder::new();
         builder.recursive(true);
-println!("Creating path: {} ", path.to_string() );
         builder.create(path.clone())?;
         Ok(())
     }
+
+    fn remove_dir(&mut self, path: &Path) -> Result<(), Error> {
+        let path = self.cat_path(path.to_relative().as_str())?;
+        fs::remove_dir_all(path)?;
+        Ok(())
+    }
+
 
     fn walk(&mut self) -> Result<tokio::sync::mpsc::Receiver<FileEvent>, Error> {
         let (event_tx, event_rx) = tokio::sync::mpsc::channel(128);

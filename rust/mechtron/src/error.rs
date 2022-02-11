@@ -2,7 +2,7 @@ use bincode::ErrorKind;
 use std::sync::{PoisonError, RwLockReadGuard, Arc, RwLockWriteGuard};
 use std::collections::HashMap;
 use crate::{MechtronFactory, MechtronWrapper};
-use mesh_portal_serde::version::v0_0_1::id::Address;
+use mesh_portal_serde::version::latest::id::Address;
 
 pub struct Error {
     pub message: String

@@ -1,3 +1,15 @@
+use std::env;
 use mesh_portal_serde::version::latest::id::Address;
+use std::process::{Child, Command};
+use crate::error::Error;
+use crate::starlane::STARLANE_MECHTRON_PORT;
 
-pub fn spawn( wasm: Address ) ->
+pub fn launch_mechtron_process(wasm_src: Address ) -> Result<Child,Error> {
+    let host = format!("localhost:{}",STARLANE_MECHTRON_PORT.to_string());
+    let program = env::args().next().expect("expected first argument");
+    let child = Command::new(program.as_str() )
+        .arg("mechtron")
+        .arg(host.as_str())
+        .arg(wasm_src.to_string().as_str()).spawn()?;
+    Ok(child)
+}

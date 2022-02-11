@@ -18,7 +18,6 @@ use crate::star::shell::message::MessagingCall;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::watch::{WatchSelector, Notification, Topic, Watch, WatchResourceSelector, Watcher};
 use crate::star::shell::search::SearchHits;
-use crate::resources::message::ProtoRequest;
 
 #[derive(Clone)]
 pub struct SurfaceApi {
@@ -51,10 +50,15 @@ impl SurfaceApi {
         self.tx.try_send(SurfaceCall::Notify(request));
     }
 
-    pub async fn exchange( &self, request: Request ) -> Result<Response,Error> {
+    pub async fn exchange( &self, request: Request ) -> Response {
         let (tx,rx) = oneshot::channel();
-        self.tx.send( SurfaceCall::Request {request, tx }).await;
-        rx.await?
+        self.tx.send( SurfaceCall::Request {request:request.clone(), tx }).await;
+        match rx.await {
+            Ok(response) => response,
+            Err(err) => {
+                request.fail(err.to_string().as_str() )
+            }
+        }
     }
 
 
@@ -114,7 +118,7 @@ pub enum SurfaceCall {
     StarSearch{ star_pattern: StarPattern, tx: oneshot::Sender<Result<SearchHits,Error>>},
     RequestStarAddress { address_template: AddressTemplate, tx: oneshot::Sender<Result<Address,Error>> },
     CreateSysResource{template:Template, messenger_tx: mpsc::Sender<Message>, tx:oneshot::Sender<Result<ResourceStub,Error>>},
-    Request{ request: Request, tx:oneshot::Sender<Result<Response,Error>>}
+    Request{ request: Request, tx:oneshot::Sender<Response>}
 }
 
 impl Call for SurfaceCall {}

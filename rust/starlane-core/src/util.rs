@@ -172,11 +172,11 @@ pub async fn wait_for_it<R>(rx: oneshot::Receiver<Result<R, Error>>) -> Result<R
         Ok(result) => match result {
             Ok(result) => match result {
                 Ok(result) => Ok(result),
-                Err(error) => log_err(error),
+                Err(error) => Err(error.into())
             },
-            Err(error) => log_err(error),
+            Err(error) => Err(error.into())
         },
-        Err(_err) => log_err("timeout"),
+        Err(_err) => Err("timeout".into())
     }
 }
 

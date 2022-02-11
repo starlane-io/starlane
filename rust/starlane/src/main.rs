@@ -4,6 +4,8 @@ extern crate lazy_static;
 #[macro_use]
 extern crate tablestream;
 
+#[macro_use]
+extern crate tracing;
 
 use std::fs::File;
 use std::io::{Read, Write};
@@ -24,11 +26,15 @@ use starlane_core::util;
 use starlane_core::starlane::api::StarlaneApi;
 use std::convert::TryInto;
 use mesh_portal_serde::version::latest::entity::request::create::Require;
+use mesh_portal_serde::version::latest::id::Address;
 use tokio::io::AsyncReadExt;
+use tracing::error;
 use starlane_core::command::cli::{CliClient, outlet};
 use starlane_core::command::cli::outlet::Frame;
 use starlane_core::command::compose::CommandOp;
 use starlane_core::command::parse::{command_line, rec_script_line};
+use starlane_core::mechtron::portal_client::launch_mechtron_client;
+use starlane_core::mechtron::process::launch_mechtron_process;
 use starlane_core::star::shell::sys::SysCall::Create;
 
 
@@ -54,27 +60,40 @@ async fn go() -> Result<(),Error> {
     let mut clap_app = App::new("Starlane")
         .version("0.1.0")
         .author("Scott Williams <scott@mightydevco.com>")
-        .about("A Resource Mesh").subcommands(vec![SubCommand::with_name("serve").usage("serve a starlane machine instance").arg(Arg::with_name("with-external").long("with-external").takes_value(false).required(false)).display_order(0),
+        .about("A Resource Mesh").subcommands(vec![SubCommand::with_name("serve").usage("serve a starlane machine instance").arg(Arg::with_name("with-external").long("with-external").takes_value(false).required(false).default_value("false")).display_order(0),
                                                             SubCommand::with_name("config").subcommands(vec![SubCommand::with_name("set-shell").usage("set the shell that the starlane CLI connects to").arg(Arg::with_name("hostname").required(true).help("the hostname of the starlane instance you wish to connect to")).display_order(0),
                                                                                                                             SubCommand::with_name("get-shell").usage("get the shell that the starlane CLI connects to")]).usage("read or manipulate the cli config").display_order(1).display_order(1),
                                                             SubCommand::with_name("exec").usage("execute a command").args(vec![Arg::with_name("command_line").required(true).help("command line to execute")].as_slice()),
                                                             SubCommand::with_name("script").usage("execute commands in a script").args(vec![Arg::with_name("script_file").required(true).help("the script file to execute")].as_slice()),
+                                                            SubCommand::with_name("mechtron").usage("launch a mechtron portal client").args(vec![Arg::with_name("server").required(true).help("the portal server to connect to"),
+                                                                                                                                                       Arg::with_name("wasm_src").required(true).help("the address of the wasm source"),
+                                                                                                                                                      ].as_slice()),
 
     ]);
 
     let matches = clap_app.clone().get_matches();
 
     if let Option::Some(serve) = matches.subcommand_matches("serve") {
-            let starlane = StarlaneMachine::new("server".to_string()).unwrap();
-            let layout = match serve.is_present("with-external") {
-                false => ConstellationLayout::standalone().unwrap(),
-                true => ConstellationLayout::standalone_with_external().unwrap(),
+            let starlane = StarlaneMachine::new("server".to_string()).expect("StarlaneMachine server");
+
+            let layout = match serve.value_of("with-external") {
+                Some(value) => {
+                    match bool::from_str(value ) {
+                        Ok(true) => {
+                                ConstellationLayout::standalone_with_external().expect("standalone_with_external")
+                        }
+                        _ =>{
+                            ConstellationLayout::standalone().expect("standalone")
+                        }
+                    }
+                },
+                None=> ConstellationLayout::standalone().expect("standalone")
             };
 
             starlane
                 .create_constellation("standalone", layout)
                 .await
-                .unwrap();
+                .expect("constellation");
             starlane.listen().await.expect("expected listen to work");
             starlane.join().await;
     } else if let Option::Some(matches) = matches.subcommand_matches("config") {
@@ -102,6 +121,8 @@ async fn go() -> Result<(),Error> {
                 eprintln!("Script Error {}", err.to_string() );
             }
         }
+    } else if let Option::Some(args) = matches.subcommand_matches("mechtron") {
+        mechtron(args.clone()).await?;
     } else {
         clap_app.print_long_help().unwrap_or_default();
     }
@@ -118,12 +139,19 @@ async fn exec_command_line(client: CliClient, line: String) -> Result<(CliClient
     for require in requires {
         match require {
             Require::File(name) => {
-                println!("transfering: '{}'",name.as_str());
-                let mut file = File::open(name.clone()).unwrap();
-                let mut buf = vec![];
-                file.read_to_end(&mut buf)?;
-                let bin = Arc::new(buf);
-                exchange.file( name, bin).await?;
+                println!("transferring: '{}'",name.as_str());
+                match File::open(name.clone() ) {
+                    Ok(mut file) => {
+                        let mut buf = vec![];
+                        file.read_to_end(&mut buf)?;
+                        let bin = Arc::new(buf);
+                        exchange.file( name, bin).await?;
+                    }
+                    Err(err) => {
+                        error!("{}",err.to_string())
+                    }
+                }
+
             }
         }
     }
@@ -182,6 +210,30 @@ async fn script(args: ArgMatches<'_>) -> Result<(), Error> {
     }
 
     std::process::exit(0);
+}
+
+
+async fn mechtron(args: ArgMatches<'_>) -> Result<(), Error> {
+println!("Staring starlane mechtron process");
+   async fn launch(args: ArgMatches<'_>) -> Result<(), Error> {
+       let server = args.value_of("server").ok_or("expected server hostname")?.to_string();
+       let wasm_src = args.value_of("wasm_src").ok_or("expected Wasm source")?.to_string();
+       let wasm_src = Address::from_str(wasm_src.as_str())?;
+       launch_mechtron_client( server, wasm_src ).await?;
+       Ok(())
+   }
+
+    match launch(args).await {
+        Ok(_) => {
+            std::process::exit(0);
+        }
+        Err(err) => {
+            eprintln!("client launch error: {}",err.to_string());
+            std::process::exit(1);
+        }
+    }
+
+
 }
 
 

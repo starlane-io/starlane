@@ -52,9 +52,11 @@ use crate::template::StarTemplateHandle;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 use std::cmp;
 use std::fmt;
+use std::future::Future;
 use crate::star::core::resource::manager::ResourceManagerApi;
 use std::str::FromStr;
 use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::portal;
 use mesh_portal_serde::version::latest::resource::Status;
 use mesh_portal_versions::version::v0_0_1::parse::Res;
 use nom::sequence::{preceded, terminated, tuple};
@@ -138,7 +140,7 @@ impl StarKind {
         }
     }
 
-    pub fn conscripts(&self) -> HashSet<StarWrangleKind> {
+    pub fn wrangles(&self) -> HashSet<StarWrangleKind> {
         HashSet::from_iter(
             match self {
                 StarKind::Central => vec![StarWrangleKind::req(StarKind::Space)],
@@ -557,6 +559,16 @@ impl Star {
 
                         break;
                     }
+                    StarCommand::GetCaches(tx)=> {
+                        match self.skel.machine.get_proto_artifact_caches_factory().await {
+                            Ok(caches) => {
+                                tx.send(caches);
+                            }
+                            Err(err) => {
+                                error!("{}",err.to_string());
+                            }
+                        }
+                    }
                     _ => {
                         unimplemented!("cannot process command: {}", command.to_string());
                     }
@@ -589,7 +601,7 @@ impl Star {
             self.set_status(StarStatus::Pending);
         }
 
-        for conscript_kind in self.skel.info.kind.conscripts() {
+        for conscript_kind in self.skel.info.kind.wrangles() {
             let search = SearchInit::new(
                 StarPattern::StarKind(conscript_kind.kind.clone()),
                 TraversalAction::SearchHits,
@@ -648,7 +660,7 @@ impl Star {
     async fn check_status(&mut self) {
         if self.status == StarStatus::Pending {
                 let satisfied = self.skel.star_wrangler_api
-                    .satisfied(self.skel.info.kind.conscripts())
+                    .satisfied(self.skel.info.kind.wrangles())
                     .await;
                 if let Result::Ok(StarWrangleSatisfaction::Ok) = satisfied {
                     self.set_status(StarStatus::Pending);
@@ -708,7 +720,7 @@ impl Star {
         match diagnose {
             Diagnose::HandlersSatisfied(satisfied) => {
                     if let Result::Ok(satisfaction) = self.skel.star_wrangler_api
-                        .satisfied(self.skel.info.kind.conscripts())
+                        .satisfied(self.skel.info.kind.wrangles())
                         .await
                     {
                         satisfied.tx.send(satisfaction);
@@ -1279,3 +1291,4 @@ impl<T> ToString for LogId<T> {
         "log-id".to_string()
     }
 }
+

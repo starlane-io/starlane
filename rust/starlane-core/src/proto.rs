@@ -34,11 +34,7 @@ use crate::star::shell::router::{RouterApi, RouterComponent, RouterCall};
 use crate::star::shell::sys::{SysApi,SysComponent};
 use crate::star::surface::{SurfaceApi, SurfaceCall, SurfaceComponent};
 use crate::star::variant::{VariantApi, start_variant};
-use crate::star::{
-    ConstellationBroadcast, FrameHold, FrameTimeoutInner, Persistence,
-     Star, StarCommand, StarController,
-    StarInfo, StarKernel, StarKey, StarKind, StarSkel,
-};
+use crate::star::{ConstellationBroadcast, FrameHold, FrameTimeoutInner, Persistence, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarSkel};
 use crate::starlane::StarlaneMachine;
 use crate::template::StarKeyConstellationIndex;
 use crate::star::shell::locator::{ResourceLocatorApi, ResourceLocatorComponent};
@@ -70,7 +66,7 @@ pub struct ProtoStar {
     machine: StarlaneMachine,
     lane_muxer_api: LaneMuxerApi,
     router_tx: mpsc::Sender<RouterCall>,
-    router_booster_rx: RouterCallBooster
+    router_booster_rx: RouterCallBooster,
 }
 
 impl ProtoStar {
@@ -115,7 +111,7 @@ impl ProtoStar {
                 surface_rx,
                 lane_muxer_api,
                 router_tx,
-                router_booster_rx
+                router_booster_rx,
             },
             StarController {
                 star_tx,
@@ -224,7 +220,7 @@ impl ProtoStar {
                             variant_api,
                             watch_api,
                             registry_api,
-                            sys_api
+                            sys_api,
                         };
 
                         start_variant(skel.clone(), variant_rx );

@@ -1,10 +1,11 @@
 use crate::resource::{Kind, ArtifactKind};
 use crate::artifact::ArtifactRef;
-use crate::cache::{Cacheable, Data};
+use crate::cache::Cacheable;
 use std::sync::Arc;
 use crate::error::Error;
 use std::str::FromStr;
 use std::convert::TryInto;
+use mesh_portal_serde::version::latest::bin::Bin;
 use mesh_portal_serde::version::latest::id::Address;
 use wasmer::{Cranelift, Universal, Store, Module};
 use crate::resource::config::Parser;
@@ -40,7 +41,7 @@ impl WasmCompiler {
 }
 
 impl Parser<Wasm> for WasmCompiler{
-    fn parse(&self, artifact: ArtifactRef, data: Data) -> Result<Arc<Wasm>, Error> {
+    fn parse(&self, artifact: ArtifactRef, data: Bin) -> Result<Arc<Wasm>, Error> {
 
        let module = Arc::new(Module::new( &self.store, data.as_ref() )?);
        Ok(Arc::new(Wasm{

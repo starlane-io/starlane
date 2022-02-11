@@ -12,7 +12,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 
-use crate::cache::ProtoArtifactCachesFactory;
+use crate::cache::{ArtifactCaches, ProtoArtifactCachesFactory};
 use crate::error::Error;
 use crate::frame::{StarPattern, TraversalAction, ResourceRegistryRequest, StarMessagePayload};
 use crate::resource::{Kind, ResourceType, AssignResourceStateSrc, ResourceRecord};
@@ -23,15 +23,13 @@ use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
 use crate::watch::{WatchResourceSelector, Watcher};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, ReplyKind, Reply};
-use crate::artifact::ArtifactBundle;
-use crate::resources::message::{ProtoRequest, MessageFrom};
+use crate::artifact::{ArtifactBundle, ArtifactRef};
 use kube::ResourceExt;
 use mesh_portal_serde::error;
 use mesh_portal_serde::version::latest::command::common::{SetLabel, StateSrc};
 use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, KindTemplate, Strategy, Template};
-use mesh_portal_serde::version::latest::entity::request::{Rc, RcCommand, ReqEntity};
+use mesh_portal_serde::version::latest::entity::request::{Action, Rc};
 use mesh_portal_serde::version::latest::entity::request::get::Get;
-use mesh_portal_serde::version::latest::entity::response::RespEntity;
 use mesh_portal_serde::version::latest::id::Address;
 use mesh_portal_serde::version::latest::messaging::{Message, Request, Response};
 use mesh_portal_serde::version::latest::payload::{Payload, PayloadMap, Primitive};
@@ -75,7 +73,7 @@ impl StarlaneApi {
         }
     }
 
-    pub async fn exchange( &self, request: Request ) -> Result<Response,Error> {
+    pub async fn exchange( &self, request: Request ) -> Response {
         self.surface_api.exchange(request).await
     }
 
@@ -106,18 +104,24 @@ impl StarlaneApi {
         self.surface_api.locate(address).await
     }
 
+
+    pub async fn cache( &self, artifact: &ArtifactRef)  -> Result<ArtifactCaches,Error> {
+        let mut cache = self.get_caches().await?.create();
+        cache.cache(vec![artifact.clone()]).await?;
+        Ok(cache.to_caches().await?)
+    }
+
     pub async fn get_caches(&self) -> Result<Arc<ProtoArtifactCachesFactory>, Error> {
         Ok(self.surface_api.get_caches().await?)
     }
 
     pub async fn create(&self, create: Create) -> Result<ResourceStub, Error> {
-        let request = Request::new(ReqEntity::Rc(Rc::new(RcCommand::Create(create.clone()))), self.agent.clone(), create.template.address.parent.clone() );
-        let response = self.surface_api.exchange(request).await?;
-        if let Ok( Payload::Primitive(Primitive::Stub(stub)) ) =  &response.entity.payload() {
+        let action = Action::Rc(Rc::Create(create.clone()));
+        let core = action.into();
+        let request = Request::new(core, self.agent.clone(), create.template.address.parent.clone() );
+        let response = self.surface_api.exchange(request).await.ok_or()?;
+        if let Payload::Primitive(Primitive::Stub(stub)) =  &response.core.body {
             Ok(stub.clone())
-        }
-        else if response.entity.is_fail() {
-            Err("Could not create".into())
         } else {
             Err("unexpected response".into())
         }
@@ -200,9 +204,14 @@ impl StarlaneApi {
             address: address.clone(),
             op: GetOp::State
         };
-        let request = Request::new(ReqEntity::Rc(Rc::new(RcCommand::Get(get) )), self.agent.clone(), address);
-        let response = self.surface_api.exchange(request).await?;
-        Ok(response.entity.payload()?)
+        let action = Action::Rc(Rc::Get(get));
+        let core = action.into();
+        let request = Request::new(core, self.agent.clone(), address.clone());
+        let response = self.surface_api.exchange(request).await;
+        match response.core.is_ok() {
+            true => Ok(response.core.body),
+            false => Err(format!("could not get state for: '{}'",address.to_string()).into())
+        }
     }
 }
 

@@ -1,0 +1,9 @@
+Bind {
+
+  Http {
+
+    <Get>/(.*) -> localhost:my-app^Http<Get>/index.html => &;
+
+  }
+
+}

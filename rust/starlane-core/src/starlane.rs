@@ -1,15 +1,21 @@
 use std::cell::Cell;
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::str::FromStr;
 
 use std::sync::{Arc, Mutex};
 
 use std::time::Duration;
+use dashmap::DashMap;
 
 use futures::future::join_all;
 use futures::{FutureExt, StreamExt, TryFutureExt};
+use mesh_portal_api_server::Portal;
 use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal_serde::version::latest::path;
+use mesh_portal_tcp_client::PortalTcpClient;
+use mesh_portal_tcp_server::{PortalTcpServer, TcpServerCall};
 
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
@@ -26,6 +32,7 @@ use crate::file_access::FileAccess;
 
 use crate::lane::{ClientSideTunnelConnector, LocalTunnelConnector, ProtoLaneEnd, ServerSideTunnelConnector, OnCloseAction};
 use crate::logger::{Flags, Logger};
+use crate::mechtron::portal_client::MechtronPortalClient;
 
 use crate::proto::{
     local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoTunnel,
@@ -34,6 +41,7 @@ use crate::proto::{
 use crate::star::surface::SurfaceApi;
 use crate::star::{ConstellationBroadcast, StarKind, StarStatus};
 use crate::star::{Request, Star, StarCommand, StarController, StarInfo, StarKey, StarTemplateId};
+use crate::star::core::resource::manager::mechtron::MechtronPortalServer;
 use crate::starlane::api::StarlaneApi;
 use crate::starlane::files::MachineFileSystem;
 use crate::template::{
@@ -53,6 +61,7 @@ lazy_static! {
     pub static ref DEFAULT_PORT: usize = std::env::var("STARLANE_PORT").unwrap_or("4343".to_string()).parse::<usize>().unwrap_or(4343);
 
     pub static ref VERSION: VersionFrame = VersionFrame{ product: "Starlane".to_string(), version: "1.0.0".to_string() };
+    pub static ref STARLANE_MECHTRON_PORT: usize = std::env::var("STARLANE_MECHTRON_PORT").unwrap_or("4345".to_string()).parse::<usize>().unwrap_or(4345);
 }
 
 #[derive(Clone)]
@@ -60,6 +69,7 @@ pub struct StarlaneMachine {
     tx: mpsc::Sender<StarlaneCommand>,
     run_complete_signal_tx: broadcast::Sender<()>,
     machine_filesystem: Arc<MachineFileSystem>,
+    portals: Arc<DashMap<String,Portal>>
 }
 
 impl StarlaneMachine {
@@ -69,8 +79,9 @@ impl StarlaneMachine {
 
     pub fn new_with_artifact_caches(
         name: MachineName,
-        artifact_caches: Option<Arc<ProtoArtifactCachesFactory>>,
+        artifact_caches: Option<Arc<ProtoArtifactCachesFactory>>
     ) -> Result<Self, Error> {
+
         let runner = StarlaneMachineRunner::new_with_artifact_caches(name, artifact_caches)?;
         let tx = runner.command_tx.clone();
         let run_complete_signal_tx = runner.run();
@@ -78,6 +89,7 @@ impl StarlaneMachine {
             tx: tx,
             run_complete_signal_tx: run_complete_signal_tx,
             machine_filesystem: Arc::new(MachineFileSystem::new()?),
+            portals: Arc::new(DashMap::new())
         };
 
         Result::Ok(starlane)
@@ -100,6 +112,13 @@ impl StarlaneMachine {
 
     }
 
+    pub async fn start_mechtron_portal_server( &self ) -> Result<mpsc::Sender<TcpServerCall>,Error> {
+        let (tx,rx) = oneshot::channel();
+        self.tx
+            .send(StarlaneCommand::StartMechtronPortal(tx))
+            .await?;
+        Ok(rx.await??)
+    }
 
     pub fn machine_filesystem(&self) -> Arc<MachineFileSystem> {
         self.machine_filesystem.clone()
@@ -170,7 +189,7 @@ pub struct StarlaneMachineRunner {
 }
 
 impl StarlaneMachineRunner {
-    pub fn new(machine: String) -> Result<Self, Error> {
+    pub fn new(machine: String, api: StarlaneApi) -> Result<Self, Error> {
         Self::new_with_artifact_caches(machine, Option::None)
     }
 
@@ -178,7 +197,36 @@ impl StarlaneMachineRunner {
         machine: String,
         artifact_caches: Option<Arc<ProtoArtifactCachesFactory>>,
     ) -> Result<Self, Error> {
+
         let (command_tx, command_rx) = mpsc::channel(32);
+        let data_access = FileAccess::new(
+            std::env::var("STARLANE_DATA_DIR").unwrap_or("data".to_string()),
+        )?;
+        let cache_access = FileAccess::new(
+            std::env::var("STARLANE_CACHE_DIR").unwrap_or("cache".to_string()),
+        )?;
+
+        // presently we favor deletion since the persistence is not really working
+        let delete_cache_on_start = std::env::var("STARLANE_DELETE_CACHE_ON_START").unwrap_or("true".to_string()).parse::<bool>().unwrap_or(true);
+        let delete_data_on_start = std::env::var("STARLANE_DELETE_DATA_ON_START").unwrap_or("true".to_string()).parse::<bool>().unwrap_or(true);
+
+        {
+            let cache_access = cache_access.clone();
+            let data_access = data_access.clone();
+            tokio::spawn(async move {
+                if delete_cache_on_start {
+                    let path = path::Path::from_str("/").expect("expected root path");
+                    cache_access.remove_dir(&path).await;
+                }
+
+                if delete_data_on_start {
+                    let path = path::Path::from_str("/").expect("expected root path");
+                    data_access.remove_dir(&path).await;
+                }
+            });
+        }
+
+
         Ok(StarlaneMachineRunner {
             name: machine,
             star_controllers: AsyncHashMap::new(),
@@ -187,12 +235,8 @@ impl StarlaneMachineRunner {
             //            star_core_ext_factory: Arc::new(ExampleStarCoreExtFactory::new() ),
             logger: Logger::new(),
             flags: Flags::new(),
-            data_access: FileAccess::new(
-                std::env::var("STARLANE_DATA").unwrap_or("data".to_string()),
-            )?,
-            cache_access: FileAccess::new(
-                std::env::var("STARLANE_CACHE").unwrap_or("cache".to_string()),
-            )?,
+            data_access,
+            cache_access,
             artifact_caches: artifact_caches,
             port: DEFAULT_PORT.clone(),
             constellations: HashMap::new(),
@@ -201,11 +245,50 @@ impl StarlaneMachineRunner {
     }
 
     pub async fn get_starlane_api(&self) -> Result<StarlaneApi, Error> {
-        let (tx, rx) = oneshot::channel();
-        self.command_tx
-            .send(StarlaneCommand::StarlaneApiSelectBest(tx))
-            .await?;
-        rx.await?
+
+            let map = match self.star_controllers.clone().into_map().await {
+                Ok(map) => map,
+                Err(err) => {
+                    return Err(err);
+                }
+            };
+            if map.is_empty() {
+                return Err(
+                    "ERROR: cannot create StarlaneApi: no StarControllers available."
+                        .into(),
+                );
+            }
+            let values: Vec<StarController> =
+                map.into_iter().map(|(_k, v)| v).collect();
+
+            let mut best = Option::None;
+
+            for star_ctrl in values {
+                let info = star_ctrl.get_star_info().await.unwrap().unwrap();
+                if best.is_none() {
+                    best = Option::Some((info, star_ctrl));
+                } else {
+                    let (prev_info, _) = best.as_ref().unwrap();
+                    match info.kind {
+                        StarKind::Mesh => {
+                            best = Option::Some((info, star_ctrl));
+                        }
+                        StarKind::Client => {
+                            if prev_info.kind != StarKind::Mesh {
+                                best = Option::Some((info, star_ctrl));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            let (_info, star_ctrl) = best.unwrap();
+
+            Ok(StarlaneApi::new(
+                star_ctrl.surface_api,
+                HyperUser::address(),
+            ))
     }
 
 
@@ -234,52 +317,8 @@ impl StarlaneMachineRunner {
                         }
                         command.tx.send(result);
                     }
-                    StarlaneCommand::StarlaneApiSelectBest(tx) => {
-                        let map = match self.star_controllers.clone().into_map().await {
-                            Ok(map) => map,
-                            Err(err) => {
-                                tx.send(Err(err));
-                                continue;
-                            }
-                        };
-                        if map.is_empty() {
-                            tx.send(Err(
-                                "ERROR: cannot create StarlaneApi: no StarControllers available."
-                                    .into(),
-                            ));
-                            continue;
-                        }
-                        let values: Vec<StarController> =
-                            map.into_iter().map(|(_k, v)| v).collect();
-
-                        let mut best = Option::None;
-
-                        for star_ctrl in values {
-                            let info = star_ctrl.get_star_info().await.unwrap().unwrap();
-                            if best.is_none() {
-                                best = Option::Some((info, star_ctrl));
-                            } else {
-                                let (prev_info, _) = best.as_ref().unwrap();
-                                match info.kind {
-                                    StarKind::Mesh => {
-                                        best = Option::Some((info, star_ctrl));
-                                    }
-                                    StarKind::Client => {
-                                        if prev_info.kind != StarKind::Mesh {
-                                            best = Option::Some((info, star_ctrl));
-                                        }
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-
-                        let (_info, star_ctrl) = best.unwrap();
-
-                        tx.send(Ok(StarlaneApi::new(
-                            star_ctrl.surface_api,
-                            HyperUser::address(),
-                        )));
+                    StarlaneCommand::StarlaneApiSelectBest(tx) =>{
+                        tx.send(self.get_starlane_api().await);
                     }
                     StarlaneCommand::Shutdown => {
                         let listening = {
@@ -320,7 +359,6 @@ impl StarlaneMachineRunner {
                             stream.read_exact(buf).await?;
 
                             let selection = String::from_utf8(vec)?;
-println!("SERVICE SELECTION {} ", selection );
                             let selection = ServiceSelection::from_str( selection.as_str() )?;
                             Ok(selection)
                         }
@@ -385,12 +423,16 @@ println!("SERVICE SELECTION {} ", selection );
                             }
                         }
                     }
+                    StarlaneCommand::StartMechtronPortal(tx) => {
+                        self.start_mechtron_portal_server(tx).await;
+                    }
                 }
             }
             run_complete_signal_tx.send(());
         });
         run_complete_signal_tx_rtn
     }
+
 
     async fn select_star_kind(&self, kind: &StarKind) -> Result<Option<StarController>, Error> {
         let map = self.star_controllers.clone().into_map().await?;
@@ -661,6 +703,23 @@ println!("SERVICE SELECTION {} ", selection );
         Ok(())
     }
 
+    async fn start_mechtron_portal_server(&mut self, result_tx: oneshot::Sender<Result<mpsc::Sender<TcpServerCall>,Error>>) {
+        {
+            async fn process( runner: &mut StarlaneMachineRunner) -> Result<mpsc::Sender<TcpServerCall>,Error> {
+                let starlane_api = runner.get_starlane_api().await?;
+                let mut inner_flags = runner.inner_flags.lock().unwrap();
+                let flags = inner_flags.get_mut();
+                if let Some(serve_tx) = &flags.mechtron_portal_server {
+                    Ok(serve_tx.clone() )
+                } else {
+                    let server_tx = PortalTcpServer::new( STARLANE_MECHTRON_PORT.clone() , Box::new(MechtronPortalServer::new(starlane_api ) ) );
+                    flags.mechtron_portal_server = Option::Some(server_tx.clone());
+                    Ok(server_tx)
+                }
+            }
+            result_tx.send(process(self).await);
+        }
+    }
     fn listen(&mut self, result_tx: oneshot::Sender<Result<(), Error>>) {
         {
             let mut inner_flags = self.inner_flags.lock().unwrap();
@@ -879,6 +938,7 @@ pub enum StarlaneCommand {
     Listen(oneshot::Sender<Result<(), Error>>),
     AddStream(TcpStream),
     GetProtoArtifactCachesFactory(oneshot::Sender<Option<Arc<ProtoArtifactCachesFactory>>>),
+    StartMechtronPortal(oneshot::Sender<Result<mpsc::Sender<TcpServerCall>,Error>>),
     Shutdown,
 }
 
@@ -939,6 +999,7 @@ pub enum StarAddress {
 struct StarlaneInnerFlags {
     pub shutdown: bool,
     pub listening: bool,
+    pub mechtron_portal_server: Option<mpsc::Sender<TcpServerCall>>
 }
 
 impl StarlaneInnerFlags {
@@ -946,6 +1007,7 @@ impl StarlaneInnerFlags {
         Self {
             shutdown: false,
             listening: false,
+            mechtron_portal_server: Option::None
         }
     }
 }
