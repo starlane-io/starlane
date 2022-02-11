@@ -2,8 +2,6 @@ use std::sync::atomic::{Ordering,AtomicI32};
 use std::sync::RwLock;
 use std::collections::HashMap;
 
-use wasm_bindgen::prelude::*;
-
 use crate::error::Error;
 
 lazy_static! {
@@ -19,14 +17,14 @@ extern "C"
     pub fn membrane_host_panic(buffer: i32);
 }
 
-#[wasm_bindgen]
-pub fn membrane_guest_version() -> i32
+#[no_mangle]
+pub extern "C" fn membrane_guest_version() -> i32
 {
   VERSION
 }
 
-#[wasm_bindgen]
-pub fn membrane_guest_alloc_buffer(len: i32) -> i32
+#[no_mangle]
+pub extern "C" fn membrane_guest_alloc_buffer(len: i32) -> i32
 {
     let buffer_id = BUFFER_INDEX.fetch_add(1, Ordering::Relaxed);
     {
@@ -38,21 +36,21 @@ pub fn membrane_guest_alloc_buffer(len: i32) -> i32
     buffer_id
 }
 
-#[wasm_bindgen]
-pub fn membrane_guest_dealloc_buffer(id: i32)
+#[no_mangle]
+pub extern "C" fn membrane_guest_dealloc_buffer(id: i32)
 {
     let mut buffers = BUFFERS.write().unwrap();
     buffers.remove(&id);
 }
 
-#[wasm_bindgen]
-pub fn membrane_guest_test(test_buffer_message: i32)
+#[no_mangle]
+pub extern "C" fn membrane_guest_test(test_buffer_message: i32)
 {
     log(membrane_consume_string(test_buffer_message).unwrap().as_str());
 }
 
-#[wasm_bindgen]
-pub fn membrane_guest_get_buffer_ptr(id: i32) ->*const u8
+#[no_mangle]
+pub extern "C" fn membrane_guest_get_buffer_ptr(id: i32) ->*const u8
 {
     let buffer_info = BUFFERS.read();
     let buffer_info = buffer_info.unwrap();
@@ -60,8 +58,8 @@ pub fn membrane_guest_get_buffer_ptr(id: i32) ->*const u8
     return buffer.as_ptr()
 }
 
-#[wasm_bindgen]
-pub fn membrane_guest_get_buffer_len(id: i32) ->i32
+#[no_mangle]
+pub extern "C" fn membrane_guest_get_buffer_len(id: i32) ->i32
 {
     let buffer_info = BUFFERS.read();
     let buffer_info = buffer_info.unwrap();
@@ -69,8 +67,8 @@ pub fn membrane_guest_get_buffer_len(id: i32) ->i32
     buffer.len() as _
 }
 
-#[wasm_bindgen]
-pub fn membrane_guest_test_log(log_message_buffer: i32)
+#[no_mangle]
+pub extern "C" fn membrane_guest_test_log(log_message_buffer: i32)
 {
     let log_message = membrane_consume_string(log_message_buffer).unwrap();
     log( log_message.as_str() );

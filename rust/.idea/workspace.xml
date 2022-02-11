@@ -7,27 +7,19 @@
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/cache.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/cache.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/config/config.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/config/config.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/config/parse.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/config/parse.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/file_access.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/file_access.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/mechtron/portal_client.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/mechtron/portal_client.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager/artifact.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager/artifact.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager/mechtron.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager/mechtron.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/shell/router.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/shell/router.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/util.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/util.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/main.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mechtron/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/mechtron/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mechtron/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/mechtron/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/mechtron/wasm.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/mechtron/wasm.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane/files.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane/files.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/wasm_membrane_guest/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/wasm_membrane_guest/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/wasm_membrane_guest/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/wasm_membrane_guest/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/wasm_membrane_guest/src/membrane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/wasm_membrane_guest/src/membrane.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/wasm_membrane_host/src/membrane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/wasm_membrane_host/src/membrane.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../tutorial/lesson-2/bundle.zip" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-2/bundle.zip" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-2/bundle/config/my-app.app" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-2/bundle/config/my-app.app" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-2/script/.install.script.swp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-2/script/install.script" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-2/script/install.script" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../tutorial/lesson-2/wasm/my-app/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-2/wasm/my-app/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../tutorial/lesson-2/wasm/my-app/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-2/wasm/my-app/Makefile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-2/wasm/my-app/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-2/wasm/my-app/src/lib.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -272,7 +264,7 @@
       <workItem from="1643807673961" duration="200866000" />
       <workItem from="1644330178042" duration="69932000" />
       <workItem from="1644537939726" duration="13481000" />
-      <workItem from="1644557766743" duration="17691000" />
+      <workItem from="1644557766743" duration="26904000" />
     </task>
     <servers />
   </component>

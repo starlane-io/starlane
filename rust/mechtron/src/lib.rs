@@ -1,7 +1,7 @@
 pub mod error;
 
-#[macro_use]
-extern crate wasm_bindgen;
+//#[macro_use]
+//extern crate wasm_bindgen;
 
 #[macro_use]
 extern crate lazy_static;
@@ -25,10 +25,8 @@ use std::convert::TryFrom;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::sync::RwLock;
-use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_membrane_guest::membrane::{
-    log, membrane_consume_buffer, membrane_read_buffer, membrane_write_buffer,
-};
+//use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_membrane_guest::membrane::{log, membrane_consume_buffer, membrane_read_buffer, membrane_read_string, membrane_write_buffer};
 
 lazy_static! {
     pub static ref FACTORIES: RwLock<HashMap<String, Arc<dyn MechtronFactory>>> =
@@ -38,13 +36,25 @@ lazy_static! {
     pub static ref EXCHANGE_INDEX: AtomicUsize = AtomicUsize::new(0);
 }
 
+#[no_mangle]
 extern "C" {
     pub fn mechtron_init();
     pub fn mechtron_inlet_frame(frame: i32);
     pub fn mechtron_inlet_request(request: i32) -> i32;
+    pub fn mechtron_unique_id() -> i32;
 }
 
-#[wasm_bindgen]
+
+#[no_mangle]
+pub extern "C" fn mesh_portal_unique_id() -> String {
+    let unique_id = unsafe {mechtron_unique_id()};
+    let unique_id = membrane_read_string(unique_id).expect("unique id");
+    unique_id
+}
+
+
+//#[wasm_bindgen]
+#[no_mangle]
 pub fn mechtron_outlet_request(request: i32) -> i32 {
     let request = match membrane_read_buffer(request) {
         Ok(request) => {
@@ -81,7 +91,9 @@ pub fn mechtron_outlet_request(request: i32) -> i32 {
         }
     };
 }
-#[wasm_bindgen]
+
+//#[wasm_bindgen]
+#[no_mangle]
 pub fn mechtron_outlet_frame(frame_buffer_id: i32) {
     log("received mechtron outlet frame");
 

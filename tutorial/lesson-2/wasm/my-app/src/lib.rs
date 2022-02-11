@@ -1,5 +1,5 @@
-#[macro_use]
-extern crate wasm_bindgen;
+//#[macro_use]
+//extern crate wasm_bindgen;
 
 use wasm_membrane_guest::membrane::log;
 use mechtron::{Mechtron, mechtron_register, MechtronCtx, MechtronFactory};

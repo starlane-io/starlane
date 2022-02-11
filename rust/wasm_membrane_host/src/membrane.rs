@@ -392,15 +392,6 @@ impl WasmMembrane {
         let imports = imports! {
 
 
-            "__wbindgen_placeholder__" => {
-               "__wbindgen_throw"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env,a:i32,b:i32| {
-                // do nothing
-           }),
-              "__wbindgen_object_drop_ref"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env,a:i32| {
-                // do nothing
-           }),
-            },
-
 
             "env"=>{
 

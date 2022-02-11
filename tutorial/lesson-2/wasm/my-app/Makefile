@@ -1,12 +1,11 @@
 
 clean:
-	rm -rf pkg || true
+	rm -rf target || true
 
 
 all: clean
-	wasm-pack --verbose build --release  --target nodejs --mode normal
-	#wasm-pack --verbose build ---target web --mode normal
-	cp pkg/my_app_bg.wasm ../../bundle/wasm/my-app.wasm
+	cargo build --target wasm32-unknown-unknown
+	cp ./target/wasm32-unknown-unknown/debug/my_app.wasm  ../../bundle/wasm/my-app.wasm
 
 
 	

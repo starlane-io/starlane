@@ -5,7 +5,7 @@ authors = ["Scott Williams <scott@mightydevco.com>"]
 edition = "2018"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 
 [features]
 #default = ["console_error_panic_hook"]
@@ -17,7 +17,7 @@ mechtron= { path = "../../../../rust/mechtron"}
 mechtron-common= { path = "../../../../rust/mechtron-common"}
 wasm_membrane_guest = { path = "../../../../rust/wasm_membrane_guest"}
 mesh-portal-serde = { path = "../../../../../mesh-portal/rust/mesh-portal-serde"}
-getrandom = { version = "0.2.4", features = ["js"] }
+#getrandom = { version = "0.2.4", features = ["js"] }
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
