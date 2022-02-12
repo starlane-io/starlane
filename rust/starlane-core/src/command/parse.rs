@@ -6,7 +6,7 @@ use nom::character::complete::{multispace0, space1};
 use nom::combinator::{all_consuming, opt, recognize};
 use nom::multi::many0;
 use nom::sequence::{terminated, tuple};
-use crate::command::compose::CommandOp;
+use crate::command::compose::{CommandOp, Strategy};
 
 fn create_command(input: &str) -> Res<&str, CommandOp> {
     tuple((tag("create"),space1,create))(input).map( |(next,(_,_,create))|{
@@ -38,9 +38,21 @@ fn get_command(input: &str) -> Res<&str, CommandOp> {
     })
 }
 
+pub fn command_strategy(input: &str) -> Res<&str, Strategy> {
+    opt( tuple((tag("?"),multispace0)) )(input).map( |(next,hint)| {
+        match hint {
+            None => (next, Strategy::Commit),
+            Some(_) => (next, Strategy::Ensure)
+        }
+    } )
+
+}
 
 pub fn command(input: &str) -> Res<&str, CommandOp> {
-    alt( (create_command,publish_command,select_command,set_command,get_command) )(input)
+    tuple((command_strategy, alt( (create_command, publish_command, select_command, set_command, get_command) )))(input).map( |(next,(strategy,mut command)),| {
+        command.set_strategy(strategy);
+        (next, command)
+    })
 }
 
 pub fn command_line(input: &str) -> Res<&str, CommandOp> {
@@ -65,4 +77,30 @@ pub fn consume_command_line(input: &str) -> Res<&str, CommandOp> {
 
 pub fn rec_script_line(input: &str) -> Res<&str, &str> {
     recognize(script_line)(input)
+}
+
+pub mod test {
+    use crate::command::parse::{command, script};
+    use crate::error::Error;
+
+    #[test]
+    pub fn test() -> Result<(),Error>{
+        command("? create localhost<Space>")?;
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_script() -> Result<(),Error>{
+        let input = r#" ? create localhost<Space>;
+? create localhost:repo<Base<Repo>>;
+? create localhost:repo:tutorial<ArtifactBundleSeries>;
+? publish ^[ bundle.zip ]-> localhost:repo:tutorial:1.0.0;
+set localhost{ +bind=localhost:repo:tutorial:1.0.0:/bind/localhost.bind };
+        "#;
+
+        script(input)?;
+        Ok(())
+    }
+
+
 }

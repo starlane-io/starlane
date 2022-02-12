@@ -8,12 +8,40 @@ use nom::combinator::all_consuming;
 use crate::command::parse::command_line;
 use crate::error::Error;
 
+pub enum Strategy {
+    Commit,
+    Ensure
+}
+
+
+
 pub enum CommandOp {
     Create(Create),
     Select(Select),
     Publish(CreateOp),
     Set(Set),
     Get(Get)
+}
+
+impl CommandOp {
+    pub fn set_strategy( &mut self, strategy: Strategy ) {
+        match self {
+            CommandOp::Create(create) => {
+               match strategy {
+                   Strategy::Commit => {
+                       create.strategy = mesh_portal_serde::version::latest::entity::request::create::Strategy::Create;
+                   }
+                   Strategy::Ensure => {
+                       create.strategy = mesh_portal_serde::version::latest::entity::request::create::Strategy::Ensure;
+                   }
+               }
+            }
+            CommandOp::Select(_) => {}
+            CommandOp::Publish(_) => {}
+            CommandOp::Set(_) => {}
+            CommandOp::Get(_) => {}
+        }
+    }
 }
 
 impl FromStr for CommandOp  {

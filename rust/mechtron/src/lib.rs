@@ -115,12 +115,12 @@ log( format!("assigning mechtron: {}",assign.stub.address.to_string()).as_str() 
                     }
                     ResourceConfigBody::Named(mechtron_name) => {
 log( format!("assigning mechtron NAMED: {}",mechtron_name).as_str() );
-                        let factory: &Box<dyn MechtronFactory> = {
+                        let mechtron = {
                             let factories = FACTORIES.read()?;
-                            factories.get(&mechtron_name).ok_or(format!(""))?
+                            let factory = factories.get(&mechtron_name).ok_or(format!(""))?;
+                            factory.create(assign.stub.clone())?
                         };
 
-                        let mechtron = factory.create(assign.stub.clone())?;
 log( format!("created mechtron: {}",assign.stub.address.to_string()).as_str() );
                         let mechtron = MechtronWrapper::new(assign.stub.clone(), mechtron);
                         {

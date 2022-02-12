@@ -100,18 +100,14 @@ impl MessagingEndpointComponent {
     async fn handle_request(&mut self, delivery: Delivery<Request>)
     {
         async fn get_bind_config( end: &mut MessagingEndpointComponent, address: Address ) -> Result<ArtifactItem<CachedConfig<BindConfig>>,Error> {
-println!("GETTING BIND ADDRESS for '{}'", address.to_string() );
             let action = Action::Rc( Rc::Get( Get{ address:address.clone(), op: GetOp::Properties(vec!["bind".to_string()])}));
             let core = action.into();
             let request = Request::new( core, address.clone(), address.parent().unwrap() );
-println!("sending GET property for '{}'", address.to_string() );
             let response = end.skel.messaging_api.exchange(request).await;
-println!("got BIND property for '{}'", address.to_string() );
 
             if let Payload::Map(map) = response.core.body {
                 if let Payload::Primitive(Primitive::Text(bind_address ))= map.get(&"bind".to_string()  ).ok_or("bind is not set" )?
                 {
-println!("BIND ADDRESS IS {}", bind_address.to_string() );
                     let bind_address = Address::from_str(bind_address.as_str())?;
                     let mut cache = end.skel.machine.get_proto_artifact_caches_factory().await?.create();
                     let artifact = ArtifactRef::new(bind_address, ArtifactKind::Bind);
@@ -138,12 +134,9 @@ println!("BIND ADDRESS IS {}", bind_address.to_string() );
                    Ok(())
                 }
                 Action::Http(http) => {
-println!("SELECTING HTTP...");
                     let selector = config.http.find_match(&delivery.item.core )?;
-println!("Selection made..." );
                     let regex = Regex::new(selector.pattern.path_regex.as_str() )?;
                     let exec = PipelineExecutor::new( delivery, end.skel.clone(), end.resource_manager_api.clone(), selector.pipeline, regex );
-println!("Prepping to exec pipeline...");
                     exec.execute();
                     Ok(())
                 }
@@ -152,11 +145,9 @@ println!("Prepping to exec pipeline...");
 
         match get_bind_config(self, delivery.to.clone() ).await {
             Ok(bind_config) => {
-println!("GOT BIND !");
                 execute(self, bind_config, delivery );
             }
             Err(_) => {
-println!("FAILED TO GET BIND");
                 delivery.fail("could not get bind config for resource".into());
             }
         }
@@ -360,13 +351,9 @@ println!("FAILED TO GET BIND");
                                 }
                             }
                             GetOp::Properties(keys) => {
-println!("GET properties");
                                 let properties = skel.registry_api.get_properties(get.address.clone(), keys.clone() ).await?;
                                 let mut map = PayloadMap::new();
                                 for (index,property) in properties.iter().enumerate() {
-
-println!("adding property {} value {}", property.0, property.1);
-
                                     map.insert( property.0.clone(), Payload::Primitive(Primitive::Text(property.1.clone())));
                                 }
 
@@ -515,10 +502,8 @@ impl PipelineExecutor {
     async fn execute_stop( &mut self, stop: &PipelineStop ) -> Result<(),Error> {
        match stop {
            PipelineStop::Internal => {
-println!("Sending Request to INTERNAL.");
                let request = self.traversal.request();
                let response = self.resource_manager_api.request(request).await?.ok_or()?;
-println!("Internal Response code: {}", response.core.code );
                self.traversal.push( Message::Response(response));
            }
            PipelineStop::Call(call) => {
@@ -544,7 +529,6 @@ println!("Internal Response code: {}", response.core.code );
                core.body = self.traversal.body.clone();
                core.headers = self.traversal.headers.clone();
                core.path = path;
-println!("forwarding to ADDRESS: {}", address.to_string() );
                let request = Request::new( core, self.traversal.to(), address.clone() );
                let response = self.skel.messaging_api.exchange(request).await;
                self.traversal.push( Message::Response(response));
