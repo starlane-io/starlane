@@ -80,7 +80,7 @@ println!("client init: Artifact received.");
 
 println!("client init:parsing wasm: ");
             let wasm = compiler.parse( artifact_ref, response.payload.clone() )?;
-            let wasm_membrane_ext = WasmMembraneExt::new( wasm.module.clone(), skel )?;
+            let wasm_membrane_ext = WasmMembraneExt::new( wasm.module.clone(), self.wasm_src.to_string(), skel )?;
 println!("client init: wasm parsed ");
             Ok(Arc::new(MechtronResourceCtrlFactory {wasm_membrane_ext}))
 

@@ -2,7 +2,7 @@
 name = "mechtron"
 version = "0.1.0"
 authors = ["Scott Williams <scott@mightydevco.com>"]
-edition = "2018"
+edition = "2021"
 homepage = "http://starlane.io"
 repository = "https://github.com/mechtronium/starlane"
 license = "MIT"

@@ -19,6 +19,7 @@ use wasmer::{Function, Module};
 
 #[derive(Clone)]
 pub struct WasmSkel {
+    pub name: String,
     pub pre_portal_skel: PrePortalSkel,
     pub tx: mpsc::Sender<MembraneExtCall>,
 }
@@ -66,9 +67,10 @@ impl Deref for WasmMembraneExt {
 }
 
 impl WasmMembraneExt {
-    pub fn new(module: Arc<Module>, pre_portal_skel: PrePortalSkel) -> Result<Self, Error> {
+    pub fn new(module: Arc<Module>, name: String, pre_portal_skel: PrePortalSkel) -> Result<Self, Error> {
         let (tx, mut rx) = mpsc::channel(1024);
         let skel = WasmSkel {
+            name: name.clone(),
             pre_portal_skel,
             tx: tx.clone(),
         };
@@ -136,6 +138,7 @@ impl WasmMembraneExt {
         let membrane = WasmMembrane::new_with_init_and_imports(
             module,
             "mechtron_init".to_string(),
+            name,
             Option::Some(imports),
         )?;
         let pool = Arc::new(Mutex::new(ThreadPool::new(10)));

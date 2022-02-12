@@ -7,6 +7,9 @@ subdirs: $(SUBDIRS)
 $(SUBDIRS):
 	$(MAKE) -C $@ all
 
+clean:
+	rm bundle.zip
+
 zip:
 	cd bundle && zip -r ../bundle.zip . 
 

@@ -29,7 +29,7 @@ use std::sync::RwLock;
 use wasm_membrane_guest::membrane::{log, membrane_consume_buffer, membrane_read_buffer, membrane_read_string, membrane_write_buffer};
 
 lazy_static! {
-    pub static ref FACTORIES: RwLock<HashMap<String, Arc<dyn MechtronFactory>>> =
+    pub static ref FACTORIES: RwLock<HashMap<String, Box<dyn MechtronFactory>>> =
         RwLock::new(HashMap::new());
     pub static ref MECHTRONS: RwLock<HashMap<Address, Arc<MechtronWrapper>>> =
         RwLock::new(HashMap::new());
@@ -115,9 +115,9 @@ log( format!("assigning mechtron: {}",assign.stub.address.to_string()).as_str() 
                     }
                     ResourceConfigBody::Named(mechtron_name) => {
 log( format!("assigning mechtron NAMED: {}",mechtron_name).as_str() );
-                        let factory: Arc<dyn MechtronFactory> = {
+                        let factory: &Box<dyn MechtronFactory> = {
                             let factories = FACTORIES.read()?;
-                            factories.get(&mechtron_name).ok_or(format!(""))?.clone()
+                            factories.get(&mechtron_name).ok_or(format!(""))?
                         };
 
                         let mechtron = factory.create(assign.stub.clone())?;
@@ -160,7 +160,9 @@ fn mechtron_send_inlet_request(request: Request) -> Response {
     response
 }
 
-pub fn mechtron_register(factory: Arc<dyn MechtronFactory>) {
+pub fn mechtron_register(factory: Box<dyn MechtronFactory>) {
+
+    let mechtron_name = factory.mechtron_name();
     {
         let mut lock = FACTORIES.write().unwrap();
         lock.insert(factory.mechtron_name(), factory);
@@ -168,7 +170,7 @@ pub fn mechtron_register(factory: Arc<dyn MechtronFactory>) {
 
     log(format!(
         "REGISTERED MECHTRON FACTORY: '{}'",
-        factory.mechtron_name()).as_str()
+        mechtron_name).as_str()
     );
 }
 

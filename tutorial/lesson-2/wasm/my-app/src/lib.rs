@@ -1,9 +1,11 @@
 //#[macro_use]
 //extern crate wasm_bindgen;
 
+#![no_main]
+
+
 use wasm_membrane_guest::membrane::log;
 use mechtron::{Mechtron, mechtron_register, MechtronCtx, MechtronFactory};
-use std::sync::Arc;
 use mechtron::error::Error;
 use mesh_portal_serde::version::latest::entity::request::Action;
 use mesh_portal_serde::version::latest::entity::response::ResponseCore;
@@ -17,7 +19,7 @@ use mesh_portal_serde::version::latest::resource::ResourceStub;
 pub extern "C" fn mechtron_init()
 {
     log("********F Hello World! From: Wasm!*************** ");
-    mechtron_register(Arc::new(MyAppFactory::new()));
+    mechtron_register(Box::new(MyAppFactory::new()));
 }
 
 pub struct MyAppFactory { }

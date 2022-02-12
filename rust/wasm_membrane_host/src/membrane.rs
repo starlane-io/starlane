@@ -12,6 +12,7 @@ pub static VERSION: i32 = 1;
 pub struct WasmMembrane {
     pub instance: Instance,
     init: String,
+    name: String
 }
 
 impl WasmMembrane {
@@ -20,10 +21,10 @@ impl WasmMembrane {
         let mut pass = true;
         match self.instance.exports.get_memory("memory") {
             Ok(_) => {
-                self.log("wasm", "verified: memory");
+                self.log("host", "verified: memory");
             }
             Err(_) => {
-                self.log("wasm", "failed: memory. could not access wasm memory. (expecting the memory module named 'memory')");
+                self.log("host", "failed: memory. could not access wasm memory. (expecting the memory module named 'memory')");
                 pass = false
             }
         }
@@ -34,12 +35,12 @@ impl WasmMembrane {
             .get_native_function::<(), i32>("membrane_guest_version")
         {
             Ok(func) => {
-                self.log("wasm", "verified: membrane_guest_version( ) -> i32");
+                self.log("host", "verified: membrane_guest_version( ) -> i32");
                 match func.call() {
                     Ok(version) => {
                         if version == VERSION {
                             self.log(
-                                "wasm",
+                                "host",
                                 format!(
                                     "passed: membrane_guest_version( ) -> i32 [USING VERSION {}]",
                                     version
@@ -47,20 +48,20 @@ impl WasmMembrane {
                                 .as_str(),
                             );
                         } else {
-                            self.log("wasm", format!("fail : membrane_guest_version( ) -> i32 [THIS HOST CANNOT WORK WITH VERSION {}]", version).as_str());
+                            self.log("host", format!("fail : membrane_guest_version( ) -> i32 [THIS HOST CANNOT WORK WITH VERSION {}]", version).as_str());
                             pass = false;
                         }
                     }
                     Err(error) => {
                         self.log(
-                            "wasm",
+                            "host",
                             "fail : membrane_guest_version( ) -> i32 [CALL FAILED]",
                         );
                     }
                 }
             }
             Err(_) => {
-                self.log("wasm", "failed: membrane_guest_version( ) -> i32");
+                self.log("host", "failed: membrane_guest_version( ) -> i32");
                 pass = false
             }
         }
@@ -72,12 +73,12 @@ impl WasmMembrane {
         {
             Ok(_) => {
                 self.log(
-                    "wasm",
+                    "host",
                     "verified: membrane_guest_alloc_buffer( i32 ) -> i32",
                 );
             }
             Err(_) => {
-                self.log("wasm", "failed: membrane_guest_alloc_buffer( i32 ) -> i32");
+                self.log("host", "failed: membrane_guest_alloc_buffer( i32 ) -> i32");
                 pass = false
             }
         }
@@ -89,13 +90,13 @@ impl WasmMembrane {
         {
             Ok(_) => {
                 self.log(
-                    "wasm",
+                    "host",
                     "verified: membrane_guest_get_buffer_ptr( i32 ) -> *const u8",
                 );
             }
             Err(_) => {
                 self.log(
-                    "wasm",
+                    "host",
                     "failed: membrane_guest_get_buffer_ptr( i32 ) -> *const u8",
                 );
                 pass = false
@@ -109,13 +110,13 @@ impl WasmMembrane {
         {
             Ok(_) => {
                 self.log(
-                    "wasm",
+                    "host",
                     "verified: membrane_guest_get_buffer_len( i32 ) -> i32",
                 );
             }
             Err(_) => {
                 self.log(
-                    "wasm",
+                    "host",
                     "failed: membrane_guest_get_buffer_len( i32 ) -> i32",
                 );
                 pass = false
@@ -127,10 +128,10 @@ impl WasmMembrane {
             .get_native_function::<i32, ()>("membrane_guest_dealloc_buffer")
         {
             Ok(_) => {
-                self.log("wasm", "verified: membrane_guest_dealloc_buffer( i32 )");
+                self.log("host", "verified: membrane_guest_dealloc_buffer( i32 )");
             }
             Err(_) => {
-                self.log("wasm", "failed: membrane_guest_dealloc_buffer( i32 )");
+                self.log("host", "failed: membrane_guest_dealloc_buffer( i32 )");
                 pass = false
             }
         }
@@ -141,15 +142,15 @@ impl WasmMembrane {
             .get_native_function::<(), ()>(self.init.as_str())
         {
             Ok(func) => {
-                self.log("wasm", "verified: membrane_guest_init()");
+                self.log("host", "verified: membrane_guest_init()");
 
                 match func.call() {
                     Ok(_) => {
-                        self.log("wasm", "passed: membrane_guest_init()");
+                        self.log("host", "passed: membrane_guest_init()");
                     }
                     Err(error) => {
                         self.log(
-                            "wasm",
+                            "host",
                             format!("failed: membrane_guest_init() ERROR: {:?}", error).as_str(),
                         );
                         pass = false;
@@ -157,7 +158,7 @@ impl WasmMembrane {
                 }
             }
             Err(_) => {
-                self.log("wasm", "failed: membrane_guest_init() [NOT REQUIRED]");
+                self.log("host", "failed: membrane_guest_init() [NOT REQUIRED]");
             }
         }
 
@@ -165,11 +166,11 @@ impl WasmMembrane {
             let test = "Test write string";
             match self.write_string(test) {
                 Ok(_) => {
-                    self.log("wasm", "passed: write_string()");
+                    self.log("host", "passed: write_string()");
                 }
                 Err(e) => {
                     self.log(
-                        "wasm",
+                        "host",
                         format!("failed: write_string() test {:?}", e).as_str(),
                     );
                     pass = false;
@@ -184,7 +185,7 @@ impl WasmMembrane {
     }
 
     pub fn log(&self, log_type: &str, message: &str) {
-        println!("{} : {}", log_type, message);
+        println!("{}({}) : {}", self.name, log_type, message);
     }
 
     pub fn write_string(&self, string: &str) -> Result<i32, Error> {
@@ -375,16 +376,17 @@ impl Env {
 }
 
 impl WasmMembrane {
-    pub fn new(module: Arc<Module>) -> Result<Arc<Self>, Error> {
-        Self::new_with_init(module, "membrane_guest_init".to_string())
+    pub fn new(module: Arc<Module>, name: String) -> Result<Arc<Self>, Error> {
+        Self::new_with_init(module, name, "membrane_guest_init".to_string())
     }
-    pub fn new_with_init(module: Arc<Module>, init: String) -> Result<Arc<Self>, Error> {
-        Self::new_with_init_and_imports(module, init, Option::None)
+    pub fn new_with_init(module: Arc<Module>, init: String, name: String) -> Result<Arc<Self>, Error> {
+        Self::new_with_init_and_imports(module, init, name, Option::None)
     }
 
     pub fn new_with_init_and_imports(
         module: Arc<Module>,
         init: String,
+        name: String,
         ext_imports: Option<ImportObject>,
     ) -> Result<Arc<Self>, Error> {
         let host = Arc::new(RwLock::new(WasmHost::new()));
@@ -434,6 +436,7 @@ impl WasmMembrane {
         let membrane = Arc::new(WasmMembrane {
             instance: instance,
             init,
+            name
         });
 
         {
