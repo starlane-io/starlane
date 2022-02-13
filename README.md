@@ -21,4 +21,4 @@ make install
 ```
 
 ## TUTORIAL
-For more hands on fun check out the Starlane [Tutorial](http://starlane.io/tutorial/). 
+For more hands on fun check out the Starlane [Tutorial](http://starlane.io/docs/tutorial/). 
