@@ -1,13 +1,7 @@
 [workspace]
 members = [
-  "mechtron",
-  "mechtron-common",
   "starlane",
   "starlane-core",
   "starlane-macros",
   "starlane-macros-test",
-  "starlane-resources",
-  "starlane-resources-test",
-  "wasm_membrane_host",
-  "wasm_membrane_guest",
   ]

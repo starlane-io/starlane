@@ -1,25 +1,23 @@
 use std::fmt;
 use std::fmt::{Debug, Formatter};
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::messaging::{Request, Response};
 
 use semver::SemVerError;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::error::Elapsed;
 
-use starlane_resources::{AssignResourceStateSrc, ResourceAssign, ResourceCreate, ResourceIdentifier, ResourceSelector, ResourceStatus, ResourceStub, ResourceAddress, Labels};
-use starlane_resources::data::{BinSrc, DataSet};
-use starlane_resources::message::{Fail, Message, MessageId, MessageReply, RawState, ResourceRequestMessage, ResourceResponseMessage, ResourcePortMessage, ResourcePortReply};
 
 use crate::error::Error;
 use crate::id::Id;
 use crate::logger::Flags;
-use crate::message::{MessageExpect, MessageUpdate, ProtoStarMessage};
-use crate::message::resource::ActorMessage;
+use crate::message::{MessageExpect, MessageUpdate, ProtoStarMessage, MessageId, Reply};
+use crate::message::delivery::ActorMessage;
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey};
 use crate::watch::{Notification, Watch, WatchKey};
-use crate::resource::{ResourceId, ResourceRegistration, ResourceRecord, ResourceType, ResourceKey, ResourceSliceStatus,  UserKey, AppKey, ActorKey};
-use starlane_resources::property::{ResourceValues, ResourceRegistryProperty, ResourceRegistryPropertyAssignment, ResourceRegistryPropertyValueSelector, ResourcePropertyOp};
-use starlane_resources::http::{HttpResponse, HttpRequest};
+use crate::resource::{ResourceType, ResourceAssign, AssignResourceStateSrc, ResourceRecord};
+use crate::fail::{Fail, StarlaneFailure};
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
 pub enum Frame {
@@ -57,11 +55,14 @@ pub enum ProtoFrame {
 
 
 
+/*
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WatchInfo {
     pub id: Id,
     pub actor: ActorKey,
 }
+
+ */
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StarMessageAck {
@@ -306,7 +307,7 @@ impl StarMessage {
         let mut proto = ProtoStarMessage::new();
         proto.to = self.from.clone().into();
         proto.reply_to = Option::Some(self.id.clone());
-        proto.payload = StarMessagePayload::Reply(SimpleReply::Fail(Fail::Error(err)));
+        proto.payload = StarMessagePayload::Reply(SimpleReply::Fail(Fail::Starlane(StarlaneFailure::Error(err))));
         proto
     }
 
@@ -334,31 +335,29 @@ impl StarMessage {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum StarMessagePayload {
     None,
-    MessagePayload(MessagePayload),
+    Request(Request),
+    Response(Response),
     ResourceRegistry(ResourceRegistryRequest),
     ResourceHost(ResourceHostAction),
-    Space(SpaceMessage),
+//    Space(SpaceMessage),
     Reply(SimpleReply),
-    UniqueId(ResourceId),
-    Select(ResourceSelector)
 }
 
 impl Debug for StarMessagePayload {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.write_str(match self {
             StarMessagePayload::None => "None",
-            StarMessagePayload::MessagePayload(_) => "MessagePayload",
+            StarMessagePayload::Request(_) => "MessagePayload",
             StarMessagePayload::ResourceRegistry(_) => "ResourceRegistry",
             StarMessagePayload::ResourceHost(_) => "ResourceHost",
-            StarMessagePayload::Space(_) => "Space",
             StarMessagePayload::Reply(_) => "Reply",
-            StarMessagePayload::UniqueId(_) => "UniqueId",
-            StarMessagePayload::Select(_) => "Select"
+            StarMessagePayload::Response(_) => "Response"
         });
         Ok(())
     }
 }
 
+/*
 #[derive(Clone, Serialize, Deserialize)]
 pub enum MessagePayload {
     Request(Message<ResourceRequestMessage>),
@@ -367,52 +366,34 @@ pub enum MessagePayload {
     HttpRequest(Message<HttpRequest>),
 }
 
+ */
+
 #[derive(Clone, Serialize, Deserialize)]
 pub enum ResourceHostAction {
-    //IsHosting(ResourceKey),
-    Assign(ResourceAssign<AssignResourceStateSrc<DataSet<BinSrc>>>),
-    Init(ResourceKey),
+    //IsHosting(Address),
+    Assign(ResourceAssign),
+    Init(Address),
+    GetState(Address)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResourceRegistryRequest {
-    Register(ResourceRegistration),
     Location(ResourceRecord),
-    Find(ResourceIdentifier),
-    Status(ResourceStatusReport),
-    UniqueResourceId {
-        parent: ResourceIdentifier,
-        child_type: ResourceType,
-    },
-    Set(ResourceRegistryPropertyAssignment),
-    SelectValues(ResourcePropertyOp<ResourceRegistryPropertyValueSelector>)
+    Find(Address)
 }
 
 impl ToString for ResourceRegistryRequest {
     fn to_string(&self) -> String {
         match self {
-            ResourceRegistryRequest::Register(_) => "Register".to_string(),
             ResourceRegistryRequest::Location(_) => "Location".to_string(),
             ResourceRegistryRequest::Find(_) => "Find".to_string(),
-            ResourceRegistryRequest::Status(_) => "Status".to_string(),
-            ResourceRegistryRequest::UniqueResourceId { .. } => "UniqueResourceId".to_string(),
-            ResourceRegistryRequest::Set(_) => "Set".to_string(),
-            ResourceRegistryRequest::SelectValues(_) => "SelectValues".to_string()
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceStatusReport {
-    pub key: ResourceKey,
-    pub status: ResourceStatus,
-}
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ResourceSliceStatusReport {
-    pub key: ResourceKey,
-    pub status: ResourceSliceStatus,
-}
+
+
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum SimpleReply {
@@ -443,10 +424,11 @@ impl StarMessagePayload {
     }
 }
 
+/*
 #[derive(Clone, Serialize, Deserialize, strum_macros::Display)]
 pub enum Reply {
     Empty,
-    Key(ResourceKey),
+    Key(Address),
     Address(ResourceAddress),
     Records(Vec<ResourceRecord>),
     Record(ResourceRecord),
@@ -475,6 +457,7 @@ pub enum ReplyKind {
     HttpResponse
 }
 
+
 impl ReplyKind {
     pub fn is_match(&self, reply: &Reply) -> bool {
         match reply {
@@ -493,6 +476,7 @@ impl ReplyKind {
         }
     }
 }
+ */
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum SequenceMessage {
@@ -513,6 +497,7 @@ pub enum MessageAckKind {
     Processing,
 }
 
+/*
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SpaceMessage {
     pub user: UserKey,
@@ -535,52 +520,8 @@ pub enum SpacePayload {
     Supervisor(SupervisorPayload),
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-pub enum SupervisorPayload {
-    AppSequenceRequest(AppKey),
-}
+ */
 
-#[derive(Clone, Serialize, Deserialize)]
-pub enum ServerPayload {
-    SequenceResponse(u64),
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub enum SpaceReply {
-    AppSequenceResponse(u64),
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub enum AssignMessage {}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct AppLabelRequest {
-    pub app: AppKey,
-    pub labels: Labels,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub enum Event {
-    App(AppEvent),
-    Actor(ActorEvent),
-    Star(StarEvent),
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub enum ActorEvent {
-    StateChange(RawState),
-    Gathered(ActorGathered),
-    Scattered(ActorScattered),
-    Broadcast(ActorBroadcast),
-    Destroyed,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub enum AppEvent {
-    Created,
-    Ready,
-    Destroyed,
-}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum StarEvent {
@@ -597,38 +538,6 @@ pub struct LaneEvent {
 pub enum LaneEventKind {
     Connect,
     Disconnect,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ActorGathered {
-    pub to: ResourceKey,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ActorScattered {
-    pub from: ResourceKey,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ActorBroadcast {
-    pub topic: String,
-    pub data: Vec<u8>,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ActorLocationRequest {
-    pub lookup: ActorLookup,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ActorLocationReport {
-    pub resource: ResourceKey,
-    pub location: ResourceRecord,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub enum ActorLookup {
-    Key(ActorKey),
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -650,13 +559,11 @@ impl fmt::Display for StarMessagePayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let r = match self {
             StarMessagePayload::None => "None".to_string(),
-            StarMessagePayload::Space(_) => "Space".to_string(),
             StarMessagePayload::Reply(reply) => format!("Reply({})", reply.to_string()),
             StarMessagePayload::ResourceRegistry(_) => "ResourceManager".to_string(),
             StarMessagePayload::ResourceHost(_) => "ResourceHost".to_string(),
-            StarMessagePayload::UniqueId(_) => "UniqueId".to_string(),
-            StarMessagePayload::MessagePayload(_) => "MessagePayload".to_string(),
-            StarMessagePayload::Select(_) => "Select".to_string()
+            StarMessagePayload::Request(_) => "Request".to_string(),
+            StarMessagePayload::Response(_) => "Response".to_string()
         };
         write!(f, "{}", r)
     }
@@ -690,6 +597,7 @@ impl fmt::Display for ProtoFrame {
         write!(f, "{}", r)
     }
 }
+
 
 
 

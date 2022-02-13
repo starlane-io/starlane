@@ -1,21 +1,19 @@
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
+use mesh_portal::version::latest::command::common::StateSrc;
+use mesh_portal::version::latest::id::Address;
 
 use serde::{Deserialize, Serialize};
 
-use starlane_resources::{AssignResourceStateSrc, LocalStateSetSrc, Resource};
-use starlane_resources::data::{BinSrc, DataSet};
-
 use crate::error::Error;
 use crate::resource::{
-    FileKey, ResourceAddress, ResourceType,
+     ResourceType,
 };
 
 #[derive(Clone)]
 pub struct File {
-    key: FileKey,
-    address: ResourceAddress,
-    state_src: DataSet<BinSrc>,
+    address: Address,
+    state_src: StateSrc
 }
 
 #[derive(Clone, Serialize, Deserialize)]

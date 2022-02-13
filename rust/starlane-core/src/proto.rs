@@ -25,25 +25,23 @@ use crate::lane::{
     STARLANE_PROTOCOL_VERSION,
 };
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
-use crate::permissions::AuthTokenSource;
 use crate::star::core::message::MessagingEndpointComponent;
 use crate::star::shell::lanes::{LaneMuxerApi, LaneMuxer, LanePattern};
 use crate::star::shell::search::{StarSearchApi, StarSearchComponent, StarSearchTransaction, ShortestPathStarKey};
 use crate::star::shell::message::{MessagingApi, MessagingComponent};
-use crate::star::shell::pledge::StarWranglerBacking;
+use crate::star::shell::wrangler::StarWranglerApi;
 use crate::star::shell::router::{RouterApi, RouterComponent, RouterCall};
+use crate::star::shell::sys::{SysApi,SysComponent};
 use crate::star::surface::{SurfaceApi, SurfaceCall, SurfaceComponent};
 use crate::star::variant::{VariantApi, start_variant};
-use crate::star::{
-    ConstellationBroadcast, FrameHold, FrameTimeoutInner, Persistence, ResourceRegistryBacking,
-    ResourceRegistryBackingSqLite, Star, StarCommand, StarController,
-    StarInfo, StarKernel, StarKey, StarKind, StarSkel,
-};
+use crate::star::{ConstellationBroadcast, FrameHold, FrameTimeoutInner, Persistence, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarSkel};
 use crate::starlane::StarlaneMachine;
 use crate::template::StarKeyConstellationIndex;
 use crate::star::shell::locator::{ResourceLocatorApi, ResourceLocatorComponent};
 use crate::star::shell::golden::{GoldenPathApi, GoldenPathComponent};
 use crate::star::shell::watch::{WatchApi, WatchComponent};
+use crate::star::core::resource::registry::{RegistryApi, RegistryComponent};
+use crate::star::core::resource::manager::ResourceManagerApi;
 
 
 pub struct ProtoStar {
@@ -68,7 +66,7 @@ pub struct ProtoStar {
     machine: StarlaneMachine,
     lane_muxer_api: LaneMuxerApi,
     router_tx: mpsc::Sender<RouterCall>,
-    router_booster_rx: RouterCallBooster
+    router_booster_rx: RouterCallBooster,
 }
 
 impl ProtoStar {
@@ -113,7 +111,7 @@ impl ProtoStar {
                 surface_rx,
                 lane_muxer_api,
                 router_tx,
-                router_booster_rx
+                router_booster_rx,
             },
             StarController {
                 star_tx,
@@ -148,10 +146,9 @@ impl ProtoStar {
                 match call {
                     StarCommand::GetStarInfo(tx) => match &self.star_key {
                         ProtoStarKey::Key(key) => {
-                            tx.send(Option::Some(StarInfo {
-                                key: key.clone(),
-                                kind: self.kind.clone(),
-                            }));
+                            tx.send(Option::Some(StarInfo::new(
+                                key.clone(),
+                                self.kind.clone())));
                         }
                         ProtoStarKey::RequestSubKeyExpansion(_) => {
                             tx.send(Option::None);
@@ -170,10 +167,9 @@ impl ProtoStar {
                             _ => panic!("proto star not ready for proto star evolution because it does not have a star_key yet assigned")
                         };
 
-                        let info = StarInfo {
-                            key: star_key,
-                            kind: self.kind.clone(),
-                        };
+                        let info = StarInfo::new(
+                             star_key,
+                            self.kind.clone() );
 
                         let (core_messaging_endpoint_tx, core_messaging_endpoint_rx) =
                             mpsc::channel(1024);
@@ -183,6 +179,8 @@ impl ProtoStar {
                         let (golden_path_tx, golden_path_rx) = mpsc::channel(1024);
                         let (variant_tx, variant_rx) = mpsc::channel(1024);
                         let (watch_tx, watch_rx) = mpsc::channel(1024);
+                        let (registry_tx, registry_rx) = mpsc::channel(1024);
+                        let (sys_tx, sys_rx) = mpsc::channel(1024);
 
                         let resource_locator_api = ResourceLocatorApi::new(resource_locator_tx);
                         let star_search_api = StarSearchApi::new(star_locator_tx);
@@ -191,43 +189,26 @@ impl ProtoStar {
                         let golden_path_api = GoldenPathApi::new(golden_path_tx);
                         let variant_api = VariantApi::new(variant_tx);
                         let watch_api = WatchApi::new(watch_tx);
+                        let registry_api = RegistryApi::new(registry_tx);
+                        let sys_api = SysApi::new(sys_tx);
 
 
                         let data_access = self
                             .data_access
                             .with_path(format!("stars/{}", info.key.to_string()))?;
 
-                        let resource_registry: Option<Arc<dyn ResourceRegistryBacking>> =
-                            if info.kind.is_resource_manager() {
-                                Option::Some(Arc::new(
-                                    ResourceRegistryBackingSqLite::new(
-                                        info.clone(),
-                                        data_access.path(),
-                                    )
-                                    .await?,
-                                ))
-                            } else {
-                                Option::None
-                            };
-
-                        let star_handler: Option<StarWranglerBacking> =
-                            if !info.kind.conscripts().is_empty() {
-                                Option::Some(StarWranglerBacking::new(self.star_tx.clone()).await)
-                            } else {
-                                Option::None
-                            };
+                        let star_wrangler_api = StarWranglerApi::new(self.star_tx.clone()).await;
 
                         let skel = StarSkel {
-                            info: info,
+                            info,
                             sequence: self.sequence.clone(),
                             star_tx: self.star_tx.clone(),
                             core_messaging_endpoint_tx: core_messaging_endpoint_tx.clone(),
                             logger: self.logger.clone(),
                             flags: self.flags.clone(),
-                            registry: resource_registry,
-                            star_handler: star_handler,
+                            star_wrangler_api,
                             persistence: Persistence::Memory,
-                            data_access: data_access,
+                            data_access,
                             machine: self.machine.clone(),
                             surface_api: self.surface_api,
                             resource_locator_api,
@@ -237,7 +218,9 @@ impl ProtoStar {
                             lane_muxer_api: self.lane_muxer_api,
                             golden_path_api,
                             variant_api,
-                            watch_api
+                            watch_api,
+                            registry_api,
+                            sys_api,
                         };
 
                         start_variant(skel.clone(), variant_rx );
@@ -250,6 +233,8 @@ impl ProtoStar {
                         SurfaceComponent::start(skel.clone(), self.surface_rx);
                         GoldenPathComponent::start(skel.clone(), golden_path_rx);
                         WatchComponent::start(skel.clone(), watch_rx);
+                        RegistryComponent::start( skel.clone(), registry_rx );
+                        SysComponent::start( skel.clone(), sys_rx );
 
                         return Ok(Star::from_proto(
                             skel,

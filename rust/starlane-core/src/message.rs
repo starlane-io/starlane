@@ -1,30 +1,42 @@
 use std::collections::HashSet;
 use std::convert::{Infallible, TryFrom, TryInto};
 use std::string::FromUtf8Error;
+use mesh_portal::version::latest::bin::Bin;
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::messaging::{Request, Response};
+use mesh_portal::version::latest::pattern::AddressKindPath;
+use mesh_portal::version::latest::payload::Payload;
+use mesh_portal::version::latest::resource::ResourceStub;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, oneshot};
 use uuid::Uuid;
 
-use starlane_resources::message::{Message, MessageId, MessageReply, ProtoMessage, ResourceRequestMessage, ResourceResponseMessage, ResourcePortMessage};
-use starlane_resources::ResourceIdentifier;
-
 use crate::error::Error;
-use crate::frame::{
-    Frame, MessageAck, MessagePayload, ReplyKind, SimpleReply, StarMessage, StarMessagePayload,
-};
-use crate::resource::{ResourceAddress, ResourceKind, ResourceType, Specific};
+use crate::resource::{Kind, ResourceType, ResourceRecord};
 use crate::star::{StarCommand, StarKey};
 use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
-use starlane_resources::http::HttpRequest;
+use crate::frame::{StarMessagePayload, StarMessage, SimpleReply, MessageAck};
 
-pub mod resource;
+pub mod delivery;
+
+pub type MessageId=String;
 
 #[derive(Clone)]
 pub enum ProtoStarMessageTo {
     None,
     Star(StarKey),
-    Resource(ResourceIdentifier),
+    Resource(Address),
+}
+
+impl ToString for ProtoStarMessageTo {
+    fn to_string(&self) -> String {
+        match self {
+            ProtoStarMessageTo::None => {"None".to_string()}
+            ProtoStarMessageTo::Star(star) => {star.to_string()}
+            ProtoStarMessageTo::Resource(address) => {address.to_string()}
+        }
+    }
 }
 
 impl ProtoStarMessageTo {
@@ -43,14 +55,14 @@ impl From<StarKey> for ProtoStarMessageTo {
     }
 }
 
-impl From<ResourceIdentifier> for ProtoStarMessageTo {
-    fn from(id: ResourceIdentifier) -> Self {
+impl From<Address> for ProtoStarMessageTo {
+    fn from(id: Address) -> Self {
         ProtoStarMessageTo::Resource(id)
     }
 }
 
-impl From<Option<ResourceIdentifier>> for ProtoStarMessageTo {
-    fn from(id: Option<ResourceIdentifier>) -> Self {
+impl From<Option<Address>> for ProtoStarMessageTo {
+    fn from(id: Option<Address>) -> Self {
         match id {
             None => ProtoStarMessageTo::None,
             Some(id) => ProtoStarMessageTo::Resource(id.into()),
@@ -118,62 +130,8 @@ impl ProtoStarMessage {
         return Ok(());
     }
 }
-impl TryFrom<ProtoMessage<ResourceRequestMessage>> for ProtoStarMessage {
 
-    type Error = Error;
 
-    fn try_from(proto: ProtoMessage<ResourceRequestMessage>) -> Result<Self, Self::Error> {
-        proto.validate()?;
-        let message = proto.create()?;
-        let mut proto = ProtoStarMessage::new();
-        proto.to = message.to.clone().into();
-        proto.trace = message.trace;
-        proto.log = message.log;
-        proto.payload = StarMessagePayload::MessagePayload(MessagePayload::Request(message));
-        Ok(proto)
-    }
-}
-
-impl TryFrom<ProtoMessage<HttpRequest>> for ProtoStarMessage {
-
-    type Error = Error;
-
-    fn try_from(proto: ProtoMessage<HttpRequest>) -> Result<Self, Self::Error> {
-        proto.validate()?;
-        let message = proto.create()?;
-        let mut proto = ProtoStarMessage::new();
-        proto.to = message.to.clone().into();
-        proto.trace = message.trace;
-        proto.log = message.log;
-        proto.payload = StarMessagePayload::MessagePayload(MessagePayload::HttpRequest(message));
-        Ok(proto)
-    }
-}
-
-impl TryFrom<ProtoMessage<ResourcePortMessage>> for ProtoStarMessage {
-
-    type Error = Error;
-
-    fn try_from(proto: ProtoMessage<ResourcePortMessage>) -> Result<Self, Self::Error> {
-        proto.validate()?;
-        let message = proto.create()?;
-        message.try_into()
-    }
-}
-
-impl TryFrom<Message<ResourcePortMessage>> for ProtoStarMessage {
-
-    type Error = Error;
-
-    fn try_from(message: Message<ResourcePortMessage>) -> Result<Self, Self::Error> {
-        let mut proto = ProtoStarMessage::new();
-        proto.to = message.to.clone().into();
-        proto.trace = message.trace;
-        proto.log = message.log;
-        proto.payload = StarMessagePayload::MessagePayload(MessagePayload::PortRequest(message));
-        Ok(proto)
-    }
-}
 
 pub struct MessageReplyTracker {
     pub reply_to: MessageId,
@@ -338,6 +296,41 @@ pub enum RejectKind {
     BadRequest,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display, Eq, PartialEq)]
+pub enum ReplyKind{
+    Empty,
+    Record,
+    Records,
+    Stubs,
+    AddressTksPath,
+    Payload
+}
+
+
+
+#[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
+pub enum Reply{
+    Empty,
+    Record(ResourceRecord),
+    Records(Vec<ResourceRecord>),
+    Stubs(Vec<ResourceStub>),
+    AddressTksPath(AddressKindPath),
+    Payload(Payload)
+}
+
+impl Reply{
+    pub fn kind(&self)-> ReplyKind {
+        match self {
+            Reply::Empty => ReplyKind::Empty,
+            Reply::Record(_) => ReplyKind::Record,
+            Reply::Records(_) => ReplyKind::Records,
+            Reply::Stubs(_) => ReplyKind::Stubs,
+            Reply::AddressTksPath(_) => ReplyKind::AddressTksPath,
+            Reply::Payload(_) => ReplyKind::Payload
+        }
+    }
+}
+
 fn hash_to_string(hash: &HashSet<ResourceType>) -> String {
     let mut rtn = String::new();
     for i in hash.iter() {
@@ -347,32 +340,19 @@ fn hash_to_string(hash: &HashSet<ResourceType>) -> String {
     rtn
 }
 
-impl From<Message<ResourceRequestMessage>> for ProtoStarMessage {
-    fn from(message: Message<ResourceRequestMessage>) -> Self {
+impl From<Request> for ProtoStarMessage {
+    fn from(request: Request) -> Self {
         let mut proto = ProtoStarMessage::new();
-        proto.to = message.to.clone().into();
-        proto.payload = StarMessagePayload::MessagePayload(MessagePayload::Request(message));
+        proto.to = request.to.clone().into();
+        proto.payload = StarMessagePayload::Request(request.into());
         proto
     }
 }
 
-impl From<MessageReply<ResourceResponseMessage>> for ProtoStarMessage {
-
-    fn from(reply: MessageReply<ResourceResponseMessage>) -> Self {
+impl From<Response> for ProtoStarMessage {
+    fn from(response: Response ) -> Self {
         let mut proto = ProtoStarMessage::new();
-        proto.payload = StarMessagePayload::MessagePayload(MessagePayload::Response(reply));
+        proto.payload = StarMessagePayload::Response(response.into());
         proto
-    }
-}
-
-impl From<Message<ResourceRequestMessage>> for StarMessagePayload {
-    fn from( message: Message<ResourceRequestMessage> ) -> Self {
-        StarMessagePayload::MessagePayload(MessagePayload::Request(message))
-    }
-}
-
-impl From<MessageReply<ResourceResponseMessage>> for StarMessagePayload {
-    fn from( message: MessageReply<ResourceResponseMessage> ) -> Self {
-        StarMessagePayload::MessagePayload(MessagePayload::Response(message))
     }
 }

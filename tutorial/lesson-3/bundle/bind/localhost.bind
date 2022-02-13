@@ -1,0 +1,10 @@
+Bind {
+
+  Http {
+
+    <Get>/app/(.*) -> localhost:my-app^Http<Get>/$1 => &;
+    <Get>/(.*) -> localhost:repo:tutorial:2.0.0:/html/$1 => &;
+
+  }
+
+}

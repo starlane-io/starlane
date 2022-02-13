@@ -15,14 +15,28 @@ use tokio::sync::mpsc::error::{SendError, TrySendError};
 use tokio::time::error::Elapsed;
 use zip::result::ZipError;
 
-use starlane_resources::message::Fail;
-use wasmer::CompileError;
+use wasmer::{CompileError, ExportError, RuntimeError};
 use actix_web::ResponseError;
 use handlebars::RenderError;
+use tokio::task::JoinError;
+use crate::fail::Fail;
+use crate::star::core::resource::registry::RegError;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Error {
     pub error: String,
+}
+
+impl std::error::Error for Error {
+
+}
+
+impl Error {
+    pub fn new( message: &str ) -> Self {
+        Self {
+            error: message.to_string()
+        }
+    }
 }
 
 impl fmt::Display for Error {
@@ -49,9 +63,8 @@ impl From<ZipError> for Error {
         }
     }
 }
-
-impl From<starlane_resources::error::Error> for Error {
-    fn from(e: starlane_resources::error::Error) -> Self {
+impl From<mesh_portal::error::Error> for Error {
+    fn from(e: mesh_portal::error::Error) -> Self {
         e.to_string().into()
     }
 }
@@ -321,11 +334,6 @@ impl<T> From<SendError<T>> for Error {
     }
 }
 
-impl Into<Fail> for Error {
-    fn into(self) -> Fail {
-        Fail::Error(self.error)
-    }
-}
 
 impl From<strum::ParseError> for Error {
     fn from(e: strum::ParseError) -> Self {
@@ -347,6 +355,60 @@ impl From<regex::Error> for Error {
     fn from(e: regex::Error) -> Self {
         Self {
             error: e.to_string()
+        }
+    }
+}
+
+
+
+
+impl From<ExportError> for Error {
+    fn from(e: ExportError) -> Self {
+        Self {
+            error: e.to_string()
+        }
+    }
+}
+
+impl From<RuntimeError> for Error {
+    fn from(e: RuntimeError) -> Self {
+        Self {
+            error: e.to_string()
+        }
+    }
+}
+
+impl From<RegError> for Error {
+    fn from(re: RegError) -> Self {
+        match re {
+            RegError::Dupe => {
+                Self{
+                    error: "Dupe".to_string()
+                }
+            }
+            RegError::Error(error) => {error}
+        }
+    }
+}
+
+impl Into<mesh_portal::version::latest::fail::Fail> for Error {
+    fn into(self) -> mesh_portal::version::latest::fail::Fail {
+        mesh_portal::version::latest::fail::Fail::Error(self.to_string())
+    }
+}
+
+impl From<anyhow::Error> for Error {
+    fn from(error: anyhow::Error) -> Self {
+        Error {
+            error: error.to_string()
+        }
+    }
+}
+
+impl From<JoinError> for Error {
+    fn from(error: JoinError) -> Self {
+        Error {
+            error: error.to_string()
         }
     }
 }

@@ -16,7 +16,7 @@ deploy:
 
     releases:
     - name: starlane
-      namespace: scott
+      namespace: starlane
       chartPath: charts/docs 
       values:
         starlane: docker.io/starlane/docs

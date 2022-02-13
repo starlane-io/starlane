@@ -1,7 +1,0 @@
-kind: Mechtron
-spec:
-  name: my-mechtron
-  prefix: my_mechtron_ 
-  bind: "{bundle}:/bind/main-app-bind.yaml"
-  wasm: "{bundle}:/wasm/my-mechtron.wasm"
-  

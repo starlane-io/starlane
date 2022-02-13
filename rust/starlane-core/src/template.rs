@@ -39,30 +39,30 @@ impl ConstellationTemplate {
             StarKind::Mesh,
             "mesh".into(),
         );
-        let mut space_host = StarTemplate::new(
+        let mut space = StarTemplate::new(
             StarKeyTemplate::central_geodesic(2),
             StarKind::Space,
-            "space_host".into(),
+            "space".into(),
         );
-        let mut app_host = StarTemplate::new(
+        let mut app = StarTemplate::new(
             StarKeyTemplate::central_geodesic(3),
             StarKind::App,
-            "app_host".into(),
+            "app".into(),
         );
-        let mut actor_host = StarTemplate::new(
+        let mut mechtron = StarTemplate::new(
             StarKeyTemplate::central_geodesic(4),
             StarKind::Mechtron,
-            "actor_host".into(),
+            "mechtron".into(),
         );
         let mut file_store = StarTemplate::new(
             StarKeyTemplate::central_geodesic(5),
             StarKind::FileStore,
             "file_store".into(),
         );
-        let mut web_host = StarTemplate::new(
+        let mut web = StarTemplate::new(
             StarKeyTemplate::central_geodesic(6),
             StarKind::Web,
-            "web_host".into(),
+            "web".into(),
         );
         let mut gateway = StarTemplate::new(
             StarKeyTemplate::central_geodesic(7),
@@ -74,25 +74,36 @@ impl ConstellationTemplate {
             StarKind::ArtifactStore,
             "artifact_store".into(),
         );
+        /*
+        let mut portal= StarTemplate::new(
+            StarKeyTemplate::central_geodesic(9),
+            StarKind::Portal,
+            "portal".into(),
+        );
+
+         */
+
 
         ConstellationTemplate::connect(&mut central, &mut mesh);
-        ConstellationTemplate::connect(&mut space_host, &mut mesh);
-        ConstellationTemplate::connect(&mut app_host, &mut mesh);
-        ConstellationTemplate::connect(&mut actor_host, &mut mesh);
+        ConstellationTemplate::connect(&mut space, &mut mesh);
+        ConstellationTemplate::connect(&mut app, &mut mesh);
+        ConstellationTemplate::connect(&mut mechtron, &mut mesh);
         ConstellationTemplate::connect(&mut file_store, &mut mesh);
-        ConstellationTemplate::connect(&mut web_host, &mut mesh);
+        ConstellationTemplate::connect(&mut web, &mut mesh);
         ConstellationTemplate::connect(&mut gateway, &mut mesh);
         ConstellationTemplate::connect(&mut artifact_store, &mut mesh);
+//        ConstellationTemplate::connect(&mut portal, &mut mesh);
 
         template.add_star(central);
         template.add_star(mesh);
-        template.add_star(space_host);
-        template.add_star(app_host);
-        template.add_star(actor_host);
+        template.add_star(space);
+        template.add_star(app);
+        template.add_star(mechtron);
         template.add_star(file_store);
-        template.add_star(web_host);
+        template.add_star(web);
         template.add_star(gateway);
         template.add_star(artifact_store);
+//        template.add_star(portal );
 
         template
     }
@@ -298,6 +309,7 @@ pub struct ConstellationLayout {
 }
 
 impl ConstellationLayout {
+
     pub fn standalone() -> Result<Self, Error> {
         let mut standalone = ProtoConstellationLayout::new(ConstellationTemplate::new_basic());
         standalone.set_default_machine("server".to_string());

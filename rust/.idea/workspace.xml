@@ -36,10 +36,13 @@
   </component>
   <component name="KubernetesApiPersistence">
     <option name="context" value="gke_williams-heavy-industries_us-central1-a_brainiac" />
-    <option name="namespace" value="scott" />
+    <option name="namespace" value="prod" />
   </component>
   <component name="MacroExpansionManager">
     <option name="directoryName" value="1h4eivq0" />
+  </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
   </component>
   <component name="ProjectId" id="1wdEP6Uvsu2vCkNjQwUBDHCIOIR" />
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
@@ -52,22 +55,30 @@
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
     <property name="jdk.selected.JAVA_MODULE" value="14" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/starlane-core/src/star/core/resource/host" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/starlane-core/src/star/variant" />
     <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
+    <property name="project.structure.last.edited" value="Modules" />
+    <property name="project.structure.proportion" value="0.0" />
+    <property name="project.structure.side.proportion" value="0.2" />
     <property name="settings.editor.selected.configurable" value="language.rust" />
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/starlane-core/src/star/variant" />
+      <recent name="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager" />
       <recent name="$PROJECT_DIR$/starlane-core/src/star/core/resource/host" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
-      <recent name="$PROJECT_DIR$/starlane-resources/src" />
-      <recent name="$PROJECT_DIR$/starlane-core/src/config" />
+      <recent name="$PROJECT_DIR$/starlane-core/src/mechtron" />
+      <recent name="$PROJECT_DIR$/starlane-core/src/mechtron/wasm.rs" />
+      <recent name="$PROJECT_DIR$/starlane-core/src/star/shell" />
+      <recent name="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager" />
+      <recent name="$PROJECT_DIR$/starlane-core/src/pattern.rs" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test star::variant::web::test::path_regex">
+  <component name="RunManager" selected="Cargo.Run">
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
-      <option name="command" value="run  --bin starlane -- serve --with-external" />
+      <option name="command" value="run  --bin starlane -- serve " />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="NIGHTLY" />
       <option name="requiredFeatures" value="true" />
@@ -77,6 +88,8 @@
       <option name="backtrace" value="SHORT" />
       <envs>
         <env name="RUST_BACKTRACE" value="full" />
+        <env name="STARLANE_DELETE_CACHE_ON_START" value="true" />
+        <env name="STARLANE_DELETE_DATA_ON_START" value="true" />
       </envs>
       <option name="isRedirectInput" value="false" />
       <option name="redirectInputPath" value="" />
@@ -84,8 +97,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test config::reverse_proxy::tests::test_parse_resource_path" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib config::reverse_proxy::tests::test_parse_resource_path -- --exact" />
+    <configuration name="Test command::parse::test::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib command::parse::test::test -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -100,8 +113,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test config::reverse_proxy::tests::test_reverse_proxy_config" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib config::reverse_proxy::tests::test_reverse_proxy_config -- --exact" />
+    <configuration name="Test command::parse::test::test_script" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib command::parse::test::test_script -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -116,8 +129,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test parse::tests::test_parse_resource_property_assignment" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-resources --lib parse::tests::test_parse_resource_property_assignment -- --exact" />
+    <configuration name="Test config::parse::test::test_property_valu3" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib config::parse::test::test_property_valu3 -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -132,8 +145,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test parse::tests::test_parse_resource_value_selector" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-resources --lib parse::tests::test_parse_resource_value_selector -- --exact" />
+    <configuration name="Test config::parse::test::test_set" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib config::parse::test::test_set -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -148,8 +161,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test star::variant::web::test::path_regex" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib star::variant::web::test::path_regex -- --exact" />
+    <configuration name="Test config::parse::test::test_set_properties" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib config::parse::test::test_set_properties -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -183,19 +196,19 @@
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test" />
-      <item itemvalue="Cargo.Test parse::tests::test_parse_resource_value_selector" />
-      <item itemvalue="Cargo.Test config::reverse_proxy::tests::test_parse_resource_path" />
-      <item itemvalue="Cargo.Test config::reverse_proxy::tests::test_reverse_proxy_config" />
-      <item itemvalue="Cargo.Test parse::tests::test_parse_resource_property_assignment" />
-      <item itemvalue="Cargo.Test star::variant::web::test::path_regex" />
+      <item itemvalue="Cargo.Test config::parse::test::test_set" />
+      <item itemvalue="Cargo.Test config::parse::test::test_property_valu3" />
+      <item itemvalue="Cargo.Test config::parse::test::test_set_properties" />
+      <item itemvalue="Cargo.Test command::parse::test::test" />
+      <item itemvalue="Cargo.Test command::parse::test::test_script" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Cargo.Test star::variant::web::test::path_regex" />
-        <item itemvalue="Cargo.Test parse::tests::test_parse_resource_property_assignment" />
-        <item itemvalue="Cargo.Test config::reverse_proxy::tests::test_reverse_proxy_config" />
-        <item itemvalue="Cargo.Test config::reverse_proxy::tests::test_parse_resource_path" />
-        <item itemvalue="Cargo.Test parse::tests::test_parse_resource_value_selector" />
+        <item itemvalue="Cargo.Test command::parse::test::test_script" />
+        <item itemvalue="Cargo.Test command::parse::test::test" />
+        <item itemvalue="Cargo.Test config::parse::test::test_set" />
+        <item itemvalue="Cargo.Test config::parse::test::test_set_properties" />
+        <item itemvalue="Cargo.Test config::parse::test::test_property_valu3" />
       </list>
     </recent_temporary>
   </component>
@@ -224,6 +237,23 @@
       <workItem from="1631559262142" duration="147604000" />
       <workItem from="1632540389238" duration="23913000" />
       <workItem from="1632628868278" duration="11646000" />
+      <workItem from="1634345190982" duration="10876000" />
+      <workItem from="1634734665290" duration="17515000" />
+      <workItem from="1635009259888" duration="33353000" />
+      <workItem from="1636706841180" duration="59702000" />
+      <workItem from="1637543276000" duration="33373000" />
+      <workItem from="1637853168732" duration="67052000" />
+      <workItem from="1639035437383" duration="303536000" />
+      <workItem from="1640372298770" duration="25000" />
+      <workItem from="1640373850612" duration="2409000" />
+      <workItem from="1643035095784" duration="30936000" />
+      <workItem from="1643461638888" duration="76608000" />
+      <workItem from="1643807673961" duration="200866000" />
+      <workItem from="1644330178042" duration="69932000" />
+      <workItem from="1644537939726" duration="13481000" />
+      <workItem from="1644557766743" duration="49467000" />
+      <workItem from="1644705818806" duration="560000" />
+      <workItem from="1644709387134" duration="1432000" />
     </task>
     <servers />
   </component>
@@ -237,7 +267,6 @@
         </entry>
       </map>
     </option>
-    <option name="oldMeFiltersMigrated" value="true" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

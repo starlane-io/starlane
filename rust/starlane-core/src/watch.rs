@@ -4,14 +4,12 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
-use starlane_resources::data::{BinSrc, DataSet};
-use starlane_resources::ResourceIdentifier;
-
-use crate::resource::ResourceKey;
 use crate::star::shell::watch::WatchApi;
 use crate::star::StarKey;
-use starlane_resources::status::Status;
 use std::hash::Hash;
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::payload::Payload;
+use mesh_portal::version::latest::resource::Status;
 
 pub type WatchKey = Uuid;
 
@@ -32,12 +30,12 @@ impl Watch {
 
 #[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct WatchResourceSelector {
-    pub resource: ResourceIdentifier,
+    pub resource: Address,
     pub property: Property
 }
 
 impl WatchResourceSelector {
-    pub fn new( resource: ResourceIdentifier, property: Property ) -> Self {
+    pub fn new( resource: Address, property: Property ) -> Self {
         Self {
             resource,
             property
@@ -53,7 +51,7 @@ pub struct WatchSelector {
 
 #[derive(Debug,Clone,Serialize,Deserialize,strum_macros::Display,Hash,Eq,PartialEq)]
 pub enum Topic{
-    Resource(ResourceKey),
+    Resource(Address),
     Star(StarKey),
 }
 
@@ -81,7 +79,7 @@ impl Notification {
 
 #[derive(Debug,Clone,Serialize,Deserialize,strum_macros::Display)]
 pub enum Change {
-    State(DataSet<BinSrc>),
+    State(Payload),
     Children(Vec<ChildChange>),
     Status(Status)
 }

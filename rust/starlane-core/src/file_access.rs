@@ -4,7 +4,7 @@ use std::{fs, thread};
 use std::fs::{DirBuilder, File};
 
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{PathBuf };
 use std::str::FromStr;
 use std::sync::{mpsc, Arc};
 
@@ -15,11 +15,11 @@ use walkdir::WalkDir;
 
 use crate::error::Error;
 use crate::resource::FileKind;
-use crate::resource::Path;
 
 use crate::util;
 use std::convert::TryFrom;
 use std::convert::TryInto;
+use mesh_portal::version::latest::path::Path;
 use tokio::fs::ReadDir;
 
 pub enum FileCommand {
@@ -52,7 +52,15 @@ pub enum FileCommand {
         target: String,
         tx: tokio::sync::oneshot::Sender<Result<(), Error>>,
     },
+    RemoveDir {
+        path: Path,
+        tx: tokio::sync::oneshot::Sender<Result<(), Error>>,
+    },
     Shutdown,
+    Exists{
+        path: Path,
+        tx: tokio::sync::oneshot::Sender<Result<bool, Error>>
+    }
 }
 
 #[derive(Clone)]
@@ -74,6 +82,18 @@ impl FileAccess {
             .to_string();
         Ok(FileAccess { path: path, tx: tx })
     }
+
+    pub async fn remove_dir(&self, path: &Path) -> Result<(), Error> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(FileCommand::RemoveDir {
+                path: path.clone(),
+                tx: tx,
+            })
+            .await?;
+        Ok(util::wait_for_it(rx).await?)
+    }
+
 
     pub async fn list(&self, path: &Path) -> Result<Vec<Path>, Error> {
         let (tx, rx) = tokio::sync::oneshot::channel();
@@ -152,6 +172,12 @@ impl FileAccess {
     pub async fn walk(&self) -> Result<tokio::sync::mpsc::Receiver<FileEvent>, Error> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.tx.send(FileCommand::Walk { tx }).await?;
+        Ok(util::wait_for_it(rx).await?)
+    }
+
+    pub async fn exists(&self, path: &Path) -> Result<bool, Error> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.tx.send(FileCommand::Exists{ path: path.clone(), tx }).await?;
         Ok(util::wait_for_it(rx).await?)
     }
 
@@ -259,6 +285,12 @@ impl LocalFileAccess {
             FileCommand::Shutdown => {
                 // do nothing
             }
+            FileCommand::Exists { path, tx } => {
+                tx.send( self.exists(&path));
+            }
+            FileCommand::RemoveDir { path, tx } => {
+                tx.send( self.remove_dir(&path) );
+            }
         }
         Ok(())
     }
@@ -282,10 +314,6 @@ impl LocalFileAccess {
     }
 
     pub fn cat_path(&self, path: &str) -> Result<String, Error> {
-        if path.len() < 1 {
-            return Err("path cannot be empty".into());
-        }
-
         let mut path_str = path.to_string();
         if path_str.starts_with("/") {
             path_str.remove(0);
@@ -298,6 +326,15 @@ impl LocalFileAccess {
 
         Ok(path)
     }
+
+    pub fn exists(&self, path: &Path) -> Result<bool, Error> {
+        let path = self.cat_path(path.to_relative().as_str())?;
+        Ok( match File::open(&path) {
+            Ok(_) => {true}
+            Err(_) => { false } }
+        )
+    }
+
 }
 
 impl LocalFileAccess {
@@ -330,6 +367,8 @@ impl LocalFileAccess {
         Ok(())
     }
 
+
+
     pub fn read(&self, path: &Path) -> Result<Arc<Vec<u8>>, Error> {
         let path = self.cat_path(path.to_relative().as_str())?;
         let mut buf = vec![];
@@ -348,7 +387,7 @@ impl LocalFileAccess {
             self.mkdir(&parent)?;
         }
 
-        let path = self.cat_path(path.to_relative().as_str())?;
+        let path = self.cat_path(path.to_string().as_str())?;
         let mut file = File::create(&path)?;
         file.write(data.as_slice()).unwrap();
 
@@ -379,6 +418,13 @@ impl LocalFileAccess {
         Ok(())
     }
 
+    fn remove_dir(&mut self, path: &Path) -> Result<(), Error> {
+        let path = self.cat_path(path.to_relative().as_str())?;
+        fs::remove_dir_all(path)?;
+        Ok(())
+    }
+
+
     fn walk(&mut self) -> Result<tokio::sync::mpsc::Receiver<FileEvent>, Error> {
         let (event_tx, event_rx) = tokio::sync::mpsc::channel(128);
         let tokio_runtime = tokio::runtime::Builder::new_current_thread()
@@ -394,7 +440,7 @@ impl LocalFileAccess {
                             let event = FileEvent {
                                 path: path.to_string(),
                                 event_kind: FileEventKind::Discovered,
-                                file_kind: FileKind::Directory,
+                                file_kind: FileKind::Dir,
                             };
                             let event_tx = event_tx.clone();
                             tokio_runtime.block_on(async move {
@@ -448,7 +494,7 @@ impl LocalFileAccess {
                         };
 
                         let file_kind = match path.is_dir() {
-                            true => FileKind::Directory,
+                            true => FileKind::Dir,
                             false => FileKind::File,
                         };
 

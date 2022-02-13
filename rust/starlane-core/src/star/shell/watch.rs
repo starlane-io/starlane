@@ -7,10 +7,8 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::sync::mpsc::Sender;
 use tokio::time::Duration;
 
-use starlane_resources::message::{Fail, MessageId, ProtoMessage};
-
 use crate::error::Error;
-use crate::frame::{Frame, ProtoFrame, Reply, ReplyKind, StarMessage, WatchFrame};
+use crate::frame::{Frame, ProtoFrame,  StarMessage, WatchFrame};
 use crate::lane::{LaneKey, LaneSession, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
 use crate::resource::ResourceRecord;
@@ -165,10 +163,10 @@ impl WatchComponent {
         match &selector.topic {
             Topic::Resource(resource_key) => {
                 let record = skel.resource_locator_api.locate(resource_key.clone().into()).await?;
-                if skel.info.key == record.location.host {
+                if skel.info.key == record.location.ok_or()?{
                     Ok(NextKind::Core)
                 } else {
-                    let lane = skel.golden_path_api.golden_lane_leading_to_star(record.location.host).await?;
+                    let lane = skel.golden_path_api.golden_lane_leading_to_star(record.location.ok_or()?).await?;
                     Ok(NextKind::Lane(lane))
                 }
             }

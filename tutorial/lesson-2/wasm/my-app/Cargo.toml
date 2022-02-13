@@ -1,0 +1,28 @@
+[package]
+name = "my-app"
+version = "0.1.0"
+authors = ["Scott Williams <scott@mightydevco.com>"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+mechtron= { path = "../../../../rust/mechtron"}
+mechtron-common= { path = "../../../../rust/mechtron-common"}
+wasm_membrane_guest = { path = "../../../../rust/wasm_membrane_guest"}
+mesh-portal-serde = { path = "../../../../../mesh-portal/rust/mesh-portal-serde"}
+
+# `wee_alloc` is a tiny allocator for wasm that is only ~1K in code size
+# compared to the default allocator's ~10K. It is slower than the default
+# allocator, however.
+#
+# Unfortunately, `wee_alloc` requires nightly Rust when targeting wasm for now.
+#wee_alloc = { version = "0.4.5", optional = true }
+
+[profile.release]
+# Tell `rustc` to optimize for small code size.
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
