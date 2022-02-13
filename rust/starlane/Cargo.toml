@@ -1,6 +1,6 @@
 [package]
 name = "starlane"
-version = "0.1.0"
+version = "0.2.0-rc1"
 authors = ["Scott Williams <scott@mightydevco.com>"]
 edition = "2018"
 
@@ -15,7 +15,7 @@ license = "MIT OR Apache-2.0"
 name = "starlane"
 
 [dependencies]
-starlane-core = { path = "../starlane-core", version="0.1.0" }
+starlane-core = "0.2.0-rc1"
 tokio = { version = "1.15.0", features = ["full"] }
 dirs = "3.0.2"
 serde_json = "1.0"
