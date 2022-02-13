@@ -1,12 +1,12 @@
 use std::convert::{TryFrom, TryInto};
 use std::fmt::write;
 use std::marker::PhantomData;
-use mesh_portal_serde::version::latest::bin::Bin;
-use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, KindTemplate, Template};
-use mesh_portal_serde::version::latest::frame::PrimitiveFrame;
-use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::messaging::Message;
-use mesh_portal_serde::version::latest::resource::ResourceStub;
+use mesh_portal::version::latest::bin::Bin;
+use mesh_portal::version::latest::entity::request::create::{AddressSegmentTemplate, KindTemplate, Template};
+use mesh_portal::version::latest::frame::PrimitiveFrame;
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::messaging::Message;
+use mesh_portal::version::latest::resource::ResourceStub;
 use mesh_portal_tcp_common::{PrimitiveFrameReader, PrimitiveFrameWriter};
 use mesh_portal_versions::version::v0_0_1::entity::request::create::{AddressTemplate, Fulfillment};
 use mesh_portal_versions::version::v0_0_1::id::RouteSegment;
@@ -26,8 +26,8 @@ use crate::starlane::ServiceSelection;
 
 pub mod inlet {
     use std::convert::{TryFrom, TryInto};
-    use mesh_portal_serde::version::latest::bin::Bin;
-    use mesh_portal_serde::version::latest::frame::PrimitiveFrame;
+    use mesh_portal::version::latest::bin::Bin;
+    use mesh_portal::version::latest::frame::PrimitiveFrame;
     use serde::{Serialize, Deserialize};
     use crate::error::Error;
 
@@ -57,7 +57,7 @@ pub mod inlet {
 
 pub mod outlet{
     use std::convert::{TryFrom, TryInto};
-    use mesh_portal_serde::version::latest::frame::PrimitiveFrame;
+    use mesh_portal::version::latest::frame::PrimitiveFrame;
     use serde::{Serialize, Deserialize};
     use crate::error::Error;
 

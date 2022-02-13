@@ -1,7 +1,7 @@
 use std::str::FromStr;
-use mesh_portal_serde::version::latest::entity::request::create::{Create, CreateOp, Require};
-use mesh_portal_serde::version::latest::entity::request::get::Get;
-use mesh_portal_serde::version::latest::entity::request::select::Select;
+use mesh_portal::version::latest::entity::request::create::{Create, CreateOp, Require};
+use mesh_portal::version::latest::entity::request::get::Get;
+use mesh_portal::version::latest::entity::request::select::Select;
 use mesh_portal_versions::version::v0_0_1::entity::request::create::Fulfillment;
 use mesh_portal_versions::version::v0_0_1::entity::request::set::Set;
 use nom::combinator::all_consuming;
@@ -29,10 +29,10 @@ impl CommandOp {
             CommandOp::Create(create) => {
                match strategy {
                    Strategy::Commit => {
-                       create.strategy = mesh_portal_serde::version::latest::entity::request::create::Strategy::Create;
+                       create.strategy = mesh_portal::version::latest::entity::request::create::Strategy::Create;
                    }
                    Strategy::Ensure => {
-                       create.strategy = mesh_portal_serde::version::latest::entity::request::create::Strategy::Ensure;
+                       create.strategy = mesh_portal::version::latest::entity::request::create::Strategy::Ensure;
                    }
                }
             }

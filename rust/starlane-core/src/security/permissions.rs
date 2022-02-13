@@ -1,7 +1,7 @@
 use core::ops;
 use std::str::FromStr;
-use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::pattern::AddressKindPattern;
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::pattern::AddressKindPattern;
 use nom::combinator::all_consuming;
 use crate::security::permissions::parse::permissions;
 use crate::error::Error;

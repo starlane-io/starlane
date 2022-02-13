@@ -5,8 +5,8 @@ use std::sync::Arc;
 use crate::error::Error;
 use std::str::FromStr;
 use std::convert::TryInto;
-use mesh_portal_serde::version::latest::bin::Bin;
-use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal::version::latest::bin::Bin;
+use mesh_portal::version::latest::id::Address;
 use wasmer::{Cranelift, Universal, Store, Module};
 use crate::resource::config::Parser;
 

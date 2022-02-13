@@ -16,13 +16,13 @@ use crate::star::{StarCommand, StarSkel};
 use crate::util;
 use crate::fail::Fail;
 use crate::frame::{StarMessage, StarMessagePayload, SimpleReply};
-use mesh_portal_serde::version::latest::util::unique_id;
+use mesh_portal::version::latest::util::unique_id;
 use crate::message::Reply;
 use std::ops::Deref;
-use mesh_portal_serde::version::latest::entity::response::ResponseCore;
-use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::messaging::{Request, Response};
-use mesh_portal_serde::version::latest::payload::{Payload, Primitive};
+use mesh_portal::version::latest::entity::response::ResponseCore;
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::messaging::{Request, Response};
+use mesh_portal::version::latest::payload::{Payload, Primitive};
 
 pub struct Delivery<M>
 where

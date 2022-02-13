@@ -19,7 +19,7 @@ use crate::resource::FileKind;
 use crate::util;
 use std::convert::TryFrom;
 use std::convert::TryInto;
-use mesh_portal_serde::version::latest::path::Path;
+use mesh_portal::version::latest::path::Path;
 use tokio::fs::ReadDir;
 
 pub enum FileCommand {

@@ -63,8 +63,8 @@ impl From<ZipError> for Error {
         }
     }
 }
-impl From<mesh_portal_serde::error::Error> for Error {
-    fn from(e: mesh_portal_serde::error::Error) -> Self {
+impl From<mesh_portal::error::Error> for Error {
+    fn from(e: mesh_portal::error::Error) -> Self {
         e.to_string().into()
     }
 }
@@ -391,9 +391,9 @@ impl From<RegError> for Error {
     }
 }
 
-impl Into<mesh_portal_serde::version::latest::fail::Fail> for Error {
-    fn into(self) -> mesh_portal_serde::version::latest::fail::Fail {
-        mesh_portal_serde::version::latest::fail::Fail::Error(self.to_string())
+impl Into<mesh_portal::version::latest::fail::Fail> for Error {
+    fn into(self) -> mesh_portal::version::latest::fail::Fail {
+        mesh_portal::version::latest::fail::Fail::Error(self.to_string())
     }
 }
 

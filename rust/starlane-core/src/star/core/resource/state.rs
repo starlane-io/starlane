@@ -1,9 +1,9 @@
 use std::convert::TryInto;
 use std::str::FromStr;
 use std::sync::Arc;
-use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::path::Path;
-use mesh_portal_serde::version::latest::payload::Payload;
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::path::Path;
+use mesh_portal::version::latest::payload::Payload;
 
 use rusqlite::{Connection, params, Row};
 use rusqlite::types::ValueRef;

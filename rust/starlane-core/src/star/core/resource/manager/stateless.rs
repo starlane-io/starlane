@@ -1,5 +1,5 @@
-use mesh_portal_serde::version::latest::command::common::StateSrc;
-use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal::version::latest::command::common::StateSrc;
+use mesh_portal::version::latest::id::Address;
 
 use crate::error::Error;
 use crate::resource::{ResourceAssign, ResourceType};

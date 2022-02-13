@@ -1,4 +1,4 @@
-use mesh_portal_serde::version::latest::id::RouteSegment;
+use mesh_portal::version::latest::id::RouteSegment;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
 

@@ -1,7 +1,7 @@
 use std::str::FromStr;
-use mesh_portal_serde::version::latest::entity::request::create::{AddressTemplate, KindTemplate, Template};
-use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::messaging::{Message, Request};
+use mesh_portal::version::latest::entity::request::create::{AddressTemplate, KindTemplate, Template};
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::messaging::{Message, Request};
 use mesh_portal_versions::version::v0_0_1::entity::request::create::AddressSegmentTemplate;
 use mesh_portal_versions::version::v0_0_1::id::RouteSegment;
 use tokio::sync::mpsc;

@@ -1,8 +1,8 @@
 use std::sync::Arc;
-use mesh_portal_serde::version::latest::entity::request::create::{AddressTemplate, Template};
-use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::messaging::{Message, Request, Response};
-use mesh_portal_serde::version::latest::resource::ResourceStub;
+use mesh_portal::version::latest::entity::request::create::{AddressTemplate, Template};
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::messaging::{Message, Request, Response};
+use mesh_portal::version::latest::resource::ResourceStub;
 
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;

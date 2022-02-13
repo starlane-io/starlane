@@ -4,7 +4,7 @@ use std::sync::Arc;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use kube::api::{ListParams, PostParams};
 use kube::Api;
-use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal::version::latest::id::Address;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;

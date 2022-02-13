@@ -7,8 +7,8 @@ use std::str::FromStr;
 
 use async_trait::async_trait;
 use lru::LruCache;
-use mesh_portal_serde::version::latest::id::{Address, RouteSegment};
-use mesh_portal_serde::version::latest::resource::{ResourceStub, Status};
+use mesh_portal::version::latest::id::{Address, RouteSegment};
+use mesh_portal::version::latest::resource::{ResourceStub, Status};
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use crate::frame::{ResourceRegistryRequest,  SimpleReply, StarMessagePayload};

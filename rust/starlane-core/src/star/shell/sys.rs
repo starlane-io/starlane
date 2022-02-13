@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::sync::atomic::{AtomicU64, Ordering};
-use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, Template};
-use mesh_portal_serde::version::latest::fail;
-use mesh_portal_serde::version::latest::id::{Address, RouteSegment};
-use mesh_portal_serde::version::latest::messaging::{Message, Request};
-use mesh_portal_serde::version::latest::resource::{ResourceStub, Status};
+use mesh_portal::version::latest::entity::request::create::{AddressSegmentTemplate, Template};
+use mesh_portal::version::latest::fail;
+use mesh_portal::version::latest::id::{Address, RouteSegment};
+use mesh_portal::version::latest::messaging::{Message, Request};
+use mesh_portal::version::latest::resource::{ResourceStub, Status};
 use tokio::sync::{mpsc, oneshot};
 use crate::error::Error;
 use crate::fail::{Fail, StarlaneFailure};

@@ -12,8 +12,8 @@ use dashmap::DashMap;
 use futures::future::join_all;
 use futures::{FutureExt, StreamExt, TryFutureExt};
 use mesh_portal_api_server::Portal;
-use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::path;
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::path;
 use mesh_portal_tcp_client::PortalTcpClient;
 use mesh_portal_tcp_server::{PortalTcpServer, TcpServerCall};
 
