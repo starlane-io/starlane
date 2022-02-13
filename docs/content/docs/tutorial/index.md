@@ -8,6 +8,6 @@ draft: false
 # TUTORIAL
 
 * [Lesson 1]({{< ref "/docs/tutorial/lesson-1" >}} "Lesson 1") -> Deploy a static site.
-* [Lesson 2]({{< ref "/docs/tutorial/lesson-2" >}} "Lesson 2") -> Deploy a 'Hello World!' App
-* [Lesson 3]({{< ref "/docs/tutorial/lesson-3" >}} "Lesson 3") -> Create and deploy a custom Mechtron
+* [Lesson 2]({{< ref "/docs/tutorial/lesson-2" >}} "Lesson 2") -> Deploy a Simple App
+* [Lesson 3]({{< ref "/docs/tutorial/lesson-3" >}} "Lesson 3") -> Create and Deploy a Dynamic App
 

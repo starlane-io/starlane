@@ -1,12 +1,15 @@
 ---
 title: "Lesson 1"
 date: 2022-02-12T21:29:31-06:00
-draft: true
+draft: false
 ---
 
 # LESSON 1 -- DEPLOY A STATIC WEBSITE
 
-The source code for this lesson is available on github
+The source code for this lesson can be found on github here:
+
+[https://github.com/mechtronium/starlane/tree/main/tutorial/lesson-1/](https://github.com/mechtronium/starlane/tree/main/tutorial/lesson-1/)
+
 
 ## START A STARLANE SERVER
 
@@ -16,10 +19,10 @@ Open a terminal and start serving a Starlane instance:
 starlane serve
 ```
 
-Open a browser window and point it to `http::localhost:8080` --  you should see a STARLANE 404 page which is expected since we haven't configured anything yet.
+Open a browser window and point it to `http://localhost:8080/index.html` --  you should see a STARLANE 404 page which is expected since we haven't configured anything yet.
 
 ## CREATE THE LOCALHOST SPACE
-Next we are going to use the starlane command line to issue a command to create the 'localhost' space.  A *Space* in Starlane is both the top of the address hierarchy used for Starlane's messaging AND the host or domain name.  Since we are running localy we will create a `localhost` space.
+Next we are going to use the starlane command line to issue a command to create the 'localhost' space.  A **Space** in Starlane is both the top of the address hierarchy used for Starlane's messaging AND the host or domain name.  Since we are running localy we will create a `localhost` space.
 
 ```bash
 starlane exec "create localhost<Space>"
