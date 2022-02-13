@@ -32,10 +32,11 @@ Let's break the last command down before we move on:
 
 First when we want to send a command to starlane we use the subcommand `starlane exec` and then we put the actual command in quotes.      
 
-```
- command   space   type 
-|--^-|   |---^---||--^--|
-create   localhost<Space>"
+``` 
+       Space address
+ command   |      Type 
+|--^-| |---^---||--^--|
+create localhost<Space>"
 ```
 
 Here we issue the `create` command to create a new resource.  The resource's address is simply going to be `localhost` and the resource type is in angle brackets which is a `Space` type.
@@ -109,11 +110,36 @@ Let's break down the most interesting line:
 
 This is a configuration for a request pipeline. The first part is the Request Pattern `<Get>/(.*)`  If the incomming request matches this pattern then it will be forwarded through the pipeline.
 
+```
+method      
+  |    path regex  
+|-^-||-^-|
+<Get>/(.*)        
+```
+
+
 The first part of the Request Pattern is `<Get>` which represents the Http Method we are trying to match.  The second part of the pattern `/(.*)` is for matching the Http Request Path. This is actually a proper Regex for matching any path and importatly the parenthesis indicate to perform a CAPTURE on that portion of the path. If a request came in such as `<Get>/index.html` the regex would capture the string `index.html`.  
+
+```
+                ArtifactBundle address segments
+pass request operator      | 
+        |                  |         Artifact address segments
+       |^|  |--------------^------------||--^----|  
+        ->  localhost:repo:tutorial:1.0.0:/html/$1   
+```
 
 Next we have the first Pipeline *Step* which is a simple `->` arrow. This particular pipeline step indicates that Starlane should pass the request on without any modification.
 
 Next we have the first Pipeline *Stop* which points to a resource address `localhost:repo:tutorial:1.0.0:/html/$1`.   This may be confusing because we haven't created this resource yet, we will be doing that next and it will become more clear how the addressing system works.  For now just notice the `$1` at the end of the address which is a regex expression telling the pipeline to replace with the first capture from the Request Pattern.   So again if the http request was `<Get>/index.html` then `index.html` would be the captured string and the address would be resolved to `localhost:repo:tutorial:1.0.0:/html/index.html`.
+
+Finally the `=>` pass response Pipeline Step says to pass whatever response to `&` which means return the response to the requestor.
+
+```
+pass response operator  
+        |   return to requestor
+       |^| |^|
+        =>  &
+```
 
 ### ZIP UP THE BUNDLE
 You should have two nice directories `html` and `bind`.  We need to zip them up into a bundle so we can publish this content for starlane to use.

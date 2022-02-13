@@ -6,7 +6,19 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/../docs/content/docs/tutorial/lesson-1/index.md" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/content/docs/tutorial/lesson-1/index.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../docs/content/docs/tutorial/lesson-2/index.md" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/content/docs/tutorial/lesson-2/index.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-1/bundle/html/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-1/bundle/html/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-2/bundle.zip" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-2/bundle.zip" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-2/bundle/html/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-2/bundle/html/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-2/script/install.script" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-2/script/install.script" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-2/wasm/my-app/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-2/wasm/my-app/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-2/wasm/my-app/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-2/wasm/my-app/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-3/bundle/html/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-3/bundle/html/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/src/html.rs" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/src/html.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/src/lib.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -253,7 +265,7 @@
       <workItem from="1644537939726" duration="13481000" />
       <workItem from="1644557766743" duration="49467000" />
       <workItem from="1644705818806" duration="560000" />
-      <workItem from="1644709387134" duration="1432000" />
+      <workItem from="1644709387134" duration="2169000" />
     </task>
     <servers />
   </component>

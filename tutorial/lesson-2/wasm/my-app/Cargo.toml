@@ -8,10 +8,10 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-mechtron= { path = "../../../../rust/mechtron"}
-mechtron-common= { path = "../../../../rust/mechtron-common"}
-wasm_membrane_guest = { path = "../../../../rust/wasm_membrane_guest"}
-mesh-portal-serde = { path = "../../../../../mesh-portal/rust/mesh-portal-serde"}
+mechtron= "0.2.0-rc1"
+mechtron-common= "0.2.0-rc1"
+wasm_membrane_guest = "0.2.0"
+mesh-portal = "0.2.0-rc1"
 
 # `wee_alloc` is a tiny allocator for wasm that is only ~1K in code size
 # compared to the default allocator's ~10K. It is slower than the default

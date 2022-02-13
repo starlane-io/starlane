@@ -10,10 +10,11 @@ crate-type = ["cdylib"]
 [features]
 
 [dependencies]
-mechtron= { path = "../../../../rust/mechtron"}
-mechtron-common= { path = "../../../../rust/mechtron-common"}
-wasm_membrane_guest = { path = "../../../../rust/wasm_membrane_guest"}
-mesh-portal-serde = { path = "../../../../../mesh-portal/rust/mesh-portal-serde"}
+
+mechtron= "0.2.0-rc1"
+mechtron-common= "0.2.0-rc1"
+wasm_membrane_guest = "0.2.0"
+mesh-portal= "0.2.0-rc1"
 
 handlebars = "4.2.1"
 serde_json = "1.0.79"

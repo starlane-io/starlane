@@ -2,8 +2,8 @@ use std::sync::Arc;
 use serde_json::json;
 use handlebars::Handlebars;
 use handlebars::RenderError;
-use mesh_portal_serde::version::latest::entity::response::ResponseCore;
-use mesh_portal_serde::version::latest::payload::{Payload, Primitive};
+use mesh_portal::version::latest::entity::response::ResponseCore;
+use mesh_portal::version::latest::payload::{Payload, Primitive};
 
 lazy_static! {
   pub static ref HTML: Handlebars<'static> = {

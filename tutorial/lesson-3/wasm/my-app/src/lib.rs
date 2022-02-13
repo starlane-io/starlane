@@ -8,12 +8,12 @@ mod html;
 use wasm_membrane_guest::membrane::log;
 use mechtron::{Mechtron, mechtron_register, MechtronCtx, MechtronFactory};
 use mechtron::error::Error;
-use mesh_portal_serde::version::latest::entity::request::Action;
-use mesh_portal_serde::version::latest::entity::response::ResponseCore;
-use mesh_portal_serde::version::latest::http::HttpRequest;
-use mesh_portal_serde::version::latest::messaging::Request;
-use mesh_portal_serde::version::latest::payload::{Payload, Primitive};
-use mesh_portal_serde::version::latest::resource::ResourceStub;
+use mesh_portal::version::latest::entity::request::Action;
+use mesh_portal::version::latest::entity::response::ResponseCore;
+use mesh_portal::version::latest::http::HttpRequest;
+use mesh_portal::version::latest::messaging::Request;
+use mesh_portal::version::latest::payload::{Payload, Primitive};
+use mesh_portal::version::latest::resource::ResourceStub;
 use crate::html::greeting;
 
 
