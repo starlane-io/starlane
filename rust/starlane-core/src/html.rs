@@ -2,7 +2,7 @@
 use std::sync::Arc;
 use serde_json::json;
 use handlebars::Handlebars;
-use mesh_portal_serde::version::latest::http::HttpResponse;
+use mesh_portal::version::latest::http::HttpResponse;
 use crate::error::Error;
 
 lazy_static! {

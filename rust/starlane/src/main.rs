@@ -25,8 +25,8 @@ use starlane_core::util::shutdown;
 use starlane_core::util;
 use starlane_core::starlane::api::StarlaneApi;
 use std::convert::TryInto;
-use mesh_portal_serde::version::latest::entity::request::create::Require;
-use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal::version::latest::entity::request::create::Require;
+use mesh_portal::version::latest::id::Address;
 use tokio::io::AsyncReadExt;
 use tracing::error;
 use starlane_core::command::cli::{CliClient, outlet};
@@ -58,7 +58,7 @@ async fn go() -> Result<(),Error> {
     .expect("expected to be able to set ctrl-c handler");
 
     let mut clap_app = App::new("Starlane")
-        .version("0.1.0")
+        .version("0.2.0-rc1")
         .author("Scott Williams <scott@mightydevco.com>")
         .about("A Resource Mesh").subcommands(vec![SubCommand::with_name("serve").usage("serve a starlane machine instance").arg(Arg::with_name("with-external").long("with-external").takes_value(false).required(false).default_value("false")).display_order(0),
                                                             SubCommand::with_name("config").subcommands(vec![SubCommand::with_name("set-shell").usage("set the shell that the starlane CLI connects to").arg(Arg::with_name("hostname").required(true).help("the hostname of the starlane instance you wish to connect to")).display_order(0),

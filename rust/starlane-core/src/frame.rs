@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::{Debug, Formatter};
-use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::messaging::{Request, Response};
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::messaging::{Request, Response};
 
 use semver::SemVerError;
 use serde::{Deserialize, Serialize};

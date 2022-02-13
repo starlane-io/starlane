@@ -1,6 +1,6 @@
 use std::str::FromStr;
 use std::sync::Arc;
-use mesh_portal_serde::version::latest::entity::request::create::Strategy;
+use mesh_portal::version::latest::entity::request::create::Strategy;
 
 use tokio::sync::{mpsc, oneshot};
 

@@ -1,6 +1,6 @@
 use std::str::{FromStr, Split};
-use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::path::Path;
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::path::Path;
 
 use serde::{Deserialize, Serialize};
 

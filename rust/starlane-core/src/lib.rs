@@ -79,7 +79,7 @@ pub mod mechtron;
 
 lazy_static! {
     static ref VERSION: semver::Version = {
-        semver::Version::from_str("0.1.0-alpha")
+        semver::Version::from_str("0.2.0-rc1")
             .expect("expected starlane::VERSION semver string to parse.")
     };
 }

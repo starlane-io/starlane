@@ -1,6 +1,6 @@
 [package]
 name = "starlane-core"
-version = "0.1.0"
+version = "0.2.0-rc1"
 authors = ["Scott Williams <scott@mightydevco.com>"]
 edition = "2018"
 description = "Resource Mesh"
@@ -66,20 +66,20 @@ k8s-openapi = { version = "0.12.0", default-features = false, features = ["v1_20
 schemars = "0.8.0"
 json-patch = "0.2.6"
 
-wasm_membrane_host = { path = "../wasm_membrane_host" , version="0.1.0"}
-mechtron-common = { path = "../mechtron-common", version="0.1.0"}
+wasm_membrane_host = "0.2.0"
+mechtron-common = "0.2.0-rc1"
 wasmer = "2.1.1"
 httparse = "1.5.1"
 bytes = "1.1.0"
 handlebars = "4.1.3"
-mesh-portal-serde = { path = "../../../mesh-portal/rust/mesh-portal-serde", version="0.0.1"}
-mesh-portal-versions= { path = "../../../mesh-portal/rust/mesh-portal-versions", version="0.0.1"}
-mesh-portal-api-client= { path = "../../../mesh-portal/rust/mesh-portal-api-client", version="0.0.1"}
-mesh-portal-api-server = { path = "../../../mesh-portal/rust/mesh-portal-api-server", version="0.0.1"}
-mesh-portal-api = { path = "../../../mesh-portal/rust/mesh-portal-api", version="0.0.1"}
-mesh-portal-tcp-client= { path = "../../../mesh-portal/rust/mesh-portal-tcp-client", version="0.0.1"}
-mesh-portal-tcp-server = { path = "../../../mesh-portal/rust/mesh-portal-tcp-server", version="0.0.1"}
-mesh-portal-tcp-common = { path = "../../../mesh-portal/rust/mesh-portal-tcp-common", version="0.0.1"}
-starlane-macros = { path = "../starlane-macros", version= "0.1.0"}
+
+mesh-portal= "0.2.0-rc1"
+mesh-portal-versions= "0.2.0-rc1"
+mesh-portal-api-client= "0.2.0-rc1"
+mesh-portal-api-server= "0.2.0-rc1"
+mesh-portal-tcp-common = "0.2.0-rc1"
+mesh-portal-tcp-client = "0.2.0-rc1"
+mesh-portal-tcp-server= "0.2.0-rc1"
+
 async-recursion = "1.0.0"
 dashmap = "4.0.2"

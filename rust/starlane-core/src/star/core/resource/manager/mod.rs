@@ -17,10 +17,10 @@ use crate::star::core::resource::manager::file::{FileSystemManager, FileManager}
 use std::collections::HashMap;
 use std::future::Future;
 use std::str::FromStr;
-use mesh_portal_serde::version::latest::fail;
-use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::messaging::{Request, Response};
-use mesh_portal_serde::version::latest::payload::Payload;
+use mesh_portal::version::latest::fail;
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::messaging::{Request, Response};
+use mesh_portal::version::latest::payload::Payload;
 use mesh_portal_versions::version::v0_0_1::id::Tks;
 use crate::star::core::resource::manager::artifact::ArtifactManager;
 

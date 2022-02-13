@@ -18,12 +18,12 @@ use crate::util;
 use crate::error::Error;
 
 use crate::message::delivery::Delivery;
-use mesh_portal_serde::version::latest::command::common::{SetProperties, StateSrc};
-use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, Strategy, Template};
-use mesh_portal_serde::version::latest::entity::request::{Action, Rc};
-use mesh_portal_serde::version::latest::id::{Address, AddressAndKind, KindParts, RouteSegment};
-use mesh_portal_serde::version::latest::messaging::Request;
-use mesh_portal_serde::version::latest::payload::{Payload, Primitive};
+use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
+use mesh_portal::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, Strategy, Template};
+use mesh_portal::version::latest::entity::request::{Action, Rc};
+use mesh_portal::version::latest::id::{Address, AddressAndKind, KindParts, RouteSegment};
+use mesh_portal::version::latest::messaging::Request;
+use mesh_portal::version::latest::payload::{Payload, Primitive};
 use mesh_portal_versions::version::v0_0_1::entity::request::create::KindTemplate;
 use zip::result::ZipResult;
 use crate::file_access::FileAccess;

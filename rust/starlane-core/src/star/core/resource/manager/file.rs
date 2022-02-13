@@ -16,11 +16,11 @@ use crate::html::html_error_code;
 use crate::frame::{StarMessagePayload, StarMessage};
 
 use std::str::FromStr;
-use mesh_portal_serde::version::latest::command::common::StateSrc;
-use mesh_portal_serde::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, KindTemplate, Strategy, Template};
-use mesh_portal_serde::version::latest::entity::request::{Action, Rc};
-use mesh_portal_serde::version::latest::id::{Address, AddressAndKind, KindParts};
-use mesh_portal_serde::version::latest::messaging::Request;
+use mesh_portal::version::latest::command::common::StateSrc;
+use mesh_portal::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, KindTemplate, Strategy, Template};
+use mesh_portal::version::latest::entity::request::{Action, Rc};
+use mesh_portal::version::latest::id::{Address, AddressAndKind, KindParts};
+use mesh_portal::version::latest::messaging::Request;
 use mesh_portal_versions::version::v0_0_1::command::common::SetProperties;
 
 #[derive(Debug)]

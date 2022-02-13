@@ -9,12 +9,12 @@ use std::iter::FromIterator;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use mesh_portal_serde::version::latest::command::common::StateSrc;
-use mesh_portal_serde::version::latest::entity::request::create::KindTemplate;
+use mesh_portal::version::latest::command::common::StateSrc;
+use mesh_portal::version::latest::entity::request::create::KindTemplate;
 
-use mesh_portal_serde::version::latest::id::{Address, KindParts, ResourceKind, Specific};
-use mesh_portal_serde::version::latest::payload::Payload;
-use mesh_portal_serde::version::latest::resource::{ResourceStub, Status};
+use mesh_portal::version::latest::id::{Address, KindParts, ResourceKind, Specific};
+use mesh_portal::version::latest::payload::Payload;
+use mesh_portal::version::latest::resource::{ResourceStub, Status};
 use mesh_portal_versions::version::v0_0_1::pattern::parse::consume_kind;
 use rusqlite::{Connection, params, params_from_iter, Row, ToSql, Transaction};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
@@ -181,7 +181,7 @@ pub enum ResourceType {
 
 /*
 impl FromStr for ResourceType{
-    type Err = mesh_portal_serde::error::Error;
+    type Err = mesh_portal::error::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(
@@ -218,7 +218,7 @@ impl Into<String> for ResourceType {
 }
 
 impl TryFrom<String> for ResourceType {
-    type Error = mesh_portal_serde::error::Error;
+    type Error = mesh_portal::error::Error;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Ok(ResourceType::from_str(value.as_str())?)
@@ -263,7 +263,7 @@ impl Kind {
 }
 
 impl TryInto<KindTemplate> for Kind {
-    type Error = mesh_portal_serde::error::Error;
+    type Error = mesh_portal::error::Error;
 
     fn try_into(self) -> Result<KindTemplate, Self::Error> {
         Ok(KindTemplate {
@@ -278,7 +278,7 @@ impl TryInto<KindTemplate> for Kind {
 }
 
 impl TryFrom<String> for Kind {
-    type Error =mesh_portal_serde::error::Error;
+    type Error =mesh_portal::error::Error;
 
     fn try_from(kind: String) -> Result<Self, Self::Error> {
         match Kind::from_str(kind.as_str()) {
@@ -286,7 +286,7 @@ impl TryFrom<String> for Kind {
                 Ok(kind)
             }
             Err(error) => {
-                Err(mesh_portal_serde::error::Error{
+                Err(mesh_portal::error::Error{
                     message: error.to_string()
                 })
             }
@@ -295,7 +295,7 @@ impl TryFrom<String> for Kind {
 }
 
 impl TryInto<String> for Kind {
-    type Error =mesh_portal_serde::error::Error;
+    type Error =mesh_portal::error::Error;
 
     fn try_into(self) -> Result<String, Self::Error> {
         Ok(self.to_string())
@@ -311,13 +311,13 @@ impl ToString for Kind {
 
 
 /*
-impl TryInto<mesh_portal_serde::version::latest::id::ResourceKind> for Kind {
-    type Error =  mesh_portal_serde::error::Error;
+impl TryInto<mesh_portal::version::latest::id::ResourceKind> for Kind {
+    type Error =  mesh_portal::error::Error;
 
-    fn try_into(self) -> Result<mesh_portal_serde::version::latest::id::ResourceKind, Self::Error> {
+    fn try_into(self) -> Result<mesh_portal::version::latest::id::ResourceKind, Self::Error> {
         let parts: KindParts = self.into();
 
-        Ok(mesh_portal_serde::version::latest::id::ResourceKind {
+        Ok(mesh_portal::version::latest::id::ResourceKind {
             resource_type: parts.resource_type.into(),
             kind: parts.kind,
             specific: parts.specific
@@ -328,7 +328,7 @@ impl TryInto<mesh_portal_serde::version::latest::id::ResourceKind> for Kind {
 
 
 impl TryFrom<KindParts> for Kind {
-    type Error = mesh_portal_serde::error::Error;
+    type Error = mesh_portal::error::Error;
 
     fn try_from(parts: KindParts) -> Result<Self, Self::Error> {
         match ResourceType::from_str(parts.resource_type.as_str() )? {
@@ -399,7 +399,7 @@ impl TryFrom<KindParts> for Kind {
 }
 
 impl FromStr for Kind {
-    type Err = mesh_portal_serde::error::Error;
+    type Err = mesh_portal::error::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let resource_kind = consume_kind(s)?;

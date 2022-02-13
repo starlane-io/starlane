@@ -1,7 +1,7 @@
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
-use mesh_portal_serde::version::latest::command::common::StateSrc;
-use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal::version::latest::command::common::StateSrc;
+use mesh_portal::version::latest::id::Address;
 
 use serde::{Deserialize, Serialize};
 

@@ -1,5 +1,5 @@
 use std::env;
-use mesh_portal_serde::version::latest::id::Address;
+use mesh_portal::version::latest::id::Address;
 use std::process::{Child, Command};
 use crate::error::Error;
 use crate::starlane::STARLANE_MECHTRON_PORT;

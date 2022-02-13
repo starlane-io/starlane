@@ -6,75 +6,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/../docs/content/docs/.index.md.swp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../docs/content/docs/index.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../docs/content/docs/tutorial.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../docs/content/docs/tutorial/index.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../docs/content/docs/tutorial/lesson-1.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-1/Makefile" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-1/bundle/bind/localhost.bind" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-1/script/install.script" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/Makefile" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/bundle/bind/app.bind" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/bundle/bind/localhost.bind" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/bundle/config/my-app.app" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/bundle/html/index.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/script/install.script" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/.appveyor.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/.cargo-ok" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/.travis.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/Cargo.toml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/LICENSE_APACHE" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/LICENSE_MIT" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/Makefile" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/README.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/example.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/src/html.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/src/lib.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../tutorial/lesson-3/wasm/my-app/tests/web.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../docs/content/docs.md" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mechtron/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/mechtron/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/command/compose.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/command/compose.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/command/parse.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/command/parse.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/0-starlane-server.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/1-create-localhost-space.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/2-create-filesystem.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/3-upload-file.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/4-publish-localhost-config.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/5-set-localhost-config.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/6-publish-app-bundle.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/7-create-a-mechtron.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/99-install-everything.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/app/.appveyor.yml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/app/.cargo-ok" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/app/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/app/.travis.yml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/app/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/app/LICENSE_APACHE" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/app/LICENSE_MIT" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/app/Makefile" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/app/README.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/app/conf/app/my-app.yaml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/app/conf/bind/main-app-bind.yaml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/app/conf/mechtron/my-mechtron.yaml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/app/example.iml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/app/my-app.zip" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/app/src/html.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/app/src/lib.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/app/tests/web.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-1/bundle/config/localhost.bind" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-2/bundle.zip" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-2/bundle.zip" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-2/bundle/bind/localhost.bind" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-2/bundle/bind/localhost.bind" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-2/script/install.script" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-2/script/install.script" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-2/wasm/my-app/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-2/wasm/my-app/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/lesson-2/wasm/my-app/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/../tutorial/lesson-2/wasm/my-app/Makefile" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/localhost-config/routes.conf" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../tutorial/websites/simple-site1/index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/main.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -319,7 +253,9 @@
       <workItem from="1643807673961" duration="200866000" />
       <workItem from="1644330178042" duration="69932000" />
       <workItem from="1644537939726" duration="13481000" />
-      <workItem from="1644557766743" duration="49180000" />
+      <workItem from="1644557766743" duration="49467000" />
+      <workItem from="1644705818806" duration="560000" />
+      <workItem from="1644709387134" duration="1321000" />
     </task>
     <servers />
   </component>

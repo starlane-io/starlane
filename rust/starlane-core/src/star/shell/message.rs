@@ -16,9 +16,9 @@ use crate::fail::{Fail, StarlaneFailure};
 use mysql::uuid::Uuid;
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
-use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::messaging::{Message,  Request, Response};
-use mesh_portal_serde::version::latest::util::unique_id;
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::messaging::{Message,  Request, Response};
+use mesh_portal::version::latest::util::unique_id;
 use mesh_portal_versions::version::v0_0_1::parse::Res;
 use tokio::sync::oneshot::Sender;
 

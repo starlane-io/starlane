@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
-use mesh_portal_serde::version::latest::bin::Bin;
-use mesh_portal_serde::version::latest::command::common::SetProperties;
+use mesh_portal::version::latest::bin::Bin;
+use mesh_portal::version::latest::command::common::SetProperties;
 use mesh_portal_versions::version::v0_0_1::parse::{camel_case, domain, Res, set_properties};
 use mesh_portal_versions::version::v0_0_1::pattern::parse::kind;
 use nom::branch::alt;
@@ -146,7 +146,7 @@ pub mod replace {
 pub mod test {
     use std::collections::HashMap;
     use std::str::FromStr;
-    use mesh_portal_serde::version::latest::id::Address;
+    use mesh_portal::version::latest::id::Address;
     use mesh_portal_versions::version::v0_0_1::command::common::PropertyMod;
     use mesh_portal_versions::version::v0_0_1::parse::{property_mod, property_value, property_value_not_space_or_comma, set_properties};
     use nom::combinator::{all_consuming, recognize};

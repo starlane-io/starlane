@@ -7,12 +7,12 @@ use std::sync::Arc;
 use std::thread;
 
 use futures::FutureExt;
-use mesh_portal_serde::version::latest::bin::Bin;
-use mesh_portal_serde::version::latest::config::bind::BindConfig;
-use mesh_portal_serde::version::latest::config::Config;
-use mesh_portal_serde::version::latest::id::Address;
-use mesh_portal_serde::version::latest::path::Path;
-use mesh_portal_serde::version::latest::payload::Primitive;
+use mesh_portal::version::latest::bin::Bin;
+use mesh_portal::version::latest::config::bind::BindConfig;
+use mesh_portal::version::latest::config::Config;
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::path::Path;
+use mesh_portal::version::latest::payload::Primitive;
 use tokio::io::AsyncReadExt;
 use tokio::runtime::Handle;
 use tokio::sync::{broadcast, mpsc, oneshot};
