@@ -11,6 +11,14 @@ Starlane is a work in progress and not ready for production yet, however it is r
 ### INSTALL RUST
 To build starlane you will need to have **rust** and **make** installed.  Follow the official Rust instructions to [install Rust](https://www.rust-lang.org/tools/install).
 
+### NIGHTLY TOOLCHAIN
+Starlane requires the `nightly` toolchain for compilation.  To switch to the `nightly` toolchain:
+
+```bash
+rustup toolchain install nightly
+rustup default nightly
+```
+
 ## INSTALLING STARLANE
 
 ```bash

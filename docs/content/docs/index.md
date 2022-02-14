@@ -6,6 +6,14 @@
 ### INSTALL RUST
 To build Starlane you will need to have **rust** installed.  Follow the official Rust instructions to [install Rust](https://www.rust-lang.org/tools/install).
 
+### NIGHTLY TOOLCHAIN
+Starlane requires the `nightly` toolchain for compilation.  To switch to the `nightly` toolchain:
+
+```bash
+rustup toolchain install nightly
+rustup default nightly
+```
+
 ### BUILD AND INSTALL STARLANE
 
 ```
