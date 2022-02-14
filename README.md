@@ -1,9 +1,10 @@
 # STARLANE
-Starlane is a RESOURCE MESH which can also execute client and server side WebAssembly. You can read more about what Starlane is and what it does on Starlane's [about page](http://starlane.io/about/).
+Starlane makes it easy to deploy and interoperate with secure WebAssembly code in the cloud, the edge, desktop, mobile and IoT environments.
+
+To learn more checkout the [about page](http://starlane.io/about/).
 
 ## A WORK IN PROGRESS 
 Starlane is a work in progress and not ready for production yet, however it is ready for community feedback.
-
 
 ## GETTING STARTED
 
@@ -22,3 +23,5 @@ make install
 
 ## TUTORIAL
 For more hands on fun check out the Starlane [Tutorial](http://starlane.io/docs/tutorial/). 
+
+

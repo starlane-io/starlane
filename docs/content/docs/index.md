@@ -4,7 +4,7 @@
 ## GETTING STARTED
 
 ### INSTALL RUST
-To build starlane you will need to have **rust** and **make** installed.  Follow the official Rust instructions to [install Rust](https://www.rust-lang.org/tools/install).
+To build Starlane you will need to have **rust** and **make** installed.  Follow the official Rust instructions to [install Rust](https://www.rust-lang.org/tools/install).
 
 ### INSTALL MAKE
 You will need **Make** installed to execute the Makefile.  This should be installed by default on Mac and other Unix based OSes. Sorry, if you are a windows user you will have to figure out how to install make yourself!
