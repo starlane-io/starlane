@@ -2,17 +2,45 @@
 
 ## WORK IN PROGRESS 
 
-### MORE MECHTRONY GOODNESS version: 0.2.0 [in progress]
-* ability for Mechtrons to create new resources
-* ability for Mechtrons to message other resources
-* ability for Mechtrons to message each other
-* split Mechtron guest framework into a new repository
-* create a new example mechtron [upload,display profile pic]
-
 
 ## BACKLOG
 
-### KUBERNETES AND DATABASES version: 0.3.0 [backlog]
+### FOR THE BETTERMENT OF ALL ERROR MESSAGES version: 0.3.0 [backlog]
+This release will be focussed on making sure that problems with Starlane are as easy to diagnose as possible.  The goals involve improvment of the logs, status states and making sure there is clear feedback and error and error messages if the user does something wrong.
+
+* better error messages when parsing commands
+  - clear message when a syntax error occurs 
+  - point out exact location of 'confusion' just like Rust compiler does
+
+* descriptive hierarchy 
+  - differentiation between User & System error
+  - fail hierarchy (as in what aspect of the resource failed [Create,Select,PortRequest, etc]
+  - component hierarchy to help describe exactly where the failure occured
+
+* improved Logs
+  - creation of new Logger resource (which is a rolling file of Logs)
+  - creation of Log resource which is an individual line in the logger
+  - mechtrons to message their logs to a logger
+  - ability to attach a Session identifier to a Log 
+  - ability to attach a Message identifier to a Log
+  - use of descriptive hierarchies in logs to better understand What happened and Where it happened
+
+* create a bunch of common user mistake scenarios (things like improperly embedded configuration file). Test for useable error messages
+* ability to query the status of resources [Unknown, Creating, Ready, Panic, Destroyed, etc.] also include descriptive error messages for some states like Panic describing the nature of the panic.
+* ability to query the status of Stars 
+
+* Actually enforce Mechtron Bind released in 'MORE MECHTRONY GOODNESS'
+  - ensure clear error message if there is a bind failure
+
+* improved message reliability:
+  - send message acknowledgements when a message is received by a Star
+  - message will be resent if it has not been acknowledged after a timeout
+  - ensure message delivery will happen once or not at all in case of a failure
+  - if a message has not received an acknowledgement and is out of retries, return a Timeout failure to the sender
+  - ability to configure ack timeout, retries and max retry 
+
+
+### KUBERNETES AND DATABASES version: 0.4.0 [backlog]
 * Introduction of the Starlane Kubernetes Operator 
   - ability to specify the number of stars that serve mechtrons
 * resource registry persistence (before resource registry was handled by in-memory SQLite)
@@ -31,13 +59,6 @@
   - pipeline DSL for message ports
   - pipeline DSL for http requests & responses
 
-
-### WEB SERVER IMPROVEMENTS version: 0.4.0 [backlog]
-* ability to serve a static site via an ArtifactBundle
-* ability to tag a specific artifact (such as tagging it to the 'latest' version) so that router configs can refernce by tag instead of exact version number
-* FIX: return proper HttpResponse headers
-* FIX: some issues with router cause it to crash
-* improvement of router configuration to make it look more like bind configuration 
 
 ### REMOTE SERIALIZATION & API version: 0.5.0 [backlog]
 * create a serialization for accessing resources remotely 
@@ -77,41 +98,6 @@
   - ability to set a timeout for mechtron port's execution time
   - ability to set a timeout for mechtron port's total time to respond to a message (includes whatever is being done with other resources)
 
-  
-
-### FOR THE BETTERMENT OF ALL ERROR MESSAGES version: 0.7.0 [backlog]
-This release will be focussed on making sure that problems with Starlane are as easy to diagnose as possible.  The goals involve improvment of the logs, status states and making sure there is clear feedback and error and error messages if the user does something wrong.
-
-* better error messages when parsing commands
-  - clear message when a syntax error occurs 
-  - point out exact location of 'confusion' just like Rust compiler does
-
-* descriptive hierarchy 
-  - differentiation between User & System error
-  - fail hierarchy (as in what aspect of the resource failed [Create,Select,PortRequest, etc]
-  - component hierarchy to help describe exactly where the failure occured
-
-* improved Logs
-  - creation of new Logger resource (which is a rolling file of Logs)
-  - creation of Log resource which is an individual line in the logger
-  - mechtrons to message their logs to a logger
-  - ability to attach a Session identifier to a Log 
-  - ability to attach a Message identifier to a Log
-  - use of descriptive hierarchies in logs to better understand What happened and Where it happened
-
-* create a bunch of common user mistake scenarios (things like improperly embedded configuration file). Test for useable error messages
-* ability to query the status of resources [Unknown, Creating, Ready, Panic, Destroyed, etc.] also include descriptive error messages for some states like Panic describing the nature of the panic.
-* ability to query the status of Stars 
-
-* Actually enforce Mechtron Bind released in 'MORE MECHTRONY GOODNESS'
-  - ensure clear error message if there is a bind failure
-
-* improved message reliability:
-  - send message acknowledgements when a message is received by a Star
-  - message will be resent if it has not been acknowledged after a timeout
-  - ensure message delivery will happen once or not at all in case of a failure
-  - if a message has not received an acknowledgement and is out of retries, return a Timeout failure to the sender
-  - ability to configure ack timeout, retries and max retry 
 
 ### MECHTRON HUB (for artifact bundles) version: 0.8.0 [backlog]
 * ability to publish and share artifact bundles via on mechtronhub.io
@@ -216,6 +202,20 @@ The first version where Starlane is ready for production environments.
 * Resource state replication
 
 ## DONE
+
+### MORE MECHTRONY GOODNESS version: 0.2.0 [done]
+* ability for Mechtrons to create new resources
+* ability for Mechtrons to message other resources
+* ability for Mechtrons to message each other
+* split Mechtron guest framework into a new repository
+* create a new example mechtron [upload,display profile pic]
+* ability to serve a static site via an ArtifactBundle
+* ability to tag a specific artifact (such as tagging it to the 'latest' version) so that router configs can refernce by tag instead of exact version number
+* FIX: return proper HttpResponse headers
+* FIX: some issues with router cause it to crash
+* improvement of router configuration to make it look more like bind configuration 
+
+
 
 ### INTRODUCTORY RELEASE version: 0.1.0 [done]
 * ability to build starlane
