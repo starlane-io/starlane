@@ -69,7 +69,7 @@ mkdir html
 
 And within the html directory create a simple `index.html` file with the content:
 
-```
+```html
 <html>
   <head>
     <title>Static Page Served from Artifact</title>

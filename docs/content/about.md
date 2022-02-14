@@ -13,7 +13,7 @@ Starlane is a special type of Mesh that spans from the server to client.  This s
 ### WHY WEBASSEMBLY?
 In case you haven't heard of WebAssembly, this section is for you to help you understand why WebAssembly is truly the future and something to get excited about!
 
-WebAssembly is a binary instruction set that can be executed consistently and securely anywhere: meaning in the browser client and on the server. It’s an amazing breakthrough that is already working on all the major browsers and all the major Os and architecture combinations. If you want to learn more about WebAssembly check it out on the WebAssembly.org website.
+WebAssembly is a binary instruction set that can be executed consistently and securely anywhere: meaning in the browser client and on the server almost any architecture and OS. It’s an amazing breakthrough that is already working on all the major browsers and all the major Os and architecture combinations. If you want to learn more about WebAssembly check it out on the WebAssembly.org website.
 
 One reason that WebAssembly is secure is that it is executed in a “host” environment, which also serves as its sandbox. WebAssembly cannot by itself access any files or connect to the network. A WebAssembly program cannot even create a thread and update itself automatically, it relies upon its host to provide it with data and execution time. The host also provides an interface for WebAssembly to call for additional custom interaction between the host and the WebAssembly guest.
 
@@ -31,7 +31,7 @@ Importantly the WebAssembly binary can now use the Mechtron interface to access 
 
 An Application that executes within Starlane's Mesh can be composed of many multiple mechtrons that may be written by completely different people in completely different languages yet they will be able to communicate and coordinate with each other.  
 
-And... the Application can even swap out mechtrons while it is running...  
+And... The Application can even swap out mechtrons while it is running...  
 
 And...  Tenants of a Starlane Cloud Service could be given permission to overwrite the default Mechtron that managed something specific to them: let's say for example users of a social media site would like to write custom code to render their Profile page. They could create a custom mechtron that implements the profile bind referenced by the application and then deploy and let the social medias sites Starlane instance securely execute their custom code infrastructure!  
 Mechtrons are made to encourage creativity and collaboration through code!  The possibilities are very exciting!

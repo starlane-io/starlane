@@ -71,40 +71,9 @@ header nav ul li a {
  
 }
 
-h1 {
-  color: grey;
-  font-family: "Josefin Sans", sans-serif;
-  font-size: xx-large;
-  background: -webkit-linear-gradient(white, #38495a);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: 2px;
-}
-
-h2 {
-  color: grey;
-  font-family: "Josefin Sans", sans-serif;
-  font-size: x-large;
-  background: -webkit-linear-gradient(white, #38495a);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: 1px;
-}
-
-h3 {
-  color: grey;
-  font-family: "Josefin Sans", sans-serif;
-  font-size: large;
-  background: -webkit-linear-gradient(white, #38495a);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: 1px;
-}
-
-
 
 p {
-  color: #cccccc;
+  color: #aaaaaa;
   font-size: large;
 }
 
@@ -115,7 +84,7 @@ pre {
 }
 
 code {
-  color: #999999;
+  color: #cccccc;
   font-family: "Roboto Mono", sans-serif;
 }
 
@@ -274,15 +243,7 @@ p a {
   color: white;
 }
 
-ul {
-  margin: 0px;
-  padding-bottom: 16px;
-}
 
-ul > li {
-  color: #cccccc;
-  font-size: large;
-}
 
 
 

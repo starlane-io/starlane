@@ -1,9 +1,5 @@
 # PRODUCT ROADMAP
 
-## WORK IN PROGRESS 
-
-
-## BACKLOG
 
 ### FOR THE BETTERMENT OF ALL ERROR MESSAGES version: 0.3.0 [backlog]
 This release will be focussed on making sure that problems with Starlane are as easy to diagnose as possible.  The goals involve improvment of the logs, status states and making sure there is clear feedback and error and error messages if the user does something wrong.
