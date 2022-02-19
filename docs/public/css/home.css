@@ -1,12 +1,14 @@
 
-
 header {
-  width: 960px;;
-  padding-bottom: 8px;
-  padding-top: 16px;
+  display: block;
+  z-index: 1;
+  margin-top: 32px;
   margin-left: auto;
   margin-right: auto;
+  font-size: xx-large;
+  width: 960px;
 }
+
 
 header nav {
     width: 100%;
@@ -16,81 +18,89 @@ header nav ul {
     overflow: hidden;
     margin: 0;
     padding: 0;
-    text-align: right;
-    list-style: none;
 }
 
 header nav ul li {
-    float: none;
-    display: inline-block;
-    position: relative;
+    list-style: none;
+    float: left;
+    text-align: center;
+    width: 16.6667%; /* fallback for non-calc() browsers */
+    width: calc(100% / 5);
+    box-sizing: border-box;
 }
 
-
-header nav ul li:nth-child(1) {
-    float: left;
+header nav ul li:first-child {
+    border-left: none;
 }
-header nav ul li:nth-child(2) {
-    float: left;
-}
-header nav ul li:nth-child(3) {
-    float: left;
-}
-
 
 header nav ul li a {
     display: block;
-    text-decoration: none;
-    padding: 5px;
-    margin: 0;
-    font-family: "Jura", sans-serif;
-}
-
-#stack {
- display: block;
- margin-left: auto;
- margin-right: auto;
- width: 960px;
- min-height: 100vh;
- background-color: #000000cc;
-}
-
-#content {
- display: flex;
- flex-direction: column;
- width: 960px;
- height: 100%;
- margin-left: auto;
- margin-right: auto;
- padding-bottom: 128px;
- z-index: 0;
- background-color: #000000cc;
- min-height: 100vh;
- padding-left: 16px;
- padding-right: 16px;
- 
+    text-decoration: underline;
+    padding: 10px 0;
 }
 
 
-p {
-  color: #aaaaaa;
-  font-size: large;
+
+#card{
+  color: #FFF;
+  text-align: center;
+  font-family: "jura", sans-serif;
+  font-family: "Stick No Bills", sans-serif;
+  font-family: "Josefin Sans", sans-serif;
+  padding-left: 10px;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 128px;
+  max-width: 640px;
 }
 
 
-pre {
- padding: 16px;
- background-color: #333333;
+#title{
+  font-weight: 300;
+  font-size: 120px;
+
+  font-family: "Josefin Sans", sans-serif;
+  background: -webkit-linear-gradient(white, #eeaa5a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: 5px;
+  margin-top: 0px;
+  margin-bottom: 0px;
 }
 
-code {
+#disclaimer{
   color: #cccccc;
-  font-family: "Roboto Mono", sans-serif;
+  padding: 16px;
+  max-width: 100%;
 }
 
-p code {
-
+#disclaimer p{
+  text-align: left;
+  margin-left: auto;
+  margin-right: auto;
+  color: #cccccc;
+  font-size: x-large;
+  font-family: "Raleway", sans-serif;
+  font-weight: 50;
 }
+
+
+#tagline {
+  font-size: 25px;
+  display:block;
+  font-family: "Stick No Bills", sans-serif;
+  letter-spacing: 5px;
+  background: -webkit-linear-gradient(white, #5a5a5a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-top: 0px;
+  margin-bottom: 0px;
+}
+
+
+
+
+
 
 footer {
   bottom: 0;
@@ -99,17 +109,11 @@ footer {
   transform: translateX(-50%);
 
   display: block;
-  width: 960px;
   z-index: 1;
   margin-left: auto;
   margin-right: auto;
+  margin-bottom: 64px;
   font-size: xx-large;
-  background-color: black;
-}
-
-footer #footer-shade{
-  background-color: #00003366;
-  padding-top: 8px;
 }
 
 footer div small {
@@ -119,35 +123,34 @@ footer div small {
   font-size: small;
 }
 
-
-
-
-
-nav{
+footer div nav{
   display: block;
+  margin-left: auto;
+  margin-right: auto;
   width: 100%;
+}
+
+
+
+header nav{
+  display: block;
   align-items: center;
   justify-content: center;
 }
 
-nav > a{
-  text-decoration: none;
+nav a{
+  text-decoration: underline;
   color: #cccccc;
-  margin: 0 40px;
-  font-size: 100%;
+  font-size: x-large;
   font-family: "Josefin Sans", sans-serif;
   font-family: "Stick No Bills", sans-serif;
   font-family: "Jura", sans-serif;
 }
 
-nav > a > i {
+nav a i {
   background: -webkit-linear-gradient(white, #38495a);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-}
-
-a {
-  color: #ffffff
 }
 
 a:hover {
@@ -157,29 +160,23 @@ a:hover {
 }
 
 #logo{
-  position: absolute;
-  left: 50%;
-  content: "";
   text-decoration: none;
   width: 200px;
   height: 100%;
   font-size: xx-large;
   font-family: "Josefin Sans", sans-serif;
   text-align: center;
-  margin-left: -100px;
-}
-
-#logo > span {
   background: -webkit-linear-gradient(white, #38495a);
   background: -webkit-linear-gradient(white, #eeaa5a);
-  letter-spacing: 2px;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 
 label {
-  display: block;
+  display: inline;
   font-family: "Josefin Sans", sans-serif;
   background: -webkit-linear-gradient(white, #38495a);
   -webkit-background-clip: text;
@@ -187,6 +184,7 @@ label {
 }
 
 input[type=email], select, textarea {
+  display: inline;
   background: #000000;
   color: #cccccc;
   width: 100%; /* Full width */
@@ -198,7 +196,13 @@ input[type=email], select, textarea {
   margin-bottom: 16px; /* Bottom margin */
 }
 
+
+
+
+
+
 input[type=text], select, textarea {
+  display: inline;
   width: 100%; /* Full width */
   color: #cccccc;
   padding: 12px; /* Some padding */ 
@@ -239,15 +243,9 @@ input[type=submit]:hover {
   padding: 20px;
 }
 
-p strong {
-  font-weight: 900
-}
-
 p a {
   color: white;
 }
-
-
 
 
 
@@ -258,26 +256,25 @@ display: inline;
 background-color: black;
 }
 
+#mc_embed_signup{clear:left; font:14px Roboto,sans-serif; width:100%; }
 
-
-.mobile {
-  display: none;
+#mc_embed_signup input[type=email],select, textarea {
+display: inline;
+background-color: black;
 }
 
-
-
-#mobile-nav{
+footer > #mobile-nav{
   display: none;
-  font-size: large;
+  margin-bottom: 32px; 
 }
 
-#mobile-nav ul li {
+footer > #mobile-nav ul li {
     list-style: none;
     text-align: center;
     box-sizing: border-box;
 }
 
-#mobile-nav ul li a {
+footer > #mobile-nav ul li a {
     display: block;
     text-decoration: underline;
     padding: 10px 0;
@@ -285,70 +282,37 @@ background-color: black;
 
 
 
-
-
 /* On screens that are 992px or less, set the background color to blue */
 @media screen and (max-width: 992px) {
  
-  #stack{
+  #card {
     width: 100%;
     max-width: 100%;
+    font-size: 150%;
+    margin-top: 32px;
   }
 
-  #content{
-    width: 100%;
-    max-width: 100%;
-  }
-
-  .mobile {
-    display: block;
-  }
-
-  #mobile-nav {
-    display: block;
-  }
-
-  .desktop {
-    display: none;
-  }
 
   header {
-  width: 100%;
-  max-width: 100%;
-  text-align: center;
+    display: none;
   }
 
   footer {
     position: relative;
-    width: 100%;
   }
 
   footer > #mobile-nav{
-     display: block;
-  }
-  
-  h1 {
-    font-size: x-large;
+     display: block
   }
 
-  h2 {
-    font-size: large;
-  }
-
-  h3 {
-    font-size: medium;
-  }
-
-  footer > div > #icons {
-    font-size: small;
-  }
-
-  #content {
-   padding-bottom: 0px;
-   padding: 16px;
-  }
+  #mc_embed_signup{ display: none;}
 
 }
+
+
+
+
+
 
 
 

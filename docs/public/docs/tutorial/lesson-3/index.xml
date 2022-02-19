@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>STARLANE</title>
+    <link>http://starlane.io/docs/tutorial/lesson-3/</link>
+    <description>Recent content on STARLANE</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 12 Feb 2022 21:29:31 -0600</lastBuildDate><atom:link href="http://starlane.io/docs/tutorial/lesson-3/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Lesson 3</title>
+      <link>http://starlane.io/docs/tutorial/lesson-3/</link>
+      <pubDate>Sat, 12 Feb 2022 21:29:31 -0600</pubDate>
+      
+      <guid>http://starlane.io/docs/tutorial/lesson-3/</guid>
+      <description>LESSON 3 &amp;ndash; CREATE AND DEPLOY A DYNAMIC APP The source code for this lesson can be found on github here:
+https://github.com/mechtronium/starlane/tree/main/tutorial/lesson-3/
+GENERATE A BOILERPLATE MECHTRON Make sure you have cargo generate installed:
+cargo install generate Next generate the mechtron:
+cargo generate --git https://github.com/mechtronium/mechtron-skel.git --name my-mechtron MODIFY THE CODE By default the generated Mechtron will return a response error for every type of request. We are going to change it so that It will process an Http request.</description>
+    </item>
+    
+  </channel>
+</rss>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 25.3.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 2000 2000" style="enable-background:new 0 0 2000 2000;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill-rule:evenodd;clip-rule:evenodd;fill:url(#SVGID_1_);}
+	.st1{fill-rule:evenodd;clip-rule:evenodd;}
+	.st2{fill-rule:evenodd;clip-rule:evenodd;fill:#805726;}
+	.st3{fill-rule:evenodd;clip-rule:evenodd;fill:#F5C16D;}
+	.st4{fill-rule:evenodd;clip-rule:evenodd;fill:#E4A152;}
+	.st5{fill:#AA0000;}
+	.st6{font-family:'Copperplate-Light';}
+	.st7{font-size:194.1471px;}
+	.st8{font-family:'Copperplate-Bold';}
+	.st9{font-size:517.7257px;}
+</style>
+<radialGradient id="SVGID_1_" cx="995.53" cy="996.58" r="789.0186" gradientTransform="matrix(1 0 0 -1 0 2000)" gradientUnits="userSpaceOnUse">
+	<stop  offset="0" style="stop-color:#660000"/>
+	<stop  offset="0.0207" style="stop-color:#730606;stop-opacity:0.9793"/>
+	<stop  offset="0.0799" style="stop-color:#921514;stop-opacity:0.9201"/>
+	<stop  offset="0.147" style="stop-color:#AE2220;stop-opacity:0.853"/>
+	<stop  offset="0.2227" style="stop-color:#C42C29;stop-opacity:0.7773"/>
+	<stop  offset="0.3111" style="stop-color:#D53431;stop-opacity:0.6889"/>
+	<stop  offset="0.4205" style="stop-color:#E03A36;stop-opacity:0.5795"/>
+	<stop  offset="0.574" style="stop-color:#E73D39;stop-opacity:0.426"/>
+	<stop  offset="1" style="stop-color:#E93E3A;stop-opacity:0"/>
+</radialGradient>
+<ellipse class="st0" cx="995.53" cy="1003.42" rx="777.88" ry="800"/>
+<path class="st1" d="M968.29,1648c-361.44-245.59-514.81-596.35-486.01-1028.97l3.56-56.31l56.3,1.63
+	c153.05,4.53,296.4-19.74,427.45-103.87l31.39-20.07l31.71,20.07c131.05,84.13,274.4,108.4,427.44,103.87l56.31-1.63l3.56,56.31
+	c28.8,432.62-124.57,783.38-486.01,1028.97l-33,22.33L968.29,1648z"/>
+<g>
+	<path class="st2" d="M953.08,1670.01c-369.2-250.77-527.1-611.24-497.66-1052.92l5.18-81.87l82.51,2.26
+		c147.55,4.53,286.04-18.76,411.91-99.66l45.95-29.45l46.27,29.45c125.88,80.9,264.36,104.18,411.92,99.66l82.18-2.26l5.51,81.87
+		c29.44,441.68-128.46,802.14-497.67,1052.92l-48.21,32.68L953.08,1670.01z M968.29,1648
+		c-361.44-245.59-514.81-596.35-486.01-1028.97l3.56-56.31l56.3,1.63c153.05,4.53,296.4-19.74,427.45-103.87l31.39-20.07
+		l31.71,20.07c131.05,84.13,274.4,108.4,427.44,103.87l56.31-1.63l3.56,56.31c28.8,432.62-124.57,783.38-486.01,1028.97l-33,22.33
+		L968.29,1648z"/>
+	<path class="st3" d="M540.53,622.91c160.81,4.86,316.46-20.7,460.45-113.25c144.32,92.55,299.96,118.11,460.78,113.25
+		c29.44,442.33-139.47,758.46-460.78,976.56C679.99,1381.37,511.08,1065.24,540.53,622.91L540.53,622.91z"/>
+	<path class="st4" d="M1000.97,509.66c144.32,92.55,299.96,118.11,460.78,113.25c29.44,442.33-139.47,758.46-460.78,976.56V509.66z"
+		/>
+</g>
+<text transform="matrix(1 0 0 1 594.6914 922.2778)" class="st5 st6 st7">RECERT</text>
+<text transform="matrix(1 0 0 1 836.1689 1316.8203)" class="st5 st8 st9">5</text>
+</svg>

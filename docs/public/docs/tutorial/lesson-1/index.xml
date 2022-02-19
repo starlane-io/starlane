@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>STARLANE</title>
+    <link>http://starlane.io/docs/tutorial/lesson-1/</link>
+    <description>Recent content on STARLANE</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 12 Feb 2022 21:29:31 -0600</lastBuildDate><atom:link href="http://starlane.io/docs/tutorial/lesson-1/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Lesson 1</title>
+      <link>http://starlane.io/docs/tutorial/lesson-1/</link>
+      <pubDate>Sat, 12 Feb 2022 21:29:31 -0600</pubDate>
+      
+      <guid>http://starlane.io/docs/tutorial/lesson-1/</guid>
+      <description>LESSON 1 &amp;ndash; DEPLOY A STATIC WEBSITE The source code for this lesson can be found on github here:
+https://github.com/mechtronium/Starlane/tree/main/tutorial/lesson-1/
+START A STARLANE SERVER Open a terminal and start serving a Starlane instance:
+Starlane serve Open a browser window and point it to http://localhost:8080/index.html &amp;ndash; you should see a STARLANE 404 page which is expected since we haven&amp;rsquo;t configured anything yet.
+CREATE THE LOCALHOST SPACE Next we are going to use the Starlane command line to issue a command to create the &amp;lsquo;localhost&amp;rsquo; space.</description>
+    </item>
+    
+  </channel>
+</rss>

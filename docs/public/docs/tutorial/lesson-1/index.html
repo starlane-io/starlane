@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>STARLANE</title>
+
+<link href="//cdn-images.mailchimp.com/embedcode/horizontal-slim-10_7.css" rel="stylesheet" type="text/css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@1,200&family=Jura&family=Roboto+Mono:wght@300&family=Roboto:wght@300&family=Stick+No+Bills:wght@200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@100;400&display=swap" rel="stylesheet">
+
+
+
+  
+  
+  
+  <link rel="stylesheet" href="/css/stars.css">
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="https://kit.fontawesome.com/e63e797fac.js" crossorigin="anonymous"></script>
+
+
+</head>
+
+
+
+
+<body>
+
+<div id="plate">
+  <div id='stars'></div>
+  <div id='stars2'></div>
+  <div id='stars3'></div>
+</div>
+
+<header>
+
+<div>
+<div id="logo">
+<span><a href="/">STARLANE</a></span>
+</div>
+<nav class="desktop">
+  <ul>
+  <li><a href="/">home</i></a></li>
+  <li><a href="/about/">about</i></a></li>
+  <li><a href="/docs/">docs</i></a></li>
+  <li><a href="/roadmap/">roadmap</i></a></li>
+  <li><a href="https://github.com/mechtronium/starlane/">github</i></a></li>
+  <li><a href="/contact/">contact</i></a></li>
+  </ul>
+</nav>
+</div>
+
+<nav class="mobile">
+  <a href="/" id="logo">STARLANE</a>
+</nav>
+
+
+</header>
+<section id="content">
+    <div>
+
+<h1 id="lesson-1----deploy-a-static-website">LESSON 1 &ndash; DEPLOY A STATIC WEBSITE</h1>
+<p>The source code for this lesson can be found on github here:</p>
+<p><a href="https://github.com/mechtronium/Starlane/tree/main/tutorial/lesson-1/">https://github.com/mechtronium/Starlane/tree/main/tutorial/lesson-1/</a></p>
+<h2 id="start-a-starlane-server">START A STARLANE SERVER</h2>
+<p>Open a terminal and start serving a Starlane instance:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">Starlane serve
+</code></pre></div><p>Open a browser window and point it to <code>http://localhost:8080/index.html</code> &ndash;  you should see a STARLANE 404 page which is expected since we haven&rsquo;t configured anything yet.</p>
+<h2 id="create-the-localhost-space">CREATE THE LOCALHOST SPACE</h2>
+<p>Next we are going to use the Starlane command line to issue a command to create the &lsquo;localhost&rsquo; space.  A <strong>Space</strong> in Starlane is both the top of the address hierarchy used for Starlane&rsquo;s messaging AND the host or domain name.  Since we are running locally we will create a <code>localhost</code> space.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">Starlane exec <span style="color:#e6db74">&#34;create localhost&lt;Space&gt;&#34;</span>
+</code></pre></div><p>Let&rsquo;s break the last command down before we move on:</p>
+<p>First when we want to send a command to Starlane we use the subcommand <code>Starlane exec</code> and then we put the actual command in quotes.</p>
+<pre><code>       Space address
+ command   |      Type 
+|--^-| |---^---||--^--|
+create localhost&lt;Space&gt;&quot;
+</code></pre><p>Here we issue the <code>create</code> command to create a new resource.  The resource&rsquo;s address is simply going to be <code>localhost</code> and the resource type is in angle brackets which is a <code>Space</code> type.</p>
+<p>We can see that if the space was created successfully by running the <code>select</code> command like so:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">Starlane exec <span style="color:#e6db74">&#34;select *&#34;</span>
+</code></pre></div><p>The output should look something like this:</p>
+<pre><code>space&lt;Space&gt;
+localhost&lt;Space&gt;
+</code></pre><p>The <code>space</code> Space is automatically created by Starlane on startup.</p>
+<h2 id="repo--artifact-bundles">REPO &amp; ARTIFACT BUNDLES</h2>
+<p>You may notice that we are still returning a 404 page, that&rsquo;s because the localhost Space lacks a Bind&ndash;which is a configuration that tells Starlane how the resource should process messages (including Http requests.)  Next We will create a bind file and package it in an artifact bundle which can be deployed to a Starlane repository&ndash; we will also create a simple HTML page to be served from the artifact bundle.</p>
+<h3 id="the-html-page">THE HTML PAGE</h3>
+<p>In an empty directory create a subdirectory called <code>html</code></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">mkdir html
+</code></pre></div><p>And within the html directory create a simple <code>index.html</code> file with the content:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-html" data-lang="html">&lt;<span style="color:#f92672">html</span>&gt;
+  &lt;<span style="color:#f92672">head</span>&gt;
+    &lt;<span style="color:#f92672">title</span>&gt;Static Page Served from Artifact&lt;/<span style="color:#f92672">title</span>&gt;
+  &lt;/<span style="color:#f92672">head</span>&gt;
+  &lt;<span style="color:#f92672">body</span>&gt;
+    &lt;<span style="color:#f92672">p</span>&gt;This page is being served from an artifact.&lt;/<span style="color:#f92672">p</span>&gt;
+  &lt;/<span style="color:#f92672">body</span>&gt;
+&lt;/<span style="color:#f92672">html</span>&gt;
+</code></pre></div><h3 id="bind-file">BIND FILE</h3>
+<p>Create another subdirectory called <code>bind</code> (on the same level as the <code>html</code> directory)</p>
+<p>Create a file named <code>localhost.bind</code> with the content:</p>
+<pre><code>Bind {
+
+  Http {
+
+    &lt;Get&gt;/(.*) -&gt; localhost:repo:tutorial:1.0.0:/html/$1 =&gt; &amp;;
+
+  }
+
+}
+</code></pre><p>So once again, let&rsquo;s break some things down before we move on.</p>
+<p>First you can see the <code>Bind</code> selector which identifies that this is a Bind file&hellip; Similarly the <code>Http</code> selector identifies the some scoped content as http configuration&hellip;</p>
+<p>Let&rsquo;s break down the most interesting line:</p>
+<pre><code>    &lt;Get&gt;/(.*) -&gt; localhost:repo:tutorial:1.0.0:/html/$1 =&gt; &amp;;
+</code></pre><p>This is a configuration for a request pipeline. The first part is the Request Pattern <code>&lt;Get&gt;/(.*)</code>  If the incoming request matches this pattern then it will be forwarded through the pipeline.</p>
+<pre><code>method      
+  |    path regex  
+|-^-||-^-|
+&lt;Get&gt;/(.*)        
+</code></pre><p>The first part of the Request Pattern is <code>&lt;Get&gt;</code> which represents the Http Method we are trying to match.  The second part of the pattern <code>/(.*)</code> is for matching the Http Request Path. This is actually a proper Regex for matching any path and importantly the parenthesis indicate to perform a CAPTURE on that portion of the path. If a request came in such as <code>&lt;Get&gt;/index.html</code> the regex would capture the string <code>index.html</code>.</p>
+<pre><code>                ArtifactBundle address segments
+pass request operator      | 
+        |                  |         Artifact address segments
+       |^|  |--------------^------------||--^----|  
+        -&gt;  localhost:repo:tutorial:1.0.0:/html/$1   
+</code></pre><p>Next we have the first Pipeline <em>Step</em> which is a simple <code>-&gt;</code> arrow. This particular pipeline step indicates that Starlane should pass the request on without any modification.</p>
+<p>Next we have the first Pipeline <em>Stop</em> which points to a resource address <code>localhost:repo:tutorial:1.0.0:/html/$1</code>.   This may be confusing because we haven&rsquo;t created this resource yet, we will be doing that next and it will become more clear how the addressing system works.  For now just notice the <code>$1</code> at the end of the address which is a regex expression telling the pipeline to replace with the first capture from the Request Pattern.   So again if the http request was <code>&lt;Get&gt;/index.html</code> then <code>index.html</code> would be the captured string and the address would be resolved to <code>localhost:repo:tutorial:1.0.0:/html/index.html</code>.</p>
+<p>Finally the <code>=&gt;</code> pass response Pipeline Step says to pass whatever response to <code>&amp;</code> which means return the response to the requester.</p>
+<pre><code>pass response operator  
+        |   return to requestor
+       |^| |^|
+        =&gt;  &amp;
+</code></pre><h3 id="zip-up-the-bundle">ZIP UP THE BUNDLE</h3>
+<p>You should have two nice directories <code>html</code> and <code>bind</code>.  We need to zip them up into a bundle so we can publish this content for Starlane to use.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">zip -r bundle.zip .
+</code></pre></div><h2 id="repo--artifact-bundle-series">REPO &amp; ARTIFACT BUNDLE SERIES</h2>
+<p>Next we need to create some address segments which to some extent act like special folder/directories in Starlane since an Artifact Bundle is required to be uploaded to a special versioned address.</p>
+<p>Create a Repo Base:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">Starlane exec <span style="color:#e6db74">&#34;create localhost:repo&lt;Base&lt;Repo&gt;&gt;&#34;</span>
+</code></pre></div><p>In this case we are creating a <code>Base</code> (which is kind of like a directory) &ndash; it&rsquo;s just a resource for containing other resources.   Notice that base takes a Kind which is akin to a SubType.  The Kind is <code>Repo</code> which indicates that only resources of type ArtifactBundleSeries will be allowed in this Base.</p>
+<p>Now let&rsquo;s create an ArtifactBundleSeries:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">Starlane exec <span style="color:#e6db74">&#34;create localhost:repo:tutorial&lt;ArtifactBundleSeries&gt;&#34;</span>
+</code></pre></div><p>An ArtifactBundleSeries will only accept a series of versioned ArtifactBundles.</p>
+<h2 id="publishing-an-artifact-bundle">PUBLISHING AN ARTIFACT BUNDLE</h2>
+<p>Finally we can now publish the <code>bundle.zip</code> we created with this command:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">Starlane exec <span style="color:#e6db74">&#34;publish ^[ bundle.zip ]-&gt; localhost:repo:tutorial:1.0.0&#34;</span>
+</code></pre></div><p>The <code>publish</code> command is a special variant of the <code>create</code> command which understands that we are creating an ArtifactBundle (which is why we don&rsquo;t need to explicitly include the Type after the address)</p>
+<p>After publish we see the use of the arrow notation <code>^[ bundle.zip ]-&gt;</code> Pipeline Step Block.  The <code>^</code> symbol indicates that we want to upload a file and make it the body of our command request.</p>
+<p>Since <code>^[ bundle.zip ]-&gt;</code> points to our newly created address <code>localhost:repo:tutorial:1.0.0</code> bundle.zip will become the stateful content of that address.  (And the ArtifactBundle resource knows how to extract the zip file and create addressable Artifacts for each file.)</p>
+<h2 id="setting-localhosts-bind">SETTING LOCALHOST&rsquo;S BIND</h2>
+<p>We now have everything in place to configure localhost&rsquo;s routing.</p>
+<p>Use this command to set the <code>bind</code> property of localhost:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">Starlane exec <span style="color:#e6db74">&#34;set localhost{ +bind=localhost:repo:tutorial:1.0.0:/bind/localhost.bind }&#34;</span>
+</code></pre></div><p>This time the command is <code>set</code> and the address is <code>localhost</code>.  The curly brace scope indicates we are going to manipulate the resource properties.  <code>+bind</code> creates a new property called <code>bind</code> and sets its value to  <code>localhost:repo:tutorial:1.0.0:/bind/localhost.bind</code> which should make some sense to you at this point.  <code>localhost:repo:tutorial:1.0.0</code> is the ArtifactBundle we just published and you can see that the trailing portion of the address references the bind file we created inside the ArtifactBundle: <code>:/bind/localhost.bind</code>.</p>
+<p>Try refreshing your browser location <code>http://localhost:8080/index.html</code> this time you should see the HTML page you created and bundled before.</p>
+<h2 id="summary">SUMMARY</h2>
+<p>You can deploy an entire static website through an ArtifactBundle.  And in the next tutorial we will cover how to combine the static webpage you just created along with a dynamic piece of WebAssembly code known as a Mechtron App.</p>
+<p><a href="http://starlane.io/docs/tutorial/lesson-2/" title="Lesson 2">NEXT : DEPLOY A &lsquo;HELLO WORLD&rsquo; APP</a></p>
+
+
+
+    </div>
+    </section><footer>
+
+
+<div id="footer-shade">
+
+ <nav id="mobile-nav">
+  <ul>
+  <li><a href="/">home</a></li>
+  <li><a href="/about/">about</a></li>
+  <li><a href="/docs/">docs</a></li>
+  <li><a href="/roadmap/">roadmap</a></li>
+  <li><a href="https://github.com/mechtronium/starlane/">github</a></li>
+  <li><a href="/contact/">contact</a></li>
+  </ul>
+ </nav>
+
+
+
+<div id="mc_embed_signup">
+<form action="https://mightydevco.us5.list-manage.com/subscribe/post?u=5db49e8f6664b3b8f0bd5ed19&amp;id=b09d2bbecb" method="post" id="mc-embedded-subscribe-form" name="mc-embedded-subscribe-form" class="validate" target="_blank" novalidate>
+    <div id="mc_embed_signup_scroll">
+	<label for="mce-EMAIL" id="join-newsletter" style="display:inline; padding-right: 16px;">JOIN THE NEWSLETTER</label>
+	<input type="email" value="" name="EMAIL" class="email" id="mce-EMAIL" placeholder="email address" required style="background-color:black;color:white">
+    
+    <div style="position: absolute; left: -5000px;" aria-hidden="true"><input type="text" name="b_5db49e8f6664b3b8f0bd5ed19_b09d2bbecb" tabindex="-1" value=""></div>
+    <div class="clear"><input type="submit" value="SUBSCRIBE" name="subscribe" id="mc-embedded-subscribe" class="button" style="margin-left:16px"></div>
+    </div>
+</form>
+</div>
+
+
+
+
+
+<nav id="icons">
+  <a href="https://www.reddit.com/r/starlane/"><i class="fab fa-reddit"></i></a>
+  <a href="https://discord.gg/S9y2uJVrq2"><i class="fab fa-discord"></i></a>
+  <a href="/contact/"><i class="fas fa-envelope"></i></a>
+  <a href="https://github.com/mechtronium/starlane/"><i class="fab fa-github"></i></a>
+</nav>
+<small>Copyright 2022 Uberscott.</small>
+
+</div>
+
+</footer>
+</body>
+</html>

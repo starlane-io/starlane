@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>STARLANE</title>
+
+<link href="//cdn-images.mailchimp.com/embedcode/horizontal-slim-10_7.css" rel="stylesheet" type="text/css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@1,200&family=Jura&family=Roboto+Mono:wght@300&family=Roboto:wght@300&family=Stick+No+Bills:wght@200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@100;400&display=swap" rel="stylesheet">
+
+
+
+  
+  
+  
+  <link rel="stylesheet" href="/css/stars.css">
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="https://kit.fontawesome.com/e63e797fac.js" crossorigin="anonymous"></script>
+
+
+</head>
+
+
+
+
+<body>
+
+<div id="plate">
+  <div id='stars'></div>
+  <div id='stars2'></div>
+  <div id='stars3'></div>
+</div>
+
+<header>
+
+<div>
+<div id="logo">
+<span><a href="/">STARLANE</a></span>
+</div>
+<nav class="desktop">
+  <ul>
+  <li><a href="/">home</i></a></li>
+  <li><a href="/about/">about</i></a></li>
+  <li><a href="/docs/">docs</i></a></li>
+  <li><a href="/roadmap/">roadmap</i></a></li>
+  <li><a href="https://github.com/mechtronium/starlane/">github</i></a></li>
+  <li><a href="/contact/">contact</i></a></li>
+  </ul>
+</nav>
+</div>
+
+<nav class="mobile">
+  <a href="/" id="logo">STARLANE</a>
+</nav>
+
+
+</header>
+<section id="content">
+    <div>
+
+<h1 id="documentation">DOCUMENTATION</h1>
+<h2 id="getting-started">GETTING STARTED</h2>
+<h3 id="install-rust">INSTALL RUST</h3>
+<p>To build Starlane you will need to have <strong>rust</strong> installed.  Follow the official Rust instructions to <a href="https://www.rust-lang.org/tools/install">install Rust</a>.</p>
+<h3 id="nightly-toolchain">NIGHTLY TOOLCHAIN</h3>
+<p>Starlane requires the <code>nightly</code> toolchain for compilation.  To switch to the <code>nightly</code> toolchain:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">rustup toolchain install nightly
+rustup default nightly
+</code></pre></div><h3 id="build-and-install-starlane">BUILD AND INSTALL STARLANE</h3>
+<pre><code>cargo install starlane
+</code></pre><p>Congrats! You now have Starlane installed on your machine!</p>
+<h3 id="start-a-starlane-server-instance">START A STARLANE SERVER INSTANCE</h3>
+<p>Open a terminal and run the following command to start a server instance of Starlane:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">starlane serve
+</code></pre></div><p>At this point starlane should be serving a Http Server on port 8080.  Open a browser and point it to <a href="http://localhost:8080/">http://localhost:8080/</a>.  You should see a &ldquo;404&rdquo; page (since there isn&rsquo;t a localhost space or routing bind.)</p>
+<p>NOTE: Starlane works most of the time, however, this software is still in development and about 1 out of every 20 runs Starlane has a failure causing the example to break.  If you notice a problem, maybe try rerunning the example from the start.</p>
+<h2 id="tutorial">TUTORIAL</h2>
+<p>To learn more please follow the online <a href="http://starlane.io/docs/tutorial/" title="Tutorial">Tutorial</a>.</p>
+
+
+
+    </div>
+    </section><footer>
+
+
+<div id="footer-shade">
+
+ <nav id="mobile-nav">
+  <ul>
+  <li><a href="/">home</a></li>
+  <li><a href="/about/">about</a></li>
+  <li><a href="/docs/">docs</a></li>
+  <li><a href="/roadmap/">roadmap</a></li>
+  <li><a href="https://github.com/mechtronium/starlane/">github</a></li>
+  <li><a href="/contact/">contact</a></li>
+  </ul>
+ </nav>
+
+
+
+<div id="mc_embed_signup">
+<form action="https://mightydevco.us5.list-manage.com/subscribe/post?u=5db49e8f6664b3b8f0bd5ed19&amp;id=b09d2bbecb" method="post" id="mc-embedded-subscribe-form" name="mc-embedded-subscribe-form" class="validate" target="_blank" novalidate>
+    <div id="mc_embed_signup_scroll">
+	<label for="mce-EMAIL" id="join-newsletter" style="display:inline; padding-right: 16px;">JOIN THE NEWSLETTER</label>
+	<input type="email" value="" name="EMAIL" class="email" id="mce-EMAIL" placeholder="email address" required style="background-color:black;color:white">
+    
+    <div style="position: absolute; left: -5000px;" aria-hidden="true"><input type="text" name="b_5db49e8f6664b3b8f0bd5ed19_b09d2bbecb" tabindex="-1" value=""></div>
+    <div class="clear"><input type="submit" value="SUBSCRIBE" name="subscribe" id="mc-embedded-subscribe" class="button" style="margin-left:16px"></div>
+    </div>
+</form>
+</div>
+
+
+
+
+
+<nav id="icons">
+  <a href="https://www.reddit.com/r/starlane/"><i class="fab fa-reddit"></i></a>
+  <a href="https://discord.gg/S9y2uJVrq2"><i class="fab fa-discord"></i></a>
+  <a href="/contact/"><i class="fas fa-envelope"></i></a>
+  <a href="https://github.com/mechtronium/starlane/"><i class="fab fa-github"></i></a>
+</nav>
+<small>Copyright 2022 Uberscott.</small>
+
+</div>
+
+</footer>
+</body>
+</html>

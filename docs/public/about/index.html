@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>STARLANE</title>
+
+<link href="//cdn-images.mailchimp.com/embedcode/horizontal-slim-10_7.css" rel="stylesheet" type="text/css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@1,200&family=Jura&family=Roboto+Mono:wght@300&family=Roboto:wght@300&family=Stick+No+Bills:wght@200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@100;400&display=swap" rel="stylesheet">
+
+
+
+  
+  
+  
+  <link rel="stylesheet" href="/css/stars.css">
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <script src="https://kit.fontawesome.com/e63e797fac.js" crossorigin="anonymous"></script>
+
+
+</head>
+
+
+
+
+<body>
+
+<div id="plate">
+  <div id='stars'></div>
+  <div id='stars2'></div>
+  <div id='stars3'></div>
+</div>
+
+<header>
+
+<div>
+<div id="logo">
+<span><a href="/">STARLANE</a></span>
+</div>
+<nav class="desktop">
+  <ul>
+  <li><a href="/">home</i></a></li>
+  <li><a href="/about/">about</i></a></li>
+  <li><a href="/docs/">docs</i></a></li>
+  <li><a href="/roadmap/">roadmap</i></a></li>
+  <li><a href="https://github.com/mechtronium/starlane/">github</i></a></li>
+  <li><a href="/contact/">contact</i></a></li>
+  </ul>
+</nav>
+</div>
+
+<nav class="mobile">
+  <a href="/" id="logo">STARLANE</a>
+</nav>
+
+
+</header>
+<section id="content">
+    <div>
+
+<h1 id="about-starlane">ABOUT STARLANE</h1>
+<p>Starlane makes it easy to deploy and interoperate with secure WebAssembly code in the cloud, the edge, desktop, mobile and IoT environments.</p>
+<h2 id="a-server-to-client-mesh">A SERVER TO CLIENT MESH</h2>
+<p>Starlane is a special type of Mesh that spans from the server to client.  This special Mesh facilitates the execution of WebAssembly at every level. To accomplish this feat Starlane provides the following :</p>
+<ul>
+<li>Starlane host environments which can run on the client or the server and connect to other Starlane hosts</li>
+<li>An Artifact Bundle repository which allows resources to reference, download and cache configurations, executable Wasm code and assets.</li>
+<li>A simple to use message passing framework enabling WebAssembly actors to interact with any other resources connected to the Mesh.</li>
+<li>A Mesh Portal API for connecting non-WebAssembly backend micro services to the mesh.</li>
+<li>Extendable resources such as Databases, FileSystems, Message Queues etc&ndash; all of which can process Starlane messages.</li>
+<li>A Simple to implement Framework which makes it easy for WebAssembly to interoperate with the host Starlane Mesh.</li>
+</ul>
+<h3 id="why-webassembly">WHY WEBASSEMBLY?</h3>
+<p>In case you haven&rsquo;t heard of WebAssembly, this section is for you to help you understand why WebAssembly is truly the future and something to get excited about!</p>
+<p>WebAssembly is a binary instruction set that can be executed consistently and securely anywhere: meaning in the browser client and on the server almost any architecture and OS. It’s an amazing breakthrough that is already working on all the major browsers and all the major Os and architecture combinations. If you want to learn more about WebAssembly check it out on the WebAssembly.org website.</p>
+<p>One reason that WebAssembly is secure is that it is executed in a “host” environment, which also serves as its sandbox. WebAssembly cannot by itself access any files or connect to the network. A WebAssembly program cannot even create a thread and update itself automatically, it relies upon its host to provide it with data and execution time. The host also provides an interface for WebAssembly to call for additional custom interaction between the host and the WebAssembly guest.</p>
+<p>This brings us back to one of the original problems Starlane was created to solve: WebAssembly needs a standard way to interact with varied enterprise resources. And to that end the Mechtron was invented…</p>
+<h3 id="mechtrons">MECHTRONS</h3>
+<p>The Mechtron is an open source framework of the <a href="https://en.wikipedia.org/wiki/Actor_model">Actor model</a>.  Starlane implements the host Mechtron interface and can communicate to any WebAssembly binary that was compiled with an implementation of the guest Mechtron interface.</p>
+<p>Additionally a Mechtron standard defines:</p>
+<ul>
+<li>A bind configuration which tells the Resource Mesh what kind of messages the Mechtron can receive and the schema of the expected message payloads</li>
+<li>A mechtron deployment configuration file which defines which WebAssembly binary artifact to execute and references a bind config artifact to implement as well as some additional custom parameters</li>
+<li>An application configuration which defines the mechtron initialization and composition of the app as well as some other required resources like FileSystems, Databases etc.</li>
+</ul>
+<p>Importantly the WebAssembly binary can now use the Mechtron interface to access The Resource Mesh in order to access any Resource in the enterprise and talk to other Mechtrons in an agreed upon message payload serialization thanks to the bind references</p>
+<p>An Application that executes within Starlane&rsquo;s Mesh can be composed of many multiple mechtrons that may be written by completely different people in completely different languages yet they will be able to communicate and coordinate with each other.</p>
+<p>And&hellip; The Application can even swap out mechtrons while it is running&hellip;</p>
+<p>And&hellip;  Tenants of a Starlane Cloud Service could be given permission to overwrite the default Mechtron that managed something specific to them: let&rsquo;s say for example users of a social media site would like to write custom code to render their Profile page. They could create a custom mechtron that implements the profile bind referenced by the application and then deploy and let the social medias sites Starlane instance securely execute their custom code infrastructure!<br>
+Mechtrons are made to encourage creativity and collaboration through code!  The possibilities are very exciting!</p>
+<h2 id="try-it-out">TRY IT OUT</h2>
+<p>Why not try out the <a href="http://starlane.io/docs/" title="Docs">Getting Started</a> guide today where you can deploy Starlane, publish some static files to an Artifact Bundle, serve those files from an http server and then deploy and create an actual Mechtron and serve an html page from that mechtron.</p>
+
+
+
+    </div>
+    </section><footer>
+
+
+<div id="footer-shade">
+
+ <nav id="mobile-nav">
+  <ul>
+  <li><a href="/">home</a></li>
+  <li><a href="/about/">about</a></li>
+  <li><a href="/docs/">docs</a></li>
+  <li><a href="/roadmap/">roadmap</a></li>
+  <li><a href="https://github.com/mechtronium/starlane/">github</a></li>
+  <li><a href="/contact/">contact</a></li>
+  </ul>
+ </nav>
+
+
+
+<div id="mc_embed_signup">
+<form action="https://mightydevco.us5.list-manage.com/subscribe/post?u=5db49e8f6664b3b8f0bd5ed19&amp;id=b09d2bbecb" method="post" id="mc-embedded-subscribe-form" name="mc-embedded-subscribe-form" class="validate" target="_blank" novalidate>
+    <div id="mc_embed_signup_scroll">
+	<label for="mce-EMAIL" id="join-newsletter" style="display:inline; padding-right: 16px;">JOIN THE NEWSLETTER</label>
+	<input type="email" value="" name="EMAIL" class="email" id="mce-EMAIL" placeholder="email address" required style="background-color:black;color:white">
+    
+    <div style="position: absolute; left: -5000px;" aria-hidden="true"><input type="text" name="b_5db49e8f6664b3b8f0bd5ed19_b09d2bbecb" tabindex="-1" value=""></div>
+    <div class="clear"><input type="submit" value="SUBSCRIBE" name="subscribe" id="mc-embedded-subscribe" class="button" style="margin-left:16px"></div>
+    </div>
+</form>
+</div>
+
+
+
+
+
+<nav id="icons">
+  <a href="https://www.reddit.com/r/starlane/"><i class="fab fa-reddit"></i></a>
+  <a href="https://discord.gg/S9y2uJVrq2"><i class="fab fa-discord"></i></a>
+  <a href="/contact/"><i class="fas fa-envelope"></i></a>
+  <a href="https://github.com/mechtronium/starlane/"><i class="fab fa-github"></i></a>
+</nav>
+<small>Copyright 2022 Uberscott.</small>
+
+</div>
+
+</footer>
+</body>
+</html>

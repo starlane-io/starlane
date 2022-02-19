@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>STARLANE</title>
+    <link>http://starlane.io/docs/tutorial/lesson-2/</link>
+    <description>Recent content on STARLANE</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 12 Feb 2022 21:29:31 -0600</lastBuildDate><atom:link href="http://starlane.io/docs/tutorial/lesson-2/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Lesson 2</title>
+      <link>http://starlane.io/docs/tutorial/lesson-2/</link>
+      <pubDate>Sat, 12 Feb 2022 21:29:31 -0600</pubDate>
+      
+      <guid>http://starlane.io/docs/tutorial/lesson-2/</guid>
+      <description>LESSON 2 &amp;ndash; DEPLOY AN APP The source code for this lesson can be found on github here:
+https://github.com/mechtronium/starlane/tree/main/tutorial/lesson-2/
+SETUP SCRIPTS At the time of this writing Starlane does not persist changes. In order to re-setup localhost and the repository you created in lesson 1 you will need to rerun the create commands&amp;ndash;BUT there is a BETTER way!
+You can run a setup script located in the repository here /tutorial/lesson-2/script/setup.script. The script looks like this:</description>
+    </item>
+    
+  </channel>
+</rss>

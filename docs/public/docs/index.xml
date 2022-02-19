@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>STARLANE</title>
+    <link>http://starlane.io/docs/</link>
+    <description>Recent content on STARLANE</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 12 Feb 2022 21:29:31 -0600</lastBuildDate><atom:link href="http://starlane.io/docs/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title></title>
+      <link>http://starlane.io/docs/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>http://starlane.io/docs/</guid>
+      <description>DOCUMENTATION GETTING STARTED INSTALL RUST To build Starlane you will need to have rust installed. Follow the official Rust instructions to install Rust.
+NIGHTLY TOOLCHAIN Starlane requires the nightly toolchain for compilation. To switch to the nightly toolchain:
+rustup toolchain install nightly rustup default nightly BUILD AND INSTALL STARLANE cargo install starlane Congrats! You now have Starlane installed on your machine!
+START A STARLANE SERVER INSTANCE Open a terminal and run the following command to start a server instance of Starlane:</description>
+    </item>
+    
+  </channel>
+</rss>

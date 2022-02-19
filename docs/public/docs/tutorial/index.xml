@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>STARLANE</title>
+    <link>http://starlane.io/docs/tutorial/</link>
+    <description>Recent content on STARLANE</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 12 Feb 2022 21:29:31 -0600</lastBuildDate><atom:link href="http://starlane.io/docs/tutorial/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Tutorial</title>
+      <link>http://starlane.io/docs/tutorial/</link>
+      <pubDate>Sat, 12 Feb 2022 21:29:26 -0600</pubDate>
+      
+      <guid>http://starlane.io/docs/tutorial/</guid>
+      <description>TUTORIAL  Lesson 1 -&amp;gt; Deploy a static site. Lesson 2 -&amp;gt; Deploy a Simple App Lesson 3 -&amp;gt; Create and Deploy a Dynamic App  </description>
+    </item>
+    
+  </channel>
+</rss>

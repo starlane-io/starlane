@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>STARLANE</title>
+    <link>http://starlane.io/</link>
+    <description>Recent content on STARLANE</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 12 Feb 2022 21:29:31 -0600</lastBuildDate><atom:link href="http://starlane.io/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Lesson 1</title>
+      <link>http://starlane.io/docs/tutorial/lesson-1/</link>
+      <pubDate>Sat, 12 Feb 2022 21:29:31 -0600</pubDate>
+      
+      <guid>http://starlane.io/docs/tutorial/lesson-1/</guid>
+      <description>LESSON 1 &amp;ndash; DEPLOY A STATIC WEBSITE The source code for this lesson can be found on github here:
+https://github.com/mechtronium/Starlane/tree/main/tutorial/lesson-1/
+START A STARLANE SERVER Open a terminal and start serving a Starlane instance:
+Starlane serve Open a browser window and point it to http://localhost:8080/index.html &amp;ndash; you should see a STARLANE 404 page which is expected since we haven&amp;rsquo;t configured anything yet.
+CREATE THE LOCALHOST SPACE Next we are going to use the Starlane command line to issue a command to create the &amp;lsquo;localhost&amp;rsquo; space.</description>
+    </item>
+    
+    <item>
+      <title>Lesson 2</title>
+      <link>http://starlane.io/docs/tutorial/lesson-2/</link>
+      <pubDate>Sat, 12 Feb 2022 21:29:31 -0600</pubDate>
+      
+      <guid>http://starlane.io/docs/tutorial/lesson-2/</guid>
+      <description>LESSON 2 &amp;ndash; DEPLOY AN APP The source code for this lesson can be found on github here:
+https://github.com/mechtronium/starlane/tree/main/tutorial/lesson-2/
+SETUP SCRIPTS At the time of this writing Starlane does not persist changes. In order to re-setup localhost and the repository you created in lesson 1 you will need to rerun the create commands&amp;ndash;BUT there is a BETTER way!
+You can run a setup script located in the repository here /tutorial/lesson-2/script/setup.script. The script looks like this:</description>
+    </item>
+    
+    <item>
+      <title>Lesson 3</title>
+      <link>http://starlane.io/docs/tutorial/lesson-3/</link>
+      <pubDate>Sat, 12 Feb 2022 21:29:31 -0600</pubDate>
+      
+      <guid>http://starlane.io/docs/tutorial/lesson-3/</guid>
+      <description>LESSON 3 &amp;ndash; CREATE AND DEPLOY A DYNAMIC APP The source code for this lesson can be found on github here:
+https://github.com/mechtronium/starlane/tree/main/tutorial/lesson-3/
+GENERATE A BOILERPLATE MECHTRON Make sure you have cargo generate installed:
+cargo install generate Next generate the mechtron:
+cargo generate --git https://github.com/mechtronium/mechtron-skel.git --name my-mechtron MODIFY THE CODE By default the generated Mechtron will return a response error for every type of request. We are going to change it so that It will process an Http request.</description>
+    </item>
+    
+    <item>
+      <title>Tutorial</title>
+      <link>http://starlane.io/docs/tutorial/</link>
+      <pubDate>Sat, 12 Feb 2022 21:29:26 -0600</pubDate>
+      
+      <guid>http://starlane.io/docs/tutorial/</guid>
+      <description>TUTORIAL  Lesson 1 -&amp;gt; Deploy a static site. Lesson 2 -&amp;gt; Deploy a Simple App Lesson 3 -&amp;gt; Create and Deploy a Dynamic App  </description>
+    </item>
+    
+    <item>
+      <title>Blogs</title>
+      <link>http://starlane.io/blogs/</link>
+      <pubDate>Thu, 22 Jul 2021 01:47:28 -0500</pubDate>
+      
+      <guid>http://starlane.io/blogs/</guid>
+      <description>BLOGS comming soon!</description>
+    </item>
+    
+    <item>
+      <title>Contact</title>
+      <link>http://starlane.io/contact/</link>
+      <pubDate>Thu, 22 Jul 2021 01:47:28 -0500</pubDate>
+      
+      <guid>http://starlane.io/contact/</guid>
+      <description>CONTACT Feel free to reach out and ask for help or any question you have about Starlane!
+If you need immediate help, try reaching out via the Starlane Discord channel.
+Otherwise fill out this form to receive a response via traditional email:
+EMAIL MESSAGE    </description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>http://starlane.io/about/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>http://starlane.io/about/</guid>
+      <description>ABOUT STARLANE Starlane makes it easy to deploy and interoperate with secure WebAssembly code in the cloud, the edge, desktop, mobile and IoT environments.
+A SERVER TO CLIENT MESH Starlane is a special type of Mesh that spans from the server to client. This special Mesh facilitates the execution of WebAssembly at every level. To accomplish this feat Starlane provides the following :
+ Starlane host environments which can run on the client or the server and connect to other Starlane hosts An Artifact Bundle repository which allows resources to reference, download and cache configurations, executable Wasm code and assets.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>http://starlane.io/docs/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>http://starlane.io/docs/</guid>
+      <description>DOCUMENTATION GETTING STARTED INSTALL RUST To build Starlane you will need to have rust installed. Follow the official Rust instructions to install Rust.
+NIGHTLY TOOLCHAIN Starlane requires the nightly toolchain for compilation. To switch to the nightly toolchain:
+rustup toolchain install nightly rustup default nightly BUILD AND INSTALL STARLANE cargo install starlane Congrats! You now have Starlane installed on your machine!
+START A STARLANE SERVER INSTANCE Open a terminal and run the following command to start a server instance of Starlane:</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>http://starlane.io/example/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>http://starlane.io/example/</guid>
+      <description>EXAMPLE jk</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>http://starlane.io/roadmap/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>http://starlane.io/roadmap/</guid>
+      <description>PRODUCT ROADMAP FOR THE BETTERMENT OF ALL ERROR MESSAGES version: 0.3.0 [backlog] This release will be focussed on making sure that problems with Starlane are as easy to diagnose as possible. The goals involve improvment of the logs, status states and making sure there is clear feedback and error and error messages if the user does something wrong.
+  better error messages when parsing commands
+ clear message when a syntax error occurs point out exact location of &amp;lsquo;confusion&amp;rsquo; just like Rust compiler does    descriptive hierarchy</description>
+    </item>
+    
+  </channel>
+</rss>

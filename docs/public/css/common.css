@@ -1,0 +1,81 @@
+body {
+  margin: 0px;
+  background: black;
+  color: #aaaaaa;
+  font-family: "Raleway", sans-serif;
+}
+
+
+
+h1 {
+  color: grey;
+  font-family: "Josefin Sans", sans-serif;
+  font-size: xxx-large;
+  background: -webkit-linear-gradient(white, #38495a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 16px;
+  margin-top: 32px;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+h2 {
+  color: grey;
+  font-family: "Josefin Sans", sans-serif;
+  font-size: xx-large;
+  background: -webkit-linear-gradient(white, #38495a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-top: 30px;
+  margin-bottom: 4px;
+}
+
+h3 {
+  color: grey;
+  font-family: "Josefin Sans", sans-serif;
+  font-size: x-large;
+  background: -webkit-linear-gradient(white, #38495a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-top: 30px;
+  margin-bottom: 4px;
+}
+
+p {
+  color: #999999;
+  margin-top: 0px;
+}
+
+
+pre {
+ padding: 16px;
+ background-color: #333333;
+ overflow-y: scroll;
+}
+
+code {
+  color: #cccccc;
+  font-family: "Roboto Mono", sans-serif;
+}
+
+ul {
+   margin-top: 4px;
+   margin-bottom: 24px;
+}
+
+li {
+   margin-top: 8px;
+   margin-bottom: 8px;
+}
+
+li p {
+  margin-bottom: 0px;
+}
+
+
+strong {
+  font-weight: 400%;
+  color: #ffffff;
+}
