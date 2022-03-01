@@ -8,25 +8,21 @@ This release will be focussed on making sure that problems with Starlane are as 
   - clear message when a syntax error occurs 
   - point out exact location of 'confusion' just like Rust compiler does
 
+* Actually enforce Mechtron Bind released in 'MORE MECHTRONY GOODNESS'
+  - ensure clear error message if there is a bind failure
+
 * descriptive hierarchy 
   - differentiation between User & System error
-  - fail hierarchy (as in what aspect of the resource failed [Create,Select,PortRequest, etc]
+  - fail hierarchy (as in what aspect of the resource failed [Create,Select,Request, etc]
   - component hierarchy to help describe exactly where the failure occured
 
 * improved Logs
-  - creation of new Logger resource (which is a rolling file of Logs)
-  - creation of Log resource which is an individual line in the logger
-  - mechtrons to message their logs to a logger
-  - ability to attach a Session identifier to a Log 
-  - ability to attach a Message identifier to a Log
-  - use of descriptive hierarchies in logs to better understand What happened and Where it happened
+  - new Rc\<Append\> logs a file
+  - creation of Rc\<Watch\<Stream\>\> to stream changes
+  - command line "tail log" (which is "watch log..." for streaming)
 
-* create a bunch of common user mistake scenarios (things like improperly embedded configuration file). Test for useable error messages
 * ability to query the status of resources [Unknown, Creating, Ready, Panic, Destroyed, etc.] also include descriptive error messages for some states like Panic describing the nature of the panic.
 * ability to query the status of Stars 
-
-* Actually enforce Mechtron Bind released in 'MORE MECHTRONY GOODNESS'
-  - ensure clear error message if there is a bind failure
 
 * improved message reliability:
   - send message acknowledgements when a message is received by a Star
@@ -36,7 +32,93 @@ This release will be focussed on making sure that problems with Starlane are as 
   - ability to configure ack timeout, retries and max retry 
 
 
-### KUBERNETES AND DATABASES version: 0.4.0 [backlog]
+### SECURITY, AUTHENTICATION AND AUTHORIZATION version: 0.4.0 [backlog]
+* Persistent Storage
+* Authentication
+  - Credentials resource (username & password)
+  - OAuth support in Kubernetes cluster (via Keycloak)
+  - starlane cli login
+  - Authenticator resource (allow for logins within the mesh)
+
+* Permissions
+  - resource ownership chain (every resource must have an owning resource leading to a User resource)
+  - Create, Read, Update, Delete and Execute resource permission for resource and children: (crudx/crudx) ... how it will work is still being heavily revised ...
+  - creation of Role resource
+  - ability to bind a role to User, App and Mechtron resources
+  -  ability to grant permissions to a Role for a resource [read,write,execute]
+  - ability to grant additional priviledges to a message request
+  - enforcement of permissions rules when accessing resources 
+
+* Http Session
+  - Ability for the WebService to enforce a login and create an HttpSession 
+
+* Mechtron Bind Improvements:
+  - whitelisting of external resource calls, including grant permissions from within the Port Definition Block
+  - ability to grant additional resource permissions to a request
+  - ability to set a timeout for mechtron port's execution time
+  - ability to set a timeout for mechtron port's total time to respond to a message (includes whatever is being done with other resources)
+
+
+### MECHTRON HUB (for artifact bundles) version: 0.5.0 [backlog]
+* ability to publish and share artifact bundles on mechtronhub.io
+* ability to reference an external Space via address i.e. mechtronhub.io::uberscott.com:my-favorite-mechtron:1.0.0:/Mechtron.wasm
+* ability to tag an external Space i.e. [hub]::uberscott.com:my-favorite-mechtron:1.0.0:/Mechtron.wasm
+* create a space based on an email address: mechtronhub.io::scott@mightydevco.com:my-mechtron:1.0.0:/Mechtron.wasm
+
+* user accounts (this may be a command line thingy)
+  - ability to create a new account
+  - ability to login
+  - email verification 
+  - domain verification to prove that user is controller of domain
+
+* bundles
+  - ability to publish a resource bundle (cli)
+
+* REST api
+  - publish a REST api for accesing ArtifactBundles so that languages other than Rust can download and access 
+  - rust client library for new rest API for downloading and unzipping ArtifactBundles as well as caching Artifacts 
+  - incorporate rust client library into starlane itself 
+
+### STARLANE IN JAVASCRIPT [backlog]
+* ability to use MechtronHub (to download & unzip packages)
+* compilating and execution starlane-wasm-portal in a Wasm guest
+* example project with starlane-paralax
+* example project with bindgen
+
+
+### PRODUCTION version: 1.0.0-beta [backlog]
+The first version where Starlane is ready for production environments.
+* support for larger binaries
+  - Implementation of the 'Data Conveyor' (Starlane's support for large files & messages)
+* Lot's and Lot's of testing the robustness of the app
+
+
+### PRODUCTION version: 1.0.0 [backlog]
+* Lot's and Lot's of more testing....
+
+### MECHTRON HUB 2 (for artifact bundles) [backlog]
+
+* bundles webpage
+  - artifact bundle metadata (name, description,image,authors) bundle.yaml file
+  - an html page for each ArtifactBundleVersion's sourced from {{ bundle }}/README.md
+  - page has different links to previous versions of ArtifactBundle
+
+* specific
+  - ability to publish a 'Specific' specific.yaml: title, authors, meta data, search keys, artifact references, README.md (which renderes a page) 
+
+* search
+  - ability to apply searchable keywords to an ArtifactBundle (in bundle.yaml)
+  - ability to search hub for a particular ArtifactBundle
+  - SearchKey: vendor:[MySql], product:[PostgreSQL], website:[mysql.org], solution:[Database], solution:[Message Broker], author:[Scott Williams], 
+
+
+### CLIENT SIDE STARLANE [backlog]
+* implementation of WebSocket for message passing messages between a starlane client and server 
+* introduction of client-side Mechtrons
+* client side libaries for running starlane inside iOS and Android
+
+
+### KUBERNETES AND DATABASES [backlog]
 * Introduction of the Starlane Kubernetes Operator 
   - ability to specify the number of stars that serve mechtrons
 * resource registry persistence (before resource registry was handled by in-memory SQLite)
@@ -56,7 +138,7 @@ This release will be focussed on making sure that problems with Starlane are as 
   - pipeline DSL for http requests & responses
 
 
-### REMOTE SERIALIZATION & API version: 0.5.0 [backlog]
+### REMOTE SERIALIZATION & API [backlog]
 * create a serialization for accessing resources remotely 
 * autogenerate library serializations for common languages like Rust, Java, C#, JavaScript, Python, Ruby, etc.
 * mechanism for negotiating serialization version
@@ -74,92 +156,19 @@ This release will be focussed on making sure that problems with Starlane are as 
   - Payload Structured Schema Validation: a payload can be validated according to a Schema document provided via an Artifact such as Json Schema
   - A Payload can have be validated by a utility Mechtron in order to handle any type of custom Schema
 
-### SECURITY, AUTHENTICATION AND AUTHORIZATION version: 0.6.0 [backlog]
-* Create, Read, Update, Delete and Execute resource permission for resource and children: (crudx/crudx) ... how it will work is still being heavily revised ...
-* Creation of UserBase resource which has a list of User resources as it's children
-* Authenticator resource (allow for logins)
-* Credentials resource (username & password)
-* resource ownership chain (every resource must have an owning resource leading to a User resource)
-* creation of Role resource
-* ability to bind a role to User, App and Mechtron resources
-* ability to grant permissions to a Role for a resource [read,write,execute]
-* ability to grant additional priviledges to a message request
-* enforcement of permissions rules when accessing resources 
-* OAuth support in Kubernetes cluster (via Keycloak)
-* Ability for the WebService to enforce a login and create an HttpSession 
 
-* Mechtron Bind Improvements:
-  - whitelisting of external resource calls, including grant permissions from within the Port Definition Block
-  - ability to grant additional resource permissions to a request
-  - ability to set a timeout for mechtron port's execution time
-  - ability to set a timeout for mechtron port's total time to respond to a message (includes whatever is being done with other resources)
-
-
-### MECHTRON HUB (for artifact bundles) version: 0.8.0 [backlog]
-* ability to publish and share artifact bundles via on mechtronhub.io
-* ability to reference an external Space via address i.e. mechtronhub.io::uberscott.com:my-favorite-mechtron:1.0.0:/Mechtron.wasm
-* ability to tag an external Space i.e. [hub]::uberscott.com:my-favorite-mechtron:1.0.0:/Mechtron.wasm
-* create a space based on an email address: mechtronhub.io::scott@mightydevco.com:my-mechtron:1.0.0:/Mechtron.wasm
-
-* user accounts (this may be a command line thingy)
-  - ability to create a new account
-  - ability to login
-  - email verification 
-  - domain verification to prove that user is controller of domain
-
-* bundles
-  - ability to publish a resource bundle (cli)
-
-* specific
-  - ability to publish a 'Specific' specific.yaml: title, authors, meta data, search keys, artifact references, README.md (which renderes a page) 
-  
-* bundles webpage
-  - artifact bundle metadata (name, description,image,authors) bundle.yaml file
-  - an html page for each ArtifactBundleVersion's sourced from {{ bundle }}/README.md
-  - page has different links to previous versions of ArtifactBundle
-
-* search
-  - ability to apply searchable keywords to an ArtifactBundle (in bundle.yaml)
-  - ability to search hub for a particular ArtifactBundle
-  - SearchKey: vendor:[MySql], product:[PostgreSQL], website:[mysql.org], solution:[Database], solution:[Message Broker], author:[Scott Williams], 
-
-* REST api
-  - publish a REST api for accesing ArtifactBundles so that languages other than Rust can download and access 
-  - rust client library for new rest API for downloading and unzipping ArtifactBundles as well as caching Artifacts 
-  - incorporate rust client library into starlane itself 
-
-
-### PRODUCTION version: 1.0.0-beta [backlog]
-The first version where Starlane is ready for production environments.
-* support for larger binaries
-  - Implementation of the 'Data Conveyor' (Starlane's support for large files & messages)
-* Lot's and Lot's of testing the robustness of the app
-
-
-### PRODUCTION version: 1.0.0 [backlog]
-* Lot's and Lot's of more testing....
-
-### CLIENT SIDE STARLANE version: 1.1.0 [backlog]
-* implementation of WebSocket for message passing messages between a starlane client and server 
-* introduction of client-side Mechtrons
-* client side libaries for running starlane inside iOS and Android
-
-### STARLANE IN JAVASCRIPT version: 1.2.0 [backlog]
-* compilating and execution starlane-core in a Wasm guest
-* JavaScript engine for running starlane-core Wasm
-
-### SCHEDULER version: 1.3.0 [backlog]
+### SCHEDULER [backlog]
 * addition of the of the Scheduler, Cron, Timer & Future resources 
 * addition of a Broadcast resource which broadcasts messages sent to it to all watching resources
 * ability to create a Cron resource which will send a message to another resource at a configured time
 * abillity to create a Timer resource [Fixed & Delayed] which will send a message to another resource repeatedly based on an interval
 * ability to create a Future which will send a message after it receives a response from a potentially long running message. It can also be configured to timeout
 
-### QUEUES & WORKERS version: 1.4.0 [backlog]
+### QUEUES & WORKERS [backlog]
 * addition of a Queue resource which will consume and hold messages
 * addition of a Worker resource which will pull messages from a Queue and send them to another reasource and wait till it receives a response before pulling from the Queue again
 
-### OPERATIONS version: 1.5.0 [backlog]
+### OPERATIONS [backlog]
 * ability to create an Operation resource which has pre-defind child resources known as Task, Wave and TaskResult
 * Operation is bound to a mechtron that builds a Task list called a Wave when it is invoked with parameters
 * Operation executes each task in its Wave and produces a TaskResult
@@ -167,13 +176,13 @@ The first version where Starlane is ready for production environments.
 * Tasks have the ability to execute Mechtrons for processing
 * add ability for Operations (and resources in general) to have a 'circuit' which can be tripped making the resource inaccessable for a configured amout of time or until a condition is met... this will be useful for operations that do things like download large amounts of data when they encouter a 'rate limit' which requires pausing the operation for a while.
 
-### EXTERNAL SERVICE version: 1.6.0 [backlog]
+### EXTERNAL SERVICE [backlog]
 * ability to hook an external Service to Starlane via the Starlane Kubernetes Operator  [RestService,WebService,etc]
 * ability to exchange messages with the external "Service Resource"  
 * ability to add a router proxy pass to an external WebService 
 * example of a Wordpress site being served through Starlane web 
 
-### STATEFUL MECHTRONS version: 1.7.0 [backlog]
+### STATEFUL MECHTRONS [backlog]
 * Mechtrons can be configured as Stateful
 * new configuration rules for mechtrons governing state persistence [None, ReplicateToFile] 
 * ability to replicate Mechtrons accross hosts in order to survive individual machine crashes
@@ -184,7 +193,7 @@ The first version where Starlane is ready for production environments.
   - at the end of the request the memory block will be once again evicted
   - mechanism needed for a mechtron to 'release' it's claim on cached memory
 
-### SCALE version: 2.0.0 [backlog]
+### SCALE [backlog]
 * Kubernetes operator gains ability to distribute stars accross multiple containers
   - ability to 'resize & reshape' the Starlane cluster based on Kubernetes resource definition 
 * Sharding of resources

@@ -3,7 +3,8 @@ use mesh_portal_versions::version::v0_0_1::parse::{create, get, publish, Res, se
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{multispace0, space1};
-use nom::combinator::{all_consuming, opt, recognize};
+use nom::combinator::{all_consuming, fail, opt, recognize};
+use nom::error::context;
 use nom::multi::many0;
 use nom::sequence::{terminated, tuple};
 use crate::command::compose::{CommandOp, Strategy};
@@ -49,20 +50,24 @@ pub fn command_strategy(input: &str) -> Res<&str, Strategy> {
 }
 
 pub fn command(input: &str) -> Res<&str, CommandOp> {
-    tuple((command_strategy, alt( (create_command, publish_command, select_command, set_command, get_command) )))(input).map( |(next,(strategy,mut command)),| {
+    context("command", alt( (create_command, publish_command, select_command, set_command, get_command,fail) ))(input)
+}
+
+pub fn command_mutation(input: &str) -> Res<&str, CommandOp> {
+    context("command_mutation", tuple((command_strategy, command)))(input).map( |(next,(strategy,mut command)),| {
         command.set_strategy(strategy);
         (next, command)
     })
 }
 
 pub fn command_line(input: &str) -> Res<&str, CommandOp> {
-    tuple( (multispace0,command,multispace0,opt(tag(";")),multispace0))(input).map(|(next,(_,command,_,_,_))|{
+    tuple( (multispace0,command_mutation,multispace0,opt(tag(";")),multispace0))(input).map(|(next,(_,command,_,_,_))|{
         (next,command)
     })
 }
 
 pub fn script_line(input: &str) -> Res<&str, CommandOp> {
-    tuple( (multispace0,command,multispace0,tag(";"),multispace0))(input).map(|(next,(_,command,_,_,_))|{
+    tuple( (multispace0,command_mutation,multispace0,tag(";"),multispace0))(input).map(|(next,(_,command,_,_,_))|{
         (next,command)
     })
 }
@@ -80,19 +85,54 @@ pub fn rec_script_line(input: &str) -> Res<&str, &str> {
 }
 
 pub mod test {
-    use crate::command::parse::{command, script};
+    use mesh_portal_versions::version::v0_0_1::parse::Res;
+    use nom::error::{VerboseError, VerboseErrorKind};
+    use nom_supreme::final_parser::{ExtractContext, final_parser};
+    use crate::command::compose::CommandOp;
+    use crate::command::parse::{command, command_mutation, script};
     use crate::error::Error;
 
     #[test]
+    pub fn test2() -> Result<(),Error>{
+        let input = "? xreate localhost<Space>";
+        let x: Result<CommandOp,VerboseError<&str>> = final_parser(command)(input);
+        match x {
+            Ok(_) => {}
+            Err(err) => {
+                println!("err: {}", err.to_string())
+            }
+        }
+
+
+        Ok(())
+    }
+
+    #[test]
     pub fn test() -> Result<(),Error>{
-        command("? create localhost<Space>")?;
+        let input = "? xreate localhost<Space>";
+        match command_mutation(input) {
+            Ok(_) => {}
+            Err(nom::Err::Error(e)) => {
+                for (blah,kind) in &e.errors
+                {
+                    if let VerboseErrorKind::Context(context) = kind {
+                        eprintln!("CONTEXT! {} blah '{}'", context, blah);
+                        return Ok(());
+                    }
+                }
+                return Err("could not find context".into());
+            }
+            Err(e) => {
+                return Err("some err".into());
+            }
+        }
         Ok(())
     }
 
     #[test]
     pub fn test_script() -> Result<(),Error>{
         let input = r#" ? create localhost<Space>;
-? create localhost:repo<Base<Repo>>;
+ Xcrete localhost:repo<Base<Repo>>;
 ? create localhost:repo:tutorial<ArtifactBundleSeries>;
 ? publish ^[ bundle.zip ]-> localhost:repo:tutorial:1.0.0;
 set localhost{ +bind=localhost:repo:tutorial:1.0.0:/bind/localhost.bind };

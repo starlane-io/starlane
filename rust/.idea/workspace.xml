@@ -6,7 +6,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/../docs/content/roadmap.md" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/content/roadmap.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/command/parse.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/command/parse.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -76,7 +78,7 @@
       <recent name="$PROJECT_DIR$/starlane-core/src/pattern.rs" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Run">
+  <component name="RunManager" selected="Cargo.Test command::parse::test::test2">
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
       <option name="command" value="run  --bin starlane -- serve " />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -113,8 +115,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test command::parse::test::test_script" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib command::parse::test::test_script -- --exact" />
+    <configuration name="Test command::parse::test::test2" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib command::parse::test::test2 -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -129,8 +131,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test config::parse::test::test_property_valu3" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib config::parse::test::test_property_valu3 -- --exact" />
+    <configuration name="Test command::parse::test::test_script" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib command::parse::test::test_script -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -197,18 +199,18 @@
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test" />
       <item itemvalue="Cargo.Test config::parse::test::test_set" />
-      <item itemvalue="Cargo.Test config::parse::test::test_property_valu3" />
       <item itemvalue="Cargo.Test config::parse::test::test_set_properties" />
       <item itemvalue="Cargo.Test command::parse::test::test" />
       <item itemvalue="Cargo.Test command::parse::test::test_script" />
+      <item itemvalue="Cargo.Test command::parse::test::test2" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Cargo.Test command::parse::test::test_script" />
+        <item itemvalue="Cargo.Test command::parse::test::test2" />
         <item itemvalue="Cargo.Test command::parse::test::test" />
+        <item itemvalue="Cargo.Test command::parse::test::test_script" />
         <item itemvalue="Cargo.Test config::parse::test::test_set" />
         <item itemvalue="Cargo.Test config::parse::test::test_set_properties" />
-        <item itemvalue="Cargo.Test config::parse::test::test_property_valu3" />
       </list>
     </recent_temporary>
   </component>
@@ -254,6 +256,7 @@
       <workItem from="1644557766743" duration="49467000" />
       <workItem from="1644705818806" duration="560000" />
       <workItem from="1644709387134" duration="3699000" />
+      <workItem from="1645761847346" duration="8186000" />
     </task>
     <servers />
   </component>
