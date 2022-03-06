@@ -2,6 +2,7 @@
 members = [
   "starlane",
   "starlane-core",
+  "starlane-operator",
   "starlane-macros",
   "starlane-macros-test",
   ]

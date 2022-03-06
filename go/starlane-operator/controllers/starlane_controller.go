@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -46,6 +47,8 @@ type StarlaneReconciler struct {
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -75,23 +78,98 @@ func (r *StarlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	// Check if the deployment already exists, if not create a new one
-	found := &appsv1.Deployment{}
-	err = r.Get(ctx, types.NamespacedName{Name: starlane.Name, Namespace: starlane.Namespace}, found)
-	if err != nil && errors.IsNotFound(err) {
-		// Define a new deployment
-		dep := r.deploymentForStarlane(starlane)
-		log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-		err = r.Create(ctx, dep)
-		if err != nil {
-			log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+	// postgres4Keycloak
+	{
+		pvc := &corev1.PersistentVolumeClaim{}
+		err = r.Get(ctx, types.NamespacedName{Name: postgres4KeycloakName(starlane), Namespace: starlane.Namespace}, pvc)
+		if err != nil && errors.IsNotFound(err) {
+			// Define a new deployment
+			dep := r.postgres4KeycloakPvc(starlane)
+			log.Info("Creating a new Pvc", "Pvc.Namespace", dep.Namespace, "Pvc.Name", dep.Name)
+			err = r.Create(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new Postgres PVC", "Pvc.Namespace", dep.Namespace, "Pvc.Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// Pvc created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Pvc")
 			return ctrl.Result{}, err
 		}
-		// Deployment created successfully - return and requeue
-		return ctrl.Result{Requeue: true}, nil
-	} else if err != nil {
-		log.Error(err, "Failed to get Deployment")
-		return ctrl.Result{}, err
+
+		secret := &corev1.Secret{}
+		err = r.Get(ctx, types.NamespacedName{Name: postgres4KeycloakName(starlane), Namespace: starlane.Namespace}, secret)
+		if err != nil && errors.IsNotFound(err) {
+			// Define a new deployment
+			dep := r.postgres4KeycloakSecret(starlane)
+			log.Info("Creating a new Secret", "Secret.Namespace", dep.Namespace, "Secret.Name", dep.Name)
+			err = r.Create(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new Postgres Secret", "Secret.Namespace", dep.Namespace, "Secret.Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// Pvc created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Secret")
+			return ctrl.Result{}, err
+		}
+
+		postgres := &appsv1.Deployment{}
+		err = r.Get(ctx, types.NamespacedName{Name: postgres4KeycloakName(starlane), Namespace: starlane.Namespace}, postgres)
+		if err != nil && errors.IsNotFound(err) {
+			dep := r.deploymentForPostgres4Keycloak(starlane)
+			log.Info("Creating a new Postgres deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+			err = r.Create(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new Postgres", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// Pvc created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Secret")
+			return ctrl.Result{}, err
+		}
+
+		service := &corev1.Service{}
+		err = r.Get(ctx, types.NamespacedName{Name: postgres4KeycloakName(starlane), Namespace: starlane.Namespace}, service)
+		if err != nil && errors.IsNotFound(err) {
+			dep := r.postgres4KeycloakService(starlane)
+			log.Info("Creating a new Postgres service", "Namespace", dep.Namespace, "Name", dep.Name)
+			err = r.Create(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new Postgres Service", "Namespace", dep.Namespace, "Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// Pvc created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Service")
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Check if the deployment already exists, if not create a new one
+	{
+		found := &appsv1.Deployment{}
+		err = r.Get(ctx, types.NamespacedName{Name: starlane.Name, Namespace: starlane.Namespace}, found)
+		if err != nil && errors.IsNotFound(err) {
+			// Define a new deployment
+			dep := r.deploymentForStarlane(starlane)
+			log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+			err = r.Create(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// Deployment created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Deployment")
+			return ctrl.Result{}, err
+		}
 	}
 
 	{
@@ -116,7 +194,7 @@ func (r *StarlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			service.Spec.Type = starlane.Spec.WebServiceType
 			err = r.Update(ctx, service)
 			if err != nil {
-				log.Error(err, "Failed to update Service", "Service.Namespace", found.Namespace, "Service.Name", found.Name)
+				log.Error(err, "Failed to update Service", "Service.Namespace", service.Namespace, "Service.Name", service.Name)
 				return ctrl.Result{}, err
 			}
 			// Ask to requeue after 1 minute in order to give enough time for the
@@ -148,7 +226,7 @@ func (r *StarlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			service.Spec.Type = starlane.Spec.GatewayServiceType
 			err = r.Update(ctx, service)
 			if err != nil {
-				log.Error(err, "Failed to update Service", "Service.Namespace", found.Namespace, "Service.Name", found.Name)
+				log.Error(err, "Failed to update Service", "Service.Namespace", service.Namespace, "Service.Name", service.Name)
 				return ctrl.Result{}, err
 			}
 			// Ask to requeue after 1 minute in order to give enough time for the
@@ -258,6 +336,10 @@ func (r *StarlaneReconciler) gatewayServiceForStarlane(m *starlanev1alpha1.Starl
 	return dep
 }
 
+func postgres4KeycloakName(m *starlanev1alpha1.Starlane) string {
+	return m.Name + "-postgres-4-keycloak"
+}
+
 func labelsForStandalone(galaxy string) map[string]string {
 	return map[string]string{"app": "starlane", "galaxy": galaxy, "web": "true", "gateway": "true"}
 }
@@ -279,11 +361,140 @@ func getPodNames(pods []corev1.Pod) []string {
 	return podNames
 }
 
+func (r *StarlaneReconciler) postgres4KeycloakSecret(m *starlanev1alpha1.Starlane) *corev1.Secret {
+	name := postgres4KeycloakName(m)
+	data := map[string]string{"password": "blah"}
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: m.Namespace,
+		},
+		StringData: data,
+	}
+}
+
+func (r *StarlaneReconciler) postgres4KeycloakPvc(m *starlanev1alpha1.Starlane) *corev1.PersistentVolumeClaim {
+	name := postgres4KeycloakName(m)
+	return &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: m.Namespace,
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{StorageClassName: &m.Spec.StorageClass,
+			AccessModes: []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse("5Gi"),
+				},
+			}},
+	}
+}
+
+// deploymentForStarlane returns a memcached Deployment object
+func (r *StarlaneReconciler) deploymentForPostgres4Keycloak(m *starlanev1alpha1.Starlane) *appsv1.Deployment {
+
+	name := postgres4KeycloakName(m)
+
+	ls := map[string]string{"name": name}
+	replicas := int32(1)
+
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: m.Namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: ls,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: ls,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Image: "postgres:14.2-alpine",
+						Name:  "postgres",
+						Args:  []string{},
+						Env: []corev1.EnvVar{
+							{
+								Name:  "PGDATA",
+								Value: "/var/lib/postgresql/data",
+							},
+							{
+								Name: "POSTGRES_PASSWORD",
+								ValueFrom: &corev1.EnvVarSource{
+									SecretKeyRef: &corev1.SecretKeySelector{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: name,
+										},
+										Key: "password",
+									},
+								},
+							},
+						},
+						Ports: []corev1.ContainerPort{{
+							ContainerPort: 5432,
+							Name:          "postgres",
+						}},
+						VolumeMounts: []corev1.VolumeMount{
+							{
+								Name:      "data",
+								MountPath: "/var/lib/postgresql/data",
+								ReadOnly:  false,
+							},
+						},
+					}},
+					Volumes: []corev1.Volume{
+						{
+							Name:         "data",
+							VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: name}},
+						},
+					},
+				},
+			},
+		},
+	}
+	// Set Starlane instance as the owner and controller
+	ctrl.SetControllerReference(m, dep, r.Scheme)
+	return dep
+}
+
+// deploymentForStarlane returns a memcached Deployment object
+func (r *StarlaneReconciler) postgres4KeycloakService(m *starlanev1alpha1.Starlane) *corev1.Service {
+
+	name := postgres4KeycloakName(m)
+
+	dep := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: m.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{
+				{Name: "postgres",
+					Port:       5432,
+					TargetPort: intstr.FromInt(5432),
+					Protocol:   corev1.ProtocolTCP,
+				},
+			},
+			Selector: map[string]string{"name": name},
+		},
+	}
+	// Set Starlane instance as the owner and controller
+	ctrl.SetControllerReference(m, dep, r.Scheme)
+	return dep
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *StarlaneReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&starlanev1alpha1.Starlane{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
+		Owns(&corev1.Secret{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
 		Complete(r)
 }

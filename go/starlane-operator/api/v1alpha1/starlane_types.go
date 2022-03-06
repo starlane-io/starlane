@@ -31,6 +31,7 @@ type StarlaneSpec struct {
 
 	WebServiceType     corev1.ServiceType `json:"web-service-type,omitempty" protobuf:"bytes,4,opt,name=web-service-type,casttype=ServiceType"`
 	GatewayServiceType corev1.ServiceType `json:"gateway-service-type,omitempty" protobuf:"bytes,4,opt,name=gateway-service-type,casttype=ServiceType"`
+	StorageClass       string             `json:"storage-class"`
 }
 
 // StarlaneStatus defines the observed state of Starlane
