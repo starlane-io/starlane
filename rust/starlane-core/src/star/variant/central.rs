@@ -70,7 +70,7 @@ impl CentralVariant {
 
 impl CentralVariant {
     async fn ensure(starlane_api: StarlaneApi) -> Result<(), Error> {
-        let mut creation = starlane_api.create_space("space", "Space").await?;
+        let mut creation = starlane_api.create_space("hyperspace", "Hyperspace").await?;
         creation.set_strategy(Strategy::Ensure);
         creation.submit().await?;
         Ok(())

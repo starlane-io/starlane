@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"time"
 
+	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -99,14 +100,18 @@ func (r *StarlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 
 		secret := &corev1.Secret{}
-		err = r.Get(ctx, types.NamespacedName{Name: postgres4KeycloakName(starlane), Namespace: starlane.Namespace}, secret)
+		err = r.Get(ctx, types.NamespacedName{Name: starlane.Name, Namespace: starlane.Namespace}, secret)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new deployment
-			dep := r.postgres4KeycloakSecret(starlane)
-			log.Info("Creating a new Secret", "Secret.Namespace", dep.Namespace, "Secret.Name", dep.Name)
+			dep, gen_err := r.generateSecret(starlane)
+			if gen_err != nil {
+				log.Error(gen_err, "Failed to create a password", "Namespace", dep.Namespace, "Name", dep.Name)
+				return ctrl.Result{}, gen_err
+			}
+			log.Info("Creating a new Secret", "Namespace", dep.Namespace, "Name", dep.Name)
 			err = r.Create(ctx, dep)
 			if err != nil {
-				log.Error(err, "Failed to create new Postgres Secret", "Secret.Namespace", dep.Namespace, "Secret.Name", dep.Name)
+				log.Error(err, "Failed to create new Postgres Secret", "Namespace", dep.Namespace, "Name", dep.Name)
 				return ctrl.Result{}, err
 			}
 			// Pvc created successfully - return and requeue
@@ -119,7 +124,7 @@ func (r *StarlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		postgres := &appsv1.Deployment{}
 		err = r.Get(ctx, types.NamespacedName{Name: postgres4KeycloakName(starlane), Namespace: starlane.Namespace}, postgres)
 		if err != nil && errors.IsNotFound(err) {
-			dep := r.deploymentForPostgres4Keycloak(starlane)
+			dep := r.postgres4KeycloakDeployment(starlane)
 			log.Info("Creating a new Postgres deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
 			err = r.Create(ctx, dep)
 			if err != nil {
@@ -147,6 +152,42 @@ func (r *StarlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			return ctrl.Result{Requeue: true}, nil
 		} else if err != nil {
 			log.Error(err, "Failed to get Service")
+			return ctrl.Result{}, err
+		}
+	}
+
+	{
+		keycloak := &appsv1.Deployment{}
+		err = r.Get(ctx, types.NamespacedName{Name: keycloakName(starlane), Namespace: starlane.Namespace}, keycloak)
+		if err != nil && errors.IsNotFound(err) {
+			dep := r.keycloakDeployment(starlane)
+			log.Info("Creating a new Keycloak deployment", "Namespace", dep.Namespace, "Name", dep.Name)
+			err = r.Create(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new Keycloak", "Namespace", dep.Namespace, "Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// Pvc created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Keycloak")
+			return ctrl.Result{}, err
+		}
+
+		service := &corev1.Service{}
+		err = r.Get(ctx, types.NamespacedName{Name: keycloakName(starlane), Namespace: starlane.Namespace}, service)
+		if err != nil && errors.IsNotFound(err) {
+			dep := r.keycloakService(starlane)
+			log.Info("Creating a new Keycloak service", "Namespace", dep.Namespace, "Name", dep.Name)
+			err = r.Create(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new Keycloak Service", "Namespace", dep.Namespace, "Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// Pvc created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Keycloak")
 			return ctrl.Result{}, err
 		}
 	}
@@ -340,6 +381,10 @@ func postgres4KeycloakName(m *starlanev1alpha1.Starlane) string {
 	return m.Name + "-postgres-4-keycloak"
 }
 
+func keycloakName(m *starlanev1alpha1.Starlane) string {
+	return m.Name + "-keycloak"
+}
+
 func labelsForStandalone(galaxy string) map[string]string {
 	return map[string]string{"app": "starlane", "galaxy": galaxy, "web": "true", "gateway": "true"}
 }
@@ -361,21 +406,28 @@ func getPodNames(pods []corev1.Pod) []string {
 	return podNames
 }
 
-func (r *StarlaneReconciler) postgres4KeycloakSecret(m *starlanev1alpha1.Starlane) *corev1.Secret {
-	name := postgres4KeycloakName(m)
-	data := map[string]string{"password": "blah"}
-	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: m.Namespace,
-		},
-		StringData: data,
+func (r *StarlaneReconciler) generateSecret(m *starlanev1alpha1.Starlane) (*corev1.Secret, error) {
+	password, err := password.Generate(16, 4, 4, false, false)
+
+	if err != nil {
+		return &corev1.Secret{}, err
+	} else {
+		data := map[string]string{"password": password}
+		dep := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      m.Name,
+				Namespace: m.Namespace,
+			},
+			StringData: data,
+		}
+		ctrl.SetControllerReference(m, dep, r.Scheme)
+		return dep, nil
 	}
 }
 
 func (r *StarlaneReconciler) postgres4KeycloakPvc(m *starlanev1alpha1.Starlane) *corev1.PersistentVolumeClaim {
 	name := postgres4KeycloakName(m)
-	return &corev1.PersistentVolumeClaim{
+	dep := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: m.Namespace,
@@ -388,10 +440,12 @@ func (r *StarlaneReconciler) postgres4KeycloakPvc(m *starlanev1alpha1.Starlane) 
 				},
 			}},
 	}
+	ctrl.SetControllerReference(m, dep, r.Scheme)
+	return dep
 }
 
 // deploymentForStarlane returns a memcached Deployment object
-func (r *StarlaneReconciler) deploymentForPostgres4Keycloak(m *starlanev1alpha1.Starlane) *appsv1.Deployment {
+func (r *StarlaneReconciler) postgres4KeycloakDeployment(m *starlanev1alpha1.Starlane) *appsv1.Deployment {
 
 	name := postgres4KeycloakName(m)
 
@@ -427,7 +481,7 @@ func (r *StarlaneReconciler) deploymentForPostgres4Keycloak(m *starlanev1alpha1.
 								ValueFrom: &corev1.EnvVarSource{
 									SecretKeyRef: &corev1.SecretKeySelector{
 										LocalObjectReference: corev1.LocalObjectReference{
-											Name: name,
+											Name: m.Name,
 										},
 										Key: "password",
 									},
@@ -477,6 +531,138 @@ func (r *StarlaneReconciler) postgres4KeycloakService(m *starlanev1alpha1.Starla
 				{Name: "postgres",
 					Port:       5432,
 					TargetPort: intstr.FromInt(5432),
+					Protocol:   corev1.ProtocolTCP,
+				},
+			},
+			Selector: map[string]string{"name": name},
+		},
+	}
+	// Set Starlane instance as the owner and controller
+	ctrl.SetControllerReference(m, dep, r.Scheme)
+	return dep
+}
+
+func (r *StarlaneReconciler) keycloakDeployment(m *starlanev1alpha1.Starlane) *appsv1.Deployment {
+
+	name := keycloakName(m)
+	postgres := postgres4KeycloakName(m)
+
+	ls := map[string]string{"name": name}
+	replicas := int32(1)
+
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: m.Namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: ls,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: ls,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Image: "jboss/keycloak:10.0.0",
+						Name:  "keycloak",
+						Args:  []string{},
+						Env: []corev1.EnvVar{
+							{
+								Name:  "DB_VENDOR",
+								Value: "postgres",
+							},
+							{
+								Name:  "DB_ADDR",
+								Value: postgres,
+							},
+							{
+								Name:  "DB_PORT",
+								Value: "5432",
+							},
+							{
+								Name:  "DB_USER",
+								Value: "postgres",
+							},
+							{
+								Name:  "DB_DATABASE",
+								Value: "postgres",
+							},
+							{
+								Name:  "KEYCLOAK_USER",
+								Value: "hyperuser",
+							},
+							{
+								Name:  "KEYCLOAK_CORS",
+								Value: "true",
+							},
+							{
+								Name:  "KEYCLOAK_ALWAYS_HTTPS",
+								Value: "false",
+							},
+							{
+								Name:  "PROTOCOL",
+								Value: "http",
+							},
+							{
+								Name:  "PROXY_ADDRESS_FORWARDING",
+								Value: "true",
+							},
+							{
+								Name: "KEYCLOAK_PASSWORD",
+								ValueFrom: &corev1.EnvVarSource{
+									SecretKeyRef: &corev1.SecretKeySelector{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: m.Name,
+										},
+										Key: "password",
+									},
+								},
+							},
+							{
+								Name: "DB_PASSWORD",
+								ValueFrom: &corev1.EnvVarSource{
+									SecretKeyRef: &corev1.SecretKeySelector{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: m.Name,
+										},
+										Key: "password",
+									},
+								},
+							},
+						},
+						Ports: []corev1.ContainerPort{{
+							ContainerPort: 8080,
+							Name:          "keycloak",
+						}},
+					}},
+				},
+			},
+		},
+	}
+	// Set Starlane instance as the owner and controller
+	ctrl.SetControllerReference(m, dep, r.Scheme)
+	return dep
+}
+
+// deploymentForStarlane returns a memcached Deployment object
+func (r *StarlaneReconciler) keycloakService(m *starlanev1alpha1.Starlane) *corev1.Service {
+
+	name := keycloakName(m)
+
+	dep := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: m.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{
+				{Name: "keycloak",
+					Port:       8080,
+					TargetPort: intstr.FromInt(8080),
 					Protocol:   corev1.ProtocolTCP,
 				},
 			},
