@@ -18,6 +18,8 @@ use zip::result::ZipError;
 use wasmer::{CompileError, ExportError, RuntimeError};
 use actix_web::ResponseError;
 use handlebars::RenderError;
+use keycloak::KeycloakError;
+use nom_supreme::error::ErrorTree;
 use tokio::task::JoinError;
 use crate::fail::Fail;
 use crate::star::core::resource::registry::RegError;
@@ -119,6 +121,15 @@ impl From<nom::Err<VerboseError<&str>>> for Error {
         }
     }
 }
+
+impl From<nom::Err<ErrorTree<&str>>> for Error {
+    fn from(i: nom::Err<ErrorTree<&str>>) -> Self {
+        Error {
+            error: format!("{}", i.to_string()),
+        }
+    }
+}
+
 
 impl<T> From<std::sync::PoisonError<T>> for Error {
     fn from(i: std::sync::PoisonError<T>) -> Self {
@@ -409,6 +420,14 @@ impl From<JoinError> for Error {
     fn from(error: JoinError) -> Self {
         Error {
             error: error.to_string()
+        }
+    }
+}
+
+impl From<KeycloakError> for Error {
+    fn from(e: KeycloakError) -> Self {
+        Error {
+            error: e.to_string()
         }
     }
 }

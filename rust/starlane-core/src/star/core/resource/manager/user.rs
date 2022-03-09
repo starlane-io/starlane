@@ -1,32 +1,27 @@
 use mesh_portal::version::latest::command::common::StateSrc;
-use mesh_portal::version::latest::id::Address;
-
 use crate::error::Error;
 use crate::resource::{ResourceAssign, ResourceType};
 use crate::star::core::resource::manager::ResourceManager;
-use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 
 #[derive(Debug)]
-pub struct StatelessManager {
+pub struct UserCoreManager {
     skel: StarSkel,
-    resource_type: ResourceType
 }
 
-impl StatelessManager {
-    pub async fn new(skel: StarSkel, resource_type: ResourceType ) -> Self {
-        StatelessManager {
+impl UserCoreManager {
+    pub async fn new(skel: StarSkel) -> Self {
+        UserCoreManager {
             skel: skel.clone(),
-            resource_type
         }
     }
 }
 
 #[async_trait]
-impl ResourceManager for StatelessManager {
+impl ResourceManager for UserCoreManager {
 
     fn resource_type(&self) -> ResourceType {
-        self.resource_type.clone()
+        ResourceType::User
     }
 
 
@@ -38,9 +33,11 @@ impl ResourceManager for StatelessManager {
             StateSrc::Stateless => {
             }
             StateSrc::StatefulDirect(_) => {
-                return Err("must be stateless".into());
+                return Err("User must be stateless".into());
             }
         };
+
+
         Ok(())
     }
 

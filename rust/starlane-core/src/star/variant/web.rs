@@ -27,6 +27,8 @@ use mesh_portal::version::latest::id::{Address, Meta};
 use mesh_portal::version::latest::messaging;
 use mesh_portal::version::latest::payload::{HttpMethod, Payload, Primitive};
 use nom::AsBytes;
+use nom_supreme::error::ErrorTree;
+use nom_supreme::final_parser::final_parser;
 use crate::artifact::ArtifactRef;
 use crate::cache::ArtifactItem;
 use crate::html::HTML;
@@ -178,7 +180,10 @@ async fn error_response( mut stream: TcpStream, code: usize, message: &str)  {
 
 async fn process_request(http_request: HttpRequest, api: StarlaneApi, skel: StarSkel ) -> Result<HttpResponse,Error> {
 
-    let host_and_port = host_and_port(http_request.headers.get("Host").ok_or("Missing HOST")?.as_str())?.1;
+    let host = http_request.headers.get("Host").ok_or("request missing 'Host' header")?;
+    let host_and_port: Result<HostAndPort,ErrorTree<&str>> = final_parser(host_and_port)(host.as_str());
+    let host_and_port = host_and_port.map_err(|e| format!("invalid host: {}",host));
+    let host_and_port = host_and_port?;
 
     let core = http_request.into();
     let to = Address::from_str( host_and_port.host.as_str() )?;
@@ -256,6 +261,7 @@ pub mod parse {
     use nom::character::is_digit;
     use nom::error::{ErrorKind, ParseError, VerboseError};
     use nom::sequence::tuple;
+    use nom_supreme::error::ErrorTree;
     use crate::star::variant::web::HostAndPort;
 
     pub fn host_and_port(input: &str ) -> Res<&str, HostAndPort> {
@@ -266,7 +272,7 @@ pub mod parse {
         let port = match u32::from_str(port) {
             Ok(port) => port,
             Err(err) => {
-                return Err(nom::Err::Error(VerboseError::from_error_kind(
+                return Err(nom::Err::Error(ErrorTree::from_error_kind(
                     input,
                     ErrorKind::Tag,
                 )))

@@ -163,6 +163,7 @@ impl Into<ResourceStub> for ResourceRecord {
 pub enum ResourceType {
     Root,
     Space,
+    UserBase,
     Base,
     User,
     App,
@@ -238,6 +239,7 @@ impl TryFrom<String> for ResourceType {
 pub enum Kind {
     Root,
     Space,
+    UserBase(UserBaseKind),
     Base(BaseKind),
     User,
     App,
@@ -435,7 +437,8 @@ impl Kind {
             Kind::Artifact(_) => ResourceType::Artifact,
             Kind::Proxy => ResourceType::Proxy,
             Kind::Credentials => ResourceType::Credentials,
-            Kind::Control => ResourceType::Control
+            Kind::Control => ResourceType::Control,
+            Kind::UserBase(_) => ResourceType::UserBase
         }
     }
 
@@ -502,7 +505,7 @@ impl Kind {
                         if "Relational" != kind.as_str() {
                             return Err(format!("DatabaseKind is not recognized found: {}",kind).into());
                         }
-                        match specific.ok_or("expected specific".into() ) {
+                        match specific.ok_or("expected Database<Relational<specific>>".into() ) {
                             Ok(specific) => {
                                 return Ok(Self::Database(DatabaseKind::Relational(specific)));
                             }
@@ -523,7 +526,7 @@ impl Kind {
             ResourceType::Artifact => {
                 match kind {
                     None => {
-                        return Err("kind needs to be set".into());
+                        return Err("expected Artifact<kind>".into());
                     }
                     Some(kind) => {
                         return Ok(Self::Artifact(ArtifactKind::from_str(kind.as_str())?));
@@ -532,7 +535,17 @@ impl Kind {
             }
             ResourceType::Proxy => {Self::Proxy}
             ResourceType::Credentials => {Self::Credentials}
-            ResourceType::Control => Self::Control
+            ResourceType::Control => Self::Control,
+            ResourceType::UserBase => {
+                match kind {
+                    None => {
+                        return Err("expected UserBase kind (UserBase<kind>)".into());
+                    }
+                    Some(kind) => {
+                        return Ok(Self::UserBase(UserBaseKind::from_str(kind.as_str())?));
+                    }
+                }
+            }
         })
     }
 }
@@ -578,6 +591,21 @@ pub enum BaseKind {
     Database,
     Repo,
     Any,
+}
+
+#[derive(
+Clone,
+Debug,
+Eq,
+PartialEq,
+Hash,
+Serialize,
+Deserialize,
+strum_macros::Display,
+strum_macros::EnumString,
+)]
+pub enum UserBaseKind {
+    Keycloak
 }
 
 #[derive(

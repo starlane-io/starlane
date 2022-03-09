@@ -84,6 +84,7 @@ pub fn rec_script_line(input: &str) -> Res<&str, &str> {
     recognize(script_line)(input)
 }
 
+#[cfg(test)]
 pub mod test {
     use mesh_portal_versions::version::v0_0_1::parse::Res;
     use nom::error::{VerboseError, VerboseErrorKind};

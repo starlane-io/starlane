@@ -13,7 +13,7 @@ use crate::frame::{
 
 use crate::message::delivery::Delivery;
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
-use crate::resource::{ArtifactKind, Kind, ResourceType, BaseKind, FileKind, ResourceLocation};
+use crate::resource::{ArtifactKind, Kind, ResourceType, BaseKind, FileKind, ResourceLocation, UserBaseKind};
 use crate::resource::{AssignKind, ResourceAssign, ResourceRecord};
 use crate::star::core::resource::registry::{RegError, Registration};
 use crate::star::shell::wrangler::{ StarFieldSelection, StarSelector};
@@ -34,12 +34,12 @@ use mesh_portal::version::latest::id::{Address, Meta};
 use mesh_portal::version::latest::messaging::{Message, Request, Response};
 use mesh_portal::version::latest::payload::{Payload, PayloadMap, Primitive, PrimitiveList};
 use mesh_portal::version::latest::resource::{ResourceStub, Status};
-use mesh_portal_versions::version::v0_0_1::config::bind::{PipelineSegment, PipelineStep, PipelineStop, Selector, StepKind};
-use mesh_portal_versions::version::v0_0_1::entity::request::get::GetOp;
-use mesh_portal_versions::version::v0_0_1::entity::response::{ResponseCore};
-use mesh_portal_versions::version::v0_0_1::id::Tks;
-use mesh_portal_versions::version::v0_0_1::pattern::{Block, HttpPattern};
-use mesh_portal_versions::version::v0_0_1::payload::CallKind;
+use mesh_portal::version::latest::config::bind::{PipelineSegment, PipelineStep, PipelineStop, Selector, StepKind};
+use mesh_portal::version::latest::entity::request::get::GetOp;
+use mesh_portal::version::latest::entity::response::{ResponseCore};
+use mesh_portal::version::latest::id::Tks;
+use mesh_portal::version::latest::pattern::{Block, HttpPattern};
+use mesh_portal::version::latest::payload::CallKind;
 use regex::Regex;
 use serde::de::Unexpected::Str;
 use crate::artifact::ArtifactRef;
@@ -278,7 +278,7 @@ impl MessagingEndpointComponent {
                             state: StateSrc,
                         ) -> Result<(), Error> {
 
-                            let star_kind = StarKind::hosts(&ResourceType::from_str(stub.kind.resource_type().as_str())?);
+                            let star_kind = StarKind::hosts(&ResourceType::from_str(stub.kind.resource_type.as_str())?);
                             let key = if skel.info.kind == star_kind {
                                 skel.info.key.clone()
                             }
@@ -311,9 +311,7 @@ impl MessagingEndpointComponent {
                                 skel.registry_api
                                     .set_status(
                                         to,
-                                        Status::Panic(
-                                            "could not assign resource to host".to_string(),
-                                        ),
+                                        Status::Panic,
                                     )
                                     .await;
                                 Err(fail.into())
@@ -434,7 +432,18 @@ pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
         }
         ResourceType::Proxy => Kind::Proxy,
         ResourceType::Credentials => Kind::Credentials,
-        ResourceType::Control => Kind::Control
+        ResourceType::Control => Kind::Control,
+        ResourceType::UserBase => {
+            match &template.kind {
+                None => {
+                    return Err("kind must be set for UserBase".into());
+                }
+                Some(kind) => {
+                    let kind = UserBaseKind::from_str(kind.as_str())?;
+                    Kind::UserBase(kind)
+                }
+            }
+        },
     })
 }
 pub struct WrappedHttpRequest {

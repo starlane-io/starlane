@@ -308,7 +308,19 @@ func (r *StarlaneReconciler) deploymentForStarlane(m *starlanev1alpha1.Starlane)
 						Args:  []string{"serve", "--with-external"},
 						Env: []corev1.EnvVar{
 							{Name: "STARLANE_KUBERNETES_INSTANCE_NAME", Value: m.Name},
+							{Name: "STARLANE_KEYCLOAK_URL", Value: keycloakName(m)+":8080"},
 							{Name: "NAMESPACE", Value: m.Namespace},
+							{
+								Name: "STARLANE_PASSWORD",
+								ValueFrom: &corev1.EnvVarSource{
+									SecretKeyRef: &corev1.SecretKeySelector{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: m.Name,
+										},
+										Key: "password",
+									},
+								},
+							},
 						},
 						Ports: []corev1.ContainerPort{{
 							ContainerPort: 4343,
@@ -566,7 +578,7 @@ func (r *StarlaneReconciler) keycloakDeployment(m *starlanev1alpha1.Starlane) *a
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Image: "jboss/keycloak:10.0.0",
+						Image: "jboss/keycloak:13.0.1",
 						Name:  "keycloak",
 						Args:  []string{},
 						Env: []corev1.EnvVar{

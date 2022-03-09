@@ -142,7 +142,7 @@ pub mod replace {
 
 }
 
-
+#[cfg(test)]
 pub mod test {
     use std::collections::HashMap;
     use std::str::FromStr;

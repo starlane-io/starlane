@@ -497,6 +497,7 @@ pub struct ShortestPathStarKey {
     pub hops: usize,
 }
 
+#[derive(Clone)]
 pub struct SearchInit {
     pub pattern: StarPattern,
     pub action: TraversalAction,

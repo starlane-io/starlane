@@ -476,22 +476,24 @@ impl RegistryComponent {
         match result {
             Ok(_) => {
                 let (otx,rx) = oneshot::channel();
-                self.locate(address,otx).await;
+                self.locate(address.clone(),otx).await;
                 tx.send(match rx.await {
                     Ok(Ok(record)) => {
                         Ok(record.into())
                     }
                     Ok(Err(err)) => {
-                        println!("~~~ could not locate record...");
-                        Err("could not locate record".into())
+                        error!("could not locate record '{}'", address.to_string());
+                        Err(format!("Registry: could not locate record: {}",address.to_string()).as_str().into())
                     }
 
                     Err(err) => {
-                        Err("could not locate record".into())
+                        error!("could not locate record '{}'", address.to_string());
+                        Err(format!("Registry: could not locate record: {}",address.to_string()).as_str().into())
                     }
                 });
             }
             Err(err) => {
+                error!("could not locate record '{}'", address.to_string());
                 tx.send(Err(RegError::Error(err)));
             }
         }
@@ -506,7 +508,7 @@ impl RegistryComponent {
         match Self::process_resource_row(row) {
             Ok(ok) => Ok(ok),
             Err(error) => {
-                eprintln!("process_resource_rows: {}", error);
+                error!("process_resource_rows: {}", error);
                 Err(error.into())
             }
         }
@@ -594,6 +596,10 @@ impl RegistryComponent {
                 Option::None
             };
 
+info!("Kind: {}", match &kind {
+    Some(kind) => kind.clone(),
+    None => "None".to_string()
+});
             let kind = Kind::from(resource_type, kind, specific)?;
             let host = match host {
                 Some(host) => {
@@ -672,6 +678,11 @@ impl RegistryParams {
 
         let resource_type = registration.kind.resource_type().to_string();
         let kind = registration.kind.sub_string();
+info!("ResourceType: {}", resource_type );
+match &kind {
+    None => {info!("Kind == None")}
+    Some(kind) => {info!("Kind == {}", kind)}
+}
 
         let vendor = match &registration.kind.specific() {
             None => Option::None,

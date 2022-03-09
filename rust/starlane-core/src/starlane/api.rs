@@ -34,9 +34,9 @@ use mesh_portal::version::latest::id::Address;
 use mesh_portal::version::latest::messaging::{Message, Request, Response};
 use mesh_portal::version::latest::payload::{Payload, PayloadMap, Primitive};
 use mesh_portal::version::latest::resource::ResourceStub;
-use mesh_portal_versions::version::v0_0_1::command::common::{PropertyMod, SetProperties};
-use mesh_portal_versions::version::v0_0_1::entity::request::get::GetOp;
-use mesh_portal_versions::version::v0_0_1::id::Tks;
+use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
+use mesh_portal::version::latest::entity::request::get::GetOp;
+use mesh_portal::version::latest::id::Tks;
 
 use crate::fail::{Fail, StarlaneFailure};
 
@@ -228,10 +228,10 @@ impl SpaceApi {
     }
 
     pub fn new(surface_api: SurfaceApi, stub: ResourceStub, agent: Address) -> Result<Self, Error> {
-        if stub.kind.resource_type() != ResourceType::Space.to_string() {
+        if stub.kind.resource_type != ResourceType::Space.to_string() {
             return Err(format!(
                 "wrong kind resource type for SpaceApi: {}",
-                stub.kind.resource_type().to_string()
+                stub.kind.resource_type.to_string()
             )
             .into());
         }

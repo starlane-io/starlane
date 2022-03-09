@@ -23,6 +23,7 @@ use mesh_portal::version::latest::messaging::{Request, Response};
 use mesh_portal::version::latest::payload::Payload;
 use mesh_portal_versions::version::v0_0_1::id::Tks;
 use crate::star::core::resource::manager::artifact::ArtifactManager;
+use crate::star::core::resource::manager::userbase::UserBaseKeycloakCoreManager;
 
 mod stateless;
 pub mod artifact;
@@ -30,6 +31,8 @@ pub mod k8s;
 pub mod mechtron;
 pub mod file;
 pub mod portal;
+pub mod userbase;
+pub mod user;
 
 #[derive(Clone)]
 pub struct ResourceManagerApi {
@@ -209,6 +212,7 @@ impl ResourceManagerComponent{
                 ResourceType::Database => Box::new(K8sManager::new(self.skel.clone(), ResourceType::Database ).await?),
                 ResourceType::FileSystem => Box::new(FileSystemManager::new(self.skel.clone() ).await),
                 ResourceType::File => Box::new(FileManager::new(self.skel.clone())),
+                ResourceType::UserBase=> Box::new(UserBaseKeycloakCoreManager::new(self.skel.clone()).await? ),
                 t => Box::new(StatelessManager::new(self.skel.clone(), t ).await)
             };
             self.managers.insert( resource_type, manager );

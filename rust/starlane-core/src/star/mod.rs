@@ -66,6 +66,7 @@ use nom::character::complete::digit1;
 use nom::branch::alt;
 use nom::combinator::all_consuming;
 use nom::error::{ErrorKind, ParseError, VerboseError};
+use nom_supreme::error::ErrorTree;
 use crate::logger::{Flags, Logger, LogInfo};
 use crate::star::shell::sys::SysApi;
 
@@ -221,7 +222,8 @@ impl StarKind {
             ResourceType::Proxy => Self::Space,
             ResourceType::Credentials => Self::Space,
             ResourceType::Base => Self::Space,
-            ResourceType::Control => Self::Portal
+            ResourceType::Control => Self::Portal,
+            ResourceType::UserBase => Self::Space
         }
     }
 
@@ -242,7 +244,8 @@ impl StarKind {
             ResourceType::Proxy => Self::Space,
             ResourceType::Credentials => Self::Space,
             ResourceType::Base => Self::Space,
-            ResourceType::Control => Self::Portal
+            ResourceType::Control => Self::Portal,
+            ResourceType::UserBase => Self::Space
         }
     }
 
@@ -606,53 +609,64 @@ impl Star {
                 StarPattern::StarKind(conscript_kind.kind.clone()),
                 TraversalAction::SearchHits,
             );
-            let (tx, rx) = oneshot::channel();
-            self.skel
-                .star_search_api
-                .tx
-                .try_send(StarSearchCall::Search { init: search, tx })
-                .unwrap_or_default();
-            let kind = conscript_kind.kind.clone();
             let skel = self.skel.clone();
+            let kind = conscript_kind.kind.clone();
             tokio::spawn(async move {
-                let result = tokio::time::timeout(Duration::from_secs(15), rx).await;
-                match result {
-                    Ok(Ok(hits)) => {
-                        for (star, hops) in hits.hits {
-                            let handle = StarWrangle {
-                                key: star,
-                                kind: kind.clone(),
-                                hops: Option::Some(hops),
-                            };
-                            let result = skel.star_wrangler_api.add_star_handle(handle).await;
-                            match result {
-                                Ok(_) => {
-                                    skel.star_tx.send(StarCommand::CheckStatus).await;
-                                }
-                                Err(error) => {
-                                    eprintln!(
-                                        "error when adding star handle: {}",
-                                        error.to_string()
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    Err(error) => {
-                        error!(
-                            "error encountered when attempting to get a handle for: {} TIMEOUT: {}",
+             let mut timeout = 1u64;
+             loop {
+                 let (tx2,rx2) = oneshot::channel();
+                 skel
+                     .star_search_api
+                     .tx
+                     .try_send(StarSearchCall::Search { init: search.clone(), tx: tx2 })
+                     .unwrap_or_default();
+
+                 let result = tokio::time::timeout(Duration::from_secs(timeout), rx2).await;
+                 match result {
+                     Ok(Ok(hits)) => {
+                         for (star, hops) in hits.hits {
+                             let handle = StarWrangle {
+                                 key: star,
+                                 kind: kind.clone(),
+                                 hops: Option::Some(hops),
+                             };
+                             let result = skel.star_wrangler_api.add_star_handle(handle).await;
+                             match result {
+                                 Ok(_) => {
+                                     skel.star_tx.send(StarCommand::CheckStatus).await;
+                                 }
+                                 Err(error) => {
+                                     eprintln!(
+                                         "error when adding star handle: {}",
+                                         error.to_string()
+                                     )
+                                 }
+                             }
+                         }
+                         break;
+                     }
+                     Err(error) => {
+                         error!(
+                            "error encountered when attempting to wrangle a handle for: {} TIMEOUT: {}",
                             kind.to_string(),
                             error.to_string()
                         );
-                    }
-                    Ok(Err(error)) => {
-                        error!(
-                            "error encountered when attempting to get a handle for: {} ERROR: {}",
+                     }
+                     Ok(Err(error)) => {
+                         error!(
+                            "error encountered when attempting to wrangle a handle for: {} ERROR: {}",
                             kind.to_string(),
                             error.to_string()
                         );
-                    }
-                }
+                     }
+                 }
+                 info!("attempting wrangle again in 5 seconds...");
+                 tokio::time::sleep(Duration::from_secs(5));
+                 timeout = timeout + 5;
+                 if timeout > 30 {
+                     timeout = 30;
+                 }
+             }
             });
         }
     }
@@ -676,7 +690,7 @@ impl Star {
                             Err(error) => {
                                 let err_msg = format!("{}", error.to_string());
                                 skel.star_tx
-                                    .try_send(StarCommand::SetStatus(StarStatus::Panic(err_msg)))
+                                    .try_send(StarCommand::SetStatus(StarStatus::Panic))
                                     .unwrap_or_default();
                                 error!("{}", error.to_string())
                             }
@@ -1064,7 +1078,7 @@ pub fn big_subgraph_key( input: &str ) -> Res<&str,StarSubGraphKey> {
     let key = match key.parse() {
         Ok(key) => key,
         Err(_)=>{
-            return Err(nom::Err::Error(VerboseError::from_error_kind(input,ErrorKind::Tag)));
+            return Err(nom::Err::Error(ErrorTree::from_error_kind(input,ErrorKind::Tag)));
         }
     };
     Ok((next,StarSubGraphKey::Big(key)))
@@ -1075,7 +1089,7 @@ pub fn small_subgraph_key( input: &str ) -> Res<&str,StarSubGraphKey> {
     let key = match key.parse() {
         Ok(key) => key,
         Err(_)=>{
-            return Err(nom::Err::Error(VerboseError::from_error_kind(input,ErrorKind::Tag)));
+            return Err(nom::Err::Error(ErrorTree::from_error_kind(input,ErrorKind::Tag)));
         }
     };
     Ok((next,StarSubGraphKey::Small(key)))
@@ -1090,7 +1104,7 @@ pub fn index(input: &str ) -> Res<&str,u16> {
     let key = match key.parse() {
         Ok(key) => key,
         Err(_)=>{
-            return Err(nom::Err::Error(VerboseError::from_error_kind(input,ErrorKind::Tag)));
+            return Err(nom::Err::Error(ErrorTree::from_error_kind(input,ErrorKind::Tag)));
         }
     };
     Ok((next,key))
