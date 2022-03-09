@@ -1064,7 +1064,7 @@ mod test {
 
     #[test]
     #[instrument]
-    pub fn tracing() {
+    pub async fn tracing() {
         let subscriber = FmtSubscriber::default();
         set_global_default(subscriber.into()).expect("setting global default failed");
         info!("tracing works!");

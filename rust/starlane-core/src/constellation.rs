@@ -44,5 +44,5 @@ mod test {
     use tokio::runtime::Runtime;
 
     #[test]
-    pub fn test() {}
+    pub async fn test() {}
 }

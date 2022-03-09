@@ -10,12 +10,3 @@ use tokio::task::JoinHandle;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 
-#[cfg(test)]
-mod test {
-
-    #[test]
-    pub fn buffer() {
-
-    }
-
-}

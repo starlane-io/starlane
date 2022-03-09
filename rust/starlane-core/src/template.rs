@@ -507,7 +507,7 @@ mod test {
     use crate::template::ConstellationTemplate;
 
     #[test]
-    pub fn standalone() {
+    pub async fn standalone() {
         ConstellationTemplate::new_basic();
     }
 }

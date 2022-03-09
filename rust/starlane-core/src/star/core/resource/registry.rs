@@ -417,6 +417,7 @@ impl RegistryComponent {
             }
         }
         fn register<'a>( registration: Registration,  trans:&Transaction<'a>,) -> Result<(),Error> {
+
             let params = RegistryParams::from_registration(&registration)?;
             trans.execute("INSERT INTO resources (address_segment,resource_type,kind,vendor,product,variant,version,version_variant,parent,status) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'Pending')", params![params.address_segment,params.resource_type,params.kind,params.vendor,params.product,params.variant,params.version,params.version_variant,params.parent])?;
 
@@ -596,10 +597,6 @@ impl RegistryComponent {
                 Option::None
             };
 
-info!("Kind: {}", match &kind {
-    Some(kind) => kind.clone(),
-    None => "None".to_string()
-});
             let kind = Kind::from(resource_type, kind, specific)?;
             let host = match host {
                 Some(host) => {
@@ -678,12 +675,6 @@ impl RegistryParams {
 
         let resource_type = registration.kind.resource_type().to_string();
         let kind = registration.kind.sub_string();
-info!("ResourceType: {}", resource_type );
-match &kind {
-    None => {info!("Kind == None")}
-    Some(kind) => {info!("Kind == {}", kind)}
-}
-
         let vendor = match &registration.kind.specific() {
             None => Option::None,
             Some(specific) => Option::Some(specific.vendor.clone()),

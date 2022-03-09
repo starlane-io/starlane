@@ -202,6 +202,7 @@ impl MessagingEndpointComponent {
                 match &rc {
                     Rc::Create(create) => {
                         let kind = match_kind(&create.template.kind)?;
+
                         let stub = match &create.template.address.child_segment_template {
                             AddressSegmentTemplate::Exact(child_segment) => {
 
@@ -296,18 +297,18 @@ impl MessagingEndpointComponent {
                             proto.payload = StarMessagePayload::ResourceHost(
                                 ResourceHostAction::Assign(assign),
                             );
-                            skel.messaging_api
+                            let reply = skel.messaging_api
                                 .star_exchange(proto, ReplyKind::Empty, "assign resource to host")
                                 .await?;
+
                             Ok(())
                         }
-
                         match assign(skel.clone(), stub.clone(), create.state.clone()).await {
                             Ok(_) => {
                                 Ok(Payload::Primitive(Primitive::Stub(stub)))
                             },
                             Err(fail) => {
-                                eprintln!("{}",fail.to_string() );
+                                eprintln!("FAIL {}",fail.to_string() );
                                 skel.registry_api
                                     .set_status(
                                         to,

@@ -456,6 +456,9 @@ impl Kind {
             Self::Artifact( artifact) => {
                 Option::Some(artifact.to_string())
             }
+            Self::UserBase( kind) => {
+                Option::Some(kind.to_string())
+            }
             _ => {
                 Option::None
             }

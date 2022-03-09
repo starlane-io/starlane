@@ -220,7 +220,7 @@ mod test {
     use crate::star::variant::web::parse::host_and_port;
 
     #[test]
-    pub fn path_regex() -> Result<(),Error> {
+    pub async fn path_regex() -> Result<(),Error> {
         let regex = Regex::new("/files/")?;
         assert!(regex.is_match("/files/"));
 
@@ -240,7 +240,7 @@ mod test {
     }
 
     #[test]
-    pub fn host() -> Result<(),Error> {
+    pub async fn host() -> Result<(),Error> {
         let (_,host_and_port) = host_and_port("localhost:8080")?;
         assert_eq!( host_and_port.host, "localhost".to_string() );
         assert_eq!( host_and_port.port, 8080 );

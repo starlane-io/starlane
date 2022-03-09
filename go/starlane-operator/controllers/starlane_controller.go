@@ -308,7 +308,7 @@ func (r *StarlaneReconciler) deploymentForStarlane(m *starlanev1alpha1.Starlane)
 						Args:  []string{"serve", "--with-external"},
 						Env: []corev1.EnvVar{
 							{Name: "STARLANE_KUBERNETES_INSTANCE_NAME", Value: m.Name},
-							{Name: "STARLANE_KEYCLOAK_URL", Value: keycloakName(m)+":8080"},
+							{Name: "STARLANE_KEYCLOAK_URL", Value: "http://"+keycloakName(m)+":8080"},
 							{Name: "NAMESPACE", Value: m.Namespace},
 							{
 								Name: "STARLANE_PASSWORD",

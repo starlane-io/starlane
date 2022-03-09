@@ -90,10 +90,12 @@ impl CommandExecutor {
     }
 
     async fn exec_create(&self, create: Create) {
+
         let parent = create.template.address.parent.clone();
         let action = Action::Rc(Rc::Create(create));
         let request = Request::new(action.into(), self.stub.address.clone(), parent);
         let response = self.api.exchange(request).await;
+
         match response.ok_or() {
             Ok(_) => {
                 self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;

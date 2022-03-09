@@ -258,6 +258,7 @@ impl StarKind {
                     ResourceType::User,
                     ResourceType::Base,
                     ResourceType::Proxy,
+                    ResourceType::UserBase,
                 ],
                 StarKind::Mesh => vec![],
                 StarKind::App => vec![ResourceType::App],

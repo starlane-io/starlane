@@ -6,32 +6,20 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/../kubernetes/password-hack.yaml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager/user.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager/userbase.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlane_controller.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlane_controller.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/command/cli.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/command/cli.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/command/compose.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/command/compose.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/command/execute.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/command/execute.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/command/parse.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/command/parse.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/config/bind.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/config/bind.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/config/parse.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/config/parse.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/error.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/error.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/mechtron/portal_client.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/mechtron/portal_client.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/constellation.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/constellation.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/data.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/data.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lib.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager/stateless.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager/stateless.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/registry.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/registry.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/shell/search.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/shell/search.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant/web.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/web.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane/api.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane/src/cli.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/cli.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/template.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/template.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -131,7 +119,7 @@
         <env name="RUST_BACKTRACE" value="full" />
         <env name="STARLANE_DELETE_CACHE_ON_START" value="true" />
         <env name="STARLANE_DELETE_DATA_ON_START" value="true" />
-        <env name="STARLANE_KEYCLOAK_URL" value="localhost:8080" />
+        <env name="STARLANE_KEYCLOAK_URL" value="http://localhost:8080" />
         <env name="STARLANE_PASSWORD" value="password" />
         <env name="STARLANE_PORT" value="5555" />
       </envs>
@@ -141,8 +129,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test command::parse::test::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib command::parse::test::test -- --exact" />
+    <configuration name="Test command::parse::test::test_kind" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib command::parse::test::test_kind -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -157,8 +145,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test command::parse::test::test2" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib command::parse::test::test2 -- --exact" />
+    <configuration name="Test config::parse::test::test_rec_command_lines" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib config::parse::test::test_rec_command_lines -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -173,8 +161,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test command::parse::test::test_script" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib command::parse::test::test_script -- --exact" />
+    <configuration name="Test config::parse::test::test_replace" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib config::parse::test::test_replace -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -189,8 +177,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test config::parse::test::test_set" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib config::parse::test::test_set -- --exact" />
+    <configuration name="Test constellation::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib constellation::test" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -224,19 +212,19 @@
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test" />
-      <item itemvalue="Cargo.Test config::parse::test::test_set" />
-      <item itemvalue="Cargo.Test command::parse::test::test" />
-      <item itemvalue="Cargo.Test command::parse::test::test_script" />
-      <item itemvalue="Cargo.Test command::parse::test::test2" />
       <item itemvalue="Cargo.Run starlane-operator" />
+      <item itemvalue="Cargo.Test command::parse::test::test_kind" />
+      <item itemvalue="Cargo.Test config::parse::test::test_replace" />
+      <item itemvalue="Cargo.Test config::parse::test::test_rec_command_lines" />
+      <item itemvalue="Cargo.Test constellation::test" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Test command::parse::test::test_kind" />
+        <item itemvalue="Cargo.Test constellation::test" />
+        <item itemvalue="Cargo.Test config::parse::test::test_rec_command_lines" />
+        <item itemvalue="Cargo.Test config::parse::test::test_replace" />
         <item itemvalue="Cargo.Run starlane-operator" />
-        <item itemvalue="Cargo.Test command::parse::test::test2" />
-        <item itemvalue="Cargo.Test command::parse::test::test" />
-        <item itemvalue="Cargo.Test command::parse::test::test_script" />
-        <item itemvalue="Cargo.Test config::parse::test::test_set" />
       </list>
     </recent_temporary>
   </component>
@@ -282,7 +270,7 @@
       <workItem from="1644557766743" duration="49467000" />
       <workItem from="1644705818806" duration="560000" />
       <workItem from="1644709387134" duration="3699000" />
-      <workItem from="1645761847346" duration="39771000" />
+      <workItem from="1645761847346" duration="43348000" />
     </task>
     <servers />
   </component>
