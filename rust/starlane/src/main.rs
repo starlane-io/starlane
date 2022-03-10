@@ -65,6 +65,7 @@ async fn go() -> Result<(),Error> {
                                                                                                                             SubCommand::with_name("get-shell").usage("get the shell that the starlane CLI connects to")]).usage("read or manipulate the cli config").display_order(1).display_order(1),
                                                             SubCommand::with_name("exec").usage("execute a command").args(vec![Arg::with_name("command_line").required(true).help("command line to execute")].as_slice()),
                                                             SubCommand::with_name("script").usage("execute commands in a script").args(vec![Arg::with_name("script_file").required(true).help("the script file to execute")].as_slice()),
+                                                            SubCommand::with_name("login").usage("login to server").args(vec![Arg::with_name("hostname").required(true).help("the host to connect to"),Arg::with_name("user").required(true).help("the user address"),Arg::with_name("password").required(true).help("password")].as_slice()),
                                                             SubCommand::with_name("mechtron").usage("launch a mechtron portal client").args(vec![Arg::with_name("server").required(true).help("the portal server to connect to"),
                                                                                                                                                        Arg::with_name("wasm_src").required(true).help("the address of the wasm source"),
                                                                                                                                                       ].as_slice()),
@@ -73,7 +74,9 @@ async fn go() -> Result<(),Error> {
 
     let matches = clap_app.clone().get_matches();
 
-    if let Option::Some(serve) = matches.subcommand_matches("serve") {
+    if let Option::Some(serve) = matches.subcommand_matches("login") {
+        println!("LOGIN!!!");
+    } else if let Option::Some(serve) = matches.subcommand_matches("serve") {
             let starlane = StarlaneMachine::new("server".to_string()).expect("StarlaneMachine server");
 
             let layout = match serve.value_of("with-external") {
@@ -151,7 +154,9 @@ async fn exec_command_line(client: CliClient, line: String) -> Result<(CliClient
                         error!("{}",err.to_string())
                     }
                 }
-
+            }
+            Require::Auth(auth) => {
+                println!("RECEIVED AUTH: {}", auth);
             }
         }
     }

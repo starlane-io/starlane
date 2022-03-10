@@ -18,6 +18,8 @@ use zip::result::ZipError;
 use wasmer::{CompileError, ExportError, RuntimeError};
 use actix_web::ResponseError;
 use handlebars::RenderError;
+use http::header::{InvalidHeaderName, InvalidHeaderValue, ToStrError};
+use http::method::InvalidMethod;
 use keycloak::KeycloakError;
 use nom_supreme::error::ErrorTree;
 use tokio::task::JoinError;
@@ -438,6 +440,62 @@ impl From<KeycloakError> for Error {
                 }
 
             }
+        }
+    }
+}
+
+impl From<InvalidMethod> for Error {
+    fn from(i: InvalidMethod) -> Self {
+        Self {
+            error: i.to_string()
+        }
+    }
+}
+
+impl From<InvalidHeaderName> for Error {
+    fn from(i: InvalidHeaderName) -> Self {
+        Self {
+            error: i.to_string()
+        }
+    }
+}
+
+impl From<InvalidHeaderValue> for Error {
+    fn from(i: InvalidHeaderValue) -> Self {
+        Self {
+            error: i.to_string()
+        }
+    }
+}
+
+impl From<ToStrError> for Error {
+    fn from(i: ToStrError) -> Self {
+        Self {
+            error: i.to_string()
+        }
+    }
+}
+
+impl From<serde_urlencoded::de::Error> for Error {
+    fn from(i: serde_urlencoded::de::Error) -> Self {
+        Self {
+            error: i.to_string()
+        }
+    }
+}
+
+impl From<reqwest::Error> for Error {
+    fn from(i: reqwest::Error) -> Self {
+        Self {
+            error: i.to_string()
+        }
+    }
+}
+
+impl From<alcoholic_jwt::ValidationError> for Error {
+    fn from(i: alcoholic_jwt::ValidationError ) -> Self {
+        Self {
+            error: format!("{:?}",i)
         }
     }
 }

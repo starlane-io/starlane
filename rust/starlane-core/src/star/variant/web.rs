@@ -22,6 +22,8 @@ use std::convert::TryInto;
 use handlebars::Handlebars;
 use serde_json::json;
 use std::future::Future;
+use http::{HeaderMap, HeaderValue};
+use http::header::{HeaderName, HOST};
 use mesh_portal::version::latest::http::{HttpRequest, HttpResponse};
 use mesh_portal::version::latest::id::{Address, Meta};
 use mesh_portal::version::latest::messaging;
@@ -129,9 +131,11 @@ println!("ok...");
 
             if status.is_complete() {
 
-                let mut http_headers = Meta::new();
+                let mut http_headers = HeaderMap::new();
                 for header in req.headers {
-                    http_headers.insert(header.name.to_string(), String::from_utf8(header.value.to_vec())?);
+                    let name = HeaderName::from_str(header.name)?;
+                    let value = HeaderValue::from_bytes(header.value)?;
+                    http_headers.insert(name, value );
                 }
 
 info!("method: {}", req.method.expect("method"));
@@ -180,8 +184,8 @@ async fn error_response( mut stream: TcpStream, code: usize, message: &str)  {
 
 async fn process_request(http_request: HttpRequest, api: StarlaneApi, skel: StarSkel ) -> Result<HttpResponse,Error> {
 
-    let host = http_request.headers.get("Host").ok_or("request missing 'Host' header")?;
-    let host_and_port: Result<HostAndPort,ErrorTree<&str>> = final_parser(host_and_port)(host.as_str());
+    let host = http_request.headers.get(HOST).ok_or("request missing 'Host' header")?.to_str()?;
+    let host_and_port: Result<HostAndPort,ErrorTree<&str>> = final_parser(host_and_port)(host);
     let host_and_port = host_and_port.map_err(|e| format!("invalid host: {}",host));
     let host_and_port = host_and_port?;
 

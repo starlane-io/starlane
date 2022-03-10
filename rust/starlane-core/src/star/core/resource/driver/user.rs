@@ -3,20 +3,23 @@ use std::convert::TryInto;
 use std::env;
 use std::future::Future;
 use std::sync::Arc;
+use alcoholic_jwt::{JWKS, token_kid};
 use keycloak::{KeycloakAdmin, KeycloakAdminToken, KeycloakError};
 use keycloak::types::{CredentialRepresentation, ProtocolMapperRepresentation, RealmRepresentation, UserRepresentation};
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::entity::request::get::Get;
 use mesh_portal::version::latest::entity::request::Rc;
 use mesh_portal::version::latest::entity::request::set::Set;
+use mesh_portal::version::latest::entity::response::ResponseCore;
 use mesh_portal::version::latest::id::Address;
 use mesh_portal::version::latest::messaging::{Request, Response};
-use mesh_portal::version::latest::payload::{Errors, Payload, Primitive};
+use mesh_portal::version::latest::payload::{Errors, HttpMethod, Payload, Primitive};
 use mesh_portal::version::latest::resource::ResourceStub;
 use mesh_portal_versions::version::v0_0_1::command::common::PropertyMod;
 use mesh_portal_versions::version::v0_0_1::entity::request::Action;
 use mesh_portal_versions::version::v0_0_1::entity::request::create::{AddressSegmentTemplate, Create};
 use mesh_portal_versions::version::v0_0_1::entity::request::get::GetOp;
+use nom::AsBytes;
 use serde_json::{json, Value};
 use validator::validate_email;
 use crate::error::Error;
@@ -26,8 +29,8 @@ use crate::star::core::resource::driver::ResourceCoreDriver;
 use crate::star::StarSkel;
 
 lazy_static! {
-    pub static HYPERUSER: &'static str ="hyperspace:users:hyperuser";
-    pub static HYPER_USERBASE: &'static str ="hyperspace:users";
+    pub static ref HYPERUSER: &'static str ="hyperspace:users:hyperuser";
+    pub static ref HYPER_USERBASE: &'static str ="hyperspace:users";
 }
 
 pub struct UserBaseKeycloakCoreDriver {
@@ -90,10 +93,10 @@ impl ResourceCoreDriver for UserBaseKeycloakCoreDriver {
     async fn handle_request(&self, request: Request ) -> Response {
         match &request.core.action {
             Action::Rc(rc) => {
-                request.result(self.resource_command(request.to.clone(), rc.clone() ).await)
+                request.clone().payload_result(self.resource_command(request.to.clone(), rc.clone() ).await)
             }
             Action::Http(_) => {
-                request.status(404)
+                self.handle_http(request).await
             }
             Action::Msg(_) => {
                 request.status(404)
@@ -114,6 +117,123 @@ impl ResourceCoreDriver for UserBaseKeycloakCoreDriver {
 }
 
 impl UserBaseKeycloakCoreDriver{
+
+    fn keycloak_url() -> Result<String,Error> {
+        Ok(std::env::var("STARLANE_KEYCLOAK_URL").map_err(|e|{"User<Keycloak>: environment variable 'STARLANE_KEYCLOAK_URL' not set."})?)
+    }
+
+    async fn handle_http( &self, request: Request ) -> Response
+    {
+        if let Action::Http(method) =&request.core.action {
+            match method {
+                &HttpMethod::POST => {
+                    match &request.core.path.as_str() {
+                        &"/login" => request.clone().result(self.handle_login(&request).await),
+                        &"/introspect" => request.clone().payload_result(self.handle_introspect_token(&request).await),
+                        &"/refresh-token" => request.clone().payload_result(self.handle_refresh_token(&request).await),
+                        _ => {
+                            request.status(404)
+                        }
+                    }
+                }
+                _ => {request.status(404)}
+            }
+        } else {
+            request.status(404)
+        }
+    }
+
+    async fn handle_login( &self, request: &Request ) -> Result<ResponseCore,Error>{
+        let multipart: Vec<(String,String)> = serde_urlencoded::from_bytes(request.core.body.clone().to_bin()?.as_bytes() )?;
+        let mut map = HashMap::new();
+        for (key,value) in multipart {
+            map.insert(key,value);
+        }
+        map.get("username").ok_or("username required")?;
+        map.get("password").ok_or("password required")?;
+        map.insert( "client_id".to_string(), "admin-cli".to_string() );
+        map.insert( "grant_type".to_string(), "password".to_string() );
+
+        let client = reqwest::Client::new();
+        let realm = normalize_realm(&request.to);
+        let url = Self::keycloak_url()?;
+        let response = client
+            .post(&format!(
+                "{}/auth/realms/{}/protocol/openid-connect/token",
+                url, realm
+            ))
+            .form(&map)
+            .send()
+            .await?;
+        let response = ResponseCore {
+            status: response.status(),
+            headers: response.headers().clone(),
+            body: Payload::Primitive(Primitive::Bin(Arc::new(response.bytes().await?.to_vec())))
+        };
+        Ok(response)
+    }
+
+    async fn handle_introspect_token( &self, request: &Request ) -> Result<Payload,Error>{
+        let token: String = request.core.body.clone().try_into()?;
+        let realm = normalize_realm(&request.to);
+        let url = Self::keycloak_url()?;
+        let url= format!("{}/auth/realms/{}/protocol/openid-connect/certs",url,realm);
+
+        let client = reqwest::Client::new();
+        let response = client.get(url ).send().await?;
+        let jwks = response.text().await?;
+        println!("jwks: {}", jwks);
+        let jwks: JWKS = serde_json::from_str(jwks.as_str())?;
+
+        let kid = token_kid(token.as_str())?.ok_or("expected token kid")?;
+
+        let jwk = jwks.find(&kid).ok_or(format!("expected to find kid: {}", kid))?;
+
+        let valid_jwt = alcoholic_jwt::validate( token.as_str(), jwk, vec![] )?;
+
+        println!("valid_jwt: {}",valid_jwt.claims.to_string());
+
+
+        Ok(Payload::Empty)
+    }
+
+
+    /*
+    Method: POST
+    URL: https://keycloak.example.com/auth/realms/myrealm/protocol/openid-connect/token
+    Body type: x-www-form-urlencoded
+    Form fields:
+    client_id : <my-client-name>
+    grant_type : refresh_token
+    refresh_token: <my-refresh-token>
+     */
+
+    async fn handle_refresh_token( &self, request: &Request ) -> Result<Payload,Error>{
+        let token: String = request.core.body.clone().try_into()?;
+
+        let client = reqwest::Client::new();
+        let realm = normalize_realm(&request.to);
+        let url = Self::keycloak_url()?;
+        let response = client
+            .post(&format!(
+                "{}/auth/realms/{}/protocol/openid-connect/token",
+                url, realm
+            ))
+            .form(&json!({
+                "refresh_token": token,
+                "client_id": "admin-cli",
+                "grant_type": "refresh_token"
+            }))
+            .send()
+            .await?;
+        let response = response.text().await?;
+        println!("{}",response );
+        Ok(Payload::Primitive(Primitive::Bin(Arc::new(response.as_bytes().to_vec()))))
+    }
+
+//    {{keycloak_url}}/admin/realms/{{realm}}/users/{{userId}}/logout
+
+
 
     async fn get_child( &self, to: Address, mut get: Get) -> Result<Payload,Error> {
 
@@ -282,29 +402,22 @@ impl StarlaneKeycloakAdmin {
         })
     }
 
-    fn normalize_realm(realm: &Address) -> String {
-        if is_hyper_userbase(realm) {
-            "master".to_string()
-        } else {
-            realm.to_string().replace(":", "_")
-        }
-    }
 
 
     pub async fn get_realm_from_address(&self, realm: &Address ) -> Result<RealmRepresentation,Error> {
-        let realm = Self::normalize_realm(realm);
+        let realm = normalize_realm(realm);
         Ok(self.admin.realm_get(realm.as_str() ).await?)
     }
 
 
     pub async fn delete_realm_from_address(&self, realm: &Address ) -> Result<(),Error> {
-        let realm = Self::normalize_realm(realm);
+        let realm = normalize_realm(realm);
         self.admin.realm_delete(realm.as_str() ).await?;
         Ok(())
     }
 
     pub async fn create_realm_from_address(&self, realm: &Address, registration_email_as_username: Option<bool>, verify_email: Option<bool> ) -> Result<(),Error> {
-        let realm = Self::normalize_realm(realm);
+        let realm = normalize_realm(realm);
         self.admin
             .post(RealmRepresentation {
                 realm: Some(realm.clone().into()),
@@ -392,7 +505,7 @@ impl StarlaneKeycloakAdmin {
     }
 
     pub async fn select_by_email(&self, realm: &Address, email: String) -> Result<Vec<UserRepresentation>,Error> {
-        let realm = Self::normalize_realm(realm);
+        let realm = normalize_realm(realm);
         Ok(self.admin.realm_users_get(realm.as_str(), Some(true),Some(email), None, None,None,None,None,None,None, None, None,None,None).await?)
     }
 
@@ -416,13 +529,13 @@ impl StarlaneKeycloakAdmin {
             .. Default::default()
         };
 
-        let realm =Self::normalize_realm(realm);
+        let realm = normalize_realm(realm);
         self.admin.realm_users_with_id_reset_password_put(realm.as_str(), id.as_str(), cred).await?;
         Ok(())
     }
 
     pub async fn create_user(&self, realm: &Address, email: String, username: Option<String>, password: Option<String> ) -> Result<(),Error> {
-        let realm = Self::normalize_realm(realm);
+        let realm = normalize_realm(realm);
 
         let user = UserRepresentation {
             username: username,
@@ -447,11 +560,18 @@ impl StarlaneKeycloakAdmin {
     }
 }
 
-
 pub fn is_hyperuser( address: &Address ) -> bool {
-    HYPERUSER == address.to_string().as_str()
+    address.to_string().as_str() == "hyperspace:users:hyperuser"
 }
 
 pub fn is_hyper_userbase( address: &Address ) -> bool {
-    HYPER_BASE == address.to_string().as_str()
+    address.to_string().as_str() == "hyperspace:users"
+}
+
+fn normalize_realm(realm: &Address) -> String {
+    if is_hyper_userbase(realm) {
+        "master".to_string()
+    } else {
+        realm.to_string().replace(":", "_")
+    }
 }

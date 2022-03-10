@@ -19,6 +19,7 @@ use crate::frame::{StarMessage, StarMessagePayload, SimpleReply};
 use mesh_portal::version::latest::util::unique_id;
 use crate::message::Reply;
 use std::ops::Deref;
+use http::StatusCode;
 use mesh_portal::version::latest::entity::response::ResponseCore;
 use mesh_portal::version::latest::id::Address;
 use mesh_portal::version::latest::messaging::{Request, Response};
@@ -118,7 +119,7 @@ impl Delivery<Request>
         let request = self.get_request()? ;
         let core = ResponseCore {
             headers: Default::default(),
-            code: 200,
+            status: StatusCode::from_u16(200).unwrap(),
             body: payload
         };
         let response = Response {
@@ -142,7 +143,7 @@ impl Delivery<Request>
         let request = self.get_request()?;
         let core = ResponseCore {
             headers: Default::default(),
-            code: 500,
+            status: StatusCode::from_u16(500).unwrap(),
             body: Payload::Primitive(Primitive::Text(fail))
         };
         let response = Response {

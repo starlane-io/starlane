@@ -22,6 +22,7 @@ use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use mesh_portal::version::latest::fail::BadRequest;
 use std::future::Future;
 use std::sync::Arc;
+use http::{HeaderMap, StatusCode};
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
 use mesh_portal::version::latest::config::bind::{BindConfig, Pipeline};
 use mesh_portal::version::latest::config::Config;
@@ -532,8 +533,8 @@ pub struct Traversal {
     pub action: Action,
     pub body: Payload,
     pub path: String,
-    pub headers: Meta,
-    pub code: u32,
+    pub headers: HeaderMap,
+    pub status: StatusCode,
 }
 
 impl Traversal {
@@ -544,7 +545,7 @@ impl Traversal {
             path: initial_request.item.core.path.clone(),
             headers: initial_request.item.core.headers.clone(),
             initial_request,
-            code: 200
+            status: StatusCode::from_u16(200).unwrap()
         }
     }
 
@@ -573,7 +574,7 @@ impl Traversal {
         ResponseCore {
             headers: self.headers.clone(),
             body: self.body.clone(),
-            code: self.code.clone()
+            status: self.status.clone()
         }
     }
 
@@ -592,7 +593,7 @@ impl Traversal {
             Message::Response(response) => {
                 self.headers = response.core.headers;
                 self.body = response.core.body;
-                self.code = response.core.code;
+                self.status = response.core.status;
             }
         }
     }
