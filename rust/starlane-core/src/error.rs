@@ -426,8 +426,18 @@ impl From<JoinError> for Error {
 
 impl From<KeycloakError> for Error {
     fn from(e: KeycloakError) -> Self {
-        Error {
-            error: e.to_string()
+        match e {
+            KeycloakError::ReqwestFailure(e) => {
+                Self {
+                    error: e.to_string()
+                }
+            }
+            KeycloakError::HttpFailure { status, body, text } => {
+                Self {
+                    error: format!("status: '{}' message: '{}'", status, text )
+                }
+
+            }
         }
     }
 }

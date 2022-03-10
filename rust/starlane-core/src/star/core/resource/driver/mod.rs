@@ -17,12 +17,14 @@ use crate::star::core::resource::driver::file::{FileSystemManager, FileCoreManag
 use std::collections::HashMap;
 use std::future::Future;
 use std::str::FromStr;
-use mesh_portal::version::latest::entity::request::create::Create;
+use mesh_portal::version::latest::entity::request::Rc;
+use mesh_portal::version::latest::entity::request::set::Set;
 use mesh_portal::version::latest::fail;
 use mesh_portal::version::latest::id::Address;
 use mesh_portal::version::latest::messaging::{Request, Response};
 use mesh_portal::version::latest::payload::Payload;
 use mesh_portal::version::latest::resource::ResourceStub;
+use mesh_portal_api_client::ResourceCommand;
 use mesh_portal_versions::version::v0_0_1::id::Tks;
 use crate::star::core::resource::driver::artifact::ArtifactManager;
 use crate::star::core::resource::driver::user::UserBaseKeycloakCoreDriver;
@@ -67,9 +69,9 @@ println!("Manager mod RETURNING" );
         rx.await?
     }
 
-    pub async fn create_child( &self, create: Create ) -> Result<ResourceStub,Error> {
+    pub async fn resource_command(&self, to: Address, rc: Rc) -> Result<Payload,Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(ResourceManagerCall::CreateChild{create, tx }).await;
+        self.tx.send(ResourceManagerCall::ResourceCommand { to, rc,  tx }).await;
         rx.await?
     }
 }
@@ -78,7 +80,7 @@ pub enum ResourceManagerCall {
     Assign{ assign:ResourceAssign, tx: oneshot::Sender<Result<(),Error>> },
     Request { request: Request, tx: oneshot::Sender<Result<Response,Error>>},
     Get{ address: Address, tx: oneshot::Sender<Result<Payload,Error>>},
-    CreateChild{ create: Create, tx: oneshot::Sender<Result<ResourceStub,Error>> }
+    ResourceCommand { to: Address, rc: Rc, tx: oneshot::Sender<Result<Payload,Error>> }
 }
 
 
@@ -141,8 +143,8 @@ impl AsyncProcessor<ResourceManagerCall> for ResourceCoreDriverComponent {
             ResourceManagerCall::Get { address, tx } => {
                 self.get(address,tx).await;
             }
-            ResourceManagerCall::CreateChild { create, tx } => {
-                tx.send( self.create_child(create).await );
+            ResourceManagerCall::ResourceCommand { to, rc, tx } => {
+                tx.send( self.resource_command(to, rc).await );
             }
         }
     }
@@ -197,10 +199,19 @@ impl ResourceCoreDriverComponent {
         }
     }
 
-    async fn create_child( &mut self, create: Create) -> Result<ResourceStub,Error> {
-        let resource_type = self.resources.get(&create.template.address.parent ).ok_or(format!("could not find parent resource: {}", create.template.address.parent.to_string()))?;
+    async fn resource_command(&mut self, to: Address, rc: Rc) -> Result<Payload,Error> {
+        let resource_type = self.resources.get(&to ).ok_or(format!("could not find resource: {}", to.to_string()))?;
         let driver = self.drivers.get(resource_type).ok_or(format!("do not have a resource core driver for '{}' and StarKind '{}'", resource_type.to_string(), self.skel.info.kind.to_string() ))?;
-        driver.create_child( create ).await
+        let result = driver.resource_command(to,rc).await;
+        match &result {
+            Ok(payload) => {
+                info!("resource command payload: {:?}", payload);
+            }
+            Err(err) => {
+                error!("{}",err.to_string())
+            }
+        }
+        result
     }
 
     fn resource_type(&mut self, address:&Address )->Result<ResourceType,Error> {
@@ -258,8 +269,8 @@ pub trait ResourceCoreDriver: Send + Sync {
 
     fn shutdown(&self) {}
 
-    async fn create_child(&self, create: Create ) -> Result<ResourceStub,Error> {
-        Err(format!("resource type: '{}' does not handle Core child creation",self.resource_type().to_string()).into())
+    async fn resource_command(&self, to: Address, rc: Rc) -> Result<Payload,Error> {
+        Err(format!("resource type: '{}' does not handle Core resource commands",self.resource_type().to_string()).into())
     }
 
 }

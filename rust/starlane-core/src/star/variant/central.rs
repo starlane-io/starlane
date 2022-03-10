@@ -73,6 +73,7 @@ impl CentralVariant {
         let mut creation = starlane_api.create_space("hyperspace", "Hyperspace").await?;
         creation.set_strategy(Strategy::Ensure);
         creation.submit().await?;
+
         Ok(())
     }
 }

@@ -149,7 +149,7 @@ impl StarlaneApi {
     }
 
 
-    pub async fn create_api<API>(&self, create: Create ) -> Result<API, Error>
+    pub async fn create_api<API>(&self, create: Create) -> Result<API, Error>
     where
         API: TryFrom<ResourceApi>,
     {
