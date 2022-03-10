@@ -1,6 +1,6 @@
 use std::cell::Cell;
 use std::collections::HashMap;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{mpsc, oneshot};
@@ -13,7 +13,7 @@ use crate::frame::{
 
 use crate::message::delivery::Delivery;
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
-use crate::resource::{ArtifactKind, Kind, ResourceType, BaseKind, FileKind, ResourceLocation, UserBaseKind};
+use crate::resource::{ArtifactKind, Kind, ResourceType, BaseKind, FileKind, ResourceLocation, UserBaseKind, ChildResourceRegistryHandler};
 use crate::resource::{AssignKind, ResourceAssign, ResourceRecord};
 use crate::star::core::resource::registry::{RegError, Registration};
 use crate::star::shell::wrangler::{ StarFieldSelection, StarSelector};
@@ -25,7 +25,7 @@ use std::sync::Arc;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
 use mesh_portal::version::latest::config::bind::{BindConfig, Pipeline};
 use mesh_portal::version::latest::config::Config;
-use mesh_portal::version::latest::entity::request::create::{AddressSegmentTemplate, KindTemplate, Strategy};
+use mesh_portal::version::latest::entity::request::create::{AddressSegmentTemplate, Create, KindTemplate, Strategy};
 use mesh_portal::version::latest::entity::request::{Action, Rc, RequestCore};
 use mesh_portal::version::latest::entity::request::get::Get;
 use mesh_portal::version::latest::fail;
@@ -45,7 +45,7 @@ use serde::de::Unexpected::Str;
 use crate::artifact::ArtifactRef;
 use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
 use crate::config::config::{ContextualConfig, ResourceConfig};
-use crate::star::core::resource::manager::{ResourceManagerApi, ResourceManagerComponent};
+use crate::star::core::resource::driver::{ResourceCoreDriverApi, ResourceCoreDriverComponent};
 
 pub enum CoreMessageCall {
     Message(StarMessage),
@@ -55,24 +55,24 @@ impl Call for CoreMessageCall {}
 
 pub struct MessagingEndpointComponent {
     skel: StarSkel,
-    resource_manager_api: ResourceManagerApi
+    resource_core_driver_api: ResourceCoreDriverApi
 }
 
 impl MessagingEndpointComponent {
     pub fn start(skel: StarSkel, rx: mpsc::Receiver<CoreMessageCall>) {
-        let (resource_manager_tx, resource_manager_rx) = mpsc::channel(1024);
-        let resource_manager_api= ResourceManagerApi::new(resource_manager_tx.clone());
+        let (resource_core_driver_tx, resource_core_driver_rx) = mpsc::channel(1024);
+        let resource_core_driver_api = ResourceCoreDriverApi::new(resource_core_driver_tx.clone());
         {
             let skel = skel.clone();
             tokio::spawn(async move {
-                ResourceManagerComponent::new(skel, resource_manager_tx, resource_manager_rx).await;
+                ResourceCoreDriverComponent::new(skel, resource_core_driver_tx, resource_core_driver_rx).await;
             });
         }
 
         AsyncRunner::new(
             Box::new(Self {
                 skel: skel.clone(),
-                resource_manager_api
+                resource_core_driver_api
             }),
             skel.core_messaging_endpoint_tx.clone(),
             rx,
@@ -129,14 +129,14 @@ impl MessagingEndpointComponent {
                 Action::Msg(msg) => {
                    let selector = config.msg.find_match(&delivery.item.core )?;
                    let regex = Regex::new(selector.pattern.path_regex.as_str() )?;
-                   let exec = PipelineExecutor::new( delivery, end.skel.clone(), end.resource_manager_api.clone(), selector.pipeline, regex );
+                   let exec = PipelineExecutor::new(delivery, end.skel.clone(), end.resource_core_driver_api.clone(), selector.pipeline, regex );
                    exec.execute();
                    Ok(())
                 }
                 Action::Http(http) => {
                     let selector = config.http.find_match(&delivery.item.core )?;
                     let regex = Regex::new(selector.pattern.path_regex.as_str() )?;
-                    let exec = PipelineExecutor::new( delivery, end.skel.clone(), end.resource_manager_api.clone(), selector.pipeline, regex );
+                    let exec = PipelineExecutor::new(delivery, end.skel.clone(), end.resource_core_driver_api.clone(), selector.pipeline, regex );
                     exec.execute();
                     Ok(())
                 }
@@ -170,13 +170,13 @@ impl MessagingEndpointComponent {
             StarMessagePayload::ResourceHost(action) => {
                 match action {
                     ResourceHostAction::Assign(assign) => {
-                        self.resource_manager_api.assign(assign.clone()).await;
+                        self.resource_core_driver_api.assign(assign.clone()).await;
                         let reply = star_message.ok(Reply::Empty);
                         self.skel.messaging_api.star_notify(reply);
                     }
                     ResourceHostAction::Init(_) => {}
                     ResourceHostAction::GetState(address) => {
-                        match self.resource_manager_api.get(address.clone()).await {
+                        match self.resource_core_driver_api.get(address.clone()).await {
                             Ok(payload) => {
                                 let reply = star_message.ok(Reply::Payload(payload));
                                 self.skel.messaging_api.star_notify(reply);
@@ -196,82 +196,26 @@ impl MessagingEndpointComponent {
 
     async fn process_resource_command(&mut self, delivery: Delivery<Request>)  {
         let skel = self.skel.clone();
-        let resource_manager_api = self.resource_manager_api.clone();
+        let resource_core_driver_api = self.resource_core_driver_api.clone();
         tokio::spawn(async move {
-            async fn process(skel: StarSkel, resource_manager_api: ResourceManagerApi, rc: &Rc, to: Address) -> Result<Payload, Error> {
+            async fn process(skel: StarSkel, resource_core_driver_api: ResourceCoreDriverApi, rc: &Rc, to: Address) -> Result<Payload, Error> {
                 match &rc {
                     Rc::Create(create) => {
-                        let kind = match_kind(&create.template.kind)?;
 
-                        let stub = match &create.template.address.child_segment_template {
-                            AddressSegmentTemplate::Exact(child_segment) => {
+                        let child_kind = match_kind(&create.template.kind)?;
+                        let record = skel.resource_locator_api.locate(to.clone()).await?;
+                        let parent_kind = Kind::try_from( record.stub.kind )?;
 
-                                let address = create.template.address.parent.push(child_segment.clone());
-                                match &address {
-                                    Ok(_) => {}
-                                    Err(err) => {
-                                        eprintln!("RC CREATE error: {}", err.to_string());
-                                    }
-                                }
-                                let address = address?;
-
-
-                                let registration = Registration {
-                                    address: address.clone(),
-                                    kind: kind.clone(),
-                                    registry: create.registry.clone(),
-                                    properties: create.properties.clone(),
-                                };
-
-                                let mut result = skel.registry_api.register(registration).await;
-
-                                // if strategy is ensure then a dupe is GOOD!
-                                if create.strategy == Strategy::Ensure {
-                                    if let Err(RegError::Dupe) = result {
-                                        result = Ok(skel.resource_locator_api.locate(address).await?.stub);
-                                    }
-                                }
-
-                                result?
+                        let stub = match parent_kind.resource_type().child_resource_registry_handler() {
+                            ChildResourceRegistryHandler::Shell => {
+                                let chamber = ResourceRegistrationChamber::new(skel.clone());
+                                chamber.create(create).await?
                             }
-                            AddressSegmentTemplate::Pattern(pattern) => {
-                                if !pattern.contains("%") {
-                                    return Err("AddressSegmentTemplate::Pattern must have at least one '%' char for substitution".into());
-                                }
-                                loop {
-                                    let index = skel.registry_api.sequence(create.template.address.parent.clone()).await?;
-                                    let child_segment = pattern.replace( "%", index.to_string().as_str() );
-                                    let address = create.template.address.parent.push(child_segment.clone())?;
-                                    let registration = Registration {
-                                        address: address.clone(),
-                                        kind: kind.clone(),
-                                        registry: create.registry.clone(),
-                                        properties: create.properties.clone(),
-                                    };
-
-                                    match skel.registry_api.register(registration).await {
-                                        Ok(stub) => {
-                                            if let Strategy::HostedBy(key) = &create.strategy {
-                                                let key = StarKey::from_str( key.as_str() )?;
-//                                                let location = ResourceLocation::new(key);
-                                                skel.registry_api.assign(address, key).await?;
-                                                return Ok(Payload::Primitive(Primitive::Stub(stub)));
-                                            } else {
-                                                break stub;
-                                            }
-                                        },
-                                        Err(RegError::Dupe) => {
-                                            // continue loop
-                                        }
-                                        Err(RegError::Error(error)) => {
-                                            return Err(error);
-                                        }
-                                    }
-                                }
+                            ChildResourceRegistryHandler::Core => {
+                                let stub = resource_core_driver_api.create_child(create.clone()).await?;
+                                return Ok(Payload::Primitive(Primitive::Stub(stub)));
                             }
                         };
-
-
 
                         async fn assign(
                             skel: StarSkel,
@@ -303,6 +247,8 @@ impl MessagingEndpointComponent {
 
                             Ok(())
                         }
+
+
                         match assign(skel.clone(), stub.clone(), create.state.clone()).await {
                             Ok(_) => {
                                 Ok(Payload::Primitive(Primitive::Stub(stub)))
@@ -342,7 +288,7 @@ impl MessagingEndpointComponent {
                                 proto.to(ProtoStarMessageTo::Resource(get.address.clone()));
                                 proto.payload = StarMessagePayload::ResourceHost(ResourceHostAction::GetState(get.address.clone()));
                                 if let Ok(Reply::Payload(payload)) = skel.messaging_api
-                                    .star_exchange(proto, ReplyKind::Payload, "get state from manager")
+                                    .star_exchange(proto, ReplyKind::Payload, "get state from driver")
                                     .await {
                                     Ok(payload)
                                 } else {
@@ -372,7 +318,7 @@ impl MessagingEndpointComponent {
                 Action::Rc(rc) => {rc}
                 _ => { panic!("should not get requests that are not Rc") }
             };
-            let result = process(skel,resource_manager_api.clone(), rc, delivery.to().expect("expected this to work since we have already established that the item is a Request")).await.into();
+            let result = process(skel, resource_core_driver_api.clone(), rc, delivery.to().expect("expected this to work since we have already established that the item is a Request")).await.into();
 
             delivery.result(result);
         });
@@ -455,13 +401,13 @@ pub struct WrappedHttpRequest {
 pub struct PipelineExecutor {
     pub traversal: Traversal,
     pub skel: StarSkel,
-    pub resource_manager_api: ResourceManagerApi,
+    pub resource_manager_api: ResourceCoreDriverApi,
     pub pipeline: Pipeline,
     pub path_regex: Regex
 }
 
 impl  PipelineExecutor {
-  pub fn new( delivery: Delivery<Request>, skel: StarSkel, resource_manager_api: ResourceManagerApi, pipeline: Pipeline, path_regex: Regex ) -> Self {
+  pub fn new(delivery: Delivery<Request>, skel: StarSkel, resource_manager_api: ResourceCoreDriverApi, pipeline: Pipeline, path_regex: Regex ) -> Self {
       let traversal = Traversal::new(delivery);
       Self {
           traversal,
@@ -672,4 +618,86 @@ impl Traversal {
         self.initial_request.fail(error);
     }
 
+}
+
+pub struct ResourceRegistrationChamber {
+    skel: StarSkel
+}
+
+impl ResourceRegistrationChamber {
+
+    pub fn new(skel: StarSkel) -> Self {
+        Self { skel }
+    }
+
+    pub async fn create(&self, create:&Create) -> Result<ResourceStub,Error> {
+        let child_kind = match_kind(&create.template.kind)?;
+        let stub = match &create.template.address.child_segment_template {
+            AddressSegmentTemplate::Exact(child_segment) => {
+
+                let address = create.template.address.parent.push(child_segment.clone());
+                match &address {
+                    Ok(_) => {}
+                    Err(err) => {
+                        eprintln!("RC CREATE error: {}", err.to_string());
+                    }
+                }
+                let address = address?;
+
+
+                let registration = Registration {
+                    address: address.clone(),
+                    kind: child_kind.clone(),
+                    registry: create.registry.clone(),
+                    properties: create.properties.clone(),
+                };
+
+                let mut result = self.skel.registry_api.register(registration).await;
+
+                // if strategy is ensure then a dupe is GOOD!
+                if create.strategy == Strategy::Ensure {
+                    if let Err(RegError::Dupe) = result {
+                        result = Ok(self.skel.resource_locator_api.locate(address).await?.stub);
+                    }
+                }
+
+                result?
+            }
+            AddressSegmentTemplate::Pattern(pattern) => {
+                if !pattern.contains("%") {
+                    return Err("AddressSegmentTemplate::Pattern must have at least one '%' char for substitution".into());
+                }
+                loop {
+                    let index = self.skel.registry_api.sequence(create.template.address.parent.clone()).await?;
+                    let child_segment = pattern.replace( "%", index.to_string().as_str() );
+                    let address = create.template.address.parent.push(child_segment.clone())?;
+                    let registration = Registration {
+                        address: address.clone(),
+                        kind: child_kind.clone(),
+                        registry: create.registry.clone(),
+                        properties: create.properties.clone(),
+                    };
+
+                    match self.skel.registry_api.register(registration).await {
+                        Ok(stub) => {
+                            if let Strategy::HostedBy(key) = &create.strategy {
+                                let key = StarKey::from_str( key.as_str() )?;
+                                self.skel.registry_api.assign(address, key).await?;
+                                return Ok(stub);
+                            } else {
+                                break stub;
+                            }
+                        },
+                        Err(RegError::Dupe) => {
+                            // continue loop
+                        }
+                        Err(RegError::Error(error)) => {
+                            return Err(error);
+                        }
+                    }
+                }
+            }
+        };
+        Ok(stub)
+    }
 }

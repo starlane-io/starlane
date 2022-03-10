@@ -41,7 +41,7 @@ use crate::proto::{
 use crate::star::surface::SurfaceApi;
 use crate::star::{ConstellationBroadcast, StarKind, StarStatus};
 use crate::star::{Request, Star, StarCommand, StarController, StarInfo, StarKey, StarTemplateId};
-use crate::star::core::resource::manager::mechtron::MechtronPortalServer;
+use crate::star::core::resource::driver::mechtron::MechtronPortalServer;
 use crate::starlane::api::StarlaneApi;
 use crate::starlane::files::MachineFileSystem;
 use crate::template::{

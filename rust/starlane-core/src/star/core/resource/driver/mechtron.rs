@@ -13,7 +13,7 @@ use mesh_portal::version::latest::artifact::{ArtifactRequest, ArtifactResponse};
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
 use crate::resource::{ArtifactKind, ResourceType, ResourceAssign, AssignResourceStateSrc, Kind};
-use crate::star::core::resource::manager::ResourceManager;
+use crate::star::core::resource::driver::ResourceCoreDriver;
 use crate::star::core::resource::state::StateStore;
 use crate::star::{StarSkel};
 use crate::util::AsyncHashMap;
@@ -48,7 +48,7 @@ use crate::message::Reply;
 use crate::starlane::api::StarlaneApi;
 
 
-pub struct MechtronManager {
+pub struct MechtronCoreDriver {
     skel: StarSkel,
     processes: HashMap<String, Child>,
     inner: Arc<RwLock<MechtronManagerInner>>,
@@ -56,7 +56,7 @@ pub struct MechtronManager {
     mechtron_portal_server_tx: Sender<TcpServerCall>,
 }
 
-impl MechtronManager {
+impl MechtronCoreDriver {
     pub async fn new(skel: StarSkel, resource_type:ResourceType) -> Result<Self,Error> {
 
         let mechtron_portal_server_tx = skel.machine.start_mechtron_portal_server().await?;
@@ -67,7 +67,7 @@ impl MechtronManager {
             let mechtron_portal_server_tx = mechtron_portal_server_tx.clone();
             let inner = inner.clone();
             tokio::spawn( async move {
-                match MechtronManager::get_portal_broadcast_tx(&mechtron_portal_server_tx).await {
+                match MechtronCoreDriver::get_portal_broadcast_tx(&mechtron_portal_server_tx).await {
                     Ok(mut portal_broadcast_rx) => {
                         while let Ok(event)  = portal_broadcast_rx.recv().await {
                             let mut inner = inner.write().await;
@@ -107,7 +107,7 @@ println!("Resource ADDDED: '{}'", resource.stub.address.to_string() );
             });
         }
 
-        Ok(MechtronManager {
+        Ok(MechtronCoreDriver {
             skel: skel.clone(),
             processes: HashMap::new(),
             inner,
@@ -117,7 +117,7 @@ println!("Resource ADDDED: '{}'", resource.stub.address.to_string() );
     }
 }
 
-impl MechtronManager {
+impl MechtronCoreDriver {
    async fn get_portal_broadcast_tx(mechtron_portal_server_tx: &mpsc::Sender<TcpServerCall>) -> Result<broadcast::Receiver<PortalEvent>,Error> {
        let (tx, rx) = oneshot::channel();
        mechtron_portal_server_tx.send(TcpServerCall::GetPortalEvents(tx)).await;
@@ -126,7 +126,7 @@ impl MechtronManager {
 }
 
 #[async_trait]
-impl ResourceManager for MechtronManager {
+impl ResourceCoreDriver for MechtronCoreDriver {
 
 
 

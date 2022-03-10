@@ -9,10 +9,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 use crate::resource::{AssignResourceStateSrc, Kind, ResourceAssign, ResourceType};
-use crate::star::core::resource::manager::ResourceManager;
+use crate::star::core::resource::driver::ResourceCoreDriver;
 use crate::star::StarSkel;
 
-pub struct K8sManager {
+pub struct K8sCoreDriver {
     skel: StarSkel,
     client: kube::Client,
     starlane_meta: ObjectMeta,
@@ -21,7 +21,7 @@ pub struct K8sManager {
     resource_type: ResourceType
 }
 
-impl K8sManager {
+impl K8sCoreDriver {
     pub async fn new(skel: StarSkel, resource_type: ResourceType ) -> Result<Self, Error> {
 
         let client = kube::Client::try_default().await?;
@@ -42,8 +42,8 @@ impl K8sManager {
             }
         };
 
-        let starlane_api: Api<crate::star::core::resource::manager::k8s::Starlane> = Api::namespaced(client.clone(), namespace.as_str() );
-        let starlane: crate::star::core::resource::manager::k8s::Starlane =  match starlane_api.get(kubernetes_instance_name.as_str()).await {
+        let starlane_api: Api<crate::star::core::resource::driver::k8s::Starlane> = Api::namespaced(client.clone(), namespace.as_str() );
+        let starlane: crate::star::core::resource::driver::k8s::Starlane =  match starlane_api.get(kubernetes_instance_name.as_str()).await {
             Ok(starlane) => starlane,
             Err(_err) => {
                 let message = format!("FATAL: could not access Kubernetes starlane instance named '{}'", kubernetes_instance_name);
@@ -53,7 +53,7 @@ impl K8sManager {
         };
         let starlane_meta: ObjectMeta = starlane.metadata.clone();
 
-        let rtn = K8sManager {
+        let rtn = K8sCoreDriver {
             skel: skel,
             client: client,
             namespace: namespace,
@@ -68,7 +68,7 @@ impl K8sManager {
 
 
 #[async_trait]
-impl ResourceManager for K8sManager {
+impl ResourceCoreDriver for K8sCoreDriver {
 
      async fn assign(
             &mut self,

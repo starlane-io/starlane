@@ -226,6 +226,14 @@ impl TryFrom<String> for ResourceType {
     }
 }
 
+impl ResourceType {
+    pub fn child_resource_registry_handler(&self) -> ChildResourceRegistryHandler {
+        match self {
+            Self::UserBase => ChildResourceRegistryHandler::Core,
+            _ => ChildResourceRegistryHandler::Shell
+        }
+    }
+}
 
 #[derive(
     Debug,
@@ -377,6 +385,16 @@ impl TryFrom<KindParts> for Kind {
                     }
                     Some(kind)  => {
                         return Ok(Self::Artifact(ArtifactKind::from_str(kind.as_str())?))
+                    }
+                }
+            }
+            ResourceType::UserBase=> {
+                match parts.kind {
+                    None => {
+                        return Err("kind needs to be set for UserBase".into())
+                    }
+                    Some(kind)  => {
+                        return Ok(Self::UserBase(UserBaseKind::from_str(kind.as_str())?))
                     }
                 }
             }
@@ -703,4 +721,10 @@ impl ResourceAssign {
 
 }
 
+
+#[derive(Debug,Clone,Serialize,Deserialize,strum_macros::Display)]
+pub enum ChildResourceRegistryHandler {
+    Shell,
+    Core
+}
 

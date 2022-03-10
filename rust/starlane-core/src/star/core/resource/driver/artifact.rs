@@ -11,7 +11,7 @@ use tempdir::TempDir;
 use tokio::sync::Mutex;
 
 use crate::resource::{ResourceType, AssignResourceStateSrc, ResourceAssign, Kind, ArtifactKind};
-use crate::star::core::resource::manager::ResourceManager;
+use crate::star::core::resource::driver::ResourceCoreDriver;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util;
@@ -56,14 +56,14 @@ fn get_artifacts(data: Arc<Vec<u8>>) -> Result<Vec<String>, Error> {
 }
 
 #[derive(Debug)]
-pub struct ArtifactBundleManager {
+pub struct ArtifactBundleCoreDriver {
     skel: StarSkel,
     store: StateStore,
 }
 
-impl ArtifactBundleManager {
+impl ArtifactBundleCoreDriver {
     pub async fn new(skel: StarSkel) -> Self {
-        ArtifactBundleManager {
+        ArtifactBundleCoreDriver {
             skel: skel.clone(),
             store: StateStore::new(skel),
         }
@@ -71,7 +71,7 @@ impl ArtifactBundleManager {
 }
 
 #[async_trait]
-impl ResourceManager for ArtifactBundleManager {
+impl ResourceCoreDriver for ArtifactBundleCoreDriver {
     fn resource_type(&self) -> ResourceType {
         ResourceType::ArtifactBundle
     }
@@ -252,7 +252,7 @@ impl ArtifactManager{
 
 
 #[async_trait]
-impl ResourceManager for ArtifactManager{
+impl ResourceCoreDriver for ArtifactManager{
     fn resource_type(&self) -> ResourceType {
         ResourceType::Artifact
     }

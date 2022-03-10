@@ -53,7 +53,7 @@ use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 use std::cmp;
 use std::fmt;
 use std::future::Future;
-use crate::star::core::resource::manager::ResourceManagerApi;
+use crate::star::core::resource::driver::ResourceCoreDriverApi;
 use std::str::FromStr;
 use mesh_portal::version::latest::id::Address;
 use mesh_portal::version::latest::portal;

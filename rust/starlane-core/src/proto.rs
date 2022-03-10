@@ -41,7 +41,7 @@ use crate::star::shell::locator::{ResourceLocatorApi, ResourceLocatorComponent};
 use crate::star::shell::golden::{GoldenPathApi, GoldenPathComponent};
 use crate::star::shell::watch::{WatchApi, WatchComponent};
 use crate::star::core::resource::registry::{RegistryApi, RegistryComponent};
-use crate::star::core::resource::manager::ResourceManagerApi;
+use crate::star::core::resource::driver::ResourceCoreDriverApi;
 
 
 pub struct ProtoStar {
