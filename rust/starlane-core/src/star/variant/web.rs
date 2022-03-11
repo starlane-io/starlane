@@ -42,7 +42,9 @@ use serde::{Serialize,Deserialize};
 use tiny_http::{HeaderField, Server, StatusCode};
 use crate::star::variant::web::parse::host_and_port;
 
-
+lazy_static! {
+//    pub static ref DATA_DIR: Mutex<String> = Mutex::new("data".to_string());
+}
 pub struct WebVariant {
     skel: StarSkel,
 }
@@ -88,7 +90,8 @@ fn start(api: StarlaneApi,skel: StarSkel) {
         let runtime = Runtime::new().unwrap();
         runtime.block_on( async move {
 
-            let server = Server::http("0.0.0.0:8000").unwrap();
+            let STARLANE_WEB_PORT = std::env::var("STARLANE_WEB_PORT").unwrap_or("8080".to_string());
+            let server = Server::http(format!("0.0.0.0:{}",STARLANE_WEB_PORT)).unwrap();
             for req in server.incoming_requests() {
                 handle(req,api.clone(),skel.clone());
             }

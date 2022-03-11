@@ -124,6 +124,7 @@ impl UserBaseKeycloakCoreDriver{
 
     async fn handle_http( &self, request: Request ) -> Response
     {
+println!("handle_http");
         if let Action::Http(method) =&request.core.action {
             match method {
                 &HttpMethod::POST => {

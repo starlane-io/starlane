@@ -101,6 +101,7 @@ impl MessagingEndpointComponent {
 
     async fn handle_request(&mut self, delivery: Delivery<Request>)
     {
+println!("MessagingEndpointComponent::handle_request");
         async fn get_bind_config( end: &mut MessagingEndpointComponent, address: Address ) -> Result<ArtifactItem<CachedConfig<BindConfig>>,Error> {
             let action = Action::Rc( Rc::Get( Get{ address:address.clone(), op: GetOp::Properties(vec!["bind".to_string()])}));
             let core = action.into();
@@ -136,10 +137,13 @@ impl MessagingEndpointComponent {
                    Ok(())
                 }
                 Action::Http(http) => {
+println!("HTTP action selected...");
                     let selector = config.http.find_match(&delivery.item.core )?;
                     let regex = Regex::new(selector.pattern.path_regex.as_str() )?;
                     let exec = PipelineExecutor::new(delivery, end.skel.clone(), end.resource_core_driver_api.clone(), selector.pipeline, regex );
+println!("executing in pipeline...");
                     exec.execute();
+println!("returned from pipeline execution...");
                     Ok(())
                 }
             }
@@ -147,6 +151,7 @@ impl MessagingEndpointComponent {
 
         match get_bind_config(self, delivery.to.clone() ).await {
             Ok(bind_config) => {
+println!("executing...");
                 execute(self, bind_config, delivery );
             }
             Err(_) => {

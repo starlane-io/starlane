@@ -1,6 +1,7 @@
 use std::cell::Cell;
 
 use std::collections::HashMap;
+use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 
@@ -63,6 +64,8 @@ lazy_static! {
 
     pub static ref VERSION: VersionFrame = VersionFrame{ product: "Starlane".to_string(), version: "1.0.0".to_string() };
     pub static ref STARLANE_MECHTRON_PORT: usize = std::env::var("STARLANE_MECHTRON_PORT").unwrap_or("4345".to_string()).parse::<usize>().unwrap_or(4345);
+    pub static ref STARLANE_DATA_DIR: String= std::env::var("STARLANE_DATA_DIR").unwrap_or("data".to_string());
+    pub static ref STARLANE_CACHE_DIR: String = std::env::var("STARLANE_CACHE_DIR").unwrap_or("data".to_string());
 }
 
 #[derive(Clone)]
@@ -82,6 +85,17 @@ impl StarlaneMachine {
         name: MachineName,
         artifact_caches: Option<Arc<ProtoArtifactCachesFactory>>
     ) -> Result<Self, Error> {
+
+        // presently we favor deletion since the persistence is not really working
+        let delete_cache_on_start = std::env::var("STARLANE_DELETE_CACHE_ON_START").unwrap_or("true".to_string()).parse::<bool>().unwrap_or(true);
+        let delete_data_on_start = std::env::var("STARLANE_DELETE_DATA_ON_START").unwrap_or("true".to_string()).parse::<bool>().unwrap_or(true);
+
+        if delete_cache_on_start {
+            fs::remove_dir_all(STARLANE_CACHE_DIR.to_string() ).unwrap_or_default();
+        }
+        if delete_data_on_start {
+            fs::remove_dir_all(STARLANE_DATA_DIR.to_string() ).unwrap_or_default();
+        }
 
         let runner = StarlaneMachineRunner::new_with_artifact_caches(name, artifact_caches)?;
         let tx = runner.command_tx.clone();
@@ -206,26 +220,6 @@ impl StarlaneMachineRunner {
         let cache_access = FileAccess::new(
             std::env::var("STARLANE_CACHE_DIR").unwrap_or("cache".to_string()),
         )?;
-
-        // presently we favor deletion since the persistence is not really working
-        let delete_cache_on_start = std::env::var("STARLANE_DELETE_CACHE_ON_START").unwrap_or("true".to_string()).parse::<bool>().unwrap_or(true);
-        let delete_data_on_start = std::env::var("STARLANE_DELETE_DATA_ON_START").unwrap_or("true".to_string()).parse::<bool>().unwrap_or(true);
-
-        {
-            let cache_access = cache_access.clone();
-            let data_access = data_access.clone();
-            tokio::spawn(async move {
-                if delete_cache_on_start {
-                    let path = path::Path::from_str("/").expect("expected root path");
-                    cache_access.remove_dir(&path).await;
-                }
-
-                if delete_data_on_start {
-                    let path = path::Path::from_str("/").expect("expected root path");
-                    data_access.remove_dir(&path).await;
-                }
-            });
-        }
 
 
         Ok(StarlaneMachineRunner {
