@@ -160,6 +160,29 @@ impl Delivery<Request>
         self.skel.messaging_api.star_notify(proto);
         Ok(())
     }
+
+    pub fn not_found(self) ->Result<(),Error> {
+
+        let request = self.get_request()?;
+        let core = ResponseCore {
+            headers: Default::default(),
+            status: StatusCode::from_u16(500).unwrap(),
+            body: Payload::Empty
+        };
+        let response = Response {
+            id: unique_id(),
+            to: request.from,
+            from: request.to,
+            core,
+            response_to: request.id
+        };
+
+        let proto = self
+            .star_message
+            .reply(StarMessagePayload::Response(response));
+        self.skel.messaging_api.star_notify(proto);
+        Ok(())
+    }
 }
 
 

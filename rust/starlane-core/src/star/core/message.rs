@@ -130,7 +130,12 @@ println!("MessagingEndpointComponent::handle_request");
             match &delivery.item.core.action {
                 Action::Rc(_) => {panic!("rc should be filtered");}
                 Action::Msg(msg) => {
-                   let selector = config.msg.find_match(&delivery.item.core )?;
+                   let selector = config.msg.find_match(&delivery.item.core );
+                   if selector.is_err() {
+                       delivery.not_found();
+                       return Ok(());
+                   }
+                   let selector = selector.expect("selector");
                    let regex = Regex::new(selector.pattern.path_regex.as_str() )?;
                    let exec = PipelineExecutor::new(delivery, end.skel.clone(), end.resource_core_driver_api.clone(), selector.pipeline, regex );
                    exec.execute();
@@ -138,7 +143,12 @@ println!("MessagingEndpointComponent::handle_request");
                 }
                 Action::Http(http) => {
 println!("HTTP action selected...");
-                    let selector = config.http.find_match(&delivery.item.core )?;
+                    let selector = config.http.find_match(&delivery.item.core );
+                    if selector.is_err() {
+                        delivery.not_found();
+                        return Ok(());
+                    }
+                    let selector = selector.expect("selector");
                     let regex = Regex::new(selector.pattern.path_regex.as_str() )?;
                     let exec = PipelineExecutor::new(delivery, end.skel.clone(), end.resource_core_driver_api.clone(), selector.pipeline, regex );
 println!("executing in pipeline...");
@@ -152,7 +162,12 @@ println!("returned from pipeline execution...");
         match get_bind_config(self, delivery.to.clone() ).await {
             Ok(bind_config) => {
 println!("executing...");
-                execute(self, bind_config, delivery );
+                match execute(self, bind_config, delivery ) {
+                    Ok(_) => {}
+                    Err(err) => {
+                        error!("{}",err.to_string())
+                    }
+                }
             }
             Err(_) => {
                 delivery.fail("could not get bind config for resource".into());
