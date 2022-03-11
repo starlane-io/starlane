@@ -20,7 +20,6 @@ impl BindConfigParser {
 impl Parser<CachedConfig<BindConfig>> for BindConfigParser {
     fn parse(&self, artifact: ArtifactRef, _data: Bin ) -> Result<Arc<CachedConfig<BindConfig>>, Error> {
         let raw = String::from_utf8(_data.to_vec() )?;
-println!("PARSING: {}", raw );
         let bind = final_bind(raw.as_str())?;
         let bind:BindConfig = bind.try_into()?;
         let config = CachedConfig {

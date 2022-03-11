@@ -17,9 +17,11 @@ use zip::result::ZipError;
 
 use wasmer::{CompileError, ExportError, RuntimeError};
 use actix_web::ResponseError;
+use ascii::FromAsciiError;
 use handlebars::RenderError;
 use http::header::{InvalidHeaderName, InvalidHeaderValue, ToStrError};
 use http::method::InvalidMethod;
+use http::uri::InvalidUri;
 use keycloak::KeycloakError;
 use nom_supreme::error::ErrorTree;
 use tokio::task::JoinError;
@@ -499,3 +501,28 @@ impl From<alcoholic_jwt::ValidationError> for Error {
         }
     }
 }
+
+impl From<InvalidUri> for Error {
+    fn from(i: InvalidUri) -> Self {
+        Self {
+            error: format!("{}",i.to_string())
+        }
+    }
+}
+
+impl From<http::Error> for Error {
+    fn from(i: http::Error) -> Self {
+        Self {
+            error: format!("{}",i.to_string())
+        }
+    }
+}
+
+impl From<FromAsciiError<&str>> for Error {
+    fn from(i: FromAsciiError<&str>) -> Self {
+        Self {
+            error: format!("{}",i.to_string())
+        }
+    }
+}
+

@@ -21,6 +21,7 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 use mesh_portal::version::latest::path::Path;
 use tokio::fs::ReadDir;
+use tokio::sync::mpsc::Sender;
 
 pub enum FileCommand {
     List {
@@ -75,7 +76,13 @@ impl FileAccess {
     }
 
     pub fn new(path: String) -> Result<Self, Error> {
-        let tx = LocalFileAccess::new(path.clone())?;
+        let tx = match LocalFileAccess::new(path.clone()) {
+            Ok(tx) => {tx}
+            Err(err) => {
+               error!("could not create base_dir: {}", path );
+                return Err(err);
+            }
+        };
         let path = fs::canonicalize(&path)?
             .to_str()
             .ok_or("turning path to string")?

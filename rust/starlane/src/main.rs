@@ -65,7 +65,7 @@ async fn go() -> Result<(),Error> {
                                                                                                                             SubCommand::with_name("get-shell").usage("get the shell that the starlane CLI connects to")]).usage("read or manipulate the cli config").display_order(1).display_order(1),
                                                             SubCommand::with_name("exec").usage("execute a command").args(vec![Arg::with_name("command_line").required(true).help("command line to execute")].as_slice()),
                                                             SubCommand::with_name("script").usage("execute commands in a script").args(vec![Arg::with_name("script_file").required(true).help("the script file to execute")].as_slice()),
-                                                            SubCommand::with_name("login").usage("login to server").args(vec![Arg::with_name("hostname").required(true).help("the host to connect to"),Arg::with_name("user").required(true).help("the user address"),Arg::with_name("password").required(true).help("password")].as_slice()),
+                                                            SubCommand::with_name("login").usage("login <hostname> <user-base-address> <email-or-username> <password>").args(vec![Arg::with_name("hostname").required(true).help("the host to connect to"),Arg::with_name("userbase").required(true).help("the userbase address i.e. hyperspace:users"),Arg::with_name("email-or-username").required(true).help("email address or username"),Arg::with_name("password").required(true).help("password")].as_slice()),
                                                             SubCommand::with_name("mechtron").usage("launch a mechtron portal client").args(vec![Arg::with_name("server").required(true).help("the portal server to connect to"),
                                                                                                                                                        Arg::with_name("wasm_src").required(true).help("the address of the wasm source"),
                                                                                                                                                       ].as_slice()),
@@ -74,7 +74,12 @@ async fn go() -> Result<(),Error> {
 
     let matches = clap_app.clone().get_matches();
 
-    if let Option::Some(serve) = matches.subcommand_matches("login") {
+    if let Option::Some(args) = matches.subcommand_matches("login") {
+        let hostname = args.value_of("hostname").unwrap();
+        let userbase= args.value_of("userbase").unwrap();
+        let username = args.value_of("email-or-username").unwrap();
+        let password = args.value_of("password").unwrap();
+
         println!("LOGIN!!!");
     } else if let Option::Some(serve) = matches.subcommand_matches("serve") {
             let starlane = StarlaneMachine::new("server".to_string()).expect("StarlaneMachine server");

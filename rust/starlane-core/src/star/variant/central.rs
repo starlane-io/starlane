@@ -74,6 +74,10 @@ impl CentralVariant {
         creation.set_strategy(Strategy::Ensure);
         creation.submit().await?;
 
+        let mut creation = starlane_api.create_space("localhost", "Localhost").await?;
+        creation.set_strategy(Strategy::Ensure);
+        creation.submit().await?;
+
         Ok(())
     }
 }

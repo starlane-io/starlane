@@ -22,7 +22,7 @@ use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use mesh_portal::version::latest::fail::BadRequest;
 use std::future::Future;
 use std::sync::Arc;
-use http::{HeaderMap, StatusCode};
+use http::{HeaderMap, StatusCode, Uri};
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
 use mesh_portal::version::latest::config::bind::{BindConfig, Pipeline};
 use mesh_portal::version::latest::config::Config;
@@ -30,7 +30,6 @@ use mesh_portal::version::latest::entity::request::create::{AddressSegmentTempla
 use mesh_portal::version::latest::entity::request::{Action, Rc, RequestCore};
 use mesh_portal::version::latest::entity::request::get::Get;
 use mesh_portal::version::latest::fail;
-use mesh_portal::version::latest::http::{HttpRequest, HttpResponse};
 use mesh_portal::version::latest::id::{Address, Meta};
 use mesh_portal::version::latest::messaging::{Message, Request, Response};
 use mesh_portal::version::latest::payload::{Payload, PayloadMap, Primitive, PrimitiveList};
@@ -301,14 +300,6 @@ impl MessagingEndpointComponent {
             }
 
             let result = process(skel, resource_core_driver_api.clone(), rc, delivery.to().expect("expected this to work since we have already established that the item is a Request")).await.into();
-match &result {
-    Ok(_) => {
-        println!("RESULT OK");
-    }
-    Err(_) => {
-        println!("RESULT ERR");
-    }
-}
             delivery.result(result);
         });
     }
@@ -382,10 +373,7 @@ pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
         },
     })
 }
-pub struct WrappedHttpRequest {
-    pub resource: Address,
-    pub request: HttpRequest,
-}
+
 
 pub struct PipelineExecutor {
     pub traversal: Traversal,
@@ -452,11 +440,11 @@ impl PipelineExecutor {
                self.traversal.push( Message::Response(response));
            }
            PipelineStop::Call(call) => {
-               let path = self.traversal.path.clone();
-               let captures = self.path_regex.captures( path.as_str() ).ok_or("cannot find regex captures" )?;
+               let uri = self.traversal.uri.clone();
+               let captures = self.path_regex.captures( uri.path() ).ok_or("cannot find regex captures" )?;
                let address = call.address.clone().to_address(captures)?;
 
-               let captures = self.path_regex.captures( path.as_str() ).ok_or("cannot find regex captures" )?;
+               let captures = self.path_regex.captures( uri.path() ).ok_or("cannot find regex captures" )?;
                let (action,path) = match &call.kind {
                    CallKind::Msg(msg) => {
                        let mut path = String::new();
@@ -473,7 +461,7 @@ impl PipelineExecutor {
                let mut core :RequestCore= action.into();
                core.body = self.traversal.body.clone();
                core.headers = self.traversal.headers.clone();
-               core.path = path;
+               core.uri = Uri::from_str(path.as_str())?;
                let request = Request::new( core, self.traversal.to(), address.clone() );
                let response = self.skel.messaging_api.exchange(request).await;
                self.traversal.push( Message::Response(response));
@@ -482,8 +470,8 @@ impl PipelineExecutor {
                // while loop will trigger a response
            }
            PipelineStop::CaptureAddress(address) => {
-               let path = self.traversal.path.clone();
-               let captures = self.path_regex.captures( path.as_str() ).ok_or("cannot find regex captures" )?;
+               let uri = self.traversal.uri.clone();
+               let captures = self.path_regex.captures( uri.path() ).ok_or("cannot find regex captures" )?;
                let address = address.clone().to_address(captures)?;
                let action = Action::Rc(Rc::Get(Get{ address:address.clone(), op: GetOp::State}));
                let core = action.into();
@@ -532,7 +520,7 @@ pub struct Traversal {
     pub initial_request: Delivery<Request>,
     pub action: Action,
     pub body: Payload,
-    pub path: String,
+    pub uri: Uri,
     pub headers: HeaderMap,
     pub status: StatusCode,
 }
@@ -542,7 +530,7 @@ impl Traversal {
         Self {
             action: initial_request.core.action.clone(),
             body: initial_request.item.core.body.clone(),
-            path: initial_request.item.core.path.clone(),
+            uri: initial_request.item.core.uri.clone(),
             headers: initial_request.item.core.headers.clone(),
             initial_request,
             status: StatusCode::from_u16(200).unwrap()
@@ -553,7 +541,7 @@ impl Traversal {
         RequestCore {
             headers: self.headers.clone(),
             action: self.action.clone(),
-            path: self.path.clone(),
+            uri: self.uri.clone(),
             body: self.body.clone()
         }
     }
@@ -586,7 +574,7 @@ impl Traversal {
         match message {
             Message::Request(request) => {
                 self.action = request.core.action;
-                self.path = request.core.path;
+                self.uri = request.core.uri;
                 self.headers = request.core.headers;
                 self.body = request.core.body;
             }

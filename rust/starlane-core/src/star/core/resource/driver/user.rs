@@ -127,7 +127,7 @@ impl UserBaseKeycloakCoreDriver{
         if let Action::Http(method) =&request.core.action {
             match method {
                 &HttpMethod::POST => {
-                    match &request.core.path.as_str() {
+                    match &request.core.uri.path() {
                         &"/login" => request.clone().result(self.handle_login(&request).await),
                         &"/introspect" => request.clone().payload_result(self.handle_introspect_token(&request).await),
                         &"/refresh-token" => request.clone().payload_result(self.handle_refresh_token(&request).await),

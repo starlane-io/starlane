@@ -15,6 +15,7 @@ use mesh_portal_api_server::Portal;
 use mesh_portal::version::latest::id::Address;
 use mesh_portal::version::latest::path;
 use mesh_portal_tcp_client::PortalTcpClient;
+use mesh_portal_tcp_common::{FrameReader, FrameWriter, PrimitiveFrameReader, PrimitiveFrameWriter};
 use mesh_portal_tcp_server::{PortalTcpServer, TcpServerCall};
 
 use serde::{Deserialize, Serialize};
@@ -350,6 +351,15 @@ impl StarlaneMachineRunner {
                         self.listen(tx);
                     }
                     StarlaneCommand::AddStream(mut stream) => {
+
+                        /*
+                        let (reader,writer) = stream.into_split();
+                        let reader = PrimitiveFrameReader::new(reader);
+                        let writer = PrimitiveFrameWriter::new(writer);
+
+                        let reader :FrameReader<AuthRequestFrame>= FrameReader::new(reader);
+                        let writer :FrameReader<AuthRequestFrame>= FrameWriter::new( writer);
+                         */
 
                         async fn service_select( stream: &mut TcpStream ) -> Result<ServiceSelection,Error> {
                             let size = stream.read_u32().await? as usize;
@@ -1010,6 +1020,39 @@ impl StarlaneInnerFlags {
             mechtron_portal_server: Option::None
         }
     }
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct UsernameAndPasswordAuth {
+    pub userbase: String,
+    pub username: String,
+    pub password: String
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct RefreshTokenAuth {
+    pub userbase: String,
+    pub token: String,
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct TokenAuth{
+    pub userbase: String,
+    pub token: String,
+}
+
+#[derive(Clone,Serialize,Deserialize,strum_macros::Display)]
+pub enum AuthRequestFrame {
+    UsernamePassword(UsernameAndPasswordAuth),
+    RefreshToken(RefreshTokenAuth),
+    Token(TokenAuth)
+}
+
+#[derive(Clone,Serialize,Deserialize,strum_macros::Display)]
+pub enum AuthResponseFrame{
+    Fail(String),
+    RefreshToken(String),
+    Ok
 }
 
 #[derive(Clone,strum_macros::Display)]
