@@ -36,11 +36,14 @@ use mesh_portal::version::latest::payload::{Payload, PayloadMap, Primitive, Prim
 use mesh_portal::version::latest::resource::{ResourceStub, Status};
 use mesh_portal::version::latest::config::bind::{PipelineSegment, PipelineStep, PipelineStop, Selector, StepKind};
 use mesh_portal::version::latest::entity::request::get::GetOp;
+use mesh_portal::version::latest::entity::request::query::Query;
+use mesh_portal::version::latest::entity::request::select::Select;
 use mesh_portal::version::latest::entity::request::set::Set;
 use mesh_portal::version::latest::entity::response::{ResponseCore};
 use mesh_portal::version::latest::id::Tks;
-use mesh_portal::version::latest::pattern::{Block, HttpPattern};
+use mesh_portal::version::latest::pattern::{Block, HttpPattern, MsgPattern};
 use mesh_portal::version::latest::payload::CallKind;
+use mesh_portal_versions::version::v0_0_1::config::bind::parse::final_http_pipeline;
 use mesh_portal_versions::version::v0_0_1::entity::request::create::Create;
 use regex::Regex;
 use serde::de::Unexpected::Str;
@@ -48,6 +51,20 @@ use crate::artifact::ArtifactRef;
 use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
 use crate::config::config::{ContextualConfig, ResourceConfig};
 use crate::star::core::resource::driver::{ResourceCoreDriverApi, ResourceCoreDriverComponent};
+
+
+lazy_static!{
+
+    pub static ref PIPELINE_OVERRIDES: HashMap<Address,Vec<Selector<HttpPattern>>> = {
+        let mut map = HashMap::new();
+        let mut sel = vec![];
+        sel.push(final_http_pipeline( "<Get>/hyperspace/users/(.*) -> hyperspace:users^Http<Get>/$1 => &;" ).unwrap());
+        sel.push(final_http_pipeline( "<Post>/hyperspace/users/(.*) -> hyperspace:users^Http<Post>/$1 => &;" ).unwrap());
+        map.insert(Address::from_str("localhost").unwrap(),sel);
+        map
+    };
+
+}
 
 pub enum CoreMessageCall {
     Message(StarMessage),
@@ -101,7 +118,6 @@ impl MessagingEndpointComponent {
 
     async fn handle_request(&mut self, delivery: Delivery<Request>)
     {
-println!("MessagingEndpointComponent::handle_request");
         async fn get_bind_config( end: &mut MessagingEndpointComponent, address: Address ) -> Result<ArtifactItem<CachedConfig<BindConfig>>,Error> {
             let action = Action::Rc( Rc::Get( Get{ address:address.clone(), op: GetOp::Properties(vec!["bind".to_string()])}));
             let core = action.into();
@@ -127,6 +143,16 @@ println!("MessagingEndpointComponent::handle_request");
         }
 
         fn execute( end: &mut MessagingEndpointComponent, config: ArtifactItem<CachedConfig<BindConfig>>, delivery: Delivery<Request> ) -> Result<(),Error> {
+            if let Some(selectors) = PIPELINE_OVERRIDES.get(&delivery.to) {
+                for selector in selectors {
+                    if selector.is_match(&delivery.item.core).is_ok() {
+                        println!("FOUND OVERRIDE SELECTOR");
+                        execute_http_pipeline(selector.clone(), delivery, end.skel.clone(), end.resource_core_driver_api.clone());
+                        return Ok(());
+                    }
+                }
+            }
+
             match &delivery.item.core.action {
                 Action::Rc(_) => {panic!("rc should be filtered");}
                 Action::Msg(msg) => {
@@ -136,24 +162,17 @@ println!("MessagingEndpointComponent::handle_request");
                        return Ok(());
                    }
                    let selector = selector.expect("selector");
-                   let regex = Regex::new(selector.pattern.path_regex.as_str() )?;
-                   let exec = PipelineExecutor::new(delivery, end.skel.clone(), end.resource_core_driver_api.clone(), selector.pipeline, regex );
-                   exec.execute();
+                    execute_msg_pipeline(selector, delivery,end.skel.clone(),end.resource_core_driver_api.clone() );
                    Ok(())
                 }
                 Action::Http(http) => {
-println!("HTTP action selected...");
                     let selector = config.http.find_match(&delivery.item.core );
                     if selector.is_err() {
                         delivery.not_found();
                         return Ok(());
                     }
                     let selector = selector.expect("selector");
-                    let regex = Regex::new(selector.pattern.path_regex.as_str() )?;
-                    let exec = PipelineExecutor::new(delivery, end.skel.clone(), end.resource_core_driver_api.clone(), selector.pipeline, regex );
-println!("executing in pipeline...");
-                    exec.execute();
-println!("returned from pipeline execution...");
+                    execute_http_pipeline(selector, delivery,end.skel.clone(),end.resource_core_driver_api.clone() );
                     Ok(())
                 }
             }
@@ -161,7 +180,6 @@ println!("returned from pipeline execution...");
 
         match get_bind_config(self, delivery.to.clone() ).await {
             Ok(bind_config) => {
-println!("executing...");
                 match execute(self, bind_config, delivery ) {
                     Ok(_) => {}
                     Err(err) => {
@@ -287,20 +305,15 @@ println!("executing...");
                                 }
                             }
                             Rc::Select(select) => {
-                                let list = Payload::List( skel.registry_api.select(select.clone()).await? );
-                                Ok(list)
+                                let chamber = ResourceRegistrationChamber::new(skel.clone());
+                                chamber.select(select).await
                             },
                             Rc::Update(_) => {
                                 unimplemented!()
                             }
                             Rc::Query(query) => {
-                                let result = Payload::Primitive(Primitive::Text(
-                                    skel.registry_api
-                                        .query(to, query.clone())
-                                        .await?
-                                        .to_string(),
-                                ));
-                                Ok(result)
+                                let chamber = ResourceRegistrationChamber::new(skel.clone());
+                                chamber.query(&to, query).await
                             },
                             Rc::Get(get) => {
                                 let chamber = ResourceRegistrationChamber::new(skel.clone());
@@ -414,6 +427,32 @@ impl  PipelineExecutor {
           path_regex
       }
   }
+}
+
+fn execute_http_pipeline( selector: Selector<HttpPattern>, delivery: Delivery<Request>, skel: StarSkel, resource_core_driver_api: ResourceCoreDriverApi )
+{
+    let regex = match Regex::new(selector.pattern.path_regex.as_str() ) {
+        Ok(regex) => regex,
+        Err(err) => {
+            delivery.fail(err.to_string());
+            return;
+        }
+    };
+    let exec = PipelineExecutor::new(delivery, skel, resource_core_driver_api, selector.pipeline, regex );
+    exec.execute();
+}
+
+fn execute_msg_pipeline( selector: Selector<MsgPattern>, delivery: Delivery<Request>, skel: StarSkel, resource_core_driver_api: ResourceCoreDriverApi )
+{
+    let regex = match Regex::new(selector.pattern.path_regex.as_str() ) {
+        Ok(regex) => regex,
+        Err(err) => {
+            delivery.fail(err.to_string());
+            return;
+        }
+    };
+    let exec = PipelineExecutor::new(delivery, skel, resource_core_driver_api, selector.pipeline, regex );
+    exec.execute();
 }
 
 impl PipelineExecutor {
@@ -659,6 +698,7 @@ impl ResourceRegistrationChamber {
 
 
     pub async fn create(&self, create:&Create) -> Result<ResourceStub,Error> {
+
         let child_kind = match_kind(&create.template.kind)?;
         let stub = match &create.template.address.child_segment_template {
             AddressSegmentTemplate::Exact(child_segment) => {
@@ -679,16 +719,17 @@ impl ResourceRegistrationChamber {
                     registry: create.registry.clone(),
                     properties: create.properties.clone(),
                 };
-
+println!("creating {}",address.to_string() );
                 let mut result = self.skel.registry_api.register(registration).await;
 
                 // if strategy is ensure then a dupe is GOOD!
                 if create.strategy == Strategy::Ensure {
                     if let Err(RegError::Dupe) = result {
-                        result = Ok(self.skel.resource_locator_api.locate(address).await?.stub);
+                        result = Ok(self.skel.resource_locator_api.locate(address.clone()).await?.stub);
                     }
                 }
 
+println!("result {}? {}",address.to_string(), result.is_ok() );
                 result?
             }
             AddressSegmentTemplate::Pattern(pattern) => {
@@ -728,4 +769,22 @@ impl ResourceRegistrationChamber {
         };
         Ok(stub)
     }
+
+    pub async fn select( &self, select: &Select ) -> Result<Payload,Error>{
+            let list = Payload::List( self.skel.registry_api.select(select.clone()).await? );
+            Ok(list)
+    }
+
+    pub async fn query( &self, to: &Address, query: &Query) -> Result<Payload,Error>{
+        let result = Payload::Primitive(Primitive::Text(
+            self.skel.registry_api
+                .query(to.clone(), query.clone())
+                .await?
+                .to_string(),
+        ));
+        Ok(result)
+    }
 }
+
+
+

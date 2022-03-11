@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::env;
 use std::future::Future;
+use std::str::FromStr;
 use std::sync::Arc;
 use alcoholic_jwt::{JWKS, token_kid};
 use keycloak::{KeycloakAdmin, KeycloakAdminToken, KeycloakError};
@@ -9,6 +10,7 @@ use keycloak::types::{CredentialRepresentation, ProtocolMapperRepresentation, Re
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::entity::request::get::Get;
 use mesh_portal::version::latest::entity::request::Rc;
+use mesh_portal::version::latest::entity::request::select::Select;
 use mesh_portal::version::latest::entity::request::set::Set;
 use mesh_portal::version::latest::entity::response::ResponseCore;
 use mesh_portal::version::latest::id::Address;
@@ -78,13 +80,16 @@ impl ResourceCoreDriver for UserBaseKeycloakCoreDriver {
         let registration_email_as_username = assign.stub.properties.get("registration-email-as-username" ).map_or( None, |x|{ Some(x.value=="true") });
         let verify_email= assign.stub.properties.get("verify-email" ).map_or( None, |x|{ Some(x.value=="true") });
 
-        match self.admin.create_realm_from_address(&assign.stub.address, registration_email_as_username, verify_email ).await
+        if !is_hyper_userbase(&assign.stub.address )
         {
-           Err(err) => {
-                error!("{}",err.to_string());
-                return Err(format!("UserBase<Keyloak>: could not create realm for {}", assign.stub.address.to_string() ).into())
+            match self.admin.create_realm_from_address(&assign.stub.address, registration_email_as_username, verify_email).await
+            {
+                Err(err) => {
+                    error!("{}",err.to_string());
+                    return Err(format!("UserBase<Keyloak>: could not create realm for {}", assign.stub.address.to_string()).into())
+                }
+                _ => {}
             }
-            _ => {}
         }
 
         Ok(())
@@ -110,6 +115,7 @@ impl ResourceCoreDriver for UserBaseKeycloakCoreDriver {
             Rc::Create(create) => { self.create_child(to, create).await }
             Rc::Set(set) => { self.set_child(to,set).await }
             Rc::Get(get) => { self.get_child(to,get).await }
+            Rc::Select(select) => { self.select_child(to,select).await }
             _ => { unimplemented!() }
         }
     }
@@ -297,7 +303,12 @@ println!("handle_http");
         let realm = self.admin.get_realm_from_address(realm).await?;
         let chamber = ResourceRegistrationChamber::new(self.skel.clone());
 
-        let email = create.properties.map.get("email").ok_or("UserBase<KeyCloak>: 'email' property is required.")?.set_or("UserBase<KeyCloak>: email property is required.")?;
+        let email = match create.properties.map.get("email") {
+            None => None,
+            Some(email) => {
+                email.opt()
+            }
+        };
         let password = match create.properties.map.remove("password") {
             None => {
                 None
@@ -307,29 +318,65 @@ println!("handle_http");
             }
         };
 
-        match &create.template.address.child_segment_template {
+        let stub = match &create.template.address.child_segment_template {
             AddressSegmentTemplate::Exact(username) => {
                 if realm.registration_email_as_username.unwrap_or(false) {
                     return Err(format!("UserBase<Keycloak>: realm '{}' requires registration email as username therefore exact address segment '{}' cannot be used. instead try pattern segment: 'user-%' ", create.template.address.parent.to_string(), username).into());
                 } else {
-                    let address = create.template.address.parent.push(username.clone())?;
-                    if !is_hyperuser(&address) {
-                        self.admin.create_user(&create.template.address.parent, email, Some(username.to_string()), password).await?;
+                    let stub = chamber.create(&create).await?;
+                    if !is_hyperuser(&stub.address) {
+                        self.admin.create_user(&create.template.address.parent, email.ok_or("'email' is required.")?, Some(username.to_string()), password, &stub.address).await?;
+                    } else {
+                        let mut attributes = HashMap::new();
+                        attributes.insert( "address".to_string(), Value::String(stub.address.to_string()));
+                        self.admin.add_user_attributes(&create.template.address.parent, username.to_string(),attributes ).await?;
                     }
+                    stub
                 }
             }
             AddressSegmentTemplate::Pattern(_) => {
                 if realm.registration_email_as_username.unwrap_or(false) {
-                    self.admin.create_user(&create.template.address.parent, email, None, password).await?;
+                    let stub = chamber.create(&create).await?;
+                    self.admin.create_user(&create.template.address.parent, email.ok_or("'email' is required.")?, None, password, &stub.address).await?;
+                    stub
                 } else {
-                    let username = create.properties.get("username").ok_or(format!("UserBase<Keycloak>: realm '{}' requires property 'username' when creating a pattern address", create.template.address.parent.to_string()))?.set_or(format!("UserBase<Keycloak>: realm '{}' requires property 'username' when creating a pattern address", create.template.address.parent.to_string()))?;
-                    self.admin.create_user(&create.template.address.parent, email.clone(), Some(username), password).await?;
+                    let username = create.properties.get("username").ok_or(format!("UserBase<Keycloak>: realm '{}' requires property 'username' when creating a pattern address", create.template.address.parent.to_string()))?.set_or(format!("UserBase<Keycloak>: realm '{}' requires property 'username' when creating a pattern address", create.template.address.parent.to_string()))?.to_lowercase();
+                    let stub = chamber.create(&create).await?;
+                    self.admin.create_user(&create.template.address.parent, email.ok_or("'email' is required")?, Some(username), password, &stub.address).await?;
+                    stub
                 }
+            }
+        };
+
+       Ok(Payload::Primitive(Primitive::Stub(stub)))
+     }
+
+
+    async fn select_child( &self, to: Address, select: Select) -> Result<Payload,Error> {
+        let chamber = ResourceRegistrationChamber::new(self.skel.clone());
+        chamber.select(&select).await
+/*        let mut first = 0;
+        let max = 100;
+        let mut rtn = vec![];
+        loop {
+            let users = self.admin.select_all(&to, first, max).await?;
+            if users.is_empty() {
+                break;
+            }
+            for user in users {
+                let address = user.attributes.ok_or("expected user to have attributes set")?.get("address").ok_or("expected 'address' attribute to be set")?.to_string();
+                let address = Address::from_str(address.to_string().as_str() )?;
+                if select.
+                let record = self.skel.resource_locator_api.locate(address).await?;
+                rtn.push(record.stub);
             }
         }
 
-       Ok(Payload::Primitive(Primitive::Stub(chamber.create(&create).await?)))
-     }
+        Ok(Payload::Empty)
+
+ */
+    }
+
 }
 
 
@@ -505,6 +552,18 @@ impl StarlaneKeycloakAdmin {
         Ok(())
     }
 
+    pub async fn select_all(&self, realm: &Address, first: i32, max: i32) -> Result<Vec<UserRepresentation>,Error> {
+        let realm = normalize_realm(realm);
+        Ok(self.admin.realm_users_get(realm.as_str(), Some(true),None, None, None,None,Some(first),None,None,None, None, Some(max),None,None).await?)
+    }
+
+
+    pub async fn select_by_username(&self, realm: &Address, username: String) -> Result<Vec<UserRepresentation>,Error> {
+        let realm = normalize_realm(realm);
+        Ok(self.admin.realm_users_get(realm.as_str(), Some(true),None, None, None,None,None,None,None,None, None, None,None,Some(username)).await?)
+    }
+
+
     pub async fn select_by_email(&self, realm: &Address, email: String) -> Result<Vec<UserRepresentation>,Error> {
         let realm = normalize_realm(realm);
         Ok(self.admin.realm_users_get(realm.as_str(), Some(true),Some(email), None, None,None,None,None,None,None, None, None,None,None).await?)
@@ -535,13 +594,42 @@ impl StarlaneKeycloakAdmin {
         Ok(())
     }
 
-    pub async fn create_user(&self, realm: &Address, email: String, username: Option<String>, password: Option<String> ) -> Result<(),Error> {
+    pub async fn add_user_attributes(&self, realm: &Address, username: String, attributes: HashMap<String,Value>) -> Result<(),Error> {
+
+        let users = self.select_by_username(realm,username).await?;
+
+        for mut user in users {
+            let realm = normalize_realm(realm);
+            let mut attributes = attributes.clone();
+            match user.attributes {
+                None => {}
+                Some(mut old_attributes) => {
+                    for (key,value) in old_attributes {
+                        if !attributes.contains_key(&key) {
+                            attributes.insert(key,value);
+                        }
+                    }
+                }
+            }
+
+            user.attributes = Some(attributes);
+
+            self.admin.realm_users_with_id_put(realm.as_str(), user.id.as_ref().ok_or("expected user id")?.clone().as_str(), user).await?;
+        }
+        Ok(())
+    }
+
+    pub async fn create_user(&self, realm: &Address, email: String, username: Option<String>, password: Option<String>, address: &Address ) -> Result<(),Error> {
         let realm = normalize_realm(realm);
+
+        let mut attributes = HashMap::new();
+        attributes.insert( "address".to_string(), Value::String(address.to_string()) );
 
         let user = UserRepresentation {
             username: username,
             email: Some(email),
             enabled: Some(true),
+            attributes: Some(attributes),
             credentials: match password {
                 None => None,
                 Some(password) => {

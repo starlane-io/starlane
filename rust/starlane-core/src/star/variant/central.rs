@@ -3,6 +3,7 @@ use std::sync::Arc;
 use mesh_portal::version::latest::entity::request::create::Strategy;
 
 use tokio::sync::{mpsc, oneshot};
+use crate::command::cli::{CliServer, inlet, outlet};
 
 
 use crate::error::Error;
@@ -77,6 +78,17 @@ impl CentralVariant {
         let mut creation = starlane_api.create_space("localhost", "Localhost").await?;
         creation.set_strategy(Strategy::Ensure);
         creation.submit().await?;
+
+        let (tx,mut rx) = CliServer::new_internal( starlane_api ).await?;
+        tx.send(inlet::Frame::CommandLine("? create hyperspace:users<UserBase<Keycloak>>".to_string()) ).await?;
+        tx.send(inlet::Frame::EndRequires ).await?;
+        while let Some(frame) = rx.recv().await {
+            if let outlet::Frame::EndOfCommand(_) = frame {
+                break;
+            }
+        }
+        tx.send(inlet::Frame::CommandLine("? create hyperspace:users:hyperuser<User>".to_string()) ).await?;
+        tx.send(inlet::Frame::EndRequires ).await?;
 
         Ok(())
     }

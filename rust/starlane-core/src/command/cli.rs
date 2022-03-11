@@ -170,6 +170,71 @@ impl CliServer {
 
         Ok(())
     }
+
+    pub async fn new_internal( api: StarlaneApi ) -> Result<(mpsc::Sender<inlet::Frame>,mpsc::Receiver<outlet::Frame>),Error> {
+        let template = Template {
+            address: AddressTemplate {
+                parent: Address::root(),
+                child_segment_template: AddressSegmentTemplate::Pattern("control-%".to_string())
+            },
+            kind: KindTemplate {
+                resource_type: "Control".to_string(),
+                kind: None,
+                specific: None
+            }
+        };
+
+        let (messenger_tx, mut messenger_rx) = mpsc::channel(1024);
+
+        tokio::spawn(async move {
+            while let Some(_) = messenger_rx.recv().await {
+                // ignore messages for now
+            }
+        });
+
+
+        let stub = api.create_sys_resource(template,messenger_tx).await?;
+
+        let (output_tx,mut output_rx):(mpsc::Sender<outlet::Frame>, mpsc::Receiver<outlet::Frame>) = mpsc::channel(1024);
+        let (input_tx,mut input_rx):(mpsc::Sender<inlet::Frame>, mpsc::Receiver<inlet::Frame>) = mpsc::channel(1024);
+
+        {
+            let stub = stub.clone();
+            let output_tx = output_tx.clone();
+            tokio::task::spawn_blocking(move || {
+                tokio::spawn(async move {
+
+                    while let Some(frame) = input_rx.recv().await {
+                        match frame {
+                            inlet::Frame::CommandLine(line) => {
+                                let mut fulfillments = vec![];
+
+                                while let Some(frame) = input_rx.recv().await {
+                                    match frame {
+                                        inlet::Frame::TransferFile { name, content } => {
+                                            fulfillments.push( Fulfillment::File {name,content});
+                                        }
+                                        inlet::Frame::EndRequires => {break;}
+                                        _ => {
+                                            eprintln!("cannot have this type of frame when sending requirements.");
+                                            return;
+                                        }
+                                    }
+                                }
+
+                                CommandExecutor::execute(line, output_tx.clone(), stub.clone(), api.clone(), fulfillments ).await;
+                            }
+                            _ =>  {
+                                eprintln!( "can only handle CommandLine frames until an executor has been selected");
+                            }
+                        }
+                    }
+                })
+            });
+        }
+
+        Ok((input_tx,output_rx))
+    }
 }
 
 pub struct CliClient {
