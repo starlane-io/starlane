@@ -16,6 +16,7 @@ use crate::fail::{Fail, StarlaneFailure};
 use mysql::uuid::Uuid;
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
+use dashmap::DashMap;
 use mesh_portal::version::latest::id::Address;
 use mesh_portal::version::latest::messaging::{Message,  Request, Response};
 use mesh_portal::version::latest::util::unique_id;
@@ -139,8 +140,8 @@ impl Call for MessagingCall {}
 
 pub struct MessagingComponent {
     skel: StarSkel,
-    exchanges: HashMap<MessageId, MessageExchanger>,
-    resource_exchange: HashMap<String, oneshot::Sender<Response>>,
+    exchanges: DashMap<MessageId, MessageExchanger>,
+    resource_exchange: DashMap<String, oneshot::Sender<Response>>,
     address: Address
 }
 
@@ -150,8 +151,8 @@ impl MessagingComponent {
         AsyncRunner::new(
             Box::new(Self {
                 skel: skel.clone(),
-                exchanges: HashMap::new(),
-                resource_exchange: Default::default(),
+                exchanges: DashMap::new(),
+                resource_exchange: DashMap::default(),
                 address
             }),
             skel.messaging_api.tx.clone(),
@@ -195,7 +196,7 @@ impl AsyncProcessor<MessagingCall> for MessagingComponent {
             MessagingCall::Response(response) => {
                 match self.resource_exchange.remove(&response.response_to) {
                     None => {}
-                    Some(tx) => {
+                    Some((_,tx)) => {
                         tx.send(response);
                     }
                 }
@@ -250,7 +251,7 @@ impl MessagingComponent {
                         .try_send(TimeoutCall::Extend)
                         .unwrap_or_default();
                 }
-            } else if let Option::Some(exchanger) = self.exchanges.remove(&reply_to) {
+            } else if let Option::Some((_,exchanger)) = self.exchanges.remove(&reply_to) {
                 exchanger
                     .timeout_tx
                     .try_send(TimeoutCall::Done)
@@ -288,17 +289,17 @@ impl MessagingComponent {
     }
 
     fn timeout_exchange(&mut self, id: MessageId) {
-        if let Option::Some(exchanger) = self.exchanges.remove(&id) {
+        if let Option::Some((_,exchanger)) = self.exchanges.remove(&id) {
             exchanger.tx.send(Err("Fail::Timeout.into())".into()));
         }
     }
 
     fn fail_exchange(&mut self, id: MessageId, proto: ProtoStarMessage, fail: Error) {
-        if let Option::Some(exchanger) = self.exchanges.remove(&id) {
+        if let Option::Some((_,exchanger)) = self.exchanges.remove(&id) {
             exchanger.tx.send(Err(fail.into()));
         }
         if let StarMessagePayload::Request(request) = &proto.payload {
-            if let Option::Some(exchanger) = self.resource_exchange.remove(&request.id) {
+            if let Option::Some((_,exchanger)) = self.resource_exchange.remove(&request.id) {
                 let response = Response {
                     id: unique_id(),
                     to: request.from.clone(),

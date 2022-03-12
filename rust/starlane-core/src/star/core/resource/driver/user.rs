@@ -96,11 +96,13 @@ impl ResourceCoreDriver for UserBaseKeycloakCoreDriver {
     }
 
     async fn handle_request(&self, request: Request ) -> Response {
+println!("USers handle reqeust...");
         match &request.core.action {
             Action::Rc(rc) => {
                 request.clone().payload_result(self.resource_command(request.to.clone(), rc.clone() ).await)
             }
             Action::Http(_) => {
+println!("handle HTTP: {}", request.core.uri.to_string());
                 self.handle_http(request).await
             }
             Action::Msg(_) => {

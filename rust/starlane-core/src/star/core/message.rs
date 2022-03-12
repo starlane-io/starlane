@@ -119,13 +119,16 @@ impl MessagingEndpointComponent {
     async fn handle_request(&mut self, delivery: Delivery<Request>)
     {
         async fn get_bind_config( end: &mut MessagingEndpointComponent, address: Address ) -> Result<ArtifactItem<CachedConfig<BindConfig>>,Error> {
+println!("{} getting bind config for {}", end.skel.info.kind.to_string(), address.to_string() );
             let action = Action::Rc( Rc::Get( Get{ address:address.clone(), op: GetOp::Properties(vec!["bind".to_string()])}));
             let core = action.into();
             let request = Request::new( core, address.clone(), address.parent().unwrap() );
             let response = end.skel.messaging_api.exchange(request).await;
 
+println!("response from Rc GET {}", address.to_string() );
+
             if let Payload::Map(map) = response.core.body {
-                if let Payload::Primitive(Primitive::Text(bind_address ))= map.get(&"bind".to_string()  ).ok_or("bind is not set" )?
+                if let Payload::Primitive(Primitive::Text(bind_address )) = map.get(&"bind".to_string()  ).ok_or("bind is not set" )?
                 {
                     let bind_address = Address::from_str(bind_address.as_str())?;
                     let mut cache = end.skel.machine.get_proto_artifact_caches_factory().await?.create();
@@ -143,15 +146,6 @@ impl MessagingEndpointComponent {
         }
 
         fn execute( end: &mut MessagingEndpointComponent, config: ArtifactItem<CachedConfig<BindConfig>>, delivery: Delivery<Request> ) -> Result<(),Error> {
-            if let Some(selectors) = PIPELINE_OVERRIDES.get(&delivery.to) {
-                for selector in selectors {
-                    if selector.is_match(&delivery.item.core).is_ok() {
-                        println!("FOUND OVERRIDE SELECTOR");
-                        execute_http_pipeline(selector.clone(), delivery, end.skel.clone(), end.resource_core_driver_api.clone());
-                        return Ok(());
-                    }
-                }
-            }
 
             match &delivery.item.core.action {
                 Action::Rc(_) => {panic!("rc should be filtered");}
@@ -178,8 +172,23 @@ impl MessagingEndpointComponent {
             }
         }
 
+        println!("delivery...to: {}", delivery.to.to_string());
+        if let Some(selectors) = PIPELINE_OVERRIDES.get(&delivery.to) {
+            println!("CHECKING: SELECTORS for :{}",delivery.item.core.uri.to_string());
+            for selector in selectors {
+                if selector.is_match(&delivery.item.core).is_ok() {
+                    println!("FOUND OVERRIDE SELECTOR");
+                    execute_http_pipeline(selector.clone(), delivery, self.skel.clone(), self.resource_core_driver_api.clone());
+                    return;
+                }
+            }
+        }
+
+
+        let to = delivery.to.clone();
         match get_bind_config(self, delivery.to.clone() ).await {
             Ok(bind_config) => {
+println!("got bind config for: {}", to.to_string() );
                 match execute(self, bind_config, delivery ) {
                     Ok(_) => {}
                     Err(err) => {
@@ -188,6 +197,7 @@ impl MessagingEndpointComponent {
                 }
             }
             Err(_) => {
+                error!("could not get bind for {}",to.to_string( ));
                 delivery.fail("could not get bind config for resource".into());
             }
         }
