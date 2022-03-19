@@ -170,7 +170,7 @@ async fn process_request( http_request: http::Request<Bin>, api: StarlaneApi, sk
     let from = skel.info.address;
     let request = messaging::Request::new( core, from, to );
 println!("exchanging...to :{}", request.to.to_string() );
-    let response = skel.messaging_api.exchange(request).await;
+    let response = skel.messaging_api.request(request).await;
 println!("got response...");
     if !response.core.status.is_success() {
         let error = response.core.status.canonical_reason().unwrap_or("Unknown");

@@ -16,11 +16,12 @@ use crate::fail::{Fail, StarlaneFailure};
 use mysql::uuid::Uuid;
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
+use std::sync::Arc;
 use dashmap::DashMap;
 use mesh_portal::version::latest::id::Address;
 use mesh_portal::version::latest::messaging::{Message,  Request, Response};
 use mesh_portal::version::latest::util::unique_id;
-use mesh_portal_versions::version::v0_0_1::parse::Res;
+use mesh_portal::version::latest::parse::Res;
 use tokio::sync::oneshot::Sender;
 
 #[derive(Clone)]
@@ -80,7 +81,7 @@ impl MessagingApi {
         Ok(())
     }
 
-    pub async fn exchange(&self, request: Request)->Response {
+    pub async fn request(&self, request: Request) ->Response {
         let (tx,rx) = oneshot::channel();
         let call = MessagingCall::ExchangeRequest{ request:request.clone(), tx };
         self.tx.send(call).await;
@@ -139,21 +140,28 @@ pub enum MessagingCall {
 impl Call for MessagingCall {}
 
 pub struct MessagingComponent {
-    skel: StarSkel,
-    exchanges: DashMap<MessageId, MessageExchanger>,
-    resource_exchange: DashMap<String, oneshot::Sender<Response>>,
-    address: Address
+    inner: Arc<MessagingComponentInner>
+}
+
+pub struct MessagingComponentInner {
+    pub skel: StarSkel,
+    pub exchanges: DashMap<MessageId, MessageExchanger>,
+    pub resource_exchange: DashMap<String, oneshot::Sender<Response>>,
+    pub address: Address
 }
 
 impl MessagingComponent {
     pub fn start(skel: StarSkel, rx: mpsc::Receiver<MessagingCall>) {
         let address = Address::from_str(format!("<<{}>>::messaging",skel.info.key.to_string()).as_str() ).expect("expected messaging address to parse");
+        let inner = Arc::new(MessagingComponentInner {
+            skel: skel.clone(),
+            exchanges: DashMap::new(),
+            resource_exchange: DashMap::default(),
+            address
+        });
         AsyncRunner::new(
             Box::new(Self {
-                skel: skel.clone(),
-                exchanges: DashMap::new(),
-                resource_exchange: DashMap::default(),
-                address
+                inner
             }),
             skel.messaging_api.tx.clone(),
             rx,
@@ -164,85 +172,53 @@ impl MessagingComponent {
 #[async_trait]
 impl AsyncProcessor<MessagingCall> for MessagingComponent {
     async fn process(&mut self, call: MessagingCall) {
-        match call {
-            MessagingCall::Send(proto) => {
-                self.send(proto).await;
-            }
-            MessagingCall::Exchange {
-                proto,
-                expect,
-                tx,
-                description,
-            } => {
-                self.exchange(proto, expect, tx, description).await;
-            }
-            MessagingCall::TimeoutExchange(id) => {
-                self.timeout_exchange(id);
-            }
-            MessagingCall::Reply(message) => {
-                self.on_reply(message);
-            }
-            MessagingCall::FailExchange { id, proto, fail } => {
-                self.fail_exchange(id, proto, fail);
-            }
+        let inner = self.inner.clone();
+        tokio::spawn( async move {
+            match call {
+                MessagingCall::Send(proto) => {
+                    inner.send(proto).await;
+                }
+                MessagingCall::Exchange {
+                    proto,
+                    expect,
+                    tx,
+                    description,
+                } => {
+                    inner.exchange(proto, expect, tx, description).await;
+                }
+                MessagingCall::TimeoutExchange(id) => {
+                    inner.timeout_exchange(id);
+                }
+                MessagingCall::Reply(message) => {
+                    inner.on_reply(message);
+                }
+                MessagingCall::FailExchange { id, proto, fail } => {
+                    inner.fail_exchange(id, proto, fail);
+                }
 
-            MessagingCall::ExchangeRequest { request, tx } => {
-               self.resource_exchange.insert( request.id.clone(), tx );
-               let mut proto = ProtoStarMessage::new();
-               proto.to=ProtoStarMessageTo::Resource(request.to.clone());
-               proto.payload = StarMessagePayload::Request(request);
-               self.send(proto).await;
-            }
-            MessagingCall::Response(response) => {
-                match self.resource_exchange.remove(&response.response_to) {
-                    None => {}
-                    Some((_,tx)) => {
-                        tx.send(response);
+                MessagingCall::ExchangeRequest { request, tx } => {
+                    inner.resource_exchange.insert(request.id.clone(), tx);
+                    let mut proto = ProtoStarMessage::new();
+                    proto.to = ProtoStarMessageTo::Resource(request.to.clone());
+                    proto.payload = StarMessagePayload::Request(request);
+                    inner.send(proto).await;
+                }
+                MessagingCall::Response(response) => {
+                    match inner.resource_exchange.remove(&response.response_to) {
+                        None => {}
+                        Some((_, tx)) => {
+                            tx.send(response);
+                        }
                     }
                 }
             }
-        }
+        });
     }
 }
 
-impl MessagingComponent {
+impl MessagingComponentInner {
 
-    /*
-    async fn request( &mut self, proto: ProtoRequest, tx: oneshot::Sender<Result<Option<Response>,Error>>) {
-        async fn process( messaging: &mut MessagingComponent, proto: ProtoRequest ) ->Result<Option<Response>,Error> {
-            let mut proto = proto;
-            let exchange_type = proto.exchange.clone();
-            if let Option::Some(MessageFrom::Inject) = proto.from {
-                proto.from = Option::Some(MessageFrom::Address(messaging.address.clone()));
-            }
-            let request = proto.create()?;
-            let mut proto = ProtoStarMessage::new();
-            proto.to = ProtoStarMessageTo::Resource(request.to.clone());
-            proto.payload = StarMessagePayload::Request(request.clone());
-            let (tx, rx) = oneshot::channel();
-            messaging.exchange(proto, ReplyKind::Response, tx, "resource request exchange".to_string() );
-            match exchange_type {
-                ExchangeType::Notification => {
-                    Ok(Option::None)
-                }
-                ExchangeType::RequestResponse => {
-                    let response = rx.await??;
-                    if let Reply::Response(response) = response {
-                        Ok(Option::Some(response))
-                    } else {
-                        Err("unexpected reply".into())
-                    }
-                }
-            }
-        }
-        tx.send(process(self, proto).await );
-    }
-
-     */
-
-
-
-    fn on_reply(&mut self, message: StarMessage) {
+    fn on_reply(&self, message: StarMessage) {
         if let Option::Some(reply_to) = message.reply_to {
             if let StarMessagePayload::Reply(SimpleReply::Ack(_)) = &message.payload {
                 if let Option::Some(exchanger) = self.exchanges.get(&reply_to) {
@@ -288,13 +264,13 @@ impl MessagingComponent {
         }
     }
 
-    fn timeout_exchange(&mut self, id: MessageId) {
+    fn timeout_exchange(&self, id: MessageId) {
         if let Option::Some((_,exchanger)) = self.exchanges.remove(&id) {
             exchanger.tx.send(Err("Fail::Timeout.into())".into()));
         }
     }
 
-    fn fail_exchange(&mut self, id: MessageId, proto: ProtoStarMessage, fail: Error) {
+    fn fail_exchange(&self, id: MessageId, proto: ProtoStarMessage, fail: Error) {
         if let Option::Some((_,exchanger)) = self.exchanges.remove(&id) {
             exchanger.tx.send(Err(fail.into()));
         }
@@ -321,7 +297,7 @@ impl MessagingComponent {
 
 
     async fn exchange(
-        &mut self,
+        &self,
         mut proto: ProtoStarMessage,
         expect: ReplyKind,
         tx: oneshot::Sender<Result<Reply, Error>>,
@@ -421,7 +397,7 @@ impl MessagingComponent {
     }
 }
 
-struct MessageExchanger {
+pub struct MessageExchanger {
     pub expect: ReplyKind,
     pub tx: oneshot::Sender<Result<Reply, Error>>,
     pub timeout_tx: mpsc::Sender<TimeoutCall>,

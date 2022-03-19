@@ -141,7 +141,7 @@ impl ResourceCoreDriver for FileSystemManager {
             let action = Action::Rc(Rc::Create(create));
             let core = action.into();
             let request = Request::new(core, assign.stub.address.clone(), assign.stub.address.clone());
-            let response = skel.messaging_api.exchange(request).await;
+            let response = skel.messaging_api.request(request).await;
         });
         Ok(())
     }

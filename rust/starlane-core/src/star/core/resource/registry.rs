@@ -375,7 +375,7 @@ impl RegistryComponent {
                 to: parent.clone(),
                 core: Action::Rc(Rc::Query(Query::AddressKindPath)).into()
             };
-            let response = skel.messaging_api.exchange(request).await;
+            let response = skel.messaging_api.request(request).await;
 
             let parent_kind_path = response.core.body;
             let parent_kind_path: Primitive= parent_kind_path.try_into()?;
@@ -1014,7 +1014,7 @@ impl Selector {
                         let action = Action::Rc(Rc::Select(select));
                         let core = action.into();
                         let request = Request::new(core, address.clone(), parent.clone() );
-                        futures.push(selector.skel.messaging_api.exchange(request));
+                        futures.push(selector.skel.messaging_api.request(request));
                     }
                 }
 

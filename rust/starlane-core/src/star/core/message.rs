@@ -44,7 +44,7 @@ use mesh_portal::version::latest::id::Tks;
 use mesh_portal::version::latest::pattern::{Block, HttpPattern, MsgPattern};
 use mesh_portal::version::latest::payload::CallKind;
 use mesh_portal_versions::version::v0_0_1::config::bind::parse::final_http_pipeline;
-use mesh_portal_versions::version::v0_0_1::entity::request::create::Create;
+use mesh_portal::version::latest::entity::request::create::Create;
 use regex::Regex;
 use serde::de::Unexpected::Str;
 use crate::artifact::ArtifactRef;
@@ -73,6 +73,11 @@ pub enum CoreMessageCall {
 impl Call for CoreMessageCall {}
 
 pub struct MessagingEndpointComponent {
+  inner: MessagingEndpointComponentInner
+}
+
+#[derive(Clone)]
+pub struct MessagingEndpointComponentInner {
     skel: StarSkel,
     resource_core_driver_api: ResourceCoreDriverApi
 }
@@ -88,10 +93,14 @@ impl MessagingEndpointComponent {
             });
         }
 
+        let inner = MessagingEndpointComponentInner {
+            skel: skel.clone(),
+            resource_core_driver_api
+        };
+
         AsyncRunner::new(
             Box::new(Self {
-                skel: skel.clone(),
-                resource_core_driver_api
+                inner
             }),
             skel.core_messaging_endpoint_tx.clone(),
             rx,
@@ -102,28 +111,31 @@ impl MessagingEndpointComponent {
 #[async_trait]
 impl AsyncProcessor<CoreMessageCall> for MessagingEndpointComponent {
     async fn process(&mut self, call: CoreMessageCall) {
-        match call {
-            CoreMessageCall::Message(message) => match self.process_resource_message(message).await
-            {
-                Ok(_) => {}
-                Err(err) => {
-                    error!("{}", err);
-                }
-            },
-        }
+        let mut inner = self.inner.clone();
+        tokio::spawn( async move {
+            match call {
+                CoreMessageCall::Message(message) => match inner.process_resource_message(message).await
+                {
+                    Ok(_) => {}
+                    Err(err) => {
+                        error!("{}", err);
+                    }
+                },
+            }
+        });
     }
 }
 
-impl MessagingEndpointComponent {
+impl MessagingEndpointComponentInner {
 
     async fn handle_request(&mut self, delivery: Delivery<Request>)
     {
-        async fn get_bind_config( end: &mut MessagingEndpointComponent, address: Address ) -> Result<ArtifactItem<CachedConfig<BindConfig>>,Error> {
+        async fn get_bind_config( end: &mut MessagingEndpointComponentInner, address: Address ) -> Result<ArtifactItem<CachedConfig<BindConfig>>,Error> {
 println!("{} getting bind config for {}", end.skel.info.kind.to_string(), address.to_string() );
             let action = Action::Rc( Rc::Get( Get{ address:address.clone(), op: GetOp::Properties(vec!["bind".to_string()])}));
             let core = action.into();
             let request = Request::new( core, address.clone(), address.parent().unwrap() );
-            let response = end.skel.messaging_api.exchange(request).await;
+            let response = end.skel.messaging_api.request(request).await;
 
 println!("response from Rc GET {}", address.to_string() );
 
@@ -145,7 +157,7 @@ println!("response from Rc GET {}", address.to_string() );
             }
         }
 
-        fn execute( end: &mut MessagingEndpointComponent, config: ArtifactItem<CachedConfig<BindConfig>>, delivery: Delivery<Request> ) -> Result<(),Error> {
+        fn execute( end: &mut MessagingEndpointComponentInner, config: ArtifactItem<CachedConfig<BindConfig>>, delivery: Delivery<Request> ) -> Result<(),Error> {
 
             match &delivery.item.core.action {
                 Action::Rc(_) => {panic!("rc should be filtered");}
@@ -204,7 +216,7 @@ println!("got bind config for: {}", to.to_string() );
 
     }
 
-    async fn process_resource_message(&mut self, star_message: StarMessage) -> Result<(), Error> {
+    pub async fn process_resource_message(&mut self, star_message: StarMessage) -> Result<(), Error> {
         match &star_message.payload {
             StarMessagePayload::Request(request) => match &request.core.action{
                 Action::Rc(rc) => {
@@ -532,7 +544,7 @@ impl PipelineExecutor {
                core.headers = self.traversal.headers.clone();
                core.uri = Uri::from_str(path.as_str())?;
                let request = Request::new( core, self.traversal.to(), address.clone() );
-               let response = self.skel.messaging_api.exchange(request).await;
+               let response = self.skel.messaging_api.request(request).await;
                self.traversal.push( Message::Response(response));
            }
            PipelineStop::Return => {
@@ -545,7 +557,7 @@ impl PipelineExecutor {
                let action = Action::Rc(Rc::Get(Get{ address:address.clone(), op: GetOp::State}));
                let core = action.into();
                let request = Request::new( core, self.traversal.to(), address.clone() );
-               let response = self.skel.messaging_api.exchange(request).await;
+               let response = self.skel.messaging_api.request(request).await;
                self.traversal.push( Message::Response(response));
            }
        }
@@ -695,9 +707,12 @@ impl ResourceRegistrationChamber {
                 }
             }
             GetOp::Properties(keys) => {
+println!("GET PROPERTIES for {}", get.address.to_string() );
                 let properties = self.skel.registry_api.get_properties(get.address.clone(), keys.clone() ).await?;
                 let mut map = PayloadMap::new();
                 for (index,property) in properties.iter().enumerate() {
+
+println!("\tprop{}", property.0.clone() );
                     map.insert( property.0.clone(), Payload::Primitive(Primitive::Text(property.1.clone())));
                 }
 
