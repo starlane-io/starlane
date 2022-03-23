@@ -14,6 +14,8 @@ use crate::starlane::api::StarlaneApi;
 use crate::user::HyperUser;
 use crate::util::{AsyncProcessor, AsyncRunner};
 
+static BOOT_BUNDLE_ZIP : &'static [u8] = include_bytes!("../../../boot/bundle.zip");
+
 pub struct CentralVariant {
     skel: StarSkel,
     initialized: bool
@@ -80,6 +82,33 @@ impl CentralVariant {
         creation.submit().await?;
 
         let (tx,mut rx) = CliServer::new_internal( starlane_api ).await?;
+
+        tx.send(inlet::Frame::CommandLine("? create hyperspace:repo<Base<Repo>>".to_string()) ).await?;
+        tx.send(inlet::Frame::EndRequires ).await?;
+        while let Some(frame) = rx.recv().await {
+            if let outlet::Frame::EndOfCommand(_) = frame {
+                break;
+            }
+        }
+        tx.send(inlet::Frame::CommandLine("? create hyperspace:repo:boot<ArtifactBundleSeries>".to_string()) ).await?;
+        tx.send(inlet::Frame::EndRequires ).await?;
+        while let Some(frame) = rx.recv().await {
+            if let outlet::Frame::EndOfCommand(_) = frame {
+                break;
+            }
+        }
+
+        tx.send(inlet::Frame::CommandLine("? publish ^[ bundle.zip ]-> hyperspace:repo:boot:1.0.0".to_string()) ).await?;
+        let content = Arc::new( BOOT_BUNDLE_ZIP.to_vec() );
+        tx.send(inlet::Frame::TransferFile { name: "bundle.zip".to_string(), content }).await?;
+        tx.send(inlet::Frame::EndRequires ).await?;
+
+        while let Some(frame) = rx.recv().await {
+            if let outlet::Frame::EndOfCommand(_) = frame {
+                break;
+            }
+        }
+
         tx.send(inlet::Frame::CommandLine("? create hyperspace:users<UserBase<Keycloak>>".to_string()) ).await?;
         tx.send(inlet::Frame::EndRequires ).await?;
         while let Some(frame) = rx.recv().await {

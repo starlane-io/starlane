@@ -40,6 +40,7 @@ use crate::util::AsyncHashMap;
 pub mod artifact;
 pub mod config;
 pub mod file;
+pub mod property;
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

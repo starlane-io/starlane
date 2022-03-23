@@ -160,7 +160,7 @@ println!("response from Rc GET {}", address.to_string() );
         fn execute( end: &mut MessagingEndpointComponentInner, config: ArtifactItem<CachedConfig<BindConfig>>, delivery: Delivery<Request> ) -> Result<(),Error> {
 
             match &delivery.item.core.action {
-                Action::Rc(_) => {panic!("rc should be filtered");}
+                Action::Rc(_) => {panic!("Rc should be filtered");}
                 Action::Msg(msg) => {
                    let selector = config.msg.find_match(&delivery.item.core );
                    if selector.is_err() {

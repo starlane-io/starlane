@@ -1,0 +1,9 @@
+Bind {
+  Pipelines {
+    Http {
+      <Post>/login -> {{}} => &;
+      <Post>/refresh-token -> {{}} => &;
+      <Get>/introspect -> {{}} => &;
+    }
+  }
+}

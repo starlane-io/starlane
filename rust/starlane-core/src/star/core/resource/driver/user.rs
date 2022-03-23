@@ -21,11 +21,15 @@ use mesh_portal_versions::version::v0_0_1::command::common::PropertyMod;
 use mesh_portal_versions::version::v0_0_1::entity::request::Action;
 use mesh_portal_versions::version::v0_0_1::entity::request::create::{AddressSegmentTemplate, Create};
 use mesh_portal_versions::version::v0_0_1::entity::request::get::GetOp;
+use mesh_portal_versions::version::v0_0_1::pattern::{skewer, skewer_or_snake};
 use nom::AsBytes;
+use nom::combinator::all_consuming;
+use nom_supreme::final_parser::final_parser;
 use serde_json::{json, Value};
 use validator::validate_email;
 use crate::error::Error;
 use crate::resource::{Kind, ResourceAssign, ResourceType};
+use crate::resource::property::{AddressPattern, EmailPattern, PropertiesConfig, PropertyPattern, PropertyPermit, PropertySource};
 use crate::star::core::message::{match_kind, ResourceRegistrationChamber};
 use crate::star::core::resource::driver::ResourceCoreDriver;
 use crate::star::StarSkel;
@@ -33,7 +37,43 @@ use crate::star::StarSkel;
 lazy_static! {
     pub static ref HYPERUSER: &'static str ="hyperspace:users:hyperuser";
     pub static ref HYPER_USERBASE: &'static str ="hyperspace:users";
+
+    pub static ref USER_PROPERTIES_CONFIG: PropertiesConfig = user_properties_config();
+    pub static ref USER_BASE_PROPERTIES_CONFIG: PropertiesConfig = userbase_properties_config();
 }
+
+fn user_properties_config() -> PropertiesConfig {
+    let mut builder = PropertiesConfig::builder();
+    builder.add("bind", Box::new(AddressPattern{}), true, false, PropertySource::Shell, Some("hyperspace:repo:boot:1.0.0:/bind/user.bind".to_string()), true, vec![] );
+    builder.add("username", Box::new(UsernamePattern{}), true, false, PropertySource::Core, None, false, vec![] );
+    builder.add("email", Box::new(EmailPattern{}), false, true, PropertySource::Core, None, false, vec![PropertyPermit::Read] );
+    builder.build()
+}
+
+fn userbase_properties_config() -> PropertiesConfig {
+    let mut builder = PropertiesConfig::builder();
+    builder.add("bind", Box::new(AddressPattern{}), true, false, PropertySource::Shell, Some("hyperspace:repo:boot:1.0.0:/bind/userbase.bind".to_string()), true, vec![] );
+    builder.build()
+}
+
+
+
+pub struct UsernamePattern {
+
+}
+
+impl PropertyPattern for UsernamePattern {
+    fn is_match(&self, value: &String) -> Result<(), Error> {
+        match all_consuming(skewer_or_snake)(value.as_str()) {
+            Ok(_) => {}
+            Err(err) => {
+                return Err(format!("illegal username '{}'. username must be all lowercase alphanumerical with '-' and '_' allowed.", value).into());
+            }
+        }
+        Ok(())
+    }
+}
+
 
 pub struct UserBaseKeycloakCoreDriver {
     skel: StarSkel,
