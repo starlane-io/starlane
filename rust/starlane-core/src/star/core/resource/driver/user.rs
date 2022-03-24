@@ -29,7 +29,7 @@ use serde_json::{json, Value};
 use validator::validate_email;
 use crate::error::Error;
 use crate::resource::{Kind, ResourceAssign, ResourceType};
-use crate::resource::property::{AddressPattern, EmailPattern, PropertiesConfig, PropertyPattern, PropertyPermit, PropertySource};
+use crate::resource::property::{AddressPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPattern, PropertyPermit, PropertySource};
 use crate::star::core::message::{match_kind, ResourceRegistrationChamber};
 use crate::star::core::resource::driver::ResourceCoreDriver;
 use crate::star::StarSkel;
@@ -37,27 +37,11 @@ use crate::star::StarSkel;
 lazy_static! {
     pub static ref HYPERUSER: &'static str ="hyperspace:users:hyperuser";
     pub static ref HYPER_USERBASE: &'static str ="hyperspace:users";
-
-    pub static ref USER_PROPERTIES_CONFIG: PropertiesConfig = user_properties_config();
-    pub static ref USER_BASE_PROPERTIES_CONFIG: PropertiesConfig = userbase_properties_config();
-}
-
-fn user_properties_config() -> PropertiesConfig {
-    let mut builder = PropertiesConfig::builder();
-    builder.add("bind", Box::new(AddressPattern{}), true, false, PropertySource::Shell, Some("hyperspace:repo:boot:1.0.0:/bind/user.bind".to_string()), true, vec![] );
-    builder.add("username", Box::new(UsernamePattern{}), true, false, PropertySource::Core, None, false, vec![] );
-    builder.add("email", Box::new(EmailPattern{}), false, true, PropertySource::Core, None, false, vec![PropertyPermit::Read] );
-    builder.build()
-}
-
-fn userbase_properties_config() -> PropertiesConfig {
-    let mut builder = PropertiesConfig::builder();
-    builder.add("bind", Box::new(AddressPattern{}), true, false, PropertySource::Shell, Some("hyperspace:repo:boot:1.0.0:/bind/userbase.bind".to_string()), true, vec![] );
-    builder.build()
 }
 
 
 
+#[derive(Clone)]
 pub struct UsernamePattern {
 
 }

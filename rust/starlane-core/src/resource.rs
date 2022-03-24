@@ -32,7 +32,10 @@ use crate::logger::{elog, LogInfo, StaticLogInfo};
 
 use crate::message::{MessageExpect, ProtoStarMessage, ReplyKind};
 use crate::names::Name;
+use crate::resource::BaseKind::Mechtron;
+use crate::resource::property::{AddressPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPermit, PropertySource};
 use crate::star::{StarInfo, StarKey, StarSkel};
+use crate::star::core::resource::driver::user::UsernamePattern;
 use crate::star::shell::wrangler::{StarWrangle};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
@@ -570,6 +573,17 @@ impl Kind {
             }
         })
     }
+
+    pub fn properties_config(&self) -> &'static PropertiesConfig {
+        match self {
+            Kind::Space => &UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG,
+            Kind::UserBase(_) => &USER_BASE_PROPERTIES_CONFIG,
+            Kind::User => &USER_PROPERTIES_CONFIG,
+            Kind::App => &MECHTRON_PROERTIES_CONFIG,
+            Kind::Mechtron => &MECHTRON_PROERTIES_CONFIG,
+            _ => &DEFAULT_PROPERTIES_CONFIG
+        }
+    }
 }
 
 #[derive(
@@ -729,3 +743,48 @@ pub enum ChildResourceRegistryHandler {
     Core
 }
 
+lazy_static! {
+    pub static ref DEFAULT_PROPERTIES_CONFIG: PropertiesConfig = default_properties_config();
+    pub static ref USER_PROPERTIES_CONFIG: PropertiesConfig = user_properties_config();
+    pub static ref USER_BASE_PROPERTIES_CONFIG: PropertiesConfig = userbase_properties_config();
+    pub static ref MECHTRON_PROERTIES_CONFIG: PropertiesConfig = mechtron_properties_config();
+    pub static ref UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG: PropertiesConfig = unrequired_bind_and_config_properties_config();
+}
+
+fn default_properties_config() -> PropertiesConfig {
+    let mut builder = PropertiesConfig::builder();
+    builder.build()
+}
+
+fn mechtron_properties_config() -> PropertiesConfig {
+    let mut builder = PropertiesConfig::builder();
+    builder.add("bind", Box::new(AddressPattern{}), true, false, PropertySource::Shell, None, false, vec![] );
+    builder.add("config", Box::new(AddressPattern{}), true, false, PropertySource::Shell, None, false, vec![] );
+    builder.build()
+}
+
+
+fn unrequired_bind_and_config_properties_config() -> PropertiesConfig {
+    let mut builder = PropertiesConfig::builder();
+    builder.add("bind", Box::new(AddressPattern{}), false, false, PropertySource::Shell, None, false, vec![] );
+    builder.add("config", Box::new(AddressPattern{}), false, false, PropertySource::Shell, None, false, vec![] );
+    builder.build()
+}
+
+fn user_properties_config() -> PropertiesConfig {
+    let mut builder = PropertiesConfig::builder();
+    builder.add("bind", Box::new(AddressPattern{}), true, false, PropertySource::Shell, Some("hyperspace:repo:boot:1.0.0:/bind/user.bind".to_string()), true, vec![] );
+    builder.add("username", Box::new(UsernamePattern{}), true, false, PropertySource::Core, None, false, vec![] );
+    builder.add("email", Box::new(EmailPattern{}), false, true, PropertySource::Core, None, false, vec![PropertyPermit::Read] );
+    builder.add("password", Box::new(AnythingPattern{}), false, true, PropertySource::CoreSecret, None, false, vec![] );
+    builder.build()
+}
+
+fn userbase_properties_config() -> PropertiesConfig {
+    let mut builder = PropertiesConfig::builder();
+    builder.add("bind", Box::new(AddressPattern{}), true, false, PropertySource::Shell, Some("hyperspace:repo:boot:1.0.0:/bind/userbase.bind".to_string()), true, vec![] );
+    builder.add("config", Box::new(AddressPattern{}), false, true, PropertySource::Shell, None, false, vec![] );
+    builder.add("registration-email-as-username", Box::new(BoolPattern{}), false, false, PropertySource::Shell, Some("true".to_string()), false, vec![] );
+    builder.add("verify-email", Box::new(BoolPattern{}), false, false, PropertySource::Shell, Some("false".to_string()), false, vec![] );
+    builder.build()
+}

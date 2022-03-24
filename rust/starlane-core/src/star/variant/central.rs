@@ -1,5 +1,6 @@
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 use mesh_portal::version::latest::entity::request::create::Strategy;
 
 use tokio::sync::{mpsc, oneshot};
@@ -73,11 +74,11 @@ impl CentralVariant {
 
 impl CentralVariant {
     async fn ensure(starlane_api: StarlaneApi) -> Result<(), Error> {
-        let mut creation = starlane_api.create_space("hyperspace", "Hyperspace").await?;
+        let mut creation = starlane_api.create_space("hyperspace").await?;
         creation.set_strategy(Strategy::Ensure);
         creation.submit().await?;
 
-        let mut creation = starlane_api.create_space("localhost", "Localhost").await?;
+        let mut creation = starlane_api.create_space("localhost" ).await?;
         creation.set_strategy(Strategy::Ensure);
         creation.submit().await?;
 
@@ -116,9 +117,9 @@ impl CentralVariant {
                 break;
             }
         }
+
         tx.send(inlet::Frame::CommandLine("? create hyperspace:users:hyperuser<User>".to_string()) ).await?;
         tx.send(inlet::Frame::EndRequires ).await?;
-
         Ok(())
     }
 }

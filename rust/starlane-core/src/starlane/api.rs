@@ -167,7 +167,7 @@ impl StarlaneApi {
         }
     }
 
-    pub async fn create_space(&self, name: &str, title: &str) -> Result<Creation<SpaceApi>, Error> {
+    pub async fn create_space(&self, name: &str) -> Result<Creation<SpaceApi>, Error> {
         let address_template = AddressTemplate{
             parent: Address::root(),
             child_segment_template: AddressSegmentTemplate::Exact(name.to_string())
@@ -181,7 +181,6 @@ impl StarlaneApi {
 
         let template = Template::new(address_template,kind_template );
         let mut properties = SetProperties::new();
-        properties.push( PropertyMod::Set{ key:"title".to_string(), value: title.to_string(), lock: false});
         let create = Create {
             template,
             state: StateSrc::Stateless,

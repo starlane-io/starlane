@@ -679,7 +679,7 @@ impl Traversal {
 }
 
 pub struct ResourceRegistrationChamber {
-    skel: StarSkel
+    skel: StarSkel,
 }
 
 impl ResourceRegistrationChamber {
@@ -737,12 +737,14 @@ println!("\tprop{}", property.0.clone() );
                 }
                 let address = address?;
 
+                let properties = child_kind.properties_config().fill_create_defaults(&create.properties )?;
+                child_kind.properties_config().check_create(&properties)?;
 
                 let registration = Registration {
                     address: address.clone(),
                     kind: child_kind.clone(),
                     registry: create.registry.clone(),
-                    properties: create.properties.clone(),
+                    properties
                 };
 println!("creating {}",address.to_string() );
                 let mut result = self.skel.registry_api.register(registration).await;

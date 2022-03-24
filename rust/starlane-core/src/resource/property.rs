@@ -52,6 +52,7 @@ pub trait PropertyPattern: Send+Sync+'static {
     fn is_match( &self, value: &String ) -> Result<(),Error>;
 }
 
+#[derive(Clone)]
 pub struct AnythingPattern {}
 
 impl PropertyPattern for AnythingPattern {
@@ -60,6 +61,7 @@ impl PropertyPattern for AnythingPattern {
     }
 }
 
+#[derive(Clone)]
 pub struct AddressPattern{}
 
 impl PropertyPattern for AddressPattern{
@@ -70,6 +72,25 @@ impl PropertyPattern for AddressPattern{
     }
 }
 
+#[derive(Clone)]
+pub struct BoolPattern{}
+
+impl PropertyPattern for BoolPattern{
+    fn is_match(&self, value: &String) -> Result<(), Error> {
+        use std::str::FromStr;
+        match bool::from_str(value.as_str()) {
+            Ok(_) => {
+                Ok(())
+            }
+            Err(err) => {
+                Err(err.to_string().into())
+            }
+
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct EmailPattern{}
 
 impl PropertyPattern for EmailPattern{
@@ -82,6 +103,7 @@ impl PropertyPattern for EmailPattern{
     }
 }
 
+#[derive(Clone)]
 pub enum PropertySource {
     Shell,
     Core,
@@ -147,7 +169,7 @@ impl PropertiesConfig {
             let def = self.get(key).ok_or(format!("illegal property: '{}'",key))?;
             match propmod {
                 PropertyMod::Set { key, value, lock } => {
-                    if def.constant {
+                    if def.constant && def.default.as_ref().unwrap().clone() != value.clone() {
                         return Err(format!("property: '{}' is constant and cannot be set",key).into());
                     }
                     def.pattern.is_match(value)?;
