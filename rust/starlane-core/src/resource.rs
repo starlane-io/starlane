@@ -773,8 +773,8 @@ fn unrequired_bind_and_config_properties_config() -> PropertiesConfig {
 
 fn user_properties_config() -> PropertiesConfig {
     let mut builder = PropertiesConfig::builder();
-    builder.add("bind", Box::new(AddressPattern{}), true, false, PropertySource::Shell, Some("hyperspace:repo:boot:1.0.0:/bind/user.bind".to_string()), true, vec![] );
-    builder.add("username", Box::new(UsernamePattern{}), true, false, PropertySource::Core, None, false, vec![] );
+    builder.add("bind", Box::new(AddressPattern{}), true, false,PropertySource::Shell, Some("hyperspace:repo:boot:1.0.0:/bind/user.bind".to_string()), true, vec![] );
+    builder.add("username", Box::new(UsernamePattern{}), false, false, PropertySource::Core, None, false, vec![] );
     builder.add("email", Box::new(EmailPattern{}), false, true, PropertySource::Core, None, false, vec![PropertyPermit::Read] );
     builder.add("password", Box::new(AnythingPattern{}), false, true, PropertySource::CoreSecret, None, false, vec![] );
     builder.build()

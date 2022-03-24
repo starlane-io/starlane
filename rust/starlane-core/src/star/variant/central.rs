@@ -120,6 +120,7 @@ impl CentralVariant {
 
         tx.send(inlet::Frame::CommandLine("? create hyperspace:users:hyperuser<User>".to_string()) ).await?;
         tx.send(inlet::Frame::EndRequires ).await?;
+
         Ok(())
     }
 }
