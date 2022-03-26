@@ -14,7 +14,7 @@ lazy_static! {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CliConfig {
     pub hostname: String,
-    pub mechtron_portal: String
+    pub refresh_token: Option<String>
 }
 
 impl CliConfig {
@@ -24,10 +24,7 @@ impl CliConfig {
                 "localhost:{}",
                 starlane_core::starlane::DEFAULT_PORT.clone(),
             ),
-            mechtron_portal: format!(
-                "localhost:{}",
-                starlane_core::starlane::STARLANE_MECHTRON_PORT.clone(),
-            ),
+            refresh_token: None
         }
     }
     pub fn load_or_default() -> Self {

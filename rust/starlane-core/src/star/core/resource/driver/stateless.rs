@@ -3,29 +3,27 @@ use mesh_portal::version::latest::id::Address;
 
 use crate::error::Error;
 use crate::resource::{ResourceAssign, ResourceType};
-use crate::star::core::resource::manager::ResourceManager;
+use crate::star::core::resource::driver::ResourceCoreDriver;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 
 #[derive(Debug)]
-pub struct StatelessManager {
+pub struct StatelessCoreDriver {
     skel: StarSkel,
-    store: StateStore,
     resource_type: ResourceType
 }
 
-impl StatelessManager {
+impl StatelessCoreDriver {
     pub async fn new(skel: StarSkel, resource_type: ResourceType ) -> Self {
-        StatelessManager {
+        StatelessCoreDriver {
             skel: skel.clone(),
-            store: StateStore::new(skel),
             resource_type
         }
     }
 }
 
 #[async_trait]
-impl ResourceManager for StatelessManager {
+impl ResourceCoreDriver for StatelessCoreDriver {
 
     fn resource_type(&self) -> ResourceType {
         self.resource_type.clone()

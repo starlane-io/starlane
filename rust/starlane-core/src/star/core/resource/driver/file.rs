@@ -7,12 +7,11 @@ use yaml_rust::Yaml;
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
 use crate::resource::{ArtifactKind, ResourceType, ResourceAssign, AssignResourceStateSrc, Kind, FileKind};
-use crate::star::core::resource::manager::ResourceManager;
+use crate::star::core::resource::driver::ResourceCoreDriver;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::watch::{Notification, Change, Topic, WatchSelector, Property};
 use crate::message::delivery::Delivery;
-use crate::html::html_error_code;
 use crate::frame::{StarMessagePayload, StarMessage};
 
 use std::str::FromStr;
@@ -24,14 +23,14 @@ use mesh_portal::version::latest::messaging::Request;
 use mesh_portal_versions::version::v0_0_1::command::common::SetProperties;
 
 #[derive(Debug)]
-pub struct FileManager {
+pub struct FileCoreManager {
     skel: StarSkel,
     store: StateStore,
 }
 
-impl FileManager {
+impl FileCoreManager {
     pub fn new(skel: StarSkel) -> Self {
-        FileManager {
+        FileCoreManager {
             skel: skel.clone(),
             store: StateStore::new(skel),
         }
@@ -39,7 +38,7 @@ impl FileManager {
 }
 
 #[async_trait]
-impl ResourceManager for FileManager {
+impl ResourceCoreDriver for FileCoreManager {
     async fn assign(
         &mut self,
         assign: ResourceAssign,
@@ -104,7 +103,7 @@ impl FileSystemManager {
 }
 
 #[async_trait]
-impl ResourceManager for FileSystemManager {
+impl ResourceCoreDriver for FileSystemManager {
     fn resource_type(&self) -> ResourceType {
         ResourceType::FileSystem
     }
@@ -142,7 +141,7 @@ impl ResourceManager for FileSystemManager {
             let action = Action::Rc(Rc::Create(create));
             let core = action.into();
             let request = Request::new(core, assign.stub.address.clone(), assign.stub.address.clone());
-            let response = skel.messaging_api.exchange(request).await;
+            let response = skel.messaging_api.request(request).await;
         });
         Ok(())
     }

@@ -1,8 +1,10 @@
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 use mesh_portal::version::latest::entity::request::create::Strategy;
 
 use tokio::sync::{mpsc, oneshot};
+use crate::command::cli::{CliServer, inlet, outlet};
 
 
 use crate::error::Error;
@@ -12,6 +14,8 @@ use crate::star::variant::{FrameVerdict, VariantCall};
 use crate::starlane::api::StarlaneApi;
 use crate::user::HyperUser;
 use crate::util::{AsyncProcessor, AsyncRunner};
+
+static BOOT_BUNDLE_ZIP : &'static [u8] = include_bytes!("../../../boot/bundle.zip");
 
 pub struct CentralVariant {
     skel: StarSkel,
@@ -70,9 +74,53 @@ impl CentralVariant {
 
 impl CentralVariant {
     async fn ensure(starlane_api: StarlaneApi) -> Result<(), Error> {
-        let mut creation = starlane_api.create_space("space", "Space").await?;
+        let mut creation = starlane_api.create_space("hyperspace").await?;
         creation.set_strategy(Strategy::Ensure);
         creation.submit().await?;
+
+        let mut creation = starlane_api.create_space("localhost" ).await?;
+        creation.set_strategy(Strategy::Ensure);
+        creation.submit().await?;
+
+        let (tx,mut rx) = CliServer::new_internal( starlane_api ).await?;
+
+        tx.send(inlet::Frame::CommandLine("? create hyperspace:repo<Base<Repo>>".to_string()) ).await?;
+        tx.send(inlet::Frame::EndRequires ).await?;
+        while let Some(frame) = rx.recv().await {
+            if let outlet::Frame::EndOfCommand(_) = frame {
+                break;
+            }
+        }
+        tx.send(inlet::Frame::CommandLine("? create hyperspace:repo:boot<ArtifactBundleSeries>".to_string()) ).await?;
+        tx.send(inlet::Frame::EndRequires ).await?;
+        while let Some(frame) = rx.recv().await {
+            if let outlet::Frame::EndOfCommand(_) = frame {
+                break;
+            }
+        }
+
+        tx.send(inlet::Frame::CommandLine("? publish ^[ bundle.zip ]-> hyperspace:repo:boot:1.0.0".to_string()) ).await?;
+        let content = Arc::new( BOOT_BUNDLE_ZIP.to_vec() );
+        tx.send(inlet::Frame::TransferFile { name: "bundle.zip".to_string(), content }).await?;
+        tx.send(inlet::Frame::EndRequires ).await?;
+
+        while let Some(frame) = rx.recv().await {
+            if let outlet::Frame::EndOfCommand(_) = frame {
+                break;
+            }
+        }
+
+        tx.send(inlet::Frame::CommandLine("? create hyperspace:users<UserBase<Keycloak>>".to_string()) ).await?;
+        tx.send(inlet::Frame::EndRequires ).await?;
+        while let Some(frame) = rx.recv().await {
+            if let outlet::Frame::EndOfCommand(_) = frame {
+                break;
+            }
+        }
+
+        tx.send(inlet::Frame::CommandLine("? create hyperspace:users:hyperuser<User>".to_string()) ).await?;
+        tx.send(inlet::Frame::EndRequires ).await?;
+
         Ok(())
     }
 }

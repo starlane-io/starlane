@@ -90,12 +90,3 @@ pub extern "C" fn mesh_portal_unique_id() -> String
     Uuid::new_v4().to_string()
 }
 
-#[cfg(test)]
-pub mod test {
-
-    #[test]
-    pub fn test() {
-        println!("It Works!");
-    }
-
-}

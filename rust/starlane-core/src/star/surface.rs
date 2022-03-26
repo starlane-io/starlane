@@ -200,7 +200,7 @@ println!("SurfaceApi: go watch listener {}",listener.is_ok());
             SurfaceCall::Request { request, tx  } => {
                 let skel = self.skel.clone();
                 tokio::spawn ( async move {
-                     tx.send(skel.messaging_api.exchange(request).await);
+                     tx.send(skel.messaging_api.request(request).await);
                 });
             }
         }

@@ -34,9 +34,9 @@ use mesh_portal::version::latest::id::Address;
 use mesh_portal::version::latest::messaging::{Message, Request, Response};
 use mesh_portal::version::latest::payload::{Payload, PayloadMap, Primitive};
 use mesh_portal::version::latest::resource::ResourceStub;
-use mesh_portal_versions::version::v0_0_1::command::common::{PropertyMod, SetProperties};
-use mesh_portal_versions::version::v0_0_1::entity::request::get::GetOp;
-use mesh_portal_versions::version::v0_0_1::id::Tks;
+use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
+use mesh_portal::version::latest::entity::request::get::GetOp;
+use mesh_portal::version::latest::id::Tks;
 
 use crate::fail::{Fail, StarlaneFailure};
 
@@ -149,7 +149,7 @@ impl StarlaneApi {
     }
 
 
-    pub async fn create_api<API>(&self, create: Create ) -> Result<API, Error>
+    pub async fn create_api<API>(&self, create: Create) -> Result<API, Error>
     where
         API: TryFrom<ResourceApi>,
     {
@@ -167,7 +167,7 @@ impl StarlaneApi {
         }
     }
 
-    pub async fn create_space(&self, name: &str, title: &str) -> Result<Creation<SpaceApi>, Error> {
+    pub async fn create_space(&self, name: &str) -> Result<Creation<SpaceApi>, Error> {
         let address_template = AddressTemplate{
             parent: Address::root(),
             child_segment_template: AddressSegmentTemplate::Exact(name.to_string())
@@ -181,7 +181,6 @@ impl StarlaneApi {
 
         let template = Template::new(address_template,kind_template );
         let mut properties = SetProperties::new();
-        properties.push( PropertyMod::Set{ key:"title".to_string(), value: title.to_string(), lock: false});
         let create = Create {
             template,
             state: StateSrc::Stateless,
@@ -228,10 +227,10 @@ impl SpaceApi {
     }
 
     pub fn new(surface_api: SurfaceApi, stub: ResourceStub, agent: Address) -> Result<Self, Error> {
-        if stub.kind.resource_type() != ResourceType::Space.to_string() {
+        if stub.kind.resource_type != ResourceType::Space.to_string() {
             return Err(format!(
                 "wrong kind resource type for SpaceApi: {}",
-                stub.kind.resource_type().to_string()
+                stub.kind.resource_type.to_string()
             )
             .into());
         }

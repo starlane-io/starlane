@@ -375,7 +375,7 @@ impl RegistryComponent {
                 to: parent.clone(),
                 core: Action::Rc(Rc::Query(Query::AddressKindPath)).into()
             };
-            let response = skel.messaging_api.exchange(request).await;
+            let response = skel.messaging_api.request(request).await;
 
             let parent_kind_path = response.core.body;
             let parent_kind_path: Primitive= parent_kind_path.try_into()?;
@@ -417,6 +417,7 @@ impl RegistryComponent {
             }
         }
         fn register<'a>( registration: Registration,  trans:&Transaction<'a>,) -> Result<(),Error> {
+
             let params = RegistryParams::from_registration(&registration)?;
             trans.execute("INSERT INTO resources (address_segment,resource_type,kind,vendor,product,variant,version,version_variant,parent,status) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'Pending')", params![params.address_segment,params.resource_type,params.kind,params.vendor,params.product,params.variant,params.version,params.version_variant,params.parent])?;
 
@@ -476,22 +477,24 @@ impl RegistryComponent {
         match result {
             Ok(_) => {
                 let (otx,rx) = oneshot::channel();
-                self.locate(address,otx).await;
+                self.locate(address.clone(),otx).await;
                 tx.send(match rx.await {
                     Ok(Ok(record)) => {
                         Ok(record.into())
                     }
                     Ok(Err(err)) => {
-                        println!("~~~ could not locate record...");
-                        Err("could not locate record".into())
+                        error!("could not locate record '{}'", address.to_string());
+                        Err(format!("Registry: could not locate record: {}",address.to_string()).as_str().into())
                     }
 
                     Err(err) => {
-                        Err("could not locate record".into())
+                        error!("could not locate record '{}'", address.to_string());
+                        Err(format!("Registry: could not locate record: {}",address.to_string()).as_str().into())
                     }
                 });
             }
             Err(err) => {
+                error!("could not locate record '{}'", address.to_string());
                 tx.send(Err(RegError::Error(err)));
             }
         }
@@ -506,7 +509,7 @@ impl RegistryComponent {
         match Self::process_resource_row(row) {
             Ok(ok) => Ok(ok),
             Err(error) => {
-                eprintln!("process_resource_rows: {}", error);
+                error!("process_resource_rows: {}", error);
                 Err(error.into())
             }
         }
@@ -672,7 +675,6 @@ impl RegistryParams {
 
         let resource_type = registration.kind.resource_type().to_string();
         let kind = registration.kind.sub_string();
-
         let vendor = match &registration.kind.specific() {
             None => Option::None,
             Some(specific) => Option::Some(specific.vendor.clone()),
@@ -1012,7 +1014,7 @@ impl Selector {
                         let action = Action::Rc(Rc::Select(select));
                         let core = action.into();
                         let request = Request::new(core, address.clone(), parent.clone() );
-                        futures.push(selector.skel.messaging_api.exchange(request));
+                        futures.push(selector.skel.messaging_api.request(request));
                     }
                 }
 

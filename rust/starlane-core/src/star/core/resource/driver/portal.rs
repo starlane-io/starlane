@@ -7,12 +7,11 @@ use yaml_rust::Yaml;
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
 use crate::resource::{ArtifactKind, ResourceType, ResourceAssign, AssignResourceStateSrc};
-use crate::star::core::resource::manager::ResourceManager;
+use crate::star::core::resource::driver::ResourceCoreDriver;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::watch::{Notification, Change, Topic, WatchSelector, Property};
 use crate::message::delivery::Delivery;
-use crate::html::html_error_code;
 use crate::frame::{StarMessagePayload, StarMessage};
 
 use std::str::FromStr;
@@ -23,14 +22,14 @@ use mesh_portal::version::latest::messaging::{Request, Response};
 use mesh_portal_tcp_server::PortalServer;
 
 #[derive(Debug)]
-pub struct PortalManager {
+pub struct PortalCoreDriver {
     skel: StarSkel,
     store: StateStore,
 }
 
-impl PortalManager {
+impl PortalCoreDriver {
     pub fn new(skel: StarSkel) -> Self {
-        PortalManager {
+        PortalCoreDriver {
             skel: skel.clone(),
             store: StateStore::new(skel),
         }
@@ -38,7 +37,7 @@ impl PortalManager {
 }
 
 #[async_trait]
-impl ResourceManager for PortalManager {
+impl ResourceCoreDriver for PortalCoreDriver {
     async fn assign(
         &mut self,
         assign: ResourceAssign,

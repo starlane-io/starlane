@@ -11,7 +11,7 @@ use tempdir::TempDir;
 use tokio::sync::Mutex;
 
 use crate::resource::{ResourceType, AssignResourceStateSrc, ResourceAssign, Kind, ArtifactKind};
-use crate::star::core::resource::manager::ResourceManager;
+use crate::star::core::resource::driver::ResourceCoreDriver;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util;
@@ -19,12 +19,11 @@ use crate::error::Error;
 
 use crate::message::delivery::Delivery;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
-use mesh_portal::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, Strategy, Template};
+use mesh_portal::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, KindTemplate, Strategy, Template};
 use mesh_portal::version::latest::entity::request::{Action, Rc};
 use mesh_portal::version::latest::id::{Address, AddressAndKind, KindParts, RouteSegment};
 use mesh_portal::version::latest::messaging::Request;
 use mesh_portal::version::latest::payload::{Payload, Primitive};
-use mesh_portal_versions::version::v0_0_1::entity::request::create::KindTemplate;
 use zip::result::ZipResult;
 use crate::file_access::FileAccess;
 
@@ -56,14 +55,14 @@ fn get_artifacts(data: Arc<Vec<u8>>) -> Result<Vec<String>, Error> {
 }
 
 #[derive(Debug)]
-pub struct ArtifactBundleManager {
+pub struct ArtifactBundleCoreDriver {
     skel: StarSkel,
     store: StateStore,
 }
 
-impl ArtifactBundleManager {
+impl ArtifactBundleCoreDriver {
     pub async fn new(skel: StarSkel) -> Self {
-        ArtifactBundleManager {
+        ArtifactBundleCoreDriver {
             skel: skel.clone(),
             store: StateStore::new(skel),
         }
@@ -71,7 +70,7 @@ impl ArtifactBundleManager {
 }
 
 #[async_trait]
-impl ResourceManager for ArtifactBundleManager {
+impl ResourceCoreDriver for ArtifactBundleCoreDriver {
     fn resource_type(&self) -> ResourceType {
         ResourceType::ArtifactBundle
     }
@@ -202,7 +201,7 @@ impl ResourceManager for ArtifactBundleManager {
                                 let action = Action::Rc(Rc::Create(create));
                                 let core = action.into();
                                 let request = Request::new(core, assign.stub.address.clone(), parent);
-                                let response = skel.messaging_api.exchange(request).await;
+                                let response = skel.messaging_api.request(request).await;
 
                             }
                             Err(err) => {
@@ -252,7 +251,7 @@ impl ArtifactManager{
 
 
 #[async_trait]
-impl ResourceManager for ArtifactManager{
+impl ResourceCoreDriver for ArtifactManager{
     fn resource_type(&self) -> ResourceType {
         ResourceType::Artifact
     }

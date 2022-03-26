@@ -2,7 +2,6 @@
 use std::sync::Arc;
 use serde_json::json;
 use handlebars::Handlebars;
-use mesh_portal::version::latest::http::HttpResponse;
 use crate::error::Error;
 
 lazy_static! {
@@ -87,14 +86,3 @@ section{
 }
 
 
-pub fn html_error_code( code: usize, title: String, message: String ) -> Result<HttpResponse,Error> {
-    unimplemented!()
-    /*
-    let mut response = HttpResponse::new();
-    response.status = code;
-    let json = json!({"title": title, "message": message });
-    response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &json)?.as_bytes().to_vec())));
-    Ok(response)
-
-     */
-}

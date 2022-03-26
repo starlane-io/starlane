@@ -11,8 +11,8 @@ use mesh_portal::version::latest::entity::request::{Action, Rc};
 use mesh_portal::version::latest::messaging::{Request, Response};
 use mesh_portal::version::latest::payload::{Payload, Primitive};
 use mesh_portal::version::latest::resource::ResourceStub;
-use mesh_portal_versions::error::Error;
-use mesh_portal_versions::version::v0_0_1::entity::request::create::{Fulfillment, KindTemplate};
+use mesh_portal::error::Error;
+use mesh_portal::version::latest::entity::request::create::{Fulfillment, KindTemplate};
 use mesh_portal_versions::version::v0_0_1::parse::Res;
 use std::string::FromUtf8Error;
 use tokio::sync::mpsc;
@@ -90,10 +90,12 @@ impl CommandExecutor {
     }
 
     async fn exec_create(&self, create: Create) {
+
         let parent = create.template.address.parent.clone();
         let action = Action::Rc(Rc::Create(create));
         let request = Request::new(action.into(), self.stub.address.clone(), parent);
         let response = self.api.exchange(request).await;
+
         match response.ok_or() {
             Ok(_) => {
                 self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;

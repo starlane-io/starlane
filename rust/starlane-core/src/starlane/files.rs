@@ -15,7 +15,7 @@ impl MachineFileSystem {
         Ok(Self {
             local_stars: RwLock::new(HashSet::new()),
             data_access: FileAccess::new(
-                std::env::var("STARLANE_DATA").unwrap_or("data".to_string()),
+                std::env::var("STARLANE_DATA_DIR").unwrap_or("data".to_string()),
             )?,
         })
     }

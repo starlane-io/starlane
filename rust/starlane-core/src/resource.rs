@@ -32,7 +32,10 @@ use crate::logger::{elog, LogInfo, StaticLogInfo};
 
 use crate::message::{MessageExpect, ProtoStarMessage, ReplyKind};
 use crate::names::Name;
+use crate::resource::BaseKind::Mechtron;
+use crate::resource::property::{AddressPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPermit, PropertySource};
 use crate::star::{StarInfo, StarKey, StarSkel};
+use crate::star::core::resource::driver::user::UsernamePattern;
 use crate::star::shell::wrangler::{StarWrangle};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
@@ -40,6 +43,7 @@ use crate::util::AsyncHashMap;
 pub mod artifact;
 pub mod config;
 pub mod file;
+pub mod property;
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -163,6 +167,7 @@ impl Into<ResourceStub> for ResourceRecord {
 pub enum ResourceType {
     Root,
     Space,
+    UserBase,
     Base,
     User,
     App,
@@ -225,6 +230,14 @@ impl TryFrom<String> for ResourceType {
     }
 }
 
+impl ResourceType {
+    pub fn child_resource_registry_handler(&self) -> ChildResourceRegistryHandler {
+        match self {
+            Self::UserBase => ChildResourceRegistryHandler::Core,
+            _ => ChildResourceRegistryHandler::Shell
+        }
+    }
+}
 
 #[derive(
     Debug,
@@ -238,6 +251,7 @@ impl TryFrom<String> for ResourceType {
 pub enum Kind {
     Root,
     Space,
+    UserBase(UserBaseKind),
     Base(BaseKind),
     User,
     App,
@@ -378,6 +392,16 @@ impl TryFrom<KindParts> for Kind {
                     }
                 }
             }
+            ResourceType::UserBase=> {
+                match parts.kind {
+                    None => {
+                        return Err("kind needs to be set for UserBase".into())
+                    }
+                    Some(kind)  => {
+                        return Ok(Self::UserBase(UserBaseKind::from_str(kind.as_str())?))
+                    }
+                }
+            }
             _ => {}
         }
 
@@ -435,7 +459,8 @@ impl Kind {
             Kind::Artifact(_) => ResourceType::Artifact,
             Kind::Proxy => ResourceType::Proxy,
             Kind::Credentials => ResourceType::Credentials,
-            Kind::Control => ResourceType::Control
+            Kind::Control => ResourceType::Control,
+            Kind::UserBase(_) => ResourceType::UserBase
         }
     }
 
@@ -452,6 +477,9 @@ impl Kind {
             }
             Self::Artifact( artifact) => {
                 Option::Some(artifact.to_string())
+            }
+            Self::UserBase( kind) => {
+                Option::Some(kind.to_string())
             }
             _ => {
                 Option::None
@@ -502,7 +530,7 @@ impl Kind {
                         if "Relational" != kind.as_str() {
                             return Err(format!("DatabaseKind is not recognized found: {}",kind).into());
                         }
-                        match specific.ok_or("expected specific".into() ) {
+                        match specific.ok_or("expected Database<Relational<specific>>".into() ) {
                             Ok(specific) => {
                                 return Ok(Self::Database(DatabaseKind::Relational(specific)));
                             }
@@ -523,7 +551,7 @@ impl Kind {
             ResourceType::Artifact => {
                 match kind {
                     None => {
-                        return Err("kind needs to be set".into());
+                        return Err("expected Artifact<kind>".into());
                     }
                     Some(kind) => {
                         return Ok(Self::Artifact(ArtifactKind::from_str(kind.as_str())?));
@@ -532,8 +560,29 @@ impl Kind {
             }
             ResourceType::Proxy => {Self::Proxy}
             ResourceType::Credentials => {Self::Credentials}
-            ResourceType::Control => Self::Control
+            ResourceType::Control => Self::Control,
+            ResourceType::UserBase => {
+                match kind {
+                    None => {
+                        return Err("expected UserBase kind (UserBase<kind>)".into());
+                    }
+                    Some(kind) => {
+                        return Ok(Self::UserBase(UserBaseKind::from_str(kind.as_str())?));
+                    }
+                }
+            }
         })
+    }
+
+    pub fn properties_config(&self) -> &'static PropertiesConfig {
+        match self {
+            Kind::Space => &UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG,
+            Kind::UserBase(_) => &USER_BASE_PROPERTIES_CONFIG,
+            Kind::User => &USER_PROPERTIES_CONFIG,
+            Kind::App => &MECHTRON_PROERTIES_CONFIG,
+            Kind::Mechtron => &MECHTRON_PROERTIES_CONFIG,
+            _ => &DEFAULT_PROPERTIES_CONFIG
+        }
     }
 }
 
@@ -578,6 +627,21 @@ pub enum BaseKind {
     Database,
     Repo,
     Any,
+}
+
+#[derive(
+Clone,
+Debug,
+Eq,
+PartialEq,
+Hash,
+Serialize,
+Deserialize,
+strum_macros::Display,
+strum_macros::EnumString,
+)]
+pub enum UserBaseKind {
+    Keycloak
 }
 
 #[derive(
@@ -673,3 +737,54 @@ impl ResourceAssign {
 }
 
 
+#[derive(Debug,Clone,Serialize,Deserialize,strum_macros::Display)]
+pub enum ChildResourceRegistryHandler {
+    Shell,
+    Core
+}
+
+lazy_static! {
+    pub static ref DEFAULT_PROPERTIES_CONFIG: PropertiesConfig = default_properties_config();
+    pub static ref USER_PROPERTIES_CONFIG: PropertiesConfig = user_properties_config();
+    pub static ref USER_BASE_PROPERTIES_CONFIG: PropertiesConfig = userbase_properties_config();
+    pub static ref MECHTRON_PROERTIES_CONFIG: PropertiesConfig = mechtron_properties_config();
+    pub static ref UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG: PropertiesConfig = unrequired_bind_and_config_properties_config();
+}
+
+fn default_properties_config() -> PropertiesConfig {
+    let mut builder = PropertiesConfig::builder();
+    builder.build()
+}
+
+fn mechtron_properties_config() -> PropertiesConfig {
+    let mut builder = PropertiesConfig::builder();
+    builder.add("bind", Box::new(AddressPattern{}), true, false, PropertySource::Shell, None, false, vec![] );
+    builder.add("config", Box::new(AddressPattern{}), true, false, PropertySource::Shell, None, false, vec![] );
+    builder.build()
+}
+
+
+fn unrequired_bind_and_config_properties_config() -> PropertiesConfig {
+    let mut builder = PropertiesConfig::builder();
+    builder.add("bind", Box::new(AddressPattern{}), false, false, PropertySource::Shell, None, false, vec![] );
+    builder.add("config", Box::new(AddressPattern{}), false, false, PropertySource::Shell, None, false, vec![] );
+    builder.build()
+}
+
+fn user_properties_config() -> PropertiesConfig {
+    let mut builder = PropertiesConfig::builder();
+    builder.add("bind", Box::new(AddressPattern{}), true, false,PropertySource::Shell, Some("hyperspace:repo:boot:1.0.0:/bind/user.bind".to_string()), true, vec![] );
+    builder.add("username", Box::new(UsernamePattern{}), false, false, PropertySource::Core, None, false, vec![] );
+    builder.add("email", Box::new(EmailPattern{}), false, true, PropertySource::Core, None, false, vec![PropertyPermit::Read] );
+    builder.add("password", Box::new(AnythingPattern{}), false, true, PropertySource::CoreSecret, None, false, vec![] );
+    builder.build()
+}
+
+fn userbase_properties_config() -> PropertiesConfig {
+    let mut builder = PropertiesConfig::builder();
+    builder.add("bind", Box::new(AddressPattern{}), true, false, PropertySource::Shell, Some("hyperspace:repo:boot:1.0.0:/bind/userbase.bind".to_string()), true, vec![] );
+    builder.add("config", Box::new(AddressPattern{}), false, true, PropertySource::Shell, None, false, vec![] );
+    builder.add("registration-email-as-username", Box::new(BoolPattern{}), false, false, PropertySource::Shell, Some("true".to_string()), false, vec![] );
+    builder.add("verify-email", Box::new(BoolPattern{}), false, false, PropertySource::Shell, Some("false".to_string()), false, vec![] );
+    builder.build()
+}

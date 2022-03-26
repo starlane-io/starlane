@@ -7,6 +7,7 @@ extern crate tablestream;
 #[macro_use]
 extern crate tracing;
 
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::io;
@@ -36,6 +37,7 @@ use starlane_core::command::parse::{command_line, rec_script_line};
 use starlane_core::mechtron::portal_client::launch_mechtron_client;
 use starlane_core::mechtron::process::launch_mechtron_process;
 use starlane_core::star::shell::sys::SysCall::Create;
+use serde::{Serialize,Deserialize};
 
 
 pub mod cli;
@@ -65,6 +67,7 @@ async fn go() -> Result<(),Error> {
                                                                                                                             SubCommand::with_name("get-shell").usage("get the shell that the starlane CLI connects to")]).usage("read or manipulate the cli config").display_order(1).display_order(1),
                                                             SubCommand::with_name("exec").usage("execute a command").args(vec![Arg::with_name("command_line").required(true).help("command line to execute")].as_slice()),
                                                             SubCommand::with_name("script").usage("execute commands in a script").args(vec![Arg::with_name("script_file").required(true).help("the script file to execute")].as_slice()),
+                                                            SubCommand::with_name("login").usage("login <hostname> <url> <email-or-username> <password>").args(vec![Arg::with_name("hostname").required(true).help("the hostname to connect to i.e. 'localhost'"),Arg::with_name("url").required(true).help("the login url to get refresh access token i.e. http://localhost:8000/hyperspace/users/login"),Arg::with_name("email-or-username").required(true).help("email address or username"),Arg::with_name("password").required(true).help("password")].as_slice()),
                                                             SubCommand::with_name("mechtron").usage("launch a mechtron portal client").args(vec![Arg::with_name("server").required(true).help("the portal server to connect to"),
                                                                                                                                                        Arg::with_name("wasm_src").required(true).help("the address of the wasm source"),
                                                                                                                                                       ].as_slice()),
@@ -73,7 +76,13 @@ async fn go() -> Result<(),Error> {
 
     let matches = clap_app.clone().get_matches();
 
-    if let Option::Some(serve) = matches.subcommand_matches("serve") {
+    if let Option::Some(args) = matches.subcommand_matches("login") {
+        let hostname = args.value_of("hostname").unwrap();
+        let url = args.value_of("url").unwrap();
+        let username = args.value_of("email-or-username").unwrap();
+        let password = args.value_of("password").unwrap();
+        login( hostname, url, username, password ).await?;
+    } else if let Option::Some(serve) = matches.subcommand_matches("serve") {
             let starlane = StarlaneMachine::new("server".to_string()).expect("StarlaneMachine server");
 
             let layout = match serve.value_of("with-external") {
@@ -130,6 +139,21 @@ async fn go() -> Result<(),Error> {
     Ok(())
 }
 
+async fn login(host: &str, url: &str, username: &str, password: &str ) -> Result<(),Error> {
+  let mut form = HashMap::new();
+  form.insert("username", username );
+  form.insert("password", password );
+  let client = reqwest::Client::new();
+  let login_url = format!("{}/login", url );
+  let res = client.post(login_url).form(&form).send().await?.json::<LoginResp>().await?;
+
+  let mut config = crate::cli::CLI_CONFIG.lock()?;
+  config.hostname = host.to_string();
+  config.refresh_token = Some(res.refresh_token);
+  config.save()?;
+  Ok(())
+}
+
 async fn exec_command_line(client: CliClient, line: String) -> Result<(CliClient,i32), Error> {
     let op = CommandOp::from_str(line.as_str() )?;
     let requires = op.requires();
@@ -151,7 +175,9 @@ async fn exec_command_line(client: CliClient, line: String) -> Result<(CliClient
                         error!("{}",err.to_string())
                     }
                 }
-
+            }
+            Require::Auth(auth) => {
+                println!("RECEIVED AUTH: {}", auth);
             }
         }
     }
@@ -243,4 +269,10 @@ pub async fn client() -> Result<CliClient, Error> {
         config.hostname.clone()
     };
     CliClient::new(host).await
+}
+
+
+#[derive(Serialize,Deserialize)]
+pub struct LoginResp {
+    pub refresh_token:String
 }

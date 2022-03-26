@@ -19,6 +19,7 @@ use crate::frame::{StarMessage, StarMessagePayload, SimpleReply};
 use mesh_portal::version::latest::util::unique_id;
 use crate::message::Reply;
 use std::ops::Deref;
+use http::StatusCode;
 use mesh_portal::version::latest::entity::response::ResponseCore;
 use mesh_portal::version::latest::id::Address;
 use mesh_portal::version::latest::messaging::{Request, Response};
@@ -118,7 +119,7 @@ impl Delivery<Request>
         let request = self.get_request()? ;
         let core = ResponseCore {
             headers: Default::default(),
-            code: 200,
+            status: StatusCode::from_u16(200).unwrap(),
             body: payload
         };
         let response = Response {
@@ -142,8 +143,31 @@ impl Delivery<Request>
         let request = self.get_request()?;
         let core = ResponseCore {
             headers: Default::default(),
-            code: 500,
+            status: StatusCode::from_u16(500).unwrap(),
             body: Payload::Primitive(Primitive::Text(fail))
+        };
+        let response = Response {
+            id: unique_id(),
+            to: request.from,
+            from: request.to,
+            core,
+            response_to: request.id
+        };
+
+        let proto = self
+            .star_message
+            .reply(StarMessagePayload::Response(response));
+        self.skel.messaging_api.star_notify(proto);
+        Ok(())
+    }
+
+    pub fn not_found(self) ->Result<(),Error> {
+
+        let request = self.get_request()?;
+        let core = ResponseCore {
+            headers: Default::default(),
+            status: StatusCode::from_u16(500).unwrap(),
+            body: Payload::Empty
         };
         let response = Response {
             id: unique_id(),

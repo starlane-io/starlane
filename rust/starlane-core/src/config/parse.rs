@@ -142,7 +142,7 @@ pub mod replace {
 
 }
 
-
+#[cfg(test)]
 pub mod test {
     use std::collections::HashMap;
     use std::str::FromStr;
@@ -157,7 +157,7 @@ pub mod test {
     use crate::resource::ArtifactKind;
 
     #[test]
-    pub fn test_replace() -> Result<(),Error>{
+    pub async fn test_replace() -> Result<(),Error>{
         let config_src = r#"App {
 
   Set {
@@ -189,7 +189,7 @@ pub mod test {
         Ok(())
     }
     #[test]
-    pub fn test_replace_property() -> Result<(),Error>{
+    pub async fn test_replace_property() -> Result<(),Error>{
         let config_src = r#"$(self.config.bundle):/wasm/my-app.wasm"#;
         let mut map = HashMap::new();
         map.insert( "self".to_string(), "localhost:app".to_string());
@@ -205,7 +205,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_set() -> Result<(),Error>{
+    pub async fn test_set() -> Result<(),Error>{
         let config_src = r#"Set {
     +wasm.src=localhost:files:/wasm/my-app.wasm,
     +wasm.name=my-app,
@@ -218,7 +218,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_set_properties() -> Result<(),Error>{
+    pub async fn test_set_properties() -> Result<(),Error>{
         let config_src = r#"
     +wasm.src=localhost:files:/wasm/my-app.wasm,
     +wasm.name=my-app,
@@ -231,7 +231,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_property_valu3() -> Result<(),Error>{
+    pub async fn test_property_valu3() -> Result<(),Error>{
         let config_src = "+some=blah,";
 
         let (next,property) = property_mod(config_src)?;
@@ -251,7 +251,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_rec_command_line() -> Result<(),Error>{
+    pub async fn test_rec_command_line() -> Result<(),Error>{
 
 
         let (_,line) = all_consuming(rec_command_line)("create $(self):users<Base<User>>;")?;
@@ -261,7 +261,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_rec_command_lines() -> Result<(),Error>{
+    pub async fn test_rec_command_lines() -> Result<(),Error>{
         let config_src = r#"
 
     create $(self):users<Base<User>>;

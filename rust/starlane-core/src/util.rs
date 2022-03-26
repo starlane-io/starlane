@@ -329,3 +329,35 @@ pub fn shutdown() {
         std::process::exit(0);
     });
 }
+
+
+#[derive(Clone)]
+pub struct ServiceChamber<S> where S: Clone{
+    name: String,
+    service: Option<S>
+}
+
+impl <S> ServiceChamber<S> where S: Clone{
+    pub fn new( name: &str ) -> Self {
+        let name = name.to_string();
+        Self {
+            name,
+            service: None
+        }
+    }
+
+    pub fn set( &mut self, service: S ) {
+        self.service = Option::Some(service);
+    }
+
+    pub fn get( &self ) -> Result<S,Error> {
+        match &self.service {
+            None => {
+                Err(format!("Service Unavalable: {}", self.name).into())
+            }
+            Some(service) => {
+                Ok(service.clone())
+            }
+        }
+    }
+}

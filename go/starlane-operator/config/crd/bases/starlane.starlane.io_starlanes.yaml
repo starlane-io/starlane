@@ -39,9 +39,13 @@ spec:
               gateway-service-type:
                 description: Service Type string describes ingress methods for a service
                 type: string
+              storage-class:
+                type: string
               web-service-type:
                 description: Service Type string describes ingress methods for a service
                 type: string
+            required:
+            - storage-class
             type: object
           status:
             description: StarlaneStatus defines the observed state of Starlane

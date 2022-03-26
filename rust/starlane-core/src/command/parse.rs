@@ -84,6 +84,7 @@ pub fn rec_script_line(input: &str) -> Res<&str, &str> {
     recognize(script_line)(input)
 }
 
+#[cfg(test)]
 pub mod test {
     use mesh_portal_versions::version::v0_0_1::parse::Res;
     use nom::error::{VerboseError, VerboseErrorKind};
@@ -92,8 +93,9 @@ pub mod test {
     use crate::command::parse::{command, command_mutation, script};
     use crate::error::Error;
 
+    /*
     #[test]
-    pub fn test2() -> Result<(),Error>{
+    pub async fn test2() -> Result<(),Error>{
         let input = "? xreate localhost<Space>";
         let x: Result<CommandOp,VerboseError<&str>> = final_parser(command)(input);
         match x {
@@ -107,19 +109,15 @@ pub mod test {
         Ok(())
     }
 
+     */
+
     #[test]
-    pub fn test() -> Result<(),Error>{
+    pub async fn test() -> Result<(),Error>{
         let input = "? xreate localhost<Space>";
         match command_mutation(input) {
             Ok(_) => {}
             Err(nom::Err::Error(e)) => {
-                for (blah,kind) in &e.errors
-                {
-                    if let VerboseErrorKind::Context(context) = kind {
-                        eprintln!("CONTEXT! {} blah '{}'", context, blah);
-                        return Ok(());
-                    }
-                }
+                eprintln!("{}",e.to_string());
                 return Err("could not find context".into());
             }
             Err(e) => {
@@ -130,7 +128,23 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_script() -> Result<(),Error>{
+    pub async fn test_kind() -> Result<(),Error>{
+        let input = "create localhost:users<UserBase<Keycloak>>";
+        let (_, command) = command(input)?;
+        match command {
+            CommandOp::Create(create) => {
+                assert_eq!(create.template.kind.kind,Some("Keycloak".to_string()));
+            }
+            _ => {
+                panic!("expected create command")
+            }
+        }
+        Ok(())
+    }
+
+
+    #[test]
+    pub async fn test_script() -> Result<(),Error>{
         let input = r#" ? create localhost<Space>;
  Xcrete localhost:repo<Base<Repo>>;
 ? create localhost:repo:tutorial<ArtifactBundleSeries>;
