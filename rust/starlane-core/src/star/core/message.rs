@@ -157,12 +157,12 @@ println!("response from Rc GET {}", address.to_string() );
             }
         }
 
-        fn execute( end: &mut MessagingEndpointComponentInner, config: ArtifactItem<CachedConfig<BindConfig>>, delivery: Delivery<Request> ) -> Result<(),Error> {
+        fn execute(end: &mut MessagingEndpointComponentInner, bind: ArtifactItem<CachedConfig<BindConfig>>, delivery: Delivery<Request> ) -> Result<(),Error> {
 
             match &delivery.item.core.action {
                 Action::Rc(_) => {panic!("Rc should be filtered");}
                 Action::Msg(msg) => {
-                   let selector = config.msg.find_match(&delivery.item.core );
+                   let selector = bind.msg.find_match(&delivery.item.core );
                    if selector.is_err() {
                        delivery.not_found();
                        return Ok(());
@@ -172,8 +172,10 @@ println!("response from Rc GET {}", address.to_string() );
                    Ok(())
                 }
                 Action::Http(http) => {
-                    let selector = config.http.find_match(&delivery.item.core );
+println!("delivery of http method {} and PATH {}", http.to_string(), delivery.item.core.uri.path() );
+                    let selector = bind.http.find_match(&delivery.item.core );
                     if selector.is_err() {
+println!("selector.is_err()");
                         delivery.not_found();
                         return Ok(());
                     }
@@ -429,7 +431,6 @@ pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
     })
 }
 
-
 pub struct PipelineExecutor {
     pub traversal: Traversal,
     pub skel: StarSkel,
@@ -453,6 +454,7 @@ impl  PipelineExecutor {
 
 fn execute_http_pipeline( selector: Selector<HttpPattern>, delivery: Delivery<Request>, skel: StarSkel, resource_core_driver_api: ResourceCoreDriverApi )
 {
+println!("executing http pipeline for {}", selector.pattern.to_string() );
     let regex = match Regex::new(selector.pattern.path_regex.as_str() ) {
         Ok(regex) => regex,
         Err(err) => {

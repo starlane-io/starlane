@@ -156,7 +156,7 @@ impl UserBaseKeycloakCoreDriver{
 
     async fn handle_http( &self, request: Request ) -> Response
     {
-println!("handle_http");
+println!("UserBaseKeycloakCoreDriver: handle_http");
         if let Action::Http(method) =&request.core.action {
             match method {
                 &HttpMethod::POST => {
@@ -177,6 +177,7 @@ println!("handle_http");
     }
 
     async fn handle_login( &self, request: &Request ) -> Result<ResponseCore,Error>{
+println!("handle_login");
         let multipart: Vec<(String,String)> = serde_urlencoded::from_bytes(request.core.body.clone().to_bin()?.as_bytes() )?;
         let mut map = HashMap::new();
         for (key,value) in multipart {
