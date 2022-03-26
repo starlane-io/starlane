@@ -7,6 +7,12 @@ use std::sync::Arc;
 use std::thread;
 
 use futures::FutureExt;
+use mesh_portal::version::latest::bin::Bin;
+use mesh_portal::version::latest::config::bind::BindConfig;
+use mesh_portal::version::latest::config::Config;
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::path::Path;
+use mesh_portal::version::latest::payload::Primitive;
 use tokio::io::AsyncReadExt;
 use tokio::runtime::Handle;
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -14,9 +20,9 @@ use wasmer::{Cranelift, Store, Universal};
 
 
 use crate::artifact::ArtifactRef;
-use crate::config::app::{AppConfig, AppConfigParser};
-use crate::config::bind::{BindConfig, BindConfigParser };
-use crate::config::mechtron::{MechtronConfig, MechtronConfigParser};
+use crate::config::bind::BindConfigParser;
+use crate::config::config::ResourceConfig;
+use crate::config::parse::ResourceConfigParser;
 use crate::config::wasm::{Wasm, WasmCompiler};
 use crate::error::Error;
 use crate::file_access::FileAccess;
@@ -26,18 +32,37 @@ use crate::resource::config::Parser;
 use crate::starlane::api::StarlaneApi;
 use crate::starlane::StarlaneMachine;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
-use crate::mesh::serde::id::Address;
-use mesh_portal_serde::version::v0_0_1::path::Path;
-use crate::mesh::serde::bin::Bin;
-use crate::mesh::serde::payload::Payload;
-use crate::mesh::serde::payload::Primitive;
 
-pub type Data = Arc<Vec<u8>>;
+
 pub type ZipFile = Address;
 
 pub trait Cacheable: Send + Sync + 'static {
     fn artifact(&self) -> ArtifactRef;
     fn references(&self) -> Vec<ArtifactRef>;
+}
+
+pub struct CachedConfig<T> where T: Send+Sync+'static{
+    pub artifact_ref: ArtifactRef,
+    pub item: T,
+    pub references: Vec<ArtifactRef>
+}
+
+impl <T> Deref for CachedConfig<T> where T: Send+Sync+'static{
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.item
+    }
+}
+
+impl <T> Cacheable for CachedConfig<T> where T: Send+Sync+'static{
+    fn artifact(&self) -> ArtifactRef {
+        self.artifact_ref.clone()
+    }
+
+    fn references(&self) -> Vec<ArtifactRef> {
+        self.references.clone()
+    }
 }
 
 pub struct ProtoArtifactCachesFactory {
@@ -63,9 +88,8 @@ impl ProtoArtifactCachesFactory {
 
 pub struct ArtifactCaches {
     pub raw: ArtifactItemCache<Raw>,
-    pub app_configs: ArtifactItemCache<AppConfig>,
-    pub mechtron_configs: ArtifactItemCache<MechtronConfig>,
-    pub bind_configs: ArtifactItemCache<BindConfig>,
+    pub resource_configs: ArtifactItemCache<ResourceConfig>,
+    pub bind_configs: ArtifactItemCache<CachedConfig<BindConfig>>,
     pub wasms: ArtifactItemCache<Wasm>,
 //    pub http_router_config: ArtifactItemCache<HttpRouterConfig>,
 }
@@ -74,8 +98,7 @@ impl ArtifactCaches {
     fn new() -> Self {
         ArtifactCaches {
             raw: ArtifactItemCache::new(),
-            app_configs: ArtifactItemCache::new(),
-            mechtron_configs: ArtifactItemCache::new(),
+            resource_configs: ArtifactItemCache::new(),
             bind_configs: ArtifactItemCache::new(),
             wasms: ArtifactItemCache::new(),
  //           http_router_config: ArtifactItemCache::new()
@@ -94,8 +117,8 @@ impl<C: Cacheable> ArtifactItemCache<C> {
         }
     }
 
-    pub fn get(&self, artifact: &Address) -> Option<ArtifactItem<C>> {
-        self.map.get(&artifact).cloned()
+    pub fn get(&self, address: &Address) -> Option<ArtifactItem<C>> {
+        self.map.get(&address).cloned()
     }
 
     fn add(&mut self, item: ArtifactItem<C>) {
@@ -144,18 +167,13 @@ impl ProtoArtifactCaches {
 
         for (artifact, _claim) in claims {
             match artifact.kind {
-                ArtifactKind::AppConfig => {
-                    caches
-                        .app_configs
-                        .add(self.root_caches.app_configs.get(artifact).await?);
-                }
                 ArtifactKind::Raw => {
                     caches.raw.add(self.root_caches.raw.get(artifact).await?);
                 }
-                ArtifactKind::MechtronConfig => {
-                    caches.mechtron_configs.add( self.root_caches.mechtron_configs.get(artifact).await? );
+                ArtifactKind::ResourceConfig=> {
+                    caches.resource_configs.add( self.root_caches.resource_configs.get(artifact).await? );
                 }
-                ArtifactKind::BindConfig => {
+                ArtifactKind::Bind => {
                     caches.bind_configs.add( self.root_caches.bind_configs.get(artifact).await? );
                 }
                 ArtifactKind::Wasm=> {
@@ -166,6 +184,7 @@ impl ProtoArtifactCaches {
                 }
 
  */
+                ArtifactKind::Dir => {}
             }
         }
 
@@ -211,20 +230,26 @@ impl ProtoArtifactCacheProc {
         let mut more = vec![];
 
         for artifact in artifacts {
-            println!(".... CACHING... {}", artifact.clone().address.to_string());
-            let claim = root_caches.claim(artifact).await?;
-            println!("claimed...");
-            let references = claim.references();
-            claims.put(claim.artifact.clone(), claim).await?;
-            println!("put...");
-            for reference in references {
-                if !claims.contains(reference.clone()).await? {
-                    more.push(reference);
+            let claim = root_caches.claim(artifact).await;
+            if let Some(claim) = claim {
+                match &claim {
+                    Ok(_) => {}
+                    Err(err) => {
+                        println!("CLAIM ERROR: {}", err.to_string() );
+                    }
                 }
+                let claim = claim?;
+                let references = claim.references();
+                claims.put(claim.artifact.clone(), claim).await?;
+                for reference in references {
+                    if !claims.contains(reference.clone()).await? {
+                        more.push(reference);
+                    }
+                }
+            } else {
+                println!("NO claim");
             }
-            println!("processed artifact...");
         }
-        println!("more is_empty(): {}", more.is_empty());
         if !more.is_empty() {
             let (sub_tx, sub_rx) = oneshot::channel();
             proc_tx
@@ -367,6 +392,13 @@ impl ArtifactBundleCacheRunner {
                     }
                 }
                 ArtifactBundleCacheCommand::Result { bundle, result } => {
+println!("~~ CACHE NOTIFYING OF RESULT: {} ",result.is_err() );
+match &result {
+    Ok(_) => {}
+    Err(err) => {
+        eprintln!("CACHE ERROR: {}",err.to_string() );
+    }
+}
                     let notifiers = self.notify.remove(&bundle);
                     if let Option::Some(mut notifiers) = notifiers {
                         for notifier in notifiers.drain(..) {
@@ -399,15 +431,11 @@ impl ArtifactBundleCacheRunner {
         machine: StarlaneMachine,
         logger: AuditLogger,
     ) -> Result<(), Error> {
-        let bundle: Address = bundle.into();
-        println!("download&extract src.fetch_resource_record...");
         let record = src.fetch_resource_record(bundle.clone()).await?;
-        println!("download&extract src.fetch_resource_record DONE");
 
         let zip = src.get_bundle_zip(bundle.clone()).await?;
 
 
-println!("Pre FileAccess");
         let mut file_access =
             ArtifactBundleCache::with_bundle_path(file_access, record.stub.address.clone().try_into()?)?;
         let bundle_zip_path = Path::from_str("/bundle.zip")?;
@@ -417,15 +445,11 @@ println!("Pre FileAccess");
             Arc::new(record.stub.address.to_string().as_bytes().to_vec()),
         );
 
-println!("WRITING...{}", bundle_zip_path.to_string());
         file_access.write(&bundle_zip_path, zip).await?;
-println!("DONE WRITING...");
 
-println!("extracting files...");
         file_access
             .unzip("bundle.zip".to_string(), "files".to_string())
             .await?;
-println!("done extracting files......");
 
         let ready_file = Path::from_str("/.ready")?;
         file_access
@@ -436,7 +460,6 @@ println!("done extracting files......");
             .await?;
 
         logger.log(Audit::Download(bundle.try_into()?));
-println!("cache DONE");
 
         Ok(())
     }
@@ -501,8 +524,8 @@ impl ArtifactBundleSrc {
     ) -> Result<Bin, Error> {
         Ok(match self {
             ArtifactBundleSrc::STARLANE_API(api) => {
-                                let bundle: Primitive = api.get_state(address).await?.try_into()?;
-                                 bundle.try_into()?
+                                let payload = api.get_state(address).await?;
+                                payload.to_bin()?
             }
             //            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(address).await,
         })
@@ -865,6 +888,7 @@ impl<C: Cacheable> AsyncProcessor<RootItemCacheCall<C>> for RootItemCacheProc<C>
                         tx.send(result.clone());
                     }
                 }
+                // convert to relative path
             }
             RootItemCacheCall::Get { artifact, tx } => {
                 tx.send(self.get(artifact));
@@ -918,20 +942,13 @@ impl<C: Cacheable> RootItemCacheProc<C> {
         parser: Arc<dyn Parser<X>>,
         bundle_cache: ArtifactBundleCache,
     ) -> Result<Arc<X>, Error> {
-        println!("root: cache_artifact: {}", artifact.address.to_string());
-        let address: Address = artifact.address.parent().ok_or("expected parent for artifact")?.into();
+        let address: Address = artifact.address.clone().to_bundle()?;
         bundle_cache.download(address.try_into()?).await?;
-        println!("bundle cached : parsing: {}", artifact.address.to_string());
         let file_access = ArtifactBundleCache::with_bundle_files_path(
             bundle_cache.file_access(),
-            artifact.address.parent().ok_or("expected parent")?.try_into()?,
+            artifact.address.clone().to_bundle()?,
         )?;
-        println!(
-            "file acces scached : parsing: {}",
-            artifact.address.to_string()
-        );
-        let data = file_access.read(&artifact.trailing_path()?).await?;
-        println!("root: parsing: {}", artifact.address.to_string());
+        let data = file_access.read(&Path::from_str(&artifact.address.filepath().ok_or("must be an address with a filesystem")?.to_string().as_str())? ).await?;
         parser.parse(artifact, data)
     }
 }
@@ -939,9 +956,8 @@ impl<C: Cacheable> RootItemCacheProc<C> {
 struct RootArtifactCaches {
     bundle_cache: ArtifactBundleCache,
     raw: RootItemCache<Raw>,
-    app_configs: RootItemCache<AppConfig>,
-    mechtron_configs: RootItemCache<MechtronConfig>,
-    bind_configs: RootItemCache<BindConfig>,
+    resource_configs: RootItemCache<ResourceConfig>,
+    bind_configs: RootItemCache<CachedConfig<BindConfig>>,
     wasms: RootItemCache<Wasm>,
 //    http_router_configs: RootItemCache<HttpRouterConfig>
 }
@@ -952,26 +968,34 @@ impl RootArtifactCaches {
         Self {
             bundle_cache: bundle_cache.clone(),
             raw: RootItemCache::new(bundle_cache.clone(), Arc::new(RawParser::new())),
-            app_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(AppConfigParser::new())),
-            mechtron_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(MechtronConfigParser::new())),
+            resource_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(ResourceConfigParser::new())),
             bind_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(BindConfigParser::new())),
             wasms: RootItemCache::new(bundle_cache.clone(), Arc::new(WasmCompiler::new())),
 //            http_router_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(HttpRouterConfigParser::new())),
 
         }
     }
-
-    async fn claim(&self, artifact: ArtifactRef) -> Result<Claim, Error> {
+    async fn core_claim(&self, artifact: ArtifactRef) -> Result<Claim, Error> {
         let claim = match artifact.kind {
-            ArtifactKind::AppConfig=> self.app_configs.cache(artifact).await?.into(),
-            ArtifactKind::MechtronConfig=> self.mechtron_configs.cache(artifact).await?.into(),
-            ArtifactKind::BindConfig=> self.bind_configs.cache(artifact).await?.into(),
+            ArtifactKind::ResourceConfig=> self.resource_configs.cache(artifact).await?.into(),
+            ArtifactKind::Bind => self.bind_configs.cache(artifact).await?.into(),
             ArtifactKind::Raw => self.raw.cache(artifact).await?.into(),
             ArtifactKind::Wasm=> self.wasms.cache(artifact).await?.into(),
 //            ArtifactKind::HttpRouter => self.http_router_configs.cache(artifact).await?.into(),
+            ArtifactKind::Dir => {
+                panic!("DIr is not a coreclaim")
+            }
         };
 
         Ok(claim)
+    }
+
+    async fn claim(&self, artifact: ArtifactRef) -> Option<Result<Claim, Error>> {
+        if let ArtifactKind::Dir = artifact.kind {
+            None
+        } else {
+            Some( self.core_claim(artifact).await )
+        }
     }
 }
 
@@ -1206,12 +1230,12 @@ mod test {
  */
 
 pub struct Raw {
-    data: Data,
+    data: Bin,
     artifact: ArtifactRef,
 }
 
 impl Raw {
-    pub fn data(&self) -> Data {
+    pub fn data(&self) -> Bin{
         self.data.clone()
     }
 }
@@ -1235,7 +1259,7 @@ impl RawParser {
 }
 
 impl Parser<Raw> for RawParser {
-    fn parse(&self, artifact: ArtifactRef, data: Data) -> Result<Arc<Raw>, Error> {
+    fn parse(&self, artifact: ArtifactRef, data: Bin ) -> Result<Arc<Raw>, Error> {
         Ok(Arc::new(Raw {
             artifact: artifact,
             data: data,

@@ -1,0 +1,7 @@
+Bind {
+  Pipelines {
+    Http {
+      <Get>/(.*) -> localhost:repo:tutorial:1.0.0:/html/$1 => &;
+    }
+  }
+}

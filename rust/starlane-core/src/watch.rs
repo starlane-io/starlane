@@ -7,9 +7,9 @@ use uuid::Uuid;
 use crate::star::shell::watch::WatchApi;
 use crate::star::StarKey;
 use std::hash::Hash;
-use crate::mesh::serde::resource::Status;
-use crate::mesh::serde::id::Address;
-use crate::mesh::serde::payload::Payload;
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::payload::Payload;
+use mesh_portal::version::latest::resource::Status;
 
 pub type WatchKey = Uuid;
 

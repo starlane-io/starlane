@@ -18,7 +18,7 @@ use tokio::sync::oneshot;
 use shell::search::{
     SearchCommit, SearchHits, SearchInit, StarSearchTransaction, TransactionResult,
 };
-use shell::wrangler::{StarWrangle, StarWrangleSatisfaction, StarWranglerApi};
+use shell::wrangler::{StarWrangle, StarWranglerApi, StarWrangleSatisfaction};
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::constellation::ConstellationStatus;
@@ -30,18 +30,12 @@ use crate::lane::{
     ConnectorController, LaneCommand, LaneEnd, LaneIndex, LaneMeta, LaneWrapper, ProtoLaneEnd,
     UltimaLaneKey,
 };
-use crate::logger::{Flags, LogInfo, Logger};
-use crate::mesh::serde::generic::resource::ResourceStub;
-use crate::mesh::serde::id::{Address, ResourceType};
-use crate::mesh::serde::payload::Payload;
-use crate::mesh::serde::resource::command::select::Select;
-use crate::mesh::serde::resource::command::update::Update;
-use crate::mesh::serde::resource::Status;
+
 use crate::message::{
     MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage,
     ProtoStarMessageTo, TrackerJob,
 };
-use crate::resource::ResourceRecord;
+use crate::resource::{ResourceRecord, ResourceType};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::core::resource::registry::RegistryApi;
 use crate::star::shell::golden::GoldenPathApi;
@@ -58,21 +52,28 @@ use crate::template::StarTemplateHandle;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 use std::cmp;
 use std::fmt;
-use crate::star::core::resource::manager::ResourceManagerApi;
+use std::future::Future;
+use crate::star::core::resource::driver::ResourceCoreDriverApi;
 use std::str::FromStr;
-use nom::sequence::{terminated, tuple, preceded};
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::portal;
+use mesh_portal::version::latest::resource::Status;
+use mesh_portal_versions::version::v0_0_1::parse::Res;
+use nom::sequence::{preceded, terminated, tuple};
 use nom::multi::many0;
 use nom::bytes::complete::tag;
 use nom::character::complete::digit1;
-use mesh_portal_serde::version::v0_0_1::parse::Res;
 use nom::branch::alt;
 use nom::combinator::all_consuming;
-use nom::error::{VerboseError, ParseError, ErrorKind};
+use nom::error::{ErrorKind, ParseError, VerboseError};
+use nom_supreme::error::ErrorTree;
+use crate::logger::{Flags, Logger, LogInfo};
+use crate::star::shell::sys::SysApi;
 
 pub mod core;
-pub mod shell;
 pub mod surface;
 pub mod variant;
+pub mod shell;
 
 #[derive(
     PartialEq,
@@ -140,7 +141,7 @@ impl StarKind {
         }
     }
 
-    pub fn conscripts(&self) -> HashSet<StarWrangleKind> {
+    pub fn wrangles(&self) -> HashSet<StarWrangleKind> {
         HashSet::from_iter(
             match self {
                 StarKind::Central => vec![StarWrangleKind::req(StarKind::Space)],
@@ -221,7 +222,8 @@ impl StarKind {
             ResourceType::Proxy => Self::Space,
             ResourceType::Credentials => Self::Space,
             ResourceType::Base => Self::Space,
-            ResourceType::Control => Self::Portal
+            ResourceType::Control => Self::Portal,
+            ResourceType::UserBase => Self::Space
         }
     }
 
@@ -242,7 +244,8 @@ impl StarKind {
             ResourceType::Proxy => Self::Space,
             ResourceType::Credentials => Self::Space,
             ResourceType::Base => Self::Space,
-            ResourceType::Control => Self::Portal
+            ResourceType::Control => Self::Portal,
+            ResourceType::UserBase => Self::Space
         }
     }
 
@@ -255,6 +258,7 @@ impl StarKind {
                     ResourceType::User,
                     ResourceType::Base,
                     ResourceType::Proxy,
+                    ResourceType::UserBase,
                 ],
                 StarKind::Mesh => vec![],
                 StarKind::App => vec![ResourceType::App],
@@ -395,6 +399,7 @@ impl StarKind {
             StarKind::FileStore => false,
             StarKind::ArtifactStore => false,
             StarKind::K8s => false,
+            StarKind::Portal => false
         }
     }
 }
@@ -558,6 +563,16 @@ impl Star {
 
                         break;
                     }
+                    StarCommand::GetCaches(tx)=> {
+                        match self.skel.machine.get_proto_artifact_caches_factory().await {
+                            Ok(caches) => {
+                                tx.send(caches);
+                            }
+                            Err(err) => {
+                                error!("{}",err.to_string());
+                            }
+                        }
+                    }
                     _ => {
                         unimplemented!("cannot process command: {}", command.to_string());
                     }
@@ -590,58 +605,69 @@ impl Star {
             self.set_status(StarStatus::Pending);
         }
 
-        for conscript_kind in self.skel.info.kind.conscripts() {
+        for conscript_kind in self.skel.info.kind.wrangles() {
             let search = SearchInit::new(
                 StarPattern::StarKind(conscript_kind.kind.clone()),
                 TraversalAction::SearchHits,
             );
-            let (tx, rx) = oneshot::channel();
-            self.skel
-                .star_search_api
-                .tx
-                .try_send(StarSearchCall::Search { init: search, tx })
-                .unwrap_or_default();
-            let kind = conscript_kind.kind.clone();
             let skel = self.skel.clone();
+            let kind = conscript_kind.kind.clone();
             tokio::spawn(async move {
-                let result = tokio::time::timeout(Duration::from_secs(15), rx).await;
-                match result {
-                    Ok(Ok(hits)) => {
-                        for (star, hops) in hits.hits {
-                            let handle = StarWrangle {
-                                key: star,
-                                kind: kind.clone(),
-                                hops: Option::Some(hops),
-                            };
-                            let result = skel.star_wrangler_api.add_star_handle(handle).await;
-                            match result {
-                                Ok(_) => {
-                                    skel.star_tx.send(StarCommand::CheckStatus).await;
-                                }
-                                Err(error) => {
-                                    eprintln!(
-                                        "error when adding star handle: {}",
-                                        error.to_string()
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    Err(error) => {
-                        error!(
-                            "error encountered when attempting to get a handle for: {} TIMEOUT: {}",
+             let mut timeout = 1u64;
+             loop {
+                 let (tx2,rx2) = oneshot::channel();
+                 skel
+                     .star_search_api
+                     .tx
+                     .try_send(StarSearchCall::Search { init: search.clone(), tx: tx2 })
+                     .unwrap_or_default();
+
+                 let result = tokio::time::timeout(Duration::from_secs(timeout), rx2).await;
+                 match result {
+                     Ok(Ok(hits)) => {
+                         for (star, hops) in hits.hits {
+                             let handle = StarWrangle {
+                                 key: star,
+                                 kind: kind.clone(),
+                                 hops: Option::Some(hops),
+                             };
+                             let result = skel.star_wrangler_api.add_star_handle(handle).await;
+                             match result {
+                                 Ok(_) => {
+                                     skel.star_tx.send(StarCommand::CheckStatus).await;
+                                 }
+                                 Err(error) => {
+                                     eprintln!(
+                                         "error when adding star handle: {}",
+                                         error.to_string()
+                                     )
+                                 }
+                             }
+                         }
+                         break;
+                     }
+                     Err(error) => {
+                         error!(
+                            "error encountered when attempting to wrangle a handle for: {} TIMEOUT: {}",
                             kind.to_string(),
                             error.to_string()
                         );
-                    }
-                    Ok(Err(error)) => {
-                        error!(
-                            "error encountered when attempting to get a handle for: {} ERROR: {}",
+                     }
+                     Ok(Err(error)) => {
+                         error!(
+                            "error encountered when attempting to wrangle a handle for: {} ERROR: {}",
                             kind.to_string(),
                             error.to_string()
                         );
-                    }
-                }
+                     }
+                 }
+                 info!("attempting wrangle again in 5 seconds...");
+                 tokio::time::sleep(Duration::from_secs(5));
+                 timeout = timeout + 5;
+                 if timeout > 30 {
+                     timeout = 30;
+                 }
+             }
             });
         }
     }
@@ -649,7 +675,7 @@ impl Star {
     async fn check_status(&mut self) {
         if self.status == StarStatus::Pending {
                 let satisfied = self.skel.star_wrangler_api
-                    .satisfied(self.skel.info.kind.conscripts())
+                    .satisfied(self.skel.info.kind.wrangles())
                     .await;
                 if let Result::Ok(StarWrangleSatisfaction::Ok) = satisfied {
                     self.set_status(StarStatus::Pending);
@@ -665,7 +691,7 @@ impl Star {
                             Err(error) => {
                                 let err_msg = format!("{}", error.to_string());
                                 skel.star_tx
-                                    .try_send(StarCommand::SetStatus(StarStatus::Panic(err_msg)))
+                                    .try_send(StarCommand::SetStatus(StarStatus::Panic))
                                     .unwrap_or_default();
                                 error!("{}", error.to_string())
                             }
@@ -709,7 +735,7 @@ impl Star {
         match diagnose {
             Diagnose::HandlersSatisfied(satisfied) => {
                     if let Result::Ok(satisfaction) = self.skel.star_wrangler_api
-                        .satisfied(self.skel.info.kind.conscripts())
+                        .satisfied(self.skel.info.kind.wrangles())
                         .await
                     {
                         satisfied.tx.send(satisfaction);
@@ -1053,7 +1079,7 @@ pub fn big_subgraph_key( input: &str ) -> Res<&str,StarSubGraphKey> {
     let key = match key.parse() {
         Ok(key) => key,
         Err(_)=>{
-            return Err(nom::Err::Error(VerboseError::from_error_kind(input,ErrorKind::Tag)));
+            return Err(nom::Err::Error(ErrorTree::from_error_kind(input,ErrorKind::Tag)));
         }
     };
     Ok((next,StarSubGraphKey::Big(key)))
@@ -1064,7 +1090,7 @@ pub fn small_subgraph_key( input: &str ) -> Res<&str,StarSubGraphKey> {
     let key = match key.parse() {
         Ok(key) => key,
         Err(_)=>{
-            return Err(nom::Err::Error(VerboseError::from_error_kind(input,ErrorKind::Tag)));
+            return Err(nom::Err::Error(ErrorTree::from_error_kind(input,ErrorKind::Tag)));
         }
     };
     Ok((next,StarSubGraphKey::Small(key)))
@@ -1079,7 +1105,7 @@ pub fn index(input: &str ) -> Res<&str,u16> {
     let key = match key.parse() {
         Ok(key) => key,
         Err(_)=>{
-            return Err(nom::Err::Error(VerboseError::from_error_kind(input,ErrorKind::Tag)));
+            return Err(nom::Err::Error(ErrorTree::from_error_kind(input,ErrorKind::Tag)));
         }
     };
     Ok((next,key))
@@ -1159,6 +1185,7 @@ pub struct StarSkel {
     pub info: StarInfo,
     pub star_tx: mpsc::Sender<StarCommand>,
     pub core_messaging_endpoint_tx: mpsc::Sender<CoreMessageCall>,
+    pub sys_api: SysApi,
     pub registry_api: RegistryApi,
     pub resource_locator_api: ResourceLocatorApi,
     pub star_search_api: StarSearchApi,
@@ -1188,25 +1215,19 @@ impl Debug for StarSkel {
 pub struct StarInfo {
     pub key: StarKey,
     pub kind: StarKind,
+    pub address: Address
 }
 
 impl StarInfo {
     pub fn new(star: StarKey, kind: StarKind) -> Self {
+        let address = Address::from_str(format!("<<{}>>::star",star.to_string()).as_str() ).expect("expect to be able to create a simple star address");
         StarInfo {
-            key: star,
-            kind: kind,
+            key:star,
+            kind ,
+            address
         }
     }
 
-    pub fn mock() -> Self {
-        StarInfo {
-            key: StarKey {
-                subgraph: vec![],
-                index: 0,
-            },
-            kind: StarKind::Central,
-        }
-    }
 }
 
 impl LogInfo for StarInfo {
@@ -1285,3 +1306,4 @@ impl<T> ToString for LogId<T> {
         "log-id".to_string()
     }
 }
+

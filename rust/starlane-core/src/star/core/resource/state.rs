@@ -1,6 +1,9 @@
 use std::convert::TryInto;
 use std::str::FromStr;
 use std::sync::Arc;
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::path::Path;
+use mesh_portal::version::latest::payload::Payload;
 
 use rusqlite::{Connection, params, Row};
 use rusqlite::types::ValueRef;
@@ -13,9 +16,6 @@ use crate::resource::{
 };
 use crate::star::StarSkel;
 use crate::starlane::files::MachineFileSystem;
-use crate::mesh::serde::id::Address;
-use crate::mesh::serde::payload::Payload;
-use mesh_portal_serde::version::v0_0_1::path::Path;
 use crate::fail::Fail;
 
 #[derive(Clone, Debug)]
@@ -130,13 +130,15 @@ impl StateStoreFS {
         state: Payload,
     ) -> Result<(), Error> {
 
-
-        let state_path = Path::from_str(
-            format!("/stars/{}/states/{}", self.skel.info.key.to_string(), address.to_string()).as_str(),
+        let parent_path= Path::from_str(
+            format!("/stars/{}/states/{}", self.skel.info.key.to_string(), address.to_safe_filename()).as_str(),
+        )?;
+        let state_path= Path::from_str(
+            format!("/stars/{}/states/{}/payload.bin", self.skel.info.key.to_string(), address.to_safe_filename()).as_str(),
         )?;
         let machine_filesystem = self.skel.machine.machine_filesystem();
         let mut data_access = machine_filesystem.data_access();
-        data_access.mkdir(&state_path).await?;
+        data_access.mkdir(&parent_path).await;
 
         let data_access = self.skel.machine.machine_filesystem().data_access();
         data_access.write(&state_path,Arc::new(bincode::serialize(&state)?)).await?;
@@ -149,9 +151,8 @@ impl StateStoreFS {
         let mut data_access = machine_filesystem.data_access();
 
         let state_path = Path::from_str(
-            format!("/stars/{}/states/{}", self.skel.info.key.to_string(), address.to_string()).as_str(),
+            format!("/stars/{}/states/{}/payload.bin", self.skel.info.key.to_string(), address.to_safe_filename()).as_str(),
         )?;
-
 
         let bin = data_access.read(&state_path).await?;
         let payload: Payload = bincode::deserialize(bin.as_slice())?;
@@ -159,9 +160,8 @@ impl StateStoreFS {
     }
 
     async fn has(&self, address: Address ) -> Result<bool,Error> {
-
         let state_path = Path::from_str(
-            format!("/stars/{}/states/{}", self.skel.info.key.to_string(), address.to_string()).as_str(),
+            format!("/stars/{}/states/{}/payload.bin", self.skel.info.key.to_string(), address.to_safe_filename()).as_str(),
         )?;
 
         let machine_filesystem = self.skel.machine.machine_filesystem();

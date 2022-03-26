@@ -6,8 +6,8 @@ use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 use std::sync::Arc;
 
-use mesh_portal_serde::version::latest::fail::Fail;
-use mesh_portal_serde::version::latest::payload::Payload;
+use mesh_portal::version::latest::fail::Fail;
+use mesh_portal::version::latest::payload::Payload;
 use nom::{AsChar, InputTakeAtPosition, IResult};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};

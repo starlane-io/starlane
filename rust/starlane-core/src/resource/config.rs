@@ -1,14 +1,12 @@
 use std::sync::Arc;
+use mesh_portal::version::latest::bin::Bin;
 
 use crate::artifact::ArtifactRef;
-use crate::cache::{Cacheable, Data};
+use crate::cache::{Cacheable};
 use crate::error::Error;
 use crate::resource::Kind;
 
-pub trait ResourceConfig {
-    fn kind(&self) -> Kind;
-}
 
 pub trait Parser<J: Cacheable>: Send + Sync + 'static {
-    fn parse(&self, artifact: ArtifactRef, data: Data) -> Result<Arc<J>, Error>;
+    fn parse(&self, artifact: ArtifactRef, data: Bin) -> Result<Arc<J>, Error>;
 }

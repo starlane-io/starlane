@@ -15,12 +15,13 @@ use walkdir::WalkDir;
 
 use crate::error::Error;
 use crate::resource::FileKind;
-use mesh_portal_serde::version::v0_0_1::path::Path;
 
 use crate::util;
 use std::convert::TryFrom;
 use std::convert::TryInto;
+use mesh_portal::version::latest::path::Path;
 use tokio::fs::ReadDir;
+use tokio::sync::mpsc::Sender;
 
 pub enum FileCommand {
     List {
@@ -52,6 +53,10 @@ pub enum FileCommand {
         target: String,
         tx: tokio::sync::oneshot::Sender<Result<(), Error>>,
     },
+    RemoveDir {
+        path: Path,
+        tx: tokio::sync::oneshot::Sender<Result<(), Error>>,
+    },
     Shutdown,
     Exists{
         path: Path,
@@ -71,13 +76,31 @@ impl FileAccess {
     }
 
     pub fn new(path: String) -> Result<Self, Error> {
-        let tx = LocalFileAccess::new(path.clone())?;
+        let tx = match LocalFileAccess::new(path.clone()) {
+            Ok(tx) => {tx}
+            Err(err) => {
+               error!("could not create base_dir: {}", path );
+                return Err(err);
+            }
+        };
         let path = fs::canonicalize(&path)?
             .to_str()
             .ok_or("turning path to string")?
             .to_string();
         Ok(FileAccess { path: path, tx: tx })
     }
+
+    pub async fn remove_dir(&self, path: &Path) -> Result<(), Error> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(FileCommand::RemoveDir {
+                path: path.clone(),
+                tx: tx,
+            })
+            .await?;
+        Ok(util::wait_for_it(rx).await?)
+    }
+
 
     pub async fn list(&self, path: &Path) -> Result<Vec<Path>, Error> {
         let (tx, rx) = tokio::sync::oneshot::channel();
@@ -272,6 +295,9 @@ impl LocalFileAccess {
             FileCommand::Exists { path, tx } => {
                 tx.send( self.exists(&path));
             }
+            FileCommand::RemoveDir { path, tx } => {
+                tx.send( self.remove_dir(&path) );
+            }
         }
         Ok(())
     }
@@ -295,10 +321,6 @@ impl LocalFileAccess {
     }
 
     pub fn cat_path(&self, path: &str) -> Result<String, Error> {
-        if path.len() < 1 {
-            return Err("path cannot be empty".into());
-        }
-
         let mut path_str = path.to_string();
         if path_str.starts_with("/") {
             path_str.remove(0);
@@ -372,7 +394,7 @@ impl LocalFileAccess {
             self.mkdir(&parent)?;
         }
 
-        let path = self.cat_path(path.to_relative().as_str())?;
+        let path = self.cat_path(path.to_string().as_str())?;
         let mut file = File::create(&path)?;
         file.write(data.as_slice()).unwrap();
 
@@ -402,6 +424,13 @@ impl LocalFileAccess {
         builder.create(path.clone())?;
         Ok(())
     }
+
+    fn remove_dir(&mut self, path: &Path) -> Result<(), Error> {
+        let path = self.cat_path(path.to_relative().as_str())?;
+        fs::remove_dir_all(path)?;
+        Ok(())
+    }
+
 
     fn walk(&mut self) -> Result<tokio::sync::mpsc::Receiver<FileEvent>, Error> {
         let (event_tx, event_rx) = tokio::sync::mpsc::channel(128);

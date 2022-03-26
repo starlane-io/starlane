@@ -1,8 +1,5 @@
 use crate::error::Error;
 use crate::frame::StarPattern;
-use crate::mesh::serde::id::{AddressAndKind, ResourceType, Address};
-use crate::mesh::serde::payload::Payload;
-use crate::mesh::serde::payload::Primitive;
 use crate::star::StarKind;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
@@ -16,7 +13,6 @@ use nom_supreme::parse_from_str;
 use std::str::FromStr;
 use std::collections::HashMap;
 use serde::{Serialize,Deserialize};
-use mesh_portal_serde::version::v0_0_1::parse::{filepath_chars, Res};
 /*
 
 pub fn parse_star_kind(input: &str) -> Res<&str, Result<StarKind, Error>> {

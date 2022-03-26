@@ -12,38 +12,39 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 
-use crate::cache::ProtoArtifactCachesFactory;
+use crate::cache::{ArtifactCaches, ProtoArtifactCachesFactory};
 use crate::error::Error;
 use crate::frame::{StarPattern, TraversalAction, ResourceRegistryRequest, StarMessagePayload};
 use crate::resource::{Kind, ResourceType, AssignResourceStateSrc, ResourceRecord};
 use crate::resource::FileKind;
-use crate::star::{Request, StarCommand, StarKind, StarSkel, StarKey};
+use crate::star::{StarCommand, StarKind, StarSkel, StarKey};
 use crate::star::shell::search::{SearchInit, SearchHits};
 use crate::star::surface::SurfaceApi;
 use crate::starlane::StarlaneCommand;
 use crate::watch::{WatchResourceSelector, Watcher};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, ReplyKind, Reply};
-use crate::artifact::ArtifactBundle;
-use crate::resources::message::{ProtoRequest, MessageFrom};
-use crate::mesh::serde::id::Address;
+use crate::artifact::{ArtifactBundle, ArtifactRef};
 use kube::ResourceExt;
-use crate::mesh::serde::resource::ResourceStub;
-use mesh_portal_serde::version::v0_0_1::path::Path;
-use crate::mesh::serde::bin::Bin;
-use crate::mesh::serde::resource::command::common::{StateSrc, SetLabel};
-use crate::mesh::serde::resource::command::create::{Create, Strategy, Template, AddressTemplate};
-use crate::mesh::serde::pattern::TksPattern;
-use crate::mesh::serde::payload::{Payload, PayloadMap};
-use crate::mesh::serde::entity::request::{ReqEntity, Rc};
-use crate::mesh::serde::payload::{RcCommand, Primitive};
-use crate::mesh::serde::resource::command::create::{AddressSegmentTemplate, KindTemplate};
+use mesh_portal::error;
+use mesh_portal::version::latest::command::common::{SetLabel, StateSrc};
+use mesh_portal::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, KindTemplate, Strategy, Template};
+use mesh_portal::version::latest::entity::request::{Action, Rc};
+use mesh_portal::version::latest::entity::request::get::Get;
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::messaging::{Message, Request, Response};
+use mesh_portal::version::latest::payload::{Payload, PayloadMap, Primitive};
+use mesh_portal::version::latest::resource::ResourceStub;
+use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
+use mesh_portal::version::latest::entity::request::get::GetOp;
+use mesh_portal::version::latest::id::Tks;
+
 use crate::fail::{Fail, StarlaneFailure};
-use crate::cache::RootItemCacheCall::Get;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
     surface_api: SurfaceApi,
     starlane_tx: Option<mpsc::Sender<StarlaneCommand>>,
+    pub agent: Address
 }
 
 impl StarlaneApi {
@@ -56,24 +57,24 @@ impl StarlaneApi {
 
 
 impl StarlaneApi {
-    pub fn new(surface_api: SurfaceApi) -> Self {
-        Self::new_with_options(surface_api, Option::None)
+    pub fn new(surface_api: SurfaceApi, agent: Address) -> Self {
+        Self::new_with_options(surface_api, Option::None, agent)
     }
+
     fn new_with_options(
         surface_api: SurfaceApi,
         starlane_tx: Option<mpsc::Sender<StarlaneCommand>>,
+        agent: Address
     ) -> Self {
         Self {
             surface_api,
             starlane_tx,
+            agent
         }
     }
 
-    pub fn with_starlane_ctrl(
-        surface_api: SurfaceApi,
-        starlane_tx: mpsc::Sender<StarlaneCommand>,
-    ) -> Self {
-        Self::new_with_options(surface_api, Option::Some(starlane_tx))
+    pub async fn exchange( &self, request: Request ) -> Response {
+        self.surface_api.exchange(request).await
     }
 
     pub fn shutdown(&self) -> Result<(), Error> {
@@ -103,27 +104,31 @@ impl StarlaneApi {
         self.surface_api.locate(address).await
     }
 
+
+    pub async fn cache( &self, artifact: &ArtifactRef)  -> Result<ArtifactCaches,Error> {
+        let mut cache = self.get_caches().await?.create();
+        cache.cache(vec![artifact.clone()]).await?;
+        Ok(cache.to_caches().await?)
+    }
+
     pub async fn get_caches(&self) -> Result<Arc<ProtoArtifactCachesFactory>, Error> {
         Ok(self.surface_api.get_caches().await?)
     }
 
-    pub async fn create(&self, create: Create) -> Result<ResourceRecord, Error> {
-
-        let mut proto = ProtoRequest::new();
-        proto.to(create.template.address.parent.clone());
-        let command = RcCommand::Create( create );
-        proto.entity( ReqEntity::Rc(Rc::new(command)));
-        let proto = proto.try_into()?;
-
-        let reply = self
-            .surface_api
-            .exchange_proto_star_message(proto, ReplyKind::Response, "StarlaneApi: create_resource")
-            .await?;
-
-        match reply{
-            Reply::Record(record) => Ok(record),
-            _ => unimplemented!("StarlaneApi::create_resource() did not receive the expected reply from surface_api")
+    pub async fn create(&self, create: Create) -> Result<ResourceStub, Error> {
+        let action = Action::Rc(Rc::Create(create.clone()));
+        let core = action.into();
+        let request = Request::new(core, self.agent.clone(), create.template.address.parent.clone() );
+        let response = self.surface_api.exchange(request).await.ok_or()?;
+        if let Payload::Primitive(Primitive::Stub(stub)) =  &response.core.body {
+            Ok(stub.clone())
+        } else {
+            Err("unexpected response".into())
         }
+    }
+
+    pub async fn create_sys_resource( &self, template: Template, messenger_tx: mpsc::Sender<Message> ) -> Result<ResourceStub,Error> {
+       self.surface_api.create_sys_resource(template,messenger_tx).await
     }
 
     pub async fn star_search(
@@ -144,13 +149,14 @@ impl StarlaneApi {
     }
 
 
-    pub async fn create_api<API>(&self, create: Create ) -> Result<API, Error>
+    pub async fn create_api<API>(&self, create: Create) -> Result<API, Error>
     where
         API: TryFrom<ResourceApi>,
     {
         let resource_api = ResourceApi {
-            stub: self.create(create).await?.stub,
+            stub: self.create(create).await?,
             surface_api: self.surface_api.clone(),
+            agent: self.agent.clone()
         };
 
         let api = API::try_from(resource_api);
@@ -161,7 +167,7 @@ impl StarlaneApi {
         }
     }
 
-    pub async fn create_space(&self, name: &str, title: &str) -> Result<Creation<SpaceApi>, Error> {
+    pub async fn create_space(&self, name: &str) -> Result<Creation<SpaceApi>, Error> {
         let address_template = AddressTemplate{
             parent: Address::root(),
             child_segment_template: AddressSegmentTemplate::Exact(name.to_string())
@@ -174,8 +180,7 @@ impl StarlaneApi {
         };
 
         let template = Template::new(address_template,kind_template );
-        let mut properties = PayloadMap::new();
-        properties.insert( "title".to_string(), Payload::Primitive(Primitive::Text(title.to_string())));
+        let mut properties = SetProperties::new();
         let create = Create {
             template,
             state: StateSrc::Stateless,
@@ -188,25 +193,31 @@ impl StarlaneApi {
         Ok(creation)
     }
 
-
     pub async fn get_space(&self, address: Address) -> Result<SpaceApi, Error> {
         let record = self.fetch_resource_record(address).await?;
-        Ok(SpaceApi::new(self.surface_api.clone(), record.stub)?)
+        Ok(SpaceApi::new(self.surface_api.clone(), record.stub, self.agent.clone() )?)
     }
 
     pub async fn get_state( &self, address: Address ) -> Result<Payload,Error> {
-        let mut request = ProtoRequest::new();
-        request.to( address );
-        request.from( MessageFrom::Inject );
-        request.entity(ReqEntity::Rc(Rc::new(RcCommand::Get )));
-        let response = self.surface_api.exchange(request).await?;
-        Ok(response.entity.ok_or()?)
+        let get = Get {
+            address: address.clone(),
+            op: GetOp::State
+        };
+        let action = Action::Rc(Rc::Get(get));
+        let core = action.into();
+        let request = Request::new(core, self.agent.clone(), address.clone());
+        let response = self.surface_api.exchange(request).await;
+        match response.core.is_ok() {
+            true => Ok(response.core.body),
+            false => Err(format!("could not get state for: '{}'",address.to_string()).into())
+        }
     }
 }
 
 pub struct SpaceApi {
     stub: ResourceStub,
     surface_api: SurfaceApi,
+    agent: Address
 }
 
 impl SpaceApi {
@@ -215,20 +226,20 @@ impl SpaceApi {
         self.stub.address.clone()
     }
 
-    pub fn new(surface_api: SurfaceApi, stub: ResourceStub) -> Result<Self, Error> {
-        if stub.kind.resource_type() != ResourceType::Space {
+    pub fn new(surface_api: SurfaceApi, stub: ResourceStub, agent: Address) -> Result<Self, Error> {
+        if stub.kind.resource_type != ResourceType::Space.to_string() {
             return Err(format!(
                 "wrong kind resource type for SpaceApi: {}",
-                stub.kind.resource_type().to_string()
+                stub.kind.resource_type.to_string()
             )
             .into());
         }
 
-        Ok(SpaceApi { stub, surface_api })
+        Ok(SpaceApi { stub, surface_api, agent })
     }
 
     pub fn starlane_api(&self) -> StarlaneApi {
-        StarlaneApi::new(self.surface_api.clone())
+        StarlaneApi::new(self.surface_api.clone(), self.agent.clone() )
     }
 
 }
@@ -280,14 +291,15 @@ where
         self.create.registry.push(SetLabel::SetValue {key,value} );
     }
 
-    pub fn set_property( &mut self, key:&str, value: Payload ) {
-       self.create.properties.insert(key.to_string(), value );
+    pub fn set_property( &mut self, key:&str, value: &str) {
+       self.create.properties.push(PropertyMod::Set{ key: key.to_string(), value: value.to_string(), lock: false });
     }
 }
 
 pub struct ResourceApi {
     stub: ResourceStub,
     surface_api: SurfaceApi,
+    agent: Address
 }
 
 
@@ -297,7 +309,7 @@ impl TryFrom<ResourceApi> for SpaceApi {
     type Error = Error;
 
     fn try_from(value: ResourceApi) -> Result<Self, Self::Error> {
-        Ok(Self::new(value.surface_api, value.stub)?)
+        Ok(Self::new(value.surface_api, value.stub, value.agent.clone())?)
     }
 }
 

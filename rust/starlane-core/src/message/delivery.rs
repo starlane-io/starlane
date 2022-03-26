@@ -16,18 +16,15 @@ use crate::star::{StarCommand, StarSkel};
 use crate::util;
 use crate::fail::Fail;
 use crate::frame::{StarMessage, StarMessagePayload, SimpleReply};
-use crate::mesh::serde::id::Address;
-use crate::mesh::Request;
-use crate::mesh::serde::entity::response::RespEntity;
-use crate::mesh::serde::payload::Payload;
-use crate::mesh::Response;
-use mesh_portal_serde::version::latest::util::unique_id;
-use crate::mesh::serde::messaging::Exchange;
+use mesh_portal::version::latest::util::unique_id;
 use crate::message::Reply;
-use crate::mesh::serde::entity::request::Rc;
 use std::ops::Deref;
+use http::StatusCode;
+use mesh_portal::version::latest::entity::response::ResponseCore;
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::messaging::{Request, Response};
+use mesh_portal::version::latest::payload::{Payload, Primitive};
 
-#[derive(Clone)]
 pub struct Delivery<M>
 where
     M: Clone,
@@ -89,75 +86,102 @@ impl <M> Delivery<M> where M: Clone + Send + Sync + 'static
   }
 }
 
-impl <M> Delivery<M> where M: Clone + Send + Sync + 'static
+impl Delivery<Request>
 {
-    pub fn result<E>( self, result: Result<Payload,E> ) where E: Into<crate::mesh::serde::fail::Fail> {
+    pub fn result( self, result: Result<Payload,Error>) {
         match result {
             Ok(payload) => {
-                self.ok(payload);
+                let request = self.item.core.clone();
+                self.respond(request.ok(payload));
             }
-            Err(fail) => {
-                self.fail(fail.into());
+            Err(err) => {
+                self.fail(err.to_string());
             }
         }
     }
 
-    pub fn ok(self, payload: Payload)  {
+    pub fn respond(self, core: ResponseCore ) {
+        let response = Response {
+            id: unique_id(),
+            to: self.item.from,
+            from: self.item.to,
+            core,
+            response_to: self.item.id
+        };
+        let proto = self
+            .star_message
+            .reply(StarMessagePayload::Response(response));
 
-        match self.get_request() {
-            Ok(request) => {
-                if let Exchange::RequestResponse( exchange ) = request.exchange {
-
-                    let entity = RespEntity::Ok(payload);
-                    let response = Response {
-                        id: unique_id(),
-                        to: request.from.clone(),
-                        from: request.to.clone(),
-                        entity,
-                        exchange,
-                    };
-
-                    let proto = self
-                        .star_message
-                        .reply(StarMessagePayload::Response(response));
-                    self.skel.messaging_api.star_notify(proto);
-                } else {
-                    eprintln!("cannot respond to a Notification exchange")
-                }
-            }
-            Err(err) => {
-                eprintln!("{}",err.to_string())
-            }
-        }
+        self.skel.messaging_api.star_notify(proto);
     }
 
-    pub fn fail(self, fail: crate::mesh::serde::fail::Fail )  {
+   pub fn ok(self, payload: Payload) -> Result<(),Error> {
+        let request = self.get_request()? ;
+        let core = ResponseCore {
+            headers: Default::default(),
+            status: StatusCode::from_u16(200).unwrap(),
+            body: payload
+        };
+        let response = Response {
+            id: unique_id(),
+            to: request.from.clone(),
+            from: request.to.clone(),
+            core,
+            response_to: self.item.id
+        };
 
-        match self.get_request() {
-            Ok(request) => {
-                if let Exchange::RequestResponse( exchange ) = request.exchange {
+        let proto = self
+            .star_message
+            .reply(StarMessagePayload::Response(response));
 
-                    let entity = RespEntity::Fail(fail);
-                    let response = Response {
-                        id: unique_id(),
-                        to: request.from.clone(),
-                        from: request.to.clone(),
-                        entity,
-                        exchange,
-                    };
+        self.skel.messaging_api.star_notify(proto);
+        Ok(())
+    }
 
-                    let proto = self
-                        .star_message
-                        .reply(StarMessagePayload::Response(response));
-                    self.skel.messaging_api.star_notify(proto);
-                } else {
-                    eprintln!("cannot respond to a Notification exchange")
-                }
-            }
-            Err(err) => {
-                eprintln!("{}",err.to_string())
-            }
-        }
+    pub fn fail(self, fail: String ) ->Result<(),Error> {
+
+        let request = self.get_request()?;
+        let core = ResponseCore {
+            headers: Default::default(),
+            status: StatusCode::from_u16(500).unwrap(),
+            body: Payload::Primitive(Primitive::Text(fail))
+        };
+        let response = Response {
+            id: unique_id(),
+            to: request.from,
+            from: request.to,
+            core,
+            response_to: request.id
+        };
+
+        let proto = self
+            .star_message
+            .reply(StarMessagePayload::Response(response));
+        self.skel.messaging_api.star_notify(proto);
+        Ok(())
+    }
+
+    pub fn not_found(self) ->Result<(),Error> {
+
+        let request = self.get_request()?;
+        let core = ResponseCore {
+            headers: Default::default(),
+            status: StatusCode::from_u16(500).unwrap(),
+            body: Payload::Empty
+        };
+        let response = Response {
+            id: unique_id(),
+            to: request.from,
+            from: request.to,
+            core,
+            response_to: request.id
+        };
+
+        let proto = self
+            .star_message
+            .reply(StarMessagePayload::Response(response));
+        self.skel.messaging_api.star_notify(proto);
+        Ok(())
     }
 }
 

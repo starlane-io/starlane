@@ -1,6 +1,12 @@
 use std::collections::HashSet;
 use std::convert::{Infallible, TryFrom, TryInto};
 use std::string::FromUtf8Error;
+use mesh_portal::version::latest::bin::Bin;
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::messaging::{Request, Response};
+use mesh_portal::version::latest::pattern::AddressKindPath;
+use mesh_portal::version::latest::payload::Payload;
+use mesh_portal::version::latest::resource::ResourceStub;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, oneshot};
@@ -10,12 +16,7 @@ use crate::error::Error;
 use crate::resource::{Kind, ResourceType, ResourceRecord};
 use crate::star::{StarCommand, StarKey};
 use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
-use crate::resources::message::ProtoRequest;
-use crate::mesh::{Request, Response};
-use crate::mesh::serde::id::Address;
 use crate::frame::{StarMessagePayload, StarMessage, SimpleReply, MessageAck};
-use crate::mesh::serde::pattern::AddressKindPath;
-use crate::mesh::serde::resource::ResourceStub;
 
 pub mod delivery;
 
@@ -26,6 +27,16 @@ pub enum ProtoStarMessageTo {
     None,
     Star(StarKey),
     Resource(Address),
+}
+
+impl ToString for ProtoStarMessageTo {
+    fn to_string(&self) -> String {
+        match self {
+            ProtoStarMessageTo::None => {"None".to_string()}
+            ProtoStarMessageTo::Star(star) => {star.to_string()}
+            ProtoStarMessageTo::Resource(address) => {address.to_string()}
+        }
+    }
 }
 
 impl ProtoStarMessageTo {
@@ -120,21 +131,7 @@ impl ProtoStarMessage {
     }
 }
 
-impl TryFrom<ProtoRequest> for ProtoStarMessage {
 
-    type Error = Error;
-
-    fn try_from(proto: ProtoRequest) -> Result<Self, Self::Error> {
-        proto.validate()?;
-        let message = proto.create()?;
-        let mut proto = ProtoStarMessage::new();
-        proto.to = message.to.clone().into();
-        proto.trace = false;
-        proto.log = false;
-        proto.payload = StarMessagePayload::Request(message.into());
-        Ok(proto)
-    }
-}
 
 pub struct MessageReplyTracker {
     pub reply_to: MessageId,
@@ -305,8 +302,8 @@ pub enum ReplyKind{
     Record,
     Records,
     Stubs,
-    Response,
-    AddressTksPath
+    AddressTksPath,
+    Payload
 }
 
 
@@ -317,8 +314,8 @@ pub enum Reply{
     Record(ResourceRecord),
     Records(Vec<ResourceRecord>),
     Stubs(Vec<ResourceStub>),
-    Response(Response),
-    AddressTksPath(AddressKindPath)
+    AddressTksPath(AddressKindPath),
+    Payload(Payload)
 }
 
 impl Reply{
@@ -328,8 +325,8 @@ impl Reply{
             Reply::Record(_) => ReplyKind::Record,
             Reply::Records(_) => ReplyKind::Records,
             Reply::Stubs(_) => ReplyKind::Stubs,
-            Reply::Response(_) => ReplyKind::Response,
-            Reply::AddressTksPath(_) => ReplyKind::AddressTksPath
+            Reply::AddressTksPath(_) => ReplyKind::AddressTksPath,
+            Reply::Payload(_) => ReplyKind::Payload
         }
     }
 }

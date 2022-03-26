@@ -1,12 +1,12 @@
 use std::str::{FromStr, Split};
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 
 use crate::resource::{ResourceType, ArtifactKind};
-use crate::mesh::serde::id::Address;
-use mesh_portal_serde::version::v0_0_1::path::Path;
 
 #[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct ArtifactBundle {

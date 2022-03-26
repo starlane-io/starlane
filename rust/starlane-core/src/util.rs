@@ -172,11 +172,11 @@ pub async fn wait_for_it<R>(rx: oneshot::Receiver<Result<R, Error>>) -> Result<R
         Ok(result) => match result {
             Ok(result) => match result {
                 Ok(result) => Ok(result),
-                Err(error) => log_err(error),
+                Err(error) => Err(error.into())
             },
-            Err(error) => log_err(error),
+            Err(error) => Err(error.into())
         },
-        Err(_err) => log_err("timeout"),
+        Err(_err) => Err("timeout".into())
     }
 }
 
@@ -328,4 +328,36 @@ pub fn shutdown() {
         std::thread::sleep(std::time::Duration::from_millis(100));
         std::process::exit(0);
     });
+}
+
+
+#[derive(Clone)]
+pub struct ServiceChamber<S> where S: Clone{
+    name: String,
+    service: Option<S>
+}
+
+impl <S> ServiceChamber<S> where S: Clone{
+    pub fn new( name: &str ) -> Self {
+        let name = name.to_string();
+        Self {
+            name,
+            service: None
+        }
+    }
+
+    pub fn set( &mut self, service: S ) {
+        self.service = Option::Some(service);
+    }
+
+    pub fn get( &self ) -> Result<S,Error> {
+        match &self.service {
+            None => {
+                Err(format!("Service Unavalable: {}", self.name).into())
+            }
+            Some(service) => {
+                Ok(service.clone())
+            }
+        }
+    }
 }

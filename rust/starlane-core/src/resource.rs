@@ -9,10 +9,13 @@ use std::iter::FromIterator;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use mesh_portal::version::latest::command::common::StateSrc;
+use mesh_portal::version::latest::entity::request::create::KindTemplate;
 
-use mesh_portal_serde::version::latest::id::Specific;
-use mesh_portal_serde::version::v0_0_1::generic::entity::request::ReqEntity;
-use mesh_portal_serde::version::v0_0_1::pattern::SegmentPattern;
+use mesh_portal::version::latest::id::{Address, KindParts, ResourceKind, Specific};
+use mesh_portal::version::latest::payload::Payload;
+use mesh_portal::version::latest::resource::{ResourceStub, Status};
+use mesh_portal_versions::version::v0_0_1::pattern::parse::consume_kind;
 use rusqlite::{Connection, params, params_from_iter, Row, ToSql, Transaction};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 use serde::{Deserialize, Serialize};
@@ -26,31 +29,21 @@ use crate::fail::Fail;
 use crate::file_access::FileAccess;
 use crate::frame::{ResourceHostAction, StarMessagePayload};
 use crate::logger::{elog, LogInfo, StaticLogInfo};
-use crate::mesh::serde::entity::request::Rc;
-use crate::mesh::serde::fail;
-use crate::mesh::serde::id::{Address, KindParts};
-use crate::mesh::serde::pattern::AddressKindPattern;
-use crate::mesh::serde::payload::{PayloadMap, Primitive, RcCommand};
-use crate::mesh::serde::payload::Payload;
-use crate::mesh::serde::resource::{Archetype, ResourceStub, Status};
-use crate::mesh::serde::resource::command::common::{SetProperties, SetRegistry, StateSrc};
-use crate::mesh::serde::resource::command::create::{Create, Strategy, KindTemplate};
-use crate::mesh::serde::resource::command::create::AddressSegmentTemplate;
-use crate::mesh::serde::resource::command::select::Select;
-use crate::mesh::serde::resource::command::update::Update;
-use crate::mesh::serde::generic;
+
 use crate::message::{MessageExpect, ProtoStarMessage, ReplyKind};
 use crate::names::Name;
-use crate::resources::message::{MessageFrom, ProtoRequest};
+use crate::resource::BaseKind::Mechtron;
+use crate::resource::property::{AddressPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPermit, PropertySource};
 use crate::star::{StarInfo, StarKey, StarSkel};
+use crate::star::core::resource::driver::user::UsernamePattern;
 use crate::star::shell::wrangler::{StarWrangle};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
-use mesh_portal_serde::version::v0_0_1::pattern::parse::consume_kind;
 
 pub mod artifact;
 pub mod config;
 pub mod file;
+pub mod property;
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,6 +51,20 @@ pub enum ResourceLocation {
     Unassigned,
     Host(StarKey)
 }
+
+impl ToString for ResourceLocation {
+    fn to_string(&self) -> String {
+        match self {
+            ResourceLocation::Unassigned => {
+                "Unassigned".to_string()
+            }
+            ResourceLocation::Host(host) => {
+                host.to_string()
+            }
+        }
+    }
+}
+
 
 impl ResourceLocation {
     pub fn new(star: StarKey) -> Self {
@@ -129,7 +136,7 @@ impl ResourceRecord {
         Self {
             stub: ResourceStub {
               address: Address::root(),
-              kind: Kind::Root,
+              kind: Kind::Root.to_resource_kind(),
               properties: Default::default(),
               status: Status::Ready
             },
@@ -155,10 +162,12 @@ impl Into<ResourceStub> for ResourceRecord {
     PartialEq,
     Hash,
     strum_macros::Display,
+    strum_macros::EnumString
 )]
 pub enum ResourceType {
     Root,
     Space,
+    UserBase,
     Base,
     User,
     App,
@@ -175,8 +184,9 @@ pub enum ResourceType {
     Credentials,
 }
 
+/*
 impl FromStr for ResourceType{
-    type Err = mesh_portal_serde::error::Error;
+    type Err = mesh_portal::error::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(
@@ -204,6 +214,7 @@ impl FromStr for ResourceType{
         )
     }
 }
+ */
 
 impl Into<String> for ResourceType {
     fn into(self) -> String {
@@ -212,13 +223,21 @@ impl Into<String> for ResourceType {
 }
 
 impl TryFrom<String> for ResourceType {
-    type Error = mesh_portal_serde::error::Error;
+    type Error = mesh_portal::error::Error;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        ResourceType::from_str(value.as_str() )
+        Ok(ResourceType::from_str(value.as_str())?)
     }
 }
 
+impl ResourceType {
+    pub fn child_resource_registry_handler(&self) -> ChildResourceRegistryHandler {
+        match self {
+            Self::UserBase => ChildResourceRegistryHandler::Core,
+            _ => ChildResourceRegistryHandler::Shell
+        }
+    }
+}
 
 #[derive(
     Debug,
@@ -232,6 +251,7 @@ impl TryFrom<String> for ResourceType {
 pub enum Kind {
     Root,
     Space,
+    UserBase(UserBaseKind),
     Base(BaseKind),
     User,
     App,
@@ -248,8 +268,16 @@ pub enum Kind {
     Control
 }
 
+impl Kind {
+
+    pub fn to_resource_kind(self) -> KindParts {
+        self.into()
+    }
+
+}
+
 impl TryInto<KindTemplate> for Kind {
-    type Error = mesh_portal_serde::error::Error;
+    type Error = mesh_portal::error::Error;
 
     fn try_into(self) -> Result<KindTemplate, Self::Error> {
         Ok(KindTemplate {
@@ -263,6 +291,31 @@ impl TryInto<KindTemplate> for Kind {
     }
 }
 
+impl TryFrom<String> for Kind {
+    type Error =mesh_portal::error::Error;
+
+    fn try_from(kind: String) -> Result<Self, Self::Error> {
+        match Kind::from_str(kind.as_str()) {
+            Ok(kind) => {
+                Ok(kind)
+            }
+            Err(error) => {
+                Err(mesh_portal::error::Error{
+                    message: error.to_string()
+                })
+            }
+        }
+    }
+}
+
+impl TryInto<String> for Kind {
+    type Error =mesh_portal::error::Error;
+
+    fn try_into(self) -> Result<String, Self::Error> {
+        Ok(self.to_string())
+    }
+}
+
 impl ToString for Kind {
     fn to_string(&self) -> String {
         let parts: KindParts = self.clone().into();
@@ -271,25 +324,28 @@ impl ToString for Kind {
 }
 
 
-impl TryInto<mesh_portal_serde::version::latest::id::Kind> for Kind {
-    type Error =  mesh_portal_serde::error::Error;
+/*
+impl TryInto<mesh_portal::version::latest::id::ResourceKind> for Kind {
+    type Error =  mesh_portal::error::Error;
 
-    fn try_into(self) -> Result<mesh_portal_serde::version::latest::id::Kind, Self::Error> {
+    fn try_into(self) -> Result<mesh_portal::version::latest::id::ResourceKind, Self::Error> {
         let parts: KindParts = self.into();
 
-        Ok(mesh_portal_serde::version::latest::id::Kind {
+        Ok(mesh_portal::version::latest::id::ResourceKind {
             resource_type: parts.resource_type.into(),
             kind: parts.kind,
             specific: parts.specific
         })
     }
 }
+ */
+
 
 impl TryFrom<KindParts> for Kind {
-    type Error = mesh_portal_serde::error::Error;
+    type Error = mesh_portal::error::Error;
 
     fn try_from(parts: KindParts) -> Result<Self, Self::Error> {
-        match parts.resource_type {
+        match ResourceType::from_str(parts.resource_type.as_str() )? {
             ResourceType::Base => {
                 let parts: String = match parts.kind {
                     None => {
@@ -336,10 +392,20 @@ impl TryFrom<KindParts> for Kind {
                     }
                 }
             }
+            ResourceType::UserBase=> {
+                match parts.kind {
+                    None => {
+                        return Err("kind needs to be set for UserBase".into())
+                    }
+                    Some(kind)  => {
+                        return Ok(Self::UserBase(UserBaseKind::from_str(kind.as_str())?))
+                    }
+                }
+            }
             _ => {}
         }
 
-        Ok(match parts.resource_type {
+        Ok(match ResourceType::from_str(parts.resource_type.as_str())? {
             ResourceType::Root => {Self::Root}
             ResourceType::Space => {Self::Space}
             ResourceType::User => {Self::User}
@@ -357,17 +423,18 @@ impl TryFrom<KindParts> for Kind {
 }
 
 impl FromStr for Kind {
-    type Err = mesh_portal_serde::error::Error;
+    type Err = mesh_portal::error::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok( consume_kind(s)? )
+        let resource_kind = consume_kind(s)?;
+        Ok(resource_kind.try_into()?)
     }
 }
 
 impl Into<KindParts> for Kind {
     fn into(self) -> KindParts {
         KindParts {
-            resource_type: self.resource_type(),
+            resource_type: self.resource_type().to_string(),
             kind: self.sub_string(),
             specific: self.specific()
         }
@@ -392,6 +459,8 @@ impl Kind {
             Kind::Artifact(_) => ResourceType::Artifact,
             Kind::Proxy => ResourceType::Proxy,
             Kind::Credentials => ResourceType::Credentials,
+            Kind::Control => ResourceType::Control,
+            Kind::UserBase(_) => ResourceType::UserBase
         }
     }
 
@@ -408,6 +477,9 @@ impl Kind {
             }
             Self::Artifact( artifact) => {
                 Option::Some(artifact.to_string())
+            }
+            Self::UserBase( kind) => {
+                Option::Some(kind.to_string())
             }
             _ => {
                 Option::None
@@ -458,7 +530,7 @@ impl Kind {
                         if "Relational" != kind.as_str() {
                             return Err(format!("DatabaseKind is not recognized found: {}",kind).into());
                         }
-                        match specific.ok_or("expected specific".into() ) {
+                        match specific.ok_or("expected Database<Relational<specific>>".into() ) {
                             Ok(specific) => {
                                 return Ok(Self::Database(DatabaseKind::Relational(specific)));
                             }
@@ -479,7 +551,7 @@ impl Kind {
             ResourceType::Artifact => {
                 match kind {
                     None => {
-                        return Err("kind needs to be set".into());
+                        return Err("expected Artifact<kind>".into());
                     }
                     Some(kind) => {
                         return Ok(Self::Artifact(ArtifactKind::from_str(kind.as_str())?));
@@ -488,7 +560,29 @@ impl Kind {
             }
             ResourceType::Proxy => {Self::Proxy}
             ResourceType::Credentials => {Self::Credentials}
+            ResourceType::Control => Self::Control,
+            ResourceType::UserBase => {
+                match kind {
+                    None => {
+                        return Err("expected UserBase kind (UserBase<kind>)".into());
+                    }
+                    Some(kind) => {
+                        return Ok(Self::UserBase(UserBaseKind::from_str(kind.as_str())?));
+                    }
+                }
+            }
         })
+    }
+
+    pub fn properties_config(&self) -> &'static PropertiesConfig {
+        match self {
+            Kind::Space => &UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG,
+            Kind::UserBase(_) => &USER_BASE_PROPERTIES_CONFIG,
+            Kind::User => &USER_PROPERTIES_CONFIG,
+            Kind::App => &MECHTRON_PROERTIES_CONFIG,
+            Kind::Mechtron => &MECHTRON_PROERTIES_CONFIG,
+            _ => &DEFAULT_PROPERTIES_CONFIG
+        }
     }
 }
 
@@ -531,7 +625,23 @@ pub enum BaseKind {
     App,
     Mechtron,
     Database,
+    Repo,
     Any,
+}
+
+#[derive(
+Clone,
+Debug,
+Eq,
+PartialEq,
+Hash,
+Serialize,
+Deserialize,
+strum_macros::Display,
+strum_macros::EnumString,
+)]
+pub enum UserBaseKind {
+    Keycloak
 }
 
 #[derive(
@@ -563,10 +673,10 @@ pub enum FileKind {
 )]
 pub enum ArtifactKind {
     Raw,
-    AppConfig,
-    MechtronConfig,
-    BindConfig,
+    ResourceConfig,
+    Bind,
     Wasm,
+    Dir,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -585,10 +695,6 @@ impl Resource {
 
     pub fn address(&self) -> Address {
         self.stub.address.clone()
-    }
-
-    pub fn resource_type(&self) -> ResourceType {
-        self.stub.kind.resource_type()
     }
 
     pub fn state_src(&self) -> Payload {
@@ -631,3 +737,54 @@ impl ResourceAssign {
 }
 
 
+#[derive(Debug,Clone,Serialize,Deserialize,strum_macros::Display)]
+pub enum ChildResourceRegistryHandler {
+    Shell,
+    Core
+}
+
+lazy_static! {
+    pub static ref DEFAULT_PROPERTIES_CONFIG: PropertiesConfig = default_properties_config();
+    pub static ref USER_PROPERTIES_CONFIG: PropertiesConfig = user_properties_config();
+    pub static ref USER_BASE_PROPERTIES_CONFIG: PropertiesConfig = userbase_properties_config();
+    pub static ref MECHTRON_PROERTIES_CONFIG: PropertiesConfig = mechtron_properties_config();
+    pub static ref UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG: PropertiesConfig = unrequired_bind_and_config_properties_config();
+}
+
+fn default_properties_config() -> PropertiesConfig {
+    let mut builder = PropertiesConfig::builder();
+    builder.build()
+}
+
+fn mechtron_properties_config() -> PropertiesConfig {
+    let mut builder = PropertiesConfig::builder();
+    builder.add("bind", Box::new(AddressPattern{}), true, false, PropertySource::Shell, None, false, vec![] );
+    builder.add("config", Box::new(AddressPattern{}), true, false, PropertySource::Shell, None, false, vec![] );
+    builder.build()
+}
+
+
+fn unrequired_bind_and_config_properties_config() -> PropertiesConfig {
+    let mut builder = PropertiesConfig::builder();
+    builder.add("bind", Box::new(AddressPattern{}), false, false, PropertySource::Shell, None, false, vec![] );
+    builder.add("config", Box::new(AddressPattern{}), false, false, PropertySource::Shell, None, false, vec![] );
+    builder.build()
+}
+
+fn user_properties_config() -> PropertiesConfig {
+    let mut builder = PropertiesConfig::builder();
+    builder.add("bind", Box::new(AddressPattern{}), true, false,PropertySource::Shell, Some("hyperspace:repo:boot:1.0.0:/bind/user.bind".to_string()), true, vec![] );
+    builder.add("username", Box::new(UsernamePattern{}), false, false, PropertySource::Core, None, false, vec![] );
+    builder.add("email", Box::new(EmailPattern{}), false, true, PropertySource::Core, None, false, vec![PropertyPermit::Read] );
+    builder.add("password", Box::new(AnythingPattern{}), false, true, PropertySource::CoreSecret, None, false, vec![] );
+    builder.build()
+}
+
+fn userbase_properties_config() -> PropertiesConfig {
+    let mut builder = PropertiesConfig::builder();
+    builder.add("bind", Box::new(AddressPattern{}), true, false, PropertySource::Shell, Some("hyperspace:repo:boot:1.0.0:/bind/userbase.bind".to_string()), true, vec![] );
+    builder.add("config", Box::new(AddressPattern{}), false, true, PropertySource::Shell, None, false, vec![] );
+    builder.add("registration-email-as-username", Box::new(BoolPattern{}), false, false, PropertySource::Shell, Some("true".to_string()), false, vec![] );
+    builder.add("verify-email", Box::new(BoolPattern{}), false, false, PropertySource::Shell, Some("false".to_string()), false, vec![] );
+    builder.build()
+}

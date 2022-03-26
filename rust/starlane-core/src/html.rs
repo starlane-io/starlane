@@ -3,7 +3,6 @@ use std::sync::Arc;
 use serde_json::json;
 use handlebars::Handlebars;
 use crate::error::Error;
-use crate::star::variant::web::HttpResponse;
 
 lazy_static! {
   pub static ref HTML: Handlebars<'static> = {
@@ -24,8 +23,6 @@ lazy_static! {
 
 <style>
 
-
-
 section{
   position: fixed;
   text-align: center;
@@ -36,9 +33,8 @@ section{
   left: 50%;
   top: 50%;
   transform: translate(-50%,-50%);
-
-
 }
+
 #title{
   display: block;
   font-weight: 300;
@@ -64,7 +60,6 @@ section{
   letter-spacing: 2px;
 }
 
-
 </style>
 
 
@@ -75,8 +70,6 @@ section{
 <span id="title">{{ title }}</span>
 <span id="message">{{ message }}</span>
 </section>
-
-
 
 </body>
 </html>
@@ -93,14 +86,3 @@ section{
 }
 
 
-pub fn html_error_code( code: usize, title: String, message: String ) -> Result<HttpResponse,Error> {
-    unimplemented!()
-    /*
-    let mut response = HttpResponse::new();
-    response.status = code;
-    let json = json!({"title": title, "message": message });
-    response.body = Option::Some(BinSrc::Memory(Arc::new(HTML.render("error-code-page", &json)?.as_bytes().to_vec())));
-    Ok(response)
-
-     */
-}

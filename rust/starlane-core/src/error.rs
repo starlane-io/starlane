@@ -17,13 +17,24 @@ use zip::result::ZipError;
 
 use wasmer::{CompileError, ExportError, RuntimeError};
 use actix_web::ResponseError;
+use ascii::FromAsciiError;
 use handlebars::RenderError;
+use http::header::{InvalidHeaderName, InvalidHeaderValue, ToStrError};
+use http::method::InvalidMethod;
+use http::uri::InvalidUri;
+use keycloak::KeycloakError;
+use nom_supreme::error::ErrorTree;
+use tokio::task::JoinError;
 use crate::fail::Fail;
 use crate::star::core::resource::registry::RegError;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Error {
     pub error: String,
+}
+
+impl std::error::Error for Error {
+
 }
 
 impl Error {
@@ -58,7 +69,11 @@ impl From<ZipError> for Error {
         }
     }
 }
-
+impl From<mesh_portal::error::Error> for Error {
+    fn from(e: mesh_portal::error::Error) -> Self {
+        e.to_string().into()
+    }
+}
 
 impl From<kube::Error> for Error {
     fn from(e: kube::Error) -> Self {
@@ -86,11 +101,6 @@ impl From<serde_json::Error> for Error {
     }
 }
 
-impl Into<RegError> for Error{
-    fn into(self) -> RegError {
-        RegError::Error(self)
-    }
-}
 
 
 impl From<wasm_membrane_host::error::Error> for Error {
@@ -115,6 +125,15 @@ impl From<nom::Err<VerboseError<&str>>> for Error {
         }
     }
 }
+
+impl From<nom::Err<ErrorTree<&str>>> for Error {
+    fn from(i: nom::Err<ErrorTree<&str>>) -> Self {
+        Error {
+            error: format!("{}", i.to_string()),
+        }
+    }
+}
+
 
 impl<T> From<std::sync::PoisonError<T>> for Error {
     fn from(i: std::sync::PoisonError<T>) -> Self {
@@ -355,29 +374,7 @@ impl From<regex::Error> for Error {
     }
 }
 
-impl From<mesh_portal_serde::error::Error> for Error {
-    fn from(e: mesh_portal_serde::error::Error) -> Self {
-        Self {
-            error: e.to_string()
-        }
-    }
-}
 
-
-
-impl From<crate::mesh::serde::fail::Fail> for Error {
-    fn from(e: crate::mesh::serde::fail::Fail) -> Self {
-        Self {
-            error: e.to_string()
-        }
-    }
-}
-
-impl Into<crate::mesh::serde::fail::Fail> for Error {
-    fn into(self) -> crate::mesh::serde::fail::Fail {
-        crate::mesh::serde::fail::Fail::Mesh(crate::mesh::serde::fail::mesh::Fail::Error(self.to_string()))
-    }
-}
 
 
 impl From<ExportError> for Error {
@@ -408,3 +405,125 @@ impl From<RegError> for Error {
         }
     }
 }
+
+impl Into<mesh_portal::version::latest::fail::Fail> for Error {
+    fn into(self) -> mesh_portal::version::latest::fail::Fail {
+        mesh_portal::version::latest::fail::Fail::Error(self.to_string())
+    }
+}
+
+impl From<anyhow::Error> for Error {
+    fn from(error: anyhow::Error) -> Self {
+        Error {
+            error: error.to_string()
+        }
+    }
+}
+
+impl From<JoinError> for Error {
+    fn from(error: JoinError) -> Self {
+        Error {
+            error: error.to_string()
+        }
+    }
+}
+
+impl From<KeycloakError> for Error {
+    fn from(e: KeycloakError) -> Self {
+        match e {
+            KeycloakError::ReqwestFailure(e) => {
+                Self {
+                    error: e.to_string()
+                }
+            }
+            KeycloakError::HttpFailure { status, body, text } => {
+                Self {
+                    error: format!("status: '{}' message: '{}'", status, text )
+                }
+
+            }
+        }
+    }
+}
+
+impl From<InvalidMethod> for Error {
+    fn from(i: InvalidMethod) -> Self {
+        Self {
+            error: i.to_string()
+        }
+    }
+}
+
+impl From<InvalidHeaderName> for Error {
+    fn from(i: InvalidHeaderName) -> Self {
+        Self {
+            error: i.to_string()
+        }
+    }
+}
+
+impl From<InvalidHeaderValue> for Error {
+    fn from(i: InvalidHeaderValue) -> Self {
+        Self {
+            error: i.to_string()
+        }
+    }
+}
+
+impl From<ToStrError> for Error {
+    fn from(i: ToStrError) -> Self {
+        Self {
+            error: i.to_string()
+        }
+    }
+}
+
+impl From<serde_urlencoded::de::Error> for Error {
+    fn from(i: serde_urlencoded::de::Error) -> Self {
+        Self {
+            error: i.to_string()
+        }
+    }
+}
+
+impl From<reqwest::Error> for Error {
+    fn from(i: reqwest::Error) -> Self {
+        Self {
+            error: i.to_string()
+        }
+    }
+}
+
+impl From<alcoholic_jwt::ValidationError> for Error {
+    fn from(i: alcoholic_jwt::ValidationError ) -> Self {
+        Self {
+            error: format!("{:?}",i)
+        }
+    }
+}
+
+impl From<InvalidUri> for Error {
+    fn from(i: InvalidUri) -> Self {
+        Self {
+            error: format!("{}",i.to_string())
+        }
+    }
+}
+
+impl From<http::Error> for Error {
+    fn from(i: http::Error) -> Self {
+        Self {
+            error: format!("{}",i.to_string())
+        }
+    }
+}
+
+impl From<FromAsciiError<&str>> for Error {
+    fn from(i: FromAsciiError<&str>) -> Self {
+        Self {
+            error: format!("{}",i.to_string())
+        }
+    }
+}
+
+

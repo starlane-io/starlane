@@ -1,5 +1,3 @@
-use tokio::runtime::Handle;
-use tokio::runtime::Runtime;
 
 use crate::error::Error;
 use crate::file_access::FileAccess;
@@ -8,7 +6,6 @@ use std::collections::HashSet;
 use tokio::sync::RwLock;
 
 pub struct MachineFileSystem {
-    runtime: Runtime,
     local_stars: RwLock<HashSet<StarKey>>,
     data_access: FileAccess,
 }
@@ -16,10 +13,9 @@ pub struct MachineFileSystem {
 impl MachineFileSystem {
     pub fn new() -> Result<Self, Error> {
         Ok(Self {
-            runtime: Runtime::new().expect("expected a new tokio Runtime"),
             local_stars: RwLock::new(HashSet::new()),
             data_access: FileAccess::new(
-                std::env::var("STARLANE_DATA").unwrap_or("data".to_string()),
+                std::env::var("STARLANE_DATA_DIR").unwrap_or("data".to_string()),
             )?,
         })
     }
