@@ -243,8 +243,9 @@ println!("handle_login");
      */
 
     async fn handle_refresh_token( &self, request: &Request ) -> Result<Payload,Error>{
+println!("handle_refresh_token...");
         let token: String = request.core.body.clone().try_into()?;
-
+println!("received refresh token: {}", token );
         let client = reqwest::Client::new();
         let realm = normalize_realm(&request.to);
         let url = Self::keycloak_url()?;
@@ -261,7 +262,7 @@ println!("handle_login");
             .send()
             .await?;
         let response = response.text().await?;
-        println!("{}",response );
+println!("{}",response );
         Ok(Payload::Primitive(Primitive::Bin(Arc::new(response.as_bytes().to_vec()))))
     }
 

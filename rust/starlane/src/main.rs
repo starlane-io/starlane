@@ -150,6 +150,7 @@ async fn login(host: &str, oauth_url: &str, username: &str, password: &str ) -> 
   let mut config = crate::cli::CLI_CONFIG.lock()?;
   config.hostname = host.to_string();
   config.refresh_token = Some(res.refresh_token);
+  config.oauth_url= Some(oauth_url.to_string());
   config.save()?;
   Ok(())
 }
@@ -264,16 +265,41 @@ println!("Staring starlane mechtron process");
 
 
 pub async fn client() -> Result<CliClient, Error> {
-    let host = {
+    let (host,refresh_token,oauth_url) = {
         let config = crate::cli::CLI_CONFIG.lock()?;
 
-        config.hostname.clone()
+        (config.hostname.clone(),config.refresh_token.clone(), config.oauth_url.clone())
     };
-    CliClient::new(host, "THE TOKEN!!!".to_string()).await
+    match refresh_token {
+        None => {
+            return Err("must login first".into())
+        }
+        Some(refresh_token) => {
+            match oauth_url {
+                None => {
+                    return Err("OAuth url not set".into());
+                }
+                Some(oauth_url) => {
+                    let client = reqwest::Client::new();
+                    let refresh_url = format!("{}/refresh-token", oauth_url);
+                    let res = client.post(refresh_url).body(refresh_token).send().await?.json::<AccessTokenResp>().await?;
+                    CliClient::new(host, res.access_token).await
+                }
+            }
+
+        }
+    }
+
 }
 
 
 #[derive(Serialize,Deserialize)]
 pub struct LoginResp {
     pub refresh_token:String
+}
+
+
+#[derive(Serialize,Deserialize)]
+pub struct AccessTokenResp {
+    pub access_token: String
 }

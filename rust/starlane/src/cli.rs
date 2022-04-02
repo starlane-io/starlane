@@ -14,6 +14,7 @@ lazy_static! {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CliConfig {
     pub hostname: String,
+    pub oauth_url: Option<String>,
     pub refresh_token: Option<String>
 }
 
@@ -24,7 +25,8 @@ impl CliConfig {
                 "localhost:{}",
                 starlane_core::starlane::DEFAULT_PORT.clone(),
             ),
-            refresh_token: None
+            refresh_token: None,
+            oauth_url: None
         }
     }
     pub fn load_or_default() -> Self {
