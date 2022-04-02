@@ -1,6 +1,7 @@
 use std::convert::{TryFrom, TryInto};
 use std::fmt::write;
 use std::marker::PhantomData;
+use mesh_portal::error;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::entity::request::create::{AddressSegmentTemplate, KindTemplate, Template};
 use mesh_portal::version::latest::frame::PrimitiveFrame;
@@ -11,8 +12,11 @@ use mesh_portal_tcp_common::{PrimitiveFrameReader, PrimitiveFrameWriter};
 use mesh_portal::version::latest::entity::request::create::{AddressTemplate, Fulfillment};
 use mesh_portal::version::latest::id::RouteSegment;
 use mesh_portal_versions::version::v0_0_1::parse::Res;
+use serde::Serialize;
 use tokio::io::AsyncWriteExt;
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
+use tokio::net::ToSocketAddrs;
 use tokio::sync::mpsc;
 use crate::command::cli::outlet::Frame;
 use crate::command::execute::CommandExecutor;
@@ -21,7 +25,7 @@ use crate::error::Error;
 use crate::star::shell::sys::SysResource;
 use crate::star::StarSkel;
 use crate::starlane::api::StarlaneApi;
-use crate::starlane::ServiceSelection;
+use crate::starlane::{AuthRequestFrame, AuthResponseFrame, ServiceSelection, ServiceSelectionResponse};
 
 
 pub mod inlet {
@@ -39,7 +43,7 @@ pub mod inlet {
     }
 
     impl TryFrom<PrimitiveFrame> for Frame {
-        type Error = Error;
+        type Error = mesh_portal::error::Error;
 
         fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
             Ok(bincode::deserialize(value.data.as_slice() )?)
@@ -69,7 +73,7 @@ pub mod outlet{
     }
 
     impl TryFrom<PrimitiveFrame> for Frame {
-        type Error = Error;
+        type Error = mesh_portal::error::Error;
 
         fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
             Ok(bincode::deserialize(value.data.as_slice() )?)
@@ -91,7 +95,7 @@ pub struct CliServer {
 
 
 impl CliServer {
-    pub async fn new( api: StarlaneApi, mut stream: TcpStream ) -> Result<(),Error> {
+    pub async fn new( api: StarlaneApi, mut reader: OwnedReadHalf, mut writer: OwnedWriteHalf) -> Result<(),Error> {
         let template = Template {
             address: AddressTemplate {
                 parent: Address::root(),
@@ -114,8 +118,6 @@ impl CliServer {
 
 
         let stub = api.create_sys_resource(template,messenger_tx).await?;
-
-        let (reader,writer) = stream.into_split();
 
         let mut reader :FrameReader<inlet::Frame> = FrameReader::new( PrimitiveFrameReader::new( reader ));
         let mut writer: FrameWriter<outlet::Frame> = FrameWriter::new( PrimitiveFrameWriter::new( writer ));
@@ -244,17 +246,35 @@ pub struct CliClient {
 
 impl CliClient {
 
-    pub async fn new( host: String ) -> Result<Self,Error> {
-        let mut stream = TcpStream::connect(host.clone()).await?;
-
-        // first select service
-        let service = ServiceSelection::Cli.to_string();
-        stream.write_u32(service.len() as u32 ).await;
-        stream.write_all( service.as_bytes() ).await;
-
+    pub async fn new( host: String, token: String ) -> Result<Self,Error> {
+        let mut stream =
+            match TcpStream::connect(host.clone()).await {
+                Ok(stream) => stream,
+                Err(err) => {
+                    return Err(format!("could not connect to: '{}' because: {}", host, err.to_string()).into());
+                }
+            };
         let (reader,writer) = stream.into_split();
-        let mut reader : FrameReader<outlet::Frame> = FrameReader::new( PrimitiveFrameReader::new( reader ));
-        let mut writer : FrameWriter<inlet::Frame>  = FrameWriter::new( PrimitiveFrameWriter::new( writer ));
+        let mut reader : FrameReader<AuthResponseFrame> = FrameReader::new( PrimitiveFrameReader::new( reader ));
+        let mut writer : FrameWriter<AuthRequestFrame>  = FrameWriter::new( PrimitiveFrameWriter::new( writer ));
+
+        // first send token
+        writer.write(AuthRequestFrame::Token(token)).await?;
+
+        let response = reader.read().await?;
+
+        let mut reader = reader.done().done();
+        let mut writer = writer.done().done();
+
+        let mut reader : FrameReader<ServiceSelectionResponse> = FrameReader::new( PrimitiveFrameReader::new( reader ));
+        let mut writer : FrameWriter<ServiceSelection>  = FrameWriter::new( PrimitiveFrameWriter::new( writer ));
+
+        writer.write(ServiceSelection::Cli ).await?;
+        reader.read().await?;
+
+        let mut reader : FrameReader<outlet::Frame> = FrameReader::new( reader.done() );
+        let mut writer : FrameWriter<inlet::Frame>  = FrameWriter::new( writer.done() );
+
 
         Ok(Self {
             reader,
@@ -344,19 +364,34 @@ pub enum Output {
 
 
 
-pub struct FrameWriter<FRAME> where FRAME: TryInto<PrimitiveFrame> {
+pub struct FrameWriter<FRAME> where FRAME: Serialize {
     stream: PrimitiveFrameWriter,
     phantom: PhantomData<FRAME>
 }
 
-impl <FRAME> FrameWriter<FRAME> where FRAME: TryInto<PrimitiveFrame>  {
+impl <FRAME> FrameWriter<FRAME> where FRAME: Serialize {
     pub fn new(stream: PrimitiveFrameWriter) -> Self {
         Self {
             stream,
             phantom: PhantomData
         }
     }
+
+    pub fn done(self) -> PrimitiveFrameWriter {
+        self.stream
+    }
 }
+
+impl <F> FrameWriter<F> where F: Serialize  {
+
+    pub async fn write( &mut self, frame: F ) -> Result<(),Error> {
+        bincode::serialize(&frame)?;
+        Ok(())
+    }
+
+}
+
+/*
 
 impl FrameWriter<outlet::Frame>  {
 
@@ -375,6 +410,8 @@ impl FrameWriter<inlet::Frame> {
     }
 }
 
+ */
+
 
 pub struct FrameReader<FRAME> {
     stream: PrimitiveFrameReader,
@@ -390,6 +427,20 @@ impl <FRAME> FrameReader<FRAME>  {
     }
 }
 
+impl <Frame> FrameReader<Frame> where Frame: TryFrom<PrimitiveFrame,Error=error::Error> {
+    pub async fn read( &mut self ) -> Result<Frame,Error> {
+        let frame = self.stream.read().await?;
+        Ok(Frame::try_from(frame)?)
+    }
+}
+
+impl <F> FrameReader<F> {
+    pub fn done(self) -> PrimitiveFrameReader {
+        self.stream
+    }
+}
+
+/*
 impl FrameReader<outlet::Frame> {
     pub async fn read( &mut self ) -> Result<outlet::Frame,Error> {
         let frame = self.stream.read().await?;
@@ -403,3 +454,5 @@ impl FrameReader<inlet::Frame> {
         Ok(inlet::Frame::try_from(frame)?)
     }
 }
+
+ */

@@ -1,6 +1,7 @@
 use std::cell::Cell;
 
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
@@ -12,6 +13,7 @@ use dashmap::DashMap;
 
 use futures::future::join_all;
 use futures::{FutureExt, StreamExt, TryFutureExt};
+use mesh_portal::version::latest::frame::PrimitiveFrame;
 use mesh_portal_api_server::Portal;
 use mesh_portal::version::latest::id::Address;
 use mesh_portal::version::latest::path;
@@ -22,6 +24,7 @@ use mesh_portal_tcp_server::{PortalTcpServer, TcpServerCall};
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::net::tcp::OwnedReadHalf;
 use tokio::sync::oneshot;
 use tokio::sync::{broadcast, mpsc};
 use crate::artifact::ArtifactRef;
@@ -346,28 +349,35 @@ impl StarlaneMachineRunner {
                     }
                     StarlaneCommand::AddStream(mut stream) => {
 
-                        /*
-                        let (reader,writer) = stream.into_split();
-                        let reader = PrimitiveFrameReader::new(reader);
-                        let writer = PrimitiveFrameWriter::new(writer);
+                        let (mut reader, mut writer) = stream.into_split();
 
-                        let reader :FrameReader<AuthRequestFrame>= FrameReader::new(reader);
-                        let writer :FrameReader<AuthRequestFrame>= FrameWriter::new( writer);
-                         */
+                        async fn auth( mut reader: OwnedReadHalf ) -> Result<OwnedReadHalf,Error> {
+                            let reader = PrimitiveFrameReader::new(reader);
 
-                        async fn service_select( stream: &mut TcpStream ) -> Result<ServiceSelection,Error> {
-                            let size = stream.read_u32().await? as usize;
+                            let mut reader :FrameReader<AuthRequestFrame>= FrameReader::new(reader);
+
+                            let request = reader.read().await?;
+                            println!("TOKEN: {}", request.to_string());
+                            // a terrible hack to return this reader, but I want to refactor
+                            // this into a common streaming solution with layered services
+                            // for request/response
+                            Ok(reader.done().done())
+                        }
+
+
+                        async fn service_select( reader: &mut OwnedReadHalf) -> Result<ServiceSelection,Error> {
+                            let size = reader.read_u32().await? as usize;
 
                             let mut vec= vec![0 as u8; size];
                             let buf = vec.as_mut_slice();
-                            stream.read_exact(buf).await?;
+                            reader.read_exact(buf).await?;
 
                             let selection = String::from_utf8(vec)?;
                             let selection = ServiceSelection::from_str( selection.as_str() )?;
                             Ok(selection)
                         }
 
-                        let service = service_select( & mut stream ).await;
+                        let service = service_select( & mut reader ).await;
                         if service.is_err() {
                             eprintln!("bad service selection");
                             return;
@@ -376,25 +386,26 @@ impl StarlaneMachineRunner {
                         let service = service.expect("expected service selection");
 
                         match service {
-                            ServiceSelection::Gateway => {
-                                match self.select_star_kind(&StarKind::Gateway).await {
-                                    Ok(Option::Some(star_ctrl)) => {
-                                        match self.add_server_side_lane_ctrl(star_ctrl, stream,OnCloseAction::Remove).await {
-                                            Ok(_result) => {}
-                                            Err(error) => {
-                                                error!("{}", error);
-                                            }
-                                        }
-                                    }
-                                    Ok(Option::None) => {
-                                        error!("cannot find StarController for kind: StarKind::Gateway");
-                                    }
-                                    Err(err) => {
-                                        error!("{}", err);
-                                    }
-                                }
-                            },
                             ServiceSelection::Cli => {
+                                // auth me
+                                let mut reader = match auth(reader).await {
+                                    Ok(reader) => reader,
+                                    Err(err) => {
+                                        error!("auth err: {}",err.to_string() );
+                                        continue;
+                                    }
+                                };
+                                let mut writer = FrameWriter::new( PrimitiveFrameWriter::new(writer));
+                                match writer.write(AuthResponseFrame::Ok ).await {
+                                    Ok(_) => {}
+                                    Err(err) => {
+                                        error!("auth write err: {}",err.to_string() );
+                                        continue;
+                                    }
+                                };
+
+                                let mut writer = writer.done().done();
+
                                 let command_tx = self.command_tx.clone();
                                 tokio::spawn( async move {
                                     async fn get_api(command_tx: mpsc::Sender<StarlaneCommand>) -> Result<StarlaneApi,Error>
@@ -406,7 +417,7 @@ impl StarlaneMachineRunner {
 
                                     match get_api(command_tx).await {
                                         Ok(api) => {
-                                            CliServer::new(api, stream).await;
+                                            CliServer::new(api, reader, writer).await;
                                         }
                                         Err(err) => {
                                             eprintln!("{}", err.to_string());
@@ -750,7 +761,7 @@ impl StarlaneMachineRunner {
         let command_tx = self.command_tx.clone();
         let flags = self.inner_flags.clone();
         tokio::spawn(async move {
-            match std::net::TcpListener::bind(format!("127.0.0.1:{}", port)) {
+            match std::net::TcpListener::bind(format!("0.0.0.0:{}", port)) {
                 Ok(std_listener) => {
                     let listener = TcpListener::from_std(std_listener).unwrap();
                     result_tx.send(Ok(()));
@@ -1024,43 +1035,77 @@ pub struct UsernameAndPasswordAuth {
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub struct RefreshTokenAuth {
-    pub userbase: String,
-    pub token: String,
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub struct TokenAuth{
-    pub userbase: String,
-    pub token: String,
-}
-
-#[derive(Clone,Serialize,Deserialize,strum_macros::Display)]
 pub enum AuthRequestFrame {
-    UsernamePassword(UsernameAndPasswordAuth),
-    RefreshToken(RefreshTokenAuth),
-    Token(TokenAuth)
+    Token(String)
 }
+
+impl TryFrom<PrimitiveFrame> for AuthRequestFrame {
+    type Error = mesh_portal::error::Error;
+
+    fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
+        Ok(bincode::deserialize(value.data.as_slice())?)
+    }
+}
+
+impl ToString for AuthRequestFrame {
+    fn to_string(&self) -> String {
+        match self {
+            AuthRequestFrame::Token(token) => token.clone()
+        }
+    }
+}
+
 
 #[derive(Clone,Serialize,Deserialize,strum_macros::Display)]
 pub enum AuthResponseFrame{
     Fail(String),
-    RefreshToken(String),
     Ok
 }
 
-#[derive(Clone,strum_macros::Display)]
-pub enum ServiceSelection {
-    Gateway,
-    Cli
+impl TryFrom<PrimitiveFrame> for AuthResponseFrame {
+    type Error = mesh_portal::error::Error;
+
+    fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
+        Ok(bincode::deserialize(value.data.as_slice())?)
+    }
 }
+
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ServiceSelection {
+    Cli,
+}
+
+impl TryFrom<PrimitiveFrame> for ServiceSelection{
+    type Error = mesh_portal::error::Error;
+
+    fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
+        Ok(bincode::deserialize(value.data.as_slice())?)
+    }
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum ServiceSelectionResponse {
+    Cli,
+    Err(String)
+}
+
+
+impl TryFrom<PrimitiveFrame> for ServiceSelectionResponse{
+    type Error = mesh_portal::error::Error;
+
+    fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
+        Ok(bincode::deserialize(value.data.as_slice())?)
+    }
+}
+
+
 
 impl FromStr for ServiceSelection {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "Gateway" => Ok(Self::Gateway),
             "Cli" => Ok(Self::Cli),
             what => Err(format!("invalid service selection: {}",what).into())
         }

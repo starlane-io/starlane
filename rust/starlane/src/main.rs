@@ -67,7 +67,7 @@ async fn go() -> Result<(),Error> {
                                                                                                                             SubCommand::with_name("get-shell").usage("get the shell that the starlane CLI connects to")]).usage("read or manipulate the cli config").display_order(1).display_order(1),
                                                             SubCommand::with_name("exec").usage("execute a command").args(vec![Arg::with_name("command_line").required(true).help("command line to execute")].as_slice()),
                                                             SubCommand::with_name("script").usage("execute commands in a script").args(vec![Arg::with_name("script_file").required(true).help("the script file to execute")].as_slice()),
-                                                            SubCommand::with_name("login").usage("login <hostname> <url> <email-or-username> <password>").args(vec![Arg::with_name("hostname").required(true).help("the hostname to connect to i.e. 'localhost'"),Arg::with_name("url").required(true).help("the login url to get refresh access token i.e. http://localhost:8000/hyperspace/users/login"),Arg::with_name("email-or-username").required(true).help("email address or username"),Arg::with_name("password").required(true).help("password")].as_slice()),
+                                                            SubCommand::with_name("login").usage("login <hostname> <oauth-url> <email-or-username> <password>").args(vec![Arg::with_name("hostname").required(true).help("the hostname to connect to i.e. 'localhost:4343'"),Arg::with_name("oauth-url").required(true).help("oauth url i.e. http://localhost:8000/hyperspace/users"),Arg::with_name("email-or-username").required(true).help("email address or username"),Arg::with_name("password").required(true).help("password")].as_slice()),
                                                             SubCommand::with_name("mechtron").usage("launch a mechtron portal client").args(vec![Arg::with_name("server").required(true).help("the portal server to connect to"),
                                                                                                                                                        Arg::with_name("wasm_src").required(true).help("the address of the wasm source"),
                                                                                                                                                       ].as_slice()),
@@ -78,10 +78,10 @@ async fn go() -> Result<(),Error> {
 
     if let Option::Some(args) = matches.subcommand_matches("login") {
         let hostname = args.value_of("hostname").unwrap();
-        let url = args.value_of("url").unwrap();
+        let oauth_url = args.value_of("oauth-url").unwrap();
         let username = args.value_of("email-or-username").unwrap();
         let password = args.value_of("password").unwrap();
-        login( hostname, url, username, password ).await?;
+        login(hostname, oauth_url, username, password ).await?;
     } else if let Option::Some(serve) = matches.subcommand_matches("serve") {
             let starlane = StarlaneMachine::new("server".to_string()).expect("StarlaneMachine server");
 
@@ -139,12 +139,12 @@ async fn go() -> Result<(),Error> {
     Ok(())
 }
 
-async fn login(host: &str, url: &str, username: &str, password: &str ) -> Result<(),Error> {
+async fn login(host: &str, oauth_url: &str, username: &str, password: &str ) -> Result<(),Error> {
   let mut form = HashMap::new();
   form.insert("username", username );
   form.insert("password", password );
   let client = reqwest::Client::new();
-  let login_url = format!("{}/login", url );
+  let login_url = format!("{}/login", oauth_url);
   let res = client.post(login_url).form(&form).send().await?.json::<LoginResp>().await?;
 
   let mut config = crate::cli::CLI_CONFIG.lock()?;
@@ -266,9 +266,11 @@ println!("Staring starlane mechtron process");
 pub async fn client() -> Result<CliClient, Error> {
     let host = {
         let config = crate::cli::CLI_CONFIG.lock()?;
+
+println!("hostname: {}", config.hostname);
         config.hostname.clone()
     };
-    CliClient::new(host).await
+    CliClient::new(host, "THE TOKEN!!!".to_string()).await
 }
 
 
