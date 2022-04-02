@@ -267,7 +267,6 @@ pub async fn client() -> Result<CliClient, Error> {
     let host = {
         let config = crate::cli::CLI_CONFIG.lock()?;
 
-println!("hostname: {}", config.hostname);
         config.hostname.clone()
     };
     CliClient::new(host, "THE TOKEN!!!".to_string()).await

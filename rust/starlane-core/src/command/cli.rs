@@ -255,22 +255,25 @@ impl CliClient {
                 }
             };
         let (reader,writer) = stream.into_split();
-        let mut reader : FrameReader<AuthResponseFrame> = FrameReader::new( PrimitiveFrameReader::new( reader ));
-        let mut writer : FrameWriter<AuthRequestFrame>  = FrameWriter::new( PrimitiveFrameWriter::new( writer ));
 
+        let mut reader : FrameReader<ServiceSelectionResponse> = FrameReader::new( PrimitiveFrameReader::new( reader ));
+        let mut writer : FrameWriter<ServiceSelection>  = FrameWriter::new( PrimitiveFrameWriter::new( writer ));
+
+info!("sending ServiceSelection::Cli" );
+        writer.write(ServiceSelection::Cli ).await?;
+info!("waiting for ServiceSelectionResponse::Cli" );
+        reader.read().await?;
+info!("moving on..." );
+
+        let mut reader : FrameReader<AuthResponseFrame> = FrameReader::new( reader.done() );
+        let mut writer : FrameWriter<AuthRequestFrame>  = FrameWriter::new(  writer.done() );
+
+info!("sending token {}", token );
         // first send token
         writer.write(AuthRequestFrame::Token(token)).await?;
 
         let response = reader.read().await?;
 
-        let mut reader = reader.done().done();
-        let mut writer = writer.done().done();
-
-        let mut reader : FrameReader<ServiceSelectionResponse> = FrameReader::new( PrimitiveFrameReader::new( reader ));
-        let mut writer : FrameWriter<ServiceSelection>  = FrameWriter::new( PrimitiveFrameWriter::new( writer ));
-
-        writer.write(ServiceSelection::Cli ).await?;
-        reader.read().await?;
 
         let mut reader : FrameReader<outlet::Frame> = FrameReader::new( reader.done() );
         let mut writer : FrameWriter<inlet::Frame>  = FrameWriter::new( writer.done() );
@@ -385,7 +388,11 @@ impl <FRAME> FrameWriter<FRAME> where FRAME: Serialize {
 impl <F> FrameWriter<F> where F: Serialize  {
 
     pub async fn write( &mut self, frame: F ) -> Result<(),Error> {
-        bincode::serialize(&frame)?;
+        let data = bincode::serialize(&frame)?;
+        let frame = PrimitiveFrame{
+            data
+        };
+        self.stream.write(frame).await?;
         Ok(())
     }
 

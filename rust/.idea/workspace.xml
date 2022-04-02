@@ -6,11 +6,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/zz_generated.deepcopy.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/zz_generated.deepcopy.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlane_controller.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlane_controller.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/command/cli.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/command/cli.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/error.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/error.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/src/main.rs" afterDir="false" />
     </list>
@@ -272,7 +269,7 @@
       <workItem from="1648307042781" duration="7199000" />
       <workItem from="1648594167007" duration="1416000" />
       <workItem from="1648705543958" duration="92000" />
-      <workItem from="1648885322291" duration="12038000" />
+      <workItem from="1648885322291" duration="14686000" />
     </task>
     <servers />
   </component>

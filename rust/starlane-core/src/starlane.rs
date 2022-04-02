@@ -348,16 +348,16 @@ impl StarlaneMachineRunner {
                         self.listen(tx);
                     }
                     StarlaneCommand::AddStream(mut stream) => {
-
+info!("adding Stream!");
                         let (mut reader, mut writer) = stream.into_split();
 
                         async fn auth( mut reader: OwnedReadHalf ) -> Result<OwnedReadHalf,Error> {
                             let reader = PrimitiveFrameReader::new(reader);
 
                             let mut reader :FrameReader<AuthRequestFrame>= FrameReader::new(reader);
-
+info!("reading auth token...");
                             let request = reader.read().await?;
-                            println!("TOKEN: {}", request.to_string());
+info!("TOKEN: {}", request.to_string());
                             // a terrible hack to return this reader, but I want to refactor
                             // this into a common streaming solution with layered services
                             // for request/response
@@ -365,28 +365,29 @@ impl StarlaneMachineRunner {
                         }
 
 
-                        async fn service_select( reader: &mut OwnedReadHalf) -> Result<ServiceSelection,Error> {
-                            let size = reader.read_u32().await? as usize;
-
-                            let mut vec= vec![0 as u8; size];
-                            let buf = vec.as_mut_slice();
-                            reader.read_exact(buf).await?;
-
-                            let selection = String::from_utf8(vec)?;
-                            let selection = ServiceSelection::from_str( selection.as_str() )?;
-                            Ok(selection)
+                        async fn service_select( mut reader: OwnedReadHalf) -> Result<(OwnedReadHalf,ServiceSelection),Error> {
+info!("service selection...");
+                            let mut reader = FrameReader::new(PrimitiveFrameReader::new(reader));
+                            let selection = reader.read().await?;
+                            Ok((reader.done().done(),selection))
                         }
 
-                        let service = service_select( & mut reader ).await;
-                        if service.is_err() {
-                            eprintln!("bad service selection");
-                            return;
+                        let service = service_select( reader ).await;
+                        if let Err(err) = &service {
+                            error!("bad service selection: {}",err.to_string());
+                            continue;
                         }
 
-                        let service = service.expect("expected service selection");
+                        let (mut reader, service) = service.expect("expected service selection");
 
                         match service {
                             ServiceSelection::Cli => {
+info!("Cli Service selected");
+                                let mut writer = FrameWriter::new( PrimitiveFrameWriter::new(writer));
+                                writer.write( ServiceSelectionResponse::Cli ).await.unwrap_or_default();
+                                let mut writer = writer.done().done();
+info!("ServiceSelectionResponse::Cli sent...");
+
                                 // auth me
                                 let mut reader = match auth(reader).await {
                                     Ok(reader) => reader,
