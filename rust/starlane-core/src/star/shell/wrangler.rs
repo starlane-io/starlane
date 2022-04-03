@@ -407,7 +407,13 @@ impl StarWrangleDB {
                 let handle =
                     trans.query_row(statement.as_str(), params_from_iter(params.iter()), |row| {
                         let key: Vec<u8> = row.get(0)?;
-                        let key = StarKey::from_bin(key)?;
+                        let key = match StarKey::from_bin(key) {
+                            Ok(key) => key,
+                            Err(err) => {
+                                error!("query row error when parsing StarKey: {}",err.to_string());
+                                return Err(rusqlite::Error::InvalidQuery)
+                            }
+                        };
 
                         let kind: String = row.get(1)?;
                         let kind = StarKind::from_str(kind.as_str())

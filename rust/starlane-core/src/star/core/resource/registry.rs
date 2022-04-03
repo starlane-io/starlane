@@ -516,7 +516,7 @@ impl RegistryComponent {
     }
 
     fn process_property(row: &Row) -> Result<Option<(String,String)>, rusqlite::Error> {
-            fn opt(row: &Row, index: usize) -> Result<Option<String>, Error>
+            fn opt(row: &Row, index: usize) -> Result<Option<String>, rusqlite::Error>
             {
                 if let ValueRef::Null = row.get_ref(index)? {
                    Ok(Option::None)
@@ -819,9 +819,7 @@ impl ToString for RegError {
 
 impl From<tokio::sync::oneshot::error::RecvError> for RegError {
     fn from(e: tokio::sync::oneshot::error::RecvError) -> Self {
-        RegError::Error(Error {
-            error: format!("{}", e.to_string()),
-        })
+        RegError::Error(Error::from_internal( format!("{}", e.to_string())))
     }
 }
 impl From<Error> for RegError {

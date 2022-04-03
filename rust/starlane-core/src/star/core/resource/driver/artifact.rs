@@ -159,7 +159,7 @@ impl ResourceCoreDriver for ArtifactBundleCoreDriver {
                 tokio::spawn(async move {
                     for address_and_kind in address_and_kind_set {
                         let parent = address_and_kind.address.parent().expect("expected parent");
-                        let result:Result<Kind,mesh_portal_versions::error::Error> = TryFrom::try_from(address_and_kind.kind.clone());
+                        let result:Result<Kind,mesh_portal::error::MsgErr> = TryFrom::try_from(address_and_kind.kind.clone());
                         match result {
                             Ok(kind) => {
                                 let state = match kind {

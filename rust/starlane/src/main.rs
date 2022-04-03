@@ -28,6 +28,7 @@ use starlane_core::starlane::api::StarlaneApi;
 use std::convert::TryInto;
 use mesh_portal::version::latest::entity::request::create::Require;
 use mesh_portal::version::latest::id::Address;
+use reqwest::StatusCode;
 use tokio::io::AsyncReadExt;
 use tracing::error;
 use starlane_core::command::cli::{CliClient, outlet};
@@ -282,7 +283,9 @@ pub async fn client() -> Result<CliClient, Error> {
                 Some(oauth_url) => {
                     let client = reqwest::Client::new();
                     let refresh_url = format!("{}/refresh-token", oauth_url);
-                    let res = client.post(refresh_url).body(refresh_token).send().await?.json::<AccessTokenResp>().await?;
+                    let res = client.post(refresh_url).body(refresh_token).send().await?;
+error!("STATUS CODE: {}", res.status().to_string());
+                    let res = res.json::<AccessTokenResp>().await?;
                     CliClient::new(host, res.access_token).await
                 }
             }

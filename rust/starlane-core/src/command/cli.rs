@@ -43,7 +43,7 @@ pub mod inlet {
     }
 
     impl TryFrom<PrimitiveFrame> for Frame {
-        type Error = mesh_portal::error::Error;
+        type Error = mesh_portal::error::MsgErr;
 
         fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
             Ok(bincode::deserialize(value.data.as_slice() )?)
@@ -73,7 +73,7 @@ pub mod outlet{
     }
 
     impl TryFrom<PrimitiveFrame> for Frame {
-        type Error = mesh_portal::error::Error;
+        type Error = mesh_portal::error::MsgErr;
 
         fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
             Ok(bincode::deserialize(value.data.as_slice() )?)
@@ -434,7 +434,7 @@ impl <FRAME> FrameReader<FRAME>  {
     }
 }
 
-impl <Frame> FrameReader<Frame> where Frame: TryFrom<PrimitiveFrame,Error=error::Error> {
+impl <Frame> FrameReader<Frame> where Frame: TryFrom<PrimitiveFrame,Error=error::MsgErr> {
     pub async fn read( &mut self ) -> Result<Frame,Error> {
         let frame = self.stream.read().await?;
         Ok(Frame::try_from(frame)?)

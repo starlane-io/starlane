@@ -23,6 +23,7 @@ use mesh_portal::version::latest::fail::BadRequest;
 use std::future::Future;
 use std::sync::Arc;
 use http::{HeaderMap, StatusCode, Uri};
+use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
 use mesh_portal::version::latest::config::bind::{BindConfig, Pipeline};
 use mesh_portal::version::latest::config::Config;
@@ -330,7 +331,7 @@ println!("got bind config for: {}", to.to_string() );
                             }
                             Rc::Select(select) => {
                                 let chamber = ResourceRegistrationChamber::new(skel.clone());
-                                chamber.select(select).await
+                                Ok(chamber.select(select).await?)
                             },
                             Rc::Update(_) => {
                                 unimplemented!()

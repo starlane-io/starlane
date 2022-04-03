@@ -360,7 +360,7 @@ info!("adding Stream!");
 info!("reading auth token...");
                             let request = reader.read().await?;
                             let token = request.to_string();
-                            jwksCache.validate(api, token.as_str());
+                            jwksCache.validate(api, token.as_str()).await?;
 
 
 info!("TOKEN: {}", request.to_string());
@@ -1054,7 +1054,7 @@ pub enum AuthRequestFrame {
 }
 
 impl TryFrom<PrimitiveFrame> for AuthRequestFrame {
-    type Error = mesh_portal::error::Error;
+    type Error = mesh_portal::error::MsgErr;
 
     fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
         Ok(bincode::deserialize(value.data.as_slice())?)
@@ -1077,7 +1077,7 @@ pub enum AuthResponseFrame{
 }
 
 impl TryFrom<PrimitiveFrame> for AuthResponseFrame {
-    type Error = mesh_portal::error::Error;
+    type Error = mesh_portal::error::MsgErr;
 
     fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
         Ok(bincode::deserialize(value.data.as_slice())?)
@@ -1091,7 +1091,7 @@ pub enum ServiceSelection {
 }
 
 impl TryFrom<PrimitiveFrame> for ServiceSelection{
-    type Error = mesh_portal::error::Error;
+    type Error = mesh_portal::error::MsgErr;
 
     fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
         Ok(bincode::deserialize(value.data.as_slice())?)
@@ -1106,7 +1106,7 @@ pub enum ServiceSelectionResponse {
 
 
 impl TryFrom<PrimitiveFrame> for ServiceSelectionResponse{
-    type Error = mesh_portal::error::Error;
+    type Error = mesh_portal::error::MsgErr;
 
     fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
         Ok(bincode::deserialize(value.data.as_slice())?)

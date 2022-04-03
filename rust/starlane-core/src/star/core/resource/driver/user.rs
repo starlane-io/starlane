@@ -5,6 +5,7 @@ use std::future::Future;
 use std::str::FromStr;
 use std::sync::Arc;
 use alcoholic_jwt::{JWKS, token_kid};
+use http::StatusCode;
 use keycloak::{KeycloakAdmin, KeycloakAdminToken, KeycloakError};
 use keycloak::types::{CredentialRepresentation, ProtocolMapperRepresentation, RealmRepresentation, UserRepresentation};
 use mesh_portal::version::latest::command::common::StateSrc;
@@ -307,9 +308,17 @@ println!("received refresh token: {}", token );
             }))
             .send()
             .await?;
-        let response = response.text().await?;
-println!("{}",response );
-        Ok(Payload::Primitive(Primitive::Bin(Arc::new(response.as_bytes().to_vec()))))
+        match &response.status().as_u16()
+        {
+            200 => {
+                let response = response.text().await?;
+                Ok(Payload::Primitive(Primitive::Bin(Arc::new(response.as_bytes().to_vec()))))
+            }
+            other => {
+                println!("{}",other);
+                Err(Error::with_status(other.clone(), "could not refresh token" ))
+            }
+        }
     }
 
 //    {{keycloak_url}}/admin/realms/{{realm}}/users/{{userId}}/logout

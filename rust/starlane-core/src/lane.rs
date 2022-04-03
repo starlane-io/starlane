@@ -457,7 +457,7 @@ impl ClientSideTunnelConnector {
                             .await;
                     }
                     Err(error) => {
-                        error!("CONNECTION ERROR: {}", error.error);
+                        error!("CONNECTION ERROR: {}", error.message);
                         break;
                     }
                 }
@@ -540,7 +540,7 @@ impl ServerSideTunnelConnector {
                     .await;
             }
             Err(error) => {
-                error!("CONNECTION ERROR: {}", error.error);
+                error!("CONNECTION ERROR: {}", error.message);
             }
         }
     }

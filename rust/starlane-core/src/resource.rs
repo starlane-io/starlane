@@ -223,7 +223,7 @@ impl Into<String> for ResourceType {
 }
 
 impl TryFrom<String> for ResourceType {
-    type Error = mesh_portal::error::Error;
+    type Error = mesh_portal::error::MsgErr;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Ok(ResourceType::from_str(value.as_str())?)
@@ -277,7 +277,7 @@ impl Kind {
 }
 
 impl TryInto<KindTemplate> for Kind {
-    type Error = mesh_portal::error::Error;
+    type Error = mesh_portal::error::MsgErr;
 
     fn try_into(self) -> Result<KindTemplate, Self::Error> {
         Ok(KindTemplate {
@@ -292,24 +292,15 @@ impl TryInto<KindTemplate> for Kind {
 }
 
 impl TryFrom<String> for Kind {
-    type Error =mesh_portal::error::Error;
+    type Error =mesh_portal::error::MsgErr;
 
     fn try_from(kind: String) -> Result<Self, Self::Error> {
-        match Kind::from_str(kind.as_str()) {
-            Ok(kind) => {
-                Ok(kind)
-            }
-            Err(error) => {
-                Err(mesh_portal::error::Error{
-                    message: error.to_string()
-                })
-            }
-        }
+        Kind::from_str(kind.as_str())
     }
 }
 
 impl TryInto<String> for Kind {
-    type Error =mesh_portal::error::Error;
+    type Error =mesh_portal::error::MsgErr;
 
     fn try_into(self) -> Result<String, Self::Error> {
         Ok(self.to_string())
@@ -342,7 +333,7 @@ impl TryInto<mesh_portal::version::latest::id::ResourceKind> for Kind {
 
 
 impl TryFrom<KindParts> for Kind {
-    type Error = mesh_portal::error::Error;
+    type Error = mesh_portal::error::MsgErr;
 
     fn try_from(parts: KindParts) -> Result<Self, Self::Error> {
         match ResourceType::from_str(parts.resource_type.as_str() )? {
@@ -423,7 +414,7 @@ impl TryFrom<KindParts> for Kind {
 }
 
 impl FromStr for Kind {
-    type Err = mesh_portal::error::Error;
+    type Err = mesh_portal::error::MsgErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let resource_kind = consume_kind(s)?;

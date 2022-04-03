@@ -11,7 +11,7 @@ use mesh_portal::version::latest::entity::request::{Action, Rc};
 use mesh_portal::version::latest::messaging::{Request, Response};
 use mesh_portal::version::latest::payload::{Payload, Primitive};
 use mesh_portal::version::latest::resource::ResourceStub;
-use mesh_portal::error::Error;
+use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::entity::request::create::{Fulfillment, KindTemplate};
 use mesh_portal_versions::version::v0_0_1::parse::Res;
 use std::string::FromUtf8Error;
