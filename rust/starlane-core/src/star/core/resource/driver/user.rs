@@ -104,7 +104,18 @@ impl ResourceCoreDriver for UserBaseKeycloakCoreDriver {
         let registration_email_as_username = assign.stub.properties.get("registration-email-as-username" ).map_or( None, |x|{ Some(x.value=="true") });
         let verify_email= assign.stub.properties.get("verify-email" ).map_or( None, |x|{ Some(x.value=="true") });
 
-        if !is_hyper_userbase(&assign.stub.address )
+        if is_hyper_userbase(&assign.stub.address )
+        {
+            match self.admin.update_realm_for_address("master".to_string(), &assign.stub.address, Some(false), Some(false)).await
+            {
+                Err(err) => {
+                    error!("{}",err.to_string());
+                    return Err(format!("UserBase<Keyloak>: could not update master realm for {}", assign.stub.address.to_string()).into())
+                }
+                _ => {}
+            }
+        }
+        else
         {
             match self.admin.create_realm_from_address(&assign.stub.address, registration_email_as_username, verify_email).await
             {
@@ -130,7 +141,7 @@ println!("handle HTTP: {}", request.core.uri.to_string());
                 self.handle_http(request).await
             }
             Action::Msg(_) => {
-                request.status(404)
+                self.handle_msg(request).await
             }
         }
     }
@@ -153,6 +164,41 @@ impl UserBaseKeycloakCoreDriver{
     fn keycloak_url() -> Result<String,Error> {
         Ok(std::env::var("STARLANE_KEYCLOAK_URL").map_err(|e|{"User<Keycloak>: environment variable 'STARLANE_KEYCLOAK_URL' not set."})?)
     }
+
+    async fn handle_msg( &self, request: Request ) -> Response {
+
+        if let Action::Msg(action) =&request.core.action {
+            match action.as_str() {
+                "GetJwks" => request.clone().payload_result(self.handle_get_jwks(&request).await),
+                _ => {
+                    request.status(404)
+                }
+            }
+        } else {
+            request.status(404)
+        }
+    }
+
+    async fn handle_get_jwks( &self, request: &Request ) -> Result<Payload,Error>
+    {
+        let client = reqwest::Client::new();
+        let realm = normalize_realm(&request.to);
+        let url = Self::keycloak_url()?;
+        let jwks= client
+            .get(&format!(
+                "{}/auth/realms/{}/protocol/openid-connect/certs",
+                url, realm
+            ))
+            .send()
+            .await?;
+        let jwks = jwks.text().await?;
+        println!("jwks: {}", jwks);
+        // just make sure it is property formated
+        serde_json::from_str(jwks.as_str())?;
+
+        Ok(Payload::Primitive(Primitive::Text(jwks)))
+    }
+
 
     async fn handle_http( &self, request: Request ) -> Response
     {
@@ -492,8 +538,8 @@ impl StarlaneKeycloakAdmin {
         Ok(())
     }
 
-    pub async fn create_realm_from_address(&self, realm: &Address, registration_email_as_username: Option<bool>, verify_email: Option<bool> ) -> Result<(),Error> {
-        let realm = normalize_realm(realm);
+    pub async fn create_realm_from_address(&self, realm_address: &Address, registration_email_as_username: Option<bool>, verify_email: Option<bool> ) -> Result<(),Error> {
+        let realm = normalize_realm(realm_address);
         self.admin
             .post(RealmRepresentation {
                 realm: Some(realm.clone().into()),
@@ -504,10 +550,12 @@ impl StarlaneKeycloakAdmin {
                 ..Default::default()
             })
             .await?;
+        self.update_realm_for_address(realm,realm_address,registration_email_as_username,verify_email).await?;
+        Ok(())
+    }
 
-        let client_id = "${client_admin-cli}";
-        let clients = self.admin.realm_clients_get(realm.clone().as_str(), None,None,None,None,None).await?;
-        let client_admin_cli_id = clients.into_iter().find_map( |client| {
+    pub async fn update_realm_for_address(&self, realm: String, realm_address: &Address, registration_email_as_username: Option<bool>, verify_email: Option<bool> ) -> Result<(),Error> {
+        let client_id = "${client_admin-cli}"; let clients = self.admin.realm_clients_get(realm.clone().as_str(), None,None,None,None,None).await?; let client_admin_cli_id = clients.into_iter().find_map( |client| {
             if let Some(name) = client.name {
                 if client_id == name {
                     client.id.clone()
@@ -538,6 +586,26 @@ impl StarlaneKeycloakAdmin {
 
             self.admin.realm_clients_with_id_protocol_mappers_models_post(realm.as_str(), client_admin_cli_id.as_str(), username).await?;
         }
+
+        {
+            let mut config = HashMap::new();
+            config.insert("userinfo.token.claim".to_string(), Value::String("true".to_string()));
+            config.insert("id.token.claim".to_string(), Value::String("true".to_string()));
+            config.insert("access.token.claim".to_string(), Value::String("true".to_string()));
+            config.insert("claim.name".to_string(), Value::String("userbase_ref".to_string()));
+            config.insert("claim.value".to_string(), Value::String(realm_address.to_string()));
+            config.insert("jsonType.label".to_string(), Value::String("String".to_string()));
+            let userbase_ref= ProtocolMapperRepresentation {
+                config: Some(config),
+                name: Some("userbase_ref".to_string()),
+                protocol: Some("openid-connect".to_string()),
+                protocol_mapper: Some("oidc-hardcoded-claim-mapper".to_string()),
+                ..Default::default()
+            };
+
+            self.admin.realm_clients_with_id_protocol_mappers_models_post(realm.as_str(), client_admin_cli_id.as_str(), userbase_ref).await?;
+        }
+
 
         {
             let mut config = HashMap::new();

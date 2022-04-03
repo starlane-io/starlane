@@ -56,7 +56,7 @@ use crate::template::{
     StarKeySubgraphTemplate, StarKeyTemplate, StarSelector, StarTemplate, StarTemplateHandle,
 };
 use crate::user::HyperUser;
-use crate::util::AsyncHashMap;
+use crate::util::{AsyncHashMap, JwksCache};
 
 pub mod api;
 pub mod files;
@@ -302,6 +302,8 @@ impl StarlaneMachineRunner {
         let run_complete_signal_tx_rtn = run_complete_signal_tx.clone();
 
         tokio::spawn(async move {
+
+            let mut jwksCache = JwksCache::new();
             while let Option::Some(command) = self.command_rx.recv().await {
                 match command {
                     StarlaneCommand::ConstellationCreate(command) => {
@@ -351,12 +353,16 @@ impl StarlaneMachineRunner {
 info!("adding Stream!");
                         let (mut reader, mut writer) = stream.into_split();
 
-                        async fn auth( mut reader: OwnedReadHalf ) -> Result<OwnedReadHalf,Error> {
+                        async fn auth( mut reader: OwnedReadHalf, jwksCache: &mut JwksCache, api: &StarlaneApi ) -> Result<OwnedReadHalf,Error> {
                             let reader = PrimitiveFrameReader::new(reader);
 
                             let mut reader :FrameReader<AuthRequestFrame>= FrameReader::new(reader);
 info!("reading auth token...");
                             let request = reader.read().await?;
+                            let token = request.to_string();
+                            jwksCache.validate(api, token.as_str());
+
+
 info!("TOKEN: {}", request.to_string());
                             // a terrible hack to return this reader, but I want to refactor
                             // this into a common streaming solution with layered services
@@ -389,7 +395,14 @@ info!("Cli Service selected");
 info!("ServiceSelectionResponse::Cli sent...");
 
                                 // auth me
-                                let mut reader = match auth(reader).await {
+                                let api = match self.get_starlane_api().await {
+                                    Ok(api) => api,
+                                    Err(err) => {
+                                        error!("auth err cannot get api: {}",err.to_string() );
+                                        continue;
+                                    }
+                                };
+                                let mut reader = match auth(reader,&mut jwksCache, &api).await {
                                     Ok(reader) => reader,
                                     Err(err) => {
                                         error!("auth err: {}",err.to_string() );

@@ -5,7 +5,14 @@ use std::fs::File;
 use std::hash::Hash;
 use std::io::{Read, Seek, Write};
 use std::path::Path;
+use std::str::FromStr;
 use std::thread;
+use alcoholic_jwt::{JWKS, token_kid, validate, ValidJWT};
+use lru::LruCache;
+use mesh_portal::version::latest::entity::request::Action;
+use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::messaging::Request;
+use mesh_portal::version::latest::payload::{Payload, Primitive};
 
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::Receiver;
@@ -18,6 +25,9 @@ use zip::result::ZipError;
 use zip::write::FileOptions;
 
 use crate::error::Error;
+use crate::starlane::api::StarlaneApi;
+use serde::Deserialize;
+
 
 lazy_static! {
     pub static ref SHUTDOWN_TX: broadcast::Sender<()> = { broadcast::channel(1).0 };
@@ -360,4 +370,66 @@ impl <S> ServiceChamber<S> where S: Clone{
             }
         }
     }
+}
+
+
+pub struct JwksCache {
+    map: LruCache<Address,JWKS>
+}
+
+impl JwksCache {
+    pub fn new() -> Self {
+        Self {
+            map: LruCache::new(1024)
+        }
+    }
+
+    pub async fn validate( &mut self, api: &StarlaneApi, token: &str ) -> Result<ValidJWT,Error>{
+        let jwt = UntrustedJwt(token.to_string());
+
+println!("jwt headers: {}", jwt.headers()?);
+println!("jwt claims : {}", jwt.claims()?);
+
+        let claims = serde_json::from_str::<JwtClaims>(jwt.claims()?.as_str() )?;
+println!("userbase_ref: {}", claims.userbase_ref);
+
+        let action = Action::Msg("GetJwks".to_string());
+        let request = Request::new(action.into(), api.agent.clone(), Address::from_str(claims.userbase_ref.as_str())? );
+        let response = api.exchange(request).await.ok_or()?;
+        let jwks = response.core.body.to_text()?;
+        let jwks: JWKS = serde_json::from_str(jwks.as_str())?;
+        let kid = token_kid(token)?.ok_or("token 'kid' not found")?;
+        let jwk = jwks.find(kid.as_str()).ok_or("jwks does not contain kid")?;
+        Ok(validate( token, jwk, vec![] )?)
+    }
+}
+
+pub struct UntrustedJwt(String);
+
+impl UntrustedJwt {
+    pub fn headers(&self) -> Result<String,Error>{
+        Ok(String::from_utf8(base64::decode(self.0.split(".").next().ok_or("invalid Jwt" )?)?)?)
+    }
+
+    pub fn claims(&self) -> Result<String,Error>{
+        let mut split = self.0.split(".");
+        split.next().ok_or("invalid Jwt")?;
+        Ok(String::from_utf8(base64::decode(split.next().ok_or("invalid Jwt" )?)?)?)
+    }
+}
+
+#[derive(Clone,Deserialize)]
+pub struct JwtClaims {
+  pub exp: u64,
+  pub typ: String,
+  pub jti: String,
+  pub iss: String,
+  pub sub: String,
+  pub session_state: String,
+  pub acr: String,
+  pub azp: String,
+  pub scope: String,
+  pub email_verified: Option<bool>,
+  pub userbase_ref: String,
+  pub preferred_username: String
 }
