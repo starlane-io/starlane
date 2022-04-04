@@ -6,7 +6,7 @@ Bind {
       <Get>/introspect -> {{}} => &;
     }
     Msg {
-      <GetJwt> -> {{ }} =[ Text ]=> &;
+      <GetJwks>/ -> {{ }} =[ Text ]=> &;
     }
   }
 }

@@ -32,6 +32,7 @@ use crate::artifact::ArtifactRef;
 use crate::cache::{ArtifactCaches, ProtoArtifactCachesFactory};
 use crate::command::cli::CliServer;
 use crate::constellation::{Constellation, ConstellationStatus};
+use crate::endpoint::ServicesEndpoint;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 
@@ -180,7 +181,7 @@ impl StarlaneMachine {
     pub async fn listen(&self) -> Result<(), Error> {
         let command_tx = self.tx.clone();
         let (tx, rx) = oneshot::channel();
-        command_tx.send(StarlaneCommand::Listen(tx)).await;
+        command_tx.send(StarlaneCommand::Listen{ machine: self.clone(), tx }).await;
         rx.await?
     }
 
@@ -303,7 +304,6 @@ impl StarlaneMachineRunner {
 
         tokio::spawn(async move {
 
-            let mut jwksCache = JwksCache::new();
             while let Option::Some(command) = self.command_rx.recv().await {
                 match command {
                     StarlaneCommand::ConstellationCreate(command) => {
@@ -346,100 +346,11 @@ impl StarlaneMachineRunner {
                         self.command_rx.close();
                         break;
                     }
-                    StarlaneCommand::Listen(tx) => {
-                        self.listen(tx);
+                    StarlaneCommand::Listen{machine, tx} => {
+                        self.listen(machine, tx);
                     }
                     StarlaneCommand::AddStream(mut stream) => {
-info!("adding Stream!");
-                        let (mut reader, mut writer) = stream.into_split();
 
-                        async fn auth( mut reader: OwnedReadHalf, jwksCache: &mut JwksCache, api: &StarlaneApi ) -> Result<OwnedReadHalf,Error> {
-                            let reader = PrimitiveFrameReader::new(reader);
-
-                            let mut reader :FrameReader<AuthRequestFrame>= FrameReader::new(reader);
-info!("reading auth token...");
-                            let request = reader.read().await?;
-                            let token = request.to_string();
-                            jwksCache.validate(api, token.as_str()).await?;
-
-
-info!("TOKEN: {}", request.to_string());
-                            // a terrible hack to return this reader, but I want to refactor
-                            // this into a common streaming solution with layered services
-                            // for request/response
-                            Ok(reader.done().done())
-                        }
-
-
-                        async fn service_select( mut reader: OwnedReadHalf) -> Result<(OwnedReadHalf,ServiceSelection),Error> {
-info!("service selection...");
-                            let mut reader = FrameReader::new(PrimitiveFrameReader::new(reader));
-                            let selection = reader.read().await?;
-                            Ok((reader.done().done(),selection))
-                        }
-
-                        let service = service_select( reader ).await;
-                        if let Err(err) = &service {
-                            error!("bad service selection: {}",err.to_string());
-                            continue;
-                        }
-
-                        let (mut reader, service) = service.expect("expected service selection");
-
-                        match service {
-                            ServiceSelection::Cli => {
-info!("Cli Service selected");
-                                let mut writer = FrameWriter::new( PrimitiveFrameWriter::new(writer));
-                                writer.write( ServiceSelectionResponse::Cli ).await.unwrap_or_default();
-                                let mut writer = writer.done().done();
-info!("ServiceSelectionResponse::Cli sent...");
-
-                                // auth me
-                                let api = match self.get_starlane_api().await {
-                                    Ok(api) => api,
-                                    Err(err) => {
-                                        error!("auth err cannot get api: {}",err.to_string() );
-                                        continue;
-                                    }
-                                };
-                                let mut reader = match auth(reader,&mut jwksCache, &api).await {
-                                    Ok(reader) => reader,
-                                    Err(err) => {
-                                        error!("auth err: {}",err.to_string() );
-                                        continue;
-                                    }
-                                };
-                                let mut writer = FrameWriter::new( PrimitiveFrameWriter::new(writer));
-                                match writer.write(AuthResponseFrame::Ok ).await {
-                                    Ok(_) => {}
-                                    Err(err) => {
-                                        error!("auth write err: {}",err.to_string() );
-                                        continue;
-                                    }
-                                };
-
-                                let mut writer = writer.done().done();
-
-                                let command_tx = self.command_tx.clone();
-                                tokio::spawn( async move {
-                                    async fn get_api(command_tx: mpsc::Sender<StarlaneCommand>) -> Result<StarlaneApi,Error>
-                                    {
-                                        let (tx, rx) = oneshot::channel();
-                                        command_tx.send(StarlaneCommand::StarlaneApiSelectBest(tx)).await?;
-                                        rx.await?
-                                    }
-
-                                    match get_api(command_tx).await {
-                                        Ok(api) => {
-                                            CliServer::new(api, reader, writer).await;
-                                        }
-                                        Err(err) => {
-                                            eprintln!("{}", err.to_string());
-                                        }
-                                    }
-                                });
-                            }
-                        }
 
                     }
                     StarlaneCommand::GetProtoArtifactCachesFactory(tx) => {
@@ -749,57 +660,12 @@ info!("ServiceSelectionResponse::Cli sent...");
             result_tx.send(process(self).await);
         }
     }
-    fn listen(&mut self, result_tx: oneshot::Sender<Result<(), Error>>) {
-        {
-            let mut inner_flags = self.inner_flags.lock().unwrap();
-            let flags = inner_flags.get_mut();
-
-            if flags.listening {
-                result_tx.send(Ok(()));
-                return;
-            }
-            flags.listening = true;
-        }
-
-        {
-            let _port = self.port.clone();
-            let _inner_flags = self.inner_flags.clone();
-
-            /*            ctrlc::set_handler( move || {
-                           Self::unlisten(inner_flags.clone(), port.clone());
-                       }).expect("expected to be able to set ctrl-c handler");
-            */
-        }
-
+    fn listen(&mut self, machine: StarlaneMachine, result_tx: oneshot::Sender<Result<(), Error>>) {
         let port = self.port.clone();
-        let command_tx = self.command_tx.clone();
-        let flags = self.inner_flags.clone();
-        tokio::spawn(async move {
-            match std::net::TcpListener::bind(format!("0.0.0.0:{}", port)) {
-                Ok(std_listener) => {
-                    let listener = TcpListener::from_std(std_listener).unwrap();
-                    result_tx.send(Ok(()));
-                    while let Ok((stream, _)) = listener.accept().await {
-                        {
-                            let mut flags = flags.lock().unwrap();
-                            let flags = flags.get_mut();
-                            if flags.shutdown {
-                                drop(listener);
-                                return;
-                            }
-                        }
-                        let _ok = command_tx
-                            .send(StarlaneCommand::AddStream(stream))
-                            .await
-                            .is_ok();
-                        tokio::time::sleep(Duration::from_secs(0)).await;
-                    }
-                }
-                Err(error) => {
-                    error!("FATAL: could not setup TcpListener {}", error);
-                    result_tx.send(Err(error.into()));
-                }
-            }
+        tokio::spawn( async move {
+            let result = ServicesEndpoint::new(machine, port).await;
+println!("listening? {}", result.is_ok());
+            result_tx.send(result);
         });
     }
 
@@ -964,7 +830,7 @@ pub struct VersionFrame {
 pub enum StarlaneCommand {
     ConstellationCreate(ConstellationCreate),
     StarlaneApiSelectBest(oneshot::Sender<Result<StarlaneApi, Error>>),
-    Listen(oneshot::Sender<Result<(), Error>>),
+    Listen{ machine: StarlaneMachine, tx: oneshot::Sender<Result<(), Error>> },
     AddStream(TcpStream),
     GetProtoArtifactCachesFactory(oneshot::Sender<Option<Arc<ProtoArtifactCachesFactory>>>),
     StartMechtronPortal(oneshot::Sender<Result<mpsc::Sender<TcpServerCall>,Error>>),
@@ -1048,381 +914,3 @@ pub struct UsernameAndPasswordAuth {
     pub password: String
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub enum AuthRequestFrame {
-    Token(String)
-}
-
-impl TryFrom<PrimitiveFrame> for AuthRequestFrame {
-    type Error = mesh_portal::error::MsgErr;
-
-    fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
-        Ok(bincode::deserialize(value.data.as_slice())?)
-    }
-}
-
-impl ToString for AuthRequestFrame {
-    fn to_string(&self) -> String {
-        match self {
-            AuthRequestFrame::Token(token) => token.clone()
-        }
-    }
-}
-
-
-#[derive(Clone,Serialize,Deserialize,strum_macros::Display)]
-pub enum AuthResponseFrame{
-    Fail(String),
-    Ok
-}
-
-impl TryFrom<PrimitiveFrame> for AuthResponseFrame {
-    type Error = mesh_portal::error::MsgErr;
-
-    fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
-        Ok(bincode::deserialize(value.data.as_slice())?)
-    }
-}
-
-
-#[derive(Clone,Serialize,Deserialize)]
-pub enum ServiceSelection {
-    Cli,
-}
-
-impl TryFrom<PrimitiveFrame> for ServiceSelection{
-    type Error = mesh_portal::error::MsgErr;
-
-    fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
-        Ok(bincode::deserialize(value.data.as_slice())?)
-    }
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub enum ServiceSelectionResponse {
-    Cli,
-    Err(String)
-}
-
-
-impl TryFrom<PrimitiveFrame> for ServiceSelectionResponse{
-    type Error = mesh_portal::error::MsgErr;
-
-    fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
-        Ok(bincode::deserialize(value.data.as_slice())?)
-    }
-}
-
-
-
-impl FromStr for ServiceSelection {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "Cli" => Ok(Self::Cli),
-            what => Err(format!("invalid service selection: {}",what).into())
-        }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::convert::TryInto;
-    use std::fs;
-    use std::fs::File;
-    use std::io::Read;
-    use std::str::FromStr;
-    use std::sync::Arc;
-
-    use tokio::runtime::Runtime;
-    use tokio::sync::oneshot;
-    use tokio::sync::oneshot::error::RecvError;
-    use tokio::time::timeout;
-    use tokio::time::Duration;
-    use tracing::dispatcher::set_global_default;
-    use tracing_subscriber::FmtSubscriber;
-
-    use crate::artifact::ArtifactLocation;
-    use crate::error::Error;
-    use crate::logger::{
-        Flag, Flags, Log, LogAggregate, ProtoStarLog, ProtoStarLogPayload, StarFlag, StarLog,
-        StarLogPayload,
-    };
-    use crate::names::Name;
-    use crate::space::CreateAppControllerFail;
-    use crate::star::{StarController, StarInfo, StarKey, StarKind};
-    use crate::starlane::{
-        ConstellationCreate, StarlaneApiRequest, StarlaneCommand, StarlaneMachine,
-        StarlaneMachineRunner,
-    };
-    use crate::template::{ConstellationLayout, ConstellationTemplate};
-
-    #[test]
-    #[instrument]
-    pub async fn tracing() {
-        let subscriber = FmtSubscriber::default();
-        set_global_default(subscriber.into()).expect("setting global default failed");
-        info!("tracing works!");
-    }
-
-
-    /*
-    #[test]
-    pub fn mechtron() {
-println!("Mechtron..");
-        let subscriber = FmtSubscriber::default();
-        set_global_default(subscriber.into()).expect("setting global default failed");
-
-        let data_dir = "tmp/data";
-        let cache_dir = "tmp/cache";
-        fs::remove_dir_all(data_dir).unwrap_or_default();
-        fs::remove_dir_all(cache_dir).unwrap_or_default();
-        std::env::set_var("STARLANE_DATA", data_dir);
-        std::env::set_var("STARLANE_CACHE", cache_dir);
-
-        println!("Hello");
-        let rt = Runtime::new().unwrap();
-        rt.block_on(async {
-println!("block ON..");
-            async fn test() -> Result<(),Error> {
-                let mut starlane = StarlaneMachine::new("server".to_string()).unwrap();
-
-                starlane.listen().await.unwrap();
-
-                starlane.create_constellation("standalone", ConstellationLayout::standalone().unwrap()) .await?;
-
-println!("POST CREATE CONSTELLATION");
-
-                let starlane_api = starlane.get_starlane_api().await.unwrap();
-
-                let sub_space_api = starlane_api.get_space( ResourceAddress::from_str("space").unwrap() .into(), ) .await?;
-
-                {
-                    let mut file =
-                        File::open("../../wasm/appy/appy.zip").unwrap();
-                    let mut data = vec![];
-                    file.read_to_end(&mut data).unwrap();
-                    let address =  ResourceAddress::from_str("hyperspace:starlane:appy:1.0.0<ArtifactBundle>")?;
-                    let mut creation = sub_space_api
-                        .create_artifact_bundle_versions(address.parent().unwrap().name().as_str())?;
-                    let artifact_bundle_versions_api = creation.submit().await?;
-
-                    let version = semver::Version::from_str(address.name().as_str())?;
-                    let mut creation = artifact_bundle_versions_api.create_artifact_bundle(
-                        version,
-                        Arc::new(data),
-                    )?;
-                    creation.submit().await?;
-                }
-println!("appy bundle published");
-
-
-
-                let config = ResourceAddress::from_str("hyperspace:starlane:appy:1.0.0:/app/appy-config.yaml<Artifact>")?;
-                let app_api = sub_space_api.create_app("appy", config.try_into()? )?.submit().await?;
-
-println!("app created: {}", app_api.key().to_string() );
-
-                std::thread::sleep(std::time::Duration::from_secs(10));
-
-                starlane.shutdown();
-
-                std::thread::sleep(std::time::Duration::from_secs(1));
-
-                Ok(())
-            }
-            match test().await {
-                Ok(_) => {}
-                Err(error) => {
-                    eprintln!("{}",error.to_string());
-                    assert!(false);
-                }
-            }
-        });
-    }
-
-     */
-
-    /*
-    #[test]
-    pub fn starlane() {
-        let subscriber = FmtSubscriber::default();
-        set_global_default(subscriber.into()).expect("setting global default failed");
-
-        let data_dir = "tmp/data";
-        let cache_dir = "tmp/cache";
-        fs::remove_dir_all(data_dir).unwrap_or_default();
-        fs::remove_dir_all(cache_dir).unwrap_or_default();
-        std::env::set_var("STARLANE_DATA", data_dir);
-        std::env::set_var("STARLANE_CACHE", cache_dir);
-
-        println!("Hello");
-        let rt = Runtime::new().unwrap();
-        rt.block_on(async {
-            let mut starlane = StarlaneMachine::new("server".to_string()).unwrap();
-            starlane.listen().await.unwrap();
-
-            tokio::spawn(async {
-                println!("PRE CREATE CONSTELLATION");
-            });
-
-            starlane
-                .create_constellation("standalone", ConstellationLayout::standalone().unwrap())
-                .await
-                .unwrap();
-
-            tokio::spawn(async {
-                println!("POST CREATE CONSTELLATION");
-            });
-
-            let mut client = StarlaneMachine::new_with_artifact_caches(
-                "client".to_string(),
-                starlane.get_proto_artifact_caches_factory().await.unwrap(),
-            )
-            .unwrap();
-            let mut client_layout = ConstellationLayout::client("gateway".to_string()).unwrap();
-            client_layout.set_machine_host_address(
-                "gateway".to_lowercase(),
-                format!("localhost:{}", crate::starlane::DEFAULT_PORT.clone()),
-            );
-            client
-                .create_constellation("client", client_layout)
-                .await
-                .unwrap();
-
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            tokio::spawn(async {
-                println!("GOT TO FIRST SLEEP");
-            });
-
-            let starlane_api = client.get_starlane_api().await.unwrap();
-
-            if starlane_api.ping_gateway().await.is_err() {
-                error!("failed to ping gateway");
-                client.shutdown();
-                starlane.shutdown();
-                return;
-            }
-            tokio::spawn(async {
-                println!("PING GATEWAY");
-            });
-
-            let sub_space_api = match starlane_api
-                .get_sub_space(
-                    ResourceAddress::from_str("hyperspace:default::<SubSpace>")
-                        .unwrap()
-                        .into(),
-                )
-                .await
-            {
-                Ok(api) => api,
-                Err(err) => {
-                    eprintln!("{}", err.to_string());
-                    panic!(err)
-                }
-            };
-
-            let file_api = sub_space_api
-                .create_file_system("website")
-                .unwrap()
-                .submit()
-                .await
-                .unwrap();
-            file_api
-                .create_file_from_string(
-                    &"/index.html".try_into().unwrap(),
-                    "The rain in Spain falls mostly on the plain.".to_string(),
-                )
-                .unwrap()
-                .submit()
-                .await
-                .unwrap();
-            file_api
-                .create_file_from_string(
-                    &"/second/index.html".try_into().unwrap(),
-                    "This is a second page....".to_string(),
-                )
-                .unwrap()
-                .submit()
-                .await
-                .unwrap();
-
-            tokio::spawn(async {
-                println!("FILE API");
-            });
-
-            /*
-            // upload an artifact bundle
-            {
-                let mut file =
-                    File::open("test-data/localhost-config/artifact-bundle.zip").unwrap();
-                let mut data = vec![];
-                file.read_to_end(&mut data).unwrap();
-                let data = Arc::new(data);
-                let artifact_bundle_api = starlane_api
-                    .create_artifact_bundle(
-                        &ArtifactBundleAddress::from_str("hyperspace:default:whiz:1.0.0").unwrap(),
-                        data,
-                    ).await
-                    .unwrap()
-                    .submit()
-                    .await
-                    .unwrap();
-            }
-             */
-
-            // upload an artifact bundle
-            {
-                let mut file =
-                    File::open("test-data/localhost-config/artifact-bundle.zip").unwrap();
-                let mut data = vec![];
-                file.read_to_end(&mut data).unwrap();
-                let data = Arc::new(data);
-                //let artifact_bundle_path = "hyperspace:starlane:filo:1.0.0<ArtifactBundle>";
-                let artifact_bundle_path = "hyperspace:starlane:filo:1.0.0<ArtifactBundle>";
-                let artifact_bundle_path =
-                    ArtifactBundlePath::from_str(artifact_bundle_path).unwrap();
-                let artifact_bundle_api = starlane_api
-                    .create_artifact_bundle(&artifact_bundle_path, data)
-                    .await
-                    .unwrap();
-            }
-
-            let bundle: ResourceAddress = match ResourceAddress::from_str("hyperspace::<Space>") {
-                Ok(ok) => ok,
-                Err(error) => {
-                    error!("error: {}", error.to_string());
-                    panic!("cannot continue")
-                }
-            };
-
-            //            let bundle: ResourceAddress = ArtifactBundleAddress::from_str("hyperspace:default:filo:1.0.0").unwrap().into();
-            let resources = starlane_api.list(&bundle.clone().into()).await.unwrap();
-
-            tokio::spawn(async move {
-                println!(
-                    "returned resources: {} from {}",
-                    resources.len(),
-                    bundle.to_string()
-                );
-                for resource in resources {
-                    println!(
-                        "{}\t{}",
-                        resource.stub.key.to_string(),
-                        resource.stub.address.to_string()
-                    )
-                }
-            });
-
-            std::thread::sleep(std::time::Duration::from_secs(5));
-
-            client.shutdown();
-            starlane.shutdown();
-
-            std::thread::sleep(std::time::Duration::from_secs(1));
-        });
-    }
-
-     */
-}

@@ -47,7 +47,17 @@ pub mod resource;
 
 fn main() -> Result<(), Error> {
     let rt = Runtime::new().unwrap();
-    rt.block_on( async move { go().await });
+    rt.block_on( async move {
+        match go().await {
+            Ok(_) => {
+                std::process::exit(0);
+            }
+            Err(err) => {
+                println!("{}",err.to_string());
+                std::process::exit(1);
+            }
+        }
+    });
     Ok(())
 }
 
@@ -121,7 +131,7 @@ async fn go() -> Result<(),Error> {
             clap_app.print_long_help().unwrap_or_default();
         }
     } else if let Option::Some(args) = matches.subcommand_matches("exec") {
-        exec(args.clone()).await.unwrap();
+        exec(args.clone()).await?;
     } else if let Option::Some(args) = matches.subcommand_matches("script") {
         match script(args.clone()).await {
             Ok(_) => {
@@ -284,9 +294,12 @@ pub async fn client() -> Result<CliClient, Error> {
                     let client = reqwest::Client::new();
                     let refresh_url = format!("{}/refresh-token", oauth_url);
                     let res = client.post(refresh_url).body(refresh_token).send().await?;
-error!("STATUS CODE: {}", res.status().to_string());
-                    let res = res.json::<AccessTokenResp>().await?;
-                    CliClient::new(host, res.access_token).await
+                    if res.status().is_success() {
+                        let res = res.json::<AccessTokenResp>().await?;
+                        CliClient::new(host, res.access_token).await
+                    } else {
+                        Err("Refresh token invalid or an error.  You may need to login again.".into())
+                    }
                 }
             }
 

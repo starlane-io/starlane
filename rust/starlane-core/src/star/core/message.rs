@@ -138,7 +138,7 @@ println!("{} getting bind config for {}", end.skel.info.kind.to_string(), addres
             let request = Request::new( core, address.clone(), address.parent().unwrap() );
             let response = end.skel.messaging_api.request(request).await;
 
-println!("response from Rc GET {}", address.to_string() );
+println!("response from Rc GET bind {}", address.to_string() );
 
             if let Payload::Map(map) = response.core.body {
                 if let Payload::Primitive(Primitive::Text(bind_address )) = map.get(&"bind".to_string()  ).ok_or("bind is not set" )?
@@ -159,13 +159,17 @@ println!("response from Rc GET {}", address.to_string() );
         }
 
         fn execute(end: &mut MessagingEndpointComponentInner, bind: ArtifactItem<CachedConfig<BindConfig>>, delivery: Delivery<Request> ) -> Result<(),Error> {
-
             match &delivery.item.core.action {
                 Action::Rc(_) => {panic!("Rc should be filtered");}
                 Action::Msg(msg) => {
+println!("received msg action {} ... present selectors: {}",msg, bind.msg.elements.len() );
                    let selector = bind.msg.find_match(&delivery.item.core );
                    if selector.is_err() {
-                       delivery.not_found();
+                       let path = delivery.item.core.uri.path().to_string();
+                       let msg = msg.clone();
+                       error!("bind selector cannot find Pipelines match for Msg<{}>{}",msg, path );
+                       delivery.err(404, format!("bind selector cannot find Pipelines match for Msg<{}>{}",msg, path).as_str() );
+                       //delivery.err(404, "bind selector cannot find Pipelines match for Msg<{}>{}" );
                        return Ok(());
                    }
                    let selector = selector.expect("selector");
@@ -173,7 +177,7 @@ println!("response from Rc GET {}", address.to_string() );
                    Ok(())
                 }
                 Action::Http(http) => {
-println!("delivery of http method {} and PATH {}", http.to_string(), delivery.item.core.uri.path() );
+println!("delivery of http method {} and PATH {} with selectors: {}", http.to_string(), delivery.item.core.uri.path(), bind.http.elements.len() );
                     let selector = bind.http.find_match(&delivery.item.core );
                     if selector.is_err() {
 println!("selector.is_err()");

@@ -171,7 +171,7 @@ async fn process_request( http_request: http::Request<Bin>, api: StarlaneApi, sk
     let request = messaging::Request::new( core, from, to );
 println!("exchanging...to :{}", request.to.to_string() );
     let response = skel.messaging_api.request(request).await;
-println!("got response...");
+println!("got response...(status: {})",response.core.status.as_u16());
     if !response.core.status.is_success() {
         let error = response.core.status.canonical_reason().unwrap_or("Unknown");
         let messages = json!({"title": response.core.status.as_u16().to_string(), "message": error});

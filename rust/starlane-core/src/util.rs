@@ -6,15 +6,16 @@ use std::hash::Hash;
 use std::io::{Read, Seek, Write};
 use std::path::Path;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::thread;
-use alcoholic_jwt::{JWKS, token_kid, validate, ValidJWT};
+use alcoholic_jwt::{JWK, JWKS, token_kid, validate, ValidJWT};
 use lru::LruCache;
 use mesh_portal::version::latest::entity::request::Action;
 use mesh_portal::version::latest::id::Address;
 use mesh_portal::version::latest::messaging::Request;
 use mesh_portal::version::latest::payload::{Payload, Primitive};
 
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, RwLock};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{mpsc, oneshot};
 
@@ -373,34 +374,64 @@ impl <S> ServiceChamber<S> where S: Clone{
 }
 
 
+#[derive(Clone)]
 pub struct JwksCache {
-    map: LruCache<Address,JWKS>
+    api: StarlaneApi,
+    map: Arc<RwLock<LruCache<Address,JWKS>>>
 }
 
 impl JwksCache {
-    pub fn new() -> Self {
+    pub fn new(api: StarlaneApi) -> Self {
         Self {
-            map: LruCache::new(1024)
+            api,
+            map: Arc::new(RwLock::new(LruCache::new(1024)))
         }
     }
 
-    pub async fn validate( &mut self, api: &StarlaneApi, token: &str ) -> Result<ValidJWT,Error>{
+    pub async fn validate( &self, token: &str ) -> Result<ValidJWT,Error>{
         let jwt = UntrustedJwt(token.to_string());
-
-println!("jwt headers: {}", jwt.headers()?);
-println!("jwt claims : {}", jwt.claims()?);
-
         let claims = serde_json::from_str::<JwtClaims>(jwt.claims()?.as_str() )?;
-println!("userbase_ref: {}", claims.userbase_ref);
+        let userbase_address=  Address::from_str(claims.userbase_ref.as_str() )?;
+        let kid = token_kid(token)?.ok_or("token 'kid' (key id) not found")?;
+
+        let jwks = {
+            let mut lock = self.map.write().await;
+            if let Some(jwks) = lock.get( &userbase_address ) {
+                Some(jwks.clone())
+            } else {
+                None
+            }
+        };
+
+        let validations = vec![];
+
+        match jwks {
+            Some(jwks) => {
+                match jwks.find(kid.as_str()) {
+                    None => {}
+                    Some(jwk) => {
+                        return Ok(validate( token, jwk, validations )?)
+                    }
+                }
+            }
+            None => {}
+        }
+
+        // in the case of jwks not being present OR jwk not present in jwks then fetch jwks from UserBase
 
         let action = Action::Msg("GetJwks".to_string());
-        let request = Request::new(action.into(), api.agent.clone(), Address::from_str(claims.userbase_ref.as_str())? );
-        let response = api.exchange(request).await.ok_or()?;
+        let request = Request::new(action.into(), self.api.agent.clone(), Address::from_str(claims.userbase_ref.as_str())? );
+        let response = self.api.exchange(request).await.ok_or()?;
         let jwks = response.core.body.to_text()?;
         let jwks: JWKS = serde_json::from_str(jwks.as_str())?;
-        let kid = token_kid(token)?.ok_or("token 'kid' not found")?;
-        let jwk = jwks.find(kid.as_str()).ok_or("jwks does not contain kid")?;
-        Ok(validate( token, jwk, vec![] )?)
+        {
+            let jwks = jwks.clone();
+            let mut lock = self.map.write().await;
+            lock.put( userbase_address, jwks );
+        }
+
+        let jwk = jwks.find(kid.as_str()).ok_or("cannot find keyId to validate token")?;
+        Ok(validate( token, jwk, validations )?)
     }
 }
 

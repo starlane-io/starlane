@@ -169,6 +169,7 @@ impl UserBaseKeycloakCoreDriver{
     async fn handle_msg( &self, request: Request ) -> Response {
 
         if let Action::Msg(action) =&request.core.action {
+println!("UserBase<Keycloak> ... Handle Message action: {}", action );
             match action.as_str() {
                 "GetJwks" => request.clone().payload_result(self.handle_get_jwks(&request).await),
                 _ => {
@@ -193,9 +194,6 @@ impl UserBaseKeycloakCoreDriver{
             .send()
             .await?;
         let jwks = jwks.text().await?;
-        println!("jwks: {}", jwks);
-        // just make sure it is property formated
-        serde_json::from_str(jwks.as_str())?;
 
         Ok(Payload::Primitive(Primitive::Text(jwks)))
     }

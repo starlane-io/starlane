@@ -23,7 +23,7 @@ use http::StatusCode;
 use mesh_portal::version::latest::entity::response::ResponseCore;
 use mesh_portal::version::latest::id::Address;
 use mesh_portal::version::latest::messaging::{Request, Response};
-use mesh_portal::version::latest::payload::{Payload, Primitive};
+use mesh_portal::version::latest::payload::{Errors, Payload, Primitive};
 
 pub struct Delivery<M>
 where
@@ -166,8 +166,32 @@ impl Delivery<Request>
         let request = self.get_request()?;
         let core = ResponseCore {
             headers: Default::default(),
-            status: StatusCode::from_u16(500).unwrap(),
+            status: StatusCode::from_u16(404).unwrap(),
             body: Payload::Empty
+        };
+        let response = Response {
+            id: unique_id(),
+            to: request.from,
+            from: request.to,
+            core,
+            response_to: request.id
+        };
+
+        let proto = self
+            .star_message
+            .reply(StarMessagePayload::Response(response));
+        self.skel.messaging_api.star_notify(proto);
+        Ok(())
+    }
+
+    pub fn err(self, status: u16, message: &str ) ->Result<(),Error> {
+
+        let request = self.get_request()?;
+
+        let core = ResponseCore {
+            headers: Default::default(),
+            status: StatusCode::from_u16(status)?,
+            body: Payload::Primitive(Primitive::Errors(Errors::default(message)))
         };
         let response = Response {
             id: unique_id(),

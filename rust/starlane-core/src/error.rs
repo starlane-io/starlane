@@ -19,10 +19,12 @@ use zip::result::ZipError;
 use crate::fail::Fail;
 use crate::star::core::resource::registry::RegError;
 use actix_web::ResponseError;
+use alcoholic_jwt::ValidationError;
 use ascii::FromAsciiError;
 use handlebars::RenderError;
 use http::header::{InvalidHeaderName, InvalidHeaderValue, ToStrError};
 use http::method::InvalidMethod;
+use http::status::InvalidStatusCode;
 use http::uri::InvalidUri;
 use keycloak::KeycloakError;
 use mesh_portal::error::MsgErr;
@@ -396,7 +398,15 @@ impl From<reqwest::Error> for Error {
 
 impl From<alcoholic_jwt::ValidationError> for Error {
     fn from(err: alcoholic_jwt::ValidationError) -> Self {
-        Error::from_internal("jwt token validation error")
+        match err {
+            ValidationError::InvalidComponents => Self::with_status( 400, "Invalid Jwt Components"),
+            ValidationError::InvalidBase64(err) => Self::with_status( 400, format!("Invalid Jwt Base64: {}", err.to_string()).as_str() ),
+            ValidationError::InvalidJWK =>Self::with_status( 500, "Invalid Jwk"),
+            ValidationError::InvalidSignature => Self::with_status( 400, "Invalid Signature"),
+            ValidationError::OpenSSL(err) => Self::with_status( 500, format!("OpenSSL: {}",err.to_string()).as_str()),
+            ValidationError::JSON(json) => Self::with_status( 400, format!("JSON : {}",json.to_string()).as_str()),
+            ValidationError::InvalidClaims(claim) => {Self::with_status( 400, "Invalid claims")}
+        }
     }
 }
 
@@ -438,5 +448,10 @@ impl Into<MsgErr> for Error {
 impl From<MsgErr> for Error {
     fn from(err: MsgErr) -> Self {
         Error::from_internal(err)
+    }
+}
+impl From<InvalidStatusCode> for Error{
+    fn from(error: InvalidStatusCode) -> Self {
+        Error::from_internal(error)
     }
 }

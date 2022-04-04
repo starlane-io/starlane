@@ -21,11 +21,11 @@ use tokio::sync::mpsc;
 use crate::command::cli::outlet::Frame;
 use crate::command::execute::CommandExecutor;
 use crate::command::parse::command_line;
+use crate::endpoint::{AuthRequestFrame, EndpointResponse, Service};
 use crate::error::Error;
 use crate::star::shell::sys::SysResource;
 use crate::star::StarSkel;
 use crate::starlane::api::StarlaneApi;
-use crate::starlane::{AuthRequestFrame, AuthResponseFrame, ServiceSelection, ServiceSelectionResponse};
 
 
 pub mod inlet {
@@ -256,28 +256,31 @@ impl CliClient {
             };
         let (reader,writer) = stream.into_split();
 
-        let mut reader : FrameReader<ServiceSelectionResponse> = FrameReader::new( PrimitiveFrameReader::new( reader ));
-        let mut writer : FrameWriter<ServiceSelection>  = FrameWriter::new( PrimitiveFrameWriter::new( writer ));
+        let mut reader = PrimitiveFrameReader::new(reader);
+        let mut writer = PrimitiveFrameWriter::new(writer);
 
-info!("sending ServiceSelection::Cli" );
-        writer.write(ServiceSelection::Cli ).await?;
-info!("waiting for ServiceSelectionResponse::Cli" );
-        reader.read().await?;
-info!("moving on..." );
+        let mut reader : FrameReader<EndpointResponse> = FrameReader::new( reader );
+        let mut writer : FrameWriter<AuthRequestFrame>  = FrameWriter::new(  writer );
 
-        let mut reader : FrameReader<AuthResponseFrame> = FrameReader::new( reader.done() );
-        let mut writer : FrameWriter<AuthRequestFrame>  = FrameWriter::new(  writer.done() );
-
-info!("sending token {}", token );
+        info!("sending token {}", token );
         // first send token
         writer.write(AuthRequestFrame::Token(token)).await?;
 
-        let response = reader.read().await?;
+        info!("about to read auth response..." );
+        reader.read().await?.to_result()?;
+        info!("got token ok response... ");
 
+        let mut reader : FrameReader<EndpointResponse> = FrameReader::new( reader.done() );
+        let mut writer : FrameWriter<Service>  = FrameWriter::new( writer.done() );
+
+info!("sending ServiceSelection::Cli" );
+        writer.write(Service::Cli ).await?;
+info!("waiting for ServiceSelectionResponse::Cli" );
+        reader.read().await?.to_result()?;
+info!("moving on..." );
 
         let mut reader : FrameReader<outlet::Frame> = FrameReader::new( reader.done() );
         let mut writer : FrameWriter<inlet::Frame>  = FrameWriter::new( writer.done() );
-
 
         Ok(Self {
             reader,
