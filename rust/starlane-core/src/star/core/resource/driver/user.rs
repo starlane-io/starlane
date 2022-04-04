@@ -102,12 +102,12 @@ impl ResourceCoreDriver for UserBaseKeycloakCoreDriver {
             }
         };
 
-        let registration_email_as_username = assign.stub.properties.get("registration-email-as-username" ).map_or( None, |x|{ Some(x.value=="true") });
-        let verify_email= assign.stub.properties.get("verify-email" ).map_or( None, |x|{ Some(x.value=="true") });
 
-        if is_hyper_userbase(&assign.stub.address )
+        if is_hyper_userbase(&assign.stub.address)
         {
-            match self.admin.update_realm_for_address("master".to_string(), &assign.stub.address, Some(false), Some(false)).await
+            let sso_session_max_lifespan = assign.stub.properties.get("sso-session-max-lifespan" ).ok_or("cannot get value for required property 'sso-session-max-lifespan'")?.value.clone();
+            self.admin.init_realm_for_address("master".to_string(), &assign.stub.address ).await?;
+            match self.admin.update_realm_for_address("master".to_string(), &assign.stub.address, Some(false), Some(false), Some(sso_session_max_lifespan)).await
             {
                 Err(err) => {
                     error!("{}",err.to_string());
@@ -118,7 +118,11 @@ impl ResourceCoreDriver for UserBaseKeycloakCoreDriver {
         }
         else
         {
-            match self.admin.create_realm_from_address(&assign.stub.address, registration_email_as_username, verify_email).await
+            let registration_email_as_username = assign.stub.properties.get("registration-email-as-username" ).map_or( None, |x|{ Some(x.value=="true") });
+            let verify_email= assign.stub.properties.get("verify-email" ).map_or( None, |x|{ Some(x.value=="true") });
+            let sso_session_max_lifespan = assign.stub.properties.get("sso-session-max-lifespan" ).ok_or("cannot get value for required property 'sso-session-max-lifespan'")?.value.clone();
+
+            match self.admin.create_realm_from_address(&assign.stub.address, registration_email_as_username, verify_email, Some(sso_session_max_lifespan)).await
             {
                 Err(err) => {
                     error!("{}",err.to_string());
@@ -545,7 +549,7 @@ impl StarlaneKeycloakAdmin {
         Ok(())
     }
 
-    pub async fn create_realm_from_address(&self, realm_address: &Address, registration_email_as_username: Option<bool>, verify_email: Option<bool> ) -> Result<(),Error> {
+    pub async fn create_realm_from_address(&self, realm_address: &Address, registration_email_as_username: Option<bool>, verify_email: Option<bool>, sso_session_max_lifespan: Option<String> ) -> Result<(),Error> {
         let realm = normalize_realm(realm_address);
         self.admin
             .post(RealmRepresentation {
@@ -557,11 +561,31 @@ impl StarlaneKeycloakAdmin {
                 ..Default::default()
             })
             .await?;
-        self.update_realm_for_address(realm,realm_address,registration_email_as_username,verify_email).await?;
+        self.init_realm_for_address(realm,&realm_address).await?;
+        Ok(())
+    }
+    pub async fn update_realm_for_address(&self, realm: String, realm_address: &Address, registration_email_as_username: Option<bool>, verify_email: Option<bool>, sso_session_max_lifespan: Option<String> ) -> Result<(),Error> {
+
+        let sso_session_max_lifespan = match sso_session_max_lifespan {
+            None => None,
+            Some(sso_session_max_lifespan) => Some(i32::from_str(sso_session_max_lifespan.as_str())?)
+        };
+
+        self.admin
+            .realm_put(&realm, RealmRepresentation {
+                realm: Some(realm.clone().into()),
+                enabled: Some(true),
+                duplicate_emails_allowed: Some(false),
+                registration_email_as_username,
+                verify_email,
+                sso_session_max_lifespan,
+                ..Default::default()
+            })
+            .await?;
         Ok(())
     }
 
-    pub async fn update_realm_for_address(&self, realm: String, realm_address: &Address, registration_email_as_username: Option<bool>, verify_email: Option<bool> ) -> Result<(),Error> {
+    pub async fn init_realm_for_address(&self, realm: String, realm_address: &Address) -> Result<(),Error> {
         let client_id = "${client_admin-cli}"; let clients = self.admin.realm_clients_get(realm.clone().as_str(), None,None,None,None,None).await?; let client_admin_cli_id = clients.into_iter().find_map( |client| {
             if let Some(name) = client.name {
                 if client_id == name {
@@ -654,6 +678,8 @@ impl StarlaneKeycloakAdmin {
 
         Ok(())
     }
+
+
 
     pub async fn select_all(&self, realm: &Address, first: i32, max: i32) -> Result<Vec<UserRepresentation>,Error> {
         let realm = normalize_realm(realm);

@@ -33,7 +33,7 @@ use crate::logger::{elog, LogInfo, StaticLogInfo};
 use crate::message::{MessageExpect, ProtoStarMessage, ReplyKind};
 use crate::names::Name;
 use crate::resource::BaseKind::Mechtron;
-use crate::resource::property::{AddressPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPermit, PropertySource};
+use crate::resource::property::{AddressPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPermit, PropertySource, U64Pattern};
 use crate::star::{StarInfo, StarKey, StarSkel};
 use crate::star::core::resource::driver::user::UsernamePattern;
 use crate::star::shell::wrangler::{StarWrangle};
@@ -777,5 +777,6 @@ fn userbase_properties_config() -> PropertiesConfig {
     builder.add("config", Box::new(AddressPattern{}), false, true, PropertySource::Shell, None, false, vec![] );
     builder.add("registration-email-as-username", Box::new(BoolPattern{}), false, false, PropertySource::Shell, Some("true".to_string()), false, vec![] );
     builder.add("verify-email", Box::new(BoolPattern{}), false, false, PropertySource::Shell, Some("false".to_string()), false, vec![] );
+    builder.add("sso-session-max-lifespan", Box::new(U64Pattern{}), false, true, PropertySource::Core, Some("315360000".to_string()), false, vec![] );
     builder.build()
 }

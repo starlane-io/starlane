@@ -209,7 +209,7 @@ async fn exec_command_line(client: CliClient, line: String) -> Result<(CliClient
             }
         }
     }
-    Err("client disconnected unexpect".into())
+    Err("client disconnected unexpected".into())
 }
 
 
@@ -302,7 +302,6 @@ pub async fn client() -> Result<CliClient, Error> {
                     }
                 }
             }
-
         }
     }
 

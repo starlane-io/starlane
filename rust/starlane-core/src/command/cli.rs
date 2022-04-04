@@ -262,22 +262,16 @@ impl CliClient {
         let mut reader : FrameReader<EndpointResponse> = FrameReader::new( reader );
         let mut writer : FrameWriter<AuthRequestFrame>  = FrameWriter::new(  writer );
 
-        info!("sending token {}", token );
         // first send token
         writer.write(AuthRequestFrame::Token(token)).await?;
 
-        info!("about to read auth response..." );
         reader.read().await?.to_result()?;
-        info!("got token ok response... ");
 
         let mut reader : FrameReader<EndpointResponse> = FrameReader::new( reader.done() );
         let mut writer : FrameWriter<Service>  = FrameWriter::new( writer.done() );
 
-info!("sending ServiceSelection::Cli" );
         writer.write(Service::Cli ).await?;
-info!("waiting for ServiceSelectionResponse::Cli" );
         reader.read().await?.to_result()?;
-info!("moving on..." );
 
         let mut reader : FrameReader<outlet::Frame> = FrameReader::new( reader.done() );
         let mut writer : FrameWriter<inlet::Frame>  = FrameWriter::new( writer.done() );

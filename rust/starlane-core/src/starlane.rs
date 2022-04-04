@@ -349,10 +349,7 @@ impl StarlaneMachineRunner {
                     StarlaneCommand::Listen{machine, tx} => {
                         self.listen(machine, tx);
                     }
-                    StarlaneCommand::AddStream(mut stream) => {
 
-
-                    }
                     StarlaneCommand::GetProtoArtifactCachesFactory(tx) => {
                         match self.artifact_caches.as_ref() {
                             None => {
@@ -831,7 +828,6 @@ pub enum StarlaneCommand {
     ConstellationCreate(ConstellationCreate),
     StarlaneApiSelectBest(oneshot::Sender<Result<StarlaneApi, Error>>),
     Listen{ machine: StarlaneMachine, tx: oneshot::Sender<Result<(), Error>> },
-    AddStream(TcpStream),
     GetProtoArtifactCachesFactory(oneshot::Sender<Option<Arc<ProtoArtifactCachesFactory>>>),
     StartMechtronPortal(oneshot::Sender<Result<mpsc::Sender<TcpServerCall>,Error>>),
     Shutdown,

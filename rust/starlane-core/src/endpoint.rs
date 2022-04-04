@@ -71,7 +71,6 @@ impl ServicesEndpoint {
 impl ServicesEndpointRunner {
 
     pub async fn handle( &mut self, stream: TcpStream ) -> Result<(),Error>{
-        println!("adding Stream!");
         let (mut reader, mut writer) = stream.into_split();
         let mut reader = PrimitiveFrameReader::new(reader);
         let mut writer = PrimitiveFrameWriter::new(writer );
@@ -80,11 +79,9 @@ impl ServicesEndpointRunner {
         let (reader,writer) = {
             let mut reader :FrameReader<AuthRequestFrame>= FrameReader::new(reader);
             let mut writer :FrameWriter<EndpointResponse>= FrameWriter::new(writer );
-            info!("reading auth token...");
             async fn auth(end: &mut ServicesEndpointRunner, reader: & mut FrameReader<AuthRequestFrame>) -> Result<(),Error> {
                 let request = reader.read().await?;
                 let token = request.to_string();
-                info!("TOKEN: {}",token);
                 end.jwksCache.validate(token.as_str()).await?;
                 Ok(())
             }
@@ -101,7 +98,6 @@ impl ServicesEndpointRunner {
         };
 
         let (reader,writer, service) = {
-            info!("service selection...");
             let mut reader: FrameReader<Service> = FrameReader::new(reader);
             let mut writer: FrameWriter<EndpointResponse>= FrameWriter::new(writer );
             match reader.read().await {
@@ -118,11 +114,9 @@ impl ServicesEndpointRunner {
 
         match service {
             Service::Cli => {
-                info!("Cli Service selected");
                 let mut writer = FrameWriter::new( writer);
                 writer.write( EndpointResponse::Ok).await?;
                 let mut writer = writer.done();
-                info!("ServiceSelectionResponse::Cli sent...");
 
                 let api = self.api.clone();
                 tokio::spawn( async move {

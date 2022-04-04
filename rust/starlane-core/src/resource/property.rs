@@ -73,6 +73,24 @@ impl PropertyPattern for AddressPattern{
 }
 
 #[derive(Clone)]
+pub struct U64Pattern{}
+
+impl PropertyPattern for U64Pattern{
+    fn is_match(&self, value: &String) -> Result<(), Error> {
+        use std::str::FromStr;
+        match u64::from_str(value.as_str()) {
+            Ok(_) => {
+                Ok(())
+            }
+            Err(err) => {
+                Err(err.to_string().into())
+            }
+
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct BoolPattern{}
 
 impl PropertyPattern for BoolPattern{
