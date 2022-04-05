@@ -369,12 +369,8 @@ impl RegistryComponent {
 
             let parent = address.parent().expect("expecting parent since we have already established the segments are >= 2");
             let address_segment = address.last_segment().expect("expecting a last_segment since we know segments are >= 2");
-            let request= Request {
-                id: unique_id(),
-                from: skel.info.address.clone(),
-                to: parent.clone(),
-                core: Action::Rc(Rc::Query(Query::AddressKindPath)).into()
-            };
+            let request= Request::new(Action::Rc(Rc::Query(Query::AddressKindPath)).into(), skel.info.address.clone(), parent.clone() );
+
             let response = skel.messaging_api.request(request).await;
 
             let parent_kind_path = response.core.body;
