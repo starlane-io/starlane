@@ -94,7 +94,7 @@ async fn go() -> Result<(),Error> {
         let password = args.value_of("password").unwrap();
         login(hostname, oauth_url, username, password ).await?;
     } else if let Option::Some(serve) = matches.subcommand_matches("serve") {
-            let starlane = StarlaneMachine::new("server".to_string()).expect("StarlaneMachine server");
+            let starlane = StarlaneMachine::new("server".to_string()).await.expect("StarlaneMachine server");
 
             let layout = match serve.value_of("with-external") {
                 Some(value) => {

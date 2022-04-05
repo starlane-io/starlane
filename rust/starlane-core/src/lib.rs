@@ -77,6 +77,7 @@ pub mod command;
 pub mod user;
 pub mod mechtron;
 pub mod endpoint;
+pub mod registry;
 
 lazy_static! {
     static ref VERSION: semver::Version = {

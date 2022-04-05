@@ -94,3 +94,4 @@ http = "0.2.6"
 http-serde = "1.1.0"
 tiny_http = "0.11.0"
 ascii = "1.0.0"
+sqlx = { version = "0.5.11", features = [ "runtime-tokio-rustls", "postgres" ] }

@@ -43,6 +43,7 @@ use crate::mechtron::portal_client::MechtronPortalClient;
 use crate::proto::{
     local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoTunnel,
 };
+use crate::registry::Registry;
 
 use crate::star::surface::SurfaceApi;
 use crate::star::{ConstellationBroadcast, StarKind, StarStatus};
@@ -77,15 +78,16 @@ pub struct StarlaneMachine {
     tx: mpsc::Sender<StarlaneCommand>,
     run_complete_signal_tx: broadcast::Sender<()>,
     machine_filesystem: Arc<MachineFileSystem>,
-    portals: Arc<DashMap<String,Portal>>
+    portals: Arc<DashMap<String,Portal>>,
+    registry: Arc<Registry>
 }
 
 impl StarlaneMachine {
-    pub fn new(name: MachineName) -> Result<Self, Error> {
-        Self::new_with_artifact_caches(name, Option::None)
+    pub async fn new(name: MachineName) -> Result<Self, Error> {
+        Self::new_with_artifact_caches(name, Option::None).await
     }
 
-    pub fn new_with_artifact_caches(
+    pub async fn new_with_artifact_caches(
         name: MachineName,
         artifact_caches: Option<Arc<ProtoArtifactCachesFactory>>
     ) -> Result<Self, Error> {
@@ -95,7 +97,12 @@ impl StarlaneMachine {
         let delete_data_on_start = std::env::var("STARLANE_DELETE_DATA_ON_START").unwrap_or("true".to_string()).parse::<bool>().unwrap_or(true);
 
         if delete_cache_on_start {
-            fs::remove_dir_all(STARLANE_CACHE_DIR.to_string() ).unwrap_or_default();
+            match fs::remove_dir_all(STARLANE_CACHE_DIR.to_string() ) {
+                Ok(_) => {}
+                Err(err) => {
+                    error!("{}",err.to_string());
+                }
+            }
         }
         if delete_data_on_start {
             fs::remove_dir_all(STARLANE_DATA_DIR.to_string() ).unwrap_or_default();
@@ -104,11 +111,13 @@ impl StarlaneMachine {
         let runner = StarlaneMachineRunner::new_with_artifact_caches(name, artifact_caches)?;
         let tx = runner.command_tx.clone();
         let run_complete_signal_tx = runner.run();
+        let registry = Registry::new().await?;
         let starlane = Self {
             tx: tx,
             run_complete_signal_tx: run_complete_signal_tx,
             machine_filesystem: Arc::new(MachineFileSystem::new()?),
-            portals: Arc::new(DashMap::new())
+            portals: Arc::new(DashMap::new()),
+            registry: Arc::new(registry)
         };
 
         Result::Ok(starlane)

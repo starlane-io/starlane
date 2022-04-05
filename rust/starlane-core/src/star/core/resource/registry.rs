@@ -643,16 +643,16 @@ pub struct Registration {
     pub properties: SetProperties
 }
 
-struct RegistryParams {
-    address_segment: String,
-    resource_type: String,
-    kind: Option<String>,
-    vendor: Option<String>,
-    product: Option<String>,
-    variant: Option<String>,
-    version: Option<String>,
-    version_variant: Option<String>,
-    parent: String,
+pub struct RegistryParams {
+    pub address_segment: String,
+    pub resource_type: String,
+    pub kind: Option<String>,
+    pub vendor: Option<String>,
+    pub product: Option<String>,
+    pub variant: Option<String>,
+    pub version: Option<String>,
+    pub version_variant: Option<String>,
+    pub parent: String,
 }
 
 impl RegistryParams {

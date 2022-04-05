@@ -30,6 +30,7 @@ use keycloak::KeycloakError;
 use mesh_portal::error::MsgErr;
 use mesh_portal_versions::error::StatusErr;
 use nom_supreme::error::ErrorTree;
+use sqlx::error::DatabaseError;
 use tokio::task::JoinError;
 use wasmer::{CompileError, ExportError, RuntimeError};
 
@@ -455,3 +456,18 @@ impl From<InvalidStatusCode> for Error{
         Error::from_internal(error)
     }
 }
+
+
+impl From<sqlx::Error> for Error{
+    fn from(error: sqlx::Error) -> Self {
+        match error.into_database_error() {
+            None => {
+                Error::from_internal("sqlx::Error" )
+            }
+            Some(err) => {
+                Error::from_internal(err.message() )
+            }
+        }
+    }
+}
+
