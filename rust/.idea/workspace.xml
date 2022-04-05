@@ -6,8 +6,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlane_controller.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlane_controller.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/registry.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/registry.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
