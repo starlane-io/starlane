@@ -1,6 +1,6 @@
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
 use mesh_portal::version::latest::id::Address;
-use mesh_portal::version::latest::resource::ResourceStub;
+use mesh_portal::version::latest::resource::{ResourceStub, Status};
 use sqlx::{Connection, Executor, Pool, Postgres, Transaction};
 use sqlx::postgres::{PgArguments, PgPoolOptions};
 use crate::error::Error;
@@ -55,7 +55,7 @@ impl Registry {
          variant TEXT,
          version TEXT,
          version_variant TEXT,
-         shell TEXT,
+         star TEXT,
          status TEXT NOT NULL,
          sequence INTEGER DEFAULT 0,
          UNIQUE(parent,address_segment)
@@ -116,7 +116,15 @@ impl Registry {
         Ok(())
     }
 
-    async fn register( &self, registration: Registration ) -> Result<(),Error> {
+    async fn nuke( &self) -> Result<(),Error>{
+        let mut conn = self.pool.acquire().await?;
+        let mut trans = conn.begin().await?;
+        trans.execute("DELETE FROM resources").await?;
+        trans.commit().await?;
+        Ok(())
+    }
+
+    async fn register( &self, registration: &Registration ) -> Result<(),Error> {
         /*
         async fn check<'a>( registration: &Registration,  trans:&mut Transaction<Postgres>, ) -> Result<(),RegError> {
             let params = RegistryParams::from_registration(registration)?;
@@ -133,7 +141,8 @@ impl Registry {
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
             let params = RegistryParams::from_registration(&registration)?;
-            let statement = format!("INSERT INTO resources (address_segment,resource_type,kind,vendor,product,variant,version,version_variant,parent,status) VALUES ('{}','{}','{}','{}','{}','{}','{}','{}','{}','Pending')", params.address_segment,params.resource_type,params.kind.unwrap_or("null".to_string()),params.vendor.unwrap_or("null".to_string()),params.product.unwrap_or("null".to_string()),params.variant.unwrap_or("null".to_string()),params.version.unwrap_or("null".to_string()),params.version_variant.unwrap_or("null".to_string()),params.parent);
+            let statement = format!("INSERT INTO resources (address_segment,resource_type,kind,vendor,product,variant,version,version_variant,parent,status) VALUES ('{}','{}',{},{},{},{},{},{},'{}','Pending')", params.address_segment,params.resource_type,opt(&params.kind),opt(&params.vendor),opt(&params.product),opt(&params.variant),opt(&params.version),opt(&params.version_variant),params.parent);
+println!("statement: {}",statement);
             trans.execute(statement.as_str()).await?;
 
                 for (_,property_mod) in registration.properties.iter() {
@@ -157,46 +166,79 @@ impl Registry {
         Ok(())
     }
 
-    pub async fn assign(&self, address: Address, host: StarKey) -> Result<(),Error> {
+    pub async fn assign(&self, address: &Address, host: &StarKey) -> Result<(),Error> {
 
             let parent = address.parent().ok_or("expecting parent since we have already established the segments are >= 2")?;
             let address_segment = address.last_segment().ok_or("expecting a last_segment since we know segments are >= 2")?;
-        let statement = format!("UPDATE resources SET shell='{}' WHERE parent='{}' AND address_segment='{}'", host.to_string(),parent.to_string(),address_segment.to_string());
+        let statement = format!("UPDATE resources SET star='{}' WHERE parent='{}' AND address_segment='{}'", host.to_string(),parent.to_string(),address_segment.to_string());
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
         trans.execute(statement.as_str()).await?;
         trans.commit().await?;
-//        sqlx::query_as("UPDATE resources SET shell=? WHERE parent=? AND address_segment=?").bind(host.to_string()).bind(parent.to_string()).bind(address_segment.to_string()).execute(&self.pool)?;
         Ok(())
     }
 
+    async fn set_status(&self, address: &Address, status: &Status ) -> Result<(),Error> {
+            let parent = address.parent().ok_or("resource must have a parent")?.to_string();
+            let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
+            let status = status.to_string();
+            let statement = format!("UPDATE resources SET status='{}' WHERE parent='{}' AND address_segment='{}'", status.to_string(), parent, address_segment );
+            let mut conn = self.pool.acquire().await?;
+            let mut trans = conn.begin().await?;
+            trans.execute(statement.as_str()).await?;
+            trans.commit().await?;
+            Ok(())
+    }
+
+}
+
+fn opt( opt: &Option<String> ) -> String {
+    match opt {
+        None => {
+            "null".to_string()
+        }
+        Some(value) => {
+            format!("'{}'",value)
+        }
+    }
 }
 
 #[cfg(test)]
 pub mod test {
     use std::str::FromStr;
     use mesh_portal::version::latest::id::Address;
+    use mesh_portal::version::latest::resource::Status;
     use crate::error::Error;
     use crate::registry::Registry;
     use crate::resource::Kind;
     use crate::star::core::resource::registry::Registration;
     use crate::star::StarKey;
 
+
+    #[tokio::test]
+    pub async fn test_nuke() -> Result<(),Error> {
+        let registry = Registry::new().await?;
+        registry.nuke().await?;
+        Ok(())
+    }
+
     #[tokio::test]
     pub async fn test_create() -> Result<(),Error> {
         let registry = Registry::new().await?;
+        registry.nuke().await?;
+        let address = Address::from_str("localhost:mechtron")?;
         let registration = Registration {
-            address: Address::from_str("localhost:mechtron")?,
+            address: address.clone(),
             kind: Kind::Mechtron,
             registry: Default::default(),
             properties: Default::default()
         };
-        registry.register(registration).await?;
-/*        let address = Address::from_str("localhost:blah")?;
-        let star = StarKey::central();
-        registry.assign(address,star).await?;
+        registry.register(&registration).await?;
 
- */
+        let star = StarKey::central();
+        registry.assign(&address,&star).await?;
+        registry.set_status( &address, &Status::Ready ).await?;
+
         Ok(())
     }
 }
