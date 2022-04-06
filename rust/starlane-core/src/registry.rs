@@ -227,20 +227,18 @@ impl Registry {
                 Ok(Self(v as u64))
             }
         }
+
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
         let parent = address.parent().ok_or("expecting parent since we have already established the segments are >= 2")?;
         let address_segment = address.last_segment().ok_or("expecting a last_segment since we know segments are >= 2")?;
         let statement = format!("UPDATE resources SET sequence=sequence+1 WHERE parent='{}' AND address_segment='{}'", parent.to_string(), address_segment.to_string());
-println!("{}",statement);
 
         trans.execute(statement.as_str()).await?;
         let sequence = sqlx::query_as::<Postgres,Sequence>("SELECT DISTINCT sequence FROM resources WHERE parent=$1 AND address_segment=$2").bind(parent.to_string()).bind(address_segment.to_string()).fetch_one(& mut trans).await?;
-//println!("{:?}",row);
-        let sequence = sequence.0;
         trans.commit().await?;
 
-        Ok(sequence)
+        Ok(sequence.0)
     }
 }
 
