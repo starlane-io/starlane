@@ -1,9 +1,15 @@
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::num::ParseIntError;
 use std::str::FromStr;
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt};
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
+use mesh_portal::version::latest::entity::request::{Action, Rc};
+use mesh_portal::version::latest::entity::request::query::{Query, QueryResult};
 use mesh_portal::version::latest::id::{Address, Specific, Version};
+use mesh_portal::version::latest::messaging::Request;
+use mesh_portal::version::latest::pattern::{AddressKindPath, AddressKindSegment};
+use mesh_portal::version::latest::payload::Primitive;
 use mesh_portal::version::latest::resource::{Property, ResourceStub, Status};
 use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
 use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
@@ -100,23 +106,16 @@ impl Registry {
 
         let address_index = "CREATE UNIQUE INDEX IF NOT EXISTS resource_address_index ON resources(parent,address_segment)";
 
-        println!("starting setup....");
         let mut conn = self.pool.acquire().await?;
         let mut transaction = conn.begin().await?;
-        println!("setup resources...");
         transaction.execute(resources).await?;
         /*
-        println!("setup labels...");
         transaction.execute(labels).await?;
-        println!("setup tags...");
         transaction.execute(tags).await?;
          */
-        println!("setup properties...");
         transaction.execute(properties).await?;
-        println!("setup address_index ...");
         transaction.execute(address_index).await?;
         transaction.commit().await?;
-        println!("Setup complete.");
 
         Ok(())
     }
@@ -147,7 +146,6 @@ impl Registry {
         let mut trans = conn.begin().await?;
         let params = RegistryParams::from_registration(&registration)?;
         let statement = format!("INSERT INTO resources (address_segment,resource_type,kind,vendor,product,variant,version,version_variant,parent,status) VALUES ('{}','{}',{},{},{},{},{},{},'{}','Pending')", params.address_segment, params.resource_type, opt(&params.kind), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent);
-        println!("statement: {}", statement);
         trans.execute(statement.as_str()).await?;
 
         for (_, property_mod) in registration.properties.iter() {
@@ -258,6 +256,31 @@ impl Registry {
 
         Ok(record)
     }
+
+    pub async fn query(&self, address: &Address, query: &Query ) -> Result<QueryResult,Error> {
+
+            let mut kind_path = AddressKindPath::new( address.route.clone(), vec![] );
+            let route = address.route.clone();
+
+            let mut segments= vec![];
+            for segment in &address.segments{
+                segments.push(segment.clone());
+                let address = Address {
+                    route: route.clone(),
+                    segments: segments.clone()
+                };
+                let record = self.locate( &address ).await?;
+                let kind_segment = AddressKindSegment {
+                    address_segment: record.stub.address.last_segment().ok_or("expected at least one segment")?,
+                    kind: record.stub.kind
+                };
+                kind_path = kind_path.push(kind_segment);
+            }
+       return Ok(QueryResult::AddressKindPath(kind_path));
+
+    }
+
+
 
 }
 
@@ -391,8 +414,11 @@ impl sqlx::FromRow<'_,PgRow> for ResourceRecord {
 
 #[cfg(test)]
 pub mod test {
+    use std::convert::TryInto;
     use std::str::FromStr;
+    use mesh_portal::version::latest::entity::request::query::Query;
     use mesh_portal::version::latest::id::Address;
+    use mesh_portal::version::latest::pattern::AddressKindPath;
     use mesh_portal::version::latest::resource::Status;
     use crate::error::Error;
     use crate::registry::Registry;
@@ -412,6 +438,17 @@ pub mod test {
     pub async fn test_create() -> Result<(),Error> {
         let registry = Registry::new().await?;
         registry.nuke().await?;
+
+        let address = Address::from_str("localhost")?;
+        let registration = Registration {
+            address: address.clone(),
+            kind: Kind::Space,
+            registry: Default::default(),
+            properties: Default::default()
+        };
+        registry.register(&registration).await?;
+
+
         let address = Address::from_str("localhost:mechtron")?;
         let registration = Registration {
             address: address.clone(),
@@ -427,7 +464,8 @@ pub mod test {
         registry.sequence( &address ).await?;
         let record = registry.locate( &address ).await?;
 
-        println!("{:?}", record);
+        let result = registry.query( &address, &Query::AddressKindPath ).await?;
+        let kind_path : AddressKindPath = result.try_into()?;
 
         Ok(())
     }
