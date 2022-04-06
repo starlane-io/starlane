@@ -1,12 +1,14 @@
+use std::collections::HashMap;
 use std::num::ParseIntError;
 use std::str::FromStr;
 use futures::StreamExt;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
-use mesh_portal::version::latest::id::Address;
-use mesh_portal::version::latest::resource::{ResourceStub, Status};
+use mesh_portal::version::latest::id::{Address, Specific, Version};
+use mesh_portal::version::latest::resource::{Property, ResourceStub, Status};
 use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
 use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
 use crate::error::Error;
+use crate::resource::{Kind, ResourceLocation, ResourceRecord, ResourceType};
 use crate::star::core::resource::registry::{RegError, Registration, RegistryParams};
 use crate::star::StarKey;
 
@@ -91,7 +93,7 @@ impl Registry {
 	     resource_id INTEGER NOT NULL,
          key TEXT NOT NULL,
          value TEXT NOT NULL,
-         lock INTEGER NOT NULL,
+         lock BOOLEAN NOT NULL,
          FOREIGN KEY (resource_id) REFERENCES resources (id),
          UNIQUE(resource_id,key)
         )"#;
@@ -240,6 +242,23 @@ impl Registry {
 
         Ok(sequence.0)
     }
+
+    pub async fn locate( &self, address:&Address) -> Result<ResourceRecord,Error> {
+        let mut conn = self.pool.acquire().await?;
+        let parent = address.parent().ok_or("expected a parent")?;
+        let address_segment = address.last_segment().ok_or("expected last address_segment")?.to_string();
+
+        let mut record = sqlx::query_as::<Postgres,ResourceRecord>("SELECT DISTINCT * FROM resources as r WHERE parent=$1 AND address_segment=$2").bind(parent.to_string()).bind(address_segment.clone()).fetch_one(& mut conn).await?;
+        let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=$1 AND address_segment=$2)").bind(parent.to_string()).bind(address_segment).fetch_all(& mut conn).await?;
+        let mut map = HashMap::new();
+        for p in properties {
+            map.insert( p.key.clone(), p.into() );
+        }
+        record.stub.properties = map;
+
+        Ok(record)
+    }
+
 }
 
 fn opt( opt: &Option<String> ) -> String {
@@ -252,6 +271,123 @@ fn opt( opt: &Option<String> ) -> String {
         }
     }
 }
+
+struct LocalProperty {
+    pub key: String,
+    pub value: String,
+    pub locked: bool
+}
+
+impl Into<Property> for LocalProperty {
+    fn into(self) -> Property {
+        Property {
+            key: self.key,
+            value: self.value,
+            locked: self.locked
+        }
+    }
+}
+
+impl sqlx::FromRow<'_,PgRow> for LocalProperty{
+    fn from_row(row: & PgRow) -> Result<Self, sqlx::Error> {
+        let key = row.get("key");
+        let value = row.get("value");
+        let locked = row.get("lock");
+        Ok(LocalProperty {
+            key,
+            value,
+            locked
+        })
+    }
+}
+
+
+impl sqlx::FromRow<'_,PgRow> for ResourceRecord {
+    fn from_row(row: & PgRow) -> Result<Self, sqlx::Error> {
+
+        fn wrap(row: &PgRow) -> Result<ResourceRecord,Error> {
+            let parent: String = row.get("parent");
+            let address_segment: String = row.get("address_segment");
+            let resource_type: String = row.get("resource_type");
+            let kind: Option<String> = row.get("kind");
+            let vendor: Option<String> = row.get("vendor");
+            let product: Option<String> = row.get("product");
+            let variant: Option<String> = row.get("variant");
+            let version: Option<String> = row.get("version");
+            let version_variant: Option<String> = row.get("version_variant");
+            let star: Option<String> = row.get("star");
+            let status: String = row.get("status");
+
+            let address = Address::from_str(parent.as_str())?;
+            let address = address.push(address_segment)?;
+            let resource_type = ResourceType::from_str(resource_type.as_str())?;
+
+            let specific = if let Option::Some(vendor) = vendor {
+                if let Option::Some(product) = product {
+                    if let Option::Some(variant) = variant {
+                        if let Option::Some(version) = version {
+                            let version = if let Option::Some(version_variant) = version_variant {
+                                let version = format!("{}-{}", version, version_variant);
+                                Version::from_str(version.as_str())?
+                            } else {
+                                Version::from_str(version.as_str())?
+                            };
+
+                            Option::Some(Specific {
+                                vendor,
+                                product,
+                                variant,
+                                version
+                            })
+                        } else {
+                            Option::None
+                        }
+                    } else {
+                        Option::None
+                    }
+                } else {
+                    Option::None
+                }
+            } else {
+                Option::None
+            };
+
+            let kind = Kind::from(resource_type, kind, specific)?;
+            let location = match star {
+                Some(star) => {
+                    ResourceLocation::Star(StarKey::from_str(star.as_str())?)
+                }
+                None => {
+                    ResourceLocation::Unassigned
+                }
+            };
+            let status = Status::from_str(status.as_str())?;
+
+            let stub = ResourceStub {
+                address,
+                kind: kind.into(),
+                properties: Default::default(), // not implemented yet...
+                status
+            };
+
+            let record = ResourceRecord {
+                stub: stub,
+                location,
+            };
+
+            Ok(record)
+        }
+
+        match wrap(row) {
+            Ok(record) => Ok(record),
+            Err(err) => {
+                error!("{}", err.to_string());
+                Err(sqlx::error::Error::Decode("resource record".into()))
+            }
+        }
+    }
+}
+
 
 #[cfg(test)]
 pub mod test {
@@ -289,6 +425,9 @@ pub mod test {
         registry.assign(&address,&star).await?;
         registry.set_status( &address, &Status::Ready ).await?;
         registry.sequence( &address ).await?;
+        let record = registry.locate( &address ).await?;
+
+        println!("{:?}", record);
 
         Ok(())
     }

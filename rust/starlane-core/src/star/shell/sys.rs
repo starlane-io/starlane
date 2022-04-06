@@ -170,7 +170,7 @@ impl AsyncProcessor<SysCall> for SysComponent {
                     Some(resource) => {
                         let record = ResourceRecord{
                             stub: resource.stub.clone(),
-                            location: ResourceLocation::Host(self.skel.info.key.clone())
+                            location: ResourceLocation::Star(self.skel.info.key.clone())
                         };
                         tx.send(Ok(record));
                     }

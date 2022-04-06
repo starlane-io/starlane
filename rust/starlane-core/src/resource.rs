@@ -49,7 +49,7 @@ pub mod property;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResourceLocation {
     Unassigned,
-    Host(StarKey)
+    Star(StarKey)
 }
 
 impl ToString for ResourceLocation {
@@ -58,7 +58,7 @@ impl ToString for ResourceLocation {
             ResourceLocation::Unassigned => {
                 "Unassigned".to_string()
             }
-            ResourceLocation::Host(host) => {
+            ResourceLocation::Star(host) => {
                 host.to_string()
             }
         }
@@ -68,10 +68,10 @@ impl ToString for ResourceLocation {
 
 impl ResourceLocation {
     pub fn new(star: StarKey) -> Self {
-        ResourceLocation::Host( star )
+        ResourceLocation::Star( star )
     }
     pub fn root() -> Self {
-        ResourceLocation::Host(StarKey::central())
+        ResourceLocation::Star(StarKey::central())
     }
 
     pub fn ok_or(&self)->Result<StarKey,Error> {
@@ -79,7 +79,7 @@ impl ResourceLocation {
             ResourceLocation::Unassigned => {
                 Err("ResourceLocation is unassigned".into())
             }
-            ResourceLocation::Host(star) => {
+            ResourceLocation::Star(star) => {
                 Ok(star.clone())
             }
         }

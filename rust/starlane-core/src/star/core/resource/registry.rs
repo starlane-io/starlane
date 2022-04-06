@@ -596,7 +596,7 @@ impl RegistryComponent {
             let kind = Kind::from(resource_type, kind, specific)?;
             let host = match host {
                 Some(host) => {
-                    ResourceLocation::Host(StarKey::from_str(host.as_str())?)
+                    ResourceLocation::Star(StarKey::from_str(host.as_str())?)
                 }
                 None => {
                     ResourceLocation::Unassigned
