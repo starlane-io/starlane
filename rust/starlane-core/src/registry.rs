@@ -1,8 +1,11 @@
+use std::num::ParseIntError;
+use std::str::FromStr;
+use futures::StreamExt;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
 use mesh_portal::version::latest::id::Address;
 use mesh_portal::version::latest::resource::{ResourceStub, Status};
-use sqlx::{Connection, Executor, Pool, Postgres, Transaction};
-use sqlx::postgres::{PgArguments, PgPoolOptions};
+use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
+use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
 use crate::error::Error;
 use crate::star::core::resource::registry::{RegError, Registration, RegistryParams};
 use crate::star::StarKey;
@@ -19,11 +22,11 @@ pub struct Registry {
 }
 
 impl Registry {
-    pub async fn new() -> Result<Self,Error> {
+    pub async fn new() -> Result<Self, Error> {
         let pool = PgPoolOptions::new()
             .max_connections(5)
-            .connect(format!("postgres://{}:{}@{}/{}",STARLANE_POSTGRES_USER.as_str(),STARLANE_POSTGRES_PASSWORD.as_str(),STARLANE_POSTGRES_URL.as_str(),STARLANE_POSTGRES_DATABASE.as_str()).as_str()).await?;
-        let registry = Self{
+            .connect(format!("postgres://{}:{}@{}/{}", STARLANE_POSTGRES_USER.as_str(), STARLANE_POSTGRES_PASSWORD.as_str(), STARLANE_POSTGRES_URL.as_str(), STARLANE_POSTGRES_DATABASE.as_str()).as_str()).await?;
+        let registry = Self {
             pool
         };
 
@@ -116,7 +119,7 @@ impl Registry {
         Ok(())
     }
 
-    async fn nuke( &self) -> Result<(),Error>{
+    async fn nuke(&self) -> Result<(), Error> {
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
         trans.execute("DELETE FROM resources").await?;
@@ -124,7 +127,7 @@ impl Registry {
         Ok(())
     }
 
-    async fn register( &self, registration: &Registration ) -> Result<(),Error> {
+    async fn register(&self, registration: &Registration) -> Result<(), Error> {
         /*
         async fn check<'a>( registration: &Registration,  trans:&mut Transaction<Postgres>, ) -> Result<(),RegError> {
             let params = RegistryParams::from_registration(registration)?;
@@ -140,37 +143,35 @@ impl Registry {
         let address = registration.address.clone();
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
-            let params = RegistryParams::from_registration(&registration)?;
-            let statement = format!("INSERT INTO resources (address_segment,resource_type,kind,vendor,product,variant,version,version_variant,parent,status) VALUES ('{}','{}',{},{},{},{},{},{},'{}','Pending')", params.address_segment,params.resource_type,opt(&params.kind),opt(&params.vendor),opt(&params.product),opt(&params.variant),opt(&params.version),opt(&params.version_variant),params.parent);
-println!("statement: {}",statement);
-            trans.execute(statement.as_str()).await?;
+        let params = RegistryParams::from_registration(&registration)?;
+        let statement = format!("INSERT INTO resources (address_segment,resource_type,kind,vendor,product,variant,version,version_variant,parent,status) VALUES ('{}','{}',{},{},{},{},{},{},'{}','Pending')", params.address_segment, params.resource_type, opt(&params.kind), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent);
+        println!("statement: {}", statement);
+        trans.execute(statement.as_str()).await?;
 
-                for (_,property_mod) in registration.properties.iter() {
-                    match property_mod {
-                        PropertyMod::Set{ key, value,lock } => {
-                            let lock:usize = match lock {
-                                true => 1,
-                                false => 0
-                            };
-                            let statement = format!("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM resources WHERE parent='{}' AND address_segment='{}'),'{}','{}',{})", params.parent,params.address_segment,key.to_string(),value.to_string(),lock);
-                            trans.execute(statement.as_str()).await?;
-
-                        }
-                        PropertyMod::UnSet(key) => {
-                            let statement = format!("DELETE FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent='{}' AND address_segment='{}') AND key='{}' AND lock=false", params.parent,params.address_segment,key.to_string());
-                            trans.execute(statement.as_str()).await?;
-                        }
-                    }
+        for (_, property_mod) in registration.properties.iter() {
+            match property_mod {
+                PropertyMod::Set { key, value, lock } => {
+                    let lock: usize = match lock {
+                        true => 1,
+                        false => 0
+                    };
+                    let statement = format!("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM resources WHERE parent='{}' AND address_segment='{}'),'{}','{}',{})", params.parent, params.address_segment, key.to_string(), value.to_string(), lock);
+                    trans.execute(statement.as_str()).await?;
                 }
+                PropertyMod::UnSet(key) => {
+                    let statement = format!("DELETE FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent='{}' AND address_segment='{}') AND key='{}' AND lock=false", params.parent, params.address_segment, key.to_string());
+                    trans.execute(statement.as_str()).await?;
+                }
+            }
+        }
         trans.commit().await?;
         Ok(())
     }
 
-    pub async fn assign(&self, address: &Address, host: &StarKey) -> Result<(),Error> {
-
-            let parent = address.parent().ok_or("expecting parent since we have already established the segments are >= 2")?;
-            let address_segment = address.last_segment().ok_or("expecting a last_segment since we know segments are >= 2")?;
-        let statement = format!("UPDATE resources SET star='{}' WHERE parent='{}' AND address_segment='{}'", host.to_string(),parent.to_string(),address_segment.to_string());
+    pub async fn assign(&self, address: &Address, host: &StarKey) -> Result<(), Error> {
+        let parent = address.parent().ok_or("expecting parent since we have already established the segments are >= 2")?;
+        let address_segment = address.last_segment().ok_or("expecting a last_segment since we know segments are >= 2")?;
+        let statement = format!("UPDATE resources SET star='{}' WHERE parent='{}' AND address_segment='{}'", host.to_string(), parent.to_string(), address_segment.to_string());
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
         trans.execute(statement.as_str()).await?;
@@ -178,18 +179,69 @@ println!("statement: {}",statement);
         Ok(())
     }
 
-    async fn set_status(&self, address: &Address, status: &Status ) -> Result<(),Error> {
-            let parent = address.parent().ok_or("resource must have a parent")?.to_string();
-            let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
-            let status = status.to_string();
-            let statement = format!("UPDATE resources SET status='{}' WHERE parent='{}' AND address_segment='{}'", status.to_string(), parent, address_segment );
-            let mut conn = self.pool.acquire().await?;
-            let mut trans = conn.begin().await?;
-            trans.execute(statement.as_str()).await?;
-            trans.commit().await?;
-            Ok(())
+    async fn set_status(&self, address: &Address, status: &Status) -> Result<(), Error> {
+        let parent = address.parent().ok_or("resource must have a parent")?.to_string();
+        let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
+        let status = status.to_string();
+        let statement = format!("UPDATE resources SET status='{}' WHERE parent='{}' AND address_segment='{}'", status.to_string(), parent, address_segment);
+        let mut conn = self.pool.acquire().await?;
+        let mut trans = conn.begin().await?;
+        trans.execute(statement.as_str()).await?;
+        trans.commit().await?;
+        Ok(())
     }
 
+    async fn set_properties(&self, address: &Address, properties: &SetProperties) -> Result<(), Error> {
+        let mut conn = self.pool.acquire().await?;
+        let mut trans = conn.begin().await?;
+        let parent = address.parent().ok_or("resource must have a parent")?.to_string();
+        let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
+
+        for (_, property_mod) in properties.iter() {
+            match property_mod {
+                PropertyMod::Set { key, value, lock } => {
+                    let lock = match *lock {
+                        true => 1,
+                        false => 0
+                    };
+
+                    let statement = format!("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM resources WHERE parent='{}' AND address_segment='{}'),'{}' ,'{}','{}') ON CONFLICT(resource_id,key) DO UPDATE SET value='{}' WHERE lock=false", parent, address_segment, key.to_string(), value.to_string(), value.to_string(), lock);
+                    trans.execute(statement.as_str()).await?;
+                }
+                PropertyMod::UnSet(key) => {
+                    let statement = format!("DELETE FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent='{}' AND address_segment='{}') AND key='{}' AND lock=false", parent, address_segment, key.to_string());
+                    trans.execute(statement.as_str()).await?;
+                }
+            }
+        }
+        trans.commit().await?;
+        Ok(())
+    }
+
+    async fn sequence(&self, address: &Address) -> Result<u64, Error> {
+        struct Sequence(u64);
+
+        impl sqlx::FromRow<'_,PgRow> for Sequence {
+            fn from_row(row: & PgRow) -> Result<Self, sqlx::Error> {
+                let v : i32 = row.get(0);
+                Ok(Self(v as u64))
+            }
+        }
+        let mut conn = self.pool.acquire().await?;
+        let mut trans = conn.begin().await?;
+        let parent = address.parent().ok_or("expecting parent since we have already established the segments are >= 2")?;
+        let address_segment = address.last_segment().ok_or("expecting a last_segment since we know segments are >= 2")?;
+        let statement = format!("UPDATE resources SET sequence=sequence+1 WHERE parent='{}' AND address_segment='{}'", parent.to_string(), address_segment.to_string());
+println!("{}",statement);
+
+        trans.execute(statement.as_str()).await?;
+        let sequence = sqlx::query_as::<Postgres,Sequence>("SELECT DISTINCT sequence FROM resources WHERE parent=$1 AND address_segment=$2").bind(parent.to_string()).bind(address_segment.to_string()).fetch_one(& mut trans).await?;
+//println!("{:?}",row);
+        let sequence = sequence.0;
+        trans.commit().await?;
+
+        Ok(sequence)
+    }
 }
 
 fn opt( opt: &Option<String> ) -> String {
@@ -238,8 +290,11 @@ pub mod test {
         let star = StarKey::central();
         registry.assign(&address,&star).await?;
         registry.set_status( &address, &Status::Ready ).await?;
+        registry.sequence( &address ).await?;
 
         Ok(())
     }
 }
+
+
 
