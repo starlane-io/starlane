@@ -460,9 +460,9 @@ impl From<InvalidStatusCode> for Error{
 
 impl From<sqlx::Error> for Error{
     fn from(error: sqlx::Error) -> Self {
-        match error.into_database_error() {
+        match error.as_database_error() {
             None => {
-                Error::from_internal("sqlx::Error" )
+                Error::from_internal(format!("{:?}",error) )
             }
             Some(err) => {
                 Error::from_internal(err.message() )

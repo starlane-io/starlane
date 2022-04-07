@@ -21,7 +21,7 @@ use mesh_portal::version::latest::payload::{Primitive, PrimitiveList};
 use mesh_portal::version::latest::resource::{Property, ResourceStub, Status};
 use mesh_portal::version::latest::util::ValuePattern;
 use mesh_portal_versions::version::v0_0_1::entity::request::select::SubSelect;
-use mesh_portal_versions::version::v0_0_1::security::{AccessGrant, AccessGrantKind};
+use mesh_portal_versions::version::v0_0_1::security::{AccessGrant, AccessGrantKind, Access, PermissionsMask, Permissions, PermissionsMaskKind, EnumeratedAccess};
 use mysql::prelude::TextQuery;
 use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
 use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
@@ -29,8 +29,10 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::num::ParseIntError;
 use std::str::FromStr;
+use mesh_portal_versions::version::v0_0_1::config::bind::parse::bind;
 
 lazy_static! {
+    pub static ref HYPERUSER: Address = Address::from_str("hyperspace:users:hyperuser").expect("address");
     pub static ref STARLANE_POSTGRES_URL: String =
         std::env::var("STARLANE_POSTGRES_URL").unwrap_or("localhost".to_string());
     pub static ref STARLANE_POSTGRES_USER: String =
@@ -95,17 +97,19 @@ impl Registry {
          status TEXT NOT NULL,
          sequence INTEGER DEFAULT 0,
          owner TEXT,
+         UNIQUE(address),
          UNIQUE(parent,address_segment)
         )"#;
 
         let access_grants = r#"
        CREATE TABLE IF NOT EXISTS access_grants (
           id SERIAL PRIMARY KEY,
+	      kind TEXT NOT NULL,
+	      data TEXT,
+	      query_root TEXT NOT NULL,
 	      on_point TEXT NOT NULL,
 	      to_point TEXT NOT NULL,
 	      by_particle INTEGER NOT NULL,
-	      kind TEXT NOT NULL,
-	      data TEXT,
           FOREIGN KEY (by_particle) REFERENCES resources (id)
         )"#;
 
@@ -140,9 +144,11 @@ impl Registry {
          UNIQUE(resource_id,key)
         )"#;
 
-        let address_index = "CREATE UNIQUE INDEX IF NOT EXISTS resource_address_index ON resources(parent,address_segment)";
+        let address_index= "CREATE UNIQUE INDEX IF NOT EXISTS resource_address_index ON resources(address)";
+        let address_segment_parent_index = "CREATE UNIQUE INDEX IF NOT EXISTS resource_address_segment_parent_index ON resources(parent,address_segment)";
         let access_grants_index =
-            "CREATE UNIQUE INDEX IF NOT EXISTS on_point_index ON access_grants(on_point)";
+            "CREATE UNIQUE INDEX IF NOT EXISTS query_root_index ON access_grants(query_root)";
+
 
         let mut conn = self.pool.acquire().await?;
         let mut transaction = conn.begin().await?;
@@ -154,6 +160,7 @@ impl Registry {
          */
         transaction.execute(properties).await?;
         transaction.execute(address_index).await?;
+        transaction.execute(address_segment_parent_index).await?;
         transaction.execute(access_grants_index).await?;
         transaction.commit().await?;
 
@@ -572,46 +579,110 @@ impl Registry {
     }
 
     async fn grant(&self, access_grant: &AccessGrant) -> Result<(), Error> {
-        let parent = access_grant
-            .by_particle
-            .clone()
-            .parent()
-            .ok_or("expected a parent")?.to_string();
-        let address_segment = access_grant
-            .by_particle
-            .clone()
-            .last_segment()
-            .ok_or("expected last address_segment")?
-            .to_string();
 
         let mut conn = self.pool.acquire().await?;
         match &access_grant.kind {
             AccessGrantKind::Super => {
-                sqlx::query("INSERT INTO access_grants (kind,on_point,to_point,by_particle) VALUES ('superuser',$1,$2,(SELECT id FROM resources WHERE parent='$3' AND address_segment='$4'))")
+                sqlx::query("INSERT INTO access_grants (kind,query_root,on_point,to_point,by_particle) VALUES ('superuser',$1,$2,$3,(SELECT id FROM resources WHERE address=$4))")
+                    .bind(access_grant.on_point.query_root().to_string())
                     .bind(access_grant.on_point.clone().to_string())
                     .bind(access_grant.to_point.clone().to_string())
-                    .bind(parent)
-                    .bind(address_segment).execute(& mut conn).await?;
+                    .bind(access_grant.by_particle.to_string()).execute(& mut conn).await?;
             }
             AccessGrantKind::Privilege(privilege) => {
-                sqlx::query("INSERT INTO access_grants (kind,data,on_point,to_point,by_particle) VALUES ('privilege',$1,$2,$3,(SELECT id FROM resources WHERE parent='$4' AND address_segment='$5'))")
+                sqlx::query("INSERT INTO access_grants (kind,data,query_root,on_point,to_point,by_particle) VALUES ('privilege',$1,$2,$3,$4(SELECT id FROM resources WHERE address=$5))")
                     .bind(privilege.to_string() )
+                    .bind(access_grant.on_point.query_root().to_string())
                     .bind(access_grant.on_point.clone().to_string())
                     .bind(access_grant.to_point.clone().to_string())
-                    .bind(parent)
-                    .bind(address_segment).execute(& mut conn).await?;
+                    .bind(access_grant.by_particle.to_string()).execute(& mut conn).await?;
             }
             AccessGrantKind::PermissionsMask(mask) => {
-                sqlx::query("INSERT INTO access_grants (kind,data,on_point,to_point,by_particle) VALUES ('permission-mask',$1,$2,$3,(SELECT id FROM resources WHERE parent='$4' AND address_segment='$5'))")
+                sqlx::query("INSERT INTO access_grants (kind,data,query_root,on_point,to_point,by_particle) VALUES ('permission-mask',$1,$2,$3,$4,(SELECT id FROM resources WHERE address=$5))")
                     .bind(mask.to_string() )
+                    .bind(access_grant.on_point.query_root().to_string())
                     .bind(access_grant.on_point.clone().to_string())
                     .bind(access_grant.to_point.clone().to_string())
-                    .bind(parent)
-                    .bind(address_segment).execute(& mut conn).await?;
+                    .bind(access_grant.by_particle.to_string() ).execute(& mut conn).await?;
             }
         }
 
         Ok(())
+    }
+
+    #[async_recursion]
+    pub async fn access( &self, to: &Address, on: &Address ) -> Result<Access,Error> {
+
+        if *HYPERUSER == *to {
+            return Ok(Access::SuperUser);
+        }
+
+        let to_kind_path:AddressKindPath = self.query(&to , &Query::AddressKindPath).await?.try_into()?;
+        let on_kind_path:AddressKindPath = self.query(&on , &Query::AddressKindPath).await?.try_into()?;
+
+        let mut traversal = on.clone();
+        let mut conn = self.pool.acquire().await?;
+        let mut privileges = HashSet::new();
+        let mut permissions = Permissions::none();
+        let mut level_ands: Vec<Vec<PermissionsMask>> = vec![];
+        while !traversal.segments.is_empty() {
+            let mut access_grants= sqlx::query_as::<Postgres,AccessGrantWrapper>("SELECT access_grants.*,resources.address as by_particle FROM access_grants,resources WHERE access_grants.query_root=$1 AND resources.id=access_grants.by_particle").bind(traversal.to_string() ).fetch_all(& mut conn).await?;
+            let mut access_grants:Vec<AccessGrant> = access_grants.into_iter().map(|a|{a.into()}).collect();
+            access_grants.retain( |access_grant| access_grant.to_point.matches(&to_kind_path) && access_grant.on_point.matches(&on_kind_path));
+            // check for any superusers
+            for access_grant in &access_grants {
+                match &access_grant.kind {
+                    AccessGrantKind::Super => {
+                        if let Access::SuperUser = self.access(&access_grant.by_particle, &on).await? {
+                            return Ok(Access::SuperUser)
+                        }
+                    }
+                    AccessGrantKind::Privilege(privilege) => {
+                        privileges.insert(privilege.clone());
+                    }
+                    AccessGrantKind::PermissionsMask(mask) => {
+                        if let PermissionsMaskKind::Or = mask.kind {
+                            permissions.or(&mask.permissions);
+                        }
+                    }
+                }
+            }
+            access_grants.retain( |a| {
+               if let AccessGrantKind::PermissionsMask(mask) = &a.kind {
+                   if let PermissionsMaskKind::And = mask.kind {
+                       return true;
+                   }
+               }
+               false
+            });
+            let ands : Vec<PermissionsMask>= access_grants.into_iter().map( |a| {
+                if let AccessGrantKind::PermissionsMask(mask) = a.kind {
+                    return mask;
+                }
+                panic!("expected a mask")
+            }).collect();
+            // save for later when we traverse back down
+            level_ands.push(ands );
+
+            // now reduce the segments of the traversal
+            traversal.segments.pop();
+        }
+
+        level_ands.reverse();
+        for level in level_ands {
+            for mask in level {
+                permissions.and(&mask.permissions);
+            }
+        }
+
+        let access = EnumeratedAccess {
+           privileges,
+           permissions
+        };
+
+        let access = Access::Enumerated(access);
+
+        Ok(access)
     }
 }
 
@@ -646,6 +717,61 @@ impl sqlx::FromRow<'_, PgRow> for LocalProperty {
         let value = row.get("value");
         let locked = row.get("lock");
         Ok(LocalProperty { key, value, locked })
+    }
+}
+
+pub struct AccessGrantWrapper(AccessGrant);
+
+impl Into<AccessGrant> for AccessGrantWrapper {
+    fn into(self) -> AccessGrant {
+        self.0
+    }
+}
+
+impl sqlx::FromRow<'_, PgRow> for AccessGrantWrapper{
+    fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
+
+
+        fn wrap(row: &PgRow) -> Result<AccessGrantWrapper, Error> {
+            let kind: &str = row.get("kind");
+            let kind = match kind {
+                "superuser" => {
+                    AccessGrantKind::Super
+                },
+                "privilege" => {
+                    let priviledge: String = row.get("kind");
+                    AccessGrantKind::Privilege(priviledge)
+                }
+                "permission-mask" => {
+                    let mask: &str = row.get("data");
+                    let mask = PermissionsMask::from_str(mask)?;
+                    AccessGrantKind::PermissionsMask(mask)
+                }
+                what => {
+                    panic!(format!("don't know how to handle access grant kind {}", what))
+                }
+            };
+
+            let on_point: &str = row.get("on_point");
+            let to_point: &str = row.get("to_point");
+            let by_particle: &str = row.get("by_particle");
+
+           let access = AccessGrant {
+                kind,
+                on_point: AddressKindPattern::from_str(on_point)?,
+                to_point: AddressKindPattern::from_str(to_point)?,
+                by_particle: Address::from_str(by_particle)?,
+            };
+            Ok(AccessGrantWrapper(access))
+        }
+
+        match wrap(row) {
+            Ok(record) => Ok(record),
+            Err(err) => {
+                error!("{}", err.to_string());
+                Err(sqlx::error::Error::Decode(err.into()))
+            }
+        }
     }
 }
 
@@ -728,6 +854,7 @@ impl sqlx::FromRow<'_, PgRow> for ResourceRecord {
             }
         }
     }
+
 }
 
 #[cfg(test)]
@@ -746,6 +873,7 @@ pub mod test {
     use mesh_portal_versions::version::v0_0_1::entity::request::select::SelectKind;
     use std::convert::TryInto;
     use std::str::FromStr;
+    use mesh_portal_versions::version::v0_0_1::security::{Access, AccessGrant, AccessGrantKind};
 
     #[tokio::test]
     pub async fn test_nuke() -> Result<(), Error> {
@@ -892,7 +1020,40 @@ pub mod test {
         };
         registry.register(&registration).await?;
 
+
+        let grant= AccessGrant{
+            kind: AccessGrantKind::Super,
+            on_point: AddressKindPattern::from_str("localhost:**")?,
+            to_point: superuser.clone().try_into()?,
+            by_particle: hyperuser.clone()
+        };
+        registry.grant(&grant).await?;
+
+        let grant= AccessGrant{
+            kind: AccessGrantKind::Super,
+            on_point: AddressKindPattern::from_str("localhost:app:**")?,
+            to_point: app.clone().try_into()?,
+            by_particle: superuser.clone()
+        };
+
+        registry.grant(&grant).await?;
+
+
+        let access = registry.access(&hyperuser,&superuser).await?;
+        assert_eq!(access.is_super(), true);
+
+        let access = registry.access(&superuser,&app ).await?;
+        assert_eq!(access.is_super(), true);
+
+        let access = registry.access(&app,&scott).await?;
+        assert_eq!(access.is_super(), true);
+
+        let access = registry.access(&scott,&app ).await?;
+        assert_eq!(access.is_super(), false);
+
         Ok(())
+
+
 
     }
 }

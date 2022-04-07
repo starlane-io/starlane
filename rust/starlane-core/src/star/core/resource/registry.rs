@@ -39,7 +39,6 @@ use crate::star::{StarKey, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::resource::{ResourceRecord, AssignResourceStateSrc, Resource, ResourceAssign, AssignKind, ResourceLocation, ResourceType, Kind};
 
-use crate::security::permissions::Pattern;
 
 static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_variant,shell,status";
 
