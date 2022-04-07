@@ -1,42 +1,59 @@
-use std::collections::HashMap;
-use std::convert::TryInto;
-use std::num::ParseIntError;
-use std::str::FromStr;
-use futures::{FutureExt, StreamExt};
-use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
-use mesh_portal::version::latest::entity::request::{Action, Rc};
-use mesh_portal::version::latest::entity::request::query::{Query, QueryResult};
-use mesh_portal::version::latest::id::{Address, Specific, Version};
-use mesh_portal::version::latest::messaging::Request;
-use mesh_portal::version::latest::pattern::{AddressKindPath, AddressKindSegment};
-use mesh_portal::version::latest::payload::Primitive;
-use mesh_portal::version::latest::resource::{Property, ResourceStub, Status};
-use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
-use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
 use crate::error::Error;
 use crate::resource::{Kind, ResourceLocation, ResourceRecord, ResourceType};
 use crate::star::core::resource::registry::{RegError, Registration, RegistryParams};
 use crate::star::StarKey;
+use futures::{FutureExt, StreamExt};
+use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
+use mesh_portal::version::latest::entity::request::query::{Query, QueryResult};
+use mesh_portal::version::latest::entity::request::{Action, Rc};
+use mesh_portal::version::latest::id::{Address, Specific, Version};
+use mesh_portal::version::latest::messaging::Request;
+use mesh_portal::version::latest::pattern::{AddressKindPath, AddressKindSegment, ExactSegment, KindPattern, ResourceTypePattern, SegmentPattern};
+use mesh_portal::version::latest::payload::{Primitive, PrimitiveList};
+use mesh_portal::version::latest::resource::{Property, ResourceStub, Status};
+use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
+use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
+use std::collections::HashMap;
+use std::convert::TryInto;
+use std::num::ParseIntError;
+use std::str::FromStr;
+use mesh_portal::version::latest::entity::request::select::Select;
+use mesh_portal::version::latest::pattern::specific::{ProductPattern, VariantPattern, VendorPattern};
+use mesh_portal::version::latest::util::ValuePattern;
+use mesh_portal_versions::version::v0_0_1::entity::request::select::SubSelect;
+use mysql::prelude::TextQuery;
 
 lazy_static! {
-    pub static ref STARLANE_POSTGRES_URL: String= std::env::var("STARLANE_POSTGRES_URL").unwrap_or("localhost".to_string());
-    pub static ref STARLANE_POSTGRES_USER: String= std::env::var("STARLANE_POSTGRES_USER").unwrap_or("postgres".to_string());
-    pub static ref STARLANE_POSTGRES_PASSWORD: String= std::env::var("STARLANE_POSTGRES_PASSWORD").unwrap_or("password".to_string());
-    pub static ref STARLANE_POSTGRES_DATABASE: String= std::env::var("STARLANE_POSTGRES_DATABASE").unwrap_or("postgres".to_string());
+    pub static ref STARLANE_POSTGRES_URL: String =
+        std::env::var("STARLANE_POSTGRES_URL").unwrap_or("localhost".to_string());
+    pub static ref STARLANE_POSTGRES_USER: String =
+        std::env::var("STARLANE_POSTGRES_USER").unwrap_or("postgres".to_string());
+    pub static ref STARLANE_POSTGRES_PASSWORD: String =
+        std::env::var("STARLANE_POSTGRES_PASSWORD").unwrap_or("password".to_string());
+    pub static ref STARLANE_POSTGRES_DATABASE: String =
+        std::env::var("STARLANE_POSTGRES_DATABASE").unwrap_or("postgres".to_string());
 }
 
 pub struct Registry {
-    pool: Pool<Postgres>
+    pool: Pool<Postgres>,
 }
 
 impl Registry {
     pub async fn new() -> Result<Self, Error> {
         let pool = PgPoolOptions::new()
             .max_connections(5)
-            .connect(format!("postgres://{}:{}@{}/{}", STARLANE_POSTGRES_USER.as_str(), STARLANE_POSTGRES_PASSWORD.as_str(), STARLANE_POSTGRES_URL.as_str(), STARLANE_POSTGRES_DATABASE.as_str()).as_str()).await?;
-        let registry = Self {
-            pool
-        };
+            .connect(
+                format!(
+                    "postgres://{}:{}@{}/{}",
+                    STARLANE_POSTGRES_USER.as_str(),
+                    STARLANE_POSTGRES_PASSWORD.as_str(),
+                    STARLANE_POSTGRES_URL.as_str(),
+                    STARLANE_POSTGRES_DATABASE.as_str()
+                )
+                .as_str(),
+            )
+            .await?;
+        let registry = Self { pool };
 
         match registry.setup().await {
             Ok(_) => {
@@ -53,7 +70,7 @@ impl Registry {
     }
 
     async fn setup(&self) -> Result<(), sqlx::Error> {
-//        let database= format!("CREATE DATABASE IF NOT EXISTS {}", STARLANE_POSTGRES_DATABASE );
+        //        let database= format!("CREATE DATABASE IF NOT EXISTS {}", STARLANE_POSTGRES_DATABASE );
 
         let resources = r#"CREATE TABLE IF NOT EXISTS resources (
          id SERIAL PRIMARY KEY,
@@ -92,7 +109,6 @@ impl Registry {
           address TEXT NOT NULL,
           UNIQUE(tag)
         )"#;
-
 
         let properties = r#"CREATE TABLE IF NOT EXISTS properties (
          id SERIAL PRIMARY KEY,
@@ -153,7 +169,7 @@ impl Registry {
                 PropertyMod::Set { key, value, lock } => {
                     let lock: usize = match lock {
                         true => 1,
-                        false => 0
+                        false => 0,
                     };
                     let statement = format!("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM resources WHERE parent='{}' AND address_segment='{}'),'{}','{}',{})", params.parent, params.address_segment, key.to_string(), value.to_string(), lock);
                     trans.execute(statement.as_str()).await?;
@@ -169,9 +185,18 @@ impl Registry {
     }
 
     pub async fn assign(&self, address: &Address, host: &StarKey) -> Result<(), Error> {
-        let parent = address.parent().ok_or("expecting parent since we have already established the segments are >= 2")?;
-        let address_segment = address.last_segment().ok_or("expecting a last_segment since we know segments are >= 2")?;
-        let statement = format!("UPDATE resources SET star='{}' WHERE parent='{}' AND address_segment='{}'", host.to_string(), parent.to_string(), address_segment.to_string());
+        let parent = address
+            .parent()
+            .ok_or("expecting parent since we have already established the segments are >= 2")?;
+        let address_segment = address
+            .last_segment()
+            .ok_or("expecting a last_segment since we know segments are >= 2")?;
+        let statement = format!(
+            "UPDATE resources SET star='{}' WHERE parent='{}' AND address_segment='{}'",
+            host.to_string(),
+            parent.to_string(),
+            address_segment.to_string()
+        );
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
         trans.execute(statement.as_str()).await?;
@@ -180,10 +205,21 @@ impl Registry {
     }
 
     async fn set_status(&self, address: &Address, status: &Status) -> Result<(), Error> {
-        let parent = address.parent().ok_or("resource must have a parent")?.to_string();
-        let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
+        let parent = address
+            .parent()
+            .ok_or("resource must have a parent")?
+            .to_string();
+        let address_segment = address
+            .last_segment()
+            .ok_or("resource must have a last segment")?
+            .to_string();
         let status = status.to_string();
-        let statement = format!("UPDATE resources SET status='{}' WHERE parent='{}' AND address_segment='{}'", status.to_string(), parent, address_segment);
+        let statement = format!(
+            "UPDATE resources SET status='{}' WHERE parent='{}' AND address_segment='{}'",
+            status.to_string(),
+            parent,
+            address_segment
+        );
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
         trans.execute(statement.as_str()).await?;
@@ -191,18 +227,28 @@ impl Registry {
         Ok(())
     }
 
-    async fn set_properties(&self, address: &Address, properties: &SetProperties) -> Result<(), Error> {
+    async fn set_properties(
+        &self,
+        address: &Address,
+        properties: &SetProperties,
+    ) -> Result<(), Error> {
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
-        let parent = address.parent().ok_or("resource must have a parent")?.to_string();
-        let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
+        let parent = address
+            .parent()
+            .ok_or("resource must have a parent")?
+            .to_string();
+        let address_segment = address
+            .last_segment()
+            .ok_or("resource must have a last segment")?
+            .to_string();
 
         for (_, property_mod) in properties.iter() {
             match property_mod {
                 PropertyMod::Set { key, value, lock } => {
                     let lock = match *lock {
                         true => 1,
-                        false => 0
+                        false => 0,
                     };
 
                     let statement = format!("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM resources WHERE parent='{}' AND address_segment='{}'),'{}' ,'{}','{}') ON CONFLICT(resource_id,key) DO UPDATE SET value='{}' WHERE lock=false", parent, address_segment, key.to_string(), value.to_string(), value.to_string(), lock);
@@ -221,76 +267,253 @@ impl Registry {
     async fn sequence(&self, address: &Address) -> Result<u64, Error> {
         struct Sequence(u64);
 
-        impl sqlx::FromRow<'_,PgRow> for Sequence {
-            fn from_row(row: & PgRow) -> Result<Self, sqlx::Error> {
-                let v : i32 = row.get(0);
+        impl sqlx::FromRow<'_, PgRow> for Sequence {
+            fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
+                let v: i32 = row.get(0);
                 Ok(Self(v as u64))
             }
         }
 
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
-        let parent = address.parent().ok_or("expecting parent since we have already established the segments are >= 2")?;
-        let address_segment = address.last_segment().ok_or("expecting a last_segment since we know segments are >= 2")?;
-        let statement = format!("UPDATE resources SET sequence=sequence+1 WHERE parent='{}' AND address_segment='{}'", parent.to_string(), address_segment.to_string());
+        let parent = address
+            .parent()
+            .ok_or("expecting parent since we have already established the segments are >= 2")?;
+        let address_segment = address
+            .last_segment()
+            .ok_or("expecting a last_segment since we know segments are >= 2")?;
+        let statement = format!(
+            "UPDATE resources SET sequence=sequence+1 WHERE parent='{}' AND address_segment='{}'",
+            parent.to_string(),
+            address_segment.to_string()
+        );
 
         trans.execute(statement.as_str()).await?;
-        let sequence = sqlx::query_as::<Postgres,Sequence>("SELECT DISTINCT sequence FROM resources WHERE parent=$1 AND address_segment=$2").bind(parent.to_string()).bind(address_segment.to_string()).fetch_one(& mut trans).await?;
+        let sequence = sqlx::query_as::<Postgres, Sequence>(
+            "SELECT DISTINCT sequence FROM resources WHERE parent=$1 AND address_segment=$2",
+        )
+        .bind(parent.to_string())
+        .bind(address_segment.to_string())
+        .fetch_one(&mut trans)
+        .await?;
         trans.commit().await?;
 
         Ok(sequence.0)
     }
 
-    pub async fn locate( &self, address:&Address) -> Result<ResourceRecord,Error> {
+    pub async fn locate(&self, address: &Address) -> Result<ResourceRecord, Error> {
         let mut conn = self.pool.acquire().await?;
         let parent = address.parent().ok_or("expected a parent")?;
-        let address_segment = address.last_segment().ok_or("expected last address_segment")?.to_string();
+        let address_segment = address
+            .last_segment()
+            .ok_or("expected last address_segment")?
+            .to_string();
 
-        let mut record = sqlx::query_as::<Postgres,ResourceRecord>("SELECT DISTINCT * FROM resources as r WHERE parent=$1 AND address_segment=$2").bind(parent.to_string()).bind(address_segment.clone()).fetch_one(& mut conn).await?;
+        let mut record = sqlx::query_as::<Postgres, ResourceRecord>(
+            "SELECT DISTINCT * FROM resources as r WHERE parent=$1 AND address_segment=$2",
+        )
+        .bind(parent.to_string())
+        .bind(address_segment.clone())
+        .fetch_one(&mut conn)
+        .await?;
         let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=$1 AND address_segment=$2)").bind(parent.to_string()).bind(address_segment).fetch_all(& mut conn).await?;
         let mut map = HashMap::new();
         for p in properties {
-            map.insert( p.key.clone(), p.into() );
+            map.insert(p.key.clone(), p.into());
         }
         record.stub.properties = map;
 
         Ok(record)
     }
 
-    pub async fn query(&self, address: &Address, query: &Query ) -> Result<QueryResult,Error> {
+    pub async fn query(&self, address: &Address, query: &Query) -> Result<QueryResult, Error> {
+        let mut kind_path = AddressKindPath::new(address.route.clone(), vec![]);
+        let route = address.route.clone();
 
-            let mut kind_path = AddressKindPath::new( address.route.clone(), vec![] );
-            let route = address.route.clone();
-
-            let mut segments= vec![];
-            for segment in &address.segments{
-                segments.push(segment.clone());
-                let address = Address {
-                    route: route.clone(),
-                    segments: segments.clone()
-                };
-                let record = self.locate( &address ).await?;
-                let kind_segment = AddressKindSegment {
-                    address_segment: record.stub.address.last_segment().ok_or("expected at least one segment")?,
-                    kind: record.stub.kind
-                };
-                kind_path = kind_path.push(kind_segment);
-            }
-       return Ok(QueryResult::AddressKindPath(kind_path));
-
+        let mut segments = vec![];
+        for segment in &address.segments {
+            segments.push(segment.clone());
+            let address = Address {
+                route: route.clone(),
+                segments: segments.clone(),
+            };
+            let record = self.locate(&address).await?;
+            let kind_segment = AddressKindSegment {
+                address_segment: record
+                    .stub
+                    .address
+                    .last_segment()
+                    .ok_or("expected at least one segment")?,
+                kind: record.stub.kind,
+            };
+            kind_path = kind_path.push(kind_segment);
+        }
+        return Ok(QueryResult::AddressKindPath(kind_path));
     }
 
+    #[async_recursion]
+    pub async fn select(&self, select: &Select) -> Result<PrimitiveList, Error> {
+        let address = select.pattern.query_root();
+
+        let address_kind_path = self.query( &address, &Query::AddressKindPath ).await?.try_into()?;
+
+        let sub_select_hops = select.pattern.sub_select_hops();
+        let sub_select = select.clone().sub_select(address.clone(), sub_select_hops, address_kind_path);
+        let list = self.sub_select(&sub_select).await?;
+        let list = sub_select.into_payload.to_primitive(list)?;
+
+        Ok(list)
+    }
+
+    #[async_recursion]
+    async fn sub_select(&self, sub_select: &SubSelect) -> Result<Vec<ResourceStub>,Error> {
+
+        // build a 'matching so far' query.  Here we will find every child that matches the subselect
+        // these matches are used to then query children for additional matches if there are more hops.
+        // all of these matches will be filtered to see if they match the ENTIRE select before returning results.
+        let mut params: Vec<String> = vec![];
+        let mut where_clause = String::new();
+        let mut index = 1;
+        where_clause.push_str( "parent=$1" );
+        params.push( sub_select.address.to_string() );
+
+        if let Option::Some(hop) = sub_select.hops.first()
+        {
+            match &hop.segment {
+                SegmentPattern::Exact(exact) => {
+                    index = index+1;
+                    where_clause.push_str( format!(" AND address_segment=${}",index).as_str() );
+                    match exact {
+                        ExactSegment::Address(address) => {
+                            params.push( address.to_string() );
+                        }
+                        ExactSegment::Version(version) => {
+                            params.push( version.to_string() );
+                        }
+                    }
+                }
+                _ => {}
+            }
+
+            match &hop.tks.resource_type {
+                ResourceTypePattern::Any => {},
+                ResourceTypePattern::Exact(resource_type)=> {
+                    index = index+1;
+                    where_clause.push_str( format!(" AND resource_type=${}",index).as_str() );
+                    params.push( resource_type.to_string() );
+                },
+            }
+
+            match &hop.tks.kind {
+                KindPattern::Any => {},
+                KindPattern::Exact(kind)=> {
+                    match &kind.kind {
+                        None => {}
+                        Some(sub) => {
+                            index = index+1;
+                            where_clause.push_str(format!(" AND kind=${}", index).as_str());
+                            params.push(sub.clone() );
+                        }
+                    }
+                }
+            }
+
+            match &hop.tks.specific {
+                ValuePattern::Any => {}
+                ValuePattern::None => {}
+                ValuePattern::Pattern(specific) => {
+                    match &specific.vendor {
+                        VendorPattern::Any => {}
+                        VendorPattern::Exact(vendor) => {
+                            index = index+1;
+                            where_clause.push_str(format!(" AND vendor=${}", index).as_str());
+                            params.push(vendor.clone() );
+                        }
+                    }
+                    match &specific.product{
+                        ProductPattern::Any => {}
+                        ProductPattern::Exact(product) => {
+                            index = index+1;
+                            where_clause.push_str(format!(" AND product=${}", index).as_str());
+                            params.push(product.clone() );
+                        }
+                    }
+                    match &specific.variant{
+                        VariantPattern::Any => {}
+                        VariantPattern::Exact(variant) => {
+                            index = index+1;
+                            where_clause.push_str(format!(" AND variant=${}", index).as_str());
+                            params.push(variant.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        let matching_so_far_statement = format!("SELECT DISTINCT * FROM resources as r WHERE {}", where_clause );
+
+        let mut query = sqlx::query_as::<Postgres,ResourceRecord>(matching_so_far_statement.as_str() );
+        for param in params {
+            query = query.bind(param);
+        }
+
+        let mut conn = self.pool.acquire().await?;
+        let mut matching_so_far = query.fetch_all(& mut conn).await?;
+        let mut matching_so_far: Vec<ResourceStub> = matching_so_far.into_iter().map( |r| r.into() ).collect();
+
+        let mut child_stub_matches = vec![];
+
+        // if we have more hops we need to see if there are matching children
+        if !sub_select.hops.is_empty() {
+            let mut hops = sub_select.hops.clone();
+            let hop = hops.first().unwrap();
+            match hop.segment {
+                SegmentPattern::Recursive => {}
+                _ => {
+                    hops.remove(0);
+                }
+            }
+
+            for stub in &matching_so_far {
+                if let Option::Some(last_segment) = stub.address.last_segment() {
+                    let address = sub_select.address.push_segment(last_segment.clone());
+                    let address_tks_path = sub_select.address_kind_path.push(AddressKindSegment {
+                        address_segment: last_segment,
+                        kind: stub.kind.clone()
+                    });
+                    let sub_select = sub_select.clone().sub_select(address.clone(), hops.clone(), address_tks_path);
+                    let more_stubs = self.sub_select(&sub_select).await?;
+                    for stub in more_stubs.into_iter() {
+                            child_stub_matches.push(stub);
+                    }
+                }
+            }
+
+            // the records matched the present hop (which we needed for deeper searches) however
+            // they may not or may not match the ENTIRE select pattern therefore they must be filtered
+            matching_so_far.retain(|stub| {
+                let address_tks_path = sub_select.address_kind_path.push(AddressKindSegment {
+                    address_segment: stub.address.last_segment().expect("expecting at least one segment" ),
+                    kind: stub.kind.clone()
+                });
+                sub_select.pattern.matches(&address_tks_path)
+            });
 
 
+            matching_so_far.append( & mut child_stub_matches );
+        }
+
+        let stubs: Vec<ResourceStub> = matching_so_far.into_iter().map(|record|record.into()).collect();
+
+        Ok(stubs)
+    }
 }
 
-fn opt( opt: &Option<String> ) -> String {
+fn opt(opt: &Option<String>) -> String {
     match opt {
-        None => {
-            "null".to_string()
-        }
+        None => "null".to_string(),
         Some(value) => {
-            format!("'{}'",value)
+            format!("'{}'", value)
         }
     }
 }
@@ -298,7 +521,7 @@ fn opt( opt: &Option<String> ) -> String {
 struct LocalProperty {
     pub key: String,
     pub value: String,
-    pub locked: bool
+    pub locked: bool,
 }
 
 impl Into<Property> for LocalProperty {
@@ -306,29 +529,23 @@ impl Into<Property> for LocalProperty {
         Property {
             key: self.key,
             value: self.value,
-            locked: self.locked
+            locked: self.locked,
         }
     }
 }
 
-impl sqlx::FromRow<'_,PgRow> for LocalProperty{
-    fn from_row(row: & PgRow) -> Result<Self, sqlx::Error> {
+impl sqlx::FromRow<'_, PgRow> for LocalProperty {
+    fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
         let key = row.get("key");
         let value = row.get("value");
         let locked = row.get("lock");
-        Ok(LocalProperty {
-            key,
-            value,
-            locked
-        })
+        Ok(LocalProperty { key, value, locked })
     }
 }
 
-
-impl sqlx::FromRow<'_,PgRow> for ResourceRecord {
-    fn from_row(row: & PgRow) -> Result<Self, sqlx::Error> {
-
-        fn wrap(row: &PgRow) -> Result<ResourceRecord,Error> {
+impl sqlx::FromRow<'_, PgRow> for ResourceRecord {
+    fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
+        fn wrap(row: &PgRow) -> Result<ResourceRecord, Error> {
             let parent: String = row.get("parent");
             let address_segment: String = row.get("address_segment");
             let resource_type: String = row.get("resource_type");
@@ -360,7 +577,7 @@ impl sqlx::FromRow<'_,PgRow> for ResourceRecord {
                                 vendor,
                                 product,
                                 variant,
-                                version
+                                version,
                             })
                         } else {
                             Option::None
@@ -377,12 +594,8 @@ impl sqlx::FromRow<'_,PgRow> for ResourceRecord {
 
             let kind = Kind::from(resource_type, kind, specific)?;
             let location = match star {
-                Some(star) => {
-                    ResourceLocation::Star(StarKey::from_str(star.as_str())?)
-                }
-                None => {
-                    ResourceLocation::Unassigned
-                }
+                Some(star) => ResourceLocation::Star(StarKey::from_str(star.as_str())?),
+                None => ResourceLocation::Unassigned,
             };
             let status = Status::from_str(status.as_str())?;
 
@@ -390,7 +603,7 @@ impl sqlx::FromRow<'_,PgRow> for ResourceRecord {
                 address,
                 kind: kind.into(),
                 properties: Default::default(), // not implemented yet...
-                status
+                status,
             };
 
             let record = ResourceRecord {
@@ -411,31 +624,32 @@ impl sqlx::FromRow<'_,PgRow> for ResourceRecord {
     }
 }
 
-
 #[cfg(test)]
 pub mod test {
-    use std::convert::TryInto;
-    use std::str::FromStr;
-    use mesh_portal::version::latest::entity::request::query::Query;
-    use mesh_portal::version::latest::id::Address;
-    use mesh_portal::version::latest::pattern::AddressKindPath;
-    use mesh_portal::version::latest::resource::Status;
     use crate::error::Error;
     use crate::registry::Registry;
     use crate::resource::Kind;
     use crate::star::core::resource::registry::Registration;
     use crate::star::StarKey;
-
+    use mesh_portal::version::latest::entity::request::query::Query;
+    use mesh_portal::version::latest::id::Address;
+    use mesh_portal::version::latest::pattern::{AddressKindPath, AddressKindPattern};
+    use mesh_portal::version::latest::resource::Status;
+    use std::convert::TryInto;
+    use std::str::FromStr;
+    use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoPayload};
+    use mesh_portal::version::latest::payload::Primitive;
+    use mesh_portal_versions::version::v0_0_1::entity::request::select::SelectKind;
 
     #[tokio::test]
-    pub async fn test_nuke() -> Result<(),Error> {
+    pub async fn test_nuke() -> Result<(), Error> {
         let registry = Registry::new().await?;
         registry.nuke().await?;
         Ok(())
     }
 
     #[tokio::test]
-    pub async fn test_create() -> Result<(),Error> {
+    pub async fn test_create() -> Result<(), Error> {
         let registry = Registry::new().await?;
         registry.nuke().await?;
 
@@ -444,32 +658,40 @@ pub mod test {
             address: address.clone(),
             kind: Kind::Space,
             registry: Default::default(),
-            properties: Default::default()
+            properties: Default::default(),
         };
         registry.register(&registration).await?;
-
 
         let address = Address::from_str("localhost:mechtron")?;
         let registration = Registration {
             address: address.clone(),
             kind: Kind::Mechtron,
             registry: Default::default(),
-            properties: Default::default()
+            properties: Default::default(),
         };
         registry.register(&registration).await?;
 
         let star = StarKey::central();
-        registry.assign(&address,&star).await?;
-        registry.set_status( &address, &Status::Ready ).await?;
-        registry.sequence( &address ).await?;
-        let record = registry.locate( &address ).await?;
+        registry.assign(&address, &star).await?;
+        registry.set_status(&address, &Status::Ready).await?;
+        registry.sequence(&address).await?;
+        let record = registry.locate(&address).await?;
 
-        let result = registry.query( &address, &Query::AddressKindPath ).await?;
-        let kind_path : AddressKindPath = result.try_into()?;
+        let result = registry.query(&address, &Query::AddressKindPath).await?;
+        let kind_path: AddressKindPath = result.try_into()?;
+
+        let pattern = AddressKindPattern::from_str("**")?;
+        let select = Select {
+            pattern,
+            properties: Default::default(),
+            into_payload: SelectIntoPayload::Addresses,
+            kind: SelectKind::Initial
+        };
+
+        let addresses = registry.select(&select).await?;
+
+        assert_eq!( addresses.len(), 2 );
 
         Ok(())
     }
 }
-
-
-
