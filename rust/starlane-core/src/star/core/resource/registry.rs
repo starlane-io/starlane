@@ -812,6 +812,12 @@ impl ToString for RegError {
         }
     }
 }
+impl From<sqlx::Error> for RegError {
+    fn from(e: sqlx::Error) -> Self {
+        RegError::Error(e.into())
+    }
+}
+
 
 impl From<tokio::sync::oneshot::error::RecvError> for RegError {
     fn from(e: tokio::sync::oneshot::error::RecvError) -> Self {

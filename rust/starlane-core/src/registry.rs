@@ -144,7 +144,7 @@ impl Registry {
         Ok(())
     }
 
-    async fn register(&self, registration: &Registration) -> Result<(), Error> {
+    async fn register(&self, registration: &Registration) -> Result<(), RegError> {
         /*
         async fn check<'a>( registration: &Registration,  trans:&mut Transaction<Postgres>, ) -> Result<(),RegError> {
             let params = RegistryParams::from_registration(registration)?;
@@ -156,11 +156,31 @@ impl Registry {
             }
         }
          */
+        struct Count(u64);
 
-        let address = registration.address.clone();
+        impl sqlx::FromRow<'_, PgRow> for Count {
+            fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
+                let v: i64 = row.get(0);
+                Ok(Self(v as u64))
+            }
+        }
+
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
         let params = RegistryParams::from_registration(&registration)?;
+
+        let count = sqlx::query_as::<Postgres, Count>(
+            "SELECT count(*) as count from resources WHERE parent=$1 AND address_segment=$2",
+        )
+            .bind(params.parent.to_string())
+            .bind(params.address_segment.to_string())
+            .fetch_one(&mut trans)
+            .await?;
+
+        if count.0 > 0 {
+            return Err(RegError::Dupe);
+        }
+
         let statement = format!("INSERT INTO resources (address_segment,resource_type,kind,vendor,product,variant,version,version_variant,parent,status) VALUES ('{}','{}',{},{},{},{},{},{},'{}','Pending')", params.address_segment, params.resource_type, opt(&params.kind), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent);
         trans.execute(statement.as_str()).await?;
 
