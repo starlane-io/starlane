@@ -751,7 +751,8 @@ println!("\tprop{}", property.0.clone() );
                     address: address.clone(),
                     kind: child_kind.clone(),
                     registry: create.registry.clone(),
-                    properties
+                    properties,
+                    owner: Address::root()
                 };
 println!("creating {}",address.to_string() );
                 let mut result = self.skel.registry_api.register(registration).await;
@@ -779,6 +780,7 @@ println!("result {}? {}",address.to_string(), result.is_ok() );
                         kind: child_kind.clone(),
                         registry: create.registry.clone(),
                         properties: create.properties.clone(),
+                        owner: Address::root()
                     };
 
                     match self.skel.registry_api.register(registration).await {

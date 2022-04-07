@@ -8,6 +8,7 @@
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/registry.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/registry.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/registry.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/registry.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -78,7 +79,7 @@
       <recent name="$PROJECT_DIR$/starlane-core/src/pattern.rs" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test registry::test::test_create">
+  <component name="RunManager" selected="Cargo.Test registry::test::test_access">
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
       <option name="command" value="run  --bin starlane -- serve " />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -137,8 +138,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test config::parse::test::test_replace" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib config::parse::test::test_replace -- --exact" />
+    <configuration name="Test constellation::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib constellation::test" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -153,8 +154,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test constellation::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib constellation::test" />
+    <configuration name="Test registry::test::test_access" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib registry::test::test_access -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -205,18 +206,18 @@
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test" />
       <item itemvalue="Cargo.Test command::parse::test::test_kind" />
-      <item itemvalue="Cargo.Test config::parse::test::test_replace" />
       <item itemvalue="Cargo.Test config::parse::test::test_rec_command_lines" />
       <item itemvalue="Cargo.Test constellation::test" />
       <item itemvalue="Cargo.Test registry::test::test_create" />
+      <item itemvalue="Cargo.Test registry::test::test_access" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Test registry::test::test_access" />
         <item itemvalue="Cargo.Test registry::test::test_create" />
         <item itemvalue="Cargo.Test command::parse::test::test_kind" />
         <item itemvalue="Cargo.Test constellation::test" />
         <item itemvalue="Cargo.Test config::parse::test::test_rec_command_lines" />
-        <item itemvalue="Cargo.Test config::parse::test::test_replace" />
       </list>
     </recent_temporary>
   </component>

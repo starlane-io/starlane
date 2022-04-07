@@ -640,10 +640,12 @@ pub struct Registration {
     pub address: Address,
     pub kind: Kind,
     pub registry: SetRegistry,
-    pub properties: SetProperties
+    pub properties: SetProperties,
+    pub owner: Address
 }
 
 pub struct RegistryParams {
+    pub address: String,
     pub address_segment: String,
     pub resource_type: String,
     pub kind: Option<String>,
@@ -653,6 +655,7 @@ pub struct RegistryParams {
     pub version: Option<String>,
     pub version_variant: Option<String>,
     pub parent: String,
+    pub owner: Address,
 }
 
 impl RegistryParams {
@@ -714,6 +717,7 @@ impl RegistryParams {
         };
 
         Ok(RegistryParams {
+            address: registration.address.to_string(),
             address_segment,
             parent,
             resource_type,
@@ -722,7 +726,8 @@ impl RegistryParams {
             product,
             variant,
             version,
-            version_variant
+            version_variant,
+            owner: registration.owner.clone()
         })
     }
 }
