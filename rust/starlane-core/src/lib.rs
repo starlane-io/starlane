@@ -35,6 +35,7 @@ extern crate validate;
 extern crate wasmer;
 #[macro_use]
 extern crate async_recursion;
+extern crate core;
 
 
 use std::str::FromStr;
@@ -77,6 +78,7 @@ pub mod user;
 pub mod mechtron;
 pub mod endpoint;
 pub mod registry;
+pub mod binder;
 
 lazy_static! {
     static ref VERSION: semver::Version = {

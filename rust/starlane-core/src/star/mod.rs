@@ -58,6 +58,7 @@ use std::str::FromStr;
 use mesh_portal::version::latest::id::Address;
 use mesh_portal::version::latest::portal;
 use mesh_portal::version::latest::resource::Status;
+use mesh_portal_versions::version::v0_0_1::log::ParticleLogger;
 use mesh_portal_versions::version::v0_0_1::parse::Res;
 use nom::sequence::{preceded, terminated, tuple};
 use nom::multi::many0;
@@ -1203,6 +1204,7 @@ pub struct StarSkel {
     pub persistence: Persistence,
     pub data_access: FileAccess,
     pub machine: StarlaneMachine,
+    pub particle_logger: Arc<dyn ParticleLogger>
 }
 
 impl Debug for StarSkel {

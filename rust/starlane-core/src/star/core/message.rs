@@ -493,7 +493,7 @@ impl PipelineExecutor {
 
                    exec.execute_step(&segment.step )?;
                    exec.execute_stop(&segment.stop ).await?;
-                   if let PipelineStop::Return = segment.stop {
+                   if let PipelineStop::Respond = segment.stop {
                        break;
                    }
                }
@@ -554,7 +554,7 @@ impl PipelineExecutor {
                let response = self.skel.messaging_api.request(request).await;
                self.traversal.push( Message::Response(response));
            }
-           PipelineStop::Return => {
+           PipelineStop::Respond => {
                // while loop will trigger a response
            }
            PipelineStop::CaptureAddress(address) => {

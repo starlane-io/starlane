@@ -79,7 +79,7 @@ pub struct StarlaneMachine {
     run_complete_signal_tx: broadcast::Sender<()>,
     machine_filesystem: Arc<MachineFileSystem>,
     portals: Arc<DashMap<String,Portal>>,
-    registry: Arc<Registry>
+    pub registry: Arc<Registry>
 }
 
 impl StarlaneMachine {

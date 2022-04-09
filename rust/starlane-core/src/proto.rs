@@ -1,3 +1,4 @@
+use core::num::fmt::Part;
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
@@ -7,6 +8,7 @@ use std::sync::Arc;
 use futures::future::select_all;
 use futures::prelude::*;
 use futures::FutureExt;
+use mesh_portal_versions::version::v0_0_1::log::{Level, ParticleLogger};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{broadcast, mpsc};
 use tokio::time::{Duration, Instant};
@@ -221,6 +223,7 @@ impl ProtoStar {
                             watch_api,
                             registry_api,
                             sys_api,
+                            particle_logger: StdOutParticleLogger::new()
                         };
 
                         start_variant(skel.clone(), variant_rx );
@@ -548,4 +551,22 @@ impl RouterCallBooster {
     }
 }
 
+pub struct StdOutParticleLogger;
 
+impl StdOutParticleLogger {
+    pub fn new() -> Self {
+        Self{}
+    }
+}
+
+impl ParticleLogger for StdOutParticleLogger {
+    fn log(&self, log: mesh_portal_versions::version::v0_0_1::log::Log) {
+        match log.level {
+            Level::Trace => {trace!("{}",log.to_string())}
+            Level::Debug => {debug!("{}",log.to_string())}
+            Level::Info => {info!("{}",log.to_string())}
+            Level::Warn => {warn!("{}",log.to_string())}
+            Level::Error => {error!("{}",log.to_string())}
+        }
+    }
+}
