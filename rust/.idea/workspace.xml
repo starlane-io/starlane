@@ -6,14 +6,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/starlane-core/src/binder.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/binder.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/bindex.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/proto.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/proto.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/message/delivery.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/message/delivery.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/registry.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/registry.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/resource.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/resource.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -279,7 +277,7 @@
       <workItem from="1649409070862" duration="230000" />
       <workItem from="1649409317731" duration="29000" />
       <workItem from="1649409414423" duration="29004000" />
-      <workItem from="1649454867022" duration="22860000" />
+      <workItem from="1649454867022" duration="26723000" />
     </task>
     <servers />
   </component>

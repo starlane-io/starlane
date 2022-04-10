@@ -13,7 +13,7 @@ use mesh_portal::version::latest::entity::request::get::{Get, GetOp};
 use mesh_portal::version::latest::entity::request::{Action, Rc, RequestCore};
 use mesh_portal::version::latest::entity::response::ResponseCore;
 use mesh_portal::version::latest::id::Address;
-use mesh_portal::version::latest::messaging::{Message, Request, Response};
+use mesh_portal::version::latest::messaging::{Agent, Message, Request, Response};
 use mesh_portal::version::latest::pattern::{Block, HttpPattern, MsgPattern};
 use mesh_portal::version::latest::payload::{CallKind, Payload};
 use mesh_portal_versions::error::MsgErr;
@@ -26,15 +26,16 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use mesh_portal::version::latest::security::Access;
 
-/// The idea here is to eventually move this funcitionality into it's own crate 'mesh-binder-muxer'
+/// The idea here is to eventually move this funcitionality into it's own crate 'mesh-bindex'
 /// this mod basically enforces the bind
 
 #[derive(Clone)]
-pub struct Binder {
+pub struct BindEx {
     pub bind_config_cache: Arc<dyn BindConfigCache>,
-    pub router: Arc<dyn BindRouter>,
-    pub pipeline_executors: Arc<Mutex<HashMap<String, PipelineExecutor>>>,
+    pub router: Arc<dyn BindExRouter>,
+    pub pipeline_executors: Arc<Mutex<HashMap<String, PipeEx>>>,
     pub logger: Arc<dyn ParticleLogger>,
+    pub registry: Arc<dyn RegistryApi>,
 }
 
 fn request_id(request: &Request) -> String {
@@ -45,8 +46,26 @@ fn request_id_from_response(response: &Response) -> String {
     format!("{}{}", response.from.to_string(), response.response_to)
 }
 
-impl Binder {
+impl BindEx {
     pub fn hande_request(&self, delivery: Delivery<Request>) -> anyhow::Result<()>{
+
+        let access = self.registry.access(&delivery.agent,&delivery.to);
+
+        match access {
+            Ok(access) => {
+                if !access.permissions().particle.execute {
+                    let err_msg = format!("execute permission required to send requests to {}", delivery.to.to_string() ).as_str();
+                    self.logger.log( Log::error(delivery.from.clone(), err_msg ));
+                    delivery.err( 403, err_msg );
+                    return Ok(());
+                }
+            }
+            Err(err) => {
+                error!("{}", err.to_string() )
+            }
+        }
+
+
         let bind = self.bind_config_cache.get_bind_config(&request.to)?;
         println!(
             "received msg action {} ... present selectors: {}",
@@ -84,26 +103,26 @@ impl Binder {
         let request_id = request_id(&delivery.item);
 
         let call = delivery.to_call();
-        let mut pipe_exec = PipelineExecutor::new(delivery, self.clone(), selector.pipeline, regex);
-        let action = match pipe_exec.next() {
+        let mut pipex = PipeEx::new(delivery, self.clone(), selector.pipeline, regex);
+        let action = match pipex.next() {
             Ok(result) => result,
             Err(err) => {
                 let err_msg = format!("Binder: pipeline error for call {}", call.to_string());
                 self.logger
                     .log(Log::error(request.from.clone(), err_msg.as_str()));
-                pipe_exec.fail(500, err_msg.as_str() );
+                pipex.fail(500, err_msg.as_str() );
                 return Ok(());
             }
         };
 
-        if let PipelineAction::Respond = action {
-            pipe_exec.respond();
+        if let PipeAction::Respond = action {
+            pipex.respond();
             return Ok(());
         }
 
         {
             let mut lock = self.pipeline_executors.lock()?;
-            lock.insert(request_id.clone(), pipe_exec);
+            lock.insert(request_id.clone(), pipex);
         }
 
         let action = RequestAction{
@@ -117,12 +136,12 @@ impl Binder {
 
     pub fn handle_response(&self, response: Response) -> anyhow::Result<()> {
         let request_id = request_id_from_response(&response);
-        let mut pipe_exec = {
+        let mut pipex = {
             let mut lock = self.pipeline_executors.lock()?;
             lock.remove(&request_id )
         };
 
-        if let None = pipe_exec {
+        if let None = pipex {
             let err_msg = format!(
                 "Binder: cannot locate a pipeline executor for processing request: {}",
                 response.response_to
@@ -133,18 +152,18 @@ impl Binder {
             Err(err_msg.into())
         }
 
-        let mut pipe_exec = pipe_exec.expect("pipeline executor");
+        let mut pipex = pipex.expect("pipeline executor");
 
-        let action = pipe_exec.hanlde_response(response);
+        let action = pipex.hanlde_response(response);
 
-        if let PipelineAction::Respond = action {
-            pipe_exec.respond();
+        if let PipeAction::Respond = action {
+            pipex.respond();
             return  Ok(());
         }
 
         {
             let mut lock = self.pipeline_executors.lock()?;
-            lock.insert(request_id.clone(), pipe_exec);
+            lock.insert(request_id.clone(), pipex);
         }
 
         let action = RequestAction{
@@ -159,24 +178,24 @@ impl Binder {
 
     fn handle_action( &self, action: RequestAction ) -> anyhow::Result<()> {
         match action.action {
-            PipelineAction::CoreRequest(request) => {
+            PipeAction::CoreRequest(request) => {
                 self.router.send_to_particle_core(Message::Request(request));
             }
-            PipelineAction::MeshRequest(request) => {
+            PipeAction::MeshRequest(request) => {
                 self.router.send_to_mesh(Message::Request(request));
             }
-            PipelineAction::Respond => {
-                let pipe_exec = {
+            PipeAction::Respond => {
+                let pipex = {
                   let mut lock = self.pipeline_executors.lock()?;
                   lock.remove(&action.request_id)
                 };
 
-                match pipe_exec {
+                match pipex {
                     None => {
                         error!("no pipeline set for requst_id: {}",action.request_id);
                     }
-                    Some(pipe_exec) => {
-                        pipe_exec.respond();
+                    Some(pipex) => {
+                        pipex.respond();
                     }
                 }
             }
@@ -185,21 +204,21 @@ impl Binder {
     }
 }
 
-pub struct PipelineExecutor {
-    pub traversal: Traversal,
-    pub binder: Binder,
+pub struct PipeEx {
+    pub traversal: Traverser,
+    pub binder: BindEx,
     pub pipeline: Pipeline,
     pub path_regex: Regex,
 }
 
-impl PipelineExecutor {
+impl PipeEx {
     pub fn new(
         delivery: Delivery<Request>,
-        binder: Binder,
+        binder: BindEx,
         pipeline: Pipeline,
         path_regex: Regex,
     ) -> Self {
-        let traversal = Traversal::new(delivery);
+        let traversal = Traverser::new(delivery);
         Self {
             traversal,
             binder,
@@ -209,8 +228,8 @@ impl PipelineExecutor {
     }
 }
 
-impl PipelineExecutor {
-    pub fn next(&mut self) -> anyhow::Result<PipelineAction> {
+impl PipeEx {
+    pub fn next(&mut self) -> anyhow::Result<PipeAction> {
         match self.pipeline.consume() {
             Some(segment) => {
                 self.execute_step(&segment.step)?;
@@ -218,12 +237,12 @@ impl PipelineExecutor {
             }
             None => {
                 self.traversal.respond();
-                Ok(PipelineAction::Respond)
+                Ok(PipeAction::Respond)
             }
         }
     }
 
-    pub fn handle_response(&mut self, response: Response) -> anyhow::Result<PipelineAction> {
+    pub fn handle_response(&mut self, response: Response) -> anyhow::Result<PipeAction> {
         self.traversal.push(Message::Response(response));
         self.next()
     }
@@ -236,11 +255,11 @@ impl PipelineExecutor {
         self.traversal.fail(status, error);
     }
 
-    fn execute_stop(&mut self, stop: &PipelineStop) -> Result<PipelineAction, Error> {
+    fn execute_stop(&mut self, stop: &PipelineStop) -> Result<PipeAction, Error> {
         match stop {
             PipelineStop::Internal => {
                 let request = self.traversal.request();
-                Ok(PipelineAction::CoreRequest(request))
+                Ok(PipeAction::CoreRequest(request))
             }
             PipelineStop::Call(call) => {
                 let uri = self.traversal.uri.clone();
@@ -271,9 +290,9 @@ impl PipelineExecutor {
                 core.headers = self.traversal.headers.clone();
                 core.uri = Uri::from_str(path.as_str())?;
                 let request = Request::new(core, self.traversal.to(), address.clone());
-                Ok(PipelineAction::MeshRequest(request))
+                Ok(PipeAction::MeshRequest(request))
             }
-            PipelineStop::Respond => Ok(PipelineAction::Respond),
+            PipelineStop::Respond => Ok(PipeAction::Respond),
             PipelineStop::CaptureAddress(address) => {
                 let uri = self.traversal.uri.clone();
                 let captures = self
@@ -287,7 +306,7 @@ impl PipelineExecutor {
                 }));
                 let core = action.into();
                 let request = Request::new(core, self.traversal.to(), address.clone());
-                Ok(PipelineAction::MeshRequest(request))
+                Ok(PipeAction::MeshRequest(request))
             }
         }
     }
@@ -323,7 +342,7 @@ impl PipelineExecutor {
     }
 }
 
-pub struct Traversal {
+pub struct Traverser {
     pub initial_request: Delivery<Request>,
     pub action: Action,
     pub body: Payload,
@@ -332,7 +351,7 @@ pub struct Traversal {
     pub status: StatusCode,
 }
 
-impl Traversal {
+impl Traverser {
     pub fn new(initial_request: Delivery<Request>) -> Self {
         Self {
             action: initial_request.core.action.clone(),
@@ -413,32 +432,32 @@ pub trait BindConfigCache {
     async fn get_bind_config(&self, point: &Address) -> anyhow::Result<Artifact<BindConfig>>;
 }
 
-pub trait BindRouter {
+pub trait BindExRouter {
     fn send_to_mesh(&self, message: Message);
     fn send_to_particle_core(&self, message: Message);
 }
 
 pub trait RegistryApi {
-    fn access( &self, to: &Address, on: &Address ) -> anyhow::Result<Access>;
+    fn access( &self, to: &Agent, on: &Address ) -> anyhow::Result<Access>;
 }
 
 
 struct RequestAction {
     pub request_id: String,
-    pub action: PipelineAction
+    pub action: PipeAction
 }
 
-enum PipelineAction {
+enum PipeAction {
     CoreRequest(Request),
     MeshRequest(Request),
     Respond,
 }
 
-pub struct BindSpanner {
+pub struct BindExSpanner {
   pub request_id: String
 }
 
-impl BindSpanner {
+impl BindExSpanner {
    pub fn handle_request( &self, request: Request ) {
 
    }
@@ -450,12 +469,12 @@ impl BindSpanner {
 
 pub struct RequestSpanner {
     pub request: Request,
-    pub spanner: BindSpanner
+    pub spanner: BindExSpanner
 }
 
 mod tmp {
     use crate::artifact::ArtifactRef;
-    use crate::binder::BindConfigCache;
+    use crate::bindex::BindConfigCache;
     use crate::resource::ArtifactKind;
     use crate::star::StarSkel;
     use mesh_artifact_api::Artifact;

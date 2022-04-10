@@ -32,6 +32,7 @@ where
     skel: StarSkel,
     star_message: StarMessage,
     pub item: M,
+    responded: bool
 }
 
 impl<M> Delivery<M>
@@ -43,6 +44,7 @@ where
             item,
             star_message: star_message,
             skel: skel,
+            responded: false
         }
     }
 
@@ -57,6 +59,13 @@ where
         }
     }
 }
+
+impl<M> Drop for Delivery<M> {
+    fn drop(&mut self) {
+
+    }
+}
+
 impl<M> Deref for Delivery<M> where
     M: Clone + Send + Sync + 'static{
     type Target = M;
@@ -100,7 +109,7 @@ impl Delivery<Request>
         }
     }
 
-    pub fn respond(self, core: ResponseCore ) {
+    pub fn respond(mut self, core: ResponseCore ) {
         let response = Response {
             id: unique_id(),
             to: self.item.from,
@@ -113,51 +122,27 @@ impl Delivery<Request>
             .reply(StarMessagePayload::Response(response));
 
         self.skel.messaging_api.star_notify(proto);
+        self.responded = true;
     }
 
    pub fn ok(self, payload: Payload) -> Result<(),Error> {
-        let request = self.get_request()? ;
         let core = ResponseCore {
             headers: Default::default(),
             status: StatusCode::from_u16(200).unwrap(),
             body: payload
         };
-        let response = Response {
-            id: unique_id(),
-            to: request.from.clone(),
-            from: request.to.clone(),
-            core,
-            response_to: self.item.id
-        };
-
-        let proto = self
-            .star_message
-            .reply(StarMessagePayload::Response(response));
-
-        self.skel.messaging_api.star_notify(proto);
+        self.respond(core);
         Ok(())
     }
 
     pub fn fail(self, fail: String ) ->Result<(),Error> {
 
-        let request = self.get_request()?;
         let core = ResponseCore {
             headers: Default::default(),
             status: StatusCode::from_u16(500).unwrap(),
             body: Payload::Primitive(Primitive::Text(fail))
         };
-        let response = Response {
-            id: unique_id(),
-            to: request.from,
-            from: request.to,
-            core,
-            response_to: request.id
-        };
-
-        let proto = self
-            .star_message
-            .reply(StarMessagePayload::Response(response));
-        self.skel.messaging_api.star_notify(proto);
+        self.respond(core);
         Ok(())
     }
 
@@ -169,18 +154,7 @@ impl Delivery<Request>
             status: StatusCode::from_u16(404).unwrap(),
             body: Payload::Empty
         };
-        let response = Response {
-            id: unique_id(),
-            to: request.from,
-            from: request.to,
-            core,
-            response_to: request.id
-        };
-
-        let proto = self
-            .star_message
-            .reply(StarMessagePayload::Response(response));
-        self.skel.messaging_api.star_notify(proto);
+        self.respond(core);
         Ok(())
     }
 
@@ -193,22 +167,36 @@ impl Delivery<Request>
             status: StatusCode::from_u16(status)?,
             body: Payload::Primitive(Primitive::Errors(Errors::default(message)))
         };
-        let response = Response {
-            id: unique_id(),
-            to: request.from,
-            from: request.to,
-            core,
-            response_to: request.id
-        };
+        self.respond(core);
 
-        let proto = self
-            .star_message
-            .reply(StarMessagePayload::Response(response));
-        self.skel.messaging_api.star_notify(proto);
         Ok(())
     }
 }
 
+impl <M>Drop for Delivery<M> {
+    fn drop(&mut self) {
+        if !self.responded {
+            let core = ResponseCore {
+                headers: Default::default(),
+                status: StatusCode::from_u16(500).unwrap(),
+                body: Payload::Primitive(Primitive::Errors(Errors::default("message delivery dropped unexpectedly.")))
+            };
+            let response = Response {
+                id: unique_id(),
+                to: self.item.from,
+                from: self.item.to,
+                core,
+                response_to: self.item.id
+            };
+            let proto = self
+                .star_message
+                .reply(StarMessagePayload::Response(response));
+
+            self.skel.messaging_api.star_notify(proto);
+            self.responded = true;
+        }
+    }
+}
 
 /*impl<M> Delivery<M>
 where

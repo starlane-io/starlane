@@ -24,7 +24,7 @@ use mesh_portal::version::latest::util::ValuePattern;
 use mesh_portal_versions::version::v0_0_1::config::bind::parse::bind;
 use mesh_portal_versions::version::v0_0_1::entity::request::create::AddressTemplateSegment::AddressSegment;
 use mesh_portal_versions::version::v0_0_1::entity::request::select::{SelectKind, SubSelect};
-use mesh_portal_versions::version::v0_0_1::security::{Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask, PermissionsMaskKind, Privileges};
+use mesh_portal_versions::version::v0_0_1::security::{Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask, PermissionsMaskKind, Privilege, Privileges};
 use mysql::prelude::TextQuery;
 use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
 use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
@@ -101,6 +101,7 @@ impl Registry {
          status TEXT NOT NULL,
          sequence INTEGER DEFAULT 0,
          owner TEXT,
+         perms TEXT NOT NULL,
          UNIQUE(address),
          UNIQUE(parent,address_segment)
         )"#;
@@ -948,7 +949,7 @@ impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
                 "super" => AccessGrantKind::Super,
                 "priv" => {
                     let privilege: String = row.get("data");
-                    AccessGrantKind::Privilege(privilege)
+                    AccessGrantKind::Privilege(Privilege::from_str(privilege.as_str())?)
                 }
                 "perm" => {
                     let mask: &str = row.get("data");
@@ -1000,10 +1001,12 @@ impl sqlx::FromRow<'_, PgRow> for ResourceRecord {
             let version_variant: Option<String> = row.get("version_variant");
             let star: Option<String> = row.get("star");
             let status: String = row.get("status");
+            let perms: String = row.get("perms");
 
             let address = Address::from_str(parent.as_str())?;
             let address = address.push(address_segment)?;
             let resource_type = ResourceType::from_str(resource_type.as_str())?;
+            let perms = Permissions::from_str(perms.as_str())?;
 
             let specific = if let Option::Some(vendor) = vendor {
                 if let Option::Some(product) = product {
@@ -1052,6 +1055,7 @@ impl sqlx::FromRow<'_, PgRow> for ResourceRecord {
             let record = ResourceRecord {
                 stub: stub,
                 location,
+                perms
             };
 
             Ok(record)
@@ -1081,9 +1085,7 @@ pub mod test {
     use mesh_portal::version::latest::payload::Primitive;
     use mesh_portal::version::latest::resource::Status;
     use mesh_portal_versions::version::v0_0_1::entity::request::select::SelectKind;
-    use mesh_portal_versions::version::v0_0_1::security::{
-        Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
-    };
+    use mesh_portal_versions::version::v0_0_1::security::{Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind, Privilege};
     use std::convert::TryInto;
     use std::str::FromStr;
 
@@ -1290,7 +1292,7 @@ pub mod test {
         registry.grant(&grant).await?;
 
         let grant = AccessGrant {
-            kind: AccessGrantKind::Privilege("property:email:read".to_string()),
+            kind: AccessGrantKind::Privilege(Privilege::Single("property:email:read".to_string())),
             on_point: AddressKindPattern::from_str("localhost:app:users:**<User>")?,
             to_point: AddressKindPattern::from_str("localhost:app:**<Mechtron>")?,
             by_particle: app.clone(),

@@ -15,6 +15,7 @@ use mesh_portal::version::latest::entity::request::create::KindTemplate;
 use mesh_portal::version::latest::id::{Address, KindParts, ResourceKind, Specific};
 use mesh_portal::version::latest::payload::Payload;
 use mesh_portal::version::latest::resource::{ResourceStub, Status};
+use mesh_portal::version::latest::security::Permissions;
 use mesh_portal_versions::version::v0_0_1::pattern::parse::consume_kind;
 use rusqlite::{Connection, params, params_from_iter, Row, ToSql, Transaction};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
@@ -121,14 +122,16 @@ impl FromStr for DisplayValue {
 pub struct ResourceRecord {
     pub stub: ResourceStub,
     pub location: ResourceLocation,
+    pub perms: Permissions
 }
 
 
 impl ResourceRecord {
-    pub fn new(stub: ResourceStub, host: StarKey) -> Self {
+    pub fn new(stub: ResourceStub, host: StarKey, perms: Permissions) -> Self {
         ResourceRecord {
             stub: stub,
             location: ResourceLocation::new(host),
+            perms
         }
     }
 
@@ -141,6 +144,7 @@ impl ResourceRecord {
               status: Status::Ready
             },
             location: ResourceLocation::root(),
+            perms: Permissions::none()
         }
     }
 
