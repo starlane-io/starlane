@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 use std::str::FromStr;
 use std::sync::Arc;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::path::Path;
 use mesh_portal::version::latest::payload::Payload;
 
@@ -11,7 +11,7 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use crate::resource::{
+use crate::particle::{
      Kind,
 };
 use crate::star::StarSkel;
@@ -30,7 +30,7 @@ impl StateStore {
         }
     }
 
-    pub async fn has(&self, address: Address) -> Result<bool, Error> {
+    pub async fn has(&self, address: Point) -> Result<bool, Error> {
         let (tx, rx) = oneshot::channel();
 
         self.tx.send(ResourceStoreCommand::Has { address, tx }).await?;
@@ -40,7 +40,7 @@ impl StateStore {
 
     pub async fn put(
         &self,
-        key: Address,
+        key: Point,
         state : Payload,
     ) -> Result<(), Error> {
         let (tx, rx) = oneshot::channel();
@@ -51,7 +51,7 @@ impl StateStore {
         rx.await?
     }
 
-    pub async fn get(&self, address: Address) -> Result<Payload, Error> {
+    pub async fn get(&self, address: Point) -> Result<Payload, Error> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(ResourceStoreCommand::Get {
@@ -74,16 +74,16 @@ impl StateStore {
 pub enum ResourceStoreCommand {
     Close,
     Save {
-        address: Address,
+        address: Point,
         state: Payload,
         tx: oneshot::Sender<Result<(), Error>>,
     },
     Get {
-        address: Address,
+        address: Point,
         tx: oneshot::Sender<Result<Payload, Error>>,
     },
     Has {
-        address: Address,
+        address: Point,
         tx: oneshot::Sender<Result<bool,Error>>,
     },
 }
@@ -126,7 +126,7 @@ impl StateStoreFS {
 
     async fn save(
         &mut self,
-        address: Address,
+        address: Point,
         state: Payload,
     ) -> Result<(), Error> {
 
@@ -146,7 +146,7 @@ impl StateStoreFS {
         Ok(())
     }
 
-    async fn get(&self, address: Address ) -> Result<Payload, Error> {
+    async fn get(&self, address: Point) -> Result<Payload, Error> {
         let machine_filesystem = self.skel.machine.machine_filesystem();
         let mut data_access = machine_filesystem.data_access();
 
@@ -159,7 +159,7 @@ impl StateStoreFS {
         Ok(payload)
     }
 
-    async fn has(&self, address: Address ) -> Result<bool,Error> {
+    async fn has(&self, address: Point) -> Result<bool,Error> {
         let state_path = Path::from_str(
             format!("/stars/{}/states/{}/payload.bin", self.skel.info.key.to_string(), address.to_safe_filename()).as_str(),
         )?;

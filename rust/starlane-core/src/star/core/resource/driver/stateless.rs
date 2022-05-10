@@ -1,20 +1,20 @@
 use mesh_portal::version::latest::command::common::StateSrc;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
 
 use crate::error::Error;
-use crate::resource::{ResourceAssign, ResourceType};
-use crate::star::core::resource::driver::ResourceCoreDriver;
+use crate::particle::{ParticleAssign, KindBase};
+use crate::star::core::resource::driver::ParticleCoreDriver;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 
 #[derive(Debug)]
 pub struct StatelessCoreDriver {
     skel: StarSkel,
-    resource_type: ResourceType
+    resource_type: KindBase
 }
 
 impl StatelessCoreDriver {
-    pub async fn new(skel: StarSkel, resource_type: ResourceType ) -> Self {
+    pub async fn new(skel: StarSkel, resource_type: KindBase) -> Self {
         StatelessCoreDriver {
             skel: skel.clone(),
             resource_type
@@ -23,16 +23,16 @@ impl StatelessCoreDriver {
 }
 
 #[async_trait]
-impl ResourceCoreDriver for StatelessCoreDriver {
+impl ParticleCoreDriver for StatelessCoreDriver {
 
-    fn resource_type(&self) -> ResourceType {
+    fn resource_type(&self) -> KindBase {
         self.resource_type.clone()
     }
 
 
     async fn assign(
         &mut self,
-        assign: ResourceAssign,
+        assign: ParticleAssign,
     ) -> Result<(), Error> {
         match assign.state {
             StateSrc::Stateless => {

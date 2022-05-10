@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 use std::ops::Deref;
-use mesh_portal::version::latest::command::common::SetProperties;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
+use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::payload::{Payload, PayloadPattern};
 use mesh_portal_api_client::ResourceCommand::Add;
-use mesh_portal_versions::version::v0_0_1::command::common::PropertyMod;
 use mesh_portal_versions::version::v0_0_1::util::ValueMatcher;
 use validator::validate_email;
 use crate::error::Error;
@@ -67,7 +66,7 @@ pub struct AddressPattern{}
 impl PropertyPattern for AddressPattern{
     fn is_match(&self, value: &String) -> Result<(), Error> {
         use std::str::FromStr;
-        Address::from_str(value.as_str())?;
+        Point::from_str(value.as_str())?;
         Ok(())
     }
 }
@@ -199,7 +198,7 @@ impl PropertiesConfig {
                     }
                 }
                 PropertyMod::UnSet(_) => {
-                    return Err(format!("cannot unset: '{}' during resource create",key).into());
+                    return Err(format!("cannot unset: '{}' during particle create",key).into());
                 }
             }
 
@@ -225,7 +224,7 @@ impl PropertiesConfig {
                 }
                 PropertyMod::UnSet(_) => {
                     if !def.mutable  {
-                        return Err(format!("property '{}' is immutable and cannot be changed after resource creation",key).into())
+                        return Err(format!("property '{}' is immutable and cannot be changed after particle creation",key).into())
                     }
                     if def.required{
                         return Err(format!("property '{}' is required and cannot be unset",key).into())

@@ -439,10 +439,7 @@ impl From<FromAsciiError<&str>> for Error {
 
 impl Into<MsgErr> for Error {
     fn into(self) -> MsgErr {
-        MsgErr {
-            status: 500,
-            message: self.message,
-        }
+        MsgErr::new( 500, self.message.as_str() )
     }
 }
 

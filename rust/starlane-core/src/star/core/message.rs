@@ -13,8 +13,8 @@ use crate::frame::{
 
 use crate::message::delivery::Delivery;
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
-use crate::resource::{ArtifactKind, Kind, ResourceType, BaseKind, FileKind, ResourceLocation, UserBaseKind, ChildResourceRegistryHandler};
-use crate::resource::{AssignKind, ResourceAssign, ResourceRecord};
+use crate::particle::{ArtifactSubKind, Kind, KindBase, FileSubKind, ParticleLocation, UserBaseSubKind, ChildResourceRegistryHandler};
+use crate::particle::{AssignKind, ParticleAssign, ParticleRecord};
 use crate::star::core::resource::registry::{RegError, Registration};
 use crate::star::shell::wrangler::{ StarFieldSelection, StarSelector};
 use crate::star::{StarCommand, StarKey, StarKind, StarSkel};
@@ -25,26 +25,24 @@ use std::sync::Arc;
 use http::{HeaderMap, StatusCode, Uri};
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
-use mesh_portal::version::latest::config::bind::{BindConfig, Pipeline};
+use mesh_portal::version::latest::config::bind::{BindConfig, Pipeline, PipelineStep, PipelineStop, Selector, StepKind};
 use mesh_portal::version::latest::config::Config;
-use mesh_portal::version::latest::entity::request::create::{AddressSegmentTemplate, KindTemplate, Strategy};
-use mesh_portal::version::latest::entity::request::{Action, Rc, RequestCore};
+use mesh_portal::version::latest::entity::request::create::{PointSegFactory, KindTemplate, Strategy};
+use mesh_portal::version::latest::entity::request::{Method, Rc, RequestCore};
 use mesh_portal::version::latest::entity::request::get::Get;
 use mesh_portal::version::latest::fail;
-use mesh_portal::version::latest::id::{Address, Meta};
+use mesh_portal::version::latest::id::{Point, Meta};
 use mesh_portal::version::latest::messaging::{Message, Request, Response};
 use mesh_portal::version::latest::payload::{Payload, PayloadMap, Primitive, PrimitiveList};
-use mesh_portal::version::latest::resource::{ResourceStub, Status};
-use mesh_portal::version::latest::config::bind::{PipelineSegment, PipelineStep, PipelineStop, Selector, StepKind};
+use mesh_portal::version::latest::particle::{Stub, Status};
 use mesh_portal::version::latest::entity::request::get::GetOp;
 use mesh_portal::version::latest::entity::request::query::Query;
 use mesh_portal::version::latest::entity::request::select::Select;
 use mesh_portal::version::latest::entity::request::set::Set;
 use mesh_portal::version::latest::entity::response::{ResponseCore};
 use mesh_portal::version::latest::id::Tks;
-use mesh_portal::version::latest::pattern::{Block, HttpPattern, MsgPattern};
+use mesh_portal::version::latest::selector::{Block, HttpPattern, MsgPattern};
 use mesh_portal::version::latest::payload::CallKind;
-use mesh_portal_versions::version::v0_0_1::config::bind::parse::final_http_pipeline;
 use mesh_portal::version::latest::entity::request::create::Create;
 use regex::Regex;
 use serde::de::Unexpected::Str;
@@ -56,12 +54,12 @@ use crate::star::core::resource::driver::{ResourceCoreDriverApi, ResourceCoreDri
 
 lazy_static!{
 
-    pub static ref PIPELINE_OVERRIDES: HashMap<Address,Vec<Selector<HttpPattern>>> = {
+    pub static ref PIPELINE_OVERRIDES: HashMap<Point,Vec<Selector<HttpPattern>>> = {
         let mut map = HashMap::new();
         let mut sel = vec![];
-        sel.push(final_http_pipeline( "<Get>/hyperspace/users/(.*) -> hyperspace:users^Http<Get>/$1 => &;" ).unwrap());
-        sel.push(final_http_pipeline( "<Post>/hyperspace/users/(.*) -> hyperspace:users^Http<Post>/$1 => &;" ).unwrap());
-        map.insert(Address::from_str("localhost").unwrap(),sel);
+//        sel.push(final_http_pipeline( "<Get>/hyperspace/users/(.*) -> hyperspace:users^Http<Get>/$1 => &;" ).unwrap());
+//        sel.push(final_http_pipeline( "<Post>/hyperspace/users/(.*) -> hyperspace:users^Http<Post>/$1 => &;" ).unwrap());
+        map.insert(Point::from_str("localhost").unwrap(),sel);
         map
     };
 
@@ -131,24 +129,24 @@ impl MessagingEndpointComponentInner {
 
     async fn handle_request(&mut self, delivery: Delivery<Request>)
     {
-        async fn get_bind_config( end: &mut MessagingEndpointComponentInner, address: Address ) -> Result<ArtifactItem<CachedConfig<BindConfig>>,Error> {
-println!("{} getting bind config for {}", end.skel.info.kind.to_string(), address.to_string() );
-            let action = Action::Rc( Rc::Get( Get{ address:address.clone(), op: GetOp::Properties(vec!["bind".to_string()])}));
+        async fn get_bind_config(end: &mut MessagingEndpointComponentInner, point: Point) -> Result<ArtifactItem<CachedConfig<BindConfig>>,Error> {
+println!("{} getting bind config for {}", end.skel.info.kind.to_string(), point.to_string() );
+            let action = Method::Cmd( Rc::Get( Get{ point:point.clone(), op: GetOp::Properties(vec!["bind".to_string()])}));
             let core = action.into();
-            let request = Request::new( core, address.clone(), address.parent().unwrap() );
+            let request = Request::new( core, point.clone(), point.parent().unwrap() );
             let response = end.skel.messaging_api.request(request).await;
 
-println!("response from Rc GET bind {}", address.to_string() );
+println!("response from Rc GET bind {}", point.to_string() );
 
             if let Payload::Map(map) = response.core.body {
-                if let Payload::Primitive(Primitive::Text(bind_address )) = map.get(&"bind".to_string()  ).ok_or("bind is not set" )?
+                if let Payload::Primitive(Primitive::Text(bind_point )) = map.get(&"bind".to_string()  ).ok_or("bind is not set" )?
                 {
-                    let bind_address = Address::from_str(bind_address.as_str())?;
+                    let bind_point = Point::from_str(bind_point.as_str())?;
                     let mut cache = end.skel.machine.get_proto_artifact_caches_factory().await?.create();
-                    let artifact = ArtifactRef::new(bind_address, ArtifactKind::Bind);
+                    let artifact = ArtifactRef::new(bind_point, ArtifactSubKind::Bind);
                     cache.cache(vec![artifact.clone()]).await?;
                     let cache = cache.to_caches().await?;
-                    return Ok(cache.bind_configs.get(&artifact.address).ok_or(format!("could not cache bind {}", artifact.address.to_string()).as_str())?);
+                    return Ok(cache.bind_configs.get(&artifact.point).ok_or(format!("could not cache bind {}", artifact.point.to_string()).as_str())?);
                 }
                 else {
                     return Err("unexpected response".into());
@@ -160,8 +158,8 @@ println!("response from Rc GET bind {}", address.to_string() );
 
         fn execute(end: &mut MessagingEndpointComponentInner, bind: ArtifactItem<CachedConfig<BindConfig>>, delivery: Delivery<Request> ) -> Result<(),Error> {
             match &delivery.item.core.action {
-                Action::Rc(_) => {panic!("Rc should be filtered");}
-                Action::Msg(msg) => {
+                Method::Cmd(_) => {panic!("Rc should be filtered");}
+                Method::Msg(msg) => {
 println!("received msg action {} ... present selectors: {}",msg, bind.msg.elements.len() );
                    let selector = bind.msg.find_match(&delivery.item.core );
                    if selector.is_err() {
@@ -176,7 +174,7 @@ println!("received msg action {} ... present selectors: {}",msg, bind.msg.elemen
                     execute_msg_pipeline(selector, delivery,end.skel.clone(),end.resource_core_driver_api.clone() );
                    Ok(())
                 }
-                Action::Http(http) => {
+                Method::Http(http) => {
 println!("delivery of http method {} and PATH {} with selectors: {}", http.to_string(), delivery.item.core.uri.path(), bind.http.elements.len() );
                     let selector = bind.http.find_match(&delivery.item.core );
                     if selector.is_err() {
@@ -217,7 +215,7 @@ println!("got bind config for: {}", to.to_string() );
             }
             Err(_) => {
                 error!("could not get bind for {}",to.to_string( ));
-                delivery.fail("could not get bind config for resource".into());
+                delivery.fail("could not get bind config for particle".into());
             }
         }
 
@@ -226,7 +224,7 @@ println!("got bind config for: {}", to.to_string() );
     pub async fn process_resource_message(&mut self, star_message: StarMessage) -> Result<(), Error> {
         match &star_message.payload {
             StarMessagePayload::Request(request) => match &request.core.action{
-                Action::Rc(rc) => {
+                Method::Cmd(rc) => {
                     let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
                     self.process_resource_command(delivery).await;
                 }
@@ -244,8 +242,8 @@ println!("got bind config for: {}", to.to_string() );
                         self.skel.messaging_api.star_notify(reply);
                     }
                     ResourceHostAction::Init(_) => {}
-                    ResourceHostAction::GetState(address) => {
-                        match self.resource_core_driver_api.get(address.clone()).await {
+                    ResourceHostAction::GetState(point) => {
+                        match self.resource_core_driver_api.get(point.clone()).await {
                             Ok(payload) => {
                                 let reply = star_message.ok(Reply::Payload(payload));
                                 self.skel.messaging_api.star_notify(reply);
@@ -269,15 +267,15 @@ println!("got bind config for: {}", to.to_string() );
         tokio::spawn(async move {
 
             let rc = match &delivery.item.core.action {
-                Action::Rc(rc) => {rc}
+                Method::Cmd(rc) => {rc}
                 _ => { panic!("should not get requests that are not Rc") }
             };
 
 
-            async fn process(skel: StarSkel, resource_core_driver_api: ResourceCoreDriverApi, rc: &Rc, to: Address) -> Result<Payload, Error> {
+            async fn process(skel: StarSkel, resource_core_driver_api: ResourceCoreDriverApi, rc: &Rc, to: Point) -> Result<Payload, Error> {
                 let record = skel.resource_locator_api.locate(to.clone()).await?;
                 let kind = Kind::try_from( record.stub.kind )?;
-                match kind.resource_type().child_resource_registry_handler() {
+                match kind.kind().child_resource_registry_handler() {
                     ChildResourceRegistryHandler::Shell => {
                         match &rc {
                             Rc::Create(create) => {
@@ -287,11 +285,11 @@ println!("got bind config for: {}", to.to_string() );
 
                                 async fn assign(
                                     skel: StarSkel,
-                                    stub: ResourceStub,
+                                    stub: Stub,
                                     state: StateSrc,
                                 ) -> Result<(), Error> {
 
-                                    let star_kind = StarKind::hosts(&ResourceType::from_str(stub.kind.resource_type.as_str())?);
+                                    let star_kind = StarKind::hosts(&KindBase::from_str(stub.kind.resource_type.as_str())?);
                                     let key = if skel.info.kind == star_kind {
                                         skel.info.key.clone()
                                     }
@@ -301,16 +299,16 @@ println!("got bind config for: {}", to.to_string() );
                                         let wrangle = skel.star_wrangler_api.next(star_selector).await?;
                                         wrangle.key
                                     };
-                                    skel.registry_api.assign(stub.address.clone(), key.clone()).await?;
+                                    skel.registry_api.assign(stub.point.clone(), key.clone()).await?;
 
                                     let mut proto = ProtoStarMessage::new();
                                     proto.to(ProtoStarMessageTo::Star(key.clone()));
-                                    let assign = ResourceAssign::new(AssignKind::Create, stub.clone(), state);
+                                    let assign = ParticleAssign::new(AssignKind::Create, stub.clone(), state);
                                     proto.payload = StarMessagePayload::ResourceHost(
                                         ResourceHostAction::Assign(assign),
                                     );
                                     let reply = skel.messaging_api
-                                        .star_exchange(proto, ReplyKind::Empty, "assign resource to host")
+                                        .star_exchange(proto, ReplyKind::Empty, "assign particle to host")
                                         .await?;
 
                                     Ok(())
@@ -369,17 +367,17 @@ println!("got bind config for: {}", to.to_string() );
 
 }
 pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
-    let resource_type: ResourceType = ResourceType::from_str(template.resource_type.as_str())?;
+    let resource_type: KindBase = KindBase::from_str(template.kind.as_str())?;
     Ok(match resource_type {
-        ResourceType::Root => Kind::Root,
-        ResourceType::Space => Kind::Space,
-        ResourceType::Base => {
-            match &template.kind {
+        KindBase::Root => Kind::Root,
+        KindBase::Space => Kind::Space,
+        KindBase::Base => {
+            match &template.sub_kind {
                 None => {
                     return Err("kind must be set for Base".into());
                 }
                 Some(kind) => {
-                    let kind = BaseKind::from_str(kind.as_str())?;
+                    let kind = KindBase::from_str(kind.as_str())?;
                     if template.specific.is_some() {
                         return Err("BaseKind cannot have a Specific".into());
                     }
@@ -387,48 +385,48 @@ pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
                 }
             }
         },
-        ResourceType::User => Kind::User,
-        ResourceType::App => Kind::App,
-        ResourceType::Mechtron => Kind::Mechtron,
-        ResourceType::FileSystem => Kind::FileSystem,
-        ResourceType::File => {
-            match &template.kind{
+        KindBase::User => Kind::User,
+        KindBase::App => Kind::App,
+        KindBase::Mechtron => Kind::Mechtron,
+        KindBase::FileSystem => Kind::FileSystem,
+        KindBase::File => {
+            match &template.sub_kind {
                 None => {
                     return Err("expected kind for File".into())
                 }
                 Some(kind) => {
-                    let file_kind = FileKind::from_str(kind.as_str())?;
+                    let file_kind = FileSubKind::from_str(kind.as_str())?;
                     return Ok(Kind::File(file_kind));
                 }
             }
         }
-        ResourceType::Database => {
+        KindBase::Database => {
             unimplemented!("need to write a SpecificPattern matcher...")
         }
-        ResourceType::Authenticator => Kind::Authenticator,
-        ResourceType::ArtifactBundleSeries => Kind::ArtifactBundleSeries,
-        ResourceType::ArtifactBundle => Kind::ArtifactBundle,
-        ResourceType::Artifact => {
-            match &template.kind {
+        KindBase::Authenticator => Kind::Authenticator,
+        KindBase::ArtifactBundleSeries => Kind::ArtifactBundleSeries,
+        KindBase::ArtifactBundle => Kind::ArtifactBundle,
+        KindBase::Artifact => {
+            match &template.sub_kind {
                 None => {
                     return Err("expected kind for Artirtact".into());
                 }
                 Some(kind) => {
-                    let artifact_kind = ArtifactKind::from_str(kind.as_str())?;
+                    let artifact_kind = ArtifactSubKind::from_str(kind.as_str())?;
                     return Ok(Kind::Artifact(artifact_kind));
                 }
             }
         }
-        ResourceType::Proxy => Kind::Proxy,
-        ResourceType::Credentials => Kind::Credentials,
-        ResourceType::Control => Kind::Control,
-        ResourceType::UserBase => {
-            match &template.kind {
+        KindBase::Proxy => Kind::Proxy,
+        KindBase::Credentials => Kind::Credentials,
+        KindBase::Control => Kind::Control,
+        KindBase::UserBase => {
+            match &template.sub_kind {
                 None => {
                     return Err("kind must be set for UserBase".into());
                 }
                 Some(kind) => {
-                    let kind = UserBaseKind::from_str(kind.as_str())?;
+                    let kind = UserBaseSubKind::from_str(kind.as_str())?;
                     Kind::UserBase(kind)
                 }
             }
@@ -530,40 +528,40 @@ impl PipelineExecutor {
            PipelineStop::Call(call) => {
                let uri = self.traversal.uri.clone();
                let captures = self.path_regex.captures( uri.path() ).ok_or("cannot find regex captures" )?;
-               let address = call.address.clone().to_address(captures)?;
+               let point = call.point.clone().to_point(captures)?;
 
                let captures = self.path_regex.captures( uri.path() ).ok_or("cannot find regex captures" )?;
                let (action,path) = match &call.kind {
                    CallKind::Msg(msg) => {
                        let mut path = String::new();
                        captures.expand( msg.path.as_str(), & mut path );
-                       (Action::Msg(msg.action.clone()),path)
+                       (Method::Msg(msg.action.clone()),path)
 
                    }
                    CallKind::Http(http) => {
                        let mut path = String::new();
                        captures.expand( http.path.as_str(), & mut path );
-                       (Action::Http(http.method.clone()),path)
+                       (Method::Http(http.method.clone()),path)
                    }
                };
                let mut core :RequestCore= action.into();
                core.body = self.traversal.body.clone();
                core.headers = self.traversal.headers.clone();
                core.uri = Uri::from_str(path.as_str())?;
-               let request = Request::new( core, self.traversal.to(), address.clone() );
+               let request = Request::new( core, self.traversal.to(), point.clone() );
                let response = self.skel.messaging_api.request(request).await;
                self.traversal.push( Message::Response(response));
            }
            PipelineStop::Respond => {
                // while loop will trigger a response
            }
-           PipelineStop::CaptureAddress(address) => {
+           PipelineStop::CaptureAddress(point) => {
                let uri = self.traversal.uri.clone();
                let captures = self.path_regex.captures( uri.path() ).ok_or("cannot find regex captures" )?;
-               let address = address.clone().to_address(captures)?;
-               let action = Action::Rc(Rc::Get(Get{ address:address.clone(), op: GetOp::State}));
+               let point = point.clone().to_point(captures)?;
+               let action = Method::Cmd(Rc::Get(Get{ point:point.clone(), op: GetOp::State}));
                let core = action.into();
-               let request = Request::new( core, self.traversal.to(), address.clone() );
+               let request = Request::new( core, self.traversal.to(), point.clone() );
                let response = self.skel.messaging_api.request(request).await;
                self.traversal.push( Message::Response(response));
            }
@@ -606,7 +604,7 @@ impl PipelineExecutor {
 
 pub struct Traversal {
     pub initial_request: Delivery<Request>,
-    pub action: Action,
+    pub method: Method,
     pub body: Payload,
     pub uri: Uri,
     pub headers: HeaderMap,
@@ -616,7 +614,7 @@ pub struct Traversal {
 impl Traversal {
     pub fn new( initial_request: Delivery<Request> ) -> Self {
         Self {
-            action: initial_request.core.action.clone(),
+            method: initial_request.core.method.clone(),
             body: initial_request.item.core.body.clone(),
             uri: initial_request.item.core.uri.clone(),
             headers: initial_request.item.core.headers.clone(),
@@ -628,17 +626,17 @@ impl Traversal {
     pub fn request_core(&self) -> RequestCore {
         RequestCore {
             headers: self.headers.clone(),
-            action: self.action.clone(),
+            action: self.method.clone(),
             uri: self.uri.clone(),
             body: self.body.clone()
         }
     }
 
-    pub fn to(&self) -> Address {
+    pub fn to(&self) -> Point {
         self.initial_request.to.clone()
     }
 
-    pub fn from(&self) -> Address {
+    pub fn from(&self) -> Point {
         self.initial_request.from.clone()
     }
 
@@ -661,7 +659,7 @@ impl Traversal {
     pub fn push( &mut self, message: Message ) {
         match message {
             Message::Request(request) => {
-                self.action = request.core.action;
+                self.method = request.core.action;
                 self.uri = request.core.uri;
                 self.headers = request.core.headers;
                 self.body = request.core.body;
@@ -696,15 +694,15 @@ impl ResourceRegistrationChamber {
     }
 
     pub async fn set(&self, set:&Set) -> Result<(),Error> {
-        self.skel.registry_api.set_properties(set.address.clone(), set.properties.clone()).await
+        self.skel.registry_api.set_properties(set.point.clone(), set.properties.clone()).await
     }
 
     pub async fn get(&self, get:&Get) -> Result<Payload,Error> {
         match &get.op {
             GetOp::State => {
                 let mut proto = ProtoStarMessage::new();
-                proto.to(ProtoStarMessageTo::Resource(get.address.clone()));
-                proto.payload = StarMessagePayload::ResourceHost(ResourceHostAction::GetState(get.address.clone()));
+                proto.to(ProtoStarMessageTo::Resource(get.point.clone()));
+                proto.payload = StarMessagePayload::ResourceHost(ResourceHostAction::GetState(get.point.clone()));
                 if let Ok(Reply::Payload(payload)) = self.skel.messaging_api
                     .star_exchange(proto, ReplyKind::Payload, "get state from driver")
                     .await {
@@ -714,8 +712,8 @@ impl ResourceRegistrationChamber {
                 }
             }
             GetOp::Properties(keys) => {
-println!("GET PROPERTIES for {}", get.address.to_string() );
-                let properties = self.skel.registry_api.get_properties(get.address.clone(), keys.clone() ).await?;
+println!("GET PROPERTIES for {}", get.point.to_string() );
+                let properties = self.skel.registry_api.get_properties(get.point.clone(), keys.clone() ).await?;
                 let mut map = PayloadMap::new();
                 for (index,property) in properties.iter().enumerate() {
 
@@ -729,65 +727,65 @@ println!("\tprop{}", property.0.clone() );
     }
 
 
-    pub async fn create(&self, create:&Create) -> Result<ResourceStub,Error> {
+    pub async fn create(&self, create:&Create) -> Result<Stub,Error> {
 
         let child_kind = match_kind(&create.template.kind)?;
-        let stub = match &create.template.address.child_segment_template {
-            AddressSegmentTemplate::Exact(child_segment) => {
+        let stub = match &create.template.point.child_segment_template {
+            PointSegFactory::Exact(child_segment) => {
 
-                let address = create.template.address.parent.push(child_segment.clone());
-                match &address {
+                let point = create.template.point.parent.push(child_segment.clone());
+                match &point {
                     Ok(_) => {}
                     Err(err) => {
                         eprintln!("RC CREATE error: {}", err.to_string());
                     }
                 }
-                let address = address?;
+                let point = point?;
 
                 let properties = child_kind.properties_config().fill_create_defaults(&create.properties )?;
                 child_kind.properties_config().check_create(&properties)?;
 
                 let registration = Registration {
-                    address: address.clone(),
+                    point: point.clone(),
                     kind: child_kind.clone(),
                     registry: create.registry.clone(),
                     properties,
-                    owner: Address::root()
+                    owner: Point::root()
                 };
-println!("creating {}",address.to_string() );
+println!("creating {}",point.to_string() );
                 let mut result = self.skel.registry_api.register(registration).await;
 
                 // if strategy is ensure then a dupe is GOOD!
                 if create.strategy == Strategy::Ensure {
                     if let Err(RegError::Dupe) = result {
-                        result = Ok(self.skel.resource_locator_api.locate(address.clone()).await?.stub);
+                        result = Ok(self.skel.resource_locator_api.locate(point.clone()).await?.stub);
                     }
                 }
 
-println!("result {}? {}",address.to_string(), result.is_ok() );
+println!("result {}? {}",point.to_string(), result.is_ok() );
                 result?
             }
-            AddressSegmentTemplate::Pattern(pattern) => {
+            PointSegFactory::Pattern(pattern) => {
                 if !pattern.contains("%") {
                     return Err("AddressSegmentTemplate::Pattern must have at least one '%' char for substitution".into());
                 }
                 loop {
-                    let index = self.skel.registry_api.sequence(create.template.address.parent.clone()).await?;
+                    let index = self.skel.registry_api.sequence(create.template.point.parent.clone()).await?;
                     let child_segment = pattern.replace( "%", index.to_string().as_str() );
-                    let address = create.template.address.parent.push(child_segment.clone())?;
+                    let point = create.template.point.parent.push(child_segment.clone())?;
                     let registration = Registration {
-                        address: address.clone(),
+                        point: point.clone(),
                         kind: child_kind.clone(),
                         registry: create.registry.clone(),
                         properties: create.properties.clone(),
-                        owner: Address::root()
+                        owner: Point::root()
                     };
 
                     match self.skel.registry_api.register(registration).await {
                         Ok(stub) => {
                             if let Strategy::HostedBy(key) = &create.strategy {
                                 let key = StarKey::from_str( key.as_str() )?;
-                                self.skel.registry_api.assign(address, key).await?;
+                                self.skel.registry_api.assign(point, key).await?;
                                 return Ok(stub);
                             } else {
                                 break stub;
@@ -811,7 +809,7 @@ println!("result {}? {}",address.to_string(), result.is_ok() );
             Ok(list)
     }
 
-    pub async fn query( &self, to: &Address, query: &Query) -> Result<Payload,Error>{
+    pub async fn query(&self, to: &Point, query: &Query) -> Result<Payload,Error>{
         let result = Payload::Primitive(Primitive::Text(
             self.skel.registry_api
                 .query(to.clone(), query.clone())

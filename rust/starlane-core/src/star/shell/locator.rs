@@ -7,13 +7,13 @@ use std::str::FromStr;
 
 use async_trait::async_trait;
 use lru::LruCache;
-use mesh_portal::version::latest::id::{Address, RouteSegment};
-use mesh_portal::version::latest::resource::{ResourceStub, Status};
+use mesh_portal::version::latest::id::{Point, RouteSegment};
+use mesh_portal::version::latest::particle::{Stub, Status};
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use crate::frame::{ResourceRegistryRequest,  SimpleReply, StarMessagePayload};
 use crate::message::{ProtoStarMessage, ReplyKind, Reply};
-use crate::resource::{Kind, ResourceRecord, ResourceType};
+use crate::particle::{Kind, ParticleRecord, KindBase};
 use crate::star::{
     LogId, Request,  Set, Star, StarCommand, StarKey, StarKind, StarSkel,
 };
@@ -31,7 +31,7 @@ impl ResourceLocatorApi {
     }
 
 
-    pub async fn locate(&self, address: Address ) -> Result<ResourceRecord, Error> {
+    pub async fn locate(&self, address: Point) -> Result<ParticleRecord, Error> {
         let (tx, mut rx) = oneshot::channel();
         self.tx
             .send(ResourceLocateCall::Locate { address, tx })
@@ -45,9 +45,9 @@ impl ResourceLocatorApi {
 
     pub async fn external_locate(
         &self,
-        address: Address,
+        address: Point,
         star: StarKey,
-    ) -> Result<ResourceRecord, Error> {
+    ) -> Result<ParticleRecord, Error> {
         let (tx, mut rx) = oneshot::channel();
         self.tx
             .send(ResourceLocateCall::ExternalLocate {
@@ -61,7 +61,7 @@ impl ResourceLocatorApi {
         Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
     }
 
-    pub fn found(&self, record: ResourceRecord) {
+    pub fn found(&self, record: ParticleRecord) {
         let tx = self.tx.clone();
         tokio::spawn(async move {
             tx.send(ResourceLocateCall::Found(record))
@@ -70,7 +70,7 @@ impl ResourceLocatorApi {
         });
     }
 
-    pub fn filter(&self, result: Result<ResourceRecord, Error>) -> Result<ResourceRecord, Error> {
+    pub fn filter(&self, result: Result<ParticleRecord, Error>) -> Result<ParticleRecord, Error> {
 
         if let Result::Ok(record) = &result {
             self.found(record.clone());
@@ -81,22 +81,22 @@ impl ResourceLocatorApi {
 
 pub enum ResourceLocateCall {
     Locate {
-        address: Address,
-        tx: oneshot::Sender<Result<ResourceRecord, Error>>,
+        address: Point,
+        tx: oneshot::Sender<Result<ParticleRecord, Error>>,
     },
     ExternalLocate {
-        address: Address,
+        address: Point,
         star: StarKey,
-        tx: oneshot::Sender<Result<ResourceRecord, Error>>,
+        tx: oneshot::Sender<Result<ParticleRecord, Error>>,
     },
-    Found(ResourceRecord),
+    Found(ParticleRecord),
 }
 
 impl Call for ResourceLocateCall {}
 
 pub struct ResourceLocatorComponent {
     skel: StarSkel,
-    resource_record_cache: LruCache<Address, ResourceRecord>,
+    resource_record_cache: LruCache<Point, ParticleRecord>,
 }
 
 impl ResourceLocatorComponent {
@@ -137,13 +137,13 @@ impl AsyncProcessor<ResourceLocateCall> for ResourceLocatorComponent {
 impl ResourceLocatorComponent {
     fn locate(
         &mut self,
-        address: Address,
-        tx: oneshot::Sender<Result<ResourceRecord, Error>>,
+        address: Point,
+        tx: oneshot::Sender<Result<ParticleRecord, Error>>,
     ) {
         if self.has_cached_record(&address) {
             let result = match self
                 .get_cached_record(&address)
-                .ok_or("expected resource record")
+                .ok_or("expected particle record")
             {
                 Ok(record) => Ok(record),
                 Err(s) => Err(s.to_string().into()),
@@ -172,8 +172,8 @@ impl ResourceLocatorComponent {
             tokio::spawn(async move {
                 async fn locate(
                     locator_api: ResourceLocatorApi,
-                    address: Address,
-                ) -> Result<ResourceRecord, Error> {
+                    address: Point,
+                ) -> Result<ParticleRecord, Error> {
                     let parent_record = locator_api.filter(
                         locator_api
                             .locate(
@@ -195,9 +195,9 @@ impl ResourceLocatorComponent {
             });
         } else {
 
-            let record = ResourceRecord::new(
-                ResourceStub {
-                    address: Address::root(),
+            let record = ParticleRecord::new(
+                Stub {
+                    address: Point::root(),
                         kind: Kind::Root.to_resource_kind(),
                     properties: Default::default(),
                     status: Status::Ready
@@ -210,33 +210,33 @@ impl ResourceLocatorComponent {
 
     async fn external_locate(
         &mut self,
-        address: Address,
+        address: Point,
         star: StarKey,
-        tx: oneshot::Sender<Result<ResourceRecord, Error>>,
+        tx: oneshot::Sender<Result<ParticleRecord, Error>>,
     ) {
         let (request, rx) = Request::new((address, star));
         self.request_resource_record_from_star(request).await;
         tokio::spawn(async move {
             async fn timeout(
-                rx: oneshot::Receiver<Result<ResourceRecord, Error>>,
-            ) -> Result<ResourceRecord, Error> {
+                rx: oneshot::Receiver<Result<ParticleRecord, Error>>,
+            ) -> Result<ParticleRecord, Error> {
                 Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
             }
             tx.send(timeout(rx).await).unwrap_or_default();
         });
     }
 
-    fn has_cached_record(&mut self, address: &Address) -> bool {
+    fn has_cached_record(&mut self, address: &Point) -> bool {
       self.resource_record_cache.contains(address)
     }
 
-    fn get_cached_record(&mut self, address: &Address) -> Option<ResourceRecord> {
+    fn get_cached_record(&mut self, address: &Point) -> Option<ParticleRecord> {
         self.resource_record_cache.get(address).cloned()
     }
 
     async fn request_resource_record_from_star(
         &mut self,
-        locate: Request<(Address, StarKey), ResourceRecord>,
+        locate: Request<(Point, StarKey), ParticleRecord>,
     ) {
         let (address, star) = locate.payload.clone();
         let mut proto = ProtoStarMessage::new();

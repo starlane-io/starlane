@@ -6,18 +6,15 @@ use std::sync::Arc;
 
 use futures::future::join_all;
 use futures::SinkExt;
-use mesh_portal::version::latest::command::common::{SetProperties, SetRegistry};
+use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties, SetRegistry};
 use mesh_portal::version::latest::entity::request::query::{Query, QueryResult};
-use mesh_portal::version::latest::entity::request::{Action, Rc};
-use mesh_portal::version::latest::id::{Address, Specific, Version};
+use mesh_portal::version::latest::entity::request::{Method, Rc};
+use mesh_portal::version::latest::id::{Point, Specific, Version};
 use mesh_portal::version::latest::messaging::Request;
-use mesh_portal::version::latest::pattern::{AddressKindPath, AddressKindSegment, ExactSegment, KindPattern, ResourceTypePattern, SegmentPattern};
-use mesh_portal::version::latest::pattern::specific::{ProductPattern, VariantPattern, VendorPattern};
+use mesh_portal::version::latest::selector::specific::{ProductSelector, VariantSelector, VendorSelector};
 use mesh_portal::version::latest::payload::{Payload, Primitive, PrimitiveList};
-use mesh_portal::version::latest::resource::{Property, ResourceStub, Status};
+use mesh_portal::version::latest::particle::{Property, Stub, Status};
 use mesh_portal::version::latest::util::ValuePattern;
-use mesh_portal_versions::version::v0_0_1::command::common::PropertyMod;
-use mesh_portal_versions::version::v0_0_1::id::AddressSegment;
 use mesh_portal_versions::version::v0_0_1::util::unique_id;
 use rusqlite::{Connection, params_from_iter, Row, Transaction};
 use  rusqlite::params;
@@ -26,7 +23,9 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, Mutex};
 use tokio::sync::oneshot;
 use async_recursion::async_recursion;
-use mesh_portal_versions::version::v0_0_1::entity::request::select::{Select, SelectKind, SubSelect};
+use mesh_portal::version::latest::entity::request::select::Select;
+use mesh_portal::version::latest::selector::{ExactSegment, GenericKindSelector, KindSelector, PointKindHierarchy, PointKindSeg, PointSegSelector};
+use mesh_portal_versions::version::v0_0_1::entity::request::select::{SelectKind, SubSelect};
 
 use crate::error::Error;
 use crate::fail::{Fail, StarlaneFailure};
@@ -34,13 +33,13 @@ use crate::frame::StarMessagePayload;
 use crate::logger::LogInfo;
 
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
-use crate::resource;
+use crate::particle;
 use crate::star::{StarKey, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use crate::resource::{ResourceRecord, AssignResourceStateSrc, Resource, ResourceAssign, AssignKind, ResourceLocation, ResourceType, Kind};
+use crate::particle::{ParticleRecord, AssignResourceStateSrc, Particle, ParticleAssign, AssignKind, ParticleLocation, KindBase, Kind};
 
 
-static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_variant,shell,status";
+static RESOURCE_QUERY_FIELDS: &str = "parent,point_segment,resource_type,kind,vendor,product,variant,version,version_variant,shell,status";
 
 #[derive(Clone)]
 pub struct RegistryApi {
@@ -52,7 +51,7 @@ impl RegistryApi {
         Self { tx }
     }
 
-    pub async fn register( &self, registration: Registration ) -> Result<ResourceStub,RegError> {
+    pub async fn register( &self, registration: Registration ) -> Result<Stub,RegError> {
         let (tx,rx) = oneshot::channel();
         self.tx.send(RegistryCall::Register {registration, tx }).await?;
 
@@ -60,9 +59,9 @@ impl RegistryApi {
         result?
     }
 
-    pub async fn assign( &self, address: Address, host: StarKey) -> Result<(),Error> {
+    pub async fn assign(&self, point: Point, host: StarKey) -> Result<(),Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(RegistryCall::Assign{address, host, tx }).await?;
+        self.tx.send(RegistryCall::Assign{point, host, tx }).await?;
         rx.await?
     }
 
@@ -83,39 +82,39 @@ impl RegistryApi {
         result
     }
 
-    pub async fn query(&self, address: Address, query: Query ) -> Result<QueryResult,Error> {
+    pub async fn query(&self, point: Point, query: Query ) -> Result<QueryResult,Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(RegistryCall::Query {address, query, tx }).await;
+        self.tx.send(RegistryCall::Query {point, query, tx }).await;
         rx.await?
     }
 
-    pub async fn set_status(&self, address: Address, status: Status ) -> Result<(),Error> {
+    pub async fn set_status(&self, point: Point, status: Status ) -> Result<(),Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(RegistryCall::SetStatus{address, status, tx }).await;
+        self.tx.send(RegistryCall::SetStatus{point, status, tx }).await;
         rx.await?
     }
 
-    pub async fn set_properties(&self, address: Address, properties: SetProperties) -> Result<(),Error> {
+    pub async fn set_properties(&self, point: Point, properties: SetProperties) -> Result<(),Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(RegistryCall::SetProperties {address, properties, tx }).await;
+        self.tx.send(RegistryCall::SetProperties {point, properties, tx }).await;
         rx.await?
     }
 
-    pub async fn get_properties(&self, address: Address, keys: Vec<String>) -> Result<Vec<(String,String)>,Error> {
+    pub async fn get_properties(&self, point: Point, keys: Vec<String>) -> Result<Vec<(String, String)>,Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(RegistryCall::GetProperties {address, keys, tx }).await;
+        self.tx.send(RegistryCall::GetProperties {point, keys, tx }).await;
         rx.await?
     }
 
-    pub async fn locate(&self, address: Address) -> Result<ResourceRecord,Error> {
+    pub async fn locate(&self, point: Point) -> Result<ParticleRecord,Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(RegistryCall::Locate{address, tx }).await;
+        self.tx.send(RegistryCall::Locate{point, tx }).await;
         rx.await?
     }
 
-    pub async fn sequence(&self, address: Address) -> Result<u64,Error> {
+    pub async fn sequence(&self, point: Point) -> Result<u64,Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(RegistryCall::Sequence{address, tx }).await;
+        self.tx.send(RegistryCall::Sequence{point, tx }).await;
         rx.await?
     }
 
@@ -123,15 +122,15 @@ impl RegistryApi {
 }
 
 pub enum RegistryCall {
-    Assign{address:Address, host: StarKey, tx: oneshot::Sender<Result<(),Error>>},
-    Register{registration:Registration, tx: oneshot::Sender<Result<ResourceStub,RegError>>},
+    Assign{point: Point, host: StarKey, tx: oneshot::Sender<Result<(),Error>>},
+    Register{registration:Registration, tx: oneshot::Sender<Result<Stub,RegError>>},
     Selector {select: Select, tx: oneshot::Sender<Selector>},
-    Query { address: Address, query: Query, tx: oneshot::Sender<Result<QueryResult,Error>>},
-    SetStatus { address: Address, status: Status, tx: oneshot::Sender<Result<(),Error>>},
-    SetProperties { address: Address, properties: SetProperties, tx: oneshot::Sender<Result<(),Error>>},
-    GetProperties { address: Address, keys: Vec<String>, tx: oneshot::Sender<Result<Vec<(String,String)>,Error>>},
-    Locate{ address: Address, tx: oneshot::Sender<Result<ResourceRecord,Error>>},
-    Sequence{ address: Address, tx: oneshot::Sender<Result<u64,Error>>},
+    Query { point: Point, query: Query, tx: oneshot::Sender<Result<QueryResult,Error>>},
+    SetStatus { point: Point, status: Status, tx: oneshot::Sender<Result<(),Error>>},
+    SetProperties { point: Point, properties: SetProperties, tx: oneshot::Sender<Result<(),Error>>},
+    GetProperties { point: Point, keys: Vec<String>, tx: oneshot::Sender<Result<Vec<(String, String)>,Error>>},
+    Locate{ point: Point, tx: oneshot::Sender<Result<ParticleRecord,Error>>},
+    Sequence{ point: Point, tx: oneshot::Sender<Result<u64,Error>>},
 }
 
 impl Call for RegistryCall {}
@@ -179,26 +178,26 @@ impl RegistryComponent {
                 };
                 tx.send(selector);
             }
-            RegistryCall::Query { address, query, tx } => {
-                self.query(address, query, tx).await
+            RegistryCall::Query { point, query, tx } => {
+                self.query(point, query, tx).await
             }
-            RegistryCall::SetStatus{ address,status,tx } => {
-                self.set_status(address, status, tx).await;
+            RegistryCall::SetStatus{ point,status,tx } => {
+                self.set_status(point, status, tx).await;
             }
-            RegistryCall::SetProperties { address, properties, tx } => {
-                self.set_properties(address, properties, tx).await;
+            RegistryCall::SetProperties { point, properties, tx } => {
+                self.set_properties(point, properties, tx).await;
             }
-            RegistryCall::Locate { address, tx } => {
-                self.locate(address,tx ).await;
+            RegistryCall::Locate { point, tx } => {
+                self.locate(point,tx ).await;
             }
-            RegistryCall::Sequence { address, tx } => {
-                self.sequence(address,tx).await;
+            RegistryCall::Sequence { point, tx } => {
+                self.sequence(point,tx).await;
             }
-            RegistryCall::Assign { address, host, tx } => {
-                self.assign(address,host, tx).await;
+            RegistryCall::Assign { point, host, tx } => {
+                self.assign(point,host, tx).await;
             }
-            RegistryCall::GetProperties { address, keys, tx } => {
-                self.get_properties(address, keys, tx).await;
+            RegistryCall::GetProperties { point, keys, tx } => {
+                self.get_properties(point, keys, tx).await;
             }
         }
     }
@@ -206,32 +205,32 @@ impl RegistryComponent {
 
 impl RegistryComponent {
 
-    async fn set_status(&mut self, address: Address, status: Status, tx: oneshot::Sender<Result<(),Error>>) {
-        async fn process( conn: Arc<Mutex<Connection>>, address:Address, status: Status ) -> Result<(),Error> {
-            let parent = address.parent().ok_or("resource must have a parent")?.to_string();
-            let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
+    async fn set_status(&mut self, point: Point, status: Status, tx: oneshot::Sender<Result<(),Error>>) {
+        async fn process(conn: Arc<Mutex<Connection>>, point: Point, status: Status ) -> Result<(),Error> {
+            let parent = point.parent().ok_or("particle must have a parent")?.to_string();
+            let point_segment = point.last_segment().ok_or("particle must have a last segment")?.to_string();
             let status = status.to_string();
-            let statement = "UPDATE resources SET status=?1 WHERE parent=?2 AND address_segment=?3";
+            let statement = "UPDATE resources SET status=?1 WHERE parent=?2 AND point_segment=?3";
             {
                 let conn = conn.lock().await;
                 let mut statement = conn.prepare(statement)?;
-                statement.execute(params!(status,parent,address_segment))?;
+                statement.execute(params!(status,parent,point_segment))?;
             }
             Ok(())
         }
-        tx.send(process(self.conn.clone(), address,status).await );
+        tx.send(process(self.conn.clone(), point,status).await );
     }
 
-    async fn get_properties(&mut self, address: Address, keys: Vec<String>, tx: oneshot::Sender<Result<Vec<(String,String)>,Error>>) {
+    async fn get_properties(&mut self, point: Point, keys: Vec<String>, tx: oneshot::Sender<Result<Vec<(String, String)>,Error>>) {
 
-        async fn process( conn: Arc<Mutex<Connection>>, address:Address, keys: Vec<String>) -> Result<Vec<(String,String)>,Error> {
+        async fn process(conn: Arc<Mutex<Connection>>, point: Point, keys: Vec<String>) -> Result<Vec<(String, String)>,Error> {
             let conn = conn.lock().await;
-            let parent = address.parent().ok_or("resource must have a parent")?.to_string();
-            let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
+            let parent = point.parent().ok_or("particle must have a parent")?.to_string();
+            let point_segment = point.last_segment().ok_or("particle must have a last segment")?.to_string();
 
             let mut properties = vec![];
             for key in keys {
-                let property = conn.query_row("SELECT key,value FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=?1 AND address_segment=?2) AND key=?3", params![parent,address_segment,key], RegistryComponent::process_property )?;
+                let property = conn.query_row("SELECT key,value FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=?1 AND point_segment=?2) AND key=?3", params![parent,point_segment,key], RegistryComponent::process_property )?;
                 if property.is_some() {
                     properties.push(property.expect("property"));
                 }
@@ -240,7 +239,7 @@ impl RegistryComponent {
             Ok(properties)
         }
 
-        let result = process(self.conn.clone(), address,keys).await;
+        let result = process(self.conn.clone(), point,keys).await;
 
         match &result {
             Ok(_) => { }
@@ -253,12 +252,12 @@ impl RegistryComponent {
     }
 
 
-    async fn set_properties(&mut self, address: Address, properties: SetProperties, tx: oneshot::Sender<Result<(),Error>>) {
+    async fn set_properties(&mut self, point: Point, properties: SetProperties, tx: oneshot::Sender<Result<(),Error>>) {
 
-        async fn process( conn: Arc<Mutex<Connection>>, address:Address, properties: SetProperties) -> Result<(),Error> {
+        async fn process(conn: Arc<Mutex<Connection>>, point: Point, properties: SetProperties) -> Result<(),Error> {
             let conn = conn.lock().await;
-            let parent = address.parent().ok_or("resource must have a parent")?.to_string();
-            let address_segment = address.last_segment().ok_or("resource must have a last segment")?.to_string();
+            let parent = point.parent().ok_or("particle must have a parent")?.to_string();
+            let point_segment = point.last_segment().ok_or("particle must have a last segment")?.to_string();
 
             for (_,property_mod) in properties.iter() {
                 match property_mod {
@@ -267,17 +266,17 @@ impl RegistryComponent {
                             true => 1,
                             false => 0
                         };
-                        conn.execute("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM resources WHERE parent=?1 AND address_segment=?2),?3,?4,?5) ON CONFLICT(resource_id,key) DO UPDATE SET value=?4 WHERE lock=0", params![parent,address_segment,key.to_string(),value.to_string(),lock])?;
+                        conn.execute("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM resources WHERE parent=?1 AND point_segment=?2),?3,?4,?5) ON CONFLICT(resource_id,key) DO UPDATE SET value=?4 WHERE lock=0", params![parent,point_segment,key.to_string(),value.to_string(),lock])?;
                     }
                     PropertyMod::UnSet(key) => {
-                        conn.execute("DELETE FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=?1 AND address_segment=?2) AND key=?3 AND lock=0", params![parent,address_segment,key.to_string()])?;
+                        conn.execute("DELETE FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=?1 AND point_segment=?2) AND key=?3 AND lock=0", params![parent,point_segment,key.to_string()])?;
                     }
                 }
             }
             Ok(())
         }
 
-        let result = process(self.conn.clone(), address,properties).await;
+        let result = process(self.conn.clone(), point,properties).await;
 
         match &result {
             Ok(_) => { }
@@ -289,19 +288,19 @@ impl RegistryComponent {
         tx.send(result);
     }
 
-    async fn locate(&mut self, address: Address, tx: oneshot::Sender<Result<ResourceRecord,Error>>) {
-        tx.send(Self::locate_inner(self.conn.clone(), address).await );
+    async fn locate(&mut self, point: Point, tx: oneshot::Sender<Result<ParticleRecord,Error>>) {
+        tx.send(Self::locate_inner(self.conn.clone(), point).await );
     }
 
-    async fn locate_inner( conn: Arc<Mutex<Connection>>, address:Address) -> Result<ResourceRecord,Error> {
+    async fn locate_inner(conn: Arc<Mutex<Connection>>, point: Point) -> Result<ParticleRecord,Error> {
         let conn = conn.lock().await;
-        let statement = format!( "SELECT DISTINCT {} FROM resources as r WHERE parent=?1 AND address_segment=?2", RESOURCE_QUERY_FIELDS );
+        let statement = format!( "SELECT DISTINCT {} FROM resources as r WHERE parent=?1 AND point_segment=?2", RESOURCE_QUERY_FIELDS );
         let mut statement = conn.prepare(statement.as_str())?;
-        let parent = address.parent().ok_or("expected a parent")?;
-        let address_segment = address.last_segment().ok_or("expected last address_segment")?.to_string();
-        let mut record = statement.query_row(params!(parent.to_string(),address_segment), RegistryComponent::process_resource_row_catch)?;
-        let mut statement = conn.prepare("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=?1 AND address_segment=?2)")?;
-        let mut rows = statement.query(params!(parent.to_string(),address_segment))?;
+        let parent = point.parent().ok_or("expected a parent")?;
+        let point_segment = point.last_segment().ok_or("expected last point_segment")?.to_string();
+        let mut record = statement.query_row(params!(parent.to_string(),point_segment), RegistryComponent::process_resource_row_catch)?;
+        let mut statement = conn.prepare("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=?1 AND point_segment=?2)")?;
+        let mut rows = statement.query(params!(parent.to_string(),point_segment))?;
         while let Option::Some(row) = rows.next()? {
             let key: String = row.get(0)?;
             let value: String = row.get(1)?;
@@ -317,58 +316,58 @@ impl RegistryComponent {
         Ok(record)
     }
 
-    async fn sequence(&mut self, address: Address, tx: oneshot::Sender<Result<u64,Error>>) {
-        async fn process(skel: StarSkel, conn:Arc<Mutex<Connection>>, address: Address) -> Result<u64, Error> {
+    async fn sequence(&mut self, point: Point, tx: oneshot::Sender<Result<u64,Error>>) {
+        async fn process(skel: StarSkel, conn:Arc<Mutex<Connection>>, point: Point) -> Result<u64, Error> {
             let conn = conn.lock().await;
-            let parent = address.parent().ok_or("expecting parent since we have already established the segments are >= 2")?;
-            let address_segment = address.last_segment().ok_or("expecting a last_segment since we know segments are >= 2")?;
-            conn.execute("UPDATE resources SET sequence=sequence+1 WHERE parent=?1 AND address_segment=?2",params![parent.to_string(),address_segment.to_string()])?;
-            Ok(conn.query_row( "SELECT DISTINCT sequence FROM resources WHERE parent=?1 AND address_segment=?2",params![parent.to_string(),address_segment.to_string()], RegistryComponent::process_sequence)?)
+            let parent = point.parent().ok_or("expecting parent since we have already established the segments are >= 2")?;
+            let point_segment = point.last_segment().ok_or("expecting a last_segment since we know segments are >= 2")?;
+            conn.execute("UPDATE resources SET sequence=sequence+1 WHERE parent=?1 AND point_segment=?2",params![parent.to_string(),point_segment.to_string()])?;
+            Ok(conn.query_row( "SELECT DISTINCT sequence FROM resources WHERE parent=?1 AND point_segment=?2",params![parent.to_string(),point_segment.to_string()], RegistryComponent::process_sequence)?)
         }
-        tx.send(process(self.skel.clone(), self.conn.clone(), address).await);
+        tx.send(process(self.skel.clone(), self.conn.clone(), point).await);
     }
 
-    async fn assign(&mut self, address: Address, host: StarKey, tx: oneshot::Sender<Result<(),Error>>) {
-        async fn process( conn:Arc<Mutex<Connection>>, address: Address, host: StarKey) -> Result<(), Error> {
+    async fn assign(&mut self, point: Point, host: StarKey, tx: oneshot::Sender<Result<(),Error>>) {
+        async fn process(conn:Arc<Mutex<Connection>>, point: Point, host: StarKey) -> Result<(), Error> {
             let conn = conn.lock().await;
-            let parent = address.parent().ok_or("expecting parent since we have already established the segments are >= 2")?;
-            let address_segment = address.last_segment().ok_or("expecting a last_segment since we know segments are >= 2")?;
-            conn.execute("UPDATE resources SET shell=?1 WHERE parent=?2 AND address_segment=?3",params![host.to_string(),parent.to_string(),address_segment.to_string()])?;
+            let parent = point.parent().ok_or("expecting parent since we have already established the segments are >= 2")?;
+            let point_segment = point.last_segment().ok_or("expecting a last_segment since we know segments are >= 2")?;
+            conn.execute("UPDATE resources SET shell=?1 WHERE parent=?2 AND point_segment=?3",params![host.to_string(),parent.to_string(),point_segment.to_string()])?;
             Ok(())
         }
-        tx.send(process(self.conn.clone(), address, host).await);
+        tx.send(process(self.conn.clone(), point, host).await);
     }
 
 
-    async fn query(&mut self, address: Address, query: Query, tx: oneshot::Sender<Result<QueryResult,Error>>) {
-        async fn process(skel: StarSkel, conn:Arc<Mutex<Connection>>, address: Address) -> Result<QueryResult, Error> {
+    async fn query(&mut self, point: Point, query: Query, tx: oneshot::Sender<Result<QueryResult,Error>>) {
+        async fn process(skel: StarSkel, conn:Arc<Mutex<Connection>>, point: Point) -> Result<QueryResult, Error> {
 
-            if address.segments.len() == 0 {
+            if point.segments.len() == 0 {
 /*                let segment = AddressKindSegment {
-                    address_segment: AddressSegment::Root,
+                    point_segment: AddressSegment::Root,
                     kind: Kind::Root.into()
                 };
 
  */
-                return Ok(QueryResult::AddressKindPath(AddressKindPath::new(
-                    address.route.clone(),
+                return Ok(QueryResult::AddressKindPath(PointKindHierarchy::new(
+                    point.route.clone(),
                     vec![]
                 )));
             }
-            else if address.segments.len() == 1 {
-                let segment = AddressKindSegment {
-                    address_segment: address.last_segment().expect("expected at least one segment"),
+            else if point.segments.len() == 1 {
+                let segment = PointKindSeg {
+                    point_segment: point.last_segment().expect("expected at least one segment"),
                     kind: Kind::Space.into()
                 };
-                return Ok(QueryResult::AddressKindPath(AddressKindPath::new(
-                    address.route.clone(),
+                return Ok(QueryResult::AddressKindPath(PointKindHierarchy::new(
+                    point.route.clone(),
                      vec![segment]
                 )));
             }
 
-            let parent = address.parent().expect("expecting parent since we have already established the segments are >= 2");
-            let address_segment = address.last_segment().expect("expecting a last_segment since we know segments are >= 2");
-            let request= Request::new(Action::Rc(Rc::Query(Query::AddressKindPath)).into(), skel.info.address.clone(), parent.clone() );
+            let parent = point.parent().expect("expecting parent since we have already established the segments are >= 2");
+            let point_segment = point.last_segment().expect("expecting a last_segment since we know segments are >= 2");
+            let request= Request::new(Method::Rc(Rc::Query(Query::AddressKindPath)).into(), skel.info.point.clone(), parent.clone() );
 
             let response = skel.messaging_api.request(request).await;
 
@@ -376,17 +375,17 @@ impl RegistryComponent {
             let parent_kind_path: Primitive= parent_kind_path.try_into()?;
             let parent_kind_path: String= parent_kind_path.try_into()?;
 
-            let parent_kind_path = AddressKindPath::from_str(parent_kind_path.as_str())?;
+            let parent_kind_path = PointKindHierarchy::from_str(parent_kind_path.as_str())?;
 
 
             let mut record = {
                 let conn = conn.lock().await;
-                let statement = format!("SELECT DISTINCT {} FROM resources as r WHERE parent=?1 AND address_segment=?2", RESOURCE_QUERY_FIELDS);
+                let statement = format!("SELECT DISTINCT {} FROM resources as r WHERE parent=?1 AND point_segment=?2", RESOURCE_QUERY_FIELDS);
                 let mut statement = conn.prepare(statement.as_str())?;
-                statement.query_row(params!(parent.to_string(),address_segment.to_string()), RegistryComponent::process_resource_row_catch)?
+                statement.query_row(params!(parent.to_string(),point_segment.to_string()), RegistryComponent::process_resource_row_catch)?
             };
-                let segment = AddressKindSegment {
-                    address_segment: record.stub.address.last_segment().expect("expected at least one segment"),
+                let segment = PointKindSeg {
+                    point_segment: record.stub.point.last_segment().expect("expected at least one segment"),
                     kind: record.stub.kind
                 };
 
@@ -397,14 +396,14 @@ impl RegistryComponent {
         }
 
                 let skel = self.skel.clone();
-                tx.send(process(skel, self.conn.clone(), address).await);
+                tx.send(process(skel, self.conn.clone(), point).await);
         }
 
 
-    async fn register( &mut self, registration: Registration, tx: oneshot::Sender<Result<ResourceStub,RegError>>) {
+    async fn register( &mut self, registration: Registration, tx: oneshot::Sender<Result<Stub,RegError>>) {
         fn check<'a>( registration: &Registration,  trans:&Transaction<'a>, ) -> Result<(),RegError> {
             let params = RegistryParams::from_registration(registration)?;
-            let count = trans.query_row("SELECT count(*) as count from resources WHERE parent=?1 AND address_segment=?2", params![params.parent, params.address_segment], RegistryComponent::count )?;
+            let count = trans.query_row("SELECT count(*) as count from resources WHERE parent=?1 AND point_segment=?2", params![params.parent, params.point_segment], RegistryComponent::count )?;
             if count > 0 {
                 Err(RegError::Dupe)
             } else {
@@ -414,7 +413,7 @@ impl RegistryComponent {
         fn register<'a>( registration: Registration,  trans:&Transaction<'a>,) -> Result<(),Error> {
 
             let params = RegistryParams::from_registration(&registration)?;
-            trans.execute("INSERT INTO resources (address_segment,resource_type,kind,vendor,product,variant,version,version_variant,parent,status) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'Pending')", params![params.address_segment,params.resource_type,params.kind,params.vendor,params.product,params.variant,params.version,params.version_variant,params.parent])?;
+            trans.execute("INSERT INTO resources (point_segment,resource_type,kind,vendor,product,variant,version,version_variant,parent,status) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'Pending')", params![params.point_segment,params.resource_type,params.kind,params.vendor,params.product,params.variant,params.version,params.version_variant,params.parent])?;
 
             fn set_properties(params: &RegistryParams, props: &SetProperties, trans: &Transaction ) -> Result<(),Error> {
                 for (_,property_mod) in props.iter() {
@@ -424,10 +423,10 @@ impl RegistryComponent {
                                 true => 1,
                                 false => 0
                             };
-                            trans.execute("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM resources WHERE parent=?1 AND address_segment=?2),?3,?4,?5)", params![params.parent,params.address_segment,key.to_string(),value.to_string(),lock])?;
+                            trans.execute("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM resources WHERE parent=?1 AND point_segment=?2),?3,?4,?5)", params![params.parent,params.point_segment,key.to_string(),value.to_string(),lock])?;
                         }
                         PropertyMod::UnSet(key) => {
-                            trans.execute("DELETE FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=?1 AND address_segment=?2) AND key=?3 AND lock=0", params![params.parent,params.address_segment,key.to_string()])?;
+                            trans.execute("DELETE FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=?1 AND point_segment=?2) AND key=?3 AND lock=0", params![params.parent,params.point_segment,key.to_string()])?;
                         }
                     }
                 }
@@ -439,7 +438,7 @@ impl RegistryComponent {
            Ok(())
         }
 
-        let address = registration.address.clone();
+        let point = registration.point.clone();
         let result = {
             let mut conn = self.conn.lock().await;
             let mut trans = match conn.transaction() {
@@ -472,24 +471,24 @@ impl RegistryComponent {
         match result {
             Ok(_) => {
                 let (otx,rx) = oneshot::channel();
-                self.locate(address.clone(),otx).await;
+                self.locate(point.clone(),otx).await;
                 tx.send(match rx.await {
                     Ok(Ok(record)) => {
                         Ok(record.into())
                     }
                     Ok(Err(err)) => {
-                        error!("could not locate record '{}'", address.to_string());
-                        Err(format!("Registry: could not locate record: {}",address.to_string()).as_str().into())
+                        error!("could not locate record '{}'", point.to_string());
+                        Err(format!("Registry: could not locate record: {}",point.to_string()).as_str().into())
                     }
 
                     Err(err) => {
-                        error!("could not locate record '{}'", address.to_string());
-                        Err(format!("Registry: could not locate record: {}",address.to_string()).as_str().into())
+                        error!("could not locate record '{}'", point.to_string());
+                        Err(format!("Registry: could not locate record: {}",point.to_string()).as_str().into())
                     }
                 });
             }
             Err(err) => {
-                error!("could not locate record '{}'", address.to_string());
+                error!("could not locate record '{}'", point.to_string());
                 tx.send(Err(RegError::Error(err)));
             }
         }
@@ -500,7 +499,7 @@ impl RegistryComponent {
         Ok(sequence)
     }
 
-    fn process_resource_row_catch(row: &Row) -> Result<ResourceRecord, rusqlite::Error> {
+    fn process_resource_row_catch(row: &Row) -> Result<ParticleRecord, rusqlite::Error> {
         match Self::process_resource_row(row) {
             Ok(ok) => Ok(ok),
             Err(error) => {
@@ -535,8 +534,8 @@ impl RegistryComponent {
         Ok(count)
     }
 
-    //    static RESOURCE_QUERY_FIELDS: &str = "parent,address_segment,resource_type,kind,vendor,product,variant,version,version_variant,shell,status";
-    fn process_resource_row(row: &Row) -> Result<ResourceRecord, Error> {
+    //    static RESOURCE_QUERY_FIELDS: &str = "parent,point_segment,resource_type,kind,vendor,product,variant,version,version_variant,shell,status";
+    fn process_resource_row(row: &Row) -> Result<ParticleRecord, Error> {
             fn opt(row: &Row, index: usize) -> Result<Option<String>, Error>
             {
                 if let ValueRef::Null = row.get_ref(index)? {
@@ -548,7 +547,7 @@ impl RegistryComponent {
             }
 
             let parent: String = row.get(0)?;
-            let address_segment: String = row.get(1)?;
+            let point_segment: String = row.get(1)?;
             let resource_type: String = row.get(2)?;
             let kind: Option<String> = opt(row,3 )?;
             let vendor: Option<String> = opt(row, 4)?;
@@ -559,9 +558,9 @@ impl RegistryComponent {
             let host: Option<String> = opt(row, 9)?;
             let status: String = row.get(10)?;
 
-            let address = Address::from_str(parent.as_str())?;
-            let address = address.push(address_segment)?;
-            let resource_type = ResourceType::from_str(resource_type.as_str())?;
+            let point = Point::from_str(parent.as_str())?;
+            let point = point.push(point_segment)?;
+            let resource_type = KindBase::from_str(resource_type.as_str())?;
             let specific = if let Option::Some(vendor) = vendor {
                 if let Option::Some(product) = product {
                     if let Option::Some(variant) = variant {
@@ -595,22 +594,22 @@ impl RegistryComponent {
             let kind = Kind::from(resource_type, kind, specific)?;
             let host = match host {
                 Some(host) => {
-                    ResourceLocation::Star(StarKey::from_str(host.as_str())?)
+                    ParticleLocation::Star(StarKey::from_str(host.as_str())?)
                 }
                 None => {
-                    ResourceLocation::Unassigned
+                    ParticleLocation::Unassigned
                 }
             };
             let status = Status::from_str(status.as_str())?;
 
-            let stub = ResourceStub {
-                address,
+            let stub = Stub {
+                point,
                 kind: kind.into(),
                 properties: Default::default(), // not implemented yet...
                 status
             };
 
-            let record = ResourceRecord {
+            let record = ParticleRecord {
                 stub: stub,
                 location: host,
             };
@@ -625,9 +624,9 @@ impl RegistryComponent {
 #[derive(Debug,Clone,Serialize,Deserialize)]
 pub struct SubSelect {
     pub pattern: AddressKindPattern,
-    pub address: Address,
+    pub point: Address,
     pub hops: Vec<Hop>,
-    pub address_tks_path: AddressTksPath
+    pub point_tks_path: AddressTksPath
 }
 
  */
@@ -636,16 +635,16 @@ pub struct SubSelect {
 
 #[derive(Clone)]
 pub struct Registration {
-    pub address: Address,
+    pub point: Point,
     pub kind: Kind,
     pub registry: SetRegistry,
     pub properties: SetProperties,
-    pub owner: Address
+    pub owner: Point
 }
 
 pub struct RegistryParams {
-    pub address: String,
-    pub address_segment: String,
+    pub point: String,
+    pub point_segment: String,
     pub resource_type: String,
     pub kind: Option<String>,
     pub vendor: Option<String>,
@@ -654,25 +653,25 @@ pub struct RegistryParams {
     pub version: Option<String>,
     pub version_variant: Option<String>,
     pub parent: String,
-    pub owner: Address,
+    pub owner: Point,
 }
 
 impl RegistryParams {
     pub fn from_registration(registration: &Registration ) -> Result<Self, Error> {
 
-        let address_segment = match registration.address.segments.last() {
+        let point_segment = match registration.point.segments.last() {
             None => {"".to_string()}
             Some(segment) => {
                 segment.to_string()
             }
         };
-        let parent = match registration.address.parent()  {
+        let parent = match registration.point.parent()  {
             None => {"".to_string()}
             Some(parent) => {parent.to_string()}
         };
 
-        let resource_type = registration.kind.resource_type().to_string();
-        let kind = registration.kind.sub_string();
+        let resource_type = registration.kind.kind().to_string();
+        let kind = registration.kind.sub_kind();
         let vendor = match &registration.kind.specific() {
             None => Option::None,
             Some(specific) => Option::Some(specific.vendor.clone()),
@@ -716,8 +715,8 @@ impl RegistryParams {
         };
 
         Ok(RegistryParams {
-            address: registration.address.to_string(),
-            address_segment,
+            point: registration.point.to_string(),
+            point_segment: point_segment,
             parent,
             resource_type,
             kind,
@@ -740,7 +739,7 @@ fn setup(conn: &mut Connection) -> Result<(), Error> {
 
     let resources = r#"CREATE TABLE IF NOT EXISTS resources (
          id INTEGER PRIMARY KEY AUTOINCREMENT,
-         address_segment TEXT NOT NULL,
+         point_segment TEXT NOT NULL,
          parent TEXT NOT NULL,
          resource_type TEXT NOT NULL,
          kind TEXT,
@@ -752,7 +751,7 @@ fn setup(conn: &mut Connection) -> Result<(), Error> {
          shell TEXT,
          status TEXT NOT NULL,
          sequence INTEGER DEFAULT 0,
-         UNIQUE(parent,address_segment)
+         UNIQUE(parent,point_segment)
         )"#;
 
     let labels = r#"
@@ -765,14 +764,14 @@ fn setup(conn: &mut Connection) -> Result<(), Error> {
           FOREIGN KEY (resource_id) REFERENCES resources (id)
         )"#;
 
-    /// note that a tag may reference an address NOT in this database
+    /// note that a tag may reference an point NOT in this database
     /// therefore it does not have a FOREIGN KEY constraint
     let tags = r#"
        CREATE TABLE IF NOT EXISTS tags(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           parent TEXT NOT NULL,
           tag TEXT NOT NULL,
-          address TEXT NOT NULL,
+          point TEXT NOT NULL,
           UNIQUE(tag)
         )"#;
 
@@ -787,14 +786,14 @@ fn setup(conn: &mut Connection) -> Result<(), Error> {
          UNIQUE(resource_id,key)
         )"#;
 
-    let address_index = "CREATE UNIQUE INDEX resource_address_index ON resources(parent,address_segment)";
+    let point_index = "CREATE UNIQUE INDEX resource_point_index ON resources(parent,point_segment)";
 
     let transaction = conn.transaction()?;
     transaction.execute(labels, [])?;
     transaction.execute(tags, [])?;
     transaction.execute(resources, [])?;
     transaction.execute(properties, [])?;
-    transaction.execute(address_index, [])?;
+    transaction.execute(point_index, [])?;
     transaction.commit()?;
     Ok(())
 }
@@ -872,19 +871,19 @@ impl Selector {
         #[async_recursion]
         async fn initial(mut selector: Selector) -> Result<PrimitiveList, Error> {
             let select = selector.select;
-            let address = select.pattern.query_root();
+            let point = select.pattern.query_root();
             println!("REG SELECT: initial");
-            if address != select.pattern.query_root() {
-                //let fail = fail::Fail::Resource(fail::resource::Fail::Select(fail::resource::Select::WrongAddress {required:select.pattern.query_root(), found: address }));
+            if point != select.pattern.query_root() {
+                //let fail = fail::Fail::Resource(fail::particle::Fail::Select(fail::particle::Select::WrongAddress {required:select.pattern.query_root(), found: point }));
                 return Err("WrongAddress".into());
             }
 
             println!("REG SELECT: pre query");
-            let address_kind_path = selector.skel.registry_api.query( address.clone(), Query::AddressKindPath ).await?.try_into()?;
+            let point_kind_path = selector.skel.registry_api.query( point.clone(), Query::AddressKindPath ).await?.try_into()?;
             println!("REG SELECT: post query");
 
             let sub_select_hops = select.pattern.sub_select_hops();
-            let sub_select = select.sub_select(address.clone(), sub_select_hops, address_kind_path);
+            let sub_select = select.sub_select(point.clone(), sub_select_hops, point_kind_path);
 
             println!("REG SELECT: pre select()...");
             let select = sub_select.into();
@@ -894,7 +893,7 @@ impl Selector {
             println!("REG SELECT: post select()... {}", list.len() );
             for l in &list.list {
                 if let Primitive::Stub(stub) = l {
-                    println!("-> FOUND: {}", stub.address.to_string());
+                    println!("-> FOUND: {}", stub.point.to_string());
                 }
             }
 
@@ -908,17 +907,17 @@ impl Selector {
             let mut where_clause = String::new();
             let mut index = 1;
             where_clause.push_str( "parent=?1" );
-            params.push( sub_select.address.to_string() );
+            params.push( sub_select.point.to_string() );
 
             if let Option::Some(hop) = sub_select.hops.first()
             {
-                match &hop.segment {
-                    SegmentPattern::Exact(exact) => {
+                match &hop.segment_selector {
+                    PointSegSelector::Exact(exact) => {
                         index = index+1;
-                        where_clause.push_str( format!(" AND address_segment=?{}",index).as_str() );
+                        where_clause.push_str( format!(" AND point_segment=?{}",index).as_str() );
                         match exact {
-                            ExactSegment::Address(address) => {
-                                params.push( address.to_string() );
+                            ExactSegment::Address(point) => {
+                                params.push( point.to_string() );
                             }
                             ExactSegment::Version(version) => {
                                 params.push( version.to_string() );
@@ -929,8 +928,8 @@ impl Selector {
                 }
 
                 match &hop.tks.resource_type {
-                    ResourceTypePattern::Any => {},
-                    ResourceTypePattern::Exact(resource_type)=> {
+                    GenericKindSelector::Any => {},
+                    GenericKindSelector::Exact(resource_type)=> {
                         index = index+1;
                         where_clause.push_str( format!(" AND resource_type=?{}",index).as_str() );
                         params.push( resource_type.to_string() );
@@ -938,8 +937,8 @@ impl Selector {
                 }
 
                 match &hop.tks.kind {
-                    KindPattern::Any => {},
-                    KindPattern::Exact(kind)=> {
+                    KindSelector::Any => {},
+                    KindSelector::Exact(kind)=> {
                         match &kind.kind {
                             None => {}
                             Some(sub) => {
@@ -956,24 +955,24 @@ impl Selector {
                     ValuePattern::None => {}
                     ValuePattern::Pattern(specific) => {
                         match &specific.vendor {
-                            VendorPattern::Any => {}
-                            VendorPattern::Exact(vendor) => {
+                            VendorSelector::Any => {}
+                            VendorSelector::Exact(vendor) => {
                                 index = index+1;
                                 where_clause.push_str(format!(" AND vendor=?{}", index).as_str());
                                 params.push(vendor.clone() );
                             }
                         }
                         match &specific.product{
-                            ProductPattern::Any => {}
-                            ProductPattern::Exact(product) => {
+                            ProductSelector::Any => {}
+                            ProductSelector::Exact(product) => {
                                 index = index+1;
                                 where_clause.push_str(format!(" AND product=?{}", index).as_str());
                                 params.push(product.clone() );
                             }
                         }
                         match &specific.variant{
-                            VariantPattern::Any => {}
-                            VariantPattern::Exact(variant) => {
+                            VariantSelector::Any => {}
+                            VariantSelector::Exact(variant) => {
                                 index = index+1;
                                 where_clause.push_str(format!(" AND variant=?{}", index).as_str());
                                 params.push(variant.clone());
@@ -988,7 +987,7 @@ impl Selector {
                 RESOURCE_QUERY_FIELDS, where_clause
             );
 
-            let mut stubs:Vec<ResourceStub> = vec![];
+            let mut stubs:Vec<Stub> = vec![];
             {
                 let conn = selector.conn.lock().await;
                 let mut statement = conn.prepare(statement.as_str())?;
@@ -1005,19 +1004,19 @@ impl Selector {
                 hops.remove(0);
                 let mut futures = vec![];
                 for stub in &stubs {
-                    if let Option::Some(last_segment) = stub.address.last_segment() {
-                        let address = sub_select.address.push_segment(last_segment.clone());
-                        let address_tks_path = sub_select.address_kind_path.push(AddressKindSegment {
-                            address_segment: last_segment,
+                    if let Option::Some(last_segment) = stub.point.last_segment() {
+                        let point = sub_select.point.push_segment(last_segment.clone());
+                        let point_tks_path = sub_select.point_kind_path.push(PointKindSeg {
+                            segment: last_segment,
                             kind: stub.kind.clone()
                         });
-                        let sub_select = selector.select.clone().sub_select(address.clone(), hops.clone(), address_tks_path);
+                        let sub_select = selector.select.clone().sub_select(point.clone(), hops.clone(), point_tks_path);
                         let select = sub_select.into();
 
-                        let parent = address.parent().ok_or::<Error>("expecting address to have a parent".into())?;
-                        let action = Action::Rc(Rc::Select(select));
+                        let parent = point.parent().ok_or::<Error>("expecting point to have a parent".into())?;
+                        let action = Method::Rc(Rc::Select(select));
                         let core = action.into();
-                        let request = Request::new(core, address.clone(), parent.clone() );
+                        let request = Request::new(core, point.clone(), parent.clone() );
                         futures.push(selector.skel.messaging_api.request(request));
                     }
                 }
@@ -1029,15 +1028,15 @@ impl Selector {
                 // the records matched the present hop (which we needed for deeper searches) however
                 // they may not or may not match the ENTIRE pattern therefore they must be filtered
                 stubs.retain(|stub| {
-                    let address_tks_path = sub_select.address_kind_path.push(AddressKindSegment {
-                        address_segment: stub.address.last_segment().expect("expecting at least one segment" ),
+                    let point_tks_path = sub_select.point_kind_path.push(PointKindSeg {
+                        segment: stub.point.last_segment().expect("expecting at least one segment" ),
                         kind: stub.kind.clone()
                     });
-                    sub_select.pattern.matches(&address_tks_path)
+                    sub_select.pattern.matches(&point_tks_path)
                 });
 
                 // here we already know that the child sub_select should have filtered it's
-                // not matching addresses so we can add all the results
+                // not matching pointes so we can add all the results
                 for future in futures {
                     let response = future;
                     if let Payload::List(more_stubs) =response.core.body {
@@ -1052,7 +1051,7 @@ impl Selector {
                 }
             }
 
-            let stubs: Vec<ResourceStub> = stubs.into_iter().map(|record|record.into()).collect();
+            let stubs: Vec<Stub> = stubs.into_iter().map(|record|record.into()).collect();
             let stubs = sub_select.into_payload.to_primitive(stubs)?;
 
             Ok(stubs)

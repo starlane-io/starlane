@@ -1,3 +1,5 @@
+#![allow(warnings)]
+
 #[macro_use]
 extern crate lazy_static;
 
@@ -18,7 +20,7 @@ use std::sync::Arc;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use starlane_core::error::Error;
 use tracing_subscriber::FmtSubscriber;
-use tracing::dispatcher::set_global_default;
+use tracing;
 use tokio::runtime::Runtime;
 use starlane_core::starlane::StarlaneMachine;
 use starlane_core::template::ConstellationLayout;
@@ -27,7 +29,7 @@ use starlane_core::util;
 use starlane_core::starlane::api::StarlaneApi;
 use std::convert::TryInto;
 use mesh_portal::version::latest::entity::request::create::Require;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
 use reqwest::StatusCode;
 use tokio::io::AsyncReadExt;
 use tracing::error;
@@ -63,7 +65,7 @@ fn main() -> Result<(), Error> {
 
 async fn go() -> Result<(),Error> {
     let subscriber = FmtSubscriber::default();
-    set_global_default(subscriber.into()).expect("setting global default tracer failed");
+    tracing::dispatcher::set_global_default(subscriber.into()).expect("setting global default tracer failed");
 
     ctrlc::set_handler(move || {
         std::process::exit(1);
@@ -256,7 +258,7 @@ println!("Staring starlane mechtron process");
    async fn launch(args: ArgMatches<'_>) -> Result<(), Error> {
        let server = args.value_of("server").ok_or("expected server hostname")?.to_string();
        let wasm_src = args.value_of("wasm_src").ok_or("expected Wasm source")?.to_string();
-       let wasm_src = Address::from_str(wasm_src.as_str())?;
+       let wasm_src = Point::from_str(wasm_src.as_str())?;
        launch_mechtron_client( server, wasm_src ).await?;
        Ok(())
    }

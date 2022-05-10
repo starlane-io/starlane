@@ -1,6 +1,6 @@
 use std::fmt;
 use std::fmt::{Debug, Formatter};
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Request, Response};
 
 use semver::SemVerError;
@@ -16,7 +16,7 @@ use crate::message::{MessageExpect, MessageUpdate, ProtoStarMessage, MessageId, 
 use crate::message::delivery::ActorMessage;
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey};
 use crate::watch::{Notification, Watch, WatchKey};
-use crate::resource::{ResourceType, ResourceAssign, AssignResourceStateSrc, ResourceRecord};
+use crate::particle::{KindBase, ParticleAssign, AssignResourceStateSrc, ParticleRecord};
 use crate::fail::{Fail, StarlaneFailure};
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
@@ -371,15 +371,15 @@ pub enum MessagePayload {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum ResourceHostAction {
     //IsHosting(Address),
-    Assign(ResourceAssign),
-    Init(Address),
-    GetState(Address)
+    Assign(ParticleAssign),
+    Init(Point),
+    GetState(Point)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResourceRegistryRequest {
-    Location(ResourceRecord),
-    Find(Address)
+    Location(ParticleRecord),
+    Find(Point)
 }
 
 impl ToString for ResourceRegistryRequest {

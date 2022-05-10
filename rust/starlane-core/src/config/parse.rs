@@ -3,8 +3,8 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::command::common::SetProperties;
-use mesh_portal_versions::version::v0_0_1::parse::{camel_case, domain, Res, set_properties};
-use mesh_portal_versions::version::v0_0_1::pattern::parse::kind;
+use mesh_portal_versions::version::v0_0_1::parse::{camel_case, domain, kind, Res, set_properties};
+use mesh_portal_versions::version::v0_0_1::wrap::Span;
 use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag, take_until};
 use nom::character::complete::multispace0;
@@ -17,8 +17,8 @@ use crate::command::compose::{Command, CommandOp};
 use crate::command::parse::{script, script_line};
 use crate::config::config::ResourceConfig;
 use crate::error::Error;
-use crate::resource::config::Parser;
-use crate::resource::Kind;
+use crate::particle::config::Parser;
+use crate::particle::Kind;
 
 
 pub struct ResourceConfigParser;
@@ -38,7 +38,7 @@ impl Parser<ResourceConfig> for ResourceConfigParser {
 }
 
 
-pub fn resource_config(input: &str, artifact_ref: ArtifactRef  ) -> Result<ResourceConfig,Error> {
+pub fn resource_config<I:Span>(input: I, artifact_ref: ArtifactRef  ) -> Result<ResourceConfig,Error> {
     let (next,(_,(kind,(_,sections)),_)) = all_consuming(tuple( (multispace0, tuple((kind, tuple((multispace0,delimited(tag("{"),sections, tag("}")))))),multispace0)) )(input)?;
 
     let kind: Kind = TryFrom::try_from(kind)?;
@@ -61,33 +61,33 @@ pub fn resource_config(input: &str, artifact_ref: ArtifactRef  ) -> Result<Resou
     Ok(config)
 }
 
-fn sections( input: &str ) -> Res<&str,Vec<Section>> {
+fn sections<I:Span>( input: I ) -> Res<I,Vec<Section>> {
     many0(section)(input)
 }
 
-fn section( input: &str) -> Res<&str,Section> {
+fn section<I:Span>( input: I) -> Res<I,Section> {
     alt( (properties_section,install_section) )(input)
 }
 
-fn properties_section( input: &str) -> Res<&str,Section> {
+fn properties_section<I:Span>( input: I) -> Res<I,Section> {
     tuple( (multispace0, preceded(tag("Set"), tuple((multispace0,delimited(tag("{"),set_properties, tag("}"))))),multispace0) )(input).map( |(next,(_,(_,properties),_))| {
         (next, Section::SetProperties(properties))
     })
 }
 
-fn rec_command_line( input: &str ) -> Res<&str,&str> {
+fn rec_command_line<I:Span>( input: I ) -> Res<I,I> {
     terminated( tuple( (multispace0,take_until(";"),multispace0) ), tag(";") )(input).map( |(next,(_,line,_))| {
         (next,line)
     } )
 }
 
-fn rec_command_lines( input: &str ) -> Res<&str,Vec<&str>> {
+fn rec_command_lines<I:Span>( input: I ) -> Res<I,Vec<I>> {
     tuple( (many0(rec_command_line), multispace0 ) )(input).map( |(next,(lines,_))| {
         (next,lines)
     } )
 }
 
-fn install_section( input: &str) -> Res<&str,Section> {
+fn install_section<I:Span>( input: I) -> Res<I,Section> {
    let (next,(_,(_,ops),_)) = context("Install Section", tuple( (multispace0, preceded(tag("Install"), tuple((multispace0,delimited(tag("{"),rec_command_lines, tag("}"))))),multispace0)) )(input)?;
 
 //    Ok((next,Section::Install(ops)))
@@ -104,6 +104,7 @@ pub enum Section {
 pub mod replace {
     use std::collections::HashMap;
     use mesh_portal_versions::version::v0_0_1::parse::{domain, Res};
+    use mesh_portal_versions::version::v0_0_1::wrap::Span;
     use nom::branch::alt;
     use nom::bytes::complete::{tag, take_until};
     use nom::character::complete::anychar;
@@ -112,15 +113,15 @@ pub mod replace {
     use nom::sequence::delimited;
     use crate::error::Error;
 
-    fn config_chunk(input: &str) -> Res<&str,&str> {
+    fn config_chunk<I:Span>(input: &str) -> Res<I,I> {
         alt(( take_until("$("),recognize(many1(anychar))))(input)
     }
 
-    fn replace_token(input: &str) -> Res<&str,&str> {
+    fn replace_token<I:Span>(input: &str) -> Res<I,I> {
         delimited(tag("$("), domain ,tag(")") )(input)
     }
 
-    pub fn substitute(input: &str, map: &HashMap<String,String>) -> Result<String,Error> {
+    pub fn substitute<I:Span>(input: &str, map: &HashMap<String,String>) -> Result<String,Error> {
         let mut rtn = String::new();
         let mut next = input;
         let mut chunk = Option::None;
@@ -146,15 +147,17 @@ pub mod replace {
 pub mod test {
     use std::collections::HashMap;
     use std::str::FromStr;
-    use mesh_portal::version::latest::id::Address;
+    use mesh_portal::version::latest::command::common::PropertyMod;
+    use mesh_portal::version::latest::id::Point;
     use mesh_portal_versions::version::v0_0_1::command::common::PropertyMod;
     use mesh_portal_versions::version::v0_0_1::parse::{property_mod, property_value, property_value_not_space_or_comma, set_properties};
+    use mesh_portal_versions::version::v0_0_1::span::new_span;
     use nom::combinator::{all_consuming, recognize};
     use crate::artifact::ArtifactRef;
     use crate::config::parse::{resource_config, properties_section, rec_command_lines, rec_command_line};
     use crate::config::parse::replace::substitute;
     use crate::error::Error;
-    use crate::resource::ArtifactKind;
+    use crate::particle::ArtifactSubKind;
 
     #[test]
     pub async fn test_replace() -> Result<(),Error>{
@@ -181,10 +184,10 @@ pub mod test {
         println!("{}",rtn);
 
         let artifact_ref = ArtifactRef {
-            address: Address::from_str("localhost:app")?,
-            kind: ArtifactKind::ResourceConfig
+            point: Point::from_str("localhost:app")?,
+            kind: ArtifactSubKind::ParticleConfig
         };
-        let config = resource_config(rtn.as_str(), artifact_ref )?;
+        let config = resource_config(new_span(rtn.as_str()), artifact_ref )?;
 
         Ok(())
     }

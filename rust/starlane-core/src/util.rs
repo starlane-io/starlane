@@ -10,9 +10,10 @@ use std::sync::Arc;
 use std::thread;
 use alcoholic_jwt::{JWK, JWKS, token_kid, validate, ValidJWT};
 use lru::LruCache;
-use mesh_portal::version::latest::entity::request::Action;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::entity::request::Method;
+use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::Request;
+use mesh_portal::version::latest::msg::MsgMethod;
 use mesh_portal::version::latest::payload::{Payload, Primitive};
 
 use tokio::sync::{broadcast, RwLock};
@@ -377,7 +378,7 @@ impl <S> ServiceChamber<S> where S: Clone{
 #[derive(Clone)]
 pub struct JwksCache {
     api: StarlaneApi,
-    map: Arc<RwLock<LruCache<Address,JWKS>>>
+    map: Arc<RwLock<LruCache<Point,JWKS>>>
 }
 
 impl JwksCache {
@@ -391,7 +392,7 @@ impl JwksCache {
     pub async fn validate( &self, token: &str ) -> Result<ValidJWT,Error>{
         let jwt = UntrustedJwt(token.to_string());
         let claims = serde_json::from_str::<JwtClaims>(jwt.claims()?.as_str() )?;
-        let userbase_address=  Address::from_str(claims.userbase_ref.as_str() )?;
+        let userbase_address=  Point::from_str(claims.userbase_ref.as_str() )?;
         let kid = token_kid(token)?.ok_or("token 'kid' (key id) not found")?;
 
         let jwks = {
@@ -419,8 +420,8 @@ impl JwksCache {
 
         // in the case of jwks not being present OR jwk not present in jwks then fetch jwks from UserBase
 
-        let action = Action::Msg("GetJwks".to_string());
-        let request = Request::new(action.into(), self.api.agent.clone(), Address::from_str(claims.userbase_ref.as_str())? );
+        let action = Method::Msg(MsgMethod::new("GetJwks")?);
+        let request = Request::new(action.into(), self.api.agent.clone(), Point::from_str(claims.userbase_ref.as_str())? );
         let response = self.api.exchange(request).await.ok_or()?;
         let jwks = response.core.body.to_text()?;
         let jwks: JWKS = serde_json::from_str(jwks.as_str())?;

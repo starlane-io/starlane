@@ -35,7 +35,7 @@ use crate::message::{
     MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage,
     ProtoStarMessageTo, TrackerJob,
 };
-use crate::resource::{ResourceRecord, ResourceType};
+use crate::particle::{ParticleRecord, KindBase};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::core::resource::registry::RegistryApi;
 use crate::star::shell::golden::GoldenPathApi;
@@ -55,10 +55,10 @@ use std::fmt;
 use std::future::Future;
 use crate::star::core::resource::driver::ResourceCoreDriverApi;
 use std::str::FromStr;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
+use mesh_portal::version::latest::log::{PointLogger, RootLogger};
 use mesh_portal::version::latest::portal;
-use mesh_portal::version::latest::resource::Status;
-use mesh_portal_versions::version::v0_0_1::log::ParticleLogger;
+use mesh_portal::version::latest::particle::Status;
 use mesh_portal_versions::version::v0_0_1::parse::Res;
 use nom::sequence::{preceded, terminated, tuple};
 use nom::multi::many0;
@@ -175,109 +175,109 @@ impl StarKind {
         )
     }
 
-    pub fn manages(&self) -> HashSet<ResourceType> {
+    pub fn manages(&self) -> HashSet<KindBase> {
         HashSet::from_iter(
             match self {
-                StarKind::Central => vec![ResourceType::Space],
+                StarKind::Central => vec![KindBase::Space],
                 StarKind::Space => vec![
-                    ResourceType::App,
-                    ResourceType::FileSystem,
-                    ResourceType::Proxy,
-                    ResourceType::Database,
+                    KindBase::App,
+                    KindBase::FileSystem,
+                    KindBase::Proxy,
+                    KindBase::Database,
                 ],
                 StarKind::Mesh => vec![],
                 StarKind::App => vec![
-                    ResourceType::Mechtron,
-                    ResourceType::FileSystem,
-                    ResourceType::Database,
+                    KindBase::Mechtron,
+                    KindBase::FileSystem,
+                    KindBase::Database,
                 ],
                 StarKind::Mechtron => vec![],
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
                 StarKind::Client => vec![],
                 StarKind::Web => vec![],
-                StarKind::FileStore => vec![ResourceType::File],
-                StarKind::ArtifactStore => vec![ResourceType::Artifact],
-                StarKind::K8s => vec![ResourceType::Database],
-                StarKind::Portal => vec![ResourceType::Control]
+                StarKind::FileStore => vec![KindBase::File],
+                StarKind::ArtifactStore => vec![KindBase::Artifact],
+                StarKind::K8s => vec![KindBase::Database],
+                StarKind::Portal => vec![KindBase::Control]
             }
             .iter()
             .cloned(),
         )
     }
 
-    pub fn registry(rt: &ResourceType) -> StarKind {
+    pub fn registry(rt: &KindBase) -> StarKind {
         match rt {
-            ResourceType::Root => Self::Central,
-            ResourceType::Space => Self::Central,
-            ResourceType::User => Self::Space,
-            ResourceType::App => Self::Space,
-            ResourceType::Mechtron => Self::App,
-            ResourceType::FileSystem => Self::Space,
-            ResourceType::File => Self::Space,
-            ResourceType::Database => Self::K8s,
-            ResourceType::Authenticator => Self::K8s,
-            ResourceType::ArtifactBundleSeries => Self::Space,
-            ResourceType::ArtifactBundle => Self::ArtifactStore,
-            ResourceType::Artifact => Self::ArtifactStore,
-            ResourceType::Proxy => Self::Space,
-            ResourceType::Credentials => Self::Space,
-            ResourceType::Base => Self::Space,
-            ResourceType::Control => Self::Portal,
-            ResourceType::UserBase => Self::Space
+            KindBase::Root => Self::Central,
+            KindBase::Space => Self::Central,
+            KindBase::User => Self::Space,
+            KindBase::App => Self::Space,
+            KindBase::Mechtron => Self::App,
+            KindBase::FileSystem => Self::Space,
+            KindBase::File => Self::Space,
+            KindBase::Database => Self::K8s,
+            KindBase::Authenticator => Self::K8s,
+            KindBase::ArtifactBundleSeries => Self::Space,
+            KindBase::ArtifactBundle => Self::ArtifactStore,
+            KindBase::Artifact => Self::ArtifactStore,
+            KindBase::Proxy => Self::Space,
+            KindBase::Credentials => Self::Space,
+            KindBase::Base => Self::Space,
+            KindBase::Control => Self::Portal,
+            KindBase::UserBase => Self::Space
         }
     }
 
-    pub fn hosts(rt: &ResourceType) -> StarKind {
+    pub fn hosts(rt: &KindBase) -> StarKind {
         match rt {
-            ResourceType::Root => Self::Central,
-            ResourceType::Space => Self::Space,
-            ResourceType::User => Self::Space,
-            ResourceType::App => Self::App,
-            ResourceType::Mechtron => Self::Mechtron,
-            ResourceType::FileSystem => Self::FileStore,
-            ResourceType::File => Self::FileStore,
-            ResourceType::Database => Self::K8s,
-            ResourceType::Authenticator => Self::K8s,
-            ResourceType::ArtifactBundleSeries => Self::ArtifactStore,
-            ResourceType::ArtifactBundle => Self::ArtifactStore,
-            ResourceType::Artifact => Self::ArtifactStore,
-            ResourceType::Proxy => Self::Space,
-            ResourceType::Credentials => Self::Space,
-            ResourceType::Base => Self::Space,
-            ResourceType::Control => Self::Portal,
-            ResourceType::UserBase => Self::Space
+            KindBase::Root => Self::Central,
+            KindBase::Space => Self::Space,
+            KindBase::User => Self::Space,
+            KindBase::App => Self::App,
+            KindBase::Mechtron => Self::Mechtron,
+            KindBase::FileSystem => Self::FileStore,
+            KindBase::File => Self::FileStore,
+            KindBase::Database => Self::K8s,
+            KindBase::Authenticator => Self::K8s,
+            KindBase::ArtifactBundleSeries => Self::ArtifactStore,
+            KindBase::ArtifactBundle => Self::ArtifactStore,
+            KindBase::Artifact => Self::ArtifactStore,
+            KindBase::Proxy => Self::Space,
+            KindBase::Credentials => Self::Space,
+            KindBase::Base => Self::Space,
+            KindBase::Control => Self::Portal,
+            KindBase::UserBase => Self::Space
         }
     }
 
-    pub fn hosted(&self) -> HashSet<ResourceType> {
+    pub fn hosted(&self) -> HashSet<KindBase> {
         HashSet::from_iter(
             match self {
-                StarKind::Central => vec![ResourceType::Root],
+                StarKind::Central => vec![KindBase::Root],
                 StarKind::Space => vec![
-                    ResourceType::Space,
-                    ResourceType::User,
-                    ResourceType::Base,
-                    ResourceType::Proxy,
-                    ResourceType::UserBase,
+                    KindBase::Space,
+                    KindBase::User,
+                    KindBase::Base,
+                    KindBase::Proxy,
+                    KindBase::UserBase,
                 ],
                 StarKind::Mesh => vec![],
-                StarKind::App => vec![ResourceType::App],
-                StarKind::Mechtron => vec![ResourceType::Mechtron],
+                StarKind::App => vec![KindBase::App],
+                StarKind::Mechtron => vec![KindBase::Mechtron],
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
-                StarKind::Client => vec![ResourceType::Mechtron],
+                StarKind::Client => vec![KindBase::Mechtron],
                 StarKind::Web => vec![],
-                StarKind::FileStore => vec![ResourceType::FileSystem, ResourceType::File],
+                StarKind::FileStore => vec![KindBase::FileSystem, KindBase::File],
                 StarKind::ArtifactStore => {
                     vec![
-                        ResourceType::ArtifactBundleSeries,
-                        ResourceType::ArtifactBundle,
-                        ResourceType::Artifact,
+                        KindBase::ArtifactBundleSeries,
+                        KindBase::ArtifactBundle,
+                        KindBase::Artifact,
                     ]
                 }
-                StarKind::K8s => vec![ResourceType::Database],
-                StarKind::Portal => vec![ResourceType::Control]
+                StarKind::K8s => vec![KindBase::Database],
+                StarKind::Portal => vec![KindBase::Control]
             }
             .iter()
             .cloned(),
@@ -829,7 +829,7 @@ pub struct ForwardFrame {
 
 pub struct AddResourceLocation {
     pub tx: mpsc::Sender<()>,
-    pub resource_location: ResourceRecord,
+    pub resource_location: ParticleRecord,
 }
 
 pub struct Request<P: Debug, R> {
@@ -1204,7 +1204,7 @@ pub struct StarSkel {
     pub persistence: Persistence,
     pub data_access: FileAccess,
     pub machine: StarlaneMachine,
-    pub particle_logger: Arc<dyn ParticleLogger>
+    pub particle_logger: RootLogger
 }
 
 impl Debug for StarSkel {
@@ -1217,12 +1217,12 @@ impl Debug for StarSkel {
 pub struct StarInfo {
     pub key: StarKey,
     pub kind: StarKind,
-    pub address: Address
+    pub address: Point
 }
 
 impl StarInfo {
     pub fn new(star: StarKey, kind: StarKind) -> Self {
-        let address = Address::from_str(format!("<<{}>>::star",star.to_string()).as_str() ).expect("expect to be able to create a simple star address");
+        let address = Point::from_str(format!("<<{}>>::star", star.to_string()).as_str() ).expect("expect to be able to create a simple star address");
         StarInfo {
             key:star,
             kind ,

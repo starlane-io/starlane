@@ -133,7 +133,7 @@ pub mod test {
         let (_, command) = command(input)?;
         match command {
             CommandOp::Create(create) => {
-                assert_eq!(create.template.kind.kind,Some("Keycloak".to_string()));
+                assert_eq!(create.template.kind.sub_kind, Some("Keycloak".to_string()));
             }
             _ => {
                 panic!("expected create command")

@@ -11,7 +11,7 @@ use crate::error::Error;
 use crate::frame::{Frame, ProtoFrame,  StarMessage, WatchFrame};
 use crate::lane::{LaneKey, LaneSession, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
-use crate::resource::ResourceRecord;
+use crate::particle::ParticleRecord;
 use crate::star::{StarKey, StarSkel};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::variant::FrameVerdict;

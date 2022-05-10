@@ -4,12 +4,12 @@ use std::sync::Arc;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use kube::api::{ListParams, PostParams};
 use kube::Api;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
-use crate::resource::{AssignResourceStateSrc, Kind, ResourceAssign, ResourceType};
-use crate::star::core::resource::driver::ResourceCoreDriver;
+use crate::particle::{AssignResourceStateSrc, Kind, ParticleAssign, KindBase};
+use crate::star::core::resource::driver::ParticleCoreDriver;
 use crate::star::StarSkel;
 
 pub struct K8sCoreDriver {
@@ -18,19 +18,19 @@ pub struct K8sCoreDriver {
     starlane_meta: ObjectMeta,
     namespace: String,
     api_version: String,
-    resource_type: ResourceType
+    resource_type: KindBase
 }
 
 impl K8sCoreDriver {
-    pub async fn new(skel: StarSkel, resource_type: ResourceType ) -> Result<Self, Error> {
+    pub async fn new(skel: StarSkel, resource_type: KindBase) -> Result<Self, Error> {
 
         let client = kube::Client::try_default().await?;
 
         let kubernetes_instance_name = match env::var("STARLANE_KUBERNETES_INSTANCE_NAME"){
             Ok(kubernetes_instance_name) => {kubernetes_instance_name}
             Err(_err) => {
-                error!("FATAL: env variable 'STARLANE_KUBERNETES_INSTANCE_NAME' must be set to a valid Starlane Kubernetes resource");
-                return Err("FATAL: env variable 'STARLANE_KUBERNETES_INSTANCE_NAME' must be set to a valid Starlane Kubernetes resource".into());
+                error!("FATAL: env variable 'STARLANE_KUBERNETES_INSTANCE_NAME' must be set to a valid Starlane Kubernetes particle");
+                return Err("FATAL: env variable 'STARLANE_KUBERNETES_INSTANCE_NAME' must be set to a valid Starlane Kubernetes particle".into());
             }
         };
 
@@ -68,11 +68,11 @@ impl K8sCoreDriver {
 
 
 #[async_trait]
-impl ResourceCoreDriver for K8sCoreDriver {
+impl ParticleCoreDriver for K8sCoreDriver {
 
      async fn assign(
-            &mut self,
-            assign: ResourceAssign,
+         &mut self,
+         assign: ParticleAssign,
         ) -> Result<(), Error> {
 
 println!("Assigning Kube Resource Host....");
@@ -129,7 +129,7 @@ println!("Assigning Kube Resource Host....");
     }
 
 
-    fn resource_type(&self) -> ResourceType {
+    fn resource_type(&self) -> KindBase {
         self.resource_type.clone()
     }
 }

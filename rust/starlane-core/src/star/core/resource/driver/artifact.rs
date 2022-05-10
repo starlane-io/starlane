@@ -10,8 +10,8 @@ use std::sync::Arc;
 use tempdir::TempDir;
 use tokio::sync::Mutex;
 
-use crate::resource::{ResourceType, AssignResourceStateSrc, ResourceAssign, Kind, ArtifactKind};
-use crate::star::core::resource::driver::ResourceCoreDriver;
+use crate::particle::{KindBase, AssignResourceStateSrc, ParticleAssign, Kind, ArtifactSubKind};
+use crate::star::core::resource::driver::ParticleCoreDriver;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::util;
@@ -19,9 +19,9 @@ use crate::error::Error;
 
 use crate::message::delivery::Delivery;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
-use mesh_portal::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, KindTemplate, Strategy, Template};
-use mesh_portal::version::latest::entity::request::{Action, Rc};
-use mesh_portal::version::latest::id::{Address, AddressAndKind, KindParts, RouteSegment};
+use mesh_portal::version::latest::entity::request::create::{PointSegFactory, PointTemplate, Create, KindTemplate, Strategy, Template};
+use mesh_portal::version::latest::entity::request::{Method, Rc};
+use mesh_portal::version::latest::id::{Point, AddressAndKind, KindParts, RouteSegment};
 use mesh_portal::version::latest::messaging::Request;
 use mesh_portal::version::latest::payload::{Payload, Primitive};
 use zip::result::ZipResult;
@@ -70,14 +70,14 @@ impl ArtifactBundleCoreDriver {
 }
 
 #[async_trait]
-impl ResourceCoreDriver for ArtifactBundleCoreDriver {
-    fn resource_type(&self) -> ResourceType {
-        ResourceType::ArtifactBundle
+impl ParticleCoreDriver for ArtifactBundleCoreDriver {
+    fn resource_type(&self) -> KindBase {
+        KindBase::ArtifactBundle
     }
 
     async fn assign(
         &mut self,
-        assign: ResourceAssign,
+        assign: ParticleAssign,
     ) -> Result<(), Error> {
         let state = match &assign.state {
             StateSrc::StatefulDirect(data) => {
@@ -117,7 +117,7 @@ impl ResourceCoreDriver for ArtifactBundleCoreDriver {
                     if index < segments.len()-1 {
                         path.push_str("/");
                     }
-                    let address = Address::from_str( format!( "{}:/{}",assign.stub.address.to_string(), path.as_str()).as_str() )?;
+                    let address = Point::from_str( format!("{}:/{}", assign.stub.address.to_string(), path.as_str()).as_str() )?;
                     let kind = if index < segments.len()-1 {
                         KindParts { resource_type: "Artifact".to_string(), kind: Option::Some("Dir".to_string()), specific: None }
                     }  else {
@@ -133,7 +133,7 @@ impl ResourceCoreDriver for ArtifactBundleCoreDriver {
             }
 
             let root_address_and_kind = AddressAndKind {
-               address: Address::from_str( format!( "{}:/",assign.stub.address.to_string()).as_str())?,
+               address: Point::from_str( format!("{}:/", assign.stub.address.to_string()).as_str())?,
                kind: KindParts { resource_type: "Artifact".to_string(), kind: Option::Some("Dir".to_string()), specific: None }
             };
 
@@ -163,7 +163,7 @@ impl ResourceCoreDriver for ArtifactBundleCoreDriver {
                         match result {
                             Ok(kind) => {
                                 let state = match kind {
-                                    Kind::Artifact(ArtifactKind::Dir) => {
+                                    Kind::Artifact(ArtifactSubKind::Dir) => {
                                         StateSrc::Stateless
                                     }
                                     Kind::Artifact(_) => {
@@ -189,8 +189,8 @@ impl ResourceCoreDriver for ArtifactBundleCoreDriver {
 
                                 let create = Create {
                                     template: Template {
-                                        address: AddressTemplate { parent: parent.clone(), child_segment_template: AddressSegmentTemplate::Exact(address_and_kind.address.last_segment().expect("expected final segment").to_string()) },
-                                        kind: KindTemplate { resource_type: address_and_kind.kind.resource_type.clone(), kind: address_and_kind.kind.kind.clone(), specific: None }
+                                        address: PointTemplate { parent: parent.clone(), child_segment_template: PointSegFactory::Exact(address_and_kind.address.last_segment().expect("expected final segment").to_string()) },
+                                        kind: KindTemplate { kind: address_and_kind.kind.resource_type.clone(), sub_kind: address_and_kind.kind.kind.clone(), specific: None }
                                     },
                                     state,
                                     properties: SetProperties::new(),
@@ -198,7 +198,7 @@ impl ResourceCoreDriver for ArtifactBundleCoreDriver {
                                     registry: Default::default()
                                 };
 
-                                let action = Action::Rc(Rc::Create(create));
+                                let action = Method::Rc(Rc::Create(create));
                                 let core = action.into();
                                 let request = Request::new(core, assign.stub.address.clone(), parent);
                                 let response = skel.messaging_api.request(request).await;
@@ -227,7 +227,7 @@ impl ResourceCoreDriver for ArtifactBundleCoreDriver {
 
 
 
-    async fn get(&self, address: Address) -> Result<Payload,Error> {
+    async fn get(&self, address: Point) -> Result<Payload,Error> {
         self.store.get(address).await
     }
 
@@ -251,20 +251,20 @@ impl ArtifactManager{
 
 
 #[async_trait]
-impl ResourceCoreDriver for ArtifactManager{
-    fn resource_type(&self) -> ResourceType {
-        ResourceType::Artifact
+impl ParticleCoreDriver for ArtifactManager{
+    fn resource_type(&self) -> KindBase {
+        KindBase::Artifact
     }
 
     async fn assign(
         &mut self,
-        assign: ResourceAssign,
+        assign: ParticleAssign,
     ) -> Result<(), Error> {
         let kind : Kind = TryFrom::try_from(assign.stub.kind)?;
         if let Kind::Artifact(artifact_kind) = kind
         {
             match artifact_kind {
-                ArtifactKind::Dir => {
+                ArtifactSubKind::Dir => {
                     // stateless
                     Ok(())
                 }
@@ -288,7 +288,7 @@ impl ResourceCoreDriver for ArtifactManager{
 
 
 
-    async fn get(&self, address: Address) -> Result<Payload,Error> {
+    async fn get(&self, address: Point) -> Result<Payload,Error> {
         self.store.get(address).await
     }
 

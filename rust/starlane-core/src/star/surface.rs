@@ -1,8 +1,8 @@
 use std::sync::Arc;
-use mesh_portal::version::latest::entity::request::create::{AddressTemplate, Template};
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::entity::request::create::{PointTemplate, Template};
+use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Message, Request, Response};
-use mesh_portal::version::latest::resource::ResourceStub;
+use mesh_portal::version::latest::particle::Stub;
 
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
@@ -11,7 +11,7 @@ use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
 use crate::frame::{StarMessagePayload, StarPattern};
 use crate::message::{ProtoStarMessage, ReplyKind, Reply, ProtoStarMessageTo};
-use crate::resource::{ResourceRecord };
+use crate::particle::{ParticleRecord};
 use crate::star::{StarCommand, StarSkel, StarInfo};
 use crate::star::shell::locator::ResourceLocateCall;
 use crate::star::shell::message::MessagingCall;
@@ -34,13 +34,13 @@ impl SurfaceApi {
         Ok(())
     }
 
-    pub async fn create_sys_resource( &self, template: Template, messenger_tx: mpsc::Sender<Message> ) -> Result<ResourceStub,Error> {
+    pub async fn create_sys_resource( &self, template: Template, messenger_tx: mpsc::Sender<Message> ) -> Result<Stub,Error> {
         let (tx, rx) = oneshot::channel();
         self.tx.send(SurfaceCall::CreateSysResource {template, messenger_tx, tx }).await;
         Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
     }
 
-    pub async fn locate(&self, address: Address ) -> Result<ResourceRecord, Error> {
+    pub async fn locate(&self, address: Point) -> Result<ParticleRecord, Error> {
         let (tx, rx) = oneshot::channel();
         self.tx.try_send(SurfaceCall::Locate { address: address, tx })?;
         Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
@@ -104,8 +104,8 @@ pub enum SurfaceCall {
     Init,
     GetCaches(oneshot::Sender<Arc<ProtoArtifactCachesFactory>>),
     Locate {
-        address: Address,
-        tx: oneshot::Sender<Result<ResourceRecord, Error>>,
+        address: Point,
+        tx: oneshot::Sender<Result<ParticleRecord, Error>>,
     },
     ExchangeStarMessage {
         proto: ProtoStarMessage,
@@ -116,8 +116,8 @@ pub enum SurfaceCall {
     Notify(Request),
     Watch{ selector: WatchResourceSelector, tx: oneshot::Sender<Result<Watcher,Error>> },
     StarSearch{ star_pattern: StarPattern, tx: oneshot::Sender<Result<SearchHits,Error>>},
-    RequestStarAddress { address_template: AddressTemplate, tx: oneshot::Sender<Result<Address,Error>> },
-    CreateSysResource{template:Template, messenger_tx: mpsc::Sender<Message>, tx:oneshot::Sender<Result<ResourceStub,Error>>},
+    RequestStarAddress { address_template: PointTemplate, tx: oneshot::Sender<Result<Point,Error>> },
+    CreateSysResource{template:Template, messenger_tx: mpsc::Sender<Message>, tx:oneshot::Sender<Result<Stub,Error>>},
     Request{ request: Request, tx:oneshot::Sender<Response>}
 }
 

@@ -6,8 +6,8 @@ use yaml_rust::Yaml;
 
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
-use crate::resource::{ArtifactKind, ResourceType, ResourceAssign, AssignResourceStateSrc, Kind, FileKind};
-use crate::star::core::resource::driver::ResourceCoreDriver;
+use crate::particle::{ArtifactSubKind, KindBase, ParticleAssign, AssignResourceStateSrc, Kind, FileSubKind};
+use crate::star::core::resource::driver::ParticleCoreDriver;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::watch::{Notification, Change, Topic, WatchSelector, Property};
@@ -15,12 +15,11 @@ use crate::message::delivery::Delivery;
 use crate::frame::{StarMessagePayload, StarMessage};
 
 use std::str::FromStr;
-use mesh_portal::version::latest::command::common::StateSrc;
-use mesh_portal::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, KindTemplate, Strategy, Template};
-use mesh_portal::version::latest::entity::request::{Action, Rc};
-use mesh_portal::version::latest::id::{Address, AddressAndKind, KindParts};
+use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
+use mesh_portal::version::latest::entity::request::create::{PointSegFactory, PointTemplate, Create, KindTemplate, Strategy, Template};
+use mesh_portal::version::latest::entity::request::{Method, Rc};
+use mesh_portal::version::latest::id::{Point, AddressAndKind, KindParts};
 use mesh_portal::version::latest::messaging::Request;
-use mesh_portal_versions::version::v0_0_1::command::common::SetProperties;
 
 #[derive(Debug)]
 pub struct FileCoreManager {
@@ -38,17 +37,17 @@ impl FileCoreManager {
 }
 
 #[async_trait]
-impl ResourceCoreDriver for FileCoreManager {
+impl ParticleCoreDriver for FileCoreManager {
     async fn assign(
         &mut self,
-        assign: ResourceAssign,
+        assign: ParticleAssign,
     ) -> Result<(), Error> {
 
         let kind : Kind = TryFrom::try_from(assign.stub.kind)?;
         if let Kind::File(file_kind) = kind
         {
             match file_kind {
-                FileKind::Dir => {
+                FileSubKind::Dir => {
                     // stateless
                 }
                 _ => {
@@ -80,8 +79,8 @@ impl ResourceCoreDriver for FileCoreManager {
     }
 
 
-    fn resource_type(&self) -> ResourceType {
-        ResourceType::File
+    fn resource_type(&self) -> KindBase {
+        KindBase::File
     }
 
 }
@@ -103,14 +102,14 @@ impl FileSystemManager {
 }
 
 #[async_trait]
-impl ResourceCoreDriver for FileSystemManager {
-    fn resource_type(&self) -> ResourceType {
-        ResourceType::FileSystem
+impl ParticleCoreDriver for FileSystemManager {
+    fn resource_type(&self) -> KindBase {
+        KindBase::FileSystem
     }
 
     async fn assign(
         &mut self,
-        assign: ResourceAssign,
+        assign: ParticleAssign,
     ) -> Result<(), Error> {
         match assign.state {
             StateSrc::Stateless => {}
@@ -121,16 +120,16 @@ impl ResourceCoreDriver for FileSystemManager {
 
 
         let root_address_and_kind = AddressAndKind {
-            address: Address::from_str( format!( "{}:/",assign.stub.address.to_string()).as_str())?,
-            kind: KindParts { resource_type: "File".to_string(), kind: Option::Some("Dir".to_string()), specific: None }
+            point: Point::from_str( format!("{}:/", assign.stub.address.to_string()).as_str())?,
+            kind: KindParts { kind: "File".to_string(), sub_kind: Option::Some("Dir".to_string()), specific: None }
         };
 
         let skel = self.skel.clone();
         tokio::spawn( async move {
             let create = Create {
                 template: Template {
-                    address: AddressTemplate { parent: assign.stub.address.clone(), child_segment_template: AddressSegmentTemplate::Exact(root_address_and_kind.address.last_segment().expect("expected final segment").to_string()) },
-                    kind: KindTemplate { resource_type: root_address_and_kind.kind.resource_type.clone(), kind: root_address_and_kind.kind.kind.clone(), specific: None }
+                    point: PointTemplate { parent: assign.stub.address.clone(), child_segment_template: PointSegFactory::Exact(root_address_and_kind.address.last_segment().expect("expected final segment").to_string()) },
+                    kind: KindTemplate { kind: root_address_and_kind.kind.resource_type.clone(), sub_kind: root_address_and_kind.kind.kind.clone(), specific: None }
                 },
                 state: StateSrc::Stateless,
                 properties: SetProperties::new(),
@@ -138,7 +137,7 @@ impl ResourceCoreDriver for FileSystemManager {
                 registry: Default::default()
             };
 
-            let action = Action::Rc(Rc::Create(create));
+            let action = Method::Rc(Rc::Create(create));
             let core = action.into();
             let request = Request::new(core, assign.stub.address.clone(), assign.stub.address.clone());
             let response = skel.messaging_api.request(request).await;

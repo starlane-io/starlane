@@ -347,7 +347,7 @@ impl FromStr for ResourcePropertyAssignment {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (leftover,result) = parse_resource_property_assignment(s)?;
         if leftover.len() > 0 {
-            Err(format!("could not parse part of resource property assignment: '{}' unprocessed portion: '{}'", s,leftover ).into())
+            Err(format!("could not parse part of particle property assignment: '{}' unprocessed portion: '{}'", s,leftover ).into())
         } else {
            result
         }

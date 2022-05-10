@@ -7,7 +7,7 @@ use crate::fail::{Fail, StarlaneFailure};
 use crate::frame::{Frame, ProtoFrame, ResourceRegistryRequest, SimpleReply, StarMessage, StarMessagePayload, WatchFrame};
 use crate::lane::{LaneKey, LaneSession, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply};
-use crate::resource::ResourceRecord;
+use crate::particle::ParticleRecord;
 use crate::star::core::message::CoreMessageCall;
 use crate::star::StarSkel;
 use crate::star::variant::FrameVerdict;

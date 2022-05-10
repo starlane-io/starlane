@@ -15,7 +15,7 @@ use starlane_core::error::Error;
 
 use starlane_core::star::StarKind;
 use starlane_macros::resources;
-use starlane_core::resource::ResourceAddressPart;
+use starlane_core::particle::ResourceAddressPart;
 
 pub fn parse_address_part(string: &str) -> Result<(&str, Vec<ResourceAddressPart>), Error> {
     unimplemented!()

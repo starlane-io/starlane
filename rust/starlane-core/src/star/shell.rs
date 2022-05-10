@@ -5,7 +5,7 @@ use tokio::time::Duration;
 
 use crate::frame::{ResourceRegistryRequest, SimpleReply, StarMessagePayload};
 use crate::message::ProtoStarMessage;
-use crate::resource::{ResourceRecord, ResourceType};
+use crate::particle::{ParticleRecord, KindBase};
 use crate::star::{LogId, Set, Star, StarCommand, StarKey, StarKind, StarSkel};
 use crate::star::Request;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};

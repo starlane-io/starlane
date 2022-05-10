@@ -1,4 +1,4 @@
-FROM rust:1.55 as builder
+FROM rust:1.59 as builder
 
 RUN rustup update nightly && rustup default nightly
 

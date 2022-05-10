@@ -10,8 +10,8 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
 
 use crate::error::Error;
-use crate::resource::{
-    ResourceType,
+use crate::particle::{
+    KindBase,
 };
 use crate::star::{StarCommand, StarWrangleKind, StarInfo, StarKey, StarKind, StarSkel};
 use crate::fail::Fail;

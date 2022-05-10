@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use crate::error::Error;
-use crate::resource::{Kind, ResourceLocation, ResourceRecord, ResourceType};
+use crate::particle::{Kind, ParticleLocation, ParticleRecord, KindBase};
 use crate::star::core::resource::registry::{RegError, Registration, RegistryParams};
 use crate::star::StarKey;
 use futures::{FutureExt, StreamExt};
@@ -8,21 +8,19 @@ use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
 use mesh_portal::version::latest::entity::request::query::{Query, QueryResult};
 use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoPayload};
-use mesh_portal::version::latest::entity::request::{Action, Rc};
-use mesh_portal::version::latest::id::{Address, KindParts, Specific, Version};
+use mesh_portal::version::latest::entity::request::{Method, Rc};
+use mesh_portal::version::latest::id::{Point, KindParts, Specific, Version};
 use mesh_portal::version::latest::messaging::Request;
-use mesh_portal::version::latest::pattern::specific::{
-    ProductPattern, VariantPattern, VendorPattern,
+use mesh_portal::version::latest::selector::specific::{
+    ProductSelector, VariantSelector, VendorSelector,
 };
-use mesh_portal::version::latest::pattern::{
-    AddressKindPath, AddressKindPattern, AddressKindSegment, ExactSegment, KindPattern,
-    ResourceTypePattern, SegmentPattern,
+use mesh_portal::version::latest::selector::{
+    PointKindHierarchy, PointSelector, PointKindSeg, ExactSegment, KindSelector,
+    GenericKindSelector, PointSegSelector,
 };
 use mesh_portal::version::latest::payload::{Primitive, PrimitiveList};
-use mesh_portal::version::latest::resource::{Property, ResourceStub, Status};
+use mesh_portal::version::latest::particle::{Property, Stub, Status};
 use mesh_portal::version::latest::util::ValuePattern;
-use mesh_portal_versions::version::v0_0_1::config::bind::parse::bind;
-use mesh_portal_versions::version::v0_0_1::entity::request::create::AddressTemplateSegment::AddressSegment;
 use mesh_portal_versions::version::v0_0_1::entity::request::select::{SelectKind, SubSelect};
 use mesh_portal_versions::version::v0_0_1::security::{Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask, PermissionsMaskKind, Privilege, Privileges};
 use mysql::prelude::TextQuery;
@@ -35,8 +33,8 @@ use std::ops::{Deref, Index};
 use std::str::FromStr;
 
 lazy_static! {
-    pub static ref HYPERUSER: Address =
-        Address::from_str("hyperspace:users:hyperuser").expect("address");
+    pub static ref HYPERUSER: Point =
+        Point::from_str("hyperspace:users:hyperuser").expect("point");
     pub static ref STARLANE_POSTGRES_URL: String =
         std::env::var("STARLANE_POSTGRES_URL").unwrap_or("localhost".to_string());
     pub static ref STARLANE_POSTGRES_USER: String =
@@ -87,8 +85,8 @@ impl Registry {
 
         let resources = r#"CREATE TABLE IF NOT EXISTS resources (
          id SERIAL PRIMARY KEY,
-         address TEXT NOT NULL,
-         address_segment TEXT NOT NULL,
+         point TEXT NOT NULL,
+         point_segment TEXT NOT NULL,
          parent TEXT NOT NULL,
          resource_type TEXT NOT NULL,
          kind TEXT,
@@ -102,8 +100,8 @@ impl Registry {
          sequence INTEGER DEFAULT 0,
          owner TEXT,
          perms TEXT NOT NULL,
-         UNIQUE(address),
-         UNIQUE(parent,address_segment)
+         UNIQUE(point),
+         UNIQUE(parent,point_segment)
         )"#;
 
         let access_grants = r#"
@@ -128,14 +126,14 @@ impl Registry {
           FOREIGN KEY (resource_id) REFERENCES resources (id)
         )"#;
 
-        /// note that a tag may reference an address NOT in this database
+        /// note that a tag may reference an point NOT in this database
         /// therefore it does not have a FOREIGN KEY constraint
         let tags = r#"
        CREATE TABLE IF NOT EXISTS tags(
           id SERIAL PRIMARY KEY,
           parent TEXT NOT NULL,
           tag TEXT NOT NULL,
-          address TEXT NOT NULL,
+          point TEXT NOT NULL,
           UNIQUE(tag)
         )"#;
 
@@ -149,9 +147,9 @@ impl Registry {
          UNIQUE(resource_id,key)
         )"#;
 
-        let address_index =
-            "CREATE UNIQUE INDEX IF NOT EXISTS resource_address_index ON resources(address)";
-        let address_segment_parent_index = "CREATE UNIQUE INDEX IF NOT EXISTS resource_address_segment_parent_index ON resources(parent,address_segment)";
+        let point_index =
+            "CREATE UNIQUE INDEX IF NOT EXISTS resource_point_index ON resources(point)";
+        let point_segment_parent_index = "CREATE UNIQUE INDEX IF NOT EXISTS resource_point_segment_parent_index ON resources(parent,point_segment)";
         let access_grants_index =
             "CREATE INDEX IF NOT EXISTS query_root_index ON access_grants(query_root)";
 
@@ -164,8 +162,8 @@ impl Registry {
         transaction.execute(tags).await?;
          */
         transaction.execute(properties).await?;
-        transaction.execute(address_index).await?;
-        transaction.execute(address_segment_parent_index).await?;
+        transaction.execute(point_index).await?;
+        transaction.execute(point_segment_parent_index).await?;
         transaction.execute(access_grants_index).await?;
         transaction.commit().await?;
 
@@ -187,7 +185,7 @@ impl Registry {
         /*
         async fn check<'a>( registration: &Registration,  trans:&mut Transaction<Postgres>, ) -> Result<(),RegError> {
             let params = RegistryParams::from_registration(registration)?;
-            let count:u64 = sqlx::query_as("SELECT count(*) as count from resources WHERE parent=? AND address_segment=?").bind(params.parent).bind(params.address_segment).fetch_one(trans).await?;
+            let count:u64 = sqlx::query_as("SELECT count(*) as count from resources WHERE parent=? AND point_segment=?").bind(params.parent).bind(params.point_segment).fetch_one(trans).await?;
             if count > 0 {
                 Err(RegError::Dupe)
             } else {
@@ -209,10 +207,10 @@ impl Registry {
         let params = RegistryParams::from_registration(&registration)?;
 
         let count = sqlx::query_as::<Postgres, Count>(
-            "SELECT count(*) as count from resources WHERE parent=$1 AND address_segment=$2",
+            "SELECT count(*) as count from resources WHERE parent=$1 AND point_segment=$2",
         )
         .bind(params.parent.to_string())
-        .bind(params.address_segment.to_string())
+        .bind(params.point_segment.to_string())
         .fetch_one(&mut trans)
         .await?;
 
@@ -220,7 +218,7 @@ impl Registry {
             return Err(RegError::Dupe);
         }
 
-        let statement = format!("INSERT INTO resources (address,address_segment,resource_type,kind,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},'{}','{}','Pending')", params.address, params.address_segment, params.resource_type, opt(&params.kind), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
+        let statement = format!("INSERT INTO resources (point,point_segment,resource_type,kind,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.resource_type, opt(&params.kind), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
         trans.execute(statement.as_str()).await?;
 
         for (_, property_mod) in registration.properties.iter() {
@@ -230,11 +228,11 @@ impl Registry {
                         true => 1,
                         false => 0,
                     };
-                    let statement = format!("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM resources WHERE parent='{}' AND address_segment='{}'),'{}','{}',{})", params.parent, params.address_segment, key.to_string(), value.to_string(), lock);
+                    let statement = format!("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM resources WHERE parent='{}' AND point_segment='{}'),'{}','{}',{})", params.parent, params.point_segment, key.to_string(), value.to_string(), lock);
                     trans.execute(statement.as_str()).await?;
                 }
                 PropertyMod::UnSet(key) => {
-                    let statement = format!("DELETE FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent='{}' AND address_segment='{}') AND key='{}' AND lock=false", params.parent, params.address_segment, key.to_string());
+                    let statement = format!("DELETE FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent='{}' AND point_segment='{}') AND key='{}' AND lock=false", params.parent, params.point_segment, key.to_string());
                     trans.execute(statement.as_str()).await?;
                 }
             }
@@ -243,18 +241,18 @@ impl Registry {
         Ok(())
     }
 
-    pub async fn assign(&self, address: &Address, host: &StarKey) -> Result<(), Error> {
-        let parent = address
+    pub async fn assign(&self, point: &Point, host: &StarKey) -> Result<(), Error> {
+        let parent = point
             .parent()
             .ok_or("expecting parent since we have already established the segments are >= 2")?;
-        let address_segment = address
+        let point_segment = point
             .last_segment()
             .ok_or("expecting a last_segment since we know segments are >= 2")?;
         let statement = format!(
-            "UPDATE resources SET star='{}' WHERE parent='{}' AND address_segment='{}'",
+            "UPDATE resources SET star='{}' WHERE parent='{}' AND point_segment='{}'",
             host.to_string(),
             parent.to_string(),
-            address_segment.to_string()
+            point_segment.to_string()
         );
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
@@ -263,21 +261,21 @@ impl Registry {
         Ok(())
     }
 
-    async fn set_status(&self, address: &Address, status: &Status) -> Result<(), Error> {
-        let parent = address
+    async fn set_status(&self, point: &Point, status: &Status) -> Result<(), Error> {
+        let parent = point
             .parent()
-            .ok_or("resource must have a parent")?
+            .ok_or("particle must have a parent")?
             .to_string();
-        let address_segment = address
+        let point_segment = point
             .last_segment()
-            .ok_or("resource must have a last segment")?
+            .ok_or("particle must have a last segment")?
             .to_string();
         let status = status.to_string();
         let statement = format!(
-            "UPDATE resources SET status='{}' WHERE parent='{}' AND address_segment='{}'",
+            "UPDATE resources SET status='{}' WHERE parent='{}' AND point_segment='{}'",
             status.to_string(),
             parent,
-            address_segment
+            point_segment
         );
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
@@ -288,18 +286,18 @@ impl Registry {
 
     async fn set_properties(
         &self,
-        address: &Address,
+        point: &Point,
         properties: &SetProperties,
     ) -> Result<(), Error> {
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
-        let parent = address
+        let parent = point
             .parent()
-            .ok_or("resource must have a parent")?
+            .ok_or("particle must have a parent")?
             .to_string();
-        let address_segment = address
+        let point_segment = point
             .last_segment()
-            .ok_or("resource must have a last segment")?
+            .ok_or("particle must have a last segment")?
             .to_string();
 
         for (_, property_mod) in properties.iter() {
@@ -310,11 +308,11 @@ impl Registry {
                         false => 0,
                     };
 
-                    let statement = format!("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM resources WHERE parent='{}' AND address_segment='{}'),'{}' ,'{}','{}') ON CONFLICT(resource_id,key) DO UPDATE SET value='{}' WHERE lock=false", parent, address_segment, key.to_string(), value.to_string(), value.to_string(), lock);
+                    let statement = format!("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM resources WHERE parent='{}' AND point_segment='{}'),'{}' ,'{}','{}') ON CONFLICT(resource_id,key) DO UPDATE SET value='{}' WHERE lock=false", parent, point_segment, key.to_string(), value.to_string(), value.to_string(), lock);
                     trans.execute(statement.as_str()).await?;
                 }
                 PropertyMod::UnSet(key) => {
-                    let statement = format!("DELETE FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent='{}' AND address_segment='{}') AND key='{}' AND lock=false", parent, address_segment, key.to_string());
+                    let statement = format!("DELETE FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent='{}' AND point_segment='{}') AND key='{}' AND lock=false", parent, point_segment, key.to_string());
                     trans.execute(statement.as_str()).await?;
                 }
             }
@@ -323,7 +321,7 @@ impl Registry {
         Ok(())
     }
 
-    async fn sequence(&self, address: &Address) -> Result<u64, Error> {
+    async fn sequence(&self, point: &Point) -> Result<u64, Error> {
         struct Sequence(u64);
 
         impl sqlx::FromRow<'_, PgRow> for Sequence {
@@ -335,24 +333,24 @@ impl Registry {
 
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
-        let parent = address
+        let parent = point
             .parent()
             .ok_or("expecting parent since we have already established the segments are >= 2")?;
-        let address_segment = address
+        let point_segment = point
             .last_segment()
             .ok_or("expecting a last_segment since we know segments are >= 2")?;
         let statement = format!(
-            "UPDATE resources SET sequence=sequence+1 WHERE parent='{}' AND address_segment='{}'",
+            "UPDATE resources SET sequence=sequence+1 WHERE parent='{}' AND point_segment='{}'",
             parent.to_string(),
-            address_segment.to_string()
+            point_segment.to_string()
         );
 
         trans.execute(statement.as_str()).await?;
         let sequence = sqlx::query_as::<Postgres, Sequence>(
-            "SELECT DISTINCT sequence FROM resources WHERE parent=$1 AND address_segment=$2",
+            "SELECT DISTINCT sequence FROM resources WHERE parent=$1 AND point_segment=$2",
         )
         .bind(parent.to_string())
-        .bind(address_segment.to_string())
+        .bind(point_segment.to_string())
         .fetch_one(&mut trans)
         .await?;
         trans.commit().await?;
@@ -360,22 +358,22 @@ impl Registry {
         Ok(sequence.0)
     }
 
-    pub async fn locate(&self, address: &Address) -> Result<ResourceRecord, Error> {
+    pub async fn locate(&self, point: &Point) -> Result<ParticleRecord, Error> {
         let mut conn = self.pool.acquire().await?;
-        let parent = address.parent().ok_or("expected a parent")?;
-        let address_segment = address
+        let parent = point.parent().ok_or("expected a parent")?;
+        let point_segment = point
             .last_segment()
-            .ok_or("expected last address_segment")?
+            .ok_or("expected last point_segment")?
             .to_string();
 
-        let mut record = sqlx::query_as::<Postgres, ResourceRecord>(
-            "SELECT DISTINCT * FROM resources as r WHERE parent=$1 AND address_segment=$2",
+        let mut record = sqlx::query_as::<Postgres, ParticleRecord>(
+            "SELECT DISTINCT * FROM resources as r WHERE parent=$1 AND point_segment=$2",
         )
         .bind(parent.to_string())
-        .bind(address_segment.clone())
+        .bind(point_segment.clone())
         .fetch_one(&mut conn)
         .await?;
-        let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=$1 AND address_segment=$2)").bind(parent.to_string()).bind(address_segment).fetch_all(& mut conn).await?;
+        let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut conn).await?;
         let mut map = HashMap::new();
         for p in properties {
             map.insert(p.key.clone(), p.into());
@@ -385,37 +383,37 @@ impl Registry {
         Ok(record)
     }
 
-    pub async fn query(&self, address: &Address, query: &Query) -> Result<QueryResult, Error> {
-        let mut kind_path = AddressKindPath::new(address.route.clone(), vec![]);
-        let route = address.route.clone();
+    pub async fn query(&self, point: &Point, query: &Query) -> Result<QueryResult, Error> {
+        let mut kind_path = PointKindHierarchy::new(point.route.clone(), vec![]);
+        let route = point.route.clone();
 
         let mut segments = vec![];
-        for segment in &address.segments {
+        for segment in &point.segments {
             segments.push(segment.clone());
-            let address = Address {
+            let point = Point {
                 route: route.clone(),
                 segments: segments.clone(),
             };
-            let record = self.locate(&address).await?;
-            let kind_segment = AddressKindSegment {
-                address_segment: record
+            let record = self.locate(&point).await?;
+            let kind_segment = PointKindSeg {
+                segment: record
                     .stub
-                    .address
+                    .point
                     .last_segment()
                     .ok_or("expected at least one segment")?,
                 kind: record.stub.kind,
             };
             kind_path = kind_path.push(kind_segment);
         }
-        return Ok(QueryResult::AddressKindPath(kind_path));
+        return Ok(QueryResult::PointKindHierarchy(kind_path));
     }
 
     #[async_recursion]
     pub async fn select(&self, select: &Select) -> Result<PrimitiveList, Error> {
-        let address = select.pattern.query_root();
+        let point = select.pattern.query_root();
 
-        let address_kind_path = self
-            .query(&address, &Query::AddressKindPath)
+        let point_kind_path = self
+            .query(&point, &Query::PointKindHierarchy)
             .await?
             .try_into()?;
 
@@ -423,11 +421,11 @@ impl Registry {
         let sub_select =
             select
                 .clone()
-                .sub_select(address.clone(), sub_select_hops, address_kind_path);
+                .sub_select(point.clone(), sub_select_hops, point_kind_path);
         let mut list = self.sub_select(&sub_select).await?;
         if select.pattern.matches_root() {
-            list.push(ResourceStub {
-                address: Address::root(),
+            list.push(Stub {
+                point: Point::root(),
                 kind: KindParts::new("Root".to_string(), None, None ),
                 properties: Default::default(),
                 status: Status::Ready
@@ -441,7 +439,7 @@ impl Registry {
     }
 
     #[async_recursion]
-    async fn sub_select(&self, sub_select: &SubSelect) -> Result<Vec<ResourceStub>, Error> {
+    async fn sub_select(&self, sub_select: &SubSelect) -> Result<Vec<Stub>, Error> {
         // build a 'matching so far' query.  Here we will find every child that matches the subselect
         // these matches are used to then query children for additional matches if there are more hops.
         // all of these matches will be filtered to see if they match the ENTIRE select before returning results.
@@ -449,16 +447,16 @@ impl Registry {
         let mut where_clause = String::new();
         let mut index = 1;
         where_clause.push_str("parent=$1");
-        params.push(sub_select.address.to_string());
+        params.push(sub_select.point.to_string());
 
         if let Option::Some(hop) = sub_select.hops.first() {
-            match &hop.segment {
-                SegmentPattern::Exact(exact) => {
+            match &hop.segment_selector {
+                PointSegSelector::Exact(exact) => {
                     index = index + 1;
-                    where_clause.push_str(format!(" AND address_segment=${}", index).as_str());
+                    where_clause.push_str(format!(" AND point_segment=${}", index).as_str());
                     match exact {
-                        ExactSegment::Address(address) => {
-                            params.push(address.to_string());
+                        ExactSegment::Point(point) => {
+                            params.push(point.to_string());
                         }
                         ExactSegment::Version(version) => {
                             params.push(version.to_string());
@@ -468,50 +466,50 @@ impl Registry {
                 _ => {}
             }
 
-            match &hop.tks.resource_type {
-                ResourceTypePattern::Any => {}
-                ResourceTypePattern::Exact(resource_type) => {
+            match &hop.kind_selector.kind{
+                GenericKindSelector::Any => {}
+                GenericKindSelector::Exact(kind) => {
                     index = index + 1;
-                    where_clause.push_str(format!(" AND resource_type=${}", index).as_str());
+                    where_clause.push_str(format!(" AND kind=${}", index).as_str());
                     params.push(resource_type.to_string());
                 }
             }
 
-            match &hop.tks.kind {
-                KindPattern::Any => {}
-                KindPattern::Exact(kind) => match &kind.kind {
+            match &hop.kind_selector.kind{
+                GenericKindSelector::Any => {}
+                GenericKindSelector::Exact(kind) => match &hop.kind_selector.sub_kind{
                     None => {}
                     Some(sub) => {
                         index = index + 1;
-                        where_clause.push_str(format!(" AND kind=${}", index).as_str());
+                        where_clause.push_str(format!(" AND sub_kind=${}", index).as_str());
                         params.push(sub.clone());
                     }
                 },
             }
 
-            match &hop.tks.specific {
+            match &hop.kind_selector.specific {
                 ValuePattern::Any => {}
                 ValuePattern::None => {}
                 ValuePattern::Pattern(specific) => {
                     match &specific.vendor {
-                        VendorPattern::Any => {}
-                        VendorPattern::Exact(vendor) => {
+                        VendorSelector::Any => {}
+                        VendorSelector::Exact(vendor) => {
                             index = index + 1;
                             where_clause.push_str(format!(" AND vendor=${}", index).as_str());
                             params.push(vendor.clone());
                         }
                     }
                     match &specific.product {
-                        ProductPattern::Any => {}
-                        ProductPattern::Exact(product) => {
+                        ProductSelector::Any => {}
+                        ProductSelector::Exact(product) => {
                             index = index + 1;
                             where_clause.push_str(format!(" AND product=${}", index).as_str());
                             params.push(product.clone());
                         }
                     }
                     match &specific.variant {
-                        VariantPattern::Any => {}
-                        VariantPattern::Exact(variant) => {
+                        VariantSelector::Any => {}
+                        VariantSelector::Exact(variant) => {
                             index = index + 1;
                             where_clause.push_str(format!(" AND variant=${}", index).as_str());
                             params.push(variant.clone());
@@ -527,14 +525,14 @@ impl Registry {
         );
 
         let mut query =
-            sqlx::query_as::<Postgres, ResourceRecord>(matching_so_far_statement.as_str());
+            sqlx::query_as::<Postgres, ParticleRecord>(matching_so_far_statement.as_str());
         for param in params {
             query = query.bind(param);
         }
 
         let mut conn = self.pool.acquire().await?;
         let mut matching_so_far = query.fetch_all(&mut conn).await?;
-        let mut matching_so_far: Vec<ResourceStub> =
+        let mut matching_so_far: Vec<Stub> =
             matching_so_far.into_iter().map(|r| r.into()).collect();
 
         let mut child_stub_matches = vec![];
@@ -543,24 +541,24 @@ impl Registry {
         if !sub_select.hops.is_empty() {
             let mut hops = sub_select.hops.clone();
             let hop = hops.first().unwrap();
-            match hop.segment {
-                SegmentPattern::Recursive => {}
+            match hop.segment_selector {
+                PointSegSelector::Recursive => {}
                 _ => {
                     hops.remove(0);
                 }
             }
 
             for stub in &matching_so_far {
-                if let Option::Some(last_segment) = stub.address.last_segment() {
-                    let address = sub_select.address.push_segment(last_segment.clone());
-                    let address_tks_path = sub_select.address_kind_path.push(AddressKindSegment {
-                        address_segment: last_segment,
+                if let Option::Some(last_segment) = stub.point.last_segment() {
+                    let point = sub_select.point.push_segment(last_segment.clone());
+                    let point_tks_path = sub_select.point_kind_path.push(PointKindSeg {
+                        segment: last_segment,
                         kind: stub.kind.clone(),
                     });
                     let sub_select = sub_select.clone().sub_select(
-                        address.clone(),
+                        point.clone(),
                         hops.clone(),
-                        address_tks_path,
+                        point_tks_path,
                     );
                     let more_stubs = self.sub_select(&sub_select).await?;
                     for stub in more_stubs.into_iter() {
@@ -572,20 +570,20 @@ impl Registry {
             // the records matched the present hop (which we needed for deeper searches) however
             // they may not or may not match the ENTIRE select pattern therefore they must be filtered
             matching_so_far.retain(|stub| {
-                let address_tks_path = sub_select.address_kind_path.push(AddressKindSegment {
-                    address_segment: stub
-                        .address
+                let point_tks_path = sub_select.point_kind_path.push(PointKindSeg {
+                    segment: stub
+                        .point
                         .last_segment()
                         .expect("expecting at least one segment"),
                     kind: stub.kind.clone(),
                 });
-                sub_select.pattern.matches(&address_tks_path)
+                sub_select.pattern.matches(&point_tks_path)
             });
 
             matching_so_far.append(&mut child_stub_matches);
         }
 
-        let stubs: Vec<ResourceStub> = matching_so_far
+        let stubs: Vec<Stub> = matching_so_far
             .into_iter()
             .map(|record| record.into())
             .collect();
@@ -597,14 +595,14 @@ impl Registry {
         let mut conn = self.pool.acquire().await?;
         match &access_grant.kind {
             AccessGrantKind::Super => {
-                sqlx::query("INSERT INTO access_grants (kind,query_root,on_point,to_point,by_particle) VALUES ('super',$1,$2,$3,(SELECT id FROM resources WHERE address=$4))")
+                sqlx::query("INSERT INTO access_grants (kind,query_root,on_point,to_point,by_particle) VALUES ('super',$1,$2,$3,(SELECT id FROM resources WHERE point=$4))")
                         .bind(access_grant.on_point.query_root().to_string())
                         .bind(access_grant.on_point.clone().to_string())
                         .bind(access_grant.to_point.clone().to_string())
                         .bind(access_grant.by_particle.to_string()).execute(& mut conn).await?;
             }
             AccessGrantKind::Privilege(privilege) => {
-                sqlx::query("INSERT INTO access_grants (kind,data,query_root,on_point,to_point,by_particle) VALUES ('priv',$1,$2,$3,$4,(SELECT id FROM resources WHERE address=$5))")
+                sqlx::query("INSERT INTO access_grants (kind,data,query_root,on_point,to_point,by_particle) VALUES ('priv',$1,$2,$3,$4,(SELECT id FROM resources WHERE point=$5))")
                         .bind(privilege.to_string() )
                         .bind(access_grant.on_point.query_root().to_string())
                         .bind(access_grant.on_point.clone().to_string())
@@ -612,7 +610,7 @@ impl Registry {
                         .bind(access_grant.by_particle.to_string()).execute(& mut conn).await?;
             }
             AccessGrantKind::PermissionsMask(mask) => {
-                sqlx::query("INSERT INTO access_grants (kind,data,query_root,on_point,to_point,by_particle) VALUES ('perm',$1,$2,$3,$4,(SELECT id FROM resources WHERE address=$5))")
+                sqlx::query("INSERT INTO access_grants (kind,data,query_root,on_point,to_point,by_particle) VALUES ('perm',$1,$2,$3,$4,(SELECT id FROM resources WHERE point=$5))")
                         .bind(mask.to_string() )
                         .bind(access_grant.on_point.query_root().to_string())
                         .bind(access_grant.on_point.clone().to_string())
@@ -625,7 +623,7 @@ impl Registry {
     }
 
     #[async_recursion]
-    pub async fn access(&self, to: &Address, on: &Address) -> Result<Access, Error> {
+    pub async fn access(&self, to: &Point, on: &Point) -> Result<Access, Error> {
         let mut conn = self.pool.acquire().await?;
 
         struct Owner(bool);
@@ -638,7 +636,7 @@ impl Registry {
 
         //if 'to' owns 'on' then grant Owner access
         let is_owner = sqlx::query_as::<Postgres, Owner>(
-            "SELECT count(*) > 0 as owner FROM resources WHERE address=$1 AND owner=$2",
+            "SELECT count(*) > 0 as owner FROM resources WHERE point=$1 AND owner=$2",
         )
         .bind(on.to_string())
         .bind(to.to_string())
@@ -654,17 +652,17 @@ impl Registry {
            return Ok(Access::Owner);
         }
 
-        let to_kind_path: AddressKindPath =
-            self.query(&to, &Query::AddressKindPath).await?.try_into()?;
-        let on_kind_path: AddressKindPath =
-            self.query(&on, &Query::AddressKindPath).await?.try_into()?;
+        let to_kind_path: PointKindHierarchy =
+            self.query(&to, &Query::PointKindHierarchy).await?.try_into()?;
+        let on_kind_path: PointKindHierarchy =
+            self.query(&on, &Query::PointKindHierarchy).await?.try_into()?;
 
         let mut traversal = on.clone();
-        let mut privileges = Privileges::new();
+        let mut privileges = Privileges::none();
         let mut permissions = Permissions::none();
         let mut level_ands: Vec<Vec<PermissionsMask>> = vec![];
         loop {
-            let mut access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,resources.address as by_particle FROM access_grants,resources WHERE access_grants.query_root=$1 AND resources.id=access_grants.by_particle").bind(traversal.to_string() ).fetch_all(& mut conn).await?;
+            let mut access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,resources.point as by_particle FROM access_grants,resources WHERE access_grants.query_root=$1 AND resources.id=access_grants.by_particle").bind(traversal.to_string() ).fetch_all(& mut conn).await?;
             let mut access_grants: Vec<AccessGrant> =
                 access_grants.into_iter().map(|a| a.into()).map(|a:IndexedAccessGrant|a.into()).collect();
             access_grants.retain(|access_grant| {
@@ -676,7 +674,7 @@ impl Registry {
                 let by_access = self.access(&access_grant.by_particle, &on).await?;
                 match &access_grant.kind {
                     AccessGrantKind::Super => {
-                        if by_access.is_super() {
+                        if by_access.has_super() {
                             return Ok(Access::Super(is_owner));
                         }
                     }
@@ -745,14 +743,14 @@ impl Registry {
 
     pub async fn chown(
         &self,
-        on: &AddressKindPattern,
-        owner: &Address,
-        by: &Address,
+        on: &PointSelector,
+        owner: &Point,
+        by: &Point,
     ) -> Result<(), Error> {
         let select = Select {
             pattern: on.clone(),
             properties: Default::default(),
-            into_payload: SelectIntoPayload::Addresses,
+            into_payload: SelectIntoPayload::Points,
             kind: SelectKind::Initial,
         };
 
@@ -763,11 +761,11 @@ impl Registry {
             let on = on.try_into()?;
             let access = self.access(by, &on).await?;
 
-            if !access.is_super() {
+            if !access.has_super() {
                 return Err("only a super can change owners".into());
             }
 
-            sqlx::query("UPDATE resources SET owner=$1 WHERE address=$2")
+            sqlx::query("UPDATE resources SET owner=$1 WHERE point=$2")
                 .bind(owner.to_string())
                 .bind(on.to_string())
                 .execute(&mut trans)
@@ -779,27 +777,27 @@ impl Registry {
 
     pub async fn list_access(
         &self,
-        to: &Option<&Address>,
-        on: &AddressKindPattern,
+        to: &Option<&Point>,
+        on: &PointSelector,
     ) -> Result<Vec<IndexedAccessGrant>, Error> {
         let select = Select {
             pattern: on.clone(),
             properties: Default::default(),
-            into_payload: SelectIntoPayload::Addresses,
+            into_payload: SelectIntoPayload::Points,
             kind: SelectKind::Initial,
         };
 
         let to = match to.as_ref() {
             None => None,
-            Some(to) => Some(self.query( to, &Query::AddressKindPath ).await?.try_into()?)
+            Some(to) => Some(self.query( to, &Query::PointKindHierarchy ).await?.try_into()?)
         };
 
         let selection = self.select(&select).await?;
         let mut all_access_grants = HashMap::new();
         let mut conn = self.pool.acquire().await?;
         for on in selection.list {
-            let on : Address = on.try_into()?;
-            let access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,resources.address as by_particle FROM access_grants,resources WHERE access_grants.query_root=$1 AND resources.id=access_grants.by_particle").bind(on.to_string() ).fetch_all(& mut conn).await?;
+            let on : Point = on.try_into()?;
+            let access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,resources.point as by_particle FROM access_grants,resources WHERE access_grants.query_root=$1 AND resources.id=access_grants.by_particle").bind(on.to_string() ).fetch_all(& mut conn).await?;
             let mut access_grants : Vec<IndexedAccessGrant> = access_grants.into_iter().map(|a|a.into()).collect();
 
             access_grants.retain(|a|{
@@ -825,11 +823,11 @@ impl Registry {
     pub async fn remove_access(
         &self,
         id: i32,
-        to: &Address,
+        to: &Point,
     ) -> Result<(), Error> {
 
         let mut conn = self.pool.acquire().await?;
-        let access_grant: IndexedAccessGrant = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,resources.address as by_particle FROM access_grants,resources WHERE access_grants.id=$1 AND resources.id=access_grants.by_particle").bind(id ).fetch_one(& mut conn).await?.into();
+        let access_grant: IndexedAccessGrant = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,resources.point as by_particle FROM access_grants,resources WHERE access_grants.id=$1 AND resources.id=access_grants.by_particle").bind(id ).fetch_one(& mut conn).await?.into();
         let access = self.access( to, &access_grant.by_particle ).await?;
        if access.has_full() {
             let mut trans = conn.begin().await?;
@@ -970,9 +968,9 @@ impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
 
             let access_grant = AccessGrant {
                 kind,
-                on_point: AddressKindPattern::from_str(on_point)?,
-                to_point: AddressKindPattern::from_str(to_point)?,
-                by_particle: Address::from_str(by_particle)?,
+                on_point: PointSelector::from_str(on_point)?,
+                to_point: PointSelector::from_str(to_point)?,
+                by_particle: Point::from_str(by_particle)?,
             };
             Ok(IndexedAccessGrant{id, access_grant})
         }
@@ -987,11 +985,11 @@ impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
     }
 }
 
-impl sqlx::FromRow<'_, PgRow> for ResourceRecord {
+impl sqlx::FromRow<'_, PgRow> for ParticleRecord {
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
-        fn wrap(row: &PgRow) -> Result<ResourceRecord, Error> {
+        fn wrap(row: &PgRow) -> Result<ParticleRecord, Error> {
             let parent: String = row.get("parent");
-            let address_segment: String = row.get("address_segment");
+            let point_segment: String = row.get("point_segment");
             let resource_type: String = row.get("resource_type");
             let kind: Option<String> = row.get("kind");
             let vendor: Option<String> = row.get("vendor");
@@ -1003,9 +1001,9 @@ impl sqlx::FromRow<'_, PgRow> for ResourceRecord {
             let status: String = row.get("status");
             let perms: String = row.get("perms");
 
-            let address = Address::from_str(parent.as_str())?;
-            let address = address.push(address_segment)?;
-            let resource_type = ResourceType::from_str(resource_type.as_str())?;
+            let point = Point::from_str(parent.as_str())?;
+            let point = point.push(point_segment)?;
+            let resource_type = KindBase::from_str(resource_type.as_str())?;
             let perms = Permissions::from_str(perms.as_str())?;
 
             let specific = if let Option::Some(vendor) = vendor {
@@ -1040,19 +1038,19 @@ impl sqlx::FromRow<'_, PgRow> for ResourceRecord {
 
             let kind = Kind::from(resource_type, kind, specific)?;
             let location = match star {
-                Some(star) => ResourceLocation::Star(StarKey::from_str(star.as_str())?),
-                None => ResourceLocation::Unassigned,
+                Some(star) => ParticleLocation::Star(StarKey::from_str(star.as_str())?),
+                None => ParticleLocation::Unassigned,
             };
             let status = Status::from_str(status.as_str())?;
 
-            let stub = ResourceStub {
-                address,
+            let stub = Stub {
+                point,
                 kind: kind.into(),
                 properties: Default::default(), // not implemented yet...
                 status,
             };
 
-            let record = ResourceRecord {
+            let record = ParticleRecord {
                 stub: stub,
                 location,
                 perms
@@ -1065,7 +1063,7 @@ impl sqlx::FromRow<'_, PgRow> for ResourceRecord {
             Ok(record) => Ok(record),
             Err(err) => {
                 error!("{}", err.to_string());
-                Err(sqlx::error::Error::Decode("resource record".into()))
+                Err(sqlx::error::Error::Decode("particle record".into()))
             }
         }
     }
@@ -1075,15 +1073,15 @@ impl sqlx::FromRow<'_, PgRow> for ResourceRecord {
 pub mod test {
     use crate::error::Error;
     use crate::registry::Registry;
-    use crate::resource::{Kind, UserBaseKind};
+    use crate::particle::{Kind, UserBaseSubKind};
     use crate::star::core::resource::registry::Registration;
     use crate::star::StarKey;
     use mesh_portal::version::latest::entity::request::query::Query;
     use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoPayload};
-    use mesh_portal::version::latest::id::Address;
-    use mesh_portal::version::latest::pattern::{AddressKindPath, AddressKindPattern};
+    use mesh_portal::version::latest::id::Point;
+    use mesh_portal::version::latest::selector::{PointKindHierarchy, PointSelector};
     use mesh_portal::version::latest::payload::Primitive;
-    use mesh_portal::version::latest::resource::Status;
+    use mesh_portal::version::latest::particle::Status;
     use mesh_portal_versions::version::v0_0_1::entity::request::select::SelectKind;
     use mesh_portal_versions::version::v0_0_1::security::{Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind, Privilege};
     use std::convert::TryInto;
@@ -1101,10 +1099,10 @@ pub mod test {
         let registry = Registry::new().await?;
         registry.nuke().await?;
 
-        let address = Address::from_str("localhost")?;
-        let hyperuser = Address::from_str("hyperspace:users:hyperuser")?;
+        let point = Point::from_str("localhost")?;
+        let hyperuser = Point::from_str("hyperspace:users:hyperuser")?;
         let registration = Registration {
-            address: address.clone(),
+            point: point.clone(),
             kind: Kind::Space,
             registry: Default::default(),
             properties: Default::default(),
@@ -1112,9 +1110,9 @@ pub mod test {
         };
         registry.register(&registration).await?;
 
-        let address = Address::from_str("localhost:mechtron")?;
+        let point = Point::from_str("localhost:mechtron")?;
         let registration = Registration {
-            address: address.clone(),
+            point: point.clone(),
             kind: Kind::Mechtron,
             registry: Default::default(),
             properties: Default::default(),
@@ -1123,25 +1121,25 @@ pub mod test {
         registry.register(&registration).await?;
 
         let star = StarKey::central();
-        registry.assign(&address, &star).await?;
-        registry.set_status(&address, &Status::Ready).await?;
-        registry.sequence(&address).await?;
-        let record = registry.locate(&address).await?;
+        registry.assign(&point, &star).await?;
+        registry.set_status(&point, &Status::Ready).await?;
+        registry.sequence(&point).await?;
+        let record = registry.locate(&point).await?;
 
-        let result = registry.query(&address, &Query::AddressKindPath).await?;
-        let kind_path: AddressKindPath = result.try_into()?;
+        let result = registry.query(&point, &Query::PointKindHierarchy).await?;
+        let kind_path: PointKindHierarchy = result.try_into()?;
 
-        let pattern = AddressKindPattern::from_str("**")?;
+        let pattern = PointSelector::from_str("**")?;
         let select = Select {
             pattern,
             properties: Default::default(),
-            into_payload: SelectIntoPayload::Addresses,
+            into_payload: SelectIntoPayload::Points,
             kind: SelectKind::Initial,
         };
 
-        let addresses = registry.select(&select).await?;
+        let points = registry.select(&select).await?;
 
-        assert_eq!(addresses.len(), 2);
+        assert_eq!(points.len(), 2);
 
         Ok(())
     }
@@ -1151,15 +1149,15 @@ pub mod test {
         let registry = Registry::new().await?;
         registry.nuke().await?;
 
-        let hyperuser = Address::from_str("hyperspace:users:hyperuser")?;
-        let superuser = Address::from_str("localhost:users:superuser")?;
-        let scott = Address::from_str("localhost:app:users:scott")?;
-        let app = Address::from_str("localhost:app")?;
-        let mechtron = Address::from_str("localhost:app:mechtron")?;
-        let localhost = Address::from_str("localhost")?;
+        let hyperuser = Point::from_str("hyperspace:users:hyperuser")?;
+        let superuser = Point::from_str("localhost:users:superuser")?;
+        let scott = Point::from_str("localhost:app:users:scott")?;
+        let app = Point::from_str("localhost:app")?;
+        let mechtron = Point::from_str("localhost:app:mechtron")?;
+        let localhost = Point::from_str("localhost")?;
 
         let registration = Registration {
-            address: Address::root(),
+            point: Point::root(),
             kind: Kind::Root,
             registry: Default::default(),
             properties: Default::default(),
@@ -1168,7 +1166,7 @@ pub mod test {
         registry.register(&registration).await?;
 
         let registration = Registration {
-            address: Address::from_str("hyperspace")?,
+            point: Point::from_str("hyperspace")?,
             kind: Kind::Space,
             registry: Default::default(),
             properties: Default::default(),
@@ -1177,8 +1175,8 @@ pub mod test {
         registry.register(&registration).await?;
 
         let registration = Registration {
-            address: Address::from_str("hyperspace:users")?,
-            kind: Kind::UserBase(UserBaseKind::Keycloak),
+            point: Point::from_str("hyperspace:users")?,
+            kind: Kind::UserBase(UserBaseSubKind::Keycloak),
             registry: Default::default(),
             properties: Default::default(),
             owner: hyperuser.clone(),
@@ -1186,7 +1184,7 @@ pub mod test {
         registry.register(&registration).await?;
 
         let registration = Registration {
-            address: hyperuser.clone(),
+            point: hyperuser.clone(),
             kind: Kind::Space,
             registry: Default::default(),
             properties: Default::default(),
@@ -1195,7 +1193,7 @@ pub mod test {
         registry.register(&registration).await?;
 
         let registration = Registration {
-            address: localhost.clone(),
+            point: localhost.clone(),
             kind: Kind::Space,
             registry: Default::default(),
             properties: Default::default(),
@@ -1203,10 +1201,10 @@ pub mod test {
         };
         registry.register(&registration).await?;
 
-        let address = Address::from_str("localhost:users")?;
+        let point = Point::from_str("localhost:users")?;
         let registration = Registration {
-            address: address.clone(),
-            kind: Kind::UserBase(UserBaseKind::Keycloak),
+            point: point.clone(),
+            kind: Kind::UserBase(UserBaseSubKind::Keycloak),
             registry: Default::default(),
             properties: Default::default(),
             owner: hyperuser.clone(),
@@ -1214,8 +1212,8 @@ pub mod test {
         registry.register(&registration).await?;
 
         let registration = Registration {
-            address: superuser.clone(),
-            kind: Kind::UserBase(UserBaseKind::Keycloak),
+            point: superuser.clone(),
+            kind: Kind::UserBase(UserBaseSubKind::Keycloak),
             registry: Default::default(),
             properties: Default::default(),
             owner: hyperuser.clone(),
@@ -1223,7 +1221,7 @@ pub mod test {
         registry.register(&registration).await?;
 
         let registration = Registration {
-            address: app.clone(),
+            point: app.clone(),
             kind: Kind::App,
             registry: Default::default(),
             properties: Default::default(),
@@ -1231,10 +1229,10 @@ pub mod test {
         };
         registry.register(&registration).await?;
 
-        let app_userbase = Address::from_str("localhost:app:users")?;
+        let app_userbase = Point::from_str("localhost:app:users")?;
         let registration = Registration {
-            address: app_userbase.clone(),
-            kind: Kind::UserBase(UserBaseKind::Keycloak),
+            point: app_userbase.clone(),
+            kind: Kind::UserBase(UserBaseSubKind::Keycloak),
             registry: Default::default(),
             properties: Default::default(),
             owner: app.clone(),
@@ -1242,7 +1240,7 @@ pub mod test {
         registry.register(&registration).await?;
 
         let registration = Registration {
-            address: scott.clone(),
+            point: scott.clone(),
             kind: Kind::User,
             registry: Default::default(),
             properties: Default::default(),
@@ -1251,7 +1249,7 @@ pub mod test {
         registry.register(&registration).await?;
 
         let registration = Registration {
-            address: mechtron.clone(),
+            point: mechtron.clone(),
             kind: Kind::Mechtron,
             registry: Default::default(),
             properties: Default::default(),
@@ -1261,7 +1259,7 @@ pub mod test {
 
         let grant = AccessGrant {
             kind: AccessGrantKind::Super,
-            on_point: AddressKindPattern::from_str("localhost+:**")?,
+            on_point: PointSelector::from_str("localhost+:**")?,
             to_point: superuser.clone().try_into()?,
             by_particle: hyperuser.clone(),
         };
@@ -1269,23 +1267,23 @@ pub mod test {
 
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("+csd-Rwx")?),
-            on_point: AddressKindPattern::from_str("localhost:app+:**")?,
-            to_point: AddressKindPattern::from_str("localhost:app:users:**<User>")?,
+            on_point: PointSelector::from_str("localhost:app+:**")?,
+            to_point: PointSelector::from_str("localhost:app:users:**<User>")?,
             by_particle: app.clone(),
         };
         registry.grant(&grant).await?;
 
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("+csd-rwX")?),
-            on_point: AddressKindPattern::from_str("localhost:app:**<Mechtron>")?,
-            to_point: AddressKindPattern::from_str("localhost:app:users:**<User>")?,
+            on_point: PointSelector::from_str("localhost:app:**<Mechtron>")?,
+            to_point: PointSelector::from_str("localhost:app:users:**<User>")?,
             by_particle: app.clone(),
         };
         registry.grant(&grant).await?;
 
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("+CSD-RWX")?),
-            on_point: AddressKindPattern::from_str("localhost:users:superuser")?,
+            on_point: PointSelector::from_str("localhost:users:superuser")?,
             to_point: scott.clone().try_into()?,
             by_particle: app.clone(),
         };
@@ -1293,8 +1291,8 @@ pub mod test {
 
         let grant = AccessGrant {
             kind: AccessGrantKind::Privilege(Privilege::Single("property:email:read".to_string())),
-            on_point: AddressKindPattern::from_str("localhost:app:users:**<User>")?,
-            to_point: AddressKindPattern::from_str("localhost:app:**<Mechtron>")?,
+            on_point: PointSelector::from_str("localhost:app:users:**<User>")?,
+            to_point: PointSelector::from_str("localhost:app:**<Mechtron>")?,
             by_particle: app.clone(),
         };
         registry.grant(&grant).await?;
@@ -1324,7 +1322,7 @@ pub mod test {
         assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
 
         // must have super to chagne ownership
-        let app_pattern = AddressKindPattern::from_str("localhost:app+:**")?;
+        let app_pattern = PointSelector::from_str("localhost:app+:**")?;
         assert!(registry.chown(&app_pattern, &app, &scott).await.is_err());
         // this should work:
         assert!(registry.chown(&app_pattern, &app, &superuser).await.is_ok());
@@ -1346,8 +1344,8 @@ pub mod test {
         // now test AND permissions (masking Read)
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("&csd-rwX")?),
-            on_point: AddressKindPattern::from_str("localhost:app:**<Mechtron>")?,
-            to_point: AddressKindPattern::from_str("localhost:app:users:**<User>")?,
+            on_point: PointSelector::from_str("localhost:app:**<Mechtron>")?,
+            to_point: PointSelector::from_str("localhost:app:users:**<User>")?,
             by_particle: app.clone(),
         };
         registry.grant(&grant).await?;
@@ -1362,7 +1360,7 @@ pub mod test {
         assert!(access.check_privilege("property:email:read").is_ok());
 
 
-        let access_grants = registry.list_access(&None, &AddressKindPattern::from_str("+:**")?).await?;
+        let access_grants = registry.list_access(&None, &PointSelector::from_str("+:**")?).await?;
 
 
         println!("{: <4}{:<6}{:<20}{:<40}{:<40}{:<40}", "id","grant","data","on","to","by");

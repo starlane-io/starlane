@@ -9,7 +9,7 @@ use tokio::time::Instant;
 use crate::error::Error;
 use crate::frame::{ SimpleReply, StarMessage, StarMessagePayload};
 use crate::message::{MessageExpect, ProtoStarMessage, ProtoStarMessageTo, MessageId, ReplyKind, Reply};
-use crate::resource::ResourceRecord;
+use crate::particle::ParticleRecord;
 use crate::star::{StarSkel, StarKey};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::fail::{Fail, StarlaneFailure};
@@ -18,7 +18,7 @@ use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 use std::sync::Arc;
 use dashmap::DashMap;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Message,  Request, Response};
 use mesh_portal::version::latest::util::unique_id;
 use mesh_portal::version::latest::parse::Res;
@@ -147,12 +147,12 @@ pub struct MessagingComponentInner {
     pub skel: StarSkel,
     pub exchanges: DashMap<MessageId, MessageExchanger>,
     pub resource_exchange: DashMap<String, oneshot::Sender<Response>>,
-    pub address: Address
+    pub address: Point
 }
 
 impl MessagingComponent {
     pub fn start(skel: StarSkel, rx: mpsc::Receiver<MessagingCall>) {
-        let address = Address::from_str(format!("<<{}>>::messaging",skel.info.key.to_string()).as_str() ).expect("expected messaging address to parse");
+        let address = Point::from_str(format!("<<{}>>::messaging", skel.info.key.to_string()).as_str() ).expect("expected messaging address to parse");
         let inner = Arc::new(MessagingComponentInner {
             skel: skel.clone(),
             exchanges: DashMap::new(),
@@ -355,7 +355,7 @@ impl MessagingComponentInner {
                         Err(fail) => {
                             eprintln!("{}", fail.to_string());
                             error!(
-                                "locator could not find resource record for: '{}'",
+                                "locator could not find particle record for: '{}'",
                                 address.to_string()
                             );
                             skel.messaging_api.fail_exchange(id.clone(), proto, fail.into());

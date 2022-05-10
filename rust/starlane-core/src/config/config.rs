@@ -3,10 +3,10 @@ use crate::cache::{ArtifactItem, Cacheable};
 use crate::command::compose::{Command, CommandOp};
 use crate::config::parse::replace::substitute;
 use crate::error::Error;
-use crate::resource::{ArtifactKind, Kind};
+use crate::particle::{ArtifactSubKind, Kind};
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
-use mesh_portal::version::latest::id::Address;
-use mesh_portal::version::latest::resource::Property;
+use mesh_portal::version::latest::id::Point;
+use mesh_portal::version::latest::particle::Property;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::str::FromStr;
@@ -28,10 +28,10 @@ impl Cacheable for ResourceConfig {
 
         if let Some(property) = self.properties.get(&"bind".to_string()) {
             if let PropertyMod::Set { key, value, lock } = property {
-                if let Ok(address) = Address::from_str(value.as_str()) {
+                if let Ok(address) = Point::from_str(value.as_str()) {
                     refs.push(ArtifactRef {
-                        address,
-                        kind: ArtifactKind::Bind,
+                        point: address,
+                        kind: ArtifactSubKind::Bind,
                     })
                 }
             }
@@ -43,11 +43,11 @@ impl Cacheable for ResourceConfig {
 
 pub struct ContextualConfig {
     pub config: ArtifactItem<ResourceConfig>,
-    pub address: Address,
+    pub address: Point,
 }
 
 impl ContextualConfig {
-    pub fn new(config: ArtifactItem<ResourceConfig>, address: Address) -> Self {
+    pub fn new(config: ArtifactItem<ResourceConfig>, address: Point) -> Self {
         Self { config, address }
     }
 
@@ -58,7 +58,7 @@ impl ContextualConfig {
             "self.config.bundle".to_string(),
             self.config
                 .artifact_ref
-                .address
+                .point
                 .clone()
                 .to_bundle()?
                 .to_string(),
@@ -102,8 +102,8 @@ impl ContextualConfig {
         }
     }
 
-    pub fn bind(&self) -> Result<Address, Error> {
-        Ok(Address::from_str(self.get_property("bind")?.as_str())?)
+    pub fn bind(&self) -> Result<Point, Error> {
+        Ok(Point::from_str(self.get_property("bind")?.as_str())?)
     }
 
     pub fn install(&self) -> Result<Vec<String>, Error> {
@@ -147,13 +147,13 @@ impl MechtronConfig {
         Self { config }
     }
 
-    pub fn new(config: ArtifactItem<ResourceConfig>, address: Address) -> Self {
+    pub fn new(config: ArtifactItem<ResourceConfig>, address: Point) -> Self {
         let config = ContextualConfig::new(config, address);
         Self { config }
     }
 
-    pub fn wasm_src(&self) -> Result<Address, Error> {
-        Ok(Address::from_str(self.get_property("wasm.src")?.as_str())?)
+    pub fn wasm_src(&self) -> Result<Point, Error> {
+        Ok(Point::from_str(self.get_property("wasm.src")?.as_str())?)
     }
 
     pub fn mechtron_name(&self) -> Result<String, Error> {

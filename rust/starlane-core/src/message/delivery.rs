@@ -11,7 +11,7 @@ use tokio::time::Duration;
 
 use crate::error::Error;
 use crate::message::ProtoStarMessage;
-use crate::resource::{ResourceRecord, ResourceType, Kind};
+use crate::particle::{ParticleRecord, KindBase, Kind};
 use crate::star::{StarCommand, StarSkel};
 use crate::util;
 use crate::fail::Fail;
@@ -21,7 +21,7 @@ use crate::message::Reply;
 use std::ops::Deref;
 use http::StatusCode;
 use mesh_portal::version::latest::entity::response::ResponseCore;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Request, Response};
 use mesh_portal::version::latest::payload::{Errors, Payload, Primitive};
 
@@ -48,7 +48,7 @@ where
         }
     }
 
-    pub fn to(&self) -> Result<Address,Error> {
+    pub fn to(&self) -> Result<Point,Error> {
         match &self.star_message.payload {
             StarMessagePayload::Request(request) => {
                 Ok(request.to.clone())
@@ -57,12 +57,6 @@ where
                 Err("this type of Delivery does not support to() resolution".into())
             }
         }
-    }
-}
-
-impl<M> Drop for Delivery<M> {
-    fn drop(&mut self) {
-
     }
 }
 
@@ -173,7 +167,7 @@ impl Delivery<Request>
     }
 }
 
-impl <M>Drop for Delivery<M> {
+impl <M:Clone>Drop for Delivery<M> {
     fn drop(&mut self) {
         if !self.responded {
             let core = ResponseCore {

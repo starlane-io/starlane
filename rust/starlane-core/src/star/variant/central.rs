@@ -8,7 +8,7 @@ use crate::command::cli::{CliServer, inlet, outlet};
 
 
 use crate::error::Error;
-use crate::resource::{Kind, ResourceRecord,  ResourceLocation};
+use crate::particle::{Kind, ParticleRecord, ParticleLocation};
 use crate::star::{StarKey, StarSkel};
 use crate::star::variant::{FrameVerdict, VariantCall};
 use crate::starlane::api::StarlaneApi;

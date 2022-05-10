@@ -1,3 +1,4 @@
+#![allow(warnings)]
 #![feature(fn_traits)]
 #![feature(unboxed_closures)]
 #![feature(trivial_bounds)]
@@ -60,7 +61,7 @@ pub mod logger;
 pub mod message;
 pub mod names;
 pub mod proto;
-pub mod resource;
+pub mod particle;
 pub mod server;
 pub mod service;
 pub mod space;

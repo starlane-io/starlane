@@ -15,8 +15,8 @@ use tokio::time::error::Elapsed;
 use crate::cache::{ArtifactCaches, ProtoArtifactCachesFactory};
 use crate::error::Error;
 use crate::frame::{StarPattern, TraversalAction, ResourceRegistryRequest, StarMessagePayload};
-use crate::resource::{Kind, ResourceType, AssignResourceStateSrc, ResourceRecord};
-use crate::resource::FileKind;
+use crate::particle::{Kind, KindBase, AssignResourceStateSrc, ParticleRecord};
+use crate::particle::FileSubKind;
 use crate::star::{StarCommand, StarKind, StarSkel, StarKey};
 use crate::star::shell::search::{SearchInit, SearchHits};
 use crate::star::surface::SurfaceApi;
@@ -27,13 +27,13 @@ use crate::artifact::{ArtifactBundle, ArtifactRef};
 use kube::ResourceExt;
 use mesh_portal::error;
 use mesh_portal::version::latest::command::common::{SetLabel, StateSrc};
-use mesh_portal::version::latest::entity::request::create::{AddressSegmentTemplate, AddressTemplate, Create, KindTemplate, Strategy, Template};
-use mesh_portal::version::latest::entity::request::{Action, Rc};
+use mesh_portal::version::latest::entity::request::create::{PointSegFactory, PointTemplate, Create, KindTemplate, Strategy, Template};
+use mesh_portal::version::latest::entity::request::{Method, Rc};
 use mesh_portal::version::latest::entity::request::get::Get;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Message, Request, Response};
 use mesh_portal::version::latest::payload::{Payload, PayloadMap, Primitive};
-use mesh_portal::version::latest::resource::ResourceStub;
+use mesh_portal::version::latest::particle::Stub;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
 use mesh_portal::version::latest::entity::request::get::GetOp;
 use mesh_portal::version::latest::id::Tks;
@@ -44,7 +44,7 @@ use crate::fail::{Fail, StarlaneFailure};
 pub struct StarlaneApi {
     surface_api: SurfaceApi,
     starlane_tx: Option<mpsc::Sender<StarlaneCommand>>,
-    pub agent: Address
+    pub agent: Point
 }
 
 impl StarlaneApi {
@@ -55,14 +55,14 @@ impl StarlaneApi {
 
 
 impl StarlaneApi {
-    pub fn new(surface_api: SurfaceApi, agent: Address) -> Self {
+    pub fn new(surface_api: SurfaceApi, agent: Point) -> Self {
         Self::new_with_options(surface_api, Option::None, agent)
     }
 
     fn new_with_options(
         surface_api: SurfaceApi,
         starlane_tx: Option<mpsc::Sender<StarlaneCommand>>,
-        agent: Address
+        agent: Point
     ) -> Self {
         Self {
             surface_api,
@@ -97,9 +97,9 @@ impl StarlaneApi {
 
     pub async fn fetch_resource_record(
         &self,
-        address: Address,
-    ) -> Result<ResourceRecord, Error> {
-        self.surface_api.locate(address).await
+        point: Point,
+    ) -> Result<ParticleRecord, Error> {
+        self.surface_api.locate(point).await
     }
 
 
@@ -113,19 +113,19 @@ impl StarlaneApi {
         Ok(self.surface_api.get_caches().await?)
     }
 
-    pub async fn create(&self, create: Create) -> Result<ResourceStub, Error> {
-        let action = Action::Rc(Rc::Create(create.clone()));
+    pub async fn create(&self, create: Create) -> Result<Stub, Error> {
+        let action = Method::Cmd(Rc::Create(create.clone()));
         let core = action.into();
-        let request = Request::new(core, self.agent.clone(), create.template.address.parent.clone() );
+        let request = Request::new(core, self.agent.clone(), create.template.point.parent.clone() );
         let response = self.surface_api.exchange(request).await.ok_or()?;
-        if let Payload::Primitive(Primitive::Stub(stub)) =  &response.core.body {
+        if let Payload::Stub(stub) =  &response.core.body {
             Ok(stub.clone())
         } else {
             Err("unexpected response".into())
         }
     }
 
-    pub async fn create_sys_resource( &self, template: Template, messenger_tx: mpsc::Sender<Message> ) -> Result<ResourceStub,Error> {
+    pub async fn create_sys_resource( &self, template: Template, messenger_tx: mpsc::Sender<Message> ) -> Result<Stub,Error> {
        self.surface_api.create_sys_resource(template,messenger_tx).await
     }
 
@@ -166,18 +166,18 @@ impl StarlaneApi {
     }
 
     pub async fn create_space(&self, name: &str) -> Result<Creation<SpaceApi>, Error> {
-        let address_template = AddressTemplate{
-            parent: Address::root(),
-            child_segment_template: AddressSegmentTemplate::Exact(name.to_string())
+        let point_template = PointTemplate {
+            parent: Point::root(),
+            child_segment_template: PointSegFactory::Exact(name.to_string())
         };
 
         let kind_template = KindTemplate {
-            resource_type: "Space".to_string(),
-            kind: None,
+            kind: "Space".to_string(),
+            sub_kind: None,
             specific: None
         };
 
-        let template = Template::new(address_template,kind_template );
+        let template = Template::new(point_template,kind_template );
         let mut properties = SetProperties::new();
         let create = Create {
             template,
@@ -191,44 +191,44 @@ impl StarlaneApi {
         Ok(creation)
     }
 
-    pub async fn get_space(&self, address: Address) -> Result<SpaceApi, Error> {
-        let record = self.fetch_resource_record(address).await?;
+    pub async fn get_space(&self, point: Point) -> Result<SpaceApi, Error> {
+        let record = self.fetch_resource_record(point).await?;
         Ok(SpaceApi::new(self.surface_api.clone(), record.stub, self.agent.clone() )?)
     }
 
-    pub async fn get_state( &self, address: Address ) -> Result<Payload,Error> {
+    pub async fn get_state(&self, point: Point) -> Result<Payload,Error> {
         let get = Get {
-            address: address.clone(),
+            point: point.clone(),
             op: GetOp::State
         };
-        let action = Action::Rc(Rc::Get(get));
+        let action = Method::Cmd(Rc::Get(get));
         let core = action.into();
-        let request = Request::new(core, self.agent.clone(), address.clone());
+        let request = Request::new(core, self.agent.clone(), point.clone());
         let response = self.surface_api.exchange(request).await;
         match response.core.is_ok() {
             true => Ok(response.core.body),
-            false => Err(format!("could not get state for: '{}'",address.to_string()).into())
+            false => Err(format!("could not get state for: '{}'",point.to_string()).into())
         }
     }
 }
 
 pub struct SpaceApi {
-    stub: ResourceStub,
+    stub: Stub,
     surface_api: SurfaceApi,
-    agent: Address
+    agent: Point
 }
 
 impl SpaceApi {
 
-    pub fn address(&self) -> Address {
-        self.stub.address.clone()
+    pub fn point(&self) -> Point {
+        self.stub.point.clone()
     }
 
-    pub fn new(surface_api: SurfaceApi, stub: ResourceStub, agent: Address) -> Result<Self, Error> {
-        if stub.kind.resource_type != ResourceType::Space.to_string() {
+    pub fn new(surface_api: SurfaceApi, stub: Stub, agent: Point) -> Result<Self, Error> {
+        if stub.kind.kind != KindBase::Space.to_string() {
             return Err(format!(
-                "wrong kind resource type for SpaceApi: {}",
-                stub.kind.resource_type.to_string()
+                "wrong kind particle type for SpaceApi: {}",
+                stub.kind.kind.to_string()
             )
             .into());
         }
@@ -295,9 +295,9 @@ where
 }
 
 pub struct ResourceApi {
-    stub: ResourceStub,
+    stub: Stub,
     surface_api: SurfaceApi,
-    agent: Address
+    agent: Point
 }
 
 
@@ -315,7 +315,7 @@ impl TryFrom<ResourceApi> for SpaceApi {
 #[derive(Debug)]
 pub enum StarlaneAction {
     GetState {
-        address: Address,
+        point: Point,
         tx: tokio::sync::oneshot::Sender<Result<Payload, Error>>,
     },
 }
@@ -352,7 +352,7 @@ impl StarlaneApiRunner {
 
     async fn process(&self, action: StarlaneAction) {
         match action {
-            StarlaneAction::GetState { address: identifier, tx } => {
+            StarlaneAction::GetState { point: identifier, tx } => {
                 tx.send(self.api.get_state(identifier).await );
             }
         }
@@ -373,7 +373,7 @@ impl StarlaneApiRelay {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.tx
             .send(StarlaneAction::GetState {
-                address: identifier,
+                point: identifier,
                 tx: tx,
             })
             .await;

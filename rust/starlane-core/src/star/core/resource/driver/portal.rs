@@ -6,8 +6,8 @@ use yaml_rust::Yaml;
 
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
-use crate::resource::{ArtifactKind, ResourceType, ResourceAssign, AssignResourceStateSrc};
-use crate::star::core::resource::driver::ResourceCoreDriver;
+use crate::particle::{ArtifactSubKind, KindBase, ParticleAssign, AssignResourceStateSrc};
+use crate::star::core::resource::driver::ParticleCoreDriver;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
 use crate::watch::{Notification, Change, Topic, WatchSelector, Property};
@@ -17,7 +17,7 @@ use crate::frame::{StarMessagePayload, StarMessage};
 use std::str::FromStr;
 use std::sync::atomic::AtomicU32;
 use mesh_portal::version::latest::command::common::StateSrc;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Request, Response};
 use mesh_portal_tcp_server::PortalServer;
 
@@ -37,10 +37,10 @@ impl PortalCoreDriver {
 }
 
 #[async_trait]
-impl ResourceCoreDriver for PortalCoreDriver {
+impl ParticleCoreDriver for PortalCoreDriver {
     async fn assign(
         &mut self,
-        assign: ResourceAssign,
+        assign: ParticleAssign,
     ) -> Result<(), Error> {
         let state = match assign.state {
             StateSrc::StatefulDirect(data) => data,
@@ -63,8 +63,8 @@ impl ResourceCoreDriver for PortalCoreDriver {
     }
 
 
-    fn resource_type(&self) -> ResourceType {
-        ResourceType::File
+    fn resource_type(&self) -> KindBase {
+        KindBase::File
     }
 
 }

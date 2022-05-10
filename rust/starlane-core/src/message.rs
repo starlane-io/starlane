@@ -2,18 +2,18 @@ use std::collections::HashSet;
 use std::convert::{Infallible, TryFrom, TryInto};
 use std::string::FromUtf8Error;
 use mesh_portal::version::latest::bin::Bin;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Request, Response};
-use mesh_portal::version::latest::pattern::AddressKindPath;
+use mesh_portal::version::latest::selector::PointKindHierarchy;
 use mesh_portal::version::latest::payload::Payload;
-use mesh_portal::version::latest::resource::ResourceStub;
+use mesh_portal::version::latest::particle::Stub;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, oneshot};
 use uuid::Uuid;
 
 use crate::error::Error;
-use crate::resource::{Kind, ResourceType, ResourceRecord};
+use crate::particle::{Kind, KindBase, ParticleRecord};
 use crate::star::{StarCommand, StarKey};
 use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
 use crate::frame::{StarMessagePayload, StarMessage, SimpleReply, MessageAck};
@@ -26,7 +26,7 @@ pub type MessageId=String;
 pub enum ProtoStarMessageTo {
     None,
     Star(StarKey),
-    Resource(Address),
+    Resource(Point),
 }
 
 impl ToString for ProtoStarMessageTo {
@@ -55,14 +55,14 @@ impl From<StarKey> for ProtoStarMessageTo {
     }
 }
 
-impl From<Address> for ProtoStarMessageTo {
-    fn from(id: Address) -> Self {
+impl From<Point> for ProtoStarMessageTo {
+    fn from(id: Point) -> Self {
         ProtoStarMessageTo::Resource(id)
     }
 }
 
-impl From<Option<Address>> for ProtoStarMessageTo {
-    fn from(id: Option<Address>) -> Self {
+impl From<Option<Point>> for ProtoStarMessageTo {
+    fn from(id: Option<Point>) -> Self {
         match id {
             None => ProtoStarMessageTo::None,
             Some(id) => ProtoStarMessageTo::Resource(id.into()),
@@ -311,10 +311,10 @@ pub enum ReplyKind{
 #[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
 pub enum Reply{
     Empty,
-    Record(ResourceRecord),
-    Records(Vec<ResourceRecord>),
-    Stubs(Vec<ResourceStub>),
-    AddressTksPath(AddressKindPath),
+    Record(ParticleRecord),
+    Records(Vec<ParticleRecord>),
+    Stubs(Vec<Stub>),
+    AddressTksPath(PointKindHierarchy),
     Payload(Payload)
 }
 
@@ -331,7 +331,7 @@ impl Reply{
     }
 }
 
-fn hash_to_string(hash: &HashSet<ResourceType>) -> String {
+fn hash_to_string(hash: &HashSet<KindBase>) -> String {
     let mut rtn = String::new();
     for i in hash.iter() {
         rtn.push_str(i.to_string().as_str());

@@ -15,7 +15,7 @@ use futures::future::join_all;
 use futures::{FutureExt, StreamExt, TryFutureExt};
 use mesh_portal::version::latest::frame::PrimitiveFrame;
 use mesh_portal_api_server::Portal;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::path;
 use mesh_portal_tcp_client::PortalTcpClient;
 use mesh_portal_tcp_common::{FrameReader, FrameWriter, PrimitiveFrameReader, PrimitiveFrameWriter};

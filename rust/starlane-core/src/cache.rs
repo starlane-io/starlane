@@ -10,7 +10,7 @@ use futures::FutureExt;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::config::bind::BindConfig;
 use mesh_portal::version::latest::config::Config;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::path::Path;
 use mesh_portal::version::latest::payload::Primitive;
 use tokio::io::AsyncReadExt;
@@ -26,15 +26,15 @@ use crate::config::parse::ResourceConfigParser;
 use crate::config::wasm::{Wasm, WasmCompiler};
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use crate::resource::{Kind, ResourceRecord};
-use crate::resource::ArtifactKind;
-use crate::resource::config::Parser;
+use crate::particle::{Kind, ParticleRecord};
+use crate::particle::ArtifactSubKind;
+use crate::particle::config::Parser;
 use crate::starlane::api::StarlaneApi;
 use crate::starlane::StarlaneMachine;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
 
 
-pub type ZipFile = Address;
+pub type ZipFile = Point;
 
 pub trait Cacheable: Send + Sync + 'static {
     fn artifact(&self) -> ArtifactRef;
@@ -107,7 +107,7 @@ impl ArtifactCaches {
 }
 
 pub struct ArtifactItemCache<C: Cacheable> {
-    map: HashMap<Address, ArtifactItem<C>>,
+    map: HashMap<Point, ArtifactItem<C>>,
 }
 
 impl<C: Cacheable> ArtifactItemCache<C> {
@@ -117,12 +117,12 @@ impl<C: Cacheable> ArtifactItemCache<C> {
         }
     }
 
-    pub fn get(&self, address: &Address) -> Option<ArtifactItem<C>> {
-        self.map.get(&address).cloned()
+    pub fn get(&self, point: &Point) -> Option<ArtifactItem<C>> {
+        self.map.get(&point).cloned()
     }
 
     fn add(&mut self, item: ArtifactItem<C>) {
-        self.map.insert(item.artifact().address, item);
+        self.map.insert(item.artifact().point, item);
     }
 }
 
@@ -167,16 +167,16 @@ impl ProtoArtifactCaches {
 
         for (artifact, _claim) in claims {
             match artifact.kind {
-                ArtifactKind::Raw => {
+                ArtifactSubKind::Raw => {
                     caches.raw.add(self.root_caches.raw.get(artifact).await?);
                 }
-                ArtifactKind::ResourceConfig=> {
+                ArtifactSubKind::ParticleConfig => {
                     caches.resource_configs.add( self.root_caches.resource_configs.get(artifact).await? );
                 }
-                ArtifactKind::Bind => {
+                ArtifactSubKind::Bind => {
                     caches.bind_configs.add( self.root_caches.bind_configs.get(artifact).await? );
                 }
-                ArtifactKind::Wasm=> {
+                ArtifactSubKind::Wasm=> {
                     caches.wasms.add( self.root_caches.wasms.get(artifact).await? );
                 }
 /*                ArtifactKind::HttpRouter => {
@@ -184,7 +184,7 @@ impl ProtoArtifactCaches {
                 }
 
  */
-                ArtifactKind::Dir => {}
+                ArtifactSubKind::Dir => {}
             }
         }
 
@@ -292,11 +292,11 @@ impl AsyncProcessor<ProtoArtifactCall> for ProtoArtifactCacheProc {
 
 pub enum ArtifactBundleCacheCommand {
     Cache {
-        bundle: Address,
+        bundle: Point,
         tx: oneshot::Sender<Result<(), Error>>,
     },
     Result {
-        bundle: Address,
+        bundle: Point,
         result: Result<(), Error>,
     },
 }
@@ -306,7 +306,7 @@ struct ArtifactBundleCacheRunner {
     rx: tokio::sync::mpsc::Receiver<ArtifactBundleCacheCommand>,
     src: ArtifactBundleSrc,
     file_access: FileAccess,
-    notify: HashMap<Address, Vec<oneshot::Sender<Result<(), Error>>>>,
+    notify: HashMap<Point, Vec<oneshot::Sender<Result<(), Error>>>>,
     logger: AuditLogger,
     machine: StarlaneMachine
 }
@@ -345,8 +345,8 @@ impl ArtifactBundleCacheRunner {
         while let Option::Some(command) = self.rx.recv().await {
             match command {
                 ArtifactBundleCacheCommand::Cache { bundle, tx } => {
-                    let bundle_address: Address = bundle.clone().into();
-                    let record = match self.src.fetch_resource_record(bundle_address).await {
+                    let bundle_point: Point = bundle.clone().into();
+                    let record = match self.src.fetch_resource_record(bundle_point).await {
                         Ok(record) => record,
                         Err(err) => {
                             tx.send(Err(err.into()));
@@ -357,14 +357,14 @@ impl ArtifactBundleCacheRunner {
                         if self.has(bundle.clone()).await.is_ok() {
                         tx.send(Ok(()));
                     } else {
-                        let first = if !self.notify.contains_key(&record.stub.address) {
-                            self.notify.insert(record.stub.address.clone(), vec![]);
+                        let first = if !self.notify.contains_key(&record.stub.point) {
+                            self.notify.insert(record.stub.point.clone(), vec![]);
                             true
                         } else {
                             false
                         };
 
-                        let notifiers = self.notify.get_mut(&record.stub.address ).unwrap();
+                        let notifiers = self.notify.get_mut(&record.stub.point ).unwrap();
                         notifiers.push(tx);
 
                         let src = self.src.clone();
@@ -383,7 +383,7 @@ impl ArtifactBundleCacheRunner {
                                 )
                                 .await;
                                 tx.send(ArtifactBundleCacheCommand::Result {
-                                    bundle: record.stub.address.clone(),
+                                    bundle: record.stub.point.clone(),
                                     result: result,
                                 })
                                 .await;
@@ -417,7 +417,7 @@ match &result {
         }
     }
 
-    async fn has(&self, bundle: Address ) -> Result<(), Error> {
+    async fn has(&self, bundle: Point) -> Result<(), Error> {
         let file_access =
             ArtifactBundleCache::with_bundle_path(self.file_access.clone(), bundle.clone())?;
         file_access.read(&Path::from_str("/.ready")?).await?;
@@ -427,7 +427,7 @@ match &result {
     async fn download_and_extract(
         src: ArtifactBundleSrc,
         file_access: FileAccess,
-        bundle: Address,
+        bundle: Point,
         machine: StarlaneMachine,
         logger: AuditLogger,
     ) -> Result<(), Error> {
@@ -437,12 +437,12 @@ match &result {
 
 
         let mut file_access =
-            ArtifactBundleCache::with_bundle_path(file_access, record.stub.address.clone().try_into()?)?;
+            ArtifactBundleCache::with_bundle_path(file_access, record.stub.point.clone().try_into()?)?;
         let bundle_zip_path = Path::from_str("/bundle.zip")?;
         let key_file = Path::from_str("/key.ser")?;
         file_access.write(
             &key_file,
-            Arc::new(record.stub.address.to_string().as_bytes().to_vec()),
+            Arc::new(record.stub.point.to_string().as_bytes().to_vec()),
         );
 
         file_access.write(&bundle_zip_path, zip).await?;
@@ -485,7 +485,7 @@ impl ArtifactBundleCache {
         })
     }
 
-    pub async fn download(&self, bundle: Address) -> Result<(), Error> {
+    pub async fn download(&self, bundle: Point) -> Result<(), Error> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(ArtifactBundleCacheCommand::Cache { bundle, tx })
@@ -499,16 +499,16 @@ impl ArtifactBundleCache {
 
     pub fn with_bundle_files_path(
         file_access: FileAccess,
-        address: Address,
+        point: Point,
     ) -> Result<FileAccess, Error> {
-        Ok(file_access.with_path(format!("bundles/{}/files", address.to_string()))?)
+        Ok(file_access.with_path(format!("bundles/{}/files", point.to_string()))?)
     }
 
     pub fn with_bundle_path(
         file_access: FileAccess,
-        address: Address,
+        point: Point,
     ) -> Result<FileAccess, Error> {
-        Ok(file_access.with_path(format!("bundles/{}", address.to_string()))?)
+        Ok(file_access.with_path(format!("bundles/{}", point.to_string()))?)
     }
 }
 
@@ -520,24 +520,24 @@ pub enum ArtifactBundleSrc {
 impl ArtifactBundleSrc {
     pub async fn get_bundle_zip(
         &self,
-        address: Address,
+        point: Point,
     ) -> Result<Bin, Error> {
         Ok(match self {
             ArtifactBundleSrc::STARLANE_API(api) => {
-                                let payload = api.get_state(address).await?;
+                                let payload = api.get_state(point).await?;
                                 payload.to_bin()?
             }
-            //            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(address).await,
+            //            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(point).await,
         })
     }
 
     pub async fn fetch_resource_record(
         &self,
-        address: Address,
-    ) -> Result<ResourceRecord, Error> {
+        point: Point,
+    ) -> Result<ParticleRecord, Error> {
         match self {
-            ArtifactBundleSrc::STARLANE_API(api) => api.fetch_resource_record(address).await,
-            //            ArtifactBundleSrc::MOCK(mock) => mock.fetch_resource_record(address).await,
+            ArtifactBundleSrc::STARLANE_API(api) => api.fetch_resource_record(point).await,
+            //            ArtifactBundleSrc::MOCK(mock) => mock.fetch_resource_record(point).await,
         }
     }
 }
@@ -557,7 +557,7 @@ impl From<MockArtifactBundleSrc> for ArtifactBundleSrc {
 
 #[derive(Clone)]
 pub struct MockArtifactBundleSrc {
-    pub resource: ResourceRecord,
+    pub particle: ResourceRecord,
 }
 
 impl MockArtifactBundleSrc {
@@ -570,13 +570,13 @@ impl MockArtifactBundleSrc {
             id: 0,
         });
 
-        let address = ResourceAddress::from_str("hyperspace:default:whiz:1.0.0::<ArtifactBundle>")?;
+        let point = ResourceAddress::from_str("hyperspace:default:whiz:1.0.0::<ArtifactBundle>")?;
 
         Ok(MockArtifactBundleSrc {
-            resource: ResourceRecord {
+            particle: ResourceRecord {
                 stub: ResourceStub {
                     key: key,
-                    address: address,
+                    point: point,
                     archetype: ResourceArchetype {
                         kind: ResourceKind::ArtifactBundle(ArtifactBundleKind::Final),
                         specific: None,
@@ -595,7 +595,7 @@ impl MockArtifactBundleSrc {
 impl MockArtifactBundleSrc {
     pub async fn get_resource_state(
         &self,
-        address: Address,
+        point: Address,
     ) -> Result<Option<Arc<Vec<u8>>>, Fail> {
         let mut file = fs::File::open("test-data/localhost-config/artifact-bundle.zip").await?;
         let mut data = vec![];
@@ -605,9 +605,9 @@ impl MockArtifactBundleSrc {
 
     pub async fn fetch_resource_record(
         &self,
-        address: Address,
+        point: Address,
     ) -> Result<ResourceRecord, Fail> {
-        Ok(self.resource.clone())
+        Ok(self.particle.clone())
     }
 }
 
@@ -901,7 +901,7 @@ impl<C: Cacheable> RootItemCacheProc<C> {
     fn get(&self, artifact: ArtifactRef) -> Result<ArtifactItem<C>, Error> {
         let ref_count = self.map.get(&artifact).ok_or(format!(
             "could not find artifact: '{}'",
-            artifact.address.to_string()
+            artifact.point.to_string()
         ))?;
         Ok(ArtifactItem::new(
             ref_count.reference.clone(),
@@ -942,13 +942,13 @@ impl<C: Cacheable> RootItemCacheProc<C> {
         parser: Arc<dyn Parser<X>>,
         bundle_cache: ArtifactBundleCache,
     ) -> Result<Arc<X>, Error> {
-        let address: Address = artifact.address.clone().to_bundle()?;
-        bundle_cache.download(address.try_into()?).await?;
+        let point: Point = artifact.point.clone().to_bundle()?;
+        bundle_cache.download(point.try_into()?).await?;
         let file_access = ArtifactBundleCache::with_bundle_files_path(
             bundle_cache.file_access(),
-            artifact.address.clone().to_bundle()?,
+            artifact.point.clone().to_bundle()?,
         )?;
-        let data = file_access.read(&Path::from_str(&artifact.address.filepath().ok_or("must be an address with a filesystem")?.to_string().as_str())? ).await?;
+        let data = file_access.read(&Path::from_str(&artifact.point.filepath().ok_or("must be an point with a filesystem")?.to_string().as_str())? ).await?;
         parser.parse(artifact, data)
     }
 }
@@ -977,12 +977,12 @@ impl RootArtifactCaches {
     }
     async fn core_claim(&self, artifact: ArtifactRef) -> Result<Claim, Error> {
         let claim = match artifact.kind {
-            ArtifactKind::ResourceConfig=> self.resource_configs.cache(artifact).await?.into(),
-            ArtifactKind::Bind => self.bind_configs.cache(artifact).await?.into(),
-            ArtifactKind::Raw => self.raw.cache(artifact).await?.into(),
-            ArtifactKind::Wasm=> self.wasms.cache(artifact).await?.into(),
+            ArtifactSubKind::ParticleConfig => self.resource_configs.cache(artifact).await?.into(),
+            ArtifactSubKind::Bind => self.bind_configs.cache(artifact).await?.into(),
+            ArtifactSubKind::Raw => self.raw.cache(artifact).await?.into(),
+            ArtifactSubKind::Wasm=> self.wasms.cache(artifact).await?.into(),
 //            ArtifactKind::HttpRouter => self.http_router_configs.cache(artifact).await?.into(),
-            ArtifactKind::Dir => {
+            ArtifactSubKind::Dir => {
                 panic!("DIr is not a coreclaim")
             }
         };
@@ -991,7 +991,7 @@ impl RootArtifactCaches {
     }
 
     async fn claim(&self, artifact: ArtifactRef) -> Option<Result<Claim, Error>> {
-        if let ArtifactKind::Dir = artifact.kind {
+        if let ArtifactSubKind::Dir = artifact.kind {
             None
         } else {
             Some( self.core_claim(artifact).await )
@@ -1001,7 +1001,7 @@ impl RootArtifactCaches {
 
 #[derive(Clone)]
 pub enum Audit {
-    Download(Address),
+    Download(Point),
 }
 
 #[derive(Clone)]
@@ -1109,10 +1109,10 @@ mod test {
     };
     use crate::error::Error;
     use crate::file_access::FileAccess;
-    use crate::resource::ArtifactAddress;
-    use crate::resource::ArtifactBundleAddress;
-    use crate::resource::ArtifactKind;
-    use crate::resource::RootKey;
+    use crate::particle::ArtifactAddress;
+    use crate::particle::ArtifactBundleAddress;
+    use crate::particle::ArtifactKind;
+    use crate::particle::RootKey;
 
     fn reset() {
         let data_dir = "tmp/data";
@@ -1157,9 +1157,9 @@ mod test {
 
         let caches = proto_caches.to_caches().await?;
 
-        let domain_config = caches.domain_configs.get(&artifact.address).ok_or(format!(
-            "expected address '{}'",
-            artifact.address.to_string()
+        let domain_config = caches.domain_configs.get(&artifact.point).ok_or(format!(
+            "expected point '{}'",
+            artifact.point.to_string()
         ))?;
 
         Ok(())
@@ -1173,7 +1173,7 @@ mod test {
         )?;
         let artifact = ArtifactAddress::from_str("hyperspace:default:whiz:1.0.0:/routes.txt")?;
         let artifact = ArtifactRef {
-            address: artifact,
+            point: artifact,
             kind: ArtifactKind::Raw,
         };
 
