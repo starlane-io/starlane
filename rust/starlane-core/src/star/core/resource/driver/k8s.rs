@@ -8,7 +8,7 @@ use mesh_portal::version::latest::id::Point;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
-use crate::particle::{AssignResourceStateSrc, Kind, ParticleAssign, KindBase};
+use crate::particle::{AssignParticleStateSrc, Kind, ParticleAssign, KindBase};
 use crate::star::core::resource::driver::ParticleCoreDriver;
 use crate::star::StarSkel;
 
@@ -129,7 +129,7 @@ println!("Assigning Kube Resource Host....");
     }
 
 
-    fn resource_type(&self) -> KindBase {
+    fn kind(&self) -> KindBase {
         self.resource_type.clone()
     }
 }

@@ -10,7 +10,7 @@ use std::sync::Arc;
 use tempdir::TempDir;
 use tokio::sync::Mutex;
 
-use crate::particle::{KindBase, AssignResourceStateSrc, ParticleAssign, Kind, ArtifactSubKind};
+use crate::particle::{KindBase, AssignParticleStateSrc, ParticleAssign, Kind, ArtifactSubKind};
 use crate::star::core::resource::driver::ParticleCoreDriver;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
@@ -23,7 +23,7 @@ use mesh_portal::version::latest::entity::request::create::{PointSegFactory, Poi
 use mesh_portal::version::latest::entity::request::{Method, Rc};
 use mesh_portal::version::latest::id::{Point, AddressAndKind, KindParts, RouteSegment};
 use mesh_portal::version::latest::messaging::Request;
-use mesh_portal::version::latest::payload::{Payload, Primitive};
+use mesh_portal::version::latest::payload::{Payload};
 use zip::result::ZipResult;
 use crate::file_access::FileAccess;
 
@@ -71,7 +71,7 @@ impl ArtifactBundleCoreDriver {
 
 #[async_trait]
 impl ParticleCoreDriver for ArtifactBundleCoreDriver {
-    fn resource_type(&self) -> KindBase {
+    fn kind(&self) -> KindBase {
         KindBase::ArtifactBundle
     }
 
@@ -89,7 +89,7 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
 
         };
 
-        if let Payload::Primitive( Primitive::Bin(zip) ) = state.clone() {
+        if let Payload::Bin(zip ) = state.clone() {
 
             let temp_dir = TempDir::new("zipcheck")?;
             let temp_path = temp_dir.path().clone();
@@ -107,7 +107,7 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
                 }
              }
 
-            let mut address_and_kind_set = HashSet::new();
+            let mut point_and_kind_set = HashSet::new();
             for artifact in artifacts {
                 let mut path = String::new();
                 let segments = artifact.split("/");
@@ -117,36 +117,36 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
                     if index < segments.len()-1 {
                         path.push_str("/");
                     }
-                    let address = Point::from_str( format!("{}:/{}", assign.stub.address.to_string(), path.as_str()).as_str() )?;
+                    let point = Point::from_str( format!("{}:/{}", assign.stub.point.to_string(), path.as_str()).as_str() )?;
                     let kind = if index < segments.len()-1 {
-                        KindParts { resource_type: "Artifact".to_string(), kind: Option::Some("Dir".to_string()), specific: None }
+                        KindParts { kind: "Artifact".to_string(), sub_kind: Option::Some("Dir".to_string()), specific: None }
                     }  else {
-                        KindParts { resource_type: "Artifact".to_string(), kind: Option::Some("Raw".to_string()), specific: None }
+                        KindParts { kind: "Artifact".to_string(), sub_kind: Option::Some("Raw".to_string()), specific: None }
                     };
-                    let address_and_kind = AddressAndKind {
-                        address,
+                    let point_and_kind = AddressAndKind {
+                        point,
                         kind
                     };
-                    address_and_kind_set.insert( address_and_kind );
+                    point_and_kind_set.insert( point_and_kind );
                 }
 
             }
 
-            let root_address_and_kind = AddressAndKind {
-               address: Point::from_str( format!("{}:/", assign.stub.address.to_string()).as_str())?,
-               kind: KindParts { resource_type: "Artifact".to_string(), kind: Option::Some("Dir".to_string()), specific: None }
+            let root_point_and_kind = AddressAndKind {
+               point: Point::from_str( format!("{}:/", assign.stub.point.to_string()).as_str())?,
+               kind: KindParts { kind: "Artifact".to_string(), sub_kind: Option::Some("Dir".to_string()), specific: None }
             };
 
 
-            address_and_kind_set.insert( root_address_and_kind );
+            point_and_kind_set.insert( root_point_and_kind );
 
-            let mut address_and_kind_set: Vec<AddressAndKind>  = address_and_kind_set.into_iter().collect();
+            let mut point_and_kind_set: Vec<AddressAndKind>  = point_and_kind_set.into_iter().collect();
 
             // shortest first will ensure that dirs are created before files
-            address_and_kind_set.sort_by(|a,b|{
-                if a.address.to_string().len() > b.address.to_string().len() {
+            point_and_kind_set.sort_by(|a,b|{
+                if a.point.to_string().len() > b.point.to_string().len() {
                     Ordering::Greater
-                } else if a.address.to_string().len() < b.address.to_string().len() {
+                } else if a.point.to_string().len() < b.point.to_string().len() {
                     Ordering::Less
                 } else {
                     Ordering::Equal
@@ -157,9 +157,9 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
                 let skel = self.skel.clone();
                 let assign = assign.clone();
                 tokio::spawn(async move {
-                    for address_and_kind in address_and_kind_set {
-                        let parent = address_and_kind.address.parent().expect("expected parent");
-                        let result:Result<Kind,mesh_portal::error::MsgErr> = TryFrom::try_from(address_and_kind.kind.clone());
+                    for point_and_kind in point_and_kind_set {
+                        let parent = point_and_kind.point.parent().expect("expected parent");
+                        let result:Result<Kind,mesh_portal::error::MsgErr> = TryFrom::try_from(point_and_kind.kind.clone());
                         match result {
                             Ok(kind) => {
                                 let state = match kind {
@@ -167,7 +167,7 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
                                         StateSrc::Stateless
                                     }
                                     Kind::Artifact(_) => {
-                                        let mut path = address_and_kind.address.filepath().expect("expecting non Dir artifact to have a filepath");
+                                        let mut path = point_and_kind.point.filepath().expect("expecting non Dir artifact to have a filepath");
                                         // convert to relative path
                                         path.remove(0);
                                         match archive.by_name(path.as_str()) {
@@ -175,7 +175,7 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
                                                 let mut buf = vec![];
                                                 file.read_to_end(&mut buf);
                                                 let bin = Arc::new(buf);
-                                                let payload = Payload::Primitive(Primitive::Bin(bin));
+                                                let payload = Payload::Bin(bin);
                                                 StateSrc::StatefulDirect(payload)
                                             }
                                             Err(err) => {
@@ -189,8 +189,8 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
 
                                 let create = Create {
                                     template: Template {
-                                        address: PointTemplate { parent: parent.clone(), child_segment_template: PointSegFactory::Exact(address_and_kind.address.last_segment().expect("expected final segment").to_string()) },
-                                        kind: KindTemplate { kind: address_and_kind.kind.resource_type.clone(), sub_kind: address_and_kind.kind.kind.clone(), specific: None }
+                                        point: PointTemplate { parent: parent.clone(), child_segment_template: PointSegFactory::Exact(point_and_kind.point.last_segment().expect("expected final segment").to_string()) },
+                                        kind: KindTemplate { kind: point_and_kind.kind.kind.clone(), sub_kind: point_and_kind.kind.sub_kind.clone(), specific: None }
                                     },
                                     state,
                                     properties: SetProperties::new(),
@@ -198,9 +198,9 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
                                     registry: Default::default()
                                 };
 
-                                let action = Method::Rc(Rc::Create(create));
+                                let action = Method::Cmd(Rc::Create(create));
                                 let core = action.into();
-                                let request = Request::new(core, assign.stub.address.clone(), parent);
+                                let request = Request::new(core, assign.stub.point.clone(), parent);
                                 let response = skel.messaging_api.request(request).await;
 
                             }
@@ -216,7 +216,7 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
             return Err("ArtifactBundle Manager expected Bin payload".into())
         }
 
-        self.store.put( assign.stub.address, state ).await?;
+        self.store.put( assign.stub.point, state ).await?;
 
         // need to unzip and create Artifacts for each...
 
@@ -227,8 +227,8 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
 
 
 
-    async fn get(&self, address: Point) -> Result<Payload,Error> {
-        self.store.get(address).await
+    async fn get(&self, point: Point) -> Result<Payload,Error> {
+        self.store.get(point).await
     }
 
 
@@ -252,7 +252,7 @@ impl ArtifactManager{
 
 #[async_trait]
 impl ParticleCoreDriver for ArtifactManager{
-    fn resource_type(&self) -> KindBase {
+    fn kind(&self) -> KindBase {
         KindBase::Artifact
     }
 
@@ -277,7 +277,7 @@ impl ParticleCoreDriver for ArtifactManager{
                             return Err("Artifact cannot be stateless".into())
                         },
                     };
-                    self.store.put( assign.stub.address.clone(), state ).await?;
+                    self.store.put( assign.stub.point.clone(), state ).await?;
                     Ok(())
                 }
             }
@@ -288,8 +288,8 @@ impl ParticleCoreDriver for ArtifactManager{
 
 
 
-    async fn get(&self, address: Point) -> Result<Payload,Error> {
-        self.store.get(address).await
+    async fn get(&self, point: Point) -> Result<Payload,Error> {
+        self.store.get(point).await
     }
 
 }

@@ -16,7 +16,7 @@ use crate::message::{MessageExpect, MessageUpdate, ProtoStarMessage, MessageId, 
 use crate::message::delivery::ActorMessage;
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey};
 use crate::watch::{Notification, Watch, WatchKey};
-use crate::particle::{KindBase, ParticleAssign, AssignResourceStateSrc, ParticleRecord};
+use crate::particle::{KindBase, ParticleAssign, AssignParticleStateSrc, ParticleRecord};
 use crate::fail::{Fail, StarlaneFailure};
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]

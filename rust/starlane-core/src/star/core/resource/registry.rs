@@ -36,7 +36,7 @@ use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
 use crate::particle;
 use crate::star::{StarKey, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use crate::particle::{ParticleRecord, AssignResourceStateSrc, Particle, ParticleAssign, AssignKind, ParticleLocation, KindBase, Kind};
+use crate::particle::{ParticleRecord, AssignParticleStateSrc, Particle, ParticleAssign, AssignKind, ParticleLocation, KindBase, Kind};
 
 
 static RESOURCE_QUERY_FIELDS: &str = "parent,point_segment,resource_type,kind,vendor,product,variant,version,version_variant,shell,status";
@@ -343,13 +343,13 @@ impl RegistryComponent {
         async fn process(skel: StarSkel, conn:Arc<Mutex<Connection>>, point: Point) -> Result<QueryResult, Error> {
 
             if point.segments.len() == 0 {
-/*                let segment = AddressKindSegment {
-                    point_segment: AddressSegment::Root,
+/*                let segment = PointKindSegment {
+                    point_segment: PointSegment::Root,
                     kind: Kind::Root.into()
                 };
 
  */
-                return Ok(QueryResult::AddressKindPath(PointKindHierarchy::new(
+                return Ok(QueryResult::PointKindPath(PointKindHierarchy::new(
                     point.route.clone(),
                     vec![]
                 )));
@@ -359,7 +359,7 @@ impl RegistryComponent {
                     point_segment: point.last_segment().expect("expected at least one segment"),
                     kind: Kind::Space.into()
                 };
-                return Ok(QueryResult::AddressKindPath(PointKindHierarchy::new(
+                return Ok(QueryResult::PointKindPath(PointKindHierarchy::new(
                     point.route.clone(),
                      vec![segment]
                 )));
@@ -367,7 +367,7 @@ impl RegistryComponent {
 
             let parent = point.parent().expect("expecting parent since we have already established the segments are >= 2");
             let point_segment = point.last_segment().expect("expecting a last_segment since we know segments are >= 2");
-            let request= Request::new(Method::Rc(Rc::Query(Query::AddressKindPath)).into(), skel.info.point.clone(), parent.clone() );
+            let request= Request::new(Method::Rc(Rc::Query(Query::PointKindPath)).into(), skel.info.point.clone(), parent.clone() );
 
             let response = skel.messaging_api.request(request).await;
 
@@ -390,7 +390,7 @@ impl RegistryComponent {
                 };
 
                 let path = parent_kind_path.push(segment);
-                let result = QueryResult::AddressKindPath(path);
+                let result = QueryResult::PointKindPath(path);
 
                 Ok(result)
         }
@@ -623,10 +623,10 @@ impl RegistryComponent {
 /*
 #[derive(Debug,Clone,Serialize,Deserialize)]
 pub struct SubSelect {
-    pub pattern: AddressKindPattern,
-    pub point: Address,
+    pub pattern: PointKindPattern,
+    pub point: Point,
     pub hops: Vec<Hop>,
-    pub point_tks_path: AddressTksPath
+    pub point_tks_path: PointTksPath
 }
 
  */
@@ -874,12 +874,12 @@ impl Selector {
             let point = select.pattern.query_root();
             println!("REG SELECT: initial");
             if point != select.pattern.query_root() {
-                //let fail = fail::Fail::Resource(fail::particle::Fail::Select(fail::particle::Select::WrongAddress {required:select.pattern.query_root(), found: point }));
-                return Err("WrongAddress".into());
+                //let fail = fail::Fail::Resource(fail::particle::Fail::Select(fail::particle::Select::WrongPoint {required:select.pattern.query_root(), found: point }));
+                return Err("WrongPoint".into());
             }
 
             println!("REG SELECT: pre query");
-            let point_kind_path = selector.skel.registry_api.query( point.clone(), Query::AddressKindPath ).await?.try_into()?;
+            let point_kind_path = selector.skel.registry_api.query( point.clone(), Query::PointKindPath ).await?.try_into()?;
             println!("REG SELECT: post query");
 
             let sub_select_hops = select.pattern.sub_select_hops();
@@ -916,7 +916,7 @@ impl Selector {
                         index = index+1;
                         where_clause.push_str( format!(" AND point_segment=?{}",index).as_str() );
                         match exact {
-                            ExactSegment::Address(point) => {
+                            ExactSegment::PointSeg(point) => {
                                 params.push( point.to_string() );
                             }
                             ExactSegment::Version(version) => {
@@ -927,7 +927,7 @@ impl Selector {
                     _ => {}
                 }
 
-                match &hop.tks.resource_type {
+                match &hop.kind_selector.kind{
                     GenericKindSelector::Any => {},
                     GenericKindSelector::Exact(resource_type)=> {
                         index = index+1;

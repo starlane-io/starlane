@@ -31,6 +31,7 @@ use std::convert::TryInto;
 use std::num::ParseIntError;
 use std::ops::{Deref, Index};
 use std::str::FromStr;
+use mesh_portal_versions::version::v0_0_1::selector::selector::GenericSubKindSelector;
 
 lazy_static! {
     pub static ref HYPERUSER: Point =
@@ -455,7 +456,7 @@ impl Registry {
                     index = index + 1;
                     where_clause.push_str(format!(" AND point_segment=${}", index).as_str());
                     match exact {
-                        ExactSegment::Point(point) => {
+                        ExactSegment::PointSeg(point) => {
                             params.push(point.to_string());
                         }
                         ExactSegment::Version(version) => {
@@ -471,21 +472,22 @@ impl Registry {
                 GenericKindSelector::Exact(kind) => {
                     index = index + 1;
                     where_clause.push_str(format!(" AND kind=${}", index).as_str());
-                    params.push(resource_type.to_string());
+                    params.push(kind.to_string());
                 }
             }
 
             match &hop.kind_selector.kind{
                 GenericKindSelector::Any => {}
                 GenericKindSelector::Exact(kind) => match &hop.kind_selector.sub_kind{
-                    None => {}
-                    Some(sub) => {
+                    GenericSubKindSelector::Any => { }
+                    GenericSubKindSelector::Exact(sub_kind) => {
                         index = index + 1;
                         where_clause.push_str(format!(" AND sub_kind=${}", index).as_str());
-                        params.push(sub.clone());
+                        params.push(sub_kind.to_string());
                     }
                 },
             }
+
 
             match &hop.kind_selector.specific {
                 ValuePattern::Any => {}
@@ -758,7 +760,7 @@ impl Registry {
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
         for on in selection.list {
-            let on = on.try_into()?;
+            let on = (*on).try_into()?;
             let access = self.access(by, &on).await?;
 
             if !access.has_super() {
@@ -796,7 +798,7 @@ impl Registry {
         let mut all_access_grants = HashMap::new();
         let mut conn = self.pool.acquire().await?;
         for on in selection.list {
-            let on : Point = on.try_into()?;
+            let on : Point = (*on).try_into()?;
             let access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,resources.point as by_particle FROM access_grants,resources WHERE access_grants.query_root=$1 AND resources.id=access_grants.by_particle").bind(on.to_string() ).fetch_all(& mut conn).await?;
             let mut access_grants : Vec<IndexedAccessGrant> = access_grants.into_iter().map(|a|a.into()).collect();
 

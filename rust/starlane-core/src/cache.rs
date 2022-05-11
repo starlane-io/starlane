@@ -21,7 +21,7 @@ use wasmer::{Cranelift, Store, Universal};
 
 use crate::artifact::ArtifactRef;
 use crate::config::bind::BindConfigParser;
-use crate::config::config::ResourceConfig;
+use crate::config::config::ParticleConfig;
 use crate::config::parse::ResourceConfigParser;
 use crate::config::wasm::{Wasm, WasmCompiler};
 use crate::error::Error;
@@ -88,7 +88,7 @@ impl ProtoArtifactCachesFactory {
 
 pub struct ArtifactCaches {
     pub raw: ArtifactItemCache<Raw>,
-    pub resource_configs: ArtifactItemCache<ResourceConfig>,
+    pub resource_configs: ArtifactItemCache<ParticleConfig>,
     pub bind_configs: ArtifactItemCache<CachedConfig<BindConfig>>,
     pub wasms: ArtifactItemCache<Wasm>,
 //    pub http_router_config: ArtifactItemCache<HttpRouterConfig>,
@@ -956,7 +956,7 @@ impl<C: Cacheable> RootItemCacheProc<C> {
 struct RootArtifactCaches {
     bundle_cache: ArtifactBundleCache,
     raw: RootItemCache<Raw>,
-    resource_configs: RootItemCache<ResourceConfig>,
+    resource_configs: RootItemCache<ParticleConfig>,
     bind_configs: RootItemCache<CachedConfig<BindConfig>>,
     wasms: RootItemCache<Wasm>,
 //    http_router_configs: RootItemCache<HttpRouterConfig>

@@ -60,6 +60,8 @@ use mesh_portal::version::latest::log::{PointLogger, RootLogger};
 use mesh_portal::version::latest::portal;
 use mesh_portal::version::latest::particle::Status;
 use mesh_portal_versions::version::v0_0_1::parse::Res;
+use mesh_portal_versions::version::v0_0_1::span::new_span;
+use mesh_portal_versions::version::v0_0_1::wrap::Span;
 use nom::sequence::{preceded, terminated, tuple};
 use nom::multi::many0;
 use nom::bytes::complete::tag;
@@ -67,6 +69,7 @@ use nom::character::complete::digit1;
 use nom::branch::alt;
 use nom::combinator::all_consuming;
 use nom::error::{ErrorKind, ParseError, VerboseError};
+use nom::Parser;
 use nom_supreme::error::ErrorTree;
 use crate::logger::{Flags, Logger, LogInfo};
 use crate::star::shell::sys::SysApi;
@@ -1075,9 +1078,9 @@ impl ToString for StarKey {
     }
 }
 
-pub fn big_subgraph_key( input: &str ) -> Res<&str,StarSubGraphKey> {
-    let (next,key) = preceded(tag("b"),digit1)(input)?;
-    let key = match key.parse() {
+pub fn big_subgraph_key<I:Span>(input:I) -> Res<I,StarSubGraphKey> {
+    let (next,key) = preceded(tag("b"),digit1)(input.clone())?;
+    let key = match key.to_string().parse() {
         Ok(key) => key,
         Err(_)=>{
             return Err(nom::Err::Error(ErrorTree::from_error_kind(input,ErrorKind::Tag)));
@@ -1086,9 +1089,9 @@ pub fn big_subgraph_key( input: &str ) -> Res<&str,StarSubGraphKey> {
     Ok((next,StarSubGraphKey::Big(key)))
 }
 
-pub fn small_subgraph_key( input: &str ) -> Res<&str,StarSubGraphKey> {
-    let (next,key) = preceded(tag("s"),digit1)(input)?;
-    let key = match key.parse() {
+pub fn small_subgraph_key<I:Span>(input:I) -> Res<I,StarSubGraphKey> {
+    let (next,key) = preceded(tag("s"),digit1)(input.clone())?;
+    let key = match key.to_string().parse() {
         Ok(key) => key,
         Err(_)=>{
             return Err(nom::Err::Error(ErrorTree::from_error_kind(input,ErrorKind::Tag)));
@@ -1097,13 +1100,13 @@ pub fn small_subgraph_key( input: &str ) -> Res<&str,StarSubGraphKey> {
     Ok((next,StarSubGraphKey::Small(key)))
 }
 
-pub fn subgraph_key( input: &str ) -> Res<&str,StarSubGraphKey> {
+pub fn subgraph_key<I:Span>(input:I) -> Res<I,StarSubGraphKey> {
     alt( (big_subgraph_key,small_subgraph_key))(input)
 }
 
-pub fn index(input: &str ) -> Res<&str,u16> {
-    let (next,key) = digit1(input)?;
-    let key = match key.parse() {
+pub fn index<I:Span>(input:I) -> Res<I,u16> {
+    let (next,key) = digit1(input.clone())?;
+    let key = match key.to_string().parse() {
         Ok(key) => key,
         Err(_)=>{
             return Err(nom::Err::Error(ErrorTree::from_error_kind(input,ErrorKind::Tag)));
@@ -1116,6 +1119,7 @@ impl FromStr for StarKey {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = new_span(s);
         Ok(all_consuming(tuple( (many0(subgraph_key ), index)))(s).map( |(next,(subgraph,index))| {
             (next,Self{
                 subgraph,

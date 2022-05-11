@@ -33,7 +33,7 @@ use mesh_portal::version::latest::entity::request::get::Get;
 use mesh_portal::version::latest::fail;
 use mesh_portal::version::latest::id::{Point, Meta};
 use mesh_portal::version::latest::messaging::{Message, Request, Response};
-use mesh_portal::version::latest::payload::{Payload, PayloadMap, Primitive, PrimitiveList};
+use mesh_portal::version::latest::payload::{Payload, PayloadMap,  };
 use mesh_portal::version::latest::particle::{Stub, Status};
 use mesh_portal::version::latest::entity::request::get::GetOp;
 use mesh_portal::version::latest::entity::request::query::Query;
@@ -48,7 +48,7 @@ use regex::Regex;
 use serde::de::Unexpected::Str;
 use crate::artifact::ArtifactRef;
 use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
-use crate::config::config::{ContextualConfig, ResourceConfig};
+use crate::config::config::{ContextualConfig, ParticleConfig};
 use crate::star::core::resource::driver::{ResourceCoreDriverApi, ResourceCoreDriverComponent};
 
 
@@ -139,7 +139,7 @@ println!("{} getting bind config for {}", end.skel.info.kind.to_string(), point.
 println!("response from Rc GET bind {}", point.to_string() );
 
             if let Payload::Map(map) = response.core.body {
-                if let Payload::Primitive(Primitive::Text(bind_point )) = map.get(&"bind".to_string()  ).ok_or("bind is not set" )?
+                if let Payload::Text(bind_point ) = map.get(&"bind".to_string()  ).ok_or("bind is not set" )?
                 {
                     let bind_point = Point::from_str(bind_point.as_str())?;
                     let mut cache = end.skel.machine.get_proto_artifact_caches_factory().await?.create();
@@ -223,7 +223,7 @@ println!("got bind config for: {}", to.to_string() );
 
     pub async fn process_resource_message(&mut self, star_message: StarMessage) -> Result<(), Error> {
         match &star_message.payload {
-            StarMessagePayload::Request(request) => match &request.core.action{
+            StarMessagePayload::Request(request) => match &request.core.method{
                 Method::Cmd(rc) => {
                     let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
                     self.process_resource_command(delivery).await;
@@ -266,7 +266,7 @@ println!("got bind config for: {}", to.to_string() );
         let resource_core_driver_api = self.resource_core_driver_api.clone();
         tokio::spawn(async move {
 
-            let rc = match &delivery.item.core.action {
+            let rc = match &delivery.item.core.method{
                 Method::Cmd(rc) => {rc}
                 _ => { panic!("should not get requests that are not Rc") }
             };
@@ -289,7 +289,7 @@ println!("got bind config for: {}", to.to_string() );
                                     state: StateSrc,
                                 ) -> Result<(), Error> {
 
-                                    let star_kind = StarKind::hosts(&KindBase::from_str(stub.kind.resource_type.as_str())?);
+                                    let star_kind = StarKind::hosts(&KindBase::from_str(stub.kind.kind.as_str())?);
                                     let key = if skel.info.kind == star_kind {
                                         skel.info.key.clone()
                                     }
@@ -317,7 +317,7 @@ println!("got bind config for: {}", to.to_string() );
 
                                 match assign(skel.clone(), stub.clone(), create.state.clone()).await {
                                     Ok(_) => {
-                                        Ok(Payload::Primitive(Primitive::Stub(stub)))
+                                        Ok(Payload::Stub(stub))
                                     },
                                     Err(fail) => {
                                         eprintln!("FAIL {}",fail.to_string() );
@@ -535,7 +535,7 @@ impl PipelineExecutor {
                    CallKind::Msg(msg) => {
                        let mut path = String::new();
                        captures.expand( msg.path.as_str(), & mut path );
-                       (Method::Msg(msg.action.clone()),path)
+                       (Method::Msg(msg.method.clone()),path)
 
                    }
                    CallKind::Http(http) => {
@@ -555,7 +555,7 @@ impl PipelineExecutor {
            PipelineStop::Respond => {
                // while loop will trigger a response
            }
-           PipelineStop::CaptureAddress(point) => {
+           PipelineStop::Point(point) => {
                let uri = self.traversal.uri.clone();
                let captures = self.path_regex.captures( uri.path() ).ok_or("cannot find regex captures" )?;
                let point = point.clone().to_point(captures)?;
@@ -718,7 +718,7 @@ println!("GET PROPERTIES for {}", get.point.to_string() );
                 for (index,property) in properties.iter().enumerate() {
 
 println!("\tprop{}", property.0.clone() );
-                    map.insert( property.0.clone(), Payload::Primitive(Primitive::Text(property.1.clone())));
+                    map.insert( property.0.clone(), Payload::Text(property.1.clone()));
                 }
 
                 Ok(Payload::Map(map))
@@ -810,12 +810,12 @@ println!("result {}? {}",point.to_string(), result.is_ok() );
     }
 
     pub async fn query(&self, to: &Point, query: &Query) -> Result<Payload,Error>{
-        let result = Payload::Primitive(Primitive::Text(
+        let result = Payload::Text(
             self.skel.registry_api
                 .query(to.clone(), query.clone())
                 .await?
                 .to_string(),
-        ));
+        );
         Ok(result)
     }
 }

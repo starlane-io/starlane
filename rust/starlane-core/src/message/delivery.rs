@@ -23,7 +23,7 @@ use http::StatusCode;
 use mesh_portal::version::latest::entity::response::ResponseCore;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Request, Response};
-use mesh_portal::version::latest::payload::{Errors, Payload, Primitive};
+use mesh_portal::version::latest::payload::{Errors, Payload };
 
 pub struct Delivery<M>
 where
@@ -134,7 +134,7 @@ impl Delivery<Request>
         let core = ResponseCore {
             headers: Default::default(),
             status: StatusCode::from_u16(500).unwrap(),
-            body: Payload::Primitive(Primitive::Text(fail))
+            body: Payload::Text(fail)
         };
         self.respond(core);
         Ok(())
@@ -159,7 +159,7 @@ impl Delivery<Request>
         let core = ResponseCore {
             headers: Default::default(),
             status: StatusCode::from_u16(status)?,
-            body: Payload::Primitive(Primitive::Errors(Errors::default(message)))
+            body: Payload::Errors(Errors::default(message))
         };
         self.respond(core);
 
@@ -167,13 +167,14 @@ impl Delivery<Request>
     }
 }
 
+/*
 impl <M:Clone>Drop for Delivery<M> {
     fn drop(&mut self) {
         if !self.responded {
             let core = ResponseCore {
                 headers: Default::default(),
                 status: StatusCode::from_u16(500).unwrap(),
-                body: Payload::Primitive(Primitive::Errors(Errors::default("message delivery dropped unexpectedly.")))
+                body: Payload::Errors(Errors::default("message delivery dropped unexpectedly."))
             };
             let response = Response {
                 id: unique_id(),
@@ -191,6 +192,8 @@ impl <M:Clone>Drop for Delivery<M> {
         }
     }
 }
+
+ */
 
 /*impl<M> Delivery<M>
 where

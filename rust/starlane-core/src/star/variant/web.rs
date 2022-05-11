@@ -233,7 +233,11 @@ pub struct HostAndPort {
 pub mod parse {
     use std::num::ParseIntError;
     use std::str::FromStr;
+    use mesh_portal_versions::error::MsgErr;
     use mesh_portal_versions::version::v0_0_1::parse::{domain, Res};
+    use mesh_portal_versions::version::v0_0_1::parse::error::result;
+    use mesh_portal_versions::version::v0_0_1::span::new_span;
+    use mesh_portal_versions::version::v0_0_1::wrap::Span;
     use nom::bytes::complete::{is_a, tag, take_while};
     use nom::character::is_digit;
     use nom::error::{ErrorKind, ParseError, VerboseError};
@@ -241,25 +245,23 @@ pub mod parse {
     use nom_supreme::error::ErrorTree;
     use crate::star::variant::web::HostAndPort;
 
-    pub fn host_and_port(input: &str ) -> Res<&str, HostAndPort> {
-        let (next, (host,_,port)) = tuple(( domain, tag(":"), is_a("0123456789")  ) )(input)?;
+    pub fn host_and_port<I:Span>(input: &str ) -> Result<HostAndPort,MsgErr> {
+        let input = new_span(input);
+        let (host,_,port) = result(tuple(( domain, tag(":"), is_a("0123456789")  ) )(input.clone()))?;
 
         let host = host.to_string();
-        let port: &str = port;
-        let port = match u32::from_str(port) {
+        let port= port.to_string();
+        let port = match u32::from_str(port.as_str() ) {
             Ok(port) => port,
             Err(err) => {
-                return Err(nom::Err::Error(ErrorTree::from_error_kind(
-                    input,
-                    ErrorKind::Tag,
-                )))
+                return Err(MsgErr::from_500(format!("bad port {}", port ).as_str() ));
             }
         };
         let host_and_port = HostAndPort {
             host,
             port
         };
-        Ok((next, host_and_port))
+        Ok(host_and_port)
     }
 
 }

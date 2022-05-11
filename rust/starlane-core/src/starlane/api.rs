@@ -15,7 +15,7 @@ use tokio::time::error::Elapsed;
 use crate::cache::{ArtifactCaches, ProtoArtifactCachesFactory};
 use crate::error::Error;
 use crate::frame::{StarPattern, TraversalAction, ResourceRegistryRequest, StarMessagePayload};
-use crate::particle::{Kind, KindBase, AssignResourceStateSrc, ParticleRecord};
+use crate::particle::{Kind, KindBase, AssignParticleStateSrc, ParticleRecord};
 use crate::particle::FileSubKind;
 use crate::star::{StarCommand, StarKind, StarSkel, StarKey};
 use crate::star::shell::search::{SearchInit, SearchHits};

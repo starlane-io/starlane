@@ -37,7 +37,6 @@ use crate::command::cli::outlet;
 use crate::command::cli::outlet::Frame;
 use crate::command::execute::CommandExecutor;
 use crate::config::config::MechtronConfig;
-use crate::config::parse::replace::substitute;
 
 use crate::fail::Fail;
 use crate::mechtron::process::launch_mechtron_process;
@@ -161,9 +160,9 @@ println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
         let api = StarlaneApi::new( self.skel.surface_api.clone(), assign.stub.point.clone() );
         let substitution_map = config.substitution_map()?;
         for command_line in &config.install {
-            let command_line = substitute(command_line.as_str(), &substitution_map)?;
+//            let command_line = substitute(command_line.as_str(), &substitution_map)?;
             println!("INSTALL: '{}'",command_line);
-            let mut output_rx = CommandExecutor::exec_simple(command_line,assign.stub.clone(), api.clone() );
+            let mut output_rx = CommandExecutor::exec_simple(command_line.to_string(),assign.stub.clone(), api.clone() );
             while let Some(frame) = output_rx.recv().await {
                 match frame {
                     outlet::Frame::StdOut(out) => {
@@ -231,7 +230,7 @@ info!("handling request");
     }
 
 
-    fn resource_type(&self) -> KindBase {
+    fn kind(&self) -> KindBase {
         self.resource_type.clone()
     }
 }

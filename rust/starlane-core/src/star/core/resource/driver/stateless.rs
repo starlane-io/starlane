@@ -25,7 +25,7 @@ impl StatelessCoreDriver {
 #[async_trait]
 impl ParticleCoreDriver for StatelessCoreDriver {
 
-    fn resource_type(&self) -> KindBase {
+    fn kind(&self) -> KindBase {
         self.resource_type.clone()
     }
 

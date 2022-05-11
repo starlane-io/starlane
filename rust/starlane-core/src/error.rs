@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 use std::env::VarError;
 use std::fmt;
-use std::fmt::Formatter;
+use std::fmt::{Debug, Formatter};
 use std::num::ParseIntError;
 use std::string::FromUtf8Error;
 use std::sync::PoisonError;
@@ -29,6 +29,7 @@ use http::uri::InvalidUri;
 use keycloak::KeycloakError;
 use mesh_portal::error::MsgErr;
 use mesh_portal_versions::error::StatusErr;
+use mesh_portal_versions::version::v0_0_1::wrap::Span;
 use nom_supreme::error::ErrorTree;
 use sqlx::error::DatabaseError;
 use tokio::task::JoinError;
@@ -132,8 +133,17 @@ impl From<nom::Err<VerboseError<&str>>> for Error {
     }
 }
 
+/*
 impl From<nom::Err<ErrorTree<&str>>> for Error {
     fn from(err: nom::Err<ErrorTree<&str>>) -> Self {
+        Error::from_internal(err)
+    }
+}
+
+ */
+
+impl <I:Span+core::fmt::Debug> From<nom::Err<ErrorTree<I>>> for Error {
+    fn from(err: nom::Err<ErrorTree<I>>) -> Self {
         Error::from_internal(err)
     }
 }

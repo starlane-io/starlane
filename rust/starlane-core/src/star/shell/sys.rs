@@ -6,6 +6,7 @@ use mesh_portal::version::latest::fail;
 use mesh_portal::version::latest::id::{Point, RouteSegment};
 use mesh_portal::version::latest::messaging::{Message, Request};
 use mesh_portal::version::latest::particle::{Stub, Status};
+use mesh_portal::version::latest::security::Permissions;
 use tokio::sync::{mpsc, oneshot};
 use crate::error::Error;
 use crate::fail::{Fail, StarlaneFailure};
@@ -31,17 +32,17 @@ impl SysApi {
         rx.await?
     }
 
-    pub fn delete(&self, address: Point) {
-        self.tx.try_send(SysCall::Delete(address)).unwrap_or_default();
+    pub fn delete(&self, point: Point) {
+        self.tx.try_send(SysCall::Delete(point)).unwrap_or_default();
     }
 
     pub fn deliver(&self, message: StarMessage ) {
         self.tx.try_send(SysCall::Delivery(message)).unwrap_or_default();
     }
 
-    pub async fn get_record(&self, address: Point) -> Result<ParticleRecord,Error>{
+    pub async fn get_record(&self, point: Point) -> Result<ParticleRecord,Error>{
         let (tx,rx) = oneshot::channel();
-        self.tx.send(SysCall::GetRecord{address, tx}).await;
+        self.tx.send(SysCall::GetRecord{point, tx}).await;
         rx.await?
     }
 }
@@ -50,7 +51,7 @@ pub enum SysCall {
     Create{ template: Template, messenger: mpsc::Sender<Message>, tx: oneshot::Sender<Result<Stub,Error>> },
     Delete(Point),
     Delivery(StarMessage),
-    GetRecord{ address: Point, tx: oneshot::Sender<Result<ParticleRecord,Error>>}
+    GetRecord{ point: Point, tx: oneshot::Sender<Result<ParticleRecord,Error>>}
 }
 
 impl Call for SysCall {}
@@ -77,7 +78,7 @@ impl AsyncProcessor<SysCall> for SysComponent {
         match call {
             SysCall::Create{ mut template, messenger, tx }  => {
 
-                    template.address.parent.route = RouteSegment::Mesh(self.skel.info.key.to_string());
+                    template.point.parent.route = RouteSegment::Mesh(self.skel.info.key.to_string());
 
                     tx.send(handle(self, template, messenger ));
 
@@ -85,16 +86,16 @@ impl AsyncProcessor<SysCall> for SysComponent {
 
 
 
-                        match template.address.child_segment_template {
+                        match template.point.child_segment_template {
                             PointSegFactory::Exact(exact) => {
-                                let address: Point = template.address.parent.clone();
-                                let address = address.push(exact)?;
-                                if sys.map.contains_key(&address) {
-                                    return Err("sys particle already exists with that address".into());
+                                let point: Point = template.point.parent.clone();
+                                let point = point.push(exact)?;
+                                if sys.map.contains_key(&point) {
+                                    return Err("sys particle already exists with that point".into());
                                 }
 
                                 let stub = Stub {
-                                    address: address.clone(),
+                                    point: point.clone(),
                                     kind: template.kind.try_into()?,
                                     properties: Default::default(),
                                     status: Status::Unknown
@@ -105,7 +106,7 @@ impl AsyncProcessor<SysCall> for SysComponent {
                                     tx: messenger
                                 };
 
-                                sys.map.insert(address.clone(), resource);
+                                sys.map.insert(point.clone(), resource);
                                 return Ok(stub);
                             }
                             PointSegFactory::Pattern(pattern) => {
@@ -113,14 +114,14 @@ impl AsyncProcessor<SysCall> for SysComponent {
                                 if !pattern.contains("%") {
                                     return Err("pattern must contain one '%' char".into());
                                 }
-                                let address: Point = template.address.parent.clone();
+                                let point: Point = template.point.parent.clone();
                                 loop {
                                     let index = sys.counter.fetch_add(1, Ordering::Relaxed);
                                     let exact = pattern.replace("%", index.to_string().as_str());
-                                    let address = address.push(exact)?;
-                                    if !sys.map.contains_key(&address) {
+                                    let point = point.push(exact)?;
+                                    if !sys.map.contains_key(&point) {
                                         let stub = Stub {
-                                            address: address.clone(),
+                                            point: point.clone(),
                                             kind: template.kind.try_into()?,
                                             properties: Default::default(),
                                             status: Status::Unknown
@@ -131,7 +132,7 @@ impl AsyncProcessor<SysCall> for SysComponent {
                                             tx: messenger
                                         };
 
-                                        sys.map.insert(address.clone(), resource);
+                                        sys.map.insert(point.clone(), resource);
                                         return Ok(stub);
                                     }
                                 }
@@ -139,8 +140,8 @@ impl AsyncProcessor<SysCall> for SysComponent {
                         }
                     }
                 }
-            SysCall::Delete(address) => {
-                self.map.remove(&address);
+            SysCall::Delete(point) => {
+                self.map.remove(&point);
             }
             SysCall::Delivery(message) => {
                 if let StarMessagePayload::Request(request) =  &message.payload {
@@ -162,15 +163,16 @@ impl AsyncProcessor<SysCall> for SysComponent {
                     }
                 }
             }
-            SysCall::GetRecord { address, tx } => {
-                match self.map.get( &address ) {
+            SysCall::GetRecord { point, tx } => {
+                match self.map.get( &point ) {
                     None => {
                         tx.send( Err("not found".into() ));
                     }
                     Some(resource) => {
                         let record = ParticleRecord {
                             stub: resource.stub.clone(),
-                            location: ParticleLocation::Star(self.skel.info.key.clone())
+                            location: ParticleLocation::Star(self.skel.info.key.clone()),
+                            perms: Permissions::none()
                         };
                         tx.send(Ok(record));
                     }

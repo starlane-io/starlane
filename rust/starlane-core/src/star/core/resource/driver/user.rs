@@ -82,7 +82,7 @@ impl UserBaseKeycloakCoreDriver {
 #[async_trait]
 impl ParticleCoreDriver for UserBaseKeycloakCoreDriver {
 
-    fn resource_type(&self) -> KindBase {
+    fn kind(&self) -> KindBase {
         KindBase::UserBase
     }
 
@@ -135,8 +135,8 @@ impl ParticleCoreDriver for UserBaseKeycloakCoreDriver {
 
     async fn handle_request(&self, request: Request ) -> Response {
 println!("USers handle reqeust...");
-        match &request.core.action {
-            Method::Rc(rc) => {
+        match &request.core.method{
+            Method::Cmd(rc) => {
                 request.clone().payload_result(self.resource_command(request.to.clone(), rc.clone() ).await)
             }
             Method::Http(_) => {
@@ -491,7 +491,7 @@ impl UserCoreDriver {
 #[async_trait]
 impl ParticleCoreDriver for UserCoreDriver {
 
-    fn resource_type(&self) -> KindBase {
+    fn kind(&self) -> KindBase {
         KindBase::User
     }
 

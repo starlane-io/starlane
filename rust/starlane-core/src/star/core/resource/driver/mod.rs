@@ -154,7 +154,7 @@ impl ResourceCoreDriverComponent {
     async fn assign(&mut self, assign: ParticleAssign, tx: oneshot::Sender<Result<(),Error>> ) {
 
        async fn process(manager_component: &mut ResourceCoreDriverComponent, assign: ParticleAssign) -> Result<(),Error> {
-           let resource_type = KindBase::from_str(assign.stub.kind.kind().as_str())?;
+           let resource_type = KindBase::from_str(assign.stub.kind.to_string().as_str())?;
            let manager:&mut Box<dyn ParticleCoreDriver> = manager_component.drivers.get_mut(&resource_type ).ok_or(format!("could not get driver for {}", resource_type.to_string()))?;
            manager_component.resources.insert( assign.stub.point.clone(), resource_type );
            manager.assign(assign).await
@@ -251,7 +251,7 @@ impl ResourceCoreDriverComponent {
 #[async_trait]
 pub trait ParticleCoreDriver: Send + Sync {
 
-    fn resource_type(&self) -> particle::KindBase;
+    fn kind(&self) -> particle::KindBase;
 
     async fn assign(
         &mut self,
@@ -259,7 +259,7 @@ pub trait ParticleCoreDriver: Send + Sync {
     ) -> Result<(),Error>;
 
     async fn handle_request(&self, request: Request ) -> Response {
-        request.fail(format!("particle type '{}' does not handle requests",self.resource_type().to_string()).as_str())
+        request.fail(format!("particle type '{}' does not handle requests",self.kind().to_string()).as_str())
     }
 
     async fn get(&self, point: Point) -> Result<Payload,Error> {
@@ -269,7 +269,7 @@ pub trait ParticleCoreDriver: Send + Sync {
     fn shutdown(&self) {}
 
     async fn resource_command(&self, to: Point, rc: Rc) -> Result<Payload,Error> {
-        Err(format!("particle type: '{}' does not handle Core particle commands",self.resource_type().to_string()).into())
+        Err(format!("particle type: '{}' does not handle Core particle commands",self.kind().to_string()).into())
     }
 
 }

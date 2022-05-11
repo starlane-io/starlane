@@ -9,6 +9,8 @@ use async_trait::async_trait;
 use lru::LruCache;
 use mesh_portal::version::latest::id::{Point, RouteSegment};
 use mesh_portal::version::latest::particle::{Stub, Status};
+use mesh_portal::version::latest::security::Permissions;
+use mesh_portal_versions::version::v0_0_1::parse::permissions;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use crate::frame::{ResourceRegistryRequest,  SimpleReply, StarMessagePayload};
@@ -128,7 +130,7 @@ impl AsyncProcessor<ResourceLocateCall> for ResourceLocatorComponent {
             }
             ResourceLocateCall::Found(record) => {
                 self.resource_record_cache
-                    .put(record.stub.address.clone(), record);
+                    .put(record.stub.point.clone(), record);
             }
         }
     }
@@ -197,12 +199,13 @@ impl ResourceLocatorComponent {
 
             let record = ParticleRecord::new(
                 Stub {
-                    address: Point::root(),
+                    point: Point::root(),
                         kind: Kind::Root.to_resource_kind(),
                     properties: Default::default(),
                     status: Status::Ready
                 },
                 StarKey::central(),
+                Permissions::none()
             );
             tx.send(Ok(record)).unwrap_or_default();
         }

@@ -6,7 +6,7 @@ use yaml_rust::Yaml;
 
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
-use crate::particle::{ArtifactSubKind, KindBase, ParticleAssign, AssignResourceStateSrc};
+use crate::particle::{ArtifactSubKind, KindBase, ParticleAssign, AssignParticleStateSrc};
 use crate::star::core::resource::driver::ParticleCoreDriver;
 use crate::star::core::resource::state::StateStore;
 use crate::star::StarSkel;
@@ -50,10 +50,10 @@ impl ParticleCoreDriver for PortalCoreDriver {
             }
         };
 
-        self.store.put(assign.stub.address.clone(), state.clone() ).await?;
+        self.store.put(assign.stub.point.clone(), state.clone() ).await?;
 
         let selector = WatchSelector{
-            topic: Topic::Resource(assign.stub.address),
+            topic: Topic::Resource(assign.stub.point),
             property: Property::State
         };
 
@@ -63,7 +63,7 @@ impl ParticleCoreDriver for PortalCoreDriver {
     }
 
 
-    fn resource_type(&self) -> KindBase {
+    fn kind(&self) -> KindBase {
         KindBase::File
     }
 

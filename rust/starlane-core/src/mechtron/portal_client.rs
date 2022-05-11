@@ -7,11 +7,13 @@ use mesh_portal::version::latest::config::{Assign, Config, ParticleConfigBody};
 use mesh_portal::version::latest::entity::response::ResponseCore;
 use mesh_portal::version::latest::frame::PrimitiveFrame;
 use mesh_portal::version::latest::id::Point;
+use mesh_portal::version::latest::log::{LogSource, PointLogger, RootLogger};
 use mesh_portal::version::latest::messaging::{Request, Response};
 use mesh_portal::version::latest::portal;
 use mesh_portal::version::latest::portal::{Exchanger, initin, initout};
 use mesh_portal::version::latest::portal::initin::PortalAuth;
 use mesh_portal::version::latest::portal::initout::Frame;
+use mesh_portal::version::latest::portal::outlet::RequestFrame;
 use mesh_portal_tcp_client::{PortalClient, PortalTcpClient};
 use mesh_portal_tcp_common::{FrameReader, FrameWriter, PrimitiveFrameReader, PrimitiveFrameWriter};
 use crate::artifact::ArtifactRef;
@@ -22,8 +24,10 @@ use crate::particle::ArtifactSubKind;
 use crate::particle::config::Parser;
 
 
-pub async fn launch_mechtron_client(server: String, wasm_src: Point) -> Result<(),Error> {
-    let client = Box::new( MechtronPortalClient::new(wasm_src) );
+pub async fn launch_mechtron_client(server: String, wasm_src: Point, point: Point) -> Result<(),Error> {
+    let root_logger = RootLogger::stdout(LogSource::Core);
+    let logger = root_logger.point(point.clone());
+    let client = Box::new( MechtronPortalClient::new(wasm_src,point, logger ));
     let client = PortalTcpClient::new(server, client).await?;
     let mut close_rx = client.close_tx.subscribe();
     close_rx.recv().await;
@@ -32,11 +36,13 @@ pub async fn launch_mechtron_client(server: String, wasm_src: Point) -> Result<(
 
 pub struct MechtronPortalClient {
     pub wasm_src: Point,
+    pub point: Point,
+    pub logger: PointLogger
 }
 
 impl MechtronPortalClient {
-    pub fn new(wasm_point: Point) -> Self {
-        Self { wasm_src: wasm_point }
+    pub fn new(wasm_src: Point, point: Point, logger: PointLogger ) -> Self {
+        Self { wasm_src, point, logger  }
     }
 }
 
@@ -54,11 +60,8 @@ impl PortalClient for MechtronPortalClient {
     }
 
 
-    fn logger(&self) -> fn(m: &str) {
-        fn logger(message: &str) {
-            println!("{}", message);
-        }
-        logger
+    fn logger(&self) -> PointLogger {
+        self.logger.clone()
     }
 
     async fn init(&self, reader: &mut mesh_portal_tcp_common::FrameReader<mesh_portal::version::latest::portal::initout::Frame>, writer: &mut mesh_portal_tcp_common::FrameWriter<mesh_portal::version::latest::portal::initin::Frame>, skel: mesh_portal_api_client::PrePortalSkel) -> Result<Arc<dyn mesh_portal_api_client::ParticleCtrlFactory>, anyhow::Error> {
@@ -144,8 +147,8 @@ impl ParticleCtrl for MechtronResourceCtrl {
         Ok(())
     }
 
-    async fn handle_request( &self, request: Request ) -> ResponseCore {
-        let response = self.skel.membrane.handle_outlet_request(request).await;
+    async fn handle_request( &self, request: RequestFrame ) -> ResponseCore {
+        let response = self.skel.membrane.handle_outlet_request(request.request).await;
         response.core
     }
 

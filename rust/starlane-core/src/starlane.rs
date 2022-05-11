@@ -19,7 +19,7 @@ use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::path;
 use mesh_portal_tcp_client::PortalTcpClient;
 use mesh_portal_tcp_common::{FrameReader, FrameWriter, PrimitiveFrameReader, PrimitiveFrameWriter};
-use mesh_portal_tcp_server::{PortalTcpServer, TcpServerCall};
+use mesh_portal_tcp_server::{PointFactory, PortalTcpServer, TcpServerCall};
 
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
@@ -658,7 +658,17 @@ impl StarlaneMachineRunner {
                 if let Some(serve_tx) = &flags.mechtron_portal_server {
                     Ok(serve_tx.clone() )
                 } else {
-                    let server_tx = PortalTcpServer::new( STARLANE_MECHTRON_PORT.clone() , Box::new(MechtronPortalServer::new(starlane_api ) ) );
+
+                    pub struct HackedPointFactory{ };
+
+                    impl PointFactory for HackedPointFactory {
+                        fn point(&self) -> Point {
+                            Point::from_str("<<HACK>>::portal").unwrap()
+                        }
+                    }
+
+
+                    let server_tx = PortalTcpServer::new( STARLANE_MECHTRON_PORT.clone() , Box::new(MechtronPortalServer::new(starlane_api ) ), Arc::new( HackedPointFactory{}) );
                     flags.mechtron_portal_server = Option::Some(server_tx.clone());
                     Ok(server_tx)
                 }
