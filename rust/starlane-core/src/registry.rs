@@ -1,11 +1,10 @@
 use std::cmp::Ordering;
 use crate::error::Error;
 use crate::particle::{Kind, ParticleLocation, ParticleRecord, KindBase};
-use crate::star::core::resource::registry::{RegError, Registration, RegistryParams};
 use crate::star::StarKey;
 use futures::{FutureExt, StreamExt};
 use mesh_portal::error::MsgErr;
-use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
+use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties, SetRegistry};
 use mesh_portal::version::latest::entity::request::query::{Query, QueryResult};
 use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoPayload};
 use mesh_portal::version::latest::entity::request::{Method, Rc};
@@ -31,7 +30,9 @@ use std::convert::TryInto;
 use std::num::ParseIntError;
 use std::ops::{Deref, Index};
 use std::str::FromStr;
+use std::sync::Arc;
 use mesh_portal_versions::version::v0_0_1::selector::selector::GenericSubKindSelector;
+use tokio::sync::mpsc;
 
 lazy_static! {
     pub static ref HYPERUSER: Point =
@@ -45,6 +46,9 @@ lazy_static! {
     pub static ref STARLANE_POSTGRES_DATABASE: String =
         std::env::var("STARLANE_POSTGRES_DATABASE").unwrap_or("postgres".to_string());
 }
+
+pub type RegistryApi = Arc<Registry>;
+
 
 pub struct Registry {
     pool: Pool<Postgres>,
@@ -262,7 +266,7 @@ impl Registry {
         Ok(())
     }
 
-    async fn set_status(&self, point: &Point, status: &Status) -> Result<(), Error> {
+    pub async fn set_status(&self, point: &Point, status: &Status) -> Result<(), Error> {
         let parent = point
             .parent()
             .ok_or("particle must have a parent")?
@@ -413,7 +417,7 @@ impl Registry {
     pub async fn select(&self, select: &Select) -> Result<PrimitiveList, Error> {
         let point = select.pattern.query_root();
 
-        let point_kind_path = self
+        let hierarchy= self
             .query(&point, &Query::PointKindHierarchy)
             .await?
             .try_into()?;
@@ -422,7 +426,7 @@ impl Registry {
         let sub_select =
             select
                 .clone()
-                .sub_select(point.clone(), sub_select_hops, point_kind_path);
+                .sub_select(point.clone(), sub_select_hops, hierarchy);
         let mut list = self.sub_select(&sub_select).await?;
         if select.pattern.matches_root() {
             list.push(Stub {
@@ -552,8 +556,8 @@ impl Registry {
 
             for stub in &matching_so_far {
                 if let Option::Some(last_segment) = stub.point.last_segment() {
-                    let point = sub_select.point.push_segment(last_segment.clone());
-                    let point_tks_path = sub_select.point_kind_path.push(PointKindSeg {
+                    let point = sub_select.point.push_segment(last_segment.clone())?;
+                    let point_tks_path = sub_select.hierarchy.push(PointKindSeg {
                         segment: last_segment,
                         kind: stub.kind.clone(),
                     });
@@ -572,7 +576,7 @@ impl Registry {
             // the records matched the present hop (which we needed for deeper searches) however
             // they may not or may not match the ENTIRE select pattern therefore they must be filtered
             matching_so_far.retain(|stub| {
-                let point_tks_path = sub_select.point_kind_path.push(PointKindSeg {
+                let point_tks_path = sub_select.hierarchy.push(PointKindSeg {
                     segment: stub
                         .point
                         .last_segment()
@@ -682,7 +686,7 @@ impl Registry {
                     }
                     AccessGrantKind::Privilege(privilege) => {
                         if by_access.has_full() {
-                            privileges.insert(privilege.clone());
+                            privileges = privileges | privilege;
                         }
                     }
                     AccessGrantKind::PermissionsMask(mask) => {
@@ -1074,7 +1078,7 @@ impl sqlx::FromRow<'_, PgRow> for ParticleRecord {
 #[cfg(test)]
 pub mod test {
     use crate::error::Error;
-    use crate::registry::Registry;
+    use crate::registry::{Registration, Registry};
     use crate::particle::{Kind, UserBaseSubKind};
     use crate::star::core::resource::registry::Registration;
     use crate::star::StarKey;
@@ -1378,3 +1382,155 @@ pub mod test {
         Ok(())
     }
 }
+
+pub enum RegError{
+    Dupe,
+    Error(Error)
+}
+
+impl ToString for RegError {
+    fn to_string(&self) -> String {
+        match self {
+            RegError::Dupe => {
+                "Dupe".to_string()
+            }
+            RegError::Error(error) => {
+                error.to_string()
+            }
+        }
+    }
+}
+impl From<sqlx::Error> for RegError {
+    fn from(e: sqlx::Error) -> Self {
+        RegError::Error(e.into())
+    }
+}
+
+
+impl From<tokio::sync::oneshot::error::RecvError> for RegError {
+    fn from(e: tokio::sync::oneshot::error::RecvError) -> Self {
+        RegError::Error(Error::from_internal( format!("{}", e.to_string())))
+    }
+}
+impl From<Error> for RegError {
+    fn from(e: Error) -> Self {
+        RegError::Error(e)
+    }
+}
+
+impl From<rusqlite::Error> for RegError {
+    fn from(e: rusqlite::Error) -> Self {
+        RegError::Error(e.into())
+    }
+}
+
+impl <T> From<mpsc::error::SendError<T>> for RegError {
+    fn from(e: mpsc::error::SendError<T>) -> Self {
+        RegError::Error(e.into())
+    }
+}
+
+impl From<&str> for RegError {
+    fn from(e: &str) -> Self {
+        RegError::Error(e.into())
+    }
+}
+
+
+#[derive(Clone)]
+pub struct Registration {
+    pub point: Point,
+    pub kind: Kind,
+    pub registry: SetRegistry,
+    pub properties: SetProperties,
+    pub owner: Point
+}
+
+pub struct RegistryParams {
+    pub point: String,
+    pub point_segment: String,
+    pub resource_type: String,
+    pub kind: Option<String>,
+    pub vendor: Option<String>,
+    pub product: Option<String>,
+    pub variant: Option<String>,
+    pub version: Option<String>,
+    pub version_variant: Option<String>,
+    pub parent: String,
+    pub owner: Point,
+}
+
+impl RegistryParams {
+    pub fn from_registration(registration: &Registration ) -> Result<Self, Error> {
+
+        let point_segment = match registration.point.segments.last() {
+            None => {"".to_string()}
+            Some(segment) => {
+                segment.to_string()
+            }
+        };
+        let parent = match registration.point.parent()  {
+            None => {"".to_string()}
+            Some(parent) => {parent.to_string()}
+        };
+
+        let resource_type = registration.kind.kind().to_string();
+        let kind = registration.kind.sub_kind();
+        let vendor = match &registration.kind.specific() {
+            None => Option::None,
+            Some(specific) => Option::Some(specific.vendor.clone()),
+        };
+
+        let product= match &registration.kind.specific() {
+            None => Option::None,
+            Some(specific) => Option::Some(specific.product.clone()),
+        };
+
+        let variant = match &registration.kind.specific() {
+            None => Option::None,
+            Some(specific) => Option::Some(specific.variant.clone()),
+        };
+
+        let version = match &registration.kind.specific() {
+            None => Option::None,
+            Some(specific) =>  {
+                let version = &specific.version;
+                Option::Some(format!( "{}.{}.{}", version.major, version.minor, version.patch ))
+            }
+        };
+
+        let version_variant = match &registration.kind.specific() {
+            None => Option::None,
+            Some(specific) =>  {
+                let version = &specific.version;
+                if version.is_prerelease() {
+                    let mut pre = String::new();
+                    for (i, x) in version.pre.iter().enumerate() {
+                        if i != 0 {
+                            pre.push_str(".");
+                        }
+                        pre.push_str(format!("{}", x).as_ref());
+                    }
+                    Option::Some(pre)
+                } else {
+                    Option::None
+                }
+            }
+        };
+
+        Ok(RegistryParams {
+            point: registration.point.to_string(),
+            point_segment: point_segment,
+            parent,
+            resource_type,
+            kind,
+            vendor,
+            product,
+            variant,
+            version,
+            version_variant,
+            owner: registration.owner.clone()
+        })
+    }
+}
+

@@ -37,7 +37,6 @@ use crate::message::{
 };
 use crate::particle::{ParticleRecord, KindBase};
 use crate::star::core::message::CoreMessageCall;
-use crate::star::core::resource::registry::RegistryApi;
 use crate::star::shell::golden::GoldenPathApi;
 use crate::star::shell::lanes::LaneMuxerApi;
 use crate::star::shell::locator::ResourceLocatorApi;
@@ -71,6 +70,7 @@ use nom::combinator::all_consuming;
 use nom::error::{ErrorKind, ParseError, VerboseError};
 use nom::Parser;
 use nom_supreme::error::ErrorTree;
+use crate::registry::RegistryApi;
 use crate::logger::{Flags, Logger, LogInfo};
 use crate::star::shell::sys::SysApi;
 

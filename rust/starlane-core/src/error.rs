@@ -17,7 +17,6 @@ use tokio::time::error::Elapsed;
 use zip::result::ZipError;
 
 use crate::fail::Fail;
-use crate::star::core::resource::registry::RegError;
 use actix_web::ResponseError;
 use alcoholic_jwt::ValidationError;
 use ascii::FromAsciiError;
@@ -341,11 +340,6 @@ impl From<RuntimeError> for Error {
     }
 }
 
-impl From<RegError> for Error {
-    fn from(err: RegError) -> Self {
-        Error::from_internal(err)
-    }
-}
 
 impl Into<mesh_portal::version::latest::fail::Fail> for Error {
     fn into(self) -> mesh_portal::version::latest::fail::Fail {

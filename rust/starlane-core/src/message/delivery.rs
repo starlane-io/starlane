@@ -170,7 +170,7 @@ impl Delivery<Request>
         Ok(())
     }
 
-    pub fn to_call(self) -> Result<Call,MsgErr> {
+    pub fn to_call(&self) -> Result<Call,MsgErr> {
         let kind = match self.item.core.method {
             Method::Cmd(_) => {
                 unimplemented!()

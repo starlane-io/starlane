@@ -89,7 +89,7 @@ impl AsyncProcessor<RouterCall> for RouterComponent {
                             return;
                         } else {
 
-                            let result = skel.registry_api.locate( address.clone() ).await;
+                            let result = skel.registry_api.locate( &address ).await;
                             match result {
                                 Ok(record) => {
                                     let reply = message.reply(StarMessagePayload::Reply(SimpleReply::Ok(Reply::Record(record))));

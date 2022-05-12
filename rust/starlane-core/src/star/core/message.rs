@@ -15,7 +15,6 @@ use crate::message::delivery::Delivery;
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
 use crate::particle::{ArtifactSubKind, Kind, KindBase, FileSubKind, ParticleLocation, UserBaseSubKind, ChildResourceRegistryHandler};
 use crate::particle::{AssignKind, ParticleAssign, ParticleRecord};
-use crate::star::core::resource::registry::{RegError, Registration};
 use crate::star::shell::wrangler::{ StarFieldSelection, StarSelector};
 use crate::star::{StarCommand, StarKey, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
@@ -49,6 +48,7 @@ use serde::de::Unexpected::Str;
 use crate::artifact::ArtifactRef;
 use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
 use crate::config::config::{ContextualConfig, ParticleConfig};
+use crate::registry::{RegError, Registration};
 use crate::star::core::resource::driver::{ResourceCoreDriverApi, ResourceCoreDriverComponent};
 
 
@@ -323,8 +323,8 @@ println!("got bind config for: {}", to.to_string() );
                                         eprintln!("FAIL {}",fail.to_string() );
                                         skel.registry_api
                                             .set_status(
-                                                to,
-                                                Status::Panic,
+                                                &to,
+                                                &Status::Panic,
                                             )
                                             .await;
                                         Err(fail.into())

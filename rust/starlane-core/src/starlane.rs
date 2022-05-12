@@ -43,7 +43,7 @@ use crate::mechtron::portal_client::MechtronPortalClient;
 use crate::proto::{
     local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoTunnel,
 };
-use crate::registry::Registry;
+use crate::registry::{Registry, RegistryApi};
 
 use crate::star::surface::SurfaceApi;
 use crate::star::{ConstellationBroadcast, StarKind, StarStatus};
@@ -79,7 +79,7 @@ pub struct StarlaneMachine {
     run_complete_signal_tx: broadcast::Sender<()>,
     machine_filesystem: Arc<MachineFileSystem>,
     portals: Arc<DashMap<String,Portal>>,
-    pub registry: Arc<Registry>
+    pub registry: RegistryApi
 }
 
 impl StarlaneMachine {

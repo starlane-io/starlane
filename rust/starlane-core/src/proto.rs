@@ -43,7 +43,6 @@ use crate::template::StarKeyConstellationIndex;
 use crate::star::shell::locator::{ResourceLocatorApi, ResourceLocatorComponent};
 use crate::star::shell::golden::{GoldenPathApi, GoldenPathComponent};
 use crate::star::shell::watch::{WatchApi, WatchComponent};
-use crate::star::core::resource::registry::{RegistryApi, RegistryComponent};
 use crate::star::core::resource::driver::ResourceCoreDriverApi;
 
 
@@ -182,7 +181,6 @@ impl ProtoStar {
                         let (golden_path_tx, golden_path_rx) = mpsc::channel(1024);
                         let (variant_tx, variant_rx) = mpsc::channel(1024);
                         let (watch_tx, watch_rx) = mpsc::channel(1024);
-                        let (registry_tx, registry_rx) = mpsc::channel(1024);
                         let (sys_tx, sys_rx) = mpsc::channel(1024);
 
                         let resource_locator_api = ResourceLocatorApi::new(resource_locator_tx);
@@ -192,7 +190,6 @@ impl ProtoStar {
                         let golden_path_api = GoldenPathApi::new(golden_path_tx);
                         let variant_api = VariantApi::new(variant_tx);
                         let watch_api = WatchApi::new(watch_tx);
-                        let registry_api = RegistryApi::new(registry_tx);
                         let sys_api = SysApi::new(sys_tx);
 
 
@@ -218,11 +215,11 @@ impl ProtoStar {
                             star_search_api,
                             router_api,
                             messaging_api,
+                            registry_api: self.machine.registry.clone(),
                             lane_muxer_api: self.lane_muxer_api,
                             golden_path_api,
                             variant_api,
                             watch_api,
-                            registry_api,
                             sys_api,
                             particle_logger: RootLogger::stdout(LogSource::Shell)
                         };
@@ -237,7 +234,6 @@ impl ProtoStar {
                         SurfaceComponent::start(skel.clone(), self.surface_rx);
                         GoldenPathComponent::start(skel.clone(), golden_path_rx);
                         WatchComponent::start(skel.clone(), watch_rx);
-                        RegistryComponent::start( skel.clone(), registry_rx );
                         SysComponent::start( skel.clone(), sys_rx );
 
                         return Ok(Star::from_proto(

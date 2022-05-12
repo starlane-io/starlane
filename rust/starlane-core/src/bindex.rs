@@ -22,7 +22,7 @@ use regex::{CaptureMatches, Regex};
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use anyhow::anyhow;
 use mesh_portal::version::latest::msg::MsgMethod;
 use mesh_portal::version::latest::security::Access;
@@ -35,6 +35,7 @@ use mesh_portal_versions::version::v0_0_1::selector::selector::PipelineKind;
 use mesh_portal_versions::version::v0_0_1::util::ValueMatcher;
 use nom::combinator::map_res;
 use tokio::io::AsyncBufReadExt;
+use tokio::sync::Mutex;
 use crate::cache::{ArtifactItem, Cacheable, CachedConfig};
 
 /// The idea here is to eventually move this funcitionality into it's own crate 'mesh-bindex'
@@ -68,9 +69,9 @@ impl BindEx {
         match access {
             Ok(access) => {
                 if !access.permissions().particle.execute {
-                    let err_msg = format!("execute permission required to send requests to {}", delivery.to.to_string() ).as_str();
-                    logger.error( err_msg );
-                    delivery.err( 403, err_msg );
+                    let err_msg = format!("execute permission required to send requests to {}", delivery.to.to_string() );
+                    logger.error( err_msg.as_str() );
+                    delivery.err( 403, err_msg.as_str() );
                     return Ok(());
                 }
             }
@@ -118,7 +119,7 @@ impl BindEx {
         }
 
         {
-            let mut lock = self.pipeline_executors.lock()?;
+            let mut lock = self.pipeline_executors.lock().await;
             lock.insert(request_id.clone(), pipex);
         }
 
@@ -131,10 +132,10 @@ impl BindEx {
         Ok(())
     }
 
-    pub fn handle_response(&self, response: Response) -> anyhow::Result<()> {
+    pub async fn handle_response(&self, response: Response) -> anyhow::Result<()> {
         let request_id = request_id_from_response(&response);
         let mut pipex = {
-            let mut lock = self.pipeline_executors.lock()?;
+            let mut lock = self.pipeline_executors.lock().await;
             lock.remove(&request_id )
         };
 
@@ -144,7 +145,7 @@ impl BindEx {
                 response.response_to
             );
             self.logger.point(response.to.clone()).span()
-                .error(err_msg);
+                .error(err_msg.clone());
             error!("{}", err_msg);
             return Err(anyhow!(err_msg));
         }
@@ -159,7 +160,7 @@ impl BindEx {
         }
 
         {
-            let mut lock = self.pipeline_executors.lock()?;
+            let mut lock = self.pipeline_executors.lock().await;
             lock.insert(request_id.clone(), pipex);
         }
 
@@ -173,7 +174,7 @@ impl BindEx {
         Ok(())
     }
 
-    fn handle_action( &self, action: RequestAction ) -> anyhow::Result<()> {
+    async fn handle_action( &self, action: RequestAction ) -> anyhow::Result<()> {
         match action.action {
             PipeAction::CoreRequest(request) => {
                 self.router.send_to_particle_core(Message::Request(request));
@@ -183,7 +184,7 @@ impl BindEx {
             }
             PipeAction::Respond => {
                 let pipex = {
-                  let mut lock = self.pipeline_executors.lock()?;
+                  let mut lock = self.pipeline_executors.lock().await;
                   lock.remove(&action.request_id)
                 };
 
