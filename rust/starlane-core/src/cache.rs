@@ -7,12 +7,14 @@ use std::sync::Arc;
 use std::thread;
 
 use futures::FutureExt;
+use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::config::bind::BindConfig;
 use mesh_portal::version::latest::config::Config;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::path::Path;
 use mesh_portal::version::latest::payload::Primitive;
+use mesh_portal_versions::version::v0_0_1::id::id::PointSegKind;
 use tokio::io::AsyncReadExt;
 use tokio::runtime::Handle;
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -39,6 +41,16 @@ pub type ZipFile = Point;
 pub trait Cacheable: Send + Sync + 'static {
     fn artifact(&self) -> ArtifactRef;
     fn references(&self) -> Vec<ArtifactRef>;
+
+    fn point(&self)-> Point {
+        self.artifact().point.clone()
+    }
+
+    fn bundle(&self)-> Result<Point,MsgErr> {
+        self.point().truncate(PointSegKind::Version)
+    }
+
+
 }
 
 pub struct CachedConfig<T> where T: Send+Sync+'static{

@@ -20,10 +20,14 @@ use mesh_portal::version::latest::util::unique_id;
 use crate::message::Reply;
 use std::ops::Deref;
 use http::StatusCode;
+use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::entity::response::ResponseCore;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Request, Response};
-use mesh_portal::version::latest::payload::{Errors, Payload };
+use mesh_portal::version::latest::payload::{Call, CallKind, Errors, MsgCall, Payload};
+use mesh_portal_versions::version::v0_0_1::entity::request::Method;
+use mesh_portal_versions::version::v0_0_1::parse::model::Subst;
+use mesh_portal_versions::version::v0_0_1::payload::payload::HttpCall;
 
 pub struct Delivery<M>
 where
@@ -164,6 +168,25 @@ impl Delivery<Request>
         self.respond(core);
 
         Ok(())
+    }
+
+    pub fn to_call(self) -> Result<Call,MsgErr> {
+        let kind = match self.item.core.method {
+            Method::Cmd(_) => {
+                unimplemented!()
+            }
+            Method::Http(method) => {
+                CallKind::Http(HttpCall::new(method, Subst::new(self.item.core.uri.path())? ))
+            }
+            Method::Msg(method) => {
+                CallKind::Msg(MsgCall::new(method, Subst::new(self.item.core.uri.path())? ))
+            }
+        };
+
+       Ok(Call {
+           point: self.item.to.clone(),
+           kind
+       })
     }
 }
 
