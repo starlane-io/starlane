@@ -13,9 +13,9 @@ use crate::frame::{
 
 use crate::message::delivery::Delivery;
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
-use crate::particle::{ArtifactSubKind, Kind, KindBase, FileSubKind, ParticleLocation, UserBaseSubKind, ChildResourceRegistryHandler};
+use crate::particle::{ArtifactSubKind, ChildResourceRegistryHandler, FileSubKind, Kind, KindBase, ParticleLocation, UserBaseSubKind};
 use crate::particle::{AssignKind, ParticleAssign, ParticleRecord};
-use crate::star::shell::wrangler::{ StarFieldSelection, StarSelector};
+use crate::star::shell::wrangler::{StarFieldSelection, StarSelector};
 use crate::star::{StarCommand, StarKey, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use mesh_portal::version::latest::fail::BadRequest;
@@ -26,29 +26,30 @@ use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
 use mesh_portal::version::latest::config::bind::{BindConfig, Pipeline, PipelineStep, PipelineStop, Selector, StepKind};
 use mesh_portal::version::latest::config::Config;
-use mesh_portal::version::latest::entity::request::create::{PointSegFactory, KindTemplate, Strategy};
+use mesh_portal::version::latest::entity::request::create::{KindTemplate, PointSegFactory, Strategy};
 use mesh_portal::version::latest::entity::request::{Method, Rc, RequestCore};
 use mesh_portal::version::latest::entity::request::get::Get;
 use mesh_portal::version::latest::fail;
-use mesh_portal::version::latest::id::{Point, Meta};
+use mesh_portal::version::latest::id::{Meta, Point};
 use mesh_portal::version::latest::messaging::{Message, Request, Response};
 use mesh_portal::version::latest::payload::{Payload, PayloadMap,  };
-use mesh_portal::version::latest::particle::{Stub, Status};
+use mesh_portal::version::latest::particle::{Status, Stub};
 use mesh_portal::version::latest::entity::request::get::GetOp;
 use mesh_portal::version::latest::entity::request::query::Query;
 use mesh_portal::version::latest::entity::request::select::Select;
 use mesh_portal::version::latest::entity::request::set::Set;
-use mesh_portal::version::latest::entity::response::{ResponseCore};
+use mesh_portal::version::latest::entity::response::ResponseCore;
 use mesh_portal::version::latest::id::Tks;
 use mesh_portal::version::latest::selector::{Block, HttpPattern, MsgPattern};
 use mesh_portal::version::latest::payload::CallKind;
 use mesh_portal::version::latest::entity::request::create::Create;
+use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
 use regex::Regex;
 use serde::de::Unexpected::Str;
 use crate::artifact::ArtifactRef;
 use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
 use crate::config::config::{ContextualConfig, ParticleConfig};
-use crate::registry::{RegError, Registration};
+use crate::registry::{RegError, Registration };
 use crate::star::core::resource::driver::{ResourceCoreDriverApi, ResourceCoreDriverComponent};
 
 
@@ -57,8 +58,8 @@ lazy_static!{
     pub static ref PIPELINE_OVERRIDES: HashMap<Point,Vec<Selector<HttpPattern>>> = {
         let mut map = HashMap::new();
         let mut sel = vec![];
-//        sel.push(final_http_pipeline( "<Get>/hyperspace/users/(.*) -> hyperspace:users^Http<Get>/$1 => &;" ).unwrap());
-//        sel.push(final_http_pipeline( "<Post>/hyperspace/users/(.*) -> hyperspace:users^Http<Post>/$1 => &;" ).unwrap());
+//        sel.push(final_http_pipeline( "<Get>/hyperspace/users/(?<path.user>.*)::(auth) -|/${path.user}|-> hyperspace:users => &;" ).unwrap());
+//        sel.push(final_http_pipeline( "<Post>/hyperspace/users/(?<path.user>.*) -|/${path.user}|-> hyperspace:users => &;" ).unwrap());
         map.insert(Point::from_str("localhost").unwrap(),sel);
         map
     };
@@ -129,96 +130,7 @@ impl MessagingEndpointComponentInner {
 
     async fn handle_request(&mut self, delivery: Delivery<Request>)
     {
-        async fn get_bind_config(end: &mut MessagingEndpointComponentInner, point: Point) -> Result<ArtifactItem<CachedConfig<BindConfig>>,Error> {
-println!("{} getting bind config for {}", end.skel.info.kind.to_string(), point.to_string() );
-            let action = Method::Cmd( Rc::Get( Get{ point:point.clone(), op: GetOp::Properties(vec!["bind".to_string()])}));
-            let core = action.into();
-            let request = Request::new( core, point.clone(), point.parent().unwrap() );
-            let response = end.skel.messaging_api.request(request).await;
-
-println!("response from Rc GET bind {}", point.to_string() );
-
-            if let Payload::Map(map) = response.core.body {
-                if let Payload::Text(bind_point ) = map.get(&"bind".to_string()  ).ok_or("bind is not set" )?
-                {
-                    let bind_point = Point::from_str(bind_point.as_str())?;
-                    let mut cache = end.skel.machine.get_proto_artifact_caches_factory().await?.create();
-                    let artifact = ArtifactRef::new(bind_point, ArtifactSubKind::Bind);
-                    cache.cache(vec![artifact.clone()]).await?;
-                    let cache = cache.to_caches().await?;
-                    return Ok(cache.bind_configs.get(&artifact.point).ok_or(format!("could not cache bind {}", artifact.point.to_string()).as_str())?);
-                }
-                else {
-                    return Err("unexpected response".into());
-                }
-            } else {
-                return Err("unexpected response".into());
-            }
-        }
-
-        fn execute(end: &mut MessagingEndpointComponentInner, bind: ArtifactItem<CachedConfig<BindConfig>>, delivery: Delivery<Request> ) -> Result<(),Error> {
-            match &delivery.item.core.action {
-                Method::Cmd(_) => {panic!("Rc should be filtered");}
-                Method::Msg(msg) => {
-println!("received msg action {} ... present selectors: {}",msg, bind.msg.elements.len() );
-                   let selector = bind.msg.find_match(&delivery.item.core );
-                   if selector.is_err() {
-                       let path = delivery.item.core.uri.path().to_string();
-                       let msg = msg.clone();
-                       error!("bind selector cannot find Pipelines match for Msg<{}>{}",msg, path );
-                       delivery.err(404, format!("bind selector cannot find Pipelines match for Msg<{}>{}",msg, path).as_str() );
-                       //delivery.err(404, "bind selector cannot find Pipelines match for Msg<{}>{}" );
-                       return Ok(());
-                   }
-                   let selector = selector.expect("selector");
-                    execute_msg_pipeline(selector, delivery,end.skel.clone(),end.resource_core_driver_api.clone() );
-                   Ok(())
-                }
-                Method::Http(http) => {
-println!("delivery of http method {} and PATH {} with selectors: {}", http.to_string(), delivery.item.core.uri.path(), bind.http.elements.len() );
-                    let selector = bind.http.find_match(&delivery.item.core );
-                    if selector.is_err() {
-println!("selector.is_err()");
-                        delivery.not_found();
-                        return Ok(());
-                    }
-                    let selector = selector.expect("selector");
-                    execute_http_pipeline(selector, delivery,end.skel.clone(),end.resource_core_driver_api.clone() );
-                    Ok(())
-                }
-            }
-        }
-
-        println!("delivery...to: {}", delivery.to.to_string());
-        if let Some(selectors) = PIPELINE_OVERRIDES.get(&delivery.to) {
-            println!("CHECKING: SELECTORS for :{}",delivery.item.core.uri.to_string());
-            for selector in selectors {
-                if selector.is_match(&delivery.item.core).is_ok() {
-                    println!("FOUND OVERRIDE SELECTOR");
-                    execute_http_pipeline(selector.clone(), delivery, self.skel.clone(), self.resource_core_driver_api.clone());
-                    return;
-                }
-            }
-        }
-
-
-        let to = delivery.to.clone();
-        match get_bind_config(self, delivery.to.clone() ).await {
-            Ok(bind_config) => {
-println!("got bind config for: {}", to.to_string() );
-                match execute(self, bind_config, delivery ) {
-                    Ok(_) => {}
-                    Err(err) => {
-                        error!("{}",err.to_string())
-                    }
-                }
-            }
-            Err(_) => {
-                error!("could not get bind for {}",to.to_string( ));
-                delivery.fail("could not get bind config for particle".into());
-            }
-        }
-
+        unimplemented!()
     }
 
     pub async fn process_resource_message(&mut self, star_message: StarMessage) -> Result<(), Error> {
@@ -274,22 +186,22 @@ println!("got bind config for: {}", to.to_string() );
 
             async fn process(skel: StarSkel, resource_core_driver_api: ResourceCoreDriverApi, rc: &Rc, to: Point) -> Result<Payload, Error> {
                 let record = skel.resource_locator_api.locate(to.clone()).await?;
-                let kind = Kind::try_from( record.stub.kind )?;
+                let kind = Kind::try_from( record.details.stub.kind )?;
                 match kind.kind().child_resource_registry_handler() {
                     ChildResourceRegistryHandler::Shell => {
                         match &rc {
                             Rc::Create(create) => {
 
-                                let chamber = ResourceRegistrationChamber::new(skel.clone());
-                                let stub = chamber.create(create).await?;
+                                let chamber = skel.registry_api.clone();
+                                let details= chamber.create(create).await?;
 
                                 async fn assign(
                                     skel: StarSkel,
-                                    stub: Stub,
+                                    details: ParticleDetails,
                                     state: StateSrc,
                                 ) -> Result<(), Error> {
 
-                                    let star_kind = StarKind::hosts(&KindBase::from_str(stub.kind.kind.as_str())?);
+                                    let star_kind = StarKind::hosts(&KindBase::from_str(details.stub.kind.kind.as_str())?);
                                     let key = if skel.info.kind == star_kind {
                                         skel.info.key.clone()
                                     }
@@ -299,11 +211,11 @@ println!("got bind config for: {}", to.to_string() );
                                         let wrangle = skel.star_wrangler_api.next(star_selector).await?;
                                         wrangle.key
                                     };
-                                    skel.registry_api.assign(stub.point.clone(), key.clone()).await?;
+                                    skel.registry_api.assign(&details.stub.point, &key).await?;
 
                                     let mut proto = ProtoStarMessage::new();
                                     proto.to(ProtoStarMessageTo::Star(key.clone()));
-                                    let assign = ParticleAssign::new(AssignKind::Create, stub.clone(), state);
+                                    let assign = ParticleAssign::new(AssignKind::Create, details.clone(), state);
                                     proto.payload = StarMessagePayload::ResourceHost(
                                         ResourceHostAction::Assign(assign),
                                     );
@@ -315,9 +227,9 @@ println!("got bind config for: {}", to.to_string() );
                                 }
 
 
-                                match assign(skel.clone(), stub.clone(), create.state.clone()).await {
+                                match assign(skel.clone(), details.clone(), create.state.clone()).await {
                                     Ok(_) => {
-                                        Ok(Payload::Stub(stub))
+                                        Ok(Payload::Stub(details.stub))
                                     },
                                     Err(fail) => {
                                         eprintln!("FAIL {}",fail.to_string() );
@@ -331,27 +243,21 @@ println!("got bind config for: {}", to.to_string() );
                                     }
                                 }
                             }
-                            Rc::Select(select) => {
-                                let chamber = ResourceRegistrationChamber::new(skel.clone());
-                                Ok(chamber.select(select).await?)
-                            },
-                            Rc::Update(_) => {
-                                unimplemented!()
-                            }
-                            Rc::Query(query) => {
-                                let chamber = ResourceRegistrationChamber::new(skel.clone());
-                                chamber.query(&to, query).await
-                            },
+
                             Rc::Get(get) => {
-                                let chamber = ResourceRegistrationChamber::new(skel.clone());
-                                chamber.get(get).await
+                                match get.op {
+                                    GetOp::State => {
+                                        unimplemented!()
+                                    }
+                                    GetOp::Properties(_) => {
+                                        return Err("messaging end point no longer handles this type of command".into());
+                                    }
+                                }
                             }
-                            Rc::Set(set) => {
-                                let chamber = ResourceRegistrationChamber::new(skel.clone());
-                                chamber.set(set).await?;
-                                Ok(Payload::Empty)
+                            _ => {
+                                return Err("messaging end point no longer handles this type of command".into());
                             }
-                        }
+                       }
                     }
                     ChildResourceRegistryHandler::Core => {
                         resource_core_driver_api.resource_command(to.clone(), rc.clone()).await
@@ -365,459 +271,6 @@ println!("got bind config for: {}", to.to_string() );
     }
 
 
-}
-pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
-    let resource_type: KindBase = KindBase::from_str(template.kind.as_str())?;
-    Ok(match resource_type {
-        KindBase::Root => Kind::Root,
-        KindBase::Space => Kind::Space,
-        KindBase::Base => {
-            match &template.sub_kind {
-                None => {
-                    return Err("kind must be set for Base".into());
-                }
-                Some(kind) => {
-                    let kind = KindBase::from_str(kind.as_str())?;
-                    if template.specific.is_some() {
-                        return Err("BaseKind cannot have a Specific".into());
-                    }
-                    return Ok(Kind::Base(kind));
-                }
-            }
-        },
-        KindBase::User => Kind::User,
-        KindBase::App => Kind::App,
-        KindBase::Mechtron => Kind::Mechtron,
-        KindBase::FileSystem => Kind::FileSystem,
-        KindBase::File => {
-            match &template.sub_kind {
-                None => {
-                    return Err("expected kind for File".into())
-                }
-                Some(kind) => {
-                    let file_kind = FileSubKind::from_str(kind.as_str())?;
-                    return Ok(Kind::File(file_kind));
-                }
-            }
-        }
-        KindBase::Database => {
-            unimplemented!("need to write a SpecificPattern matcher...")
-        }
-        KindBase::Authenticator => Kind::Authenticator,
-        KindBase::ArtifactBundleSeries => Kind::ArtifactBundleSeries,
-        KindBase::ArtifactBundle => Kind::ArtifactBundle,
-        KindBase::Artifact => {
-            match &template.sub_kind {
-                None => {
-                    return Err("expected kind for Artirtact".into());
-                }
-                Some(kind) => {
-                    let artifact_kind = ArtifactSubKind::from_str(kind.as_str())?;
-                    return Ok(Kind::Artifact(artifact_kind));
-                }
-            }
-        }
-        KindBase::Proxy => Kind::Proxy,
-        KindBase::Credentials => Kind::Credentials,
-        KindBase::Control => Kind::Control,
-        KindBase::UserBase => {
-            match &template.sub_kind {
-                None => {
-                    return Err("kind must be set for UserBase".into());
-                }
-                Some(kind) => {
-                    let kind = UserBaseSubKind::from_str(kind.as_str())?;
-                    Kind::UserBase(kind)
-                }
-            }
-        },
-    })
-}
-
-pub struct PipelineExecutor {
-    pub traversal: Traversal,
-    pub skel: StarSkel,
-    pub resource_manager_api: ResourceCoreDriverApi,
-    pub pipeline: Pipeline,
-    pub path_regex: Regex
-}
-
-impl  PipelineExecutor {
-  pub fn new(delivery: Delivery<Request>, skel: StarSkel, resource_manager_api: ResourceCoreDriverApi, pipeline: Pipeline, path_regex: Regex ) -> Self {
-      let traversal = Traversal::new(delivery);
-      Self {
-          traversal,
-          skel,
-          resource_manager_api,
-          pipeline,
-          path_regex
-      }
-  }
-}
-
-fn execute_http_pipeline( selector: Selector<HttpPattern>, delivery: Delivery<Request>, skel: StarSkel, resource_core_driver_api: ResourceCoreDriverApi )
-{
-println!("executing http pipeline for {}", selector.pattern.to_string() );
-    let regex = match Regex::new(selector.pattern.path_regex.as_str() ) {
-        Ok(regex) => regex,
-        Err(err) => {
-            delivery.fail(err.to_string());
-            return;
-        }
-    };
-    let exec = PipelineExecutor::new(delivery, skel, resource_core_driver_api, selector.pipeline, regex );
-    exec.execute();
-}
-
-fn execute_msg_pipeline( selector: Selector<MsgPattern>, delivery: Delivery<Request>, skel: StarSkel, resource_core_driver_api: ResourceCoreDriverApi )
-{
-    let regex = match Regex::new(selector.pattern.path_regex.as_str() ) {
-        Ok(regex) => regex,
-        Err(err) => {
-            delivery.fail(err.to_string());
-            return;
-        }
-    };
-    let exec = PipelineExecutor::new(delivery, skel, resource_core_driver_api, selector.pipeline, regex );
-    exec.execute();
-}
-
-impl PipelineExecutor {
-
-    pub fn execute( mut self ) {
-       tokio::spawn( async move {
-           async fn process( exec: &mut PipelineExecutor) -> Result<(),Error> {
-               while let Option::Some(segment) = exec.pipeline.consume() {
-
-                   exec.execute_step(&segment.step )?;
-                   exec.execute_stop(&segment.stop ).await?;
-                   if let PipelineStop::Respond = segment.stop {
-                       break;
-                   }
-               }
-               Ok(())
-           }
-           match process(&mut self ).await {
-               Ok(_) => {
-                   self.respond();
-               }
-               Err(error) => {
-                   error!("{}",error.to_string());
-                   self.fail(error.to_string())
-               }
-           }
-       });
-    }
-
-    fn respond(self) {
-        self.traversal.respond();
-    }
-
-    fn fail(self, error: String) {
-        self.traversal.fail(error);
-    }
-
-
-    async fn execute_stop( &mut self, stop: &PipelineStop ) -> Result<(),Error> {
-       match stop {
-           PipelineStop::Internal => {
-               let request = self.traversal.request();
-               let response = self.resource_manager_api.request(request).await?.ok_or()?;
-               self.traversal.push( Message::Response(response));
-           }
-           PipelineStop::Call(call) => {
-               let uri = self.traversal.uri.clone();
-               let captures = self.path_regex.captures( uri.path() ).ok_or("cannot find regex captures" )?;
-               let point = call.point.clone().to_point(captures)?;
-
-               let captures = self.path_regex.captures( uri.path() ).ok_or("cannot find regex captures" )?;
-               let (action,path) = match &call.kind {
-                   CallKind::Msg(msg) => {
-                       let mut path = String::new();
-                       captures.expand( msg.path.as_str(), & mut path );
-                       (Method::Msg(msg.method.clone()),path)
-
-                   }
-                   CallKind::Http(http) => {
-                       let mut path = String::new();
-                       captures.expand( http.path.as_str(), & mut path );
-                       (Method::Http(http.method.clone()),path)
-                   }
-               };
-               let mut core :RequestCore= action.into();
-               core.body = self.traversal.body.clone();
-               core.headers = self.traversal.headers.clone();
-               core.uri = Uri::from_str(path.as_str())?;
-               let request = Request::new( core, self.traversal.to(), point.clone() );
-               let response = self.skel.messaging_api.request(request).await;
-               self.traversal.push( Message::Response(response));
-           }
-           PipelineStop::Respond => {
-               // while loop will trigger a response
-           }
-           PipelineStop::Point(point) => {
-               let uri = self.traversal.uri.clone();
-               let captures = self.path_regex.captures( uri.path() ).ok_or("cannot find regex captures" )?;
-               let point = point.clone().to_point(captures)?;
-               let action = Method::Cmd(Rc::Get(Get{ point:point.clone(), op: GetOp::State}));
-               let core = action.into();
-               let request = Request::new( core, self.traversal.to(), point.clone() );
-               let response = self.skel.messaging_api.request(request).await;
-               self.traversal.push( Message::Response(response));
-           }
-       }
-       Ok(())
-    }
-
-
-    fn execute_step( &self,  step: &PipelineStep ) -> Result<(),Error> {
-        match &step.kind {
-            StepKind::Request => {
-                for block in &step.blocks {
-                    self.execute_block(block)?;
-                }
-            }
-            StepKind::Response => {}
-        }
-        Ok(())
-    }
-
-    fn execute_block( &self,  block: &Block ) -> Result<(),Error> {
-        match block {
-            Block::Upload(_) => {
-                return Err("upload block can only be used on the command line".into());
-            }
-            Block::RequestPattern(pattern) => {
-                pattern.is_match( &self.traversal.body )?;
-            }
-            Block::ResponsePattern(pattern) => {
-                pattern.is_match( &self.traversal.body )?;
-            }
-            Block::CreatePayload(payload) => {
-                unimplemented!()
-            }
-        }
-        Ok(())
-    }
-}
-
-
-pub struct Traversal {
-    pub initial_request: Delivery<Request>,
-    pub method: Method,
-    pub body: Payload,
-    pub uri: Uri,
-    pub headers: HeaderMap,
-    pub status: StatusCode,
-}
-
-impl Traversal {
-    pub fn new( initial_request: Delivery<Request> ) -> Self {
-        Self {
-            method: initial_request.core.method.clone(),
-            body: initial_request.item.core.body.clone(),
-            uri: initial_request.item.core.uri.clone(),
-            headers: initial_request.item.core.headers.clone(),
-            initial_request,
-            status: StatusCode::from_u16(200).unwrap()
-        }
-    }
-
-    pub fn request_core(&self) -> RequestCore {
-        RequestCore {
-            headers: self.headers.clone(),
-            action: self.method.clone(),
-            uri: self.uri.clone(),
-            body: self.body.clone()
-        }
-    }
-
-    pub fn to(&self) -> Point {
-        self.initial_request.to.clone()
-    }
-
-    pub fn from(&self) -> Point {
-        self.initial_request.from.clone()
-    }
-
-    pub fn request(&self) -> Request {
-        Request::new( self.request_core(), self.from(), self.to() )
-    }
-
-    pub fn response_core(&self) -> ResponseCore {
-        ResponseCore {
-            headers: self.headers.clone(),
-            body: self.body.clone(),
-            status: self.status.clone()
-        }
-    }
-
-    pub fn response(&self) -> Response{
-        Response::new( self.response_core(), self.to(), self.from(), self.initial_request.id.clone() )
-    }
-
-    pub fn push( &mut self, message: Message ) {
-        match message {
-            Message::Request(request) => {
-                self.method = request.core.action;
-                self.uri = request.core.uri;
-                self.headers = request.core.headers;
-                self.body = request.core.body;
-            }
-            Message::Response(response) => {
-                self.headers = response.core.headers;
-                self.body = response.core.body;
-                self.status = response.core.status;
-            }
-        }
-    }
-
-    pub fn respond(self) {
-        let core = self.response_core();
-        self.initial_request.respond( core );
-    }
-
-    pub fn fail(self,error:String) {
-        self.initial_request.fail(error);
-    }
-
-}
-
-pub struct ResourceRegistrationChamber {
-    skel: StarSkel,
-}
-
-impl ResourceRegistrationChamber {
-
-    pub fn new(skel: StarSkel) -> Self {
-        Self { skel }
-    }
-
-    pub async fn set(&self, set:&Set) -> Result<(),Error> {
-        self.skel.registry_api.set_properties(set.point.clone(), set.properties.clone()).await
-    }
-
-    pub async fn get(&self, get:&Get) -> Result<Payload,Error> {
-        match &get.op {
-            GetOp::State => {
-                let mut proto = ProtoStarMessage::new();
-                proto.to(ProtoStarMessageTo::Resource(get.point.clone()));
-                proto.payload = StarMessagePayload::ResourceHost(ResourceHostAction::GetState(get.point.clone()));
-                if let Ok(Reply::Payload(payload)) = self.skel.messaging_api
-                    .star_exchange(proto, ReplyKind::Payload, "get state from driver")
-                    .await {
-                    Ok(payload)
-                } else {
-                    Err("could not get state".into())
-                }
-            }
-            GetOp::Properties(keys) => {
-println!("GET PROPERTIES for {}", get.point.to_string() );
-                let properties = self.skel.registry_api.get_properties(get.point.clone(), keys.clone() ).await?;
-                let mut map = PayloadMap::new();
-                for (index,property) in properties.iter().enumerate() {
-
-println!("\tprop{}", property.0.clone() );
-                    map.insert( property.0.clone(), Payload::Text(property.1.clone()));
-                }
-
-                Ok(Payload::Map(map))
-            }
-        }
-    }
-
-
-    pub async fn create(&self, create:&Create) -> Result<Stub,Error> {
-
-        let child_kind = match_kind(&create.template.kind)?;
-        let stub = match &create.template.point.child_segment_template {
-            PointSegFactory::Exact(child_segment) => {
-
-                let point = create.template.point.parent.push(child_segment.clone());
-                match &point {
-                    Ok(_) => {}
-                    Err(err) => {
-                        eprintln!("RC CREATE error: {}", err.to_string());
-                    }
-                }
-                let point = point?;
-
-                let properties = child_kind.properties_config().fill_create_defaults(&create.properties )?;
-                child_kind.properties_config().check_create(&properties)?;
-
-                let registration = Registration {
-                    point: point.clone(),
-                    kind: child_kind.clone(),
-                    registry: create.registry.clone(),
-                    properties,
-                    owner: Point::root()
-                };
-println!("creating {}",point.to_string() );
-                let mut result = self.skel.registry_api.register(registration).await;
-
-                // if strategy is ensure then a dupe is GOOD!
-                if create.strategy == Strategy::Ensure {
-                    if let Err(RegError::Dupe) = result {
-                        result = Ok(self.skel.resource_locator_api.locate(point.clone()).await?.stub);
-                    }
-                }
-
-println!("result {}? {}",point.to_string(), result.is_ok() );
-                result?
-            }
-            PointSegFactory::Pattern(pattern) => {
-                if !pattern.contains("%") {
-                    return Err("AddressSegmentTemplate::Pattern must have at least one '%' char for substitution".into());
-                }
-                loop {
-                    let index = self.skel.registry_api.sequence(create.template.point.parent.clone()).await?;
-                    let child_segment = pattern.replace( "%", index.to_string().as_str() );
-                    let point = create.template.point.parent.push(child_segment.clone())?;
-                    let registration = Registration {
-                        point: point.clone(),
-                        kind: child_kind.clone(),
-                        registry: create.registry.clone(),
-                        properties: create.properties.clone(),
-                        owner: Point::root()
-                    };
-
-                    match self.skel.registry_api.register(registration).await {
-                        Ok(stub) => {
-                            if let Strategy::HostedBy(key) = &create.strategy {
-                                let key = StarKey::from_str( key.as_str() )?;
-                                self.skel.registry_api.assign(point, key).await?;
-                                return Ok(stub);
-                            } else {
-                                break stub;
-                            }
-                        },
-                        Err(RegError::Dupe) => {
-                            // continue loop
-                        }
-                        Err(RegError::Error(error)) => {
-                            return Err(error);
-                        }
-                    }
-                }
-            }
-        };
-        Ok(stub)
-    }
-
-    pub async fn select( &self, select: &Select ) -> Result<Payload,Error>{
-            let list = Payload::List( self.skel.registry_api.select(select.clone()).await? );
-            Ok(list)
-    }
-
-    pub async fn query(&self, to: &Point, query: &Query) -> Result<Payload,Error>{
-        let result = Payload::Text(
-            self.skel.registry_api
-                .query(to.clone(), query.clone())
-                .await?
-                .to_string(),
-        );
-        Ok(result)
-    }
 }
 
 

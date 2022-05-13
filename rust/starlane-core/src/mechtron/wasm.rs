@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::mechtron::portal_client::MechtronSkel;
-use crate::mesh_portal_unique_id;
+use crate::mesh_portal_uuid;
 use crate::util::AsyncHashMap;
 use mesh_portal_api_client::{Inlet, PortalSkel, PrePortalSkel, ParticleSkel};
 use mesh_portal::version::latest::id::Point;

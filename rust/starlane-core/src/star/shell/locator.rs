@@ -33,10 +33,10 @@ impl ResourceLocatorApi {
     }
 
 
-    pub async fn locate(&self, address: Point) -> Result<ParticleRecord, Error> {
+    pub async fn locate(&self, point: Point) -> Result<ParticleRecord, Error> {
         let (tx, mut rx) = oneshot::channel();
         self.tx
-            .send(ResourceLocateCall::Locate { address, tx })
+            .send(ResourceLocateCall::Locate { point, tx })
             .await
             .unwrap_or_default();
 
@@ -83,7 +83,7 @@ impl ResourceLocatorApi {
 
 pub enum ResourceLocateCall {
     Locate {
-        address: Point,
+        point: Point,
         tx: oneshot::Sender<Result<ParticleRecord, Error>>,
     },
     ExternalLocate {
@@ -118,7 +118,7 @@ impl ResourceLocatorComponent {
 impl AsyncProcessor<ResourceLocateCall> for ResourceLocatorComponent {
     async fn process(&mut self, call: ResourceLocateCall) {
         match call {
-            ResourceLocateCall::Locate { address: address, tx } => {
+            ResourceLocateCall::Locate { point: address, tx } => {
                 self.locate(address, tx);
             }
             ResourceLocateCall::ExternalLocate {
@@ -130,7 +130,7 @@ impl AsyncProcessor<ResourceLocateCall> for ResourceLocatorComponent {
             }
             ResourceLocateCall::Found(record) => {
                 self.resource_record_cache
-                    .put(record.stub.point.clone(), record);
+                    .put(record.details.stub.point.clone(), record);
             }
         }
     }
@@ -197,17 +197,7 @@ impl ResourceLocatorComponent {
             });
         } else {
 
-            let record = ParticleRecord::new(
-                Stub {
-                    point: Point::root(),
-                        kind: Kind::Root.to_resource_kind(),
-                    properties: Default::default(),
-                    status: Status::Ready
-                },
-                StarKey::central(),
-                Permissions::none()
-            );
-            tx.send(Ok(record)).unwrap_or_default();
+            tx.send(Err("could not find".into())).unwrap_or_default();
         }
     }
 

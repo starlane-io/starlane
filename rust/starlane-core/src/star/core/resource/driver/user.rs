@@ -27,9 +27,9 @@ use nom_supreme::final_parser::final_parser;
 use serde_json::{json, Value};
 use validator::validate_email;
 use crate::error::Error;
-use crate::particle::{Kind, ParticleAssign, KindBase};
+use crate::particle::{Kind, KindBase, ParticleAssign};
 use crate::particle::property::{AddressPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPattern, PropertyPermit, PropertySource};
-use crate::star::core::message::{match_kind, ResourceRegistrationChamber};
+use crate::registry::{match_kind};
 use crate::star::core::resource::driver::ParticleCoreDriver;
 use crate::star::StarSkel;
 
@@ -101,30 +101,30 @@ impl ParticleCoreDriver for UserBaseKeycloakCoreDriver {
         };
 
 
-        if is_hyper_userbase(&assign.stub.point)
+        if is_hyper_userbase(&assign.details.stub.point)
         {
-            let sso_session_max_lifespan = assign.stub.properties.get("sso-session-max-lifespan" ).ok_or("cannot get value for required property 'sso-session-max-lifespan'")?.value.clone();
-            self.admin.init_realm_for_point("master".to_string(), &assign.stub.point ).await?;
-            match self.admin.update_realm_for_point("master".to_string(), &assign.stub.point, Some(false), Some(false), Some(sso_session_max_lifespan)).await
+            let sso_session_max_lifespan = assign.details.properties.get("sso-session-max-lifespan" ).ok_or("cannot get value for required property 'sso-session-max-lifespan'")?.value.clone();
+            self.admin.init_realm_for_point("master".to_string(), &assign.details.stub.point ).await?;
+            match self.admin.update_realm_for_point("master".to_string(), &assign.details.stub.point, Some(false), Some(false), Some(sso_session_max_lifespan)).await
             {
                 Err(err) => {
                     error!("{}",err.to_string());
-                    return Err(format!("UserBase<Keyloak>: could not update master realm for {}", assign.stub.point.to_string()).into())
+                    return Err(format!("UserBase<Keyloak>: could not update master realm for {}", assign.details.stub.point.to_string()).into())
                 }
                 _ => {}
             }
         }
         else
         {
-            let registration_email_as_username = assign.stub.properties.get("registration-email-as-username" ).map_or( None, |x|{ Some(x.value=="true") });
-            let verify_email= assign.stub.properties.get("verify-email" ).map_or( None, |x|{ Some(x.value=="true") });
-            let sso_session_max_lifespan = assign.stub.properties.get("sso-session-max-lifespan" ).ok_or("cannot get value for required property 'sso-session-max-lifespan'")?.value.clone();
+            let registration_email_as_username = assign.details.properties.get("registration-email-as-username" ).map_or(None, |x|{ Some(x.value=="true") });
+            let verify_email= assign.details.properties.get("verify-email" ).map_or(None, |x|{ Some(x.value=="true") });
+            let sso_session_max_lifespan = assign.details.properties.get("sso-session-max-lifespan" ).ok_or("cannot get value for required property 'sso-session-max-lifespan'")?.value.clone();
 
-            match self.admin.create_realm_from_point(&assign.stub.point, registration_email_as_username, verify_email, Some(sso_session_max_lifespan)).await
+            match self.admin.create_realm_from_point(&assign.details.stub.point, registration_email_as_username, verify_email, Some(sso_session_max_lifespan)).await
             {
                 Err(err) => {
                     error!("{}",err.to_string());
-                    return Err(format!("UserBase<Keyloak>: could not create realm for {}", assign.stub.point.to_string()).into())
+                    return Err(format!("UserBase<Keyloak>: could not create realm for {}", assign.details.stub.point.to_string()).into())
                 }
                 _ => {}
             }
@@ -339,8 +339,7 @@ println!("received refresh token: {}", token );
             }
         }
 
-        let chamber = ResourceRegistrationChamber::new(self.skel.clone());
-        chamber.get(&get).await?;
+        self.skel.registry_api.get(&get).await?;
 
         Ok(Payload::Empty)
     }
@@ -365,7 +364,7 @@ println!("received refresh token: {}", token );
             return Err("UserBase<Keycloak>: 'username' property is immutable".into());
         }
 
-        let email = record.stub.properties.get("email").ok_or("User missing 'email' property")?.value.clone();
+        let email = record.details.properties.get("email").ok_or("User missing 'email' property")?.value.clone();
 
         if password.is_some() {
             self.admin.reset_password(&to, email, password.unwrap() ).await?;
@@ -385,7 +384,6 @@ println!("received refresh token: {}", token );
 
         let realm = &create.template.point.parent;
         let realm = self.admin.get_realm_from_point(realm).await?;
-        let chamber = ResourceRegistrationChamber::new(self.skel.clone());
 
         let email = match create.properties.map.get("email") {
             None => None,
@@ -407,7 +405,7 @@ println!("received refresh token: {}", token );
                 if realm.registration_email_as_username.unwrap_or(false) {
                     return Err(format!("UserBase<Keycloak>: realm '{}' requires registration email as username therefore exact point segment '{}' cannot be used. instead try pattern segment: 'user-%' ", create.template.point.parent.to_string(), username).into());
                 } else {
-                    let stub = chamber.create(&create).await?;
+                    let stub = self.skel.registry_api.create(&create).await?.stub;
                     if !is_hyperuser(&stub.point) {
                         self.admin.create_user(&create.template.point.parent, email.ok_or("'email' is required.")?, Some(username.to_string()), password, &stub.point).await?;
                     } else {
@@ -420,12 +418,12 @@ println!("received refresh token: {}", token );
             }
             PointSegFactory::Pattern(_) => {
                 if realm.registration_email_as_username.unwrap_or(false) {
-                    let stub = chamber.create(&create).await?;
+                    let stub = self.skel.registry_api.create(&create).await?.stub;
                     self.admin.create_user(&create.template.point.parent, email.ok_or("'email' is required.")?, None, password, &stub.point).await?;
                     stub
                 } else {
                     let username = create.properties.get("username").ok_or(format!("UserBase<Keycloak>: realm '{}' requires property 'username' when creating a pattern point", create.template.point.parent.to_string()))?.set_or(format!("UserBase<Keycloak>: realm '{}' requires property 'username' when creating a pattern point", create.template.point.parent.to_string()))?.to_lowercase();
-                    let stub = chamber.create(&create).await?;
+                    let stub = self.skel.registry_api.create(&create).await?.stub;
                     self.admin.create_user(&create.template.point.parent, email.ok_or("'email' is required")?, Some(username), password, &stub.point).await?;
                     stub
                 }
@@ -437,8 +435,7 @@ println!("received refresh token: {}", token );
 
 
     async fn select_child(&self, to: Point, select: Select) -> Result<Payload,Error> {
-        let chamber = ResourceRegistrationChamber::new(self.skel.clone());
-        chamber.select(&select).await
+        self.skel.registry_api.cmd_select(&select).await
 /*        let mut first = 0;
         let max = 100;
         let mut rtn = vec![];

@@ -139,7 +139,7 @@ impl ParticleCoreDriver for MechtronCoreDriver {
 
 println!("Assigning Mechtron...");
 
-        let config_point = assign.stub.properties.get(&"config".to_string() ).ok_or(format!("'config' property required to be set for {}", self.resource_type.to_string() ))?.value.as_str();
+        let config_point = assign.details.properties.get(&"config".to_string() ).ok_or(format!("'config' property required to be set for {}", self.resource_type.to_string() ))?.value.as_str();
         let config_point = Point::from_str(config_point)?;
 
         let config_artifact_ref = ArtifactRef {
@@ -152,17 +152,17 @@ println!("Assigning Mechtron...");
 println!("MECHTRON: got caches" );
         let config = caches.resource_configs.get(&config_point).ok_or::<Error>(format!("expected mechtron_config").into())?;
 println!("MECHTRON: got config" );
-        let config = MechtronConfig::new(config, assign.stub.point.clone() );
+        let config = MechtronConfig::new(config, assign.details.stub.point.clone() );
 
 println!("MechtronConfig.wasm_src().is_ok() {}", config.wasm_src().is_ok() );
 println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
 
-        let api = StarlaneApi::new( self.skel.surface_api.clone(), assign.stub.point.clone() );
+        let api = StarlaneApi::new( self.skel.surface_api.clone(), assign.details.stub.point.clone() );
         let substitution_map = config.substitution_map()?;
         for command_line in &config.install {
 //            let command_line = substitute(command_line.as_str(), &substitution_map)?;
             println!("INSTALL: '{}'",command_line);
-            let mut output_rx = CommandExecutor::exec_simple(command_line.to_string(),assign.stub.clone(), api.clone() );
+            let mut output_rx = CommandExecutor::exec_simple(command_line.to_string(), assign.details.stub.clone(), api.clone() );
             while let Some(frame) = output_rx.recv().await {
                 match frame {
                     outlet::Frame::StdOut(out) => {
@@ -196,9 +196,9 @@ println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
         let portal_assign = Assign {
             config: Config {
                 body: ParticleConfigBody::Named(config.mechtron_name()?),
-                point: assign.stub.point.clone()
+                point: assign.details.stub.point.clone()
             },
-            stub: assign.stub.clone()
+            details: assign.details.clone()
         };
 
         portal.assign(portal_assign);

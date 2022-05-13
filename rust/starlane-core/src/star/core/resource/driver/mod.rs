@@ -154,9 +154,9 @@ impl ResourceCoreDriverComponent {
     async fn assign(&mut self, assign: ParticleAssign, tx: oneshot::Sender<Result<(),Error>> ) {
 
        async fn process(manager_component: &mut ResourceCoreDriverComponent, assign: ParticleAssign) -> Result<(),Error> {
-           let resource_type = KindBase::from_str(assign.stub.kind.to_string().as_str())?;
+           let resource_type = KindBase::from_str(assign.details.stub.kind.to_string().as_str())?;
            let manager:&mut Box<dyn ParticleCoreDriver> = manager_component.drivers.get_mut(&resource_type ).ok_or(format!("could not get driver for {}", resource_type.to_string()))?;
-           manager_component.resources.insert( assign.stub.point.clone(), resource_type );
+           manager_component.resources.insert(assign.details.stub.point.clone(), resource_type );
            manager.assign(assign).await
        }
        let result = process(self,assign).await;

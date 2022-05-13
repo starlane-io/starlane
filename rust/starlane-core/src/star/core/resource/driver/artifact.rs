@@ -117,7 +117,7 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
                     if index < segments.len()-1 {
                         path.push_str("/");
                     }
-                    let point = Point::from_str( format!("{}:/{}", assign.stub.point.to_string(), path.as_str()).as_str() )?;
+                    let point = Point::from_str( format!("{}:/{}", assign.details.stub.point.to_string(), path.as_str()).as_str() )?;
                     let kind = if index < segments.len()-1 {
                         KindParts { kind: "Artifact".to_string(), sub_kind: Option::Some("Dir".to_string()), specific: None }
                     }  else {
@@ -133,7 +133,7 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
             }
 
             let root_point_and_kind = AddressAndKind {
-               point: Point::from_str( format!("{}:/", assign.stub.point.to_string()).as_str())?,
+               point: Point::from_str( format!("{}:/", assign.details.stub.point.to_string()).as_str())?,
                kind: KindParts { kind: "Artifact".to_string(), sub_kind: Option::Some("Dir".to_string()), specific: None }
             };
 
@@ -200,7 +200,7 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
 
                                 let action = Method::Cmd(Rc::Create(create));
                                 let core = action.into();
-                                let request = Request::new(core, assign.stub.point.clone(), parent);
+                                let request = Request::new(core, assign.details.stub.point.clone(), parent);
                                 let response = skel.messaging_api.request(request).await;
 
                             }
@@ -216,7 +216,7 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
             return Err("ArtifactBundle Manager expected Bin payload".into())
         }
 
-        self.store.put( assign.stub.point, state ).await?;
+        self.store.put(assign.details.stub.point, state ).await?;
 
         // need to unzip and create Artifacts for each...
 
@@ -260,7 +260,7 @@ impl ParticleCoreDriver for ArtifactManager{
         &mut self,
         assign: ParticleAssign,
     ) -> Result<(), Error> {
-        let kind : Kind = TryFrom::try_from(assign.stub.kind)?;
+        let kind : Kind = TryFrom::try_from(assign.details.stub.kind)?;
         if let Kind::Artifact(artifact_kind) = kind
         {
             match artifact_kind {
@@ -277,7 +277,7 @@ impl ParticleCoreDriver for ArtifactManager{
                             return Err("Artifact cannot be stateless".into())
                         },
                     };
-                    self.store.put( assign.stub.point.clone(), state ).await?;
+                    self.store.put(assign.details.stub.point.clone(), state ).await?;
                     Ok(())
                 }
             }

@@ -7,6 +7,7 @@ use mesh_portal::version::latest::id::{Point, RouteSegment};
 use mesh_portal::version::latest::messaging::{Message, Request};
 use mesh_portal::version::latest::particle::{Stub, Status};
 use mesh_portal::version::latest::security::Permissions;
+use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
 use tokio::sync::{mpsc, oneshot};
 use crate::error::Error;
 use crate::fail::{Fail, StarlaneFailure};
@@ -97,7 +98,6 @@ impl AsyncProcessor<SysCall> for SysComponent {
                                 let stub = Stub {
                                     point: point.clone(),
                                     kind: template.kind.try_into()?,
-                                    properties: Default::default(),
                                     status: Status::Unknown
                                 };
 
@@ -123,7 +123,6 @@ impl AsyncProcessor<SysCall> for SysComponent {
                                         let stub = Stub {
                                             point: point.clone(),
                                             kind: template.kind.try_into()?,
-                                            properties: Default::default(),
                                             status: Status::Unknown
                                         };
 
@@ -170,9 +169,12 @@ impl AsyncProcessor<SysCall> for SysComponent {
                     }
                     Some(resource) => {
                         let record = ParticleRecord {
-                            stub: resource.stub.clone(),
+                            details: ParticleDetails {
+                                stub: resource.stub.clone(),
+                                properties: Default::default(),
+                                perms: Permissions::none()
+                            },
                             location: ParticleLocation::Star(self.skel.info.key.clone()),
-                            perms: Permissions::none()
                         };
                         tx.send(Ok(record));
                     }

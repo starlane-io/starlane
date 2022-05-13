@@ -40,6 +40,8 @@ extern crate core;
 
 
 use std::str::FromStr;
+use std::time::SystemTime;
+use chrono::{DateTime, Utc};
 
 use semver;
 use uuid::Uuid;
@@ -89,8 +91,13 @@ lazy_static! {
 }
 
 #[no_mangle]
-pub extern "C" fn mesh_portal_unique_id() -> String
+pub extern "C" fn mesh_portal_uuid() -> String
 {
     Uuid::new_v4().to_string()
 }
 
+
+#[no_mangle]
+pub extern "C" fn mesh_portal_timestamp() -> DateTime<Utc>{
+    Utc::now()
+}

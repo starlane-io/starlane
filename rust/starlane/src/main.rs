@@ -20,7 +20,6 @@ use std::sync::Arc;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use starlane_core::error::Error;
 use tracing_subscriber::FmtSubscriber;
-use tracing;
 use tokio::runtime::Runtime;
 use starlane_core::starlane::StarlaneMachine;
 use starlane_core::template::ConstellationLayout;
@@ -30,6 +29,7 @@ use starlane_core::starlane::api::StarlaneApi;
 use std::convert::TryInto;
 use mesh_portal::version::latest::entity::request::create::Require;
 use mesh_portal::version::latest::id::Point;
+use mesh_portal_versions::version::v0_0_1::span::new_span;
 use reqwest::StatusCode;
 use tokio::io::AsyncReadExt;
 use tracing::error;
@@ -83,7 +83,8 @@ async fn go() -> Result<(),Error> {
                                                             SubCommand::with_name("login").usage("login <hostname> <oauth-url> <email-or-username> <password>").args(vec![Arg::with_name("hostname").required(true).help("the hostname to connect to i.e. 'localhost:4343'"),Arg::with_name("oauth-url").required(true).help("oauth url i.e. http://localhost:8000/hyperspace/users"),Arg::with_name("email-or-username").required(true).help("email address or username"),Arg::with_name("password").required(true).help("password")].as_slice()),
                                                             SubCommand::with_name("mechtron").usage("launch a mechtron portal client").args(vec![Arg::with_name("server").required(true).help("the portal server to connect to"),
                                                                                                                                                        Arg::with_name("wasm_src").required(true).help("the address of the wasm source"),
-                                                                                                                                                      ].as_slice()),
+                                                                                                                                                       Arg::with_name("point").required(true).help("the mount point for the portal"),
+                                                            ].as_slice()),
 
     ]);
 
@@ -235,9 +236,9 @@ async fn script(args: ArgMatches<'_>) -> Result<(), Error> {
     file.read_to_end(&mut buf)?;
     let mut script = String::from_utf8(buf)?;
     loop {
-        let (next,line)  = rec_script_line(script.as_str() )?;
-        println!("{}",line);
-        let (c,code) = exec_command_line(client, line.to_string() ).await?;
+        let (next,line)  = rec_script_line(new_span(script.as_str()) )?;
+        println!("{}",line.to_string());
+        let (c,code) = exec_command_line(client, line.to_string()).await?;
         client = c;
         if code != 0 {
             std::process::exit(code);
@@ -258,8 +259,10 @@ println!("Staring starlane mechtron process");
    async fn launch(args: ArgMatches<'_>) -> Result<(), Error> {
        let server = args.value_of("server").ok_or("expected server hostname")?.to_string();
        let wasm_src = args.value_of("wasm_src").ok_or("expected Wasm source")?.to_string();
+       let point = args.value_of("point").ok_or("expected portal point")?.to_string();
        let wasm_src = Point::from_str(wasm_src.as_str())?;
-       launch_mechtron_client( server, wasm_src ).await?;
+       let point = Point::from_str(point.as_str())?;
+       launch_mechtron_client( server, wasm_src, point ).await?;
        Ok(())
    }
 

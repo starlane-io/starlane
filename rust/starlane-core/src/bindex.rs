@@ -104,7 +104,7 @@ impl BindEx {
         let logger = logger.span();
         let mut pipex = PipeEx::new(delivery, self.clone(), pipeline, env,logger.clone());
         let action = match pipex.next() {
-            Ok(result) => result,
+            Ok(action) => action,
             Err(err) => {
                 let err_msg = format!("Binder: pipeline error for call {}", call.to_string());
                 logger.error(err_msg.as_str());
@@ -237,7 +237,6 @@ impl PipeEx {
                 Ok(self.execute_stop(&segment.stop)?)
             }
             None => {
-                self.traversal.respond();
                 Ok(PipeAction::Respond)
             }
         }
@@ -309,7 +308,7 @@ impl PipeEx {
     }
 
     fn execute_block(&self, block: &PayloadBlockVar) -> Result<(), Error> {
-        let block:PayloadBlock  = block.to_resolved(&self.env)?;
+        let block:PayloadBlock  = block.clone().to_resolved(&self.env)?;
         match block {
             PayloadBlock::RequestPattern(pattern) => {
                 pattern.is_match(&self.traversal.body)?;
@@ -321,6 +320,7 @@ impl PipeEx {
         Ok(())
     }
 }
+
 
 pub struct Traverser {
     pub initial_request: Delivery<Request>,
@@ -428,7 +428,7 @@ struct RequestAction {
     pub action: PipeAction
 }
 
-enum PipeAction {
+pub enum PipeAction {
     CoreRequest(Request),
     MeshRequest(Request),
     Respond,
@@ -477,7 +477,7 @@ mod tmp {
 
             let registry = self.skel.machine.registry.clone();
             let record = registry.locate(particle).await?;
-            let bind = record.stub.properties.get("bind").context("bind property not set")?;
+            let bind = record.details.properties.get("bind").context("bind property not set")?;
             let bind_point = Point::from_str(bind.value.as_str())?;
 
             let mut cache = self

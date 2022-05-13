@@ -134,7 +134,7 @@ impl MechtronResourceCtrl {
     }
 
     pub fn log( &self, message: String) {
-        println!("{} => {}", self.skel.resource_skel.assign.stub.point.to_string(), message );
+        println!("{} => {}", self.skel.resource_skel.assign.details.stub.point.to_string(), message );
     }
 }
 

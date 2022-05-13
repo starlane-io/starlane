@@ -16,7 +16,7 @@ use crate::star::{StarCommand, StarSkel};
 use crate::util;
 use crate::fail::Fail;
 use crate::frame::{StarMessage, StarMessagePayload, SimpleReply};
-use mesh_portal::version::latest::util::unique_id;
+use mesh_portal::version::latest::util::uuid;
 use crate::message::Reply;
 use std::ops::Deref;
 use http::StatusCode;
@@ -109,7 +109,7 @@ impl Delivery<Request>
 
     pub fn respond(mut self, core: ResponseCore ) {
         let response = Response {
-            id: unique_id(),
+            id: uuid(),
             to: self.item.from,
             from: self.item.to,
             core,
@@ -171,21 +171,21 @@ impl Delivery<Request>
     }
 
     pub fn to_call(&self) -> Result<Call,MsgErr> {
-        let kind = match self.item.core.method {
+        let kind = match &self.item.core.method {
             Method::Cmd(_) => {
                 unimplemented!()
             }
             Method::Http(method) => {
-                CallKind::Http(HttpCall::new(method, Subst::new(self.item.core.uri.path())? ))
+                CallKind::Http(HttpCall::new(method.clone(), Subst::new(self.item.core.uri.path())? ))
             }
             Method::Msg(method) => {
-                CallKind::Msg(MsgCall::new(method, Subst::new(self.item.core.uri.path())? ))
+                CallKind::Msg(MsgCall::new(method.clone(), Subst::new(self.item.core.uri.path())? ))
             }
         };
 
        Ok(Call {
            point: self.item.to.clone(),
-           kind
+           kind: kind.clone()
        })
     }
 }

@@ -193,7 +193,7 @@ impl StarlaneApi {
 
     pub async fn get_space(&self, point: Point) -> Result<SpaceApi, Error> {
         let record = self.fetch_resource_record(point).await?;
-        Ok(SpaceApi::new(self.surface_api.clone(), record.stub, self.agent.clone() )?)
+        Ok(SpaceApi::new(self.surface_api.clone(), record.details.stub, self.agent.clone() )?)
     }
 
     pub async fn get_state(&self, point: Point) -> Result<Payload,Error> {

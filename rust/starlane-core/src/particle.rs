@@ -17,6 +17,7 @@ use mesh_portal::version::latest::payload::Payload;
 use mesh_portal::version::latest::particle::{Stub, Status};
 use mesh_portal::version::latest::security::Permissions;
 use mesh_portal_versions::version::v0_0_1::parse::consume_kind;
+use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
 use mesh_portal_versions::version::v0_0_1::span::new_span;
 use rusqlite::{Connection, params, params_from_iter, Row, ToSql, Transaction};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
@@ -121,31 +122,50 @@ impl FromStr for DisplayValue {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParticleRecord {
-    pub stub: Stub,
+    pub details: ParticleDetails,
     pub location: ParticleLocation,
-    pub perms: Permissions
+}
+
+impl Default for ParticleRecord {
+    fn default() -> Self {
+        Self {
+            details: ParticleDetails {
+                stub: Stub {
+                    point: Point::root(),
+                    kind: Kind::Root.to_resource_kind(),
+                    status: Status::Ready
+                },
+                perms: Permissions::none(),
+                properties: Default::default()
+            },
+            location: ParticleLocation::Star(StarKey::central()),
+        }
+    }
 }
 
 
+
+
 impl ParticleRecord {
-    pub fn new(stub: Stub, host: StarKey, perms: Permissions) -> Self {
+    pub fn new(details: ParticleDetails, host: StarKey ) -> Self {
         ParticleRecord {
-            stub: stub,
+            details,
             location: ParticleLocation::new(host),
-            perms
         }
     }
 
     pub fn root() -> Self {
         Self {
-            stub: Stub {
-              point: Point::root(),
-              kind: Kind::Root.to_resource_kind(),
-              properties: Default::default(),
-              status: Status::Ready
+            details: ParticleDetails {
+                stub: Stub {
+                    point: Point::root(),
+                    kind: Kind::Root.to_resource_kind(),
+                    status: Status::Ready
+                },
+                properties: Default::default(),
+                perms: Permissions::none(),
             },
-            location: ParticleLocation::root(),
-            perms: Permissions::none()
+            location: ParticleLocation::Unassigned
         }
     }
 
@@ -154,7 +174,7 @@ impl ParticleRecord {
 
 impl Into<Stub> for ParticleRecord {
     fn into(self) -> Stub {
-        self.stub
+        self.details.stub
     }
 }
 
@@ -716,17 +736,17 @@ pub enum AssignKind {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParticleAssign {
     pub kind: AssignKind,
-    pub stub: Stub,
+    pub details: ParticleDetails,
     pub state: StateSrc,
 }
 
 
 impl ParticleAssign {
 
-    pub fn new(kind: AssignKind, stub: Stub, state: StateSrc) -> Self {
+    pub fn new(kind: AssignKind, details: ParticleDetails, state: StateSrc) -> Self {
         Self {
             kind,
-            stub,
+            details,
             state
         }
     }

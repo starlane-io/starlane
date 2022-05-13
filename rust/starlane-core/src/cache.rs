@@ -369,14 +369,14 @@ impl ArtifactBundleCacheRunner {
                         if self.has(bundle.clone()).await.is_ok() {
                         tx.send(Ok(()));
                     } else {
-                        let first = if !self.notify.contains_key(&record.stub.point) {
-                            self.notify.insert(record.stub.point.clone(), vec![]);
+                        let first = if !self.notify.contains_key(&record.details.stub.point) {
+                            self.notify.insert(record.details.stub.point.clone(), vec![]);
                             true
                         } else {
                             false
                         };
 
-                        let notifiers = self.notify.get_mut(&record.stub.point ).unwrap();
+                        let notifiers = self.notify.get_mut(&record.details.stub.point ).unwrap();
                         notifiers.push(tx);
 
                         let src = self.src.clone();
@@ -395,7 +395,7 @@ impl ArtifactBundleCacheRunner {
                                 )
                                 .await;
                                 tx.send(ArtifactBundleCacheCommand::Result {
-                                    bundle: record.stub.point.clone(),
+                                    bundle: record.details.stub.point.clone(),
                                     result: result,
                                 })
                                 .await;
@@ -449,12 +449,12 @@ match &result {
 
 
         let mut file_access =
-            ArtifactBundleCache::with_bundle_path(file_access, record.stub.point.clone().try_into()?)?;
+            ArtifactBundleCache::with_bundle_path(file_access, record.details.stub.point.clone().try_into()?)?;
         let bundle_zip_path = Path::from_str("/bundle.zip")?;
         let key_file = Path::from_str("/key.ser")?;
         file_access.write(
             &key_file,
-            Arc::new(record.stub.point.to_string().as_bytes().to_vec()),
+            Arc::new(record.details.stub.point.to_string().as_bytes().to_vec()),
         );
 
         file_access.write(&bundle_zip_path, zip).await?;

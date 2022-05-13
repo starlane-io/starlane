@@ -20,7 +20,7 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Message,  Request, Response};
-use mesh_portal::version::latest::util::unique_id;
+use mesh_portal::version::latest::util::uuid;
 use mesh_portal::version::latest::parse::Res;
 use tokio::sync::oneshot::Sender;
 
@@ -277,7 +277,7 @@ impl MessagingComponentInner {
         if let StarMessagePayload::Request(request) = &proto.payload {
             if let Option::Some((_,exchanger)) = self.resource_exchange.remove(&request.id) {
                 let response = Response {
-                    id: unique_id(),
+                    id: uuid(),
                     to: request.from.clone(),
                     from: self.skel.info.address.clone(),
                     core: request.core.not_found(),

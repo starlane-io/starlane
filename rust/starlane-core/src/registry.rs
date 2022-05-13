@@ -1,42 +1,55 @@
-use std::cmp::Ordering;
 use crate::error::Error;
-use crate::particle::{Kind, ParticleLocation, ParticleRecord, KindBase};
-use crate::star::StarKey;
+use crate::frame::{ResourceHostAction, StarMessagePayload};
+use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
+use crate::particle::{
+    ArtifactSubKind, BaseSubKind, FileSubKind, Kind, KindBase, ParticleLocation, ParticleRecord,
+    UserBaseSubKind,
+};
+use crate::star::{StarKey, StarSkel};
 use futures::{FutureExt, StreamExt};
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties, SetRegistry};
+use mesh_portal::version::latest::entity::request::create::{
+    Create, KindTemplate, PointSegFactory, Strategy,
+};
+use mesh_portal::version::latest::entity::request::get::{Get, GetOp};
 use mesh_portal::version::latest::entity::request::query::{Query, QueryResult};
 use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoPayload};
+use mesh_portal::version::latest::entity::request::set::Set;
 use mesh_portal::version::latest::entity::request::{Method, Rc};
-use mesh_portal::version::latest::id::{Point, KindParts, Specific, Version};
+use mesh_portal::version::latest::id::{KindParts, Point, Specific, Version};
 use mesh_portal::version::latest::messaging::Request;
+use mesh_portal::version::latest::particle::{Properties, Property, Status, Stub};
+use mesh_portal::version::latest::payload::{Payload, PayloadMap, Primitive, PrimitiveList};
 use mesh_portal::version::latest::selector::specific::{
     ProductSelector, VariantSelector, VendorSelector,
 };
 use mesh_portal::version::latest::selector::{
-    PointKindHierarchy, PointSelector, PointKindSeg, ExactSegment, KindSelector,
-    GenericKindSelector, PointSegSelector,
+    ExactSegment, GenericKindSelector, KindSelector, PointKindHierarchy, PointKindSeg,
+    PointSegSelector, PointSelector,
 };
-use mesh_portal::version::latest::payload::{Primitive, PrimitiveList};
-use mesh_portal::version::latest::particle::{Property, Stub, Status};
 use mesh_portal::version::latest::util::ValuePattern;
 use mesh_portal_versions::version::v0_0_1::entity::request::select::{SelectKind, SubSelect};
-use mesh_portal_versions::version::v0_0_1::security::{Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask, PermissionsMaskKind, Privilege, Privileges};
+use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
+use mesh_portal_versions::version::v0_0_1::security::{
+    Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask,
+    PermissionsMaskKind, Privilege, Privileges,
+};
+use mesh_portal_versions::version::v0_0_1::selector::selector::GenericSubKindSelector;
 use mysql::prelude::TextQuery;
 use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
 use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::num::ParseIntError;
 use std::ops::{Deref, Index};
 use std::str::FromStr;
 use std::sync::Arc;
-use mesh_portal_versions::version::v0_0_1::selector::selector::GenericSubKindSelector;
 use tokio::sync::mpsc;
 
 lazy_static! {
-    pub static ref HYPERUSER: Point =
-        Point::from_str("hyperspace:users:hyperuser").expect("point");
+    pub static ref HYPERUSER: Point = Point::from_str("hyperspace:users:hyperuser").expect("point");
     pub static ref STARLANE_POSTGRES_URL: String =
         std::env::var("STARLANE_POSTGRES_URL").unwrap_or("localhost".to_string());
     pub static ref STARLANE_POSTGRES_USER: String =
@@ -48,7 +61,6 @@ lazy_static! {
 }
 
 pub type RegistryApi = Arc<Registry>;
-
 
 pub struct Registry {
     pool: Pool<Postgres>,
@@ -186,7 +198,7 @@ impl Registry {
         Ok(())
     }
 
-    async fn register(&self, registration: &Registration) -> Result<(), RegError> {
+    pub async fn register(&self, registration: &Registration) -> Result<ParticleDetails, RegError> {
         /*
         async fn check<'a>( registration: &Registration,  trans:&mut Transaction<Postgres>, ) -> Result<(),RegError> {
             let params = RegistryParams::from_registration(registration)?;
@@ -209,7 +221,7 @@ impl Registry {
 
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
-        let params = RegistryParams::from_registration(&registration)?;
+        let params = RegistryParams::from_registration(registration)?;
 
         let count = sqlx::query_as::<Postgres, Count>(
             "SELECT count(*) as count from resources WHERE parent=$1 AND point_segment=$2",
@@ -243,7 +255,15 @@ impl Registry {
             }
         }
         trans.commit().await?;
-        Ok(())
+        Ok(ParticleDetails {
+            stub: Stub {
+                point: registration.point.clone(),
+                kind: registration.kind.clone().into(),
+                status: Status::Pending,
+            },
+            properties: Default::default(),
+            perms: Permissions::none(),
+        })
     }
 
     pub async fn assign(&self, point: &Point, host: &StarKey) -> Result<(), Error> {
@@ -289,7 +309,7 @@ impl Registry {
         Ok(())
     }
 
-    async fn set_properties(
+    pub async fn set_properties(
         &self,
         point: &Point,
         properties: &SetProperties,
@@ -326,7 +346,7 @@ impl Registry {
         Ok(())
     }
 
-    async fn sequence(&self, point: &Point) -> Result<u64, Error> {
+    pub async fn sequence(&self, point: &Point) -> Result<u64, Error> {
         struct Sequence(u64);
 
         impl sqlx::FromRow<'_, PgRow> for Sequence {
@@ -363,6 +383,22 @@ impl Registry {
         Ok(sequence.0)
     }
 
+    pub async fn get_properties( &self, point:&Point ) -> Result<Properties,Error> {
+        let parent = point.parent().ok_or("expected a parent")?;
+        let point_segment = point
+            .last_segment()
+            .ok_or("expected last point_segment")?
+            .to_string();
+
+        let mut conn = self.pool.acquire().await?;
+        let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut conn).await?;
+        let mut map = HashMap::new();
+        for p in properties {
+            map.insert(p.key.clone(), p.into());
+        }
+        Ok(map)
+    }
+
     pub async fn locate(&self, point: &Point) -> Result<ParticleRecord, Error> {
         let mut conn = self.pool.acquire().await?;
         let parent = point.parent().ok_or("expected a parent")?;
@@ -383,7 +419,7 @@ impl Registry {
         for p in properties {
             map.insert(p.key.clone(), p.into());
         }
-        record.stub.properties = map;
+        record.details.properties = map;
 
         Ok(record)
     }
@@ -402,11 +438,12 @@ impl Registry {
             let record = self.locate(&point).await?;
             let kind_segment = PointKindSeg {
                 segment: record
+                    .details
                     .stub
                     .point
                     .last_segment()
                     .ok_or("expected at least one segment")?,
-                kind: record.stub.kind,
+                kind: record.details.stub.kind,
             };
             kind_path = kind_path.push(kind_segment);
         }
@@ -417,26 +454,23 @@ impl Registry {
     pub async fn select(&self, select: &Select) -> Result<PrimitiveList, Error> {
         let point = select.pattern.query_root();
 
-        let hierarchy= self
+        let hierarchy = self
             .query(&point, &Query::PointKindHierarchy)
             .await?
             .try_into()?;
 
         let sub_select_hops = select.pattern.sub_select_hops();
-        let sub_select =
-            select
-                .clone()
-                .sub_select(point.clone(), sub_select_hops, hierarchy);
+        let sub_select = select
+            .clone()
+            .sub_select(point.clone(), sub_select_hops, hierarchy);
         let mut list = self.sub_select(&sub_select).await?;
         if select.pattern.matches_root() {
             list.push(Stub {
                 point: Point::root(),
-                kind: KindParts::new("Root".to_string(), None, None ),
-                properties: Default::default(),
-                status: Status::Ready
+                kind: KindParts::new("Root".to_string(), None, None),
+                status: Status::Ready,
             });
         }
-
 
         let list = sub_select.into_payload.to_primitive(list)?;
 
@@ -471,7 +505,7 @@ impl Registry {
                 _ => {}
             }
 
-            match &hop.kind_selector.kind{
+            match &hop.kind_selector.kind {
                 GenericKindSelector::Any => {}
                 GenericKindSelector::Exact(kind) => {
                     index = index + 1;
@@ -480,10 +514,10 @@ impl Registry {
                 }
             }
 
-            match &hop.kind_selector.kind{
+            match &hop.kind_selector.kind {
                 GenericKindSelector::Any => {}
-                GenericKindSelector::Exact(kind) => match &hop.kind_selector.sub_kind{
-                    GenericSubKindSelector::Any => { }
+                GenericKindSelector::Exact(kind) => match &hop.kind_selector.sub_kind {
+                    GenericSubKindSelector::Any => {}
                     GenericSubKindSelector::Exact(sub_kind) => {
                         index = index + 1;
                         where_clause.push_str(format!(" AND sub_kind=${}", index).as_str());
@@ -491,7 +525,6 @@ impl Registry {
                     }
                 },
             }
-
 
             match &hop.kind_selector.specific {
                 ValuePattern::Any => {}
@@ -561,11 +594,10 @@ impl Registry {
                         segment: last_segment,
                         kind: stub.kind.clone(),
                     });
-                    let sub_select = sub_select.clone().sub_select(
-                        point.clone(),
-                        hops.clone(),
-                        point_tks_path,
-                    );
+                    let sub_select =
+                        sub_select
+                            .clone()
+                            .sub_select(point.clone(), hops.clone(), point_tks_path);
                     let more_stubs = self.sub_select(&sub_select).await?;
                     for stub in more_stubs.into_iter() {
                         child_stub_matches.push(stub);
@@ -655,13 +687,17 @@ impl Registry {
         }
 
         if *to == *on && is_owner {
-           return Ok(Access::Owner);
+            return Ok(Access::Owner);
         }
 
-        let to_kind_path: PointKindHierarchy =
-            self.query(&to, &Query::PointKindHierarchy).await?.try_into()?;
-        let on_kind_path: PointKindHierarchy =
-            self.query(&on, &Query::PointKindHierarchy).await?.try_into()?;
+        let to_kind_path: PointKindHierarchy = self
+            .query(&to, &Query::PointKindHierarchy)
+            .await?
+            .try_into()?;
+        let on_kind_path: PointKindHierarchy = self
+            .query(&on, &Query::PointKindHierarchy)
+            .await?
+            .try_into()?;
 
         let mut traversal = on.clone();
         let mut privileges = Privileges::none();
@@ -669,8 +705,11 @@ impl Registry {
         let mut level_ands: Vec<Vec<PermissionsMask>> = vec![];
         loop {
             let mut access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,resources.point as by_particle FROM access_grants,resources WHERE access_grants.query_root=$1 AND resources.id=access_grants.by_particle").bind(traversal.to_string() ).fetch_all(& mut conn).await?;
-            let mut access_grants: Vec<AccessGrant> =
-                access_grants.into_iter().map(|a| a.into()).map(|a:IndexedAccessGrant|a.into()).collect();
+            let mut access_grants: Vec<AccessGrant> = access_grants
+                .into_iter()
+                .map(|a| a.into())
+                .map(|a: IndexedAccessGrant| a.into())
+                .collect();
             access_grants.retain(|access_grant| {
                 access_grant.to_point.matches(&to_kind_path)
                     && access_grant.on_point.matches(&on_kind_path)
@@ -747,12 +786,7 @@ impl Registry {
         Ok(access)
     }
 
-    pub async fn chown(
-        &self,
-        on: &PointSelector,
-        owner: &Point,
-        by: &Point,
-    ) -> Result<(), Error> {
+    pub async fn chown(&self, on: &PointSelector, owner: &Point, by: &Point) -> Result<(), Error> {
         let select = Select {
             pattern: on.clone(),
             properties: Default::default(),
@@ -795,49 +829,52 @@ impl Registry {
 
         let to = match to.as_ref() {
             None => None,
-            Some(to) => Some(self.query( to, &Query::PointKindHierarchy ).await?.try_into()?)
+            Some(to) => Some(
+                self.query(to, &Query::PointKindHierarchy)
+                    .await?
+                    .try_into()?,
+            ),
         };
 
         let selection = self.select(&select).await?;
         let mut all_access_grants = HashMap::new();
         let mut conn = self.pool.acquire().await?;
         for on in selection.list {
-            let on : Point = (*on).try_into()?;
+            let on: Point = (*on).try_into()?;
             let access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,resources.point as by_particle FROM access_grants,resources WHERE access_grants.query_root=$1 AND resources.id=access_grants.by_particle").bind(on.to_string() ).fetch_all(& mut conn).await?;
-            let mut access_grants : Vec<IndexedAccessGrant> = access_grants.into_iter().map(|a|a.into()).collect();
+            let mut access_grants: Vec<IndexedAccessGrant> =
+                access_grants.into_iter().map(|a| a.into()).collect();
 
-            access_grants.retain(|a|{
-                match to.as_ref() {
-                    None => true,
-                    Some(to) => {
-                        a.to_point.matches(to)
-                    }
-                }
+            access_grants.retain(|a| match to.as_ref() {
+                None => true,
+                Some(to) => a.to_point.matches(to),
             });
             for access_grant in access_grants {
-                all_access_grants.insert( access_grant.id.clone(), access_grant );
+                all_access_grants.insert(access_grant.id.clone(), access_grant);
             }
         }
 
-        let mut all_access_grants : Vec<IndexedAccessGrant> = all_access_grants.values().into_iter().map(|a|a.clone()).collect();
+        let mut all_access_grants: Vec<IndexedAccessGrant> = all_access_grants
+            .values()
+            .into_iter()
+            .map(|a| a.clone())
+            .collect();
 
         all_access_grants.sort();
 
         Ok(all_access_grants)
     }
 
-    pub async fn remove_access(
-        &self,
-        id: i32,
-        to: &Point,
-    ) -> Result<(), Error> {
-
+    pub async fn remove_access(&self, id: i32, to: &Point) -> Result<(), Error> {
         let mut conn = self.pool.acquire().await?;
         let access_grant: IndexedAccessGrant = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,resources.point as by_particle FROM access_grants,resources WHERE access_grants.id=$1 AND resources.id=access_grants.by_particle").bind(id ).fetch_one(& mut conn).await?.into();
-        let access = self.access( to, &access_grant.by_particle ).await?;
-       if access.has_full() {
+        let access = self.access(to, &access_grant.by_particle).await?;
+        if access.has_full() {
             let mut trans = conn.begin().await?;
-            sqlx::query("DELETE FROM access_grants WHERE id=$1").bind(id).execute(&mut trans).await?;
+            sqlx::query("DELETE FROM access_grants WHERE id=$1")
+                .bind(id)
+                .execute(&mut trans)
+                .await?;
             trans.commit().await?;
             Ok(())
         } else {
@@ -888,23 +925,19 @@ impl Into<IndexedAccessGrant> for WrappedIndexedAccessGrant {
     }
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct IndexedAccessGrant {
     pub id: i32,
-    pub access_grant: AccessGrant
+    pub access_grant: AccessGrant,
 }
 
-impl Eq for IndexedAccessGrant {
-
-}
-
+impl Eq for IndexedAccessGrant {}
 
 impl PartialEq<Self> for IndexedAccessGrant {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
-
 
 impl Ord for IndexedAccessGrant {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -978,7 +1011,7 @@ impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
                 to_point: PointSelector::from_str(to_point)?,
                 by_particle: Point::from_str(by_particle)?,
             };
-            Ok(IndexedAccessGrant{id, access_grant})
+            Ok(IndexedAccessGrant { id, access_grant })
         }
 
         match wrap(row) {
@@ -1052,15 +1085,16 @@ impl sqlx::FromRow<'_, PgRow> for ParticleRecord {
             let stub = Stub {
                 point,
                 kind: kind.into(),
-                properties: Default::default(), // not implemented yet...
                 status,
             };
 
-            let record = ParticleRecord {
-                stub: stub,
-                location,
-                perms
+            let details = ParticleDetails {
+                stub,
+                properties: Default::default(), // not implemented yet...
+                perms,
             };
+
+            let record = ParticleRecord { details, location };
 
             Ok(record)
         }
@@ -1078,18 +1112,21 @@ impl sqlx::FromRow<'_, PgRow> for ParticleRecord {
 #[cfg(test)]
 pub mod test {
     use crate::error::Error;
-    use crate::registry::{Registration, Registry};
     use crate::particle::{Kind, UserBaseSubKind};
+    use crate::registry::{Registration, Registry};
     use crate::star::core::resource::registry::Registration;
     use crate::star::StarKey;
     use mesh_portal::version::latest::entity::request::query::Query;
     use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoPayload};
     use mesh_portal::version::latest::id::Point;
-    use mesh_portal::version::latest::selector::{PointKindHierarchy, PointSelector};
-    use mesh_portal::version::latest::payload::Primitive;
     use mesh_portal::version::latest::particle::Status;
+    use mesh_portal::version::latest::payload::Primitive;
+    use mesh_portal::version::latest::selector::{PointKindHierarchy, PointSelector};
     use mesh_portal_versions::version::v0_0_1::entity::request::select::SelectKind;
-    use mesh_portal_versions::version::v0_0_1::security::{Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind, Privilege};
+    use mesh_portal_versions::version::v0_0_1::security::{
+        Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
+        Privilege,
+    };
     use std::convert::TryInto;
     use std::str::FromStr;
 
@@ -1365,38 +1402,45 @@ pub mod test {
         assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
         assert!(access.check_privilege("property:email:read").is_ok());
 
+        let access_grants = registry
+            .list_access(&None, &PointSelector::from_str("+:**")?)
+            .await?;
 
-        let access_grants = registry.list_access(&None, &PointSelector::from_str("+:**")?).await?;
-
-
-        println!("{: <4}{:<6}{:<20}{:<40}{:<40}{:<40}", "id","grant","data","on","to","by");
+        println!(
+            "{: <4}{:<6}{:<20}{:<40}{:<40}{:<40}",
+            "id", "grant", "data", "on", "to", "by"
+        );
         for access_grant in &access_grants {
-            println!("{: <4}{:<6}{:<20}{:<40}{:<40}{:<40}", access_grant.id, access_grant.access_grant.kind.to_string(), match &access_grant.kind {
-                AccessGrantKind::Super => "".to_string(),
-                AccessGrantKind::Privilege(prv) => prv.clone(),
-                AccessGrantKind::PermissionsMask(perm) => perm.to_string()
-            }, access_grant.access_grant.on_point.to_string(), access_grant.to_point.to_string(), access_grant.by_particle.to_string() );
-//            registry.remove_access(access_grant.id, &app ).await?;
+            println!(
+                "{: <4}{:<6}{:<20}{:<40}{:<40}{:<40}",
+                access_grant.id,
+                access_grant.access_grant.kind.to_string(),
+                match &access_grant.kind {
+                    AccessGrantKind::Super => "".to_string(),
+                    AccessGrantKind::Privilege(prv) => prv.clone(),
+                    AccessGrantKind::PermissionsMask(perm) => perm.to_string(),
+                },
+                access_grant.access_grant.on_point.to_string(),
+                access_grant.to_point.to_string(),
+                access_grant.by_particle.to_string()
+            );
+            //            registry.remove_access(access_grant.id, &app ).await?;
         }
 
         Ok(())
     }
 }
 
-pub enum RegError{
+pub enum RegError {
     Dupe,
-    Error(Error)
+    Error(Error),
 }
 
 impl ToString for RegError {
     fn to_string(&self) -> String {
         match self {
-            RegError::Dupe => {
-                "Dupe".to_string()
-            }
-            RegError::Error(error) => {
-                error.to_string()
-            }
+            RegError::Dupe => "Dupe".to_string(),
+            RegError::Error(error) => error.to_string(),
         }
     }
 }
@@ -1406,10 +1450,9 @@ impl From<sqlx::Error> for RegError {
     }
 }
 
-
 impl From<tokio::sync::oneshot::error::RecvError> for RegError {
     fn from(e: tokio::sync::oneshot::error::RecvError) -> Self {
-        RegError::Error(Error::from_internal( format!("{}", e.to_string())))
+        RegError::Error(Error::from_internal(format!("{}", e.to_string())))
     }
 }
 impl From<Error> for RegError {
@@ -1424,7 +1467,7 @@ impl From<rusqlite::Error> for RegError {
     }
 }
 
-impl <T> From<mpsc::error::SendError<T>> for RegError {
+impl<T> From<mpsc::error::SendError<T>> for RegError {
     fn from(e: mpsc::error::SendError<T>) -> Self {
         RegError::Error(e.into())
     }
@@ -1437,13 +1480,19 @@ impl From<&str> for RegError {
 }
 
 
+impl From<RegError> for Error {
+    fn from(r: RegError) -> Self {
+        Error::new("RegError")
+    }
+}
+
 #[derive(Clone)]
 pub struct Registration {
     pub point: Point,
     pub kind: Kind,
     pub registry: SetRegistry,
     pub properties: SetProperties,
-    pub owner: Point
+    pub owner: Point,
 }
 
 pub struct RegistryParams {
@@ -1461,17 +1510,14 @@ pub struct RegistryParams {
 }
 
 impl RegistryParams {
-    pub fn from_registration(registration: &Registration ) -> Result<Self, Error> {
-
+    pub fn from_registration(registration: &Registration) -> Result<Self, Error> {
         let point_segment = match registration.point.segments.last() {
-            None => {"".to_string()}
-            Some(segment) => {
-                segment.to_string()
-            }
+            None => "".to_string(),
+            Some(segment) => segment.to_string(),
         };
-        let parent = match registration.point.parent()  {
-            None => {"".to_string()}
-            Some(parent) => {parent.to_string()}
+        let parent = match registration.point.parent() {
+            None => "".to_string(),
+            Some(parent) => parent.to_string(),
         };
 
         let resource_type = registration.kind.kind().to_string();
@@ -1481,7 +1527,7 @@ impl RegistryParams {
             Some(specific) => Option::Some(specific.vendor.clone()),
         };
 
-        let product= match &registration.kind.specific() {
+        let product = match &registration.kind.specific() {
             None => Option::None,
             Some(specific) => Option::Some(specific.product.clone()),
         };
@@ -1493,15 +1539,18 @@ impl RegistryParams {
 
         let version = match &registration.kind.specific() {
             None => Option::None,
-            Some(specific) =>  {
+            Some(specific) => {
                 let version = &specific.version;
-                Option::Some(format!( "{}.{}.{}", version.major, version.minor, version.patch ))
+                Option::Some(format!(
+                    "{}.{}.{}",
+                    version.major, version.minor, version.patch
+                ))
             }
         };
 
         let version_variant = match &registration.kind.specific() {
             None => Option::None,
-            Some(specific) =>  {
+            Some(specific) => {
                 let version = &specific.version;
                 if version.is_prerelease() {
                     let mut pre = String::new();
@@ -1529,8 +1578,189 @@ impl RegistryParams {
             variant,
             version,
             version_variant,
-            owner: registration.owner.clone()
+            owner: registration.owner.clone(),
         })
     }
 }
 
+pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
+    let resource_type: KindBase = KindBase::from_str(template.kind.as_str())?;
+    Ok(match resource_type {
+        KindBase::Root => Kind::Root,
+        KindBase::Space => Kind::Space,
+        KindBase::Base => match &template.sub_kind {
+            None => {
+                return Err("kind must be set for Base".into());
+            }
+            Some(sub_kind) => {
+                let kind = BaseSubKind::from_str(sub_kind.as_str())?;
+                if template.specific.is_some() {
+                    return Err("BaseKind cannot have a Specific".into());
+                }
+                return Ok(Kind::Base(kind));
+            }
+        },
+        KindBase::User => Kind::User,
+        KindBase::App => Kind::App,
+        KindBase::Mechtron => Kind::Mechtron,
+        KindBase::FileSystem => Kind::FileSystem,
+        KindBase::File => match &template.sub_kind {
+            None => return Err("expected kind for File".into()),
+            Some(kind) => {
+                let file_kind = FileSubKind::from_str(kind.as_str())?;
+                return Ok(Kind::File(file_kind));
+            }
+        },
+        KindBase::Database => {
+            unimplemented!("need to write a SpecificPattern matcher...")
+        }
+        KindBase::Authenticator => Kind::Authenticator,
+        KindBase::ArtifactBundleSeries => Kind::ArtifactBundleSeries,
+        KindBase::ArtifactBundle => Kind::ArtifactBundle,
+        KindBase::Artifact => match &template.sub_kind {
+            None => {
+                return Err("expected kind for Artirtact".into());
+            }
+            Some(kind) => {
+                let artifact_kind = ArtifactSubKind::from_str(kind.as_str())?;
+                return Ok(Kind::Artifact(artifact_kind));
+            }
+        },
+        KindBase::Proxy => Kind::Proxy,
+        KindBase::Credentials => Kind::Credentials,
+        KindBase::Control => Kind::Control,
+        KindBase::UserBase => match &template.sub_kind {
+            None => {
+                return Err("kind must be set for UserBase".into());
+            }
+            Some(kind) => {
+                let kind = UserBaseSubKind::from_str(kind.as_str())?;
+                Kind::UserBase(kind)
+            }
+        },
+    })
+}
+
+impl Registry {
+    pub async fn set(&self, set: &Set) -> Result<(), Error> {
+        self.set_properties(&set.point, &set.properties).await
+    }
+
+    pub async fn get(&self, get: &Get) -> Result<Payload, Error> {
+        match &get.op {
+            GetOp::State => {
+                return Err("Registry does not handle GetOp::State operations".into());
+                /*
+                let mut proto = ProtoStarMessage::new();
+                proto.to(ProtoStarMessageTo::Resource(get.point.clone()));
+                proto.payload = StarMessagePayload::ResourceHost(ResourceHostAction::GetState(get.point.clone()));
+                if let Ok(Reply::Payload(payload)) = self.skel.messaging_api
+                    .star_exchange(proto, ReplyKind::Payload, "get state from driver")
+                    .await {
+                    Ok(payload)
+                } else {
+                    Err("could not get state".into())
+                }
+                 */
+            }
+            GetOp::Properties(keys) => {
+                println!("GET PROPERTIES for {}", get.point.to_string());
+                let properties = self.get_properties(&get.point ).await?;
+                let mut map = PayloadMap::new();
+                for (index, property) in properties.iter().enumerate() {
+                    println!("\tprop{}", property.0.clone());
+                    map.insert(property.0.clone(), Payload::Text(property.1.value.clone()));
+                }
+
+                Ok(Payload::Map(map))
+            }
+        }
+    }
+
+    pub async fn create(&self, create: &Create) -> Result<ParticleDetails, Error> {
+        let child_kind = match_kind(&create.template.kind)?;
+        let stub = match &create.template.point.child_segment_template {
+            PointSegFactory::Exact(child_segment) => {
+                let point = create.template.point.parent.push(child_segment.clone());
+                match &point {
+                    Ok(_) => {}
+                    Err(err) => {
+                        eprintln!("RC CREATE error: {}", err.to_string());
+                    }
+                }
+                let point = point?;
+
+                let properties = child_kind
+                    .properties_config()
+                    .fill_create_defaults(&create.properties)?;
+                child_kind.properties_config().check_create(&properties)?;
+
+                let registration = Registration {
+                    point: point.clone(),
+                    kind: child_kind.clone(),
+                    registry: create.registry.clone(),
+                    properties,
+                    owner: Point::root(),
+                };
+                println!("creating {}", point.to_string());
+                let mut result = self.register(&registration).await;
+
+                // if strategy is ensure then a dupe is GOOD!
+                if create.strategy == Strategy::Ensure {
+                    if let Err(RegError::Dupe) = result {
+                        result = Ok(self.locate(&point).await?.details);
+                    }
+                }
+
+                println!("result {}? {}", point.to_string(), result.is_ok());
+                result?
+            }
+            PointSegFactory::Pattern(pattern) => {
+                if !pattern.contains("%") {
+                    return Err("AddressSegmentTemplate::Pattern must have at least one '%' char for substitution".into());
+                }
+                loop {
+                    let index = self.sequence(&create.template.point.parent).await?;
+                    let child_segment = pattern.replace("%", index.to_string().as_str());
+                    let point = create.template.point.parent.push(child_segment.clone())?;
+                    let registration = Registration {
+                        point: point.clone(),
+                        kind: child_kind.clone(),
+                        registry: create.registry.clone(),
+                        properties: create.properties.clone(),
+                        owner: Point::root(),
+                    };
+
+                    match self.register(&registration).await {
+                        Ok(stub) => {
+                            if let Strategy::HostedBy(key) = &create.strategy {
+                                let key = StarKey::from_str(key.as_str())?;
+                                self.assign(&point, &key).await?;
+                                return Ok(stub);
+                            } else {
+                                break stub;
+                            }
+                        }
+                        Err(RegError::Dupe) => {
+                            // continue loop
+                        }
+                        Err(RegError::Error(error)) => {
+                            return Err(error);
+                        }
+                    }
+                }
+            }
+        };
+        Ok(stub)
+    }
+
+    pub async fn cmd_select(&self, select: &Select) -> Result<Payload, Error> {
+        let list = Payload::List(self.select(select).await?);
+        Ok(list)
+    }
+
+    pub async fn cmd_query(&self, to: &Point, query: &Query) -> Result<Payload, Error> {
+        let result = Payload::Text(self.query(to, query).await?.to_string());
+        Ok(result)
+    }
+}
