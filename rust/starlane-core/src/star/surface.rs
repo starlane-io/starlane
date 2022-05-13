@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use futures::TryFutureExt;
 use mesh_portal::version::latest::entity::request::create::{PointTemplate, Template};
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Message, Request, Response};
@@ -13,7 +14,6 @@ use crate::frame::{StarMessagePayload, StarPattern};
 use crate::message::{ProtoStarMessage, ReplyKind, Reply, ProtoStarMessageTo};
 use crate::particle::{ParticleRecord};
 use crate::star::{StarCommand, StarSkel, StarInfo};
-use crate::star::shell::locator::ResourceLocateCall;
 use crate::star::shell::message::MessagingCall;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::watch::{WatchSelector, Notification, Topic, Watch, WatchResourceSelector, Watcher};
@@ -171,15 +171,15 @@ impl AsyncProcessor<SurfaceCall> for SurfaceComponent {
                     .unwrap_or_default();
             }
             SurfaceCall::Locate { address: identifier, tx } => {
-                self.skel
-                    .resource_locator_api
-                    .tx
-                    .try_send(ResourceLocateCall::Locate { point: identifier, tx })
-                    .unwrap_or_default();
+                let skel = self.skel.clone();
+                tokio::spawn( async move {
+                    let result = skel.registry_api.locate(&identifier).await;
+                    tx.send(result);
+                });
             }
             SurfaceCall::Watch { selector, tx } => {
                 let selector = WatchSelector{
-                    topic: Topic::Resource(selector.resource),
+                    topic: Topic::Point(selector.resource),
                     property: selector.property
                 };
 

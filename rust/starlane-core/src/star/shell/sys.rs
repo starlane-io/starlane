@@ -172,7 +172,6 @@ impl AsyncProcessor<SysCall> for SysComponent {
                             details: ParticleDetails {
                                 stub: resource.stub.clone(),
                                 properties: Default::default(),
-                                perms: Permissions::none()
                             },
                             location: ParticleLocation::Star(self.skel.info.key.clone()),
                         };

@@ -100,7 +100,7 @@ impl Registry {
     async fn setup(&self) -> Result<(), sqlx::Error> {
         //        let database= format!("CREATE DATABASE IF NOT EXISTS {}", STARLANE_POSTGRES_DATABASE );
 
-        let resources = r#"CREATE TABLE IF NOT EXISTS resources (
+        let particles = r#"CREATE TABLE IF NOT EXISTS particles (
          id SERIAL PRIMARY KEY,
          point TEXT NOT NULL,
          point_segment TEXT NOT NULL,
@@ -116,7 +116,6 @@ impl Registry {
          status TEXT NOT NULL,
          sequence INTEGER DEFAULT 0,
          owner TEXT,
-         perms TEXT NOT NULL,
          UNIQUE(point),
          UNIQUE(parent,point_segment)
         )"#;
@@ -130,7 +129,7 @@ impl Registry {
 	      on_point TEXT NOT NULL,
 	      to_point TEXT NOT NULL,
 	      by_particle INTEGER NOT NULL,
-          FOREIGN KEY (by_particle) REFERENCES resources (id)
+          FOREIGN KEY (by_particle) REFERENCES particles (id)
         )"#;
 
         let labels = r#"
@@ -140,7 +139,7 @@ impl Registry {
 	      key TEXT NOT NULL,
 	      value TEXT,
           UNIQUE(key,value),
-          FOREIGN KEY (resource_id) REFERENCES resources (id)
+          FOREIGN KEY (resource_id) REFERENCES particles (id)
         )"#;
 
         /// note that a tag may reference an point NOT in this database
@@ -160,19 +159,19 @@ impl Registry {
          key TEXT NOT NULL,
          value TEXT NOT NULL,
          lock BOOLEAN NOT NULL,
-         FOREIGN KEY (resource_id) REFERENCES resources (id),
+         FOREIGN KEY (resource_id) REFERENCES particles (id),
          UNIQUE(resource_id,key)
         )"#;
 
         let point_index =
-            "CREATE UNIQUE INDEX IF NOT EXISTS resource_point_index ON resources(point)";
-        let point_segment_parent_index = "CREATE UNIQUE INDEX IF NOT EXISTS resource_point_segment_parent_index ON resources(parent,point_segment)";
+            "CREATE UNIQUE INDEX IF NOT EXISTS resource_point_index ON particles(point)";
+        let point_segment_parent_index = "CREATE UNIQUE INDEX IF NOT EXISTS resource_point_segment_parent_index ON particles(parent,point_segment)";
         let access_grants_index =
             "CREATE INDEX IF NOT EXISTS query_root_index ON access_grants(query_root)";
 
         let mut conn = self.pool.acquire().await?;
         let mut transaction = conn.begin().await?;
-        transaction.execute(resources).await?;
+        transaction.execute(particles).await?;
         transaction.execute(access_grants).await?;
         /*
         transaction.execute(labels).await?;
@@ -190,7 +189,7 @@ impl Registry {
     async fn nuke(&self) -> Result<(), Error> {
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
-        trans.execute("DROP TABLE resources CASCADE").await;
+        trans.execute("DROP TABLE particles CASCADE").await;
         trans.execute("DROP TABLE access_grants CASCADE").await;
         trans.execute("DROP TABLE properties CASCADE").await;
         trans.commit().await?;
@@ -202,7 +201,7 @@ impl Registry {
         /*
         async fn check<'a>( registration: &Registration,  trans:&mut Transaction<Postgres>, ) -> Result<(),RegError> {
             let params = RegistryParams::from_registration(registration)?;
-            let count:u64 = sqlx::query_as("SELECT count(*) as count from resources WHERE parent=? AND point_segment=?").bind(params.parent).bind(params.point_segment).fetch_one(trans).await?;
+            let count:u64 = sqlx::query_as("SELECT count(*) as count from particles WHERE parent=? AND point_segment=?").bind(params.parent).bind(params.point_segment).fetch_one(trans).await?;
             if count > 0 {
                 Err(RegError::Dupe)
             } else {
@@ -224,7 +223,7 @@ impl Registry {
         let params = RegistryParams::from_registration(registration)?;
 
         let count = sqlx::query_as::<Postgres, Count>(
-            "SELECT count(*) as count from resources WHERE parent=$1 AND point_segment=$2",
+            "SELECT count(*) as count from particles WHERE parent=$1 AND point_segment=$2",
         )
         .bind(params.parent.to_string())
         .bind(params.point_segment.to_string())
@@ -235,7 +234,7 @@ impl Registry {
             return Err(RegError::Dupe);
         }
 
-        let statement = format!("INSERT INTO resources (point,point_segment,resource_type,kind,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.resource_type, opt(&params.kind), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
+        let statement = format!("INSERT INTO particles (point,point_segment,resource_type,kind,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.resource_type, opt(&params.kind), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
         trans.execute(statement.as_str()).await?;
 
         for (_, property_mod) in registration.properties.iter() {
@@ -245,11 +244,11 @@ impl Registry {
                         true => 1,
                         false => 0,
                     };
-                    let statement = format!("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM resources WHERE parent='{}' AND point_segment='{}'),'{}','{}',{})", params.parent, params.point_segment, key.to_string(), value.to_string(), lock);
+                    let statement = format!("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM particles WHERE parent='{}' AND point_segment='{}'),'{}','{}',{})", params.parent, params.point_segment, key.to_string(), value.to_string(), lock);
                     trans.execute(statement.as_str()).await?;
                 }
                 PropertyMod::UnSet(key) => {
-                    let statement = format!("DELETE FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent='{}' AND point_segment='{}') AND key='{}' AND lock=false", params.parent, params.point_segment, key.to_string());
+                    let statement = format!("DELETE FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent='{}' AND point_segment='{}') AND key='{}' AND lock=false", params.parent, params.point_segment, key.to_string());
                     trans.execute(statement.as_str()).await?;
                 }
             }
@@ -262,7 +261,6 @@ impl Registry {
                 status: Status::Pending,
             },
             properties: Default::default(),
-            perms: Permissions::none(),
         })
     }
 
@@ -274,7 +272,7 @@ impl Registry {
             .last_segment()
             .ok_or("expecting a last_segment since we know segments are >= 2")?;
         let statement = format!(
-            "UPDATE resources SET star='{}' WHERE parent='{}' AND point_segment='{}'",
+            "UPDATE particles SET star='{}' WHERE parent='{}' AND point_segment='{}'",
             host.to_string(),
             parent.to_string(),
             point_segment.to_string()
@@ -297,7 +295,7 @@ impl Registry {
             .to_string();
         let status = status.to_string();
         let statement = format!(
-            "UPDATE resources SET status='{}' WHERE parent='{}' AND point_segment='{}'",
+            "UPDATE particles SET status='{}' WHERE parent='{}' AND point_segment='{}'",
             status.to_string(),
             parent,
             point_segment
@@ -333,11 +331,11 @@ impl Registry {
                         false => 0,
                     };
 
-                    let statement = format!("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM resources WHERE parent='{}' AND point_segment='{}'),'{}' ,'{}','{}') ON CONFLICT(resource_id,key) DO UPDATE SET value='{}' WHERE lock=false", parent, point_segment, key.to_string(), value.to_string(), value.to_string(), lock);
+                    let statement = format!("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM particles WHERE parent='{}' AND point_segment='{}'),'{}' ,'{}','{}') ON CONFLICT(resource_id,key) DO UPDATE SET value='{}' WHERE lock=false", parent, point_segment, key.to_string(), value.to_string(), value.to_string(), lock);
                     trans.execute(statement.as_str()).await?;
                 }
                 PropertyMod::UnSet(key) => {
-                    let statement = format!("DELETE FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent='{}' AND point_segment='{}') AND key='{}' AND lock=false", parent, point_segment, key.to_string());
+                    let statement = format!("DELETE FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent='{}' AND point_segment='{}') AND key='{}' AND lock=false", parent, point_segment, key.to_string());
                     trans.execute(statement.as_str()).await?;
                 }
             }
@@ -365,14 +363,14 @@ impl Registry {
             .last_segment()
             .ok_or("expecting a last_segment since we know segments are >= 2")?;
         let statement = format!(
-            "UPDATE resources SET sequence=sequence+1 WHERE parent='{}' AND point_segment='{}'",
+            "UPDATE particles SET sequence=sequence+1 WHERE parent='{}' AND point_segment='{}'",
             parent.to_string(),
             point_segment.to_string()
         );
 
         trans.execute(statement.as_str()).await?;
         let sequence = sqlx::query_as::<Postgres, Sequence>(
-            "SELECT DISTINCT sequence FROM resources WHERE parent=$1 AND point_segment=$2",
+            "SELECT DISTINCT sequence FROM particles WHERE parent=$1 AND point_segment=$2",
         )
         .bind(parent.to_string())
         .bind(point_segment.to_string())
@@ -391,7 +389,7 @@ impl Registry {
             .to_string();
 
         let mut conn = self.pool.acquire().await?;
-        let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut conn).await?;
+        let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut conn).await?;
         let mut map = HashMap::new();
         for p in properties {
             map.insert(p.key.clone(), p.into());
@@ -400,6 +398,11 @@ impl Registry {
     }
 
     pub async fn locate(&self, point: &Point) -> Result<ParticleRecord, Error> {
+
+        if point.is_local_root() {
+            return Ok(ParticleRecord::root());
+        }
+
         let mut conn = self.pool.acquire().await?;
         let parent = point.parent().ok_or("expected a parent")?;
         let point_segment = point
@@ -408,13 +411,13 @@ impl Registry {
             .to_string();
 
         let mut record = sqlx::query_as::<Postgres, ParticleRecord>(
-            "SELECT DISTINCT * FROM resources as r WHERE parent=$1 AND point_segment=$2",
+            "SELECT DISTINCT * FROM particles as r WHERE parent=$1 AND point_segment=$2",
         )
         .bind(parent.to_string())
         .bind(point_segment.clone())
         .fetch_one(&mut conn)
         .await?;
-        let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM resources WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut conn).await?;
+        let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut conn).await?;
         let mut map = HashMap::new();
         for p in properties {
             map.insert(p.key.clone(), p.into());
@@ -559,7 +562,7 @@ impl Registry {
         }
 
         let matching_so_far_statement = format!(
-            "SELECT DISTINCT * FROM resources as r WHERE {}",
+            "SELECT DISTINCT * FROM particles as r WHERE {}",
             where_clause
         );
 
@@ -633,14 +636,14 @@ impl Registry {
         let mut conn = self.pool.acquire().await?;
         match &access_grant.kind {
             AccessGrantKind::Super => {
-                sqlx::query("INSERT INTO access_grants (kind,query_root,on_point,to_point,by_particle) VALUES ('super',$1,$2,$3,(SELECT id FROM resources WHERE point=$4))")
+                sqlx::query("INSERT INTO access_grants (kind,query_root,on_point,to_point,by_particle) VALUES ('super',$1,$2,$3,(SELECT id FROM particles WHERE point=$4))")
                         .bind(access_grant.on_point.query_root().to_string())
                         .bind(access_grant.on_point.clone().to_string())
                         .bind(access_grant.to_point.clone().to_string())
                         .bind(access_grant.by_particle.to_string()).execute(& mut conn).await?;
             }
             AccessGrantKind::Privilege(privilege) => {
-                sqlx::query("INSERT INTO access_grants (kind,data,query_root,on_point,to_point,by_particle) VALUES ('priv',$1,$2,$3,$4,(SELECT id FROM resources WHERE point=$5))")
+                sqlx::query("INSERT INTO access_grants (kind,data,query_root,on_point,to_point,by_particle) VALUES ('priv',$1,$2,$3,$4,(SELECT id FROM particles WHERE point=$5))")
                         .bind(privilege.to_string() )
                         .bind(access_grant.on_point.query_root().to_string())
                         .bind(access_grant.on_point.clone().to_string())
@@ -648,7 +651,7 @@ impl Registry {
                         .bind(access_grant.by_particle.to_string()).execute(& mut conn).await?;
             }
             AccessGrantKind::PermissionsMask(mask) => {
-                sqlx::query("INSERT INTO access_grants (kind,data,query_root,on_point,to_point,by_particle) VALUES ('perm',$1,$2,$3,$4,(SELECT id FROM resources WHERE point=$5))")
+                sqlx::query("INSERT INTO access_grants (kind,data,query_root,on_point,to_point,by_particle) VALUES ('perm',$1,$2,$3,$4,(SELECT id FROM particles WHERE point=$5))")
                         .bind(mask.to_string() )
                         .bind(access_grant.on_point.query_root().to_string())
                         .bind(access_grant.on_point.clone().to_string())
@@ -674,7 +677,7 @@ impl Registry {
 
         //if 'to' owns 'on' then grant Owner access
         let is_owner = sqlx::query_as::<Postgres, Owner>(
-            "SELECT count(*) > 0 as owner FROM resources WHERE point=$1 AND owner=$2",
+            "SELECT count(*) > 0 as owner FROM particles WHERE point=$1 AND owner=$2",
         )
         .bind(on.to_string())
         .bind(to.to_string())
@@ -704,7 +707,7 @@ impl Registry {
         let mut permissions = Permissions::none();
         let mut level_ands: Vec<Vec<PermissionsMask>> = vec![];
         loop {
-            let mut access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,resources.point as by_particle FROM access_grants,resources WHERE access_grants.query_root=$1 AND resources.id=access_grants.by_particle").bind(traversal.to_string() ).fetch_all(& mut conn).await?;
+            let mut access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(traversal.to_string() ).fetch_all(& mut conn).await?;
             let mut access_grants: Vec<AccessGrant> = access_grants
                 .into_iter()
                 .map(|a| a.into())
@@ -805,7 +808,7 @@ impl Registry {
                 return Err("only a super can change owners".into());
             }
 
-            sqlx::query("UPDATE resources SET owner=$1 WHERE point=$2")
+            sqlx::query("UPDATE particles SET owner=$1 WHERE point=$2")
                 .bind(owner.to_string())
                 .bind(on.to_string())
                 .execute(&mut trans)
@@ -841,7 +844,7 @@ impl Registry {
         let mut conn = self.pool.acquire().await?;
         for on in selection.list {
             let on: Point = (*on).try_into()?;
-            let access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,resources.point as by_particle FROM access_grants,resources WHERE access_grants.query_root=$1 AND resources.id=access_grants.by_particle").bind(on.to_string() ).fetch_all(& mut conn).await?;
+            let access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(on.to_string() ).fetch_all(& mut conn).await?;
             let mut access_grants: Vec<IndexedAccessGrant> =
                 access_grants.into_iter().map(|a| a.into()).collect();
 
@@ -867,7 +870,7 @@ impl Registry {
 
     pub async fn remove_access(&self, id: i32, to: &Point) -> Result<(), Error> {
         let mut conn = self.pool.acquire().await?;
-        let access_grant: IndexedAccessGrant = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,resources.point as by_particle FROM access_grants,resources WHERE access_grants.id=$1 AND resources.id=access_grants.by_particle").bind(id ).fetch_one(& mut conn).await?.into();
+        let access_grant: IndexedAccessGrant = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.id=$1 AND particles.id=access_grants.by_particle").bind(id ).fetch_one(& mut conn).await?.into();
         let access = self.access(to, &access_grant.by_particle).await?;
         if access.has_full() {
             let mut trans = conn.begin().await?;
@@ -1038,12 +1041,10 @@ impl sqlx::FromRow<'_, PgRow> for ParticleRecord {
             let version_variant: Option<String> = row.get("version_variant");
             let star: Option<String> = row.get("star");
             let status: String = row.get("status");
-            let perms: String = row.get("perms");
 
             let point = Point::from_str(parent.as_str())?;
             let point = point.push(point_segment)?;
             let resource_type = KindBase::from_str(resource_type.as_str())?;
-            let perms = Permissions::from_str(perms.as_str())?;
 
             let specific = if let Option::Some(vendor) = vendor {
                 if let Option::Some(product) = product {
@@ -1091,7 +1092,6 @@ impl sqlx::FromRow<'_, PgRow> for ParticleRecord {
             let details = ParticleDetails {
                 stub,
                 properties: Default::default(), // not implemented yet...
-                perms,
             };
 
             let record = ParticleRecord { details, location };
@@ -1482,7 +1482,7 @@ impl From<&str> for RegError {
 
 impl From<RegError> for Error {
     fn from(r: RegError) -> Self {
-        Error::new("RegError")
+        Error::new(r.to_string().as_str())
     }
 }
 

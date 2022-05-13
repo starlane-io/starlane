@@ -51,7 +51,7 @@ pub struct WatchSelector {
 
 #[derive(Debug,Clone,Serialize,Deserialize,strum_macros::Display,Hash,Eq,PartialEq)]
 pub enum Topic{
-    Resource(Point),
+    Point(Point),
     Star(StarKey),
 }
 

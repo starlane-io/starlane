@@ -62,7 +62,7 @@ impl ParticleCoreDriver for FileCoreManager {
                     self.store.put(assign.details.stub.point.clone(), state.clone() ).await?;
 
                     let selector = WatchSelector{
-                        topic: Topic::Resource(assign.details.stub.point),
+                        topic: Topic::Point(assign.details.stub.point),
                         property: Property::State
                     };
 

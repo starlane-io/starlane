@@ -39,7 +39,6 @@ use crate::particle::{ParticleRecord, KindBase};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::shell::golden::GoldenPathApi;
 use crate::star::shell::lanes::LaneMuxerApi;
-use crate::star::shell::locator::ResourceLocatorApi;
 use crate::star::shell::message::MessagingApi;
 use crate::star::shell::router::RouterApi;
 use crate::star::shell::search::{StarSearchApi, StarSearchCall};
@@ -1192,7 +1191,6 @@ pub struct StarSkel {
     pub core_messaging_endpoint_tx: mpsc::Sender<CoreMessageCall>,
     pub sys_api: SysApi,
     pub registry_api: RegistryApi,
-    pub resource_locator_api: ResourceLocatorApi,
     pub star_search_api: StarSearchApi,
     pub router_api: RouterApi,
     pub surface_api: SurfaceApi,

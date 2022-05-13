@@ -126,6 +126,7 @@ pub struct ParticleRecord {
     pub location: ParticleLocation,
 }
 
+
 impl Default for ParticleRecord {
     fn default() -> Self {
         Self {
@@ -135,7 +136,6 @@ impl Default for ParticleRecord {
                     kind: Kind::Root.to_resource_kind(),
                     status: Status::Ready
                 },
-                perms: Permissions::none(),
                 properties: Default::default()
             },
             location: ParticleLocation::Star(StarKey::central()),
@@ -163,9 +163,8 @@ impl ParticleRecord {
                     status: Status::Ready
                 },
                 properties: Default::default(),
-                perms: Permissions::none(),
             },
-            location: ParticleLocation::Unassigned
+            location: ParticleLocation::Star(StarKey::central())
         }
     }
 

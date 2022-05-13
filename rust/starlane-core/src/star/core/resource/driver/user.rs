@@ -346,7 +346,7 @@ println!("received refresh token: {}", token );
 
 
     async fn set_child(&self, to: Point, mut set: Set) -> Result<Payload,Error> {
-        let record = self.skel.resource_locator_api.locate(set.point.clone()).await?;
+        let record = self.skel.registry_api.locate(&set.point).await?;
         let password = match set.properties.map.remove("password") {
             None => {
                 None

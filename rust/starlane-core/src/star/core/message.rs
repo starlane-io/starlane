@@ -138,7 +138,7 @@ impl MessagingEndpointComponentInner {
             StarMessagePayload::Request(request) => match &request.core.method{
                 Method::Cmd(rc) => {
                     let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
-                    self.process_resource_command(delivery).await;
+                    self.process_particle_command(delivery).await;
                 }
                 _ => {
                     let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
@@ -173,7 +173,7 @@ impl MessagingEndpointComponentInner {
         Ok(())
     }
 
-    async fn process_resource_command(&mut self, delivery: Delivery<Request>)  {
+    async fn process_particle_command(&mut self, delivery: Delivery<Request>)  {
         let skel = self.skel.clone();
         let resource_core_driver_api = self.resource_core_driver_api.clone();
         tokio::spawn(async move {
@@ -185,7 +185,7 @@ impl MessagingEndpointComponentInner {
 
 
             async fn process(skel: StarSkel, resource_core_driver_api: ResourceCoreDriverApi, rc: &Rc, to: Point) -> Result<Payload, Error> {
-                let record = skel.resource_locator_api.locate(to.clone()).await?;
+                let record = skel.registry_api.locate(&to).await?;
                 let kind = Kind::try_from( record.details.stub.kind )?;
                 match kind.kind().child_resource_registry_handler() {
                     ChildResourceRegistryHandler::Shell => {

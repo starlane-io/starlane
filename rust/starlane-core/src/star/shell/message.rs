@@ -350,7 +350,7 @@ impl MessagingComponentInner {
                     return;
                 }
                 ProtoStarMessageTo::Resource(address) => {
-                    let record = match skel.resource_locator_api.locate(address.clone()).await {
+                    let record = match skel.registry_api.locate(&address).await {
                         Ok(record) => record,
                         Err(fail) => {
                             eprintln!("{}", fail.to_string());

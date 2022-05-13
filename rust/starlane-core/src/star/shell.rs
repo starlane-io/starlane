@@ -11,7 +11,6 @@ use crate::star::Request;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
 pub mod lanes;
-pub mod locator;
 pub mod message;
 pub mod wrangler;
 pub mod router;

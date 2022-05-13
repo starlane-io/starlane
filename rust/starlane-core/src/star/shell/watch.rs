@@ -161,8 +161,8 @@ impl WatchComponent {
 
     async fn find_next(skel: &StarSkel, selector: &WatchSelector ) -> Result<NextKind,Error> {
         match &selector.topic {
-            Topic::Resource(resource_key) => {
-                let record = skel.resource_locator_api.locate(resource_key.clone().into()).await?;
+            Topic::Point(point) => {
+                let record = skel.registry_api.locate(&point).await?;
                 if skel.info.key == record.location.ok_or()?{
                     Ok(NextKind::Core)
                 } else {

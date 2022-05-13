@@ -40,7 +40,6 @@ use crate::star::variant::{VariantApi, start_variant};
 use crate::star::{ConstellationBroadcast, FrameHold, FrameTimeoutInner, Persistence, Star, StarCommand, StarController, StarInfo, StarKernel, StarKey, StarKind, StarSkel};
 use crate::starlane::StarlaneMachine;
 use crate::template::StarKeyConstellationIndex;
-use crate::star::shell::locator::{ResourceLocatorApi, ResourceLocatorComponent};
 use crate::star::shell::golden::{GoldenPathApi, GoldenPathComponent};
 use crate::star::shell::watch::{WatchApi, WatchComponent};
 use crate::star::core::resource::driver::ResourceCoreDriverApi;
@@ -175,7 +174,6 @@ impl ProtoStar {
 
                         let (core_messaging_endpoint_tx, core_messaging_endpoint_rx) =
                             mpsc::channel(1024);
-                        let (resource_locator_tx, resource_locator_rx) = mpsc::channel(1024);
                         let (star_locator_tx, star_locator_rx) = mpsc::channel(1024);
                         let (messaging_tx, messaging_rx) = mpsc::channel(1024);
                         let (golden_path_tx, golden_path_rx) = mpsc::channel(1024);
@@ -183,7 +181,6 @@ impl ProtoStar {
                         let (watch_tx, watch_rx) = mpsc::channel(1024);
                         let (sys_tx, sys_rx) = mpsc::channel(1024);
 
-                        let resource_locator_api = ResourceLocatorApi::new(resource_locator_tx);
                         let star_search_api = StarSearchApi::new(star_locator_tx);
                         let router_api = RouterApi::new(self.router_tx);
                         let messaging_api = MessagingApi::new(messaging_tx);
@@ -211,7 +208,6 @@ impl ProtoStar {
                             data_access,
                             machine: self.machine.clone(),
                             surface_api: self.surface_api,
-                            resource_locator_api,
                             star_search_api,
                             router_api,
                             messaging_api,
@@ -227,7 +223,6 @@ impl ProtoStar {
                         start_variant(skel.clone(), variant_rx );
 
                         MessagingEndpointComponent::start(skel.clone(), core_messaging_endpoint_rx);
-                        ResourceLocatorComponent::start(skel.clone(), resource_locator_rx);
                         StarSearchComponent::start(skel.clone(), star_locator_rx);
                         RouterComponent::start(skel.clone(), self.router_booster_rx.router_rx);
                         MessagingComponent::start(skel.clone(), messaging_rx);
