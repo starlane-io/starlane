@@ -972,7 +972,7 @@ impl<C: Cacheable> RootItemCacheProc<C> {
     }
 }
 
-struct RootArtifactCaches {
+pub struct RootArtifactCaches {
     bundle_cache: ArtifactBundleCache,
     raw: RootItemCache<Raw>,
     resource_configs: RootItemCache<ParticleConfig>,
@@ -1292,6 +1292,6 @@ impl Parser<Raw> for RawParser {
 impl BindConfigCache for RootArtifactCaches{
     async fn get_bind_config(&self, point: &Point) -> anyhow::Result<ArtifactItem<CachedConfig<BindConfig>>> {
         let aref = ArtifactRef::new(point.clone(), ArtifactSubKind::Bind );
-        Ok(self.bind_configs.get(aref ).ok_or(format!("bind not found: {}",point.to_string()))?)
+        Ok(self.bind_configs.get(aref ).await?)
     }
 }

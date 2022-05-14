@@ -7,11 +7,7 @@
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/bindex.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/bindex.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/cache.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/cache.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/proto.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/proto.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/driver/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/driver/mod.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -302,7 +298,7 @@
       <workItem from="1652383724843" duration="1829000" />
       <workItem from="1652392037145" duration="17871000" />
       <workItem from="1652460941811" duration="2294000" />
-      <workItem from="1652463972689" duration="8070000" />
+      <workItem from="1652463972689" duration="8802000" />
     </task>
     <servers />
   </component>
