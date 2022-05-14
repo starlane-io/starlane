@@ -48,7 +48,7 @@ use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
 use regex::Regex;
 use serde::de::Unexpected::Str;
 use crate::artifact::ArtifactRef;
-use crate::bindex::{BindEx, BindExRouter, RegistryApi};
+use crate::bindex::{BindConfigCache, BindEx, BindExRouter, RegistryApi};
 use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
 use crate::config::config::{ContextualConfig, ParticleConfig};
 use crate::registry::{RegError, Registration };
@@ -96,7 +96,7 @@ impl MessagingEndpointComponent {
             });
         }
 
-        let bind_config_cache = skel.machine.get_proto_artifact_caches_factory().await.expect("proto cache").root_caches();
+        let bind_config_cache = Arc::new(BindConfigCacheProxy::new(skel.clone()));
 
         let router = EndpointRouter{
             skel: skel.clone(),
@@ -156,7 +156,12 @@ impl MessagingEndpointComponentInner {
 
     async fn handle_request(&mut self, delivery: Delivery<Request>)
     {
-        self.bindex.hande_request(delivery).await.unwrap()
+        match self.bindex.handle_request(delivery).await {
+            Ok(_) => {}
+            Err(err) => {
+                error!("{}",err.to_string())
+            }
+        }
     }
 
     pub async fn process_resource_message(&mut self, star_message: StarMessage) -> Result<(), Error> {
@@ -322,3 +327,23 @@ impl BindExRouter for EndpointRouter {
     }
 }
 
+
+
+pub struct BindConfigCacheProxy {
+   pub skel: StarSkel
+}
+
+impl BindConfigCacheProxy {
+    pub fn new( skel :StarSkel ) -> Self {
+        Self {
+            skel
+        }
+    }
+}
+
+#[async_trait]
+impl BindConfigCache for BindConfigCacheProxy {
+    async fn get_bind_config(&self, particle: &Point) -> anyhow::Result<ArtifactItem<CachedConfig<BindConfig>>> {
+        self.skel.machine.get_proto_artifact_caches_factory().await?.root_caches().get_bind_config(particle).await
+    }
+}

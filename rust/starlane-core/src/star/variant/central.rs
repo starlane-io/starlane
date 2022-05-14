@@ -74,6 +74,7 @@ impl CentralVariant {
 
 impl CentralVariant {
     async fn ensure(starlane_api: StarlaneApi) -> Result<(), Error> {
+info!("CENTRAL ensure!");
         let mut creation = starlane_api.create_space("hyperspace").await?;
         creation.set_strategy(Strategy::Ensure);
         creation.submit().await?;
@@ -91,6 +92,7 @@ impl CentralVariant {
                 break;
             }
         }
+info!("create baes repo!");
         tx.send(inlet::Frame::CommandLine("? create hyperspace:repo:boot<ArtifactBundleSeries>".to_string()) ).await?;
         tx.send(inlet::Frame::EndRequires ).await?;
         while let Some(frame) = rx.recv().await {
@@ -120,6 +122,8 @@ impl CentralVariant {
 
         tx.send(inlet::Frame::CommandLine("? create hyperspace:users:hyperuser<User>".to_string()) ).await?;
         tx.send(inlet::Frame::EndRequires ).await?;
+
+        info!("Done with CENTRAL init");
 
         Ok(())
     }

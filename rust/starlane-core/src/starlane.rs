@@ -137,7 +137,6 @@ impl StarlaneMachine {
             .send(StarlaneCommand::GetProtoArtifactCachesFactory(tx))
             .await?;
         Ok(rx.await?.ok_or("expected proto artifact cache")?)
-
     }
 
     pub async fn start_mechtron_portal_server( &self ) -> Result<mpsc::Sender<TcpServerCall>,Error> {

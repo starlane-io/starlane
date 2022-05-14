@@ -59,8 +59,9 @@ fn request_id_from_response(response: &Response) -> String {
 }
 
 impl BindEx {
-    pub async fn hande_request(&self, delivery: Delivery<Request>) -> anyhow::Result<()>{
+    pub async fn handle_request(&self, delivery: Delivery<Request>) -> anyhow::Result<()>{
 
+        info!("BindEx: handle_request");
         let logger = self.logger.point(delivery.to.clone());
         let mut logger = logger.span();
         logger.set_span_attr("message-id", &delivery.id );
