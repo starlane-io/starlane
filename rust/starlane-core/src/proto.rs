@@ -222,7 +222,7 @@ impl ProtoStar {
 
                         start_variant(skel.clone(), variant_rx );
 
-                        MessagingEndpointComponent::start(skel.clone(), core_messaging_endpoint_rx);
+                        MessagingEndpointComponent::start(skel.clone(), core_messaging_endpoint_rx).await;
                         StarSearchComponent::start(skel.clone(), star_locator_rx);
                         RouterComponent::start(skel.clone(), self.router_booster_rx.router_rx);
                         MessagingComponent::start(skel.clone(), messaging_rx);

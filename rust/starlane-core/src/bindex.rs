@@ -177,10 +177,10 @@ impl BindEx {
     async fn handle_action( &self, action: RequestAction ) -> anyhow::Result<()> {
         match action.action {
             PipeAction::CoreRequest(request) => {
-                self.router.send_to_particle_core(Message::Request(request));
+                self.router.route_to_particle_core(Message::Request(request));
             }
             PipeAction::MeshRequest(request) => {
-                self.router.send_to_mesh(Message::Request(request));
+                self.router.route_to_mesh(Message::Request(request));
             }
             PipeAction::Respond => {
                 let pipex = {
@@ -414,8 +414,8 @@ pub trait BindConfigCache: Send+Sync {
 
 
 pub trait BindExRouter: Send+Sync {
-    fn send_to_mesh(&self, message: Message);
-    fn send_to_particle_core(&self, message: Message);
+    fn route_to_mesh(&self, message: Message);
+    fn route_to_particle_core(&self, message: Message);
 }
 
 pub trait RegistryApi: Send+Sync {

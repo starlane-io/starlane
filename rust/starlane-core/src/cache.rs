@@ -5,6 +5,7 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
+use anyhow::anyhow;
 
 use futures::FutureExt;
 use mesh_portal::error::MsgErr;
@@ -22,13 +23,14 @@ use wasmer::{Cranelift, Store, Universal};
 
 
 use crate::artifact::ArtifactRef;
+use crate::bindex::BindConfigCache;
 use crate::config::bind::BindConfigParser;
 use crate::config::config::ParticleConfig;
 use crate::config::parse::ResourceConfigParser;
 use crate::config::wasm::{Wasm, WasmCompiler};
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use crate::particle::{Kind, ParticleRecord};
+use crate::particle::{BaseSubKind, Kind, ParticleRecord};
 use crate::particle::ArtifactSubKind;
 use crate::particle::config::Parser;
 use crate::starlane::api::StarlaneApi;
@@ -82,6 +84,11 @@ pub struct ProtoArtifactCachesFactory {
 }
 
 impl ProtoArtifactCachesFactory {
+
+    pub fn root_caches(&self) -> Arc<RootArtifactCaches> {
+        self.root_caches.clone()
+    }
+
     pub fn new(
         src: ArtifactBundleSrc,
         file_access: FileAccess,
@@ -1276,5 +1283,15 @@ impl Parser<Raw> for RawParser {
             artifact: artifact,
             data: data,
         }))
+    }
+}
+
+
+
+#[async_trait]
+impl BindConfigCache for RootArtifactCaches{
+    async fn get_bind_config(&self, point: &Point) -> anyhow::Result<ArtifactItem<CachedConfig<BindConfig>>> {
+        let aref = ArtifactRef::new(point.clone(), ArtifactSubKind::Bind );
+        Ok(self.bind_configs.get(aref ).ok_or(format!("bind not found: {}",point.to_string()))?)
     }
 }

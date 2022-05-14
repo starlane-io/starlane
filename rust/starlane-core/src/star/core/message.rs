@@ -31,7 +31,7 @@ use mesh_portal::version::latest::entity::request::{Method, Rc, RequestCore};
 use mesh_portal::version::latest::entity::request::get::Get;
 use mesh_portal::version::latest::fail;
 use mesh_portal::version::latest::id::{Meta, Point};
-use mesh_portal::version::latest::messaging::{Message, Request, Response};
+use mesh_portal::version::latest::messaging::{Agent, Message, Request, Response};
 use mesh_portal::version::latest::payload::{Payload, PayloadMap,  };
 use mesh_portal::version::latest::particle::{Status, Stub};
 use mesh_portal::version::latest::entity::request::get::GetOp;
@@ -43,10 +43,12 @@ use mesh_portal::version::latest::id::Tks;
 use mesh_portal::version::latest::selector::{Block, HttpPattern, MsgPattern};
 use mesh_portal::version::latest::payload::CallKind;
 use mesh_portal::version::latest::entity::request::create::Create;
+use mesh_portal::version::latest::security::Access;
 use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
 use regex::Regex;
 use serde::de::Unexpected::Str;
 use crate::artifact::ArtifactRef;
+use crate::bindex::{BindEx, BindExRouter, RegistryApi};
 use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
 use crate::config::config::{ContextualConfig, ParticleConfig};
 use crate::registry::{RegError, Registration };
@@ -79,11 +81,12 @@ pub struct MessagingEndpointComponent {
 #[derive(Clone)]
 pub struct MessagingEndpointComponentInner {
     skel: StarSkel,
+    bindex: BindEx,
     resource_core_driver_api: ResourceCoreDriverApi
 }
 
 impl MessagingEndpointComponent {
-    pub fn start(skel: StarSkel, rx: mpsc::Receiver<CoreMessageCall>) {
+    pub async fn start(skel: StarSkel, rx: mpsc::Receiver<CoreMessageCall>) {
         let (resource_core_driver_tx, resource_core_driver_rx) = mpsc::channel(1024);
         let resource_core_driver_api = ResourceCoreDriverApi::new(resource_core_driver_tx.clone());
         {
@@ -93,8 +96,31 @@ impl MessagingEndpointComponent {
             });
         }
 
+        let bind_config_cache = skel.machine.get_proto_artifact_caches_factory().await.expect("proto cache").root_caches();
+
+        let router = EndpointRouter{
+            skel: skel.clone(),
+            core_driver_api: resource_core_driver_api.clone()
+        };
+
+        pub struct MockRegistryApi();
+        impl RegistryApi for MockRegistryApi {
+            fn access(&self, to: &Agent, on: &Point) -> anyhow::Result<Access> {
+                Ok(Access::Super(true))
+            }
+        }
+
+        let bindex = BindEx {
+            bind_config_cache,
+            router: Arc::new(router),
+            pipeline_executors: Arc::new(Default::default()),
+            logger: Default::default(),
+            registry: Arc::new(MockRegistryApi())
+        };
+
         let inner = MessagingEndpointComponentInner {
             skel: skel.clone(),
+            bindex,
             resource_core_driver_api
         };
 
@@ -130,7 +156,7 @@ impl MessagingEndpointComponentInner {
 
     async fn handle_request(&mut self, delivery: Delivery<Request>)
     {
-        unimplemented!()
+        self.bindex.hande_request(delivery).await.unwrap()
     }
 
     pub async fn process_resource_message(&mut self, star_message: StarMessage) -> Result<(), Error> {
@@ -260,7 +286,7 @@ impl MessagingEndpointComponentInner {
                        }
                     }
                     ChildResourceRegistryHandler::Core => {
-                        resource_core_driver_api.resource_command(to.clone(), rc.clone()).await
+                        resource_core_driver_api.particle_command(to.clone(), rc.clone()).await
                     }
                 }
             }
@@ -274,4 +300,25 @@ impl MessagingEndpointComponentInner {
 }
 
 
+pub struct EndpointRouter {
+  pub skel: StarSkel,
+  pub core_driver_api: ResourceCoreDriverApi
+}
+
+impl BindExRouter for EndpointRouter {
+    fn route_to_mesh(&self, message: Message) {
+        self.skel.messaging_api.message(message);
+    }
+
+    fn route_to_particle_core(&self, message: Message) {
+        match message {
+            Message::Request(request) => {
+                self.core_driver_api.request(request);
+            }
+            Message::Response(_) => {
+                unimplemented!()
+            }
+        }
+    }
+}
 

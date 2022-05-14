@@ -68,7 +68,7 @@ println!("Manager mod RETURNING" );
         rx.await?
     }
 
-    pub async fn resource_command(&self, to: Point, rc: Rc) -> Result<Payload,Error> {
+    pub async fn particle_command(&self, to: Point, rc: Rc) -> Result<Payload,Error> {
         let (tx,rx) = oneshot::channel();
         self.tx.send(ResourceManagerCall::ResourceCommand { to, rc,  tx }).await;
         rx.await?
