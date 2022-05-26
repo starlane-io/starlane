@@ -6,7 +6,6 @@ use crate::error::Error;
 use crate::frame::{StarMessage, Frame};
 use crate::lane::{LaneWrapper, UltimaLaneKey, LaneSession};
 use crate::star::variant::central::CentralVariant;
-use crate::star::variant::gateway::GatewayVariant;
 use crate::star::variant::web::WebVariant;
 use crate::star::{StarCommand, StarKind, StarSkel};
 use std::sync::Arc;
@@ -15,7 +14,6 @@ use tokio::time::Duration;
 use crate::util::{AsyncRunner, AsyncProcessor, Call};
 
 pub mod central;
-pub mod gateway;
 pub mod web;
 
 
@@ -91,7 +89,6 @@ pub fn start_variant( skel: StarSkel, rx: mpsc::Receiver<VariantCall>) {
     let kind = skel.info.kind.clone();
     match kind {
         StarKind::Central => CentralVariant::start(skel, rx),
-        StarKind::Gateway => GatewayVariant::start(skel, rx),
         StarKind::Web => WebVariant::start(skel, rx),
         _ => NoVariant::start(skel, rx)
     }

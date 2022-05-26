@@ -7,7 +7,7 @@ use crate::error::Error;
 
 use crate::proto::ProtoStarKey;
 
-use crate::star::{ServerKindExt, StarKey, StarKind, StarSubGraphKey, StarTemplateId};
+use crate::star::{ServerKindExt, StarKey, StarKind, StarTemplateId};
 
 pub type StarKeyConstellationIndex = u16;
 
@@ -129,33 +129,6 @@ impl ConstellationTemplate {
         Self::new_basic_with(vec![external])
     }
 
-    pub fn new_client(gateway_machine: MachineName) -> Self {
-        let mut template = ConstellationTemplate { stars: vec![] };
-
-        let _subgraph_data_key = "client".to_string();
-
-        let request_from_constellation =
-            ConstellationSelector::AnyWithGatewayInsideMachine(gateway_machine.clone());
-
-        let mut client = StarTemplate::new(
-            StarKeyTemplate::subgraph_data_key(request_from_constellation, 1),
-            StarKind::Client,
-            "client".into(),
-        );
-
-        let mut lane = LaneTemplate::new(StarInConstellationTemplateSelector {
-            constellation: ConstellationSelector::AnyWithGatewayInsideMachine(gateway_machine),
-            star: StarTemplateSelector::Kind(StarKind::Gateway),
-        });
-        lane.as_key_requestor();
-
-        client.add_lane(lane);
-
-        template.add_star(client);
-
-        template
-    }
-
     pub fn connect(a: &mut StarTemplate, b: &mut StarTemplate) {
         a.add_lane(LaneTemplate::new(StarInConstellationTemplateSelector {
             constellation: ConstellationSelector::Local,
@@ -218,7 +191,6 @@ pub enum StarSelector {
 pub enum ConstellationSelector {
     Local,
     Named(ConstellationName),
-    AnyWithGatewayInsideMachine(MachineName),
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
@@ -236,33 +208,28 @@ pub enum StarTemplateSelector {
 #[derive(Hash, PartialEq, Eq, Debug, Clone, Serialize, Deserialize, Ord, PartialOrd)]
 pub struct StarTemplateHandle {
     pub name: String,
-    pub index: Option<usize>,
+    pub index: u16,
 }
 
 impl StarTemplateHandle {
     pub fn new(name: String) -> Self {
         Self {
             name,
-            index: Option::None,
+            index: 0
         }
     }
 
-    pub fn with_index(name: String, index: usize) -> Self {
+    pub fn with_index(name: String, index: u16) -> Self {
         Self {
             name,
-            index: Option::Some(index),
+            index
         }
     }
 }
 
 impl ToString for StarTemplateHandle {
     fn to_string(&self) -> String {
-        match self.index {
-            None => self.name.clone(),
-            Some(index) => {
-                format!("{}[{}]", self.name, index)
-            }
-        }
+        format!("{}[{}]", self.name, self.index)
     }
 }
 
@@ -323,13 +290,6 @@ impl ConstellationLayout {
         standalone.try_into()
     }
 
-    pub fn client(gateway_machine: MachineName) -> Result<Self, Error> {
-        let mut standalone =
-            ProtoConstellationLayout::new(ConstellationTemplate::new_client(gateway_machine));
-        standalone.set_default_machine("client".to_string());
-        standalone.try_into()
-    }
-
     pub fn set_machine_host_address(&mut self, machine: MachineName, host_address: String) {
         self.machine_to_host_address.insert(machine, host_address);
     }
@@ -369,14 +329,12 @@ impl TryFrom<ProtoConstellationLayout> for ConstellationLayout {
 
 pub struct ConstellationData {
     pub exclude_handles: HashSet<String>,
-    pub subgraphs: HashMap<String, Vec<StarSubGraphKey>>,
 }
 
 impl ConstellationData {
     pub fn new() -> Self {
         ConstellationData {
             exclude_handles: HashSet::new(),
-            subgraphs: HashMap::new(),
         }
     }
 }
@@ -401,36 +359,6 @@ impl StarKeyTemplate {
             index: StarKeyConstellationIndexTemplate::Central,
         }
     }
-
-    pub fn subgraph_data_key(
-        request_from_constellation: ConstellationSelector,
-        index: StarKeyConstellationIndex,
-    ) -> Self {
-        StarKeyTemplate {
-            subgraph: StarKeySubgraphTemplate::RequestStarSubGraphKeyFromConstellation(
-                request_from_constellation,
-            ),
-            index: StarKeyConstellationIndexTemplate::Exact(index),
-        }
-    }
-
-    pub fn create(&self) -> ProtoStarKey {
-        let index = match self.index {
-            StarKeyConstellationIndexTemplate::Central => 0,
-            StarKeyConstellationIndexTemplate::Exact(index) => index,
-        };
-
-        let subgraph = match &self.subgraph {
-            StarKeySubgraphTemplate::Core => {
-                vec![]
-            }
-            StarKeySubgraphTemplate::RequestStarSubGraphKeyFromConstellation(_) => {
-                return ProtoStarKey::RequestSubKeyExpansion(index)
-            }
-        };
-
-        ProtoStarKey::Key(StarKey::new_with_subgraph(subgraph, index))
-    }
 }
 
 pub type MachineName = String;
@@ -439,8 +367,6 @@ pub type ConstellationName = String;
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Serialize, Deserialize)]
 pub enum StarKeySubgraphTemplate {
     Core,
-    RequestStarSubGraphKeyFromConstellation(ConstellationSelector),
-    //    Path(Vec<StarSubGraphKey>),
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Serialize, Deserialize)]

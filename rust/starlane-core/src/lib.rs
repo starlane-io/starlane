@@ -1,7 +1,4 @@
 #![allow(warnings)]
-#![feature(fn_traits)]
-#![feature(unboxed_closures)]
-#![feature(trivial_bounds)]
 
 
 #[macro_use]

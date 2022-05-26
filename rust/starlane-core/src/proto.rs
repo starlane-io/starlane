@@ -151,9 +151,6 @@ impl ProtoStar {
                                 key.clone(),
                                 self.kind.clone())));
                         }
-                        ProtoStarKey::RequestSubKeyExpansion(_) => {
-                            tx.send(Option::None);
-                        }
                     },
                     StarCommand::ConstellationBroadcast(broadcast) => match broadcast {
                         ConstellationBroadcast::Status(constellation_status) => {
@@ -252,35 +249,11 @@ impl ProtoStar {
                                     )))
                                     .await?;
                             }
-                            ProtoStarKey::RequestSubKeyExpansion(_index) => {
-                                lane.outgoing
-                                    .out_tx
-                                    .send(LaneCommand::Frame(Frame::Proto(
-                                        ProtoFrame::GatewaySelect,
-                                    )))
-                                    .await?;
-                            }
                         }
 
                         self.lane_muxer_api.add_proto_lane(lane, StarPattern::Any );
 
 
-                    }
-                    StarCommand::Frame(Frame::Proto( ProtoFrame::GatewayAssign(subgraph))) => {
-                        if let ProtoStarKey::RequestSubKeyExpansion(index) = self.star_key {
-                            let star_key = StarKey::new_with_subgraph(subgraph.clone(), index);
-                            self.star_key = ProtoStarKey::Key(star_key.clone());
-                            self.lane_muxer_api.broadcast(Frame::Proto(
-                                ProtoFrame::ReportStarKey(star_key.clone()),
-                            ), LanePattern::Any );
-
-                            self.lane_muxer_api.broadcast(Frame::Proto(
-                                ProtoFrame::GatewayAssign(subgraph),
-                            ), LanePattern::Protos );
-                            self.check_ready();
-                        } else {
-                            eprintln!("not expecting a GatewayAssign for this ProtoStarKey which is already assigned.")
-                        }
                     }
                     StarCommand::AddConnectorController(connector_ctrl) => {
                         self.connector_ctrls.push(connector_ctrl);
@@ -503,14 +476,12 @@ pub struct LaneToCentral {
 #[derive(Clone)]
 pub enum ProtoStarKey {
     Key(StarKey),
-    RequestSubKeyExpansion(StarKeyConstellationIndex),
 }
 
 impl ProtoStarKey {
     pub fn is_some(&self) -> bool {
         match self {
             ProtoStarKey::Key(_) => true,
-            ProtoStarKey::RequestSubKeyExpansion(_) => false,
         }
     }
 }

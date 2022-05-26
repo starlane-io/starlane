@@ -46,21 +46,23 @@ use crate::star::shell::watch::WatchApi;
 use crate::star::surface::SurfaceApi;
 use crate::star::variant::{FrameVerdict, VariantApi};
 use crate::starlane::StarlaneMachine;
-use crate::template::StarTemplateHandle;
+use crate::template::{ConstellationName, StarTemplateHandle};
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 use std::cmp;
 use std::fmt;
 use std::future::Future;
+use std::num::ParseIntError;
 use crate::star::core::resource::driver::ResourceCoreDriverApi;
 use std::str::FromStr;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::log::{PointLogger, RootLogger};
 use mesh_portal::version::latest::portal;
 use mesh_portal::version::latest::particle::Status;
-use mesh_portal_versions::version::v0_0_1::parse::Res;
+use mesh_portal_versions::version::v0_0_1::parse::{Res, skewer_case};
+use mesh_portal_versions::version::v0_0_1::parse::error::result;
 use mesh_portal_versions::version::v0_0_1::span::new_span;
 use mesh_portal_versions::version::v0_0_1::wrap::Span;
-use nom::sequence::{preceded, terminated, tuple};
+use nom::sequence::{delimited, preceded, terminated, tuple};
 use nom::multi::many0;
 use nom::bytes::complete::tag;
 use nom::character::complete::digit1;
@@ -807,7 +809,6 @@ pub enum StarCommand {
         star: StarKey,
         tx: oneshot::Sender<Option<UltimaLaneKey>>,
     },
-    GatewayAssign(Vec<StarSubGraphKey>),
 }
 
 #[derive(Clone)]
@@ -1008,123 +1009,67 @@ impl FrameHold {
 }
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Hash, Debug, Clone, Serialize, Deserialize)]
-pub enum StarSubGraphKey {
-    Big(u64),
-    Small(u16),
-}
-
-impl ToString for StarSubGraphKey {
-    fn to_string(&self) -> String {
-        match self {
-            StarSubGraphKey::Big(n) => format!("b{}",n),
-            StarSubGraphKey::Small(n) => format!("s{}",n),
-        }
-    }
-}
-
-#[derive(PartialEq, Eq, PartialOrd, Hash, Debug, Clone, Serialize, Deserialize)]
 pub struct StarKey {
-    pub subgraph: Vec<StarSubGraphKey>,
-    pub index: u16,
+    constellation: ConstellationName,
+    name: String,
+    index: u16
 }
 
 impl StarKey {
+
+    pub fn new(constellation:&ConstellationName, handle: &StarTemplateHandle ) -> Self {
+        Self {
+            constellation: constellation.clone(),
+            name: handle.name.clone(),
+            index: handle.index.clone()
+        }
+    }
+
     pub fn central() -> Self {
         StarKey {
-            subgraph: vec![],
+            constellation: "central".to_string(),
+            name: "central".to_string(),
             index: 0,
         }
     }
 }
 
-impl StarKey {
-    pub fn bin(&self) -> Result<Vec<u8>, Error> {
-        let bin = bincode::serialize(self)?;
-        Ok(bin)
-    }
 
-    pub fn from_bin(bin: Vec<u8>) -> Result<StarKey, Error> {
-        let key = bincode::deserialize::<StarKey>(bin.as_slice())?;
-        Ok(key)
-    }
-}
 
-impl cmp::Ord for StarKey {
-    fn cmp(&self, other: &Self) -> Ordering {
-        if self.subgraph.len() > other.subgraph.len() {
-            Ordering::Greater
-        } else if self.subgraph.len() < other.subgraph.len() {
-            Ordering::Less
-        } else if self.subgraph.cmp(&other.subgraph) != Ordering::Equal {
-            return self.subgraph.cmp(&other.subgraph);
-        } else {
-            return self.index.cmp(&other.index);
-        }
-    }
-}
+
 
 impl ToString for StarKey {
     fn to_string(&self) -> String {
-        if self.subgraph.len() > 0 {
-            let mut string = String::new();
-            for (index, node) in self.subgraph.iter().enumerate() {
-               string.push_str(node.to_string().as_str());
-            }
-            format!("{}:{}", string, self.index)
-        } else {
-            self.index.to_string()
-        }
+        format!("{}:{}[{}]", self.constellation, self.name, self.index)
     }
 }
 
-pub fn big_subgraph_key<I:Span>(input:I) -> Res<I,StarSubGraphKey> {
-    let (next,key) = preceded(tag("b"),digit1)(input.clone())?;
-    let key = match key.to_string().parse() {
-        Ok(key) => key,
-        Err(_)=>{
-            return Err(nom::Err::Error(ErrorTree::from_error_kind(input,ErrorKind::Tag)));
+
+
+fn parse_star_key<I:Span>( input: I) -> Res<I,StarKey> {
+    let (next,(constelation,_,name,index)) = tuple((skewer_case,tag(":"),skewer_case,delimited(tag("["),digit1,tag("]"))) )(input.clone())?;
+    let constelation = constelation.to_string();
+    let name = name.to_string();
+    let index = match index.to_string().parse::<u16>() {
+        Ok(index) => index,
+        Err(err) => {
+            return Err(nom::Err::Failure(ErrorTree::from_error_kind(input, ErrorKind::Digit )))
         }
     };
-    Ok((next,StarSubGraphKey::Big(key)))
+
+    Ok((next, StarKey {
+        constellation: constelation,
+        name,
+        index
+    }))
 }
 
-pub fn small_subgraph_key<I:Span>(input:I) -> Res<I,StarSubGraphKey> {
-    let (next,key) = preceded(tag("s"),digit1)(input.clone())?;
-    let key = match key.to_string().parse() {
-        Ok(key) => key,
-        Err(_)=>{
-            return Err(nom::Err::Error(ErrorTree::from_error_kind(input,ErrorKind::Tag)));
-        }
-    };
-    Ok((next,StarSubGraphKey::Small(key)))
-}
-
-pub fn subgraph_key<I:Span>(input:I) -> Res<I,StarSubGraphKey> {
-    alt( (big_subgraph_key,small_subgraph_key))(input)
-}
-
-pub fn index<I:Span>(input:I) -> Res<I,u16> {
-    let (next,key) = digit1(input.clone())?;
-    let key = match key.to_string().parse() {
-        Ok(key) => key,
-        Err(_)=>{
-            return Err(nom::Err::Error(ErrorTree::from_error_kind(input,ErrorKind::Tag)));
-        }
-    };
-    Ok((next,key))
-}
 
 impl FromStr for StarKey {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = new_span(s);
-        Ok(all_consuming(tuple( (many0(subgraph_key ), index)))(s).map( |(next,(subgraph,index))| {
-            (next,Self{
-                subgraph,
-                index
-            })
-        } )?.1)
+        Ok(result(all_consuming(parse_star_key)(new_span(s)))?)
     }
 }
 
@@ -1132,51 +1077,6 @@ impl FromStr for StarKey {
 pub struct StarTemplateId {
     pub constellation: String,
     pub handle: StarTemplateHandle,
-}
-
-impl StarKey {
-    pub fn new(index: u16) -> Self {
-        StarKey {
-            subgraph: vec![],
-            index: index,
-        }
-    }
-
-    pub fn new_with_subgraph(subgraph: Vec<StarSubGraphKey>, index: u16) -> Self {
-        StarKey {
-            subgraph,
-            index: index,
-        }
-    }
-
-    pub fn with_index(&self, index: u16) -> Self {
-        StarKey {
-            subgraph: self.subgraph.clone(),
-            index: index,
-        }
-    }
-
-    // highest to lowest
-    pub fn sort(a: StarKey, b: StarKey) -> Result<(Self, Self), Error> {
-        if a == b {
-            Err(format!(
-                "both StarKeys are equal. {}=={}",
-                a.to_string(),
-                b.to_string()
-            )
-            .into())
-        } else if a.cmp(&b) == Ordering::Greater {
-            Ok((a, b))
-        } else {
-            Ok((b, a))
-        }
-    }
-
-    pub fn child_subgraph(&self) -> Vec<StarSubGraphKey> {
-        let mut subgraph = self.subgraph.clone();
-        subgraph.push(StarSubGraphKey::Small(self.index));
-        subgraph
-    }
 }
 
 #[derive(Clone)]

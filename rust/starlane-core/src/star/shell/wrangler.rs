@@ -275,7 +275,7 @@ impl StarWrangleDB {
                 Ok(StarWrangleResult::Ok)
             }
             StarWrangleCall::SetStar(handle) => {
-                let key = handle.key.bin()?;
+                let key = handle.key.to_string();
                 let kind = handle.kind.to_string();
 
                 let trans = self.conn.transaction()?;
@@ -339,8 +339,9 @@ impl StarWrangleDB {
 
                 let mut handles = vec![];
                 while let Option::Some(row) = rows.next()? {
-                    let key: Vec<u8> = row.get(0)?;
-                    let key = StarKey::from_bin(key)?;
+                    let key: String = row.get(0)?;
+                    let key = StarKey::from_str(key.as_str() )?;
+
 
                     let kind: String = row.get(1)?;
                     let kind = StarKind::from_str(kind.as_str())?;
@@ -406,8 +407,8 @@ impl StarWrangleDB {
 
                 let handle =
                     trans.query_row(statement.as_str(), params_from_iter(params.iter()), |row| {
-                        let key: Vec<u8> = row.get(0)?;
-                        let key = match StarKey::from_bin(key) {
+                        let key: String = row.get(0)?;
+                        let key = match StarKey::from_str(key.as_str()) {
                             Ok(key) => key,
                             Err(err) => {
                                 error!("query row error when parsing StarKey: {}",err.to_string());
@@ -453,7 +454,7 @@ impl StarWrangleDB {
 
                 trans.execute(
                     "UPDATE stars SET selections=selections+1 WHERE key=?1",
-                    params![handle.key.bin()?],
+                    params![handle.key.to_string()],
                 )?;
 
                 trans.commit()?;
@@ -492,7 +493,7 @@ impl StarWrangleDB {
     pub fn setup(&mut self) -> Result<(), Error> {
         let stars = r#"
        CREATE TABLE IF NOT EXISTS stars(
-	      key BLOB PRIMARY KEY,
+	      key  TEXT PRIMARY KEY,
 	      kind TEXT NOT NULL,
 	      hops INTEGER,
 	      selections INTEGER NOT NULL DEFAULT 0

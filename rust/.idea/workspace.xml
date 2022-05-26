@@ -7,10 +7,15 @@
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/bindex.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/bindex.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/message.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant/central.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/central.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/frame.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/frame.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/proto.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/proto.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/shell/wrangler.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/shell/wrangler.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant/gateway.rs" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/starlane.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/starlane.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/template.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/template.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -127,8 +132,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test version::v0_0_1::test::test_address" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package mesh-portal-versions --lib version::v0_0_1::test::test_address -- --exact" />
+    <configuration name="Test tests::it_works" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane --bin starlane tests::it_works -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -215,19 +220,19 @@
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test" />
+      <item itemvalue="Cargo.Test tests::it_works" />
       <item itemvalue="Cargo.Test registry::test::test_access" />
-      <item itemvalue="Cargo.Test version::v0_0_1::test::test_address" />
       <item itemvalue="Cargo.Test version::v0_0_1::test::test_address_kind_pattern" />
       <item itemvalue="Cargo.Test version::v0_0_1::test::test_inclusive" />
       <item itemvalue="Cargo.Test version::v0_0_1::test::test_query_root" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Test tests::it_works" />
         <item itemvalue="Cargo.Test registry::test::test_access" />
         <item itemvalue="Cargo.Test version::v0_0_1::test::test_query_root" />
         <item itemvalue="Cargo.Test version::v0_0_1::test::test_inclusive" />
         <item itemvalue="Cargo.Test version::v0_0_1::test::test_address_kind_pattern" />
-        <item itemvalue="Cargo.Test version::v0_0_1::test::test_address" />
       </list>
     </recent_temporary>
   </component>
@@ -301,7 +306,10 @@
       <workItem from="1652383724843" duration="1829000" />
       <workItem from="1652392037145" duration="17871000" />
       <workItem from="1652460941811" duration="2294000" />
-      <workItem from="1652463972689" duration="14780000" />
+      <workItem from="1652463972689" duration="17889000" />
+      <workItem from="1653052596601" duration="352000" />
+      <workItem from="1653523854361" duration="864000" />
+      <workItem from="1653543772643" duration="4134000" />
     </task>
     <servers />
   </component>

@@ -40,9 +40,7 @@ use crate::lane::{ClientSideTunnelConnector, LocalTunnelConnector, ProtoLaneEnd,
 use crate::logger::{Flags, Logger};
 use crate::mechtron::portal_client::MechtronPortalClient;
 
-use crate::proto::{
-    local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoTunnel,
-};
+use crate::proto::{local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoStarKey, ProtoTunnel};
 use crate::registry::{Registry, RegistryApi};
 
 use crate::star::surface::SurfaceApi;
@@ -428,7 +426,9 @@ impl StarlaneMachineRunner {
                     star_template.handle.to_string()
                 ))?;
             if self.name == *machine {
-                let star_key = star_template.key.create();
+                let star_key = StarKey::new(&name, &star_template.handle ) ;
+                // hacking to ProtoStarKey so we don't have to trouble with fixing the old setup yet
+                let star_key = ProtoStarKey::Key(star_key);
 
                 let (evolve_tx, evolve_rx) = oneshot::channel();
                 evolve_rxs.push(evolve_rx);
@@ -554,25 +554,6 @@ impl StarlaneMachineRunner {
                             let mut evolution_rxs =
                                 self.add_local_lane(local_star.clone(), second_star).await?;
                             proto_lane_evolution_rxs.append(&mut evolution_rxs);
-                        }
-                        ConstellationSelector::AnyWithGatewayInsideMachine(machine_name) => {
-                            let host_address =
-                                layout.get_machine_host_adddress(machine_name.clone());
-                            let star_ctrl = self
-                                .star_controllers
-                                .get(local_star.clone())
-                                .await?
-                                .ok_or("expected local star to have star_ctrl")?;
-                            let proto_lane_evolution_rx = self
-                                .add_client_side_lane_ctrl(
-                                    star_ctrl,
-                                    host_address,
-                                    lane.star_selector.clone(),
-                                    true,
-                                    OnCloseAction::Remove
-                                )
-                                .await?;
-                            proto_lane_evolution_rxs.push(proto_lane_evolution_rx);
                         }
                     }
                 }
