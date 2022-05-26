@@ -192,8 +192,10 @@ mod tests {
 }
 #[cfg(test)]
 mod test {
+    use mesh_portal_versions::version::v0_0_1::span::new_span;
     use crate::error::Error;
     use regex::Regex;
+    use crate::star::variant::web::HostAndPort;
     use crate::star::variant::web::parse::host_and_port;
 
     #[test]
@@ -218,7 +220,7 @@ mod test {
 
     #[test]
     pub async fn host() -> Result<(),Error> {
-        let (_,host_and_port) = host_and_port("localhost:8080")?;
+        let host_and_port:HostAndPort = host_and_port(new_span("localhost:8080"))?;
         assert_eq!( host_and_port.host, "localhost".to_string() );
         assert_eq!( host_and_port.port, 8080 );
         Ok(())
@@ -245,8 +247,8 @@ pub mod parse {
     use nom_supreme::error::ErrorTree;
     use crate::star::variant::web::HostAndPort;
 
-    pub fn host_and_port<I:Span>(input: &str ) -> Result<HostAndPort,MsgErr> {
-        let input = new_span(input);
+    pub fn host_and_port<I:Span>(input: I ) -> Result<HostAndPort,MsgErr> {
+        let input = input;
         let (host,_,port) = result(tuple(( domain, tag(":"), is_a("0123456789")  ) )(input.clone()))?;
 
         let host = host.to_string();

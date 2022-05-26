@@ -88,6 +88,7 @@ pub fn rec_script_line<I:Span>(input: I) -> Res<I,I> {
 #[cfg(test)]
 pub mod test {
     use mesh_portal_versions::version::v0_0_1::parse::Res;
+    use mesh_portal_versions::version::v0_0_1::span::new_span;
     use nom::error::{VerboseError, VerboseErrorKind};
     use nom_supreme::final_parser::{ExtractContext, final_parser};
     use crate::command::compose::CommandOp;
@@ -115,10 +116,10 @@ pub mod test {
     #[test]
     pub async fn test() -> Result<(),Error>{
         let input = "? xreate localhost<Space>";
-        match command_mutation(input) {
+        match command_mutation(new_span(input)) {
             Ok(_) => {}
             Err(nom::Err::Error(e)) => {
-                eprintln!("{}",e.to_string());
+                eprintln!("yikes!");
                 return Err("could not find context".into());
             }
             Err(e) => {
@@ -131,7 +132,7 @@ pub mod test {
     #[test]
     pub async fn test_kind() -> Result<(),Error>{
         let input = "create localhost:users<UserBase<Keycloak>>";
-        let (_, command) = command(input)?;
+        let (_, command) = command(new_span(input))?;
         match command {
             CommandOp::Create(create) => {
                 assert_eq!(create.template.kind.sub_kind, Some("Keycloak".to_string()));
@@ -153,7 +154,7 @@ pub mod test {
 set localhost{ +bind=localhost:repo:tutorial:1.0.0:/bind/localhost.bind };
         "#;
 
-        script(input)?;
+        script(new_span(input))?;
         Ok(())
     }
 

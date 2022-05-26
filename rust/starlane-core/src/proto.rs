@@ -32,7 +32,6 @@ use crate::star::core::message::MessagingEndpointComponent;
 use crate::star::shell::lanes::{LaneMuxerApi, LaneMuxer, LanePattern};
 use crate::star::shell::search::{StarSearchApi, StarSearchComponent, StarSearchTransaction, ShortestPathStarKey};
 use crate::star::shell::message::{MessagingApi, MessagingComponent};
-use crate::star::shell::wrangler::StarWranglerApi;
 use crate::star::shell::router::{RouterApi, RouterComponent, RouterCall};
 use crate::star::shell::sys::{SysApi,SysComponent};
 use crate::star::surface::{SurfaceApi, SurfaceCall, SurfaceComponent};
@@ -43,6 +42,7 @@ use crate::template::StarKeyConstellationIndex;
 use crate::star::shell::golden::{GoldenPathApi, GoldenPathComponent};
 use crate::star::shell::watch::{WatchApi, WatchComponent};
 use crate::star::core::resource::driver::ResourceCoreDriverApi;
+use crate::star::shell::db::StarDB;
 
 
 pub struct ProtoStar {
@@ -166,7 +166,7 @@ impl ProtoStar {
                         };
 
                         let info = StarInfo::new(
-                             star_key,
+                             star_key.clone(),
                             self.kind.clone() );
 
                         let (core_messaging_endpoint_tx, core_messaging_endpoint_rx) =
@@ -191,7 +191,7 @@ impl ProtoStar {
                             .data_access
                             .with_path(format!("stars/{}", info.key.to_string()))?;
 
-                        let star_wrangler_api = StarWranglerApi::new(self.star_tx.clone()).await;
+                        let star_db = Arc::new(StarDB::new(star_key.clone()).await?);
 
                         let skel = StarSkel {
                             info,
@@ -200,7 +200,7 @@ impl ProtoStar {
                             core_messaging_endpoint_tx: core_messaging_endpoint_tx.clone(),
                             logger: self.logger.clone(),
                             flags: self.flags.clone(),
-                            star_wrangler_api,
+                            star_db: star_db,
                             persistence: Persistence::Memory,
                             data_access,
                             machine: self.machine.clone(),

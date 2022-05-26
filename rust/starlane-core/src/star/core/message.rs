@@ -15,12 +15,12 @@ use crate::message::delivery::Delivery;
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
 use crate::particle::{ArtifactSubKind, ChildResourceRegistryHandler, FileSubKind, Kind, KindBase, ParticleLocation, UserBaseSubKind};
 use crate::particle::{AssignKind, ParticleAssign, ParticleRecord};
-use crate::star::shell::wrangler::{StarFieldSelection, StarSelector};
 use crate::star::{StarCommand, StarKey, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use mesh_portal::version::latest::fail::BadRequest;
 use std::future::Future;
 use std::sync::Arc;
+use futures::StreamExt;
 use http::{HeaderMap, StatusCode, Uri};
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
@@ -53,6 +53,7 @@ use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
 use crate::config::config::{ContextualConfig, ParticleConfig};
 use crate::registry::{RegError, Registration };
 use crate::star::core::resource::driver::{ResourceCoreDriverApi, ResourceCoreDriverComponent};
+use crate::star::shell::db::{StarFieldSelection, StarSelector};
 
 
 lazy_static!{
@@ -239,7 +240,7 @@ impl MessagingEndpointComponentInner {
                                     else {
                                         let mut star_selector = StarSelector::new();
                                         star_selector.add(StarFieldSelection::Kind(star_kind.clone()));
-                                        let wrangle = skel.star_wrangler_api.next(star_selector).await?;
+                                        let wrangle = skel.star_db.next_wrangle(star_selector).await?;
                                         wrangle.key
                                     };
                                     skel.registry_api.assign(&details.stub.point, &key).await?;

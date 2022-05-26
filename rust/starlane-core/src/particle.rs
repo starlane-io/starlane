@@ -39,7 +39,6 @@ use crate::particle::KindBase::Mechtron;
 use crate::particle::property::{AddressPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPermit, PropertySource, U64Pattern};
 use crate::star::{StarInfo, StarKey, StarSkel};
 use crate::star::core::resource::driver::user::UsernamePattern;
-use crate::star::shell::wrangler::{StarWrangle};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
 

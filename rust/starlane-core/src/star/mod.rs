@@ -18,7 +18,6 @@ use tokio::sync::oneshot;
 use shell::search::{
     SearchCommit, SearchHits, SearchInit, StarSearchTransaction, TransactionResult,
 };
-use shell::wrangler::{StarWrangle, StarWranglerApi, StarWrangleSatisfaction};
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::constellation::ConstellationStatus;
@@ -35,7 +34,7 @@ use crate::message::{
     MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage,
     ProtoStarMessageTo, TrackerJob,
 };
-use crate::particle::{ParticleRecord, KindBase};
+use crate::particle::{KindBase, ParticleRecord};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::shell::golden::GoldenPathApi;
 use crate::star::shell::lanes::LaneMuxerApi;
@@ -58,7 +57,7 @@ use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::log::{PointLogger, RootLogger};
 use mesh_portal::version::latest::portal;
 use mesh_portal::version::latest::particle::Status;
-use mesh_portal_versions::version::v0_0_1::parse::{Res, skewer_case};
+use mesh_portal_versions::version::v0_0_1::parse::{lowercase_alphanumeric, Res, skewer_case};
 use mesh_portal_versions::version::v0_0_1::parse::error::result;
 use mesh_portal_versions::version::v0_0_1::span::new_span;
 use mesh_portal_versions::version::v0_0_1::wrap::Span;
@@ -73,6 +72,7 @@ use nom::Parser;
 use nom_supreme::error::ErrorTree;
 use crate::registry::RegistryApi;
 use crate::logger::{Flags, Logger, LogInfo};
+use crate::star::shell::db::{StarDB, StarDBApi, StarWrangle, StarWrangleSatisfaction};
 use crate::star::shell::sys::SysApi;
 
 pub mod core;
@@ -631,12 +631,12 @@ impl Star {
                  match result {
                      Ok(Ok(hits)) => {
                          for (star, hops) in hits.hits {
-                             let handle = StarWrangle {
+                             let wrangle = StarWrangle {
                                  key: star,
                                  kind: kind.clone(),
-                                 hops: Option::Some(hops),
+                                 hops: hops
                              };
-                             let result = skel.star_wrangler_api.add_star_handle(handle).await;
+                             let result = skel.star_db.set_wrangle(wrangle).await;
                              match result {
                                  Ok(_) => {
                                      skel.star_tx.send(StarCommand::CheckStatus).await;
@@ -679,8 +679,8 @@ impl Star {
 
     async fn check_status(&mut self) {
         if self.status == StarStatus::Pending {
-                let satisfied = self.skel.star_wrangler_api
-                    .satisfied(self.skel.info.kind.wrangles())
+                let satisfied = self.skel.star_db
+                    .wrangle_satisfaction(self.skel.info.kind.wrangles())
                     .await;
                 if let Result::Ok(StarWrangleSatisfaction::Ok) = satisfied {
                     self.set_status(StarStatus::Pending);
@@ -739,8 +739,8 @@ impl Star {
     async fn diagnose(&self, diagnose: Diagnose) {
         match diagnose {
             Diagnose::HandlersSatisfied(satisfied) => {
-                    if let Result::Ok(satisfaction) = self.skel.star_wrangler_api
-                        .satisfied(self.skel.info.kind.wrangles())
+                    if let Result::Ok(satisfaction) = self.skel.star_db
+                        .wrangle_satisfaction(self.skel.info.kind.wrangles())
                         .await
                     {
                         satisfied.tx.send(satisfaction);
@@ -1044,10 +1044,16 @@ impl ToString for StarKey {
     }
 }
 
+impl StarKey {
+    pub fn to_sql_name(&self) -> String {
+       format!("{}_{}_{}", self.constellation, self.name, self.index )
+    }
+}
+
 
 
 fn parse_star_key<I:Span>( input: I) -> Res<I,StarKey> {
-    let (next,(constelation,_,name,index)) = tuple((skewer_case,tag(":"),skewer_case,delimited(tag("["),digit1,tag("]"))) )(input.clone())?;
+    let (next,(constelation,_,name,index)) = tuple((lowercase_alphanumeric,tag(":"),lowercase_alphanumeric,delimited(tag("["),digit1,tag("]"))) )(input.clone())?;
     let constelation = constelation.to_string();
     let name = name.to_string();
     let index = match index.to_string().parse::<u16>() {
@@ -1102,7 +1108,7 @@ pub struct StarSkel {
     pub flags: Flags,
     pub logger: Logger,
     pub sequence: Arc<AtomicU64>,
-    pub star_wrangler_api: StarWranglerApi,
+    pub star_db: StarDBApi,
     pub persistence: Persistence,
     pub data_access: FileAccess,
     pub machine: StarlaneMachine,

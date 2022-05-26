@@ -47,17 +47,10 @@ use std::ops::{Deref, Index};
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+use crate::databases::lookup_registry_db;
 
 lazy_static! {
     pub static ref HYPERUSER: Point = Point::from_str("hyperspace:users:hyperuser").expect("point");
-    pub static ref STARLANE_POSTGRES_URL: String =
-        std::env::var("STARLANE_POSTGRES_URL").unwrap_or("localhost".to_string());
-    pub static ref STARLANE_POSTGRES_USER: String =
-        std::env::var("STARLANE_POSTGRES_USER").unwrap_or("postgres".to_string());
-    pub static ref STARLANE_POSTGRES_PASSWORD: String =
-        std::env::var("STARLANE_POSTGRES_PASSWORD").unwrap_or("password".to_string());
-    pub static ref STARLANE_POSTGRES_DATABASE: String =
-        std::env::var("STARLANE_POSTGRES_DATABASE").unwrap_or("postgres".to_string());
 }
 
 pub type RegistryApi = Arc<Registry>;
@@ -68,17 +61,11 @@ pub struct Registry {
 
 impl Registry {
     pub async fn new() -> Result<Self, Error> {
+        let db = lookup_registry_db();
         let pool = PgPoolOptions::new()
             .max_connections(5)
             .connect(
-                format!(
-                    "postgres://{}:{}@{}/{}",
-                    STARLANE_POSTGRES_USER.as_str(),
-                    STARLANE_POSTGRES_PASSWORD.as_str(),
-                    STARLANE_POSTGRES_URL.as_str(),
-                    STARLANE_POSTGRES_DATABASE.as_str()
-                )
-                .as_str(),
+               db.to_uri().as_str(),
             )
             .await?;
         let registry = Self { pool };
@@ -98,7 +85,7 @@ impl Registry {
     }
 
     async fn setup(&self) -> Result<(), sqlx::Error> {
-        //        let database= format!("CREATE DATABASE IF NOT EXISTS {}", STARLANE_POSTGRES_DATABASE );
+        //        let database= format!("CREATE DATABASE IF NOT EXISTS {}", REGISTRY_DATABASE );
 
         let particles = r#"CREATE TABLE IF NOT EXISTS particles (
          id SERIAL PRIMARY KEY,
@@ -676,7 +663,7 @@ impl Registry {
         }
 
         //if 'to' owns 'on' then grant Owner access
-        let is_owner = sqlx::query_as::<Postgres, Owner>(
+        let has_owner = sqlx::query_as::<Postgres, Owner>(
             "SELECT count(*) > 0 as owner FROM particles WHERE point=$1 AND owner=$2",
         )
         .bind(on.to_string())
@@ -686,10 +673,10 @@ impl Registry {
         .0;
 
         if *HYPERUSER == *to {
-            return Ok(Access::Super(is_owner));
+            return Ok(Access::Super(has_owner));
         }
 
-        if *to == *on && is_owner {
+        if *to == *on && has_owner {
             return Ok(Access::Owner);
         }
 
@@ -723,7 +710,7 @@ impl Registry {
                 match &access_grant.kind {
                     AccessGrantKind::Super => {
                         if by_access.has_super() {
-                            return Ok(Access::Super(is_owner));
+                            return Ok(Access::Super(has_owner));
                         }
                     }
                     AccessGrantKind::Privilege(privilege) => {
@@ -768,7 +755,7 @@ impl Registry {
             }
         }
 
-        if is_owner {
+        if has_owner {
             return Ok(Access::Owner);
         }
 
@@ -1114,7 +1101,6 @@ pub mod test {
     use crate::error::Error;
     use crate::particle::{Kind, UserBaseSubKind};
     use crate::registry::{Registration, Registry};
-    use crate::star::core::resource::registry::Registration;
     use crate::star::StarKey;
     use mesh_portal::version::latest::entity::request::query::Query;
     use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoPayload};
@@ -1341,27 +1327,27 @@ pub mod test {
         registry.grant(&grant).await?;
 
         let access = registry.access(&hyperuser, &superuser).await?;
-        assert_eq!(access.is_super(), true);
+        assert_eq!(access.has_super(), true);
 
         let access = registry.access(&superuser, &localhost).await?;
-        assert_eq!(access.is_super(), true);
+        assert_eq!(access.has_super(), true);
 
         let access = registry.access(&superuser, &app).await?;
-        assert_eq!(access.is_super(), true);
+        assert_eq!(access.has_super(), true);
 
         let access = registry.access(&app, &scott).await?;
-        assert_eq!(access.is_super(), false);
-        assert_eq!(access.is_owner(), true);
+        assert_eq!(access.has_super(), false);
+        assert_eq!(access.has_owner(), true);
         assert_eq!(access.has_full(), true);
 
         let access = registry.access(&scott, &superuser).await?;
-        assert_eq!(access.is_super(), false);
+        assert_eq!(access.has_super(), false);
         assert_eq!(access.has_full(), false);
         assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
 
         // should fail because app is not the owner of localhost:app yet...
         let access = registry.access(&scott, &app).await?;
-        assert_eq!(access.is_super(), false);
+        assert_eq!(access.has_super(), false);
         assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
 
         // must have super to chagne ownership
@@ -1372,16 +1358,16 @@ pub mod test {
 
         // now the previous rule should work since app now owns itself.
         let access = registry.access(&scott, &app).await?;
-        assert_eq!(access.is_super(), false);
+        assert_eq!(access.has_super(), false);
         assert_eq!(access.permissions().to_string(), "csd-Rwx".to_string());
 
         let access = registry.access(&scott, &superuser).await?;
-        assert_eq!(access.is_super(), false);
+        assert_eq!(access.has_super(), false);
         assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
 
         // test masked OR permissions
         let access = registry.access(&scott, &mechtron).await?;
-        assert_eq!(access.is_super(), false);
+        assert_eq!(access.has_super(), false);
         assert_eq!(access.permissions().to_string(), "csd-RwX".to_string());
 
         // now test AND permissions (masking Read)
@@ -1394,11 +1380,11 @@ pub mod test {
         registry.grant(&grant).await?;
 
         let access = registry.access(&scott, &mechtron).await?;
-        assert_eq!(access.is_super(), false);
+        assert_eq!(access.has_super(), false);
         assert_eq!(access.permissions().to_string(), "csd-rwX".to_string());
 
         let access = registry.access(&mechtron, &scott).await?;
-        assert_eq!(access.is_super(), false);
+        assert_eq!(access.has_super(), false);
         assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
         assert!(access.check_privilege("property:email:read").is_ok());
 
@@ -1417,7 +1403,7 @@ pub mod test {
                 access_grant.access_grant.kind.to_string(),
                 match &access_grant.kind {
                     AccessGrantKind::Super => "".to_string(),
-                    AccessGrantKind::Privilege(prv) => prv.clone(),
+                    AccessGrantKind::Privilege(prv) => prv.to_string(),
                     AccessGrantKind::PermissionsMask(perm) => perm.to_string(),
                 },
                 access_grant.access_grant.on_point.to_string(),

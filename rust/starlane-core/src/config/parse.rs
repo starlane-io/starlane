@@ -126,7 +126,6 @@ pub enum Section {
 #[cfg(test)]
 pub mod test {
     use crate::artifact::ArtifactRef;
-    use crate::config::parse::replace::substitute;
     use crate::config::parse::{
         properties_section, rec_command_line, rec_command_lines, resource_config,
     };
@@ -134,7 +133,6 @@ pub mod test {
     use crate::particle::ArtifactSubKind;
     use mesh_portal::version::latest::command::common::PropertyMod;
     use mesh_portal::version::latest::id::Point;
-    use mesh_portal_versions::version::v0_0_1::command::common::PropertyMod;
     use mesh_portal_versions::version::v0_0_1::parse::{
         property_mod, property_value, property_value_not_space_or_comma, set_properties,
     };
@@ -151,7 +149,7 @@ pub mod test {
     +bind=localhost:files:/bind/app.bind
   }"#;
 
-        let (_, section) = properties_section(config_src)?;
+        let (_, section) = properties_section(new_span(config_src))?;
 
         Ok(())
     }
@@ -164,7 +162,7 @@ pub mod test {
     +bind=localhost:files:/bind/app.bind
   "#;
 
-        let (_, section) = set_properties(config_src)?;
+        let (_, section) = set_properties(new_span(config_src))?;
 
         Ok(())
     }
@@ -173,7 +171,7 @@ pub mod test {
     pub async fn test_property_valu3() -> Result<(), Error> {
         let config_src = "+some=blah,";
 
-        let (next, property) = property_mod(config_src)?;
+        let (next, property) = property_mod(new_span(config_src))?;
 
         match property.clone() {
             PropertyMod::Set { key, value, lock } => {
@@ -184,16 +182,16 @@ pub mod test {
                 assert!(false);
             }
         }
-        assert_eq!(next, ",");
+        assert_eq!(next.to_string(), ",".to_string());
 
         Ok(())
     }
 
     #[test]
     pub async fn test_rec_command_line() -> Result<(), Error> {
-        let (_, line) = all_consuming(rec_command_line)("create $(self):users<Base<User>>;")?;
+        let (_, line) = all_consuming(rec_command_line)(new_span("create $(self):users<Base<User>>;"))?;
         let (_, line) =
-            all_consuming(rec_command_line)("        create $(self):users<Base<User>>;")?;
+            all_consuming(rec_command_line)(new_span("        create $(self):users<Base<User>>;"))?;
 
         Ok(())
     }
@@ -207,7 +205,7 @@ pub mod test {
 
 "#;
 
-        let (_, section) = all_consuming(rec_command_lines)(config_src)?;
+        let (_, section) = all_consuming(rec_command_lines)(new_span(config_src))?;
 
         assert_eq!(section.len(), 2);
         Ok(())
