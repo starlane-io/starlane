@@ -2,9 +2,12 @@ use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::str::FromStr;
 use std::sync::Arc;
-use sqlx::{Connection, Pool, Postgres, Row,Transaction};
-use sqlx::postgres::{PgPoolOptions, PgRow};
+
+use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
+use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
+use sqlx::error::DatabaseError;
 use crate::databases::lookup_db_for_star;
+use crate::error;
 use crate::error::Error;
 use crate::star::{StarKey, StarKind, StarWrangleKind};
 
@@ -57,8 +60,8 @@ impl StarDB {
 
         let mut conn = self.pool.acquire().await?;
         let mut transaction = conn.begin().await?;
-        transaction.execute(schema).await?;
-        transaction.execute(wrangles).await?;
+        transaction.execute(schema.as_str()).await?;
+        transaction.execute(wrangles.as_str()).await?;
 
         Ok(())
     }
@@ -67,7 +70,7 @@ impl StarDB {
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
         trans
-            .execute(format!("DROP SCHEMA {} CASCADE", self.schema))
+            .execute(format!("DROP SCHEMA {} CASCADE", self.schema).as_str())
             .await;
         trans.commit().await?;
         self.setup().await?;
@@ -118,7 +121,6 @@ impl StarDB {
                 param_index = param_index + 1;
             }
         }
-        let mut conn = self.pool.acquire().await;
 
         // in case this search was for EVERYTHING
         let statement = if !selector.is_empty() {
@@ -133,6 +135,7 @@ impl StarDB {
             )
         };
 
+        let mut conn = self.pool.acquire().await?;
         let wrangles = sqlx::query_as::<Postgres, StarWrangle>(statement.as_str())
             .fetch_all(&mut conn)
             .await?;
@@ -141,9 +144,7 @@ impl StarDB {
     }
 
     pub async fn next_wrangle(&self, selector: StarSelector) -> anyhow::Result<StarWrangle> {
-        let mut params = vec![];
         let mut where_clause = String::new();
-        let mut param_index = 0;
 
         for (index, field) in Vec::from_iter(selector.fields.clone())
             .iter()
@@ -175,15 +176,16 @@ impl StarDB {
         } else {
             format!("SELECT DISTINCT key,kind,hops  FROM {}.wrangles ORDER BY selections", self.schema)
         };
-        let mut trans = self.pool.acquire().await?.begin().await?;
+        let mut conn = self.pool.acquire().await?;
+        let mut trans = conn.begin().await?;
         let wrangle = sqlx::query_as::<Postgres, StarWrangle>(statement.as_str())
             .fetch_one(&mut trans)
             .await?;
 
         trans.execute(
             format!("UPDATE {}.wrangles SET selections=selections+1 WHERE key='{}'",
-            self.schema,wrangle.key.to_string())
-        )?;
+            self.schema,wrangle.key.to_string()).as_str()
+        );
 
         trans.commit().await?;
 
@@ -218,13 +220,25 @@ impl sqlx::FromRow<'_, PgRow> for StarWrangle {
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
         let key: String = row.get(0);
         let kind: String = row.get(1);
-        let hops: usize = row.get(2);
+        let hops: u32= row.get(2);
 
-        let key = StarKey::from_str(key.as_str())?;
-        let kind = StarKind::from_str(kind.as_str())?;
-        Ok(Self { key, kind, hops })
+        let key = match StarKey::from_str(key.as_str()) {
+            Ok(key) => key,
+            Err(_) => {
+                return Err(sqlx::Error::RowNotFound)
+            }
+        };
+        let kind = match StarKind::from_str(kind.as_str()) {
+            Ok(kind) => kind,
+            Err(_) => {
+                return Err(sqlx::Error::RowNotFound)
+            }
+
+        };
+        Ok(Self { key, kind, hops: hops as usize })
     }
 }
+
 
 #[cfg(test)]
 pub mod test {
