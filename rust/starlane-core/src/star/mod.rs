@@ -46,7 +46,7 @@ use crate::star::shell::watch::WatchApi;
 use crate::star::surface::SurfaceApi;
 use crate::star::variant::{FrameVerdict, VariantApi};
 use crate::starlane::StarlaneMachine;
-use crate::template::{ConstellationName, StarTemplateHandle};
+use crate::template::{ConstellationName, StarHandle};
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 use std::cmp;
 use std::fmt;
@@ -96,9 +96,9 @@ pub mod shell;
 pub enum StarKind {
     Central,
     Space,
-    Mesh,
+    Relay,
     App,
-    Mechtron,
+    Exe,
     FileStore,
     ArtifactStore,
     Gateway,
@@ -114,9 +114,9 @@ impl StarKind {
         match self {
             StarKind::Central => true,
             StarKind::Space => true,
-            StarKind::Mesh => false,
+            StarKind::Relay => false,
             StarKind::App => true,
-            StarKind::Mechtron => false,
+            StarKind::Exe => false,
             StarKind::FileStore => true,
             StarKind::Gateway => false,
             StarKind::Link => false,
@@ -132,9 +132,9 @@ impl StarKind {
         match self {
             StarKind::Central => false,
             StarKind::Space => true,
-            StarKind::Mesh => false,
+            StarKind::Relay => false,
             StarKind::App => true,
-            StarKind::Mechtron => true,
+            StarKind::Exe => true,
             StarKind::FileStore => true,
             StarKind::Gateway => false,
             StarKind::Link => false,
@@ -159,12 +159,12 @@ impl StarKind {
                         StarWrangleKind::opt(StarKind::App),
                     ]
                 }
-                StarKind::Mesh => vec![],
+                StarKind::Relay => vec![],
                 StarKind::App => vec![
-                    StarWrangleKind::req(StarKind::Mechtron),
+                    StarWrangleKind::req(StarKind::Exe),
                     StarWrangleKind::req(StarKind::FileStore),
                 ],
-                StarKind::Mechtron => vec![],
+                StarKind::Exe => vec![],
                 StarKind::FileStore => vec![],
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
@@ -189,13 +189,13 @@ impl StarKind {
                     KindBase::Proxy,
                     KindBase::Database,
                 ],
-                StarKind::Mesh => vec![],
+                StarKind::Relay => vec![],
                 StarKind::App => vec![
                     KindBase::Mechtron,
                     KindBase::FileSystem,
                     KindBase::Database,
                 ],
-                StarKind::Mechtron => vec![],
+                StarKind::Exe => vec![],
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
                 StarKind::Client => vec![],
@@ -238,7 +238,7 @@ impl StarKind {
             KindBase::Space => Self::Space,
             KindBase::User => Self::Space,
             KindBase::App => Self::App,
-            KindBase::Mechtron => Self::Mechtron,
+            KindBase::Mechtron => Self::Exe,
             KindBase::FileSystem => Self::FileStore,
             KindBase::File => Self::FileStore,
             KindBase::Database => Self::K8s,
@@ -265,9 +265,9 @@ impl StarKind {
                     KindBase::Proxy,
                     KindBase::UserBase,
                 ],
-                StarKind::Mesh => vec![],
+                StarKind::Relay => vec![],
                 StarKind::App => vec![KindBase::App],
-                StarKind::Mechtron => vec![KindBase::Mechtron],
+                StarKind::Exe => vec![KindBase::Mechtron],
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
                 StarKind::Client => vec![KindBase::Mechtron],
@@ -375,7 +375,7 @@ impl StarKind {
     }
 
     pub fn server_result(&self) -> Result<(), Error> {
-        if let StarKind::Mechtron = self {
+        if let StarKind::Exe = self {
             Ok(())
         } else {
             Err("not server".into())
@@ -393,9 +393,9 @@ impl StarKind {
     pub fn relay(&self) -> bool {
         match self {
             StarKind::Central => false,
-            StarKind::Mesh => true,
+            StarKind::Relay => true,
             StarKind::App => false,
-            StarKind::Mechtron => true,
+            StarKind::Exe => true,
             StarKind::Gateway => true,
             StarKind::Client => true,
             StarKind::Link => true,
@@ -1017,7 +1017,7 @@ pub struct StarKey {
 
 impl StarKey {
 
-    pub fn new(constellation:&ConstellationName, handle: &StarTemplateHandle ) -> Self {
+    pub fn new(constellation:&ConstellationName, handle: &StarHandle) -> Self {
         Self {
             constellation: constellation.clone(),
             name: handle.name.clone(),
@@ -1076,7 +1076,7 @@ impl FromStr for StarKey {
 #[derive(Eq, PartialEq, Hash, Clone)]
 pub struct StarTemplateId {
     pub constellation: String,
-    pub handle: StarTemplateHandle,
+    pub handle: StarHandle,
 }
 
 #[derive(Clone)]

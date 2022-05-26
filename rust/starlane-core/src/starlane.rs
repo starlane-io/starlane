@@ -53,7 +53,7 @@ use crate::template::{
     ConstellationData, ConstellationLayout, ConstellationSelector, ConstellationTemplate,
     ConstellationTemplateHandle, MachineName, StarInConstellationTemplateHandle,
     StarInConstellationTemplateSelector, StarKeyConstellationIndexTemplate,
-    StarKeySubgraphTemplate, StarKeyTemplate, StarSelector, StarTemplate, StarTemplateHandle,
+    StarKeySubgraphTemplate, StarKeyTemplate, StarSelector, StarTemplate, StarHandle,
 };
 use crate::user::HyperUser;
 use crate::util::{AsyncHashMap, JwksCache};
@@ -275,11 +275,11 @@ impl StarlaneMachineRunner {
                 } else {
                     let (prev_info, _) = best.as_ref().unwrap();
                     match info.kind {
-                        StarKind::Mesh => {
+                        StarKind::Relay => {
                             best = Option::Some((info, star_ctrl));
                         }
                         StarKind::Client => {
-                            if prev_info.kind != StarKind::Mesh {
+                            if prev_info.kind != StarKind::Relay {
                                 best = Option::Some((info, star_ctrl));
                             }
                         }

@@ -103,7 +103,7 @@ async fn go() -> Result<(),Error> {
                 Some(value) => {
                     match bool::from_str(value ) {
                         Ok(true) => {
-                                ConstellationLayout::standalone_with_external().expect("standalone_with_external")
+                                ConstellationLayout::standalone().expect("standalone_with_external")
                         }
                         _ =>{
                             ConstellationLayout::standalone().expect("standalone")
