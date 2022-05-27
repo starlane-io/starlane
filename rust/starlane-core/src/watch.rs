@@ -7,9 +7,9 @@ use uuid::Uuid;
 use crate::star::shell::watch::WatchApi;
 use crate::star::StarKey;
 use std::hash::Hash;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::payload::Payload;
-use mesh_portal::version::latest::resource::Status;
+use mesh_portal::version::latest::particle::Status;
 
 pub type WatchKey = Uuid;
 
@@ -30,12 +30,12 @@ impl Watch {
 
 #[derive(Debug,Clone,Serialize,Deserialize,Hash,Eq,PartialEq)]
 pub struct WatchResourceSelector {
-    pub resource: Address,
+    pub resource: Point,
     pub property: Property
 }
 
 impl WatchResourceSelector {
-    pub fn new( resource: Address, property: Property ) -> Self {
+    pub fn new(resource: Point, property: Property ) -> Self {
         Self {
             resource,
             property
@@ -51,7 +51,7 @@ pub struct WatchSelector {
 
 #[derive(Debug,Clone,Serialize,Deserialize,strum_macros::Display,Hash,Eq,PartialEq)]
 pub enum Topic{
-    Resource(Address),
+    Point(Point),
     Star(StarKey),
 }
 

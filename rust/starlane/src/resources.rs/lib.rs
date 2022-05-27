@@ -1488,7 +1488,7 @@ impl TryInto<ResourceKey> for ResourceIdentifier {
     fn try_into(self) -> Result<ResourceKey, Self::Error> {
         match self {
             ResourceIdentifier::Key(key) => Ok(key),
-            ResourceIdentifier::Address(address) => Err(format!("resource identifier is not a key.  Instead got address: {}",address.to_string()).into()),
+            ResourceIdentifier::Address(address) => Err(format!("particle identifier is not a key.  Instead got address: {}",address.to_string()).into()),
         }
     }
 }
@@ -1500,7 +1500,7 @@ impl TryInto<ResourcePath> for ResourceIdentifier {
 
     fn try_into(self) -> Result<ResourcePath, Self::Error> {
         match self {
-            ResourceIdentifier::Key(_) => Err("resource identifier is not an address".into()),
+            ResourceIdentifier::Key(_) => Err("particle identifier is not an address".into()),
             ResourceIdentifier::Address(address) => Ok(address),
         }
     }
@@ -1909,7 +1909,7 @@ impl ResourceCreate {
 
         if let KeyCreationSrc::Key(key) = &self.key {
             if key.resource_type() != resource_type {
-                return Err(Fail::ResourceTypeMismatch("ResourceCreate: key: KeyCreationSrc::Key(key) resource type != init.archetype.kind.resource_type()".into()));
+                return Err(Fail::ResourceTypeMismatch("ResourceCreate: key: KeyCreationSrc::Key(key) particle type != init.archetype.kind.resource_type()".into()));
             }
         }
 
@@ -2303,7 +2303,7 @@ impl FromStr for ResourcePathAndType {
         let (leftover,result) = parse::parse_resource_path_and_type(s)?;
 
         if !leftover.is_empty() {
-            return Err(format!("illegal resource path with type: '{}' unrecognized portion: '{}'",s, leftover).into());
+            return Err(format!("illegal particle path with type: '{}' unrecognized portion: '{}'",s, leftover).into());
         }
 
         Ok(result?)
@@ -2334,7 +2334,7 @@ impl ResourcePathAndKind {
     pub fn new(path: ResourcePath, kind: ResourceKind) -> Result<Self,Error> {
         let path_segment_kind: ResourcePathSegmentKind = kind.resource_type().path_segment_kind();
         // if the path segment is illegal then there will be a Result::Err returned
-        path_segment_kind.from_str(path.segments.last().ok_or("expected at least one resource path segment" )?.as_str() )?;
+        path_segment_kind.from_str(path.segments.last().ok_or("expected at least one particle path segment" )?.as_str() )?;
 
         Ok(ResourcePathAndKind{
             path,
@@ -2354,7 +2354,7 @@ impl FromStr for ResourcePathAndKind {
         let (leftover,result) = parse::parse_resource_path_and_kind(s)?;
 
         if !leftover.is_empty() {
-            return Err(format!("illegal resource path with kind: '{}' unrecognized portion: '{}'",s, leftover).into());
+            return Err(format!("illegal particle path with kind: '{}' unrecognized portion: '{}'",s, leftover).into());
         }
 
         Ok(result?)
@@ -2407,7 +2407,7 @@ impl FromStr for ResourcePath {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (leftover,path) = parse::parse_resource_path(s)?;
         if !leftover.is_empty() {
-            return Err(format!("illegal resource path: '{}' unrecognized portion: '{}'",s, leftover).into());
+            return Err(format!("illegal particle path: '{}' unrecognized portion: '{}'",s, leftover).into());
         }
         Ok(path)
     }

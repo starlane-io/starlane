@@ -130,7 +130,7 @@ impl Resource {
         if let Item::Struct(e) = &mut self.item {
             e.attrs.retain(|attr| {
                 if let Option::Some(seg) = attr.path.segments.last() {
-                    if seg.ident.to_string() == "resource".to_string() {
+                    if seg.ident.to_string() == "particle".to_string() {
                         false
                     } else {
                         true
@@ -154,7 +154,7 @@ impl Parse for ResourceParser {
                 let mut resource = Resource::new(item.clone());
                 for attr in &e.attrs {
                     if let Option::Some(seg) = attr.path.segments.last() {
-                        if seg.ident.to_string() == "resource".to_string() {
+                        if seg.ident.to_string() == "particle".to_string() {
                             let content: Meta = attr.parse_args()?;
                             match content {
                                 Meta::Path(path) => {
@@ -206,11 +206,11 @@ impl Parse for ResourceParser {
                                                     resource.state_aspects.insert(name, kind);
                                                 }
                                             }
-                                            //                                            resource.parents = to_idents(&list);
+                                            //                                            particle.parents = to_idents(&list);
                                         }
 
                                         what => {
-                                            panic!("unrecognized resource attribute '{}'", what);
+                                            panic!("unrecognized particle attribute '{}'", what);
                                         }
                                     }
                                 }
@@ -384,16 +384,16 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         }
 
         pathways
-            .push_str("(_,_) => Err(\"could not find parent match for resource pathway\".into())");
+            .push_str("(_,_) => Err(\"could not find parent match for particle pathway\".into())");
 
         pathways.push_str("}");
 
         pathways.push_str("},");
 
         /*
-        state_schema.push_str( format!("Self::{}=>{{", resource.get_ident().to_string()).as_str() );
+        state_schema.push_str( format!("Self::{}=>{{", particle.get_ident().to_string()).as_str() );
         state_schema.push_str( "let mut state_schema = StateSchema::new();" );
-        for (key,value) in &resource.state_aspects {
+        for (key,value) in &particle.state_aspects {
             state_schema.push_str( format!("state_schema.insert( \"{}\".to_string(), DataAspectKind::{} );", key, value).as_str() );
         }
         state_schema.push_str( "state_schema" );
@@ -500,18 +500,18 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /*
 fn paths(parsed: &ResourceParser) -> TokenStream {
     let mut paths = vec![];
-    for resource in &parsed.resources {
+    for particle in &parsed.resources {
         let _ident = Ident::new(
-            resource.get_ident().to_string().as_str(),
-            resource.get_ident().span(),
+            particle.get_ident().to_string().as_str(),
+            particle.get_ident().span(),
         );
         let path_ident = Ident::new(
-            format!("{}Path", resource.get_ident().to_string()).as_str(),
-            resource.get_ident().span(),
+            format!("{}Path", particle.get_ident().to_string()).as_str(),
+            particle.get_ident().span(),
         );
 
-        if resource.parents.len() == 1 {
-            let parent = resource.parents.first().unwrap().clone();
+        if particle.parents.len() == 1 {
+            let parent = particle.parents.first().unwrap().clone();
             let parent_path = Ident::new(
                 format!("{}Path", parent.to_string()).as_str(),
                 parent.span(),
@@ -526,8 +526,8 @@ fn paths(parsed: &ResourceParser) -> TokenStream {
                 }
             } );
         } else {
-            let _parents = resource.parents.clone();
-            let _parent_path: Vec<Ident> = resource
+            let _parents = particle.parents.clone();
+            let _parent_path: Vec<Ident> = particle
                 .parents
                 .iter()
                 .map(|parent| {
@@ -552,17 +552,17 @@ fn paths(parsed: &ResourceParser) -> TokenStream {
         .resources
         .clone()
         .iter()
-        .map(|resource| resource.get_ident())
+        .map(|particle| particle.get_ident())
         .collect();
     let idents2 = idents.clone();
 
     let path_idents: Vec<Ident> = parsed
         .resources
         .iter()
-        .map(|resource| {
+        .map(|particle| {
             Ident::new(
-                format!("{}Path", resource.get_ident().to_string()).as_str(),
-                resource.get_ident().span(),
+                format!("{}Path", particle.get_ident().to_string()).as_str(),
+                particle.get_ident().span(),
             )
         })
         .collect();
@@ -888,7 +888,7 @@ fn kinds(parsed: &ResourceParser) -> TokenStream {
             if parsed.kind_for(resource).is_some() {
                 from_parts.push_str(format!("match parts.kind.ok_or(\"kind must be specified for {}. i.e.: <Type<Kind>>\")?.as_str() {{", resource.get_ident().to_string()).as_str());
             } else {
-                from_parts.push_str(format!("if parts.kind.is_some() {{  return Err(\"resource type <{}> does not have a kind\".into());}}", resource.get_ident().to_string() ).as_str() );
+                from_parts.push_str(format!("if parts.kind.is_some() {{  return Err(\"particle type <{}> does not have a kind\".into());}}", resource.get_ident().to_string() ).as_str() );
 
                 from_parts.push_str(format!("Self::{}",resource.get_ident().to_string()).as_str() );
 
@@ -1507,15 +1507,15 @@ fn identifiers(parsed: &ResourceParser) -> TokenStream {
         .resources
         .clone()
         .iter()
-        .map(|resource| resource.get_ident())
+        .map(|particle| particle.get_ident())
         .collect();
     let identifier_idents: Vec<Ident> = parsed
         .resources
         .iter()
-        .map(|resource| {
+        .map(|particle| {
             Ident::new(
-                format!("{}Identifier", resource.get_ident().to_string()).as_str(),
-                resource.get_ident().span(),
+                format!("{}Identifier", particle.get_ident().to_string()).as_str(),
+                particle.get_ident().span(),
             )
         })
         .collect();
@@ -1523,10 +1523,10 @@ fn identifiers(parsed: &ResourceParser) -> TokenStream {
     let key_idents: Vec<Ident> = parsed
         .resources
         .iter()
-        .map(|resource| {
+        .map(|particle| {
             Ident::new(
-                format!("{}Key", resource.get_ident().to_string()).as_str(),
-                resource.get_ident().span(),
+                format!("{}Key", particle.get_ident().to_string()).as_str(),
+                particle.get_ident().span(),
             )
         })
         .collect();
@@ -1534,10 +1534,10 @@ fn identifiers(parsed: &ResourceParser) -> TokenStream {
     let path_idents: Vec<Ident> = parsed
         .resources
         .iter()
-        .map(|resource| {
+        .map(|particle| {
             Ident::new(
-                format!("{}Path", resource.get_ident().to_string()).as_str(),
-                resource.get_ident().span(),
+                format!("{}Path", particle.get_ident().to_string()).as_str(),
+                particle.get_ident().span(),
             )
         })
         .collect();

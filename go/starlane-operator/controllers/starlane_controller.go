@@ -79,26 +79,8 @@ func (r *StarlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	// postgres4Keycloak
+	// secret
 	{
-		pvc := &corev1.PersistentVolumeClaim{}
-		err = r.Get(ctx, types.NamespacedName{Name: postgres4KeycloakName(starlane), Namespace: starlane.Namespace}, pvc)
-		if err != nil && errors.IsNotFound(err) {
-			// Define a new deployment
-			dep := r.postgres4KeycloakPvc(starlane)
-			log.Info("Creating a new Pvc", "Pvc.Namespace", dep.Namespace, "Pvc.Name", dep.Name)
-			err = r.Create(ctx, dep)
-			if err != nil {
-				log.Error(err, "Failed to create new Postgres PVC", "Pvc.Namespace", dep.Namespace, "Pvc.Name", dep.Name)
-				return ctrl.Result{}, err
-			}
-			// Pvc created successfully - return and requeue
-			return ctrl.Result{Requeue: true}, nil
-		} else if err != nil {
-			log.Error(err, "Failed to get Pvc")
-			return ctrl.Result{}, err
-		}
-
 		secret := &corev1.Secret{}
 		err = r.Get(ctx, types.NamespacedName{Name: starlane.Name, Namespace: starlane.Namespace}, secret)
 		if err != nil && errors.IsNotFound(err) {
@@ -118,6 +100,93 @@ func (r *StarlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			return ctrl.Result{Requeue: true}, nil
 		} else if err != nil {
 			log.Error(err, "Failed to get Secret")
+			return ctrl.Result{}, err
+		}
+	}
+
+	// postgres
+	{
+		pvc := &corev1.PersistentVolumeClaim{}
+		err = r.Get(ctx, types.NamespacedName{Name: postgresName(starlane), Namespace: starlane.Namespace}, pvc)
+		if err != nil && errors.IsNotFound(err) {
+			// Define a new deployment
+			dep := r.postgresPvc(starlane)
+			log.Info("Creating a new Pvc", "Pvc.Namespace", dep.Namespace, "Pvc.Name", dep.Name)
+			err = r.Create(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new Postgres PVC", "Pvc.Namespace", dep.Namespace, "Pvc.Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// Pvc created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Pvc")
+			return ctrl.Result{}, err
+		}
+
+		postgres := &appsv1.Deployment{}
+		err = r.Get(ctx, types.NamespacedName{Name: postgresName(starlane), Namespace: starlane.Namespace}, postgres)
+		if err != nil && errors.IsNotFound(err) {
+			dep := r.postgresDeployment(starlane)
+			log.Info("Creating a new Postgres deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+			err = r.Create(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new Postgres", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// Pvc created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Secret")
+			return ctrl.Result{}, err
+		}
+
+		service := &corev1.Service{}
+		err = r.Get(ctx, types.NamespacedName{Name: postgresName(starlane), Namespace: starlane.Namespace}, service)
+		if err != nil && errors.IsNotFound(err) {
+			dep := r.postgresService(starlane)
+			log.Info("Creating a new Postgres service", "Namespace", dep.Namespace, "Name", dep.Name)
+			err = r.Create(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new Postgres Service", "Namespace", dep.Namespace, "Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// Pvc created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Service")
+			return ctrl.Result{}, err
+		} else if service.Spec.Type != starlane.Spec.PostgresServiceType {
+			service.Spec.Type = starlane.Spec.PostgresServiceType
+			err = r.Update(ctx, service)
+			if err != nil {
+				log.Error(err, "Failed to update Service", "Service.Namespace", service.Namespace, "Service.Name", service.Name)
+				return ctrl.Result{}, err
+			}
+			// Ask to requeue after 1 minute in order to give enough time for the
+			// pods be created on the cluster side and the operand be able
+			// to do the next update step accurately.
+			return ctrl.Result{RequeueAfter: time.Minute}, nil
+		}
+	}
+
+	// postgres4Keycloak
+	{
+		pvc := &corev1.PersistentVolumeClaim{}
+		err = r.Get(ctx, types.NamespacedName{Name: postgres4KeycloakName(starlane), Namespace: starlane.Namespace}, pvc)
+		if err != nil && errors.IsNotFound(err) {
+			// Define a new deployment
+			dep := r.postgres4KeycloakPvc(starlane)
+			log.Info("Creating a new Pvc", "Pvc.Namespace", dep.Namespace, "Pvc.Name", dep.Name)
+			err = r.Create(ctx, dep)
+			if err != nil {
+				log.Error(err, "Failed to create new Postgres PVC", "Pvc.Namespace", dep.Namespace, "Pvc.Name", dep.Name)
+				return ctrl.Result{}, err
+			}
+			// Pvc created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get Pvc")
 			return ctrl.Result{}, err
 		}
 
@@ -184,55 +253,13 @@ func (r *StarlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 				log.Error(err, "Failed to create new Keycloak Service", "Namespace", dep.Namespace, "Name", dep.Name)
 				return ctrl.Result{}, err
 			}
-			// Pvc created successfully - return and requeue
+			// Service created successfully - return and requeue
 			return ctrl.Result{Requeue: true}, nil
 		} else if err != nil {
 			log.Error(err, "Failed to get Keycloak")
 			return ctrl.Result{}, err
-		}
-	}
-
-	// Check if the deployment already exists, if not create a new one
-	{
-		found := &appsv1.Deployment{}
-		err = r.Get(ctx, types.NamespacedName{Name: starlane.Name, Namespace: starlane.Namespace}, found)
-		if err != nil && errors.IsNotFound(err) {
-			// Define a new deployment
-			dep := r.deploymentForStarlane(starlane)
-			log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-			err = r.Create(ctx, dep)
-			if err != nil {
-				log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-				return ctrl.Result{}, err
-			}
-			// Deployment created successfully - return and requeue
-			return ctrl.Result{Requeue: true}, nil
-		} else if err != nil {
-			log.Error(err, "Failed to get Deployment")
-			return ctrl.Result{}, err
-		}
-	}
-
-	{
-		// Check if the web service already exists, if not create a new one
-		service := &corev1.Service{}
-		err = r.Get(ctx, types.NamespacedName{Name: starlane.Name + "-web", Namespace: starlane.Namespace}, service)
-		if err != nil && errors.IsNotFound(err) {
-			// Define a new deployment
-			srv := r.webServiceForStarlane(starlane)
-			log.Info("Creating a new Service", "Service.Namespace", srv.Namespace, "Service.Name", srv.Name)
-			err = r.Create(ctx, srv)
-			if err != nil {
-				log.Error(err, "Failed to create new Service", "Service.Namespace", srv.Namespace, "Service.Name", srv.Name)
-				return ctrl.Result{}, err
-			}
-			// Deployment created successfully - return and requeue
-			return ctrl.Result{Requeue: true}, nil
-		} else if err != nil {
-			log.Error(err, "Failed to get Service")
-			return ctrl.Result{}, err
-		} else if service.Spec.Type != starlane.Spec.WebServiceType {
-			service.Spec.Type = starlane.Spec.WebServiceType
+		} else if service.Spec.Type != starlane.Spec.KeycloakServiceType {
+			service.Spec.Type = starlane.Spec.KeycloakServiceType
 			err = r.Update(ctx, service)
 			if err != nil {
 				log.Error(err, "Failed to update Service", "Service.Namespace", service.Namespace, "Service.Name", service.Name)
@@ -245,35 +272,89 @@ func (r *StarlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 	}
 
-	{
-		// Check if the web service already exists, if not create a new one
-		service := &corev1.Service{}
-		err = r.Get(ctx, types.NamespacedName{Name: starlane.Name + "-gateway", Namespace: starlane.Namespace}, service)
-		if err != nil && errors.IsNotFound(err) {
-			// Define a new deployment
-			srv := r.gatewayServiceForStarlane(starlane)
-			log.Info("Creating a new Service", "Service.Namespace", srv.Namespace, "Service.Name", srv.Name)
-			err = r.Create(ctx, srv)
-			if err != nil {
-				log.Error(err, "Failed to create new Service", "Service.Namespace", srv.Namespace, "Service.Name", srv.Name)
+	if !starlane.Spec.DisableStarlaneDeployment {
+		{
+			found := &appsv1.Deployment{}
+			err = r.Get(ctx, types.NamespacedName{Name: starlane.Name, Namespace: starlane.Namespace}, found)
+			if err != nil && errors.IsNotFound(err) {
+				// Define a new deployment
+				dep := r.deploymentForStarlane(starlane)
+				log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+				err = r.Create(ctx, dep)
+				if err != nil {
+					log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+					return ctrl.Result{}, err
+				}
+				// Deployment created successfully - return and requeue
+				return ctrl.Result{Requeue: true}, nil
+			} else if err != nil {
+				log.Error(err, "Failed to get Deployment")
 				return ctrl.Result{}, err
 			}
-			// Deployment created successfully - return and requeue
-			return ctrl.Result{Requeue: true}, nil
-		} else if err != nil {
-			log.Error(err, "Failed to get Service")
-			return ctrl.Result{}, err
-		} else if service.Spec.Type != starlane.Spec.GatewayServiceType {
-			service.Spec.Type = starlane.Spec.GatewayServiceType
-			err = r.Update(ctx, service)
-			if err != nil {
-				log.Error(err, "Failed to update Service", "Service.Namespace", service.Namespace, "Service.Name", service.Name)
+		}
+
+		{
+			// Check if the web service already exists, if not create a new one
+			service := &corev1.Service{}
+			err = r.Get(ctx, types.NamespacedName{Name: starlane.Name + "-web", Namespace: starlane.Namespace}, service)
+			if err != nil && errors.IsNotFound(err) {
+				// Define a new deployment
+				srv := r.webServiceForStarlane(starlane)
+				log.Info("Creating a new Service", "Service.Namespace", srv.Namespace, "Service.Name", srv.Name)
+				err = r.Create(ctx, srv)
+				if err != nil {
+					log.Error(err, "Failed to create new Service", "Service.Namespace", srv.Namespace, "Service.Name", srv.Name)
+					return ctrl.Result{}, err
+				}
+				// Deployment created successfully - return and requeue
+				return ctrl.Result{Requeue: true}, nil
+			} else if err != nil {
+				log.Error(err, "Failed to get Service")
 				return ctrl.Result{}, err
+			} else if service.Spec.Type != starlane.Spec.WebServiceType {
+				service.Spec.Type = starlane.Spec.WebServiceType
+				err = r.Update(ctx, service)
+				if err != nil {
+					log.Error(err, "Failed to update Service", "Service.Namespace", service.Namespace, "Service.Name", service.Name)
+					return ctrl.Result{}, err
+				}
+				// Ask to requeue after 1 minute in order to give enough time for the
+				// pods be created on the cluster side and the operand be able
+				// to do the next update step accurately.
+				return ctrl.Result{RequeueAfter: time.Minute}, nil
 			}
-			// Ask to requeue after 1 minute in order to give enough time for the
-			// pods be created on the cluster side and the operand be able
-			// to do the next update step accurately.
-			return ctrl.Result{RequeueAfter: time.Minute}, nil
+		}
+
+		{
+			// Check if the web service already exists, if not create a new one
+			service := &corev1.Service{}
+			err = r.Get(ctx, types.NamespacedName{Name: starlane.Name + "-gateway", Namespace: starlane.Namespace}, service)
+			if err != nil && errors.IsNotFound(err) {
+				// Define a new deployment
+				srv := r.gatewayServiceForStarlane(starlane)
+				log.Info("Creating a new Service", "Service.Namespace", srv.Namespace, "Service.Name", srv.Name)
+				err = r.Create(ctx, srv)
+				if err != nil {
+					log.Error(err, "Failed to create new Service", "Service.Namespace", srv.Namespace, "Service.Name", srv.Name)
+					return ctrl.Result{}, err
+				}
+				// Deployment created successfully - return and requeue
+				return ctrl.Result{Requeue: true}, nil
+			} else if err != nil {
+				log.Error(err, "Failed to get Service")
+				return ctrl.Result{}, err
+			} else if service.Spec.Type != starlane.Spec.GatewayServiceType {
+				service.Spec.Type = starlane.Spec.GatewayServiceType
+				err = r.Update(ctx, service)
+				if err != nil {
+					log.Error(err, "Failed to update Service", "Service.Namespace", service.Namespace, "Service.Name", service.Name)
+					return ctrl.Result{}, err
+				}
+				// Ask to requeue after 1 minute in order to give enough time for the
+				// pods be created on the cluster side and the operand be able
+				// to do the next update step accurately.
+				return ctrl.Result{RequeueAfter: time.Minute}, nil
+			}
 		}
 	}
 
@@ -309,6 +390,30 @@ func (r *StarlaneReconciler) deploymentForStarlane(m *starlanev1alpha1.Starlane)
 						Env: []corev1.EnvVar{
 							{Name: "STARLANE_KUBERNETES_INSTANCE_NAME", Value: m.Name},
 							{Name: "STARLANE_KEYCLOAK_URL", Value: "http://" + keycloakName(m) + ":8080"},
+							{
+								Name: "STARLANE_KEYCLOAK_PASSWORD",
+								ValueFrom: &corev1.EnvVarSource{
+									SecretKeyRef: &corev1.SecretKeySelector{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: m.Name,
+										},
+										Key: "password",
+									},
+								},
+							},
+							{Name: "STARLANE_POSTGRES_URL", Value: postgresName(m)},
+							{Name: "STARLANE_POSTGRES_USERNAME", Value: "postgres"},
+							{
+								Name: "STARLANE_POSTGRES_PASSWORD",
+								ValueFrom: &corev1.EnvVarSource{
+									SecretKeyRef: &corev1.SecretKeySelector{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: m.Name,
+										},
+										Key: "password",
+									},
+								},
+							},
 							{Name: "NAMESPACE", Value: m.Namespace},
 							{
 								Name: "STARLANE_PASSWORD",
@@ -390,7 +495,11 @@ func (r *StarlaneReconciler) gatewayServiceForStarlane(m *starlanev1alpha1.Starl
 }
 
 func postgres4KeycloakName(m *starlanev1alpha1.Starlane) string {
-	return m.Name + "-postgres-4-keycloak"
+	return m.Name + "-postgres4keycloak"
+}
+
+func postgresName(m *starlanev1alpha1.Starlane) string {
+	return m.Name + "-postgres"
 }
 
 func keycloakName(m *starlanev1alpha1.Starlane) string {
@@ -670,11 +779,128 @@ func (r *StarlaneReconciler) keycloakService(m *starlanev1alpha1.Starlane) *core
 			Namespace: m.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeLoadBalancer,
+			Type: m.Spec.KeycloakServiceType,
 			Ports: []corev1.ServicePort{
 				{Name: "keycloak",
 					Port:       8080,
 					TargetPort: intstr.FromInt(8080),
+					Protocol:   corev1.ProtocolTCP,
+				},
+			},
+			Selector: map[string]string{"name": name},
+		},
+	}
+	// Set Starlane instance as the owner and controller
+	ctrl.SetControllerReference(m, dep, r.Scheme)
+	return dep
+}
+
+func (r *StarlaneReconciler) postgresPvc(m *starlanev1alpha1.Starlane) *corev1.PersistentVolumeClaim {
+	name := postgresName(m)
+	dep := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: m.Namespace,
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{StorageClassName: &m.Spec.StorageClass,
+			AccessModes: []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse("5Gi"),
+				},
+			}},
+	}
+	ctrl.SetControllerReference(m, dep, r.Scheme)
+	return dep
+}
+
+// deploymentForStarlane returns a memcached Deployment object
+func (r *StarlaneReconciler) postgresDeployment(m *starlanev1alpha1.Starlane) *appsv1.Deployment {
+
+	name := postgresName(m)
+
+	ls := map[string]string{"name": name}
+	replicas := int32(1)
+
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: m.Namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: ls,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: ls,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Image: "postgres:14.2-alpine",
+						Name:  "postgres",
+						Args:  []string{},
+						Env: []corev1.EnvVar{
+							{
+								Name:  "PGDATA",
+								Value: "/var/lib/postgresql/data",
+							},
+							{
+								Name: "POSTGRES_PASSWORD",
+								ValueFrom: &corev1.EnvVarSource{
+									SecretKeyRef: &corev1.SecretKeySelector{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: m.Name,
+										},
+										Key: "password",
+									},
+								},
+							},
+						},
+						Ports: []corev1.ContainerPort{{
+							ContainerPort: 5432,
+							Name:          "postgres",
+						}},
+						VolumeMounts: []corev1.VolumeMount{
+							{
+								Name:      "data",
+								MountPath: "/var/lib/postgresql/data",
+								ReadOnly:  false,
+							},
+						},
+					}},
+					Volumes: []corev1.Volume{
+						{
+							Name:         "data",
+							VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: name}},
+						},
+					},
+				},
+			},
+		},
+	}
+	// Set Starlane instance as the owner and controller
+	ctrl.SetControllerReference(m, dep, r.Scheme)
+	return dep
+}
+
+// deploymentForStarlane returns a memcached Deployment object
+func (r *StarlaneReconciler) postgresService(m *starlanev1alpha1.Starlane) *corev1.Service {
+
+	name := postgresName(m)
+
+	dep := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: m.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Type: m.Spec.PostgresServiceType,
+			Ports: []corev1.ServicePort{
+				{Name: "postgres",
+					Port:       5432,
+					TargetPort: intstr.FromInt(5432),
 					Protocol:   corev1.ProtocolTCP,
 				},
 			},

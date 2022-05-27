@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 use std::env::VarError;
 use std::fmt;
-use std::fmt::Formatter;
+use std::fmt::{Debug, Formatter};
 use std::num::ParseIntError;
 use std::string::FromUtf8Error;
 use std::sync::PoisonError;
@@ -17,7 +17,6 @@ use tokio::time::error::Elapsed;
 use zip::result::ZipError;
 
 use crate::fail::Fail;
-use crate::star::core::resource::registry::RegError;
 use actix_web::ResponseError;
 use alcoholic_jwt::ValidationError;
 use ascii::FromAsciiError;
@@ -29,7 +28,9 @@ use http::uri::InvalidUri;
 use keycloak::KeycloakError;
 use mesh_portal::error::MsgErr;
 use mesh_portal_versions::error::StatusErr;
+use mesh_portal_versions::version::v0_0_1::wrap::Span;
 use nom_supreme::error::ErrorTree;
+use sqlx::error::DatabaseError;
 use tokio::task::JoinError;
 use wasmer::{CompileError, ExportError, RuntimeError};
 
@@ -131,8 +132,17 @@ impl From<nom::Err<VerboseError<&str>>> for Error {
     }
 }
 
+/*
 impl From<nom::Err<ErrorTree<&str>>> for Error {
     fn from(err: nom::Err<ErrorTree<&str>>) -> Self {
+        Error::from_internal(err)
+    }
+}
+
+ */
+
+impl <I:Span+core::fmt::Debug> From<nom::Err<ErrorTree<I>>> for Error {
+    fn from(err: nom::Err<ErrorTree<I>>) -> Self {
         Error::from_internal(err)
     }
 }
@@ -330,11 +340,6 @@ impl From<RuntimeError> for Error {
     }
 }
 
-impl From<RegError> for Error {
-    fn from(err: RegError) -> Self {
-        Error::from_internal(err)
-    }
-}
 
 impl Into<mesh_portal::version::latest::fail::Fail> for Error {
     fn into(self) -> mesh_portal::version::latest::fail::Fail {
@@ -438,10 +443,7 @@ impl From<FromAsciiError<&str>> for Error {
 
 impl Into<MsgErr> for Error {
     fn into(self) -> MsgErr {
-        MsgErr {
-            status: 500,
-            message: self.message,
-        }
+        MsgErr::new( 500, self.message.as_str() )
     }
 }
 
@@ -455,3 +457,18 @@ impl From<InvalidStatusCode> for Error{
         Error::from_internal(error)
     }
 }
+
+
+impl From<sqlx::Error> for Error{
+    fn from(error: sqlx::Error) -> Self {
+        match error.as_database_error() {
+            None => {
+                Error::from_internal(format!("{:?}",error) )
+            }
+            Some(err) => {
+                Error::from_internal(err.message() )
+            }
+        }
+    }
+}
+

@@ -18,7 +18,6 @@ use tokio::sync::oneshot;
 use shell::search::{
     SearchCommit, SearchHits, SearchInit, StarSearchTransaction, TransactionResult,
 };
-use shell::wrangler::{StarWrangle, StarWranglerApi, StarWrangleSatisfaction};
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::constellation::ConstellationStatus;
@@ -35,12 +34,10 @@ use crate::message::{
     MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage,
     ProtoStarMessageTo, TrackerJob,
 };
-use crate::resource::{ResourceRecord, ResourceType};
+use crate::particle::{KindBase, ParticleRecord};
 use crate::star::core::message::CoreMessageCall;
-use crate::star::core::resource::registry::RegistryApi;
 use crate::star::shell::golden::GoldenPathApi;
 use crate::star::shell::lanes::LaneMuxerApi;
-use crate::star::shell::locator::ResourceLocatorApi;
 use crate::star::shell::message::MessagingApi;
 use crate::star::shell::router::RouterApi;
 use crate::star::shell::search::{StarSearchApi, StarSearchCall};
@@ -48,26 +45,34 @@ use crate::star::shell::watch::WatchApi;
 use crate::star::surface::SurfaceApi;
 use crate::star::variant::{FrameVerdict, VariantApi};
 use crate::starlane::StarlaneMachine;
-use crate::template::StarTemplateHandle;
+use crate::template::{ConstellationName, StarHandle};
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 use std::cmp;
 use std::fmt;
 use std::future::Future;
+use std::num::ParseIntError;
 use crate::star::core::resource::driver::ResourceCoreDriverApi;
 use std::str::FromStr;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
+use mesh_portal::version::latest::log::{PointLogger, RootLogger};
 use mesh_portal::version::latest::portal;
-use mesh_portal::version::latest::resource::Status;
-use mesh_portal_versions::version::v0_0_1::parse::Res;
-use nom::sequence::{preceded, terminated, tuple};
+use mesh_portal::version::latest::particle::Status;
+use mesh_portal_versions::version::v0_0_1::parse::{lowercase_alphanumeric, Res, skewer_case};
+use mesh_portal_versions::version::v0_0_1::parse::error::result;
+use mesh_portal_versions::version::v0_0_1::span::new_span;
+use mesh_portal_versions::version::v0_0_1::wrap::Span;
+use nom::sequence::{delimited, preceded, terminated, tuple};
 use nom::multi::many0;
 use nom::bytes::complete::tag;
 use nom::character::complete::digit1;
 use nom::branch::alt;
 use nom::combinator::all_consuming;
 use nom::error::{ErrorKind, ParseError, VerboseError};
+use nom::Parser;
 use nom_supreme::error::ErrorTree;
+use crate::registry::RegistryApi;
 use crate::logger::{Flags, Logger, LogInfo};
+use crate::star::shell::db::{StarDB, StarDBApi, StarWrangle, StarWrangleSatisfaction};
 use crate::star::shell::sys::SysApi;
 
 pub mod core;
@@ -91,9 +96,9 @@ pub mod shell;
 pub enum StarKind {
     Central,
     Space,
-    Mesh,
+    Relay,
     App,
-    Mechtron,
+    Exe,
     FileStore,
     ArtifactStore,
     Gateway,
@@ -109,9 +114,9 @@ impl StarKind {
         match self {
             StarKind::Central => true,
             StarKind::Space => true,
-            StarKind::Mesh => false,
+            StarKind::Relay => false,
             StarKind::App => true,
-            StarKind::Mechtron => false,
+            StarKind::Exe => false,
             StarKind::FileStore => true,
             StarKind::Gateway => false,
             StarKind::Link => false,
@@ -127,9 +132,9 @@ impl StarKind {
         match self {
             StarKind::Central => false,
             StarKind::Space => true,
-            StarKind::Mesh => false,
+            StarKind::Relay => false,
             StarKind::App => true,
-            StarKind::Mechtron => true,
+            StarKind::Exe => true,
             StarKind::FileStore => true,
             StarKind::Gateway => false,
             StarKind::Link => false,
@@ -154,12 +159,12 @@ impl StarKind {
                         StarWrangleKind::opt(StarKind::App),
                     ]
                 }
-                StarKind::Mesh => vec![],
+                StarKind::Relay => vec![],
                 StarKind::App => vec![
-                    StarWrangleKind::req(StarKind::Mechtron),
+                    StarWrangleKind::req(StarKind::Exe),
                     StarWrangleKind::req(StarKind::FileStore),
                 ],
-                StarKind::Mechtron => vec![],
+                StarKind::Exe => vec![],
                 StarKind::FileStore => vec![],
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
@@ -174,109 +179,109 @@ impl StarKind {
         )
     }
 
-    pub fn manages(&self) -> HashSet<ResourceType> {
+    pub fn manages(&self) -> HashSet<KindBase> {
         HashSet::from_iter(
             match self {
-                StarKind::Central => vec![ResourceType::Space],
+                StarKind::Central => vec![KindBase::Space],
                 StarKind::Space => vec![
-                    ResourceType::App,
-                    ResourceType::FileSystem,
-                    ResourceType::Proxy,
-                    ResourceType::Database,
+                    KindBase::App,
+                    KindBase::FileSystem,
+                    KindBase::Proxy,
+                    KindBase::Database,
                 ],
-                StarKind::Mesh => vec![],
+                StarKind::Relay => vec![],
                 StarKind::App => vec![
-                    ResourceType::Mechtron,
-                    ResourceType::FileSystem,
-                    ResourceType::Database,
+                    KindBase::Mechtron,
+                    KindBase::FileSystem,
+                    KindBase::Database,
                 ],
-                StarKind::Mechtron => vec![],
+                StarKind::Exe => vec![],
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
                 StarKind::Client => vec![],
                 StarKind::Web => vec![],
-                StarKind::FileStore => vec![ResourceType::File],
-                StarKind::ArtifactStore => vec![ResourceType::Artifact],
-                StarKind::K8s => vec![ResourceType::Database],
-                StarKind::Portal => vec![ResourceType::Control]
+                StarKind::FileStore => vec![KindBase::File],
+                StarKind::ArtifactStore => vec![KindBase::Artifact],
+                StarKind::K8s => vec![KindBase::Database],
+                StarKind::Portal => vec![KindBase::Control]
             }
             .iter()
             .cloned(),
         )
     }
 
-    pub fn registry(rt: &ResourceType) -> StarKind {
+    pub fn registry(rt: &KindBase) -> StarKind {
         match rt {
-            ResourceType::Root => Self::Central,
-            ResourceType::Space => Self::Central,
-            ResourceType::User => Self::Space,
-            ResourceType::App => Self::Space,
-            ResourceType::Mechtron => Self::App,
-            ResourceType::FileSystem => Self::Space,
-            ResourceType::File => Self::Space,
-            ResourceType::Database => Self::K8s,
-            ResourceType::Authenticator => Self::K8s,
-            ResourceType::ArtifactBundleSeries => Self::Space,
-            ResourceType::ArtifactBundle => Self::ArtifactStore,
-            ResourceType::Artifact => Self::ArtifactStore,
-            ResourceType::Proxy => Self::Space,
-            ResourceType::Credentials => Self::Space,
-            ResourceType::Base => Self::Space,
-            ResourceType::Control => Self::Portal,
-            ResourceType::UserBase => Self::Space
+            KindBase::Root => Self::Central,
+            KindBase::Space => Self::Central,
+            KindBase::User => Self::Space,
+            KindBase::App => Self::Space,
+            KindBase::Mechtron => Self::App,
+            KindBase::FileSystem => Self::Space,
+            KindBase::File => Self::Space,
+            KindBase::Database => Self::K8s,
+            KindBase::Authenticator => Self::K8s,
+            KindBase::ArtifactBundleSeries => Self::Space,
+            KindBase::ArtifactBundle => Self::ArtifactStore,
+            KindBase::Artifact => Self::ArtifactStore,
+            KindBase::Proxy => Self::Space,
+            KindBase::Credentials => Self::Space,
+            KindBase::Base => Self::Space,
+            KindBase::Control => Self::Portal,
+            KindBase::UserBase => Self::Space
         }
     }
 
-    pub fn hosts(rt: &ResourceType) -> StarKind {
+    pub fn hosts(rt: &KindBase) -> StarKind {
         match rt {
-            ResourceType::Root => Self::Central,
-            ResourceType::Space => Self::Space,
-            ResourceType::User => Self::Space,
-            ResourceType::App => Self::App,
-            ResourceType::Mechtron => Self::Mechtron,
-            ResourceType::FileSystem => Self::FileStore,
-            ResourceType::File => Self::FileStore,
-            ResourceType::Database => Self::K8s,
-            ResourceType::Authenticator => Self::K8s,
-            ResourceType::ArtifactBundleSeries => Self::ArtifactStore,
-            ResourceType::ArtifactBundle => Self::ArtifactStore,
-            ResourceType::Artifact => Self::ArtifactStore,
-            ResourceType::Proxy => Self::Space,
-            ResourceType::Credentials => Self::Space,
-            ResourceType::Base => Self::Space,
-            ResourceType::Control => Self::Portal,
-            ResourceType::UserBase => Self::Space
+            KindBase::Root => Self::Central,
+            KindBase::Space => Self::Space,
+            KindBase::User => Self::Space,
+            KindBase::App => Self::App,
+            KindBase::Mechtron => Self::Exe,
+            KindBase::FileSystem => Self::FileStore,
+            KindBase::File => Self::FileStore,
+            KindBase::Database => Self::K8s,
+            KindBase::Authenticator => Self::K8s,
+            KindBase::ArtifactBundleSeries => Self::ArtifactStore,
+            KindBase::ArtifactBundle => Self::ArtifactStore,
+            KindBase::Artifact => Self::ArtifactStore,
+            KindBase::Proxy => Self::Space,
+            KindBase::Credentials => Self::Space,
+            KindBase::Base => Self::Space,
+            KindBase::Control => Self::Portal,
+            KindBase::UserBase => Self::Space
         }
     }
 
-    pub fn hosted(&self) -> HashSet<ResourceType> {
+    pub fn hosted(&self) -> HashSet<KindBase> {
         HashSet::from_iter(
             match self {
-                StarKind::Central => vec![ResourceType::Root],
+                StarKind::Central => vec![KindBase::Root],
                 StarKind::Space => vec![
-                    ResourceType::Space,
-                    ResourceType::User,
-                    ResourceType::Base,
-                    ResourceType::Proxy,
-                    ResourceType::UserBase,
+                    KindBase::Space,
+                    KindBase::User,
+                    KindBase::Base,
+                    KindBase::Proxy,
+                    KindBase::UserBase,
                 ],
-                StarKind::Mesh => vec![],
-                StarKind::App => vec![ResourceType::App],
-                StarKind::Mechtron => vec![ResourceType::Mechtron],
+                StarKind::Relay => vec![],
+                StarKind::App => vec![KindBase::App],
+                StarKind::Exe => vec![KindBase::Mechtron],
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
-                StarKind::Client => vec![ResourceType::Mechtron],
+                StarKind::Client => vec![KindBase::Mechtron],
                 StarKind::Web => vec![],
-                StarKind::FileStore => vec![ResourceType::FileSystem, ResourceType::File],
+                StarKind::FileStore => vec![KindBase::FileSystem, KindBase::File],
                 StarKind::ArtifactStore => {
                     vec![
-                        ResourceType::ArtifactBundleSeries,
-                        ResourceType::ArtifactBundle,
-                        ResourceType::Artifact,
+                        KindBase::ArtifactBundleSeries,
+                        KindBase::ArtifactBundle,
+                        KindBase::Artifact,
                     ]
                 }
-                StarKind::K8s => vec![ResourceType::Database],
-                StarKind::Portal => vec![ResourceType::Control]
+                StarKind::K8s => vec![KindBase::Database],
+                StarKind::Portal => vec![KindBase::Control]
             }
             .iter()
             .cloned(),
@@ -370,7 +375,7 @@ impl StarKind {
     }
 
     pub fn server_result(&self) -> Result<(), Error> {
-        if let StarKind::Mechtron = self {
+        if let StarKind::Exe = self {
             Ok(())
         } else {
             Err("not server".into())
@@ -388,9 +393,9 @@ impl StarKind {
     pub fn relay(&self) -> bool {
         match self {
             StarKind::Central => false,
-            StarKind::Mesh => true,
+            StarKind::Relay => true,
             StarKind::App => false,
-            StarKind::Mechtron => true,
+            StarKind::Exe => true,
             StarKind::Gateway => true,
             StarKind::Client => true,
             StarKind::Link => true,
@@ -626,12 +631,12 @@ impl Star {
                  match result {
                      Ok(Ok(hits)) => {
                          for (star, hops) in hits.hits {
-                             let handle = StarWrangle {
+                             let wrangle = StarWrangle {
                                  key: star,
                                  kind: kind.clone(),
-                                 hops: Option::Some(hops),
+                                 hops: hops
                              };
-                             let result = skel.star_wrangler_api.add_star_handle(handle).await;
+                             let result = skel.star_db.set_wrangle(wrangle).await;
                              match result {
                                  Ok(_) => {
                                      skel.star_tx.send(StarCommand::CheckStatus).await;
@@ -674,8 +679,8 @@ impl Star {
 
     async fn check_status(&mut self) {
         if self.status == StarStatus::Pending {
-                let satisfied = self.skel.star_wrangler_api
-                    .satisfied(self.skel.info.kind.wrangles())
+                let satisfied = self.skel.star_db
+                    .wrangle_satisfaction(self.skel.info.kind.wrangles())
                     .await;
                 if let Result::Ok(StarWrangleSatisfaction::Ok) = satisfied {
                     self.set_status(StarStatus::Pending);
@@ -734,8 +739,8 @@ impl Star {
     async fn diagnose(&self, diagnose: Diagnose) {
         match diagnose {
             Diagnose::HandlersSatisfied(satisfied) => {
-                    if let Result::Ok(satisfaction) = self.skel.star_wrangler_api
-                        .satisfied(self.skel.info.kind.wrangles())
+                    if let Result::Ok(satisfaction) = self.skel.star_db
+                        .wrangle_satisfaction(self.skel.info.kind.wrangles())
                         .await
                     {
                         satisfied.tx.send(satisfaction);
@@ -804,7 +809,6 @@ pub enum StarCommand {
         star: StarKey,
         tx: oneshot::Sender<Option<UltimaLaneKey>>,
     },
-    GatewayAssign(Vec<StarSubGraphKey>),
 }
 
 #[derive(Clone)]
@@ -828,7 +832,7 @@ pub struct ForwardFrame {
 
 pub struct AddResourceLocation {
     pub tx: mpsc::Sender<()>,
-    pub resource_location: ResourceRecord,
+    pub resource_location: ParticleRecord,
 }
 
 pub struct Request<P: Debug, R> {
@@ -1005,174 +1009,80 @@ impl FrameHold {
 }
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Hash, Debug, Clone, Serialize, Deserialize)]
-pub enum StarSubGraphKey {
-    Big(u64),
-    Small(u16),
-}
-
-impl ToString for StarSubGraphKey {
-    fn to_string(&self) -> String {
-        match self {
-            StarSubGraphKey::Big(n) => format!("b{}",n),
-            StarSubGraphKey::Small(n) => format!("s{}",n),
-        }
-    }
-}
-
-#[derive(PartialEq, Eq, PartialOrd, Hash, Debug, Clone, Serialize, Deserialize)]
 pub struct StarKey {
-    pub subgraph: Vec<StarSubGraphKey>,
-    pub index: u16,
+    constellation: ConstellationName,
+    name: String,
+    index: u16
 }
 
 impl StarKey {
+
+    pub fn new(constellation:&ConstellationName, handle: &StarHandle) -> Self {
+        Self {
+            constellation: constellation.clone(),
+            name: handle.name.clone(),
+            index: handle.index.clone()
+        }
+    }
+
     pub fn central() -> Self {
         StarKey {
-            subgraph: vec![],
+            constellation: "central".to_string(),
+            name: "central".to_string(),
             index: 0,
         }
     }
 }
 
-impl StarKey {
-    pub fn bin(&self) -> Result<Vec<u8>, Error> {
-        let bin = bincode::serialize(self)?;
-        Ok(bin)
-    }
 
-    pub fn from_bin(bin: Vec<u8>) -> Result<StarKey, Error> {
-        let key = bincode::deserialize::<StarKey>(bin.as_slice())?;
-        Ok(key)
-    }
-}
 
-impl cmp::Ord for StarKey {
-    fn cmp(&self, other: &Self) -> Ordering {
-        if self.subgraph.len() > other.subgraph.len() {
-            Ordering::Greater
-        } else if self.subgraph.len() < other.subgraph.len() {
-            Ordering::Less
-        } else if self.subgraph.cmp(&other.subgraph) != Ordering::Equal {
-            return self.subgraph.cmp(&other.subgraph);
-        } else {
-            return self.index.cmp(&other.index);
-        }
-    }
-}
+
 
 impl ToString for StarKey {
     fn to_string(&self) -> String {
-        if self.subgraph.len() > 0 {
-            let mut string = String::new();
-            for (index, node) in self.subgraph.iter().enumerate() {
-               string.push_str(node.to_string().as_str());
-            }
-            format!("{}:{}", string, self.index)
-        } else {
-            self.index.to_string()
-        }
+        format!("{}:{}[{}]", self.constellation, self.name, self.index)
     }
 }
 
-pub fn big_subgraph_key( input: &str ) -> Res<&str,StarSubGraphKey> {
-    let (next,key) = preceded(tag("b"),digit1)(input)?;
-    let key = match key.parse() {
-        Ok(key) => key,
-        Err(_)=>{
-            return Err(nom::Err::Error(ErrorTree::from_error_kind(input,ErrorKind::Tag)));
-        }
-    };
-    Ok((next,StarSubGraphKey::Big(key)))
+impl StarKey {
+    pub fn to_sql_name(&self) -> String {
+       format!("{}_{}_{}", self.constellation, self.name, self.index )
+    }
 }
 
-pub fn small_subgraph_key( input: &str ) -> Res<&str,StarSubGraphKey> {
-    let (next,key) = preceded(tag("s"),digit1)(input)?;
-    let key = match key.parse() {
-        Ok(key) => key,
-        Err(_)=>{
-            return Err(nom::Err::Error(ErrorTree::from_error_kind(input,ErrorKind::Tag)));
+
+
+fn parse_star_key<I:Span>( input: I) -> Res<I,StarKey> {
+    let (next,(constelation,_,name,index)) = tuple((lowercase_alphanumeric,tag(":"),lowercase_alphanumeric,delimited(tag("["),digit1,tag("]"))) )(input.clone())?;
+    let constelation = constelation.to_string();
+    let name = name.to_string();
+    let index = match index.to_string().parse::<u16>() {
+        Ok(index) => index,
+        Err(err) => {
+            return Err(nom::Err::Failure(ErrorTree::from_error_kind(input, ErrorKind::Digit )))
         }
     };
-    Ok((next,StarSubGraphKey::Small(key)))
+
+    Ok((next, StarKey {
+        constellation: constelation,
+        name,
+        index
+    }))
 }
 
-pub fn subgraph_key( input: &str ) -> Res<&str,StarSubGraphKey> {
-    alt( (big_subgraph_key,small_subgraph_key))(input)
-}
-
-pub fn index(input: &str ) -> Res<&str,u16> {
-    let (next,key) = digit1(input)?;
-    let key = match key.parse() {
-        Ok(key) => key,
-        Err(_)=>{
-            return Err(nom::Err::Error(ErrorTree::from_error_kind(input,ErrorKind::Tag)));
-        }
-    };
-    Ok((next,key))
-}
 
 impl FromStr for StarKey {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(all_consuming(tuple( (many0(subgraph_key ), index)))(s).map( |(next,(subgraph,index))| {
-            (next,Self{
-                subgraph,
-                index
-            })
-        } )?.1)
+        Ok(result(all_consuming(parse_star_key)(new_span(s)))?)
     }
 }
 
 #[derive(Eq, PartialEq, Hash, Clone)]
 pub struct StarTemplateId {
     pub constellation: String,
-    pub handle: StarTemplateHandle,
-}
-
-impl StarKey {
-    pub fn new(index: u16) -> Self {
-        StarKey {
-            subgraph: vec![],
-            index: index,
-        }
-    }
-
-    pub fn new_with_subgraph(subgraph: Vec<StarSubGraphKey>, index: u16) -> Self {
-        StarKey {
-            subgraph,
-            index: index,
-        }
-    }
-
-    pub fn with_index(&self, index: u16) -> Self {
-        StarKey {
-            subgraph: self.subgraph.clone(),
-            index: index,
-        }
-    }
-
-    // highest to lowest
-    pub fn sort(a: StarKey, b: StarKey) -> Result<(Self, Self), Error> {
-        if a == b {
-            Err(format!(
-                "both StarKeys are equal. {}=={}",
-                a.to_string(),
-                b.to_string()
-            )
-            .into())
-        } else if a.cmp(&b) == Ordering::Greater {
-            Ok((a, b))
-        } else {
-            Ok((b, a))
-        }
-    }
-
-    pub fn child_subgraph(&self) -> Vec<StarSubGraphKey> {
-        let mut subgraph = self.subgraph.clone();
-        subgraph.push(StarSubGraphKey::Small(self.index));
-        subgraph
-    }
+    pub handle: StarHandle,
 }
 
 #[derive(Clone)]
@@ -1187,7 +1097,6 @@ pub struct StarSkel {
     pub core_messaging_endpoint_tx: mpsc::Sender<CoreMessageCall>,
     pub sys_api: SysApi,
     pub registry_api: RegistryApi,
-    pub resource_locator_api: ResourceLocatorApi,
     pub star_search_api: StarSearchApi,
     pub router_api: RouterApi,
     pub surface_api: SurfaceApi,
@@ -1199,10 +1108,11 @@ pub struct StarSkel {
     pub flags: Flags,
     pub logger: Logger,
     pub sequence: Arc<AtomicU64>,
-    pub star_wrangler_api: StarWranglerApi,
+    pub star_db: StarDBApi,
     pub persistence: Persistence,
     pub data_access: FileAccess,
     pub machine: StarlaneMachine,
+    pub particle_logger: RootLogger
 }
 
 impl Debug for StarSkel {
@@ -1215,12 +1125,12 @@ impl Debug for StarSkel {
 pub struct StarInfo {
     pub key: StarKey,
     pub kind: StarKind,
-    pub address: Address
+    pub address: Point
 }
 
 impl StarInfo {
     pub fn new(star: StarKey, kind: StarKind) -> Self {
-        let address = Address::from_str(format!("<<{}>>::star",star.to_string()).as_str() ).expect("expect to be able to create a simple star address");
+        let address = Point::from_str(format!("<<{}>>::star", star.to_string()).as_str() ).expect("expect to be able to create a simple star address");
         StarInfo {
             key:star,
             kind ,

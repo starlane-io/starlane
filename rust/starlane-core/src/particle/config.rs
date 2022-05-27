@@ -4,7 +4,7 @@ use mesh_portal::version::latest::bin::Bin;
 use crate::artifact::ArtifactRef;
 use crate::cache::{Cacheable};
 use crate::error::Error;
-use crate::resource::Kind;
+use crate::particle::Kind;
 
 
 pub trait Parser<J: Cacheable>: Send + Sync + 'static {

@@ -4,6 +4,11 @@ use mesh_portal::version::latest::entity::request::get::Get;
 use mesh_portal::version::latest::entity::request::select::Select;
 use mesh_portal::version::latest::entity::request::create::Fulfillment;
 use mesh_portal::version::latest::entity::request::set::Set;
+use mesh_portal_versions::version::v0_0_1::entity::request::create::CreateOpVar;
+use mesh_portal_versions::version::v0_0_1::entity::request::get::GetVar;
+use mesh_portal_versions::version::v0_0_1::entity::request::set::SetVar;
+use mesh_portal_versions::version::v0_0_1::parse::ToResolved;
+use mesh_portal_versions::version::v0_0_1::span::new_span;
 use nom::combinator::all_consuming;
 use crate::command::parse::command_line;
 use crate::error::Error;
@@ -18,9 +23,9 @@ pub enum Strategy {
 pub enum CommandOp {
     Create(Create),
     Select(Select),
-    Publish(CreateOp),
-    Set(Set),
-    Get(Get)
+    Publish(CreateOpVar),
+    Set(SetVar),
+    Get(GetVar)
 }
 
 impl CommandOp {
@@ -48,6 +53,7 @@ impl FromStr for CommandOp  {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = new_span(s);
         Ok(all_consuming(command_line)(s)?.1)
     }
 }
@@ -76,9 +82,11 @@ impl CommandOp {
                     Ok(Command::Select(select))
                 }
                 CommandOp::Set(set) => {
+                    let set = set.collapse().unwrap();
                     Ok(Command::Set(set))
                 }
                 CommandOp::Get(get) => {
+                    let get = get.collapse().unwrap();
                     Ok(Command::Get(get))
                 }
                 _ => {

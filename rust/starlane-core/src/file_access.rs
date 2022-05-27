@@ -14,7 +14,7 @@ use tokio::time::Duration;
 use walkdir::WalkDir;
 
 use crate::error::Error;
-use crate::resource::FileKind;
+use crate::particle::FileSubKind;
 
 use crate::util;
 use std::convert::TryFrom;
@@ -205,7 +205,7 @@ pub enum FileEventKind {
 pub struct FileEvent {
     pub path: String,
     pub event_kind: FileEventKind,
-    pub file_kind: FileKind,
+    pub file_kind: FileSubKind,
 }
 
 #[derive(Clone)]
@@ -447,7 +447,7 @@ impl LocalFileAccess {
                             let event = FileEvent {
                                 path: path.to_string(),
                                 event_kind: FileEventKind::Discovered,
-                                file_kind: FileKind::Dir,
+                                file_kind: FileSubKind::Dir,
                             };
                             let event_tx = event_tx.clone();
                             tokio_runtime.block_on(async move {
@@ -501,8 +501,8 @@ impl LocalFileAccess {
                         };
 
                         let file_kind = match path.is_dir() {
-                            true => FileKind::Dir,
-                            false => FileKind::File,
+                            true => FileSubKind::Dir,
+                            false => FileSubKind::File,
                         };
 
                         let event = FileEvent {

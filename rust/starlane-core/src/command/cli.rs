@@ -3,13 +3,13 @@ use std::fmt::write;
 use std::marker::PhantomData;
 use mesh_portal::error;
 use mesh_portal::version::latest::bin::Bin;
-use mesh_portal::version::latest::entity::request::create::{AddressSegmentTemplate, KindTemplate, Template};
+use mesh_portal::version::latest::entity::request::create::{PointSegFactory, KindTemplate, Template};
 use mesh_portal::version::latest::frame::PrimitiveFrame;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::Message;
-use mesh_portal::version::latest::resource::ResourceStub;
+use mesh_portal::version::latest::particle::Stub;
 use mesh_portal_tcp_common::{PrimitiveFrameReader, PrimitiveFrameWriter};
-use mesh_portal::version::latest::entity::request::create::{AddressTemplate, Fulfillment};
+use mesh_portal::version::latest::entity::request::create::{PointTemplate, Fulfillment};
 use mesh_portal::version::latest::id::RouteSegment;
 use mesh_portal_versions::version::v0_0_1::parse::Res;
 use serde::Serialize;
@@ -97,13 +97,13 @@ pub struct CliServer {
 impl CliServer {
     pub async fn new( api: StarlaneApi, mut reader: OwnedReadHalf, mut writer: OwnedWriteHalf) -> Result<(),Error> {
         let template = Template {
-            address: AddressTemplate {
-                parent: Address::root(),
-                child_segment_template: AddressSegmentTemplate::Pattern("control-%".to_string())
+            point: PointTemplate {
+                parent: Point::root(),
+                child_segment_template: PointSegFactory::Pattern("control-%".to_string())
             },
             kind: KindTemplate {
-                resource_type: "Control".to_string(),
-                kind: None,
+                kind: "Control".to_string(),
+                sub_kind: None,
                 specific: None
             }
         };
@@ -175,13 +175,13 @@ impl CliServer {
 
     pub async fn new_internal( api: StarlaneApi ) -> Result<(mpsc::Sender<inlet::Frame>,mpsc::Receiver<outlet::Frame>),Error> {
         let template = Template {
-            address: AddressTemplate {
-                parent: Address::root(),
-                child_segment_template: AddressSegmentTemplate::Pattern("control-%".to_string())
+            point: PointTemplate {
+                parent: Point::root(),
+                child_segment_template: PointSegFactory::Pattern("control-%".to_string())
             },
             kind: KindTemplate {
-                resource_type: "Control".to_string(),
-                kind: None,
+                kind: "Control".to_string(),
+                sub_kind: None,
                 specific: None
             }
         };

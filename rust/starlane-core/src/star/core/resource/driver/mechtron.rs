@@ -7,31 +7,28 @@ use std::time::Duration;
 use anyhow::anyhow;
 use dashmap::DashMap;
 use dashmap::mapref::one::Ref;
-use mesh_portal_api_server::{Portal, PortalApi, PortalEvent, PortalRequestHandler, PortalResourceApi};
+use mesh_portal_api_server::{Portal, PortalApi, PortalEvent, PortalRequestHandler, PortalParticleApi};
 use mesh_portal::version::latest::artifact::{ArtifactRequest, ArtifactResponse};
 
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
-use crate::resource::{ArtifactKind, ResourceType, ResourceAssign, AssignResourceStateSrc, Kind};
-use crate::star::core::resource::driver::ResourceCoreDriver;
+use crate::particle::{ArtifactSubKind, KindBase, ParticleAssign, AssignParticleStateSrc, Kind};
+use crate::star::core::resource::driver::ParticleCoreDriver;
 use crate::star::core::resource::state::StateStore;
 use crate::star::{StarSkel};
 use crate::util::AsyncHashMap;
 use crate::message::delivery::Delivery;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::config;
-use mesh_portal::version::latest::config::{Assign, Config};
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::config::{Assign, Config, ParticleConfigBody};
+use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Request, Response};
 use mesh_portal::version::latest::payload::{Payload, PayloadPattern, Primitive};
 use mesh_portal::version::latest::portal;
 use mesh_portal::version::latest::portal::Exchanger;
 use mesh_portal::version::latest::portal::inlet::AssignRequest;
-use mesh_portal::version::latest::resource::Properties;
+use mesh_portal::version::latest::particle::Properties;
 use mesh_portal_tcp_server::{PortalServer, PortalTcpServer, TcpServerCall};
-use mesh_portal_versions::version::v0_0_1::config::ResourceConfigBody;
-use mesh_portal_versions::version::v0_0_1::pattern::consume_data_struct_def;
-use mesh_portal_versions::version::v0_0_1::util::ValueMatcher;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::mpsc::Sender;
@@ -40,7 +37,6 @@ use crate::command::cli::outlet;
 use crate::command::cli::outlet::Frame;
 use crate::command::execute::CommandExecutor;
 use crate::config::config::MechtronConfig;
-use crate::config::parse::replace::substitute;
 
 use crate::fail::Fail;
 use crate::mechtron::process::launch_mechtron_process;
@@ -52,12 +48,12 @@ pub struct MechtronCoreDriver {
     skel: StarSkel,
     processes: HashMap<String, Child>,
     inner: Arc<RwLock<MechtronManagerInner>>,
-    resource_type: ResourceType,
+    resource_type: KindBase,
     mechtron_portal_server_tx: Sender<TcpServerCall>,
 }
 
 impl MechtronCoreDriver {
-    pub async fn new(skel: StarSkel, resource_type:ResourceType) -> Result<Self,Error> {
+    pub async fn new(skel: StarSkel, resource_type: KindBase) -> Result<Self,Error> {
 
         let mechtron_portal_server_tx = skel.machine.start_mechtron_portal_server().await?;
 
@@ -83,19 +79,19 @@ impl MechtronCoreDriver {
                                 PortalEvent::PortalRemoved(key) => {
                                     inner.portals.remove(&key);
                                 }
-                                PortalEvent::ResourceAdded(resource) => {
+                                PortalEvent::ParticleAdded(resource) => {
 
-println!("Resource ADDDED: '{}'", resource.stub.address.to_string() );
-                                    let address = resource.stub.address.clone();
-                                    inner.mechtrons.insert( address.clone() , resource.clone() );
-                                    if let Some(exchanges) = inner.mechtron_exchange.remove( &address ) {
+println!("Particle ADDDED: '{}'", resource.stub.point.to_string() );
+                                    let point = resource.stub.point.clone();
+                                    inner.mechtrons.insert( point.clone() , resource.clone() );
+                                    if let Some(exchanges) = inner.mechtron_exchange.remove( &point ) {
                                         for tx in exchanges {
                                             tx.send( resource.clone() );
                                         }
                                     }
                                 }
-                                PortalEvent::ResourceRemoved(address) => {
-                                    inner.mechtrons.remove(&address);
+                                PortalEvent::ParticleRemoved(point) => {
+                                    inner.mechtrons.remove(&point);
                                 }
                             }
                         }
@@ -126,13 +122,13 @@ impl MechtronCoreDriver {
 }
 
 #[async_trait]
-impl ResourceCoreDriver for MechtronCoreDriver {
+impl ParticleCoreDriver for MechtronCoreDriver {
 
 
 
     async fn assign(
         &mut self,
-        assign: ResourceAssign,
+        assign: ParticleAssign,
     ) -> Result<(), Error> {
         match assign.state {
             StateSrc::Stateless => {}
@@ -143,30 +139,30 @@ impl ResourceCoreDriver for MechtronCoreDriver {
 
 println!("Assigning Mechtron...");
 
-        let config_address = assign.stub.properties.get(&"config".to_string() ).ok_or(format!("'config' property required to be set for {}", self.resource_type.to_string() ))?.value.as_str();
-        let config_address = Address::from_str(config_address)?;
+        let config_point = assign.details.properties.get(&"config".to_string() ).ok_or(format!("'config' property required to be set for {}", self.resource_type.to_string() ))?.value.as_str();
+        let config_point = Point::from_str(config_point)?;
 
         let config_artifact_ref = ArtifactRef {
-          address:config_address.clone(),
-          kind: ArtifactKind::ResourceConfig
+          point:config_point.clone(),
+          kind: ArtifactSubKind::ParticleConfig
         };
 
         let caches = self.skel.machine.cache( &config_artifact_ref ).await?;
 
 println!("MECHTRON: got caches" );
-        let config = caches.resource_configs.get(&config_address).ok_or::<Error>(format!("expected mechtron_config").into())?;
+        let config = caches.resource_configs.get(&config_point).ok_or::<Error>(format!("expected mechtron_config").into())?;
 println!("MECHTRON: got config" );
-        let config = MechtronConfig::new(config, assign.stub.address.clone() );
+        let config = MechtronConfig::new(config, assign.details.stub.point.clone() );
 
 println!("MechtronConfig.wasm_src().is_ok() {}", config.wasm_src().is_ok() );
 println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
 
-        let api = StarlaneApi::new( self.skel.surface_api.clone(), assign.stub.address.clone() );
+        let api = StarlaneApi::new( self.skel.surface_api.clone(), assign.details.stub.point.clone() );
         let substitution_map = config.substitution_map()?;
         for command_line in &config.install {
-            let command_line = substitute(command_line.as_str(), &substitution_map)?;
+//            let command_line = substitute(command_line.as_str(), &substitution_map)?;
             println!("INSTALL: '{}'",command_line);
-            let mut output_rx = CommandExecutor::exec_simple(command_line,assign.stub.clone(), api.clone() );
+            let mut output_rx = CommandExecutor::exec_simple(command_line.to_string(), assign.details.stub.clone(), api.clone() );
             while let Some(frame) = output_rx.recv().await {
                 match frame {
                     outlet::Frame::StdOut(out) => {
@@ -199,10 +195,10 @@ println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
 
         let portal_assign = Assign {
             config: Config {
-                body: ResourceConfigBody::Named(config.mechtron_name()?),
-                address: assign.stub.address.clone()
+                body: ParticleConfigBody::Named(config.mechtron_name()?),
+                point: assign.details.stub.point.clone()
             },
-            stub: assign.stub.clone()
+            details: assign.details.clone()
         };
 
         portal.assign(portal_assign);
@@ -234,16 +230,16 @@ info!("handling request");
     }
 
 
-    fn resource_type(&self) -> ResourceType {
+    fn kind(&self) -> KindBase {
         self.resource_type.clone()
     }
 }
 
 struct MechtronManagerInner{
     pub portals: HashMap<String,PortalApi>,
-    pub mechtrons: HashMap<Address, PortalResourceApi>,
+    pub mechtrons: HashMap<Point, PortalParticleApi>,
     pub portal_exchange: HashMap<String,Vec<oneshot::Sender<PortalApi>>>,
-    pub mechtron_exchange: HashMap<Address,Vec<oneshot::Sender<PortalResourceApi>>>,
+    pub mechtron_exchange: HashMap<Point,Vec<oneshot::Sender<PortalParticleApi>>>,
 }
 
 impl MechtronManagerInner {
@@ -278,17 +274,17 @@ impl MechtronManagerInner {
         rx
     }
 
-    pub fn exchange_mechtron( &mut self, address: &Address ) -> oneshot::Receiver<PortalResourceApi> {
+    pub fn exchange_mechtron(&mut self, point: &Point) -> oneshot::Receiver<PortalParticleApi> {
         let (tx,rx) = oneshot::channel();
-        if let Some(mechtron) = self.mechtrons.get(address) {
+        if let Some(mechtron) = self.mechtrons.get(point) {
             tx.send(mechtron.clone() );
             return rx;
         }
 
-        let vec_tx: &mut Vec<oneshot::Sender<PortalResourceApi>> = match self.mechtron_exchange.get_mut(address ) {
+        let vec_tx: &mut Vec<oneshot::Sender<PortalParticleApi>> = match self.mechtron_exchange.get_mut(point ) {
             None => {
-                self.mechtron_exchange.insert(address.clone(), vec![]);
-                self.mechtron_exchange.get_mut( address).expect("expected vec")
+                self.mechtron_exchange.insert(point.clone(), vec![]);
+                self.mechtron_exchange.get_mut( point).expect("expected vec")
             }
             Some(vec_tx) => vec_tx
         };
@@ -365,13 +361,13 @@ impl PortalRequestHandler for MechtronPortalRequestHandler {
     ) -> Result<ArtifactResponse, anyhow::Error> {
 
         let artifact_ref = ArtifactRef {
-            address: request.address.clone(),
-            kind: ArtifactKind::Raw
+            point: request.point.clone(),
+            kind: ArtifactSubKind::Raw
         };
         let caches = self.api.cache( &artifact_ref).await?;
-        let artifact = caches.raw.get(&request.address).ok_or(anyhow!("could not get raw artifact: '{}'",request.address.to_string()))?;
+        let artifact = caches.raw.get(&request.point).ok_or(anyhow!("could not get raw artifact: '{}'",request.point.to_string()))?;
         Ok(ArtifactResponse{
-            to: request.address.clone(),
+            to: request.point.clone(),
             payload: artifact.data()
         })
     }

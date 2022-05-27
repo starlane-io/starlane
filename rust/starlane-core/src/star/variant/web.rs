@@ -26,10 +26,10 @@ use ascii::IntoAsciiString;
 use http::{HeaderMap, HeaderValue, Response, Uri, Version};
 use http::header::{HeaderName, HOST};
 use mesh_portal::version::latest::bin::Bin;
-use mesh_portal::version::latest::entity::request::{Action, RequestCore};
-use mesh_portal::version::latest::id::{Address, Meta};
+use mesh_portal::version::latest::entity::request::{Method, RequestCore};
+use mesh_portal::version::latest::id::{Point, Meta};
 use mesh_portal::version::latest::messaging;
-use mesh_portal::version::latest::payload::{HttpMethod, Payload, Primitive};
+use mesh_portal::version::latest::payload::{Payload, Primitive};
 use nom::AsBytes;
 use nom_supreme::error::ErrorTree;
 use nom_supreme::final_parser::final_parser;
@@ -37,7 +37,7 @@ use crate::artifact::ArtifactRef;
 use crate::cache::ArtifactItem;
 use crate::html::HTML;
 use regex::Regex;
-use crate::resource::ArtifactKind;
+use crate::particle::ArtifactSubKind;
 use serde::{Serialize,Deserialize};
 use tiny_http::{HeaderField, Server, StatusCode};
 use crate::star::variant::web::parse::host_and_port;
@@ -166,7 +166,7 @@ async fn process_request( http_request: http::Request<Bin>, api: StarlaneApi, sk
     let host_and_port = http_request.headers().get("Host").ok_or("HOST header not set")?;
     let host = host_and_port.to_str()?.split(":").next().ok_or("expected host")?.to_string();
     let core = RequestCore::from(http_request);
-    let to = Address::from_str( host.as_str() )?;
+    let to = Point::from_str( host.as_str() )?;
     let from = skel.info.address;
     let request = messaging::Request::new( core, from, to );
 println!("exchanging...to :{}", request.to.to_string() );
@@ -192,8 +192,10 @@ mod tests {
 }
 #[cfg(test)]
 mod test {
+    use mesh_portal_versions::version::v0_0_1::span::new_span;
     use crate::error::Error;
     use regex::Regex;
+    use crate::star::variant::web::HostAndPort;
     use crate::star::variant::web::parse::host_and_port;
 
     #[test]
@@ -218,7 +220,7 @@ mod test {
 
     #[test]
     pub async fn host() -> Result<(),Error> {
-        let (_,host_and_port) = host_and_port("localhost:8080")?;
+        let host_and_port:HostAndPort = host_and_port(new_span("localhost:8080"))?;
         assert_eq!( host_and_port.host, "localhost".to_string() );
         assert_eq!( host_and_port.port, 8080 );
         Ok(())
@@ -233,7 +235,11 @@ pub struct HostAndPort {
 pub mod parse {
     use std::num::ParseIntError;
     use std::str::FromStr;
+    use mesh_portal_versions::error::MsgErr;
     use mesh_portal_versions::version::v0_0_1::parse::{domain, Res};
+    use mesh_portal_versions::version::v0_0_1::parse::error::result;
+    use mesh_portal_versions::version::v0_0_1::span::new_span;
+    use mesh_portal_versions::version::v0_0_1::wrap::Span;
     use nom::bytes::complete::{is_a, tag, take_while};
     use nom::character::is_digit;
     use nom::error::{ErrorKind, ParseError, VerboseError};
@@ -241,25 +247,23 @@ pub mod parse {
     use nom_supreme::error::ErrorTree;
     use crate::star::variant::web::HostAndPort;
 
-    pub fn host_and_port(input: &str ) -> Res<&str, HostAndPort> {
-        let (next, (host,_,port)) = tuple(( domain, tag(":"), is_a("0123456789")  ) )(input)?;
+    pub fn host_and_port<I:Span>(input: I ) -> Result<HostAndPort,MsgErr> {
+        let input = input;
+        let (host,_,port) = result(tuple(( domain, tag(":"), is_a("0123456789")  ) )(input.clone()))?;
 
         let host = host.to_string();
-        let port: &str = port;
-        let port = match u32::from_str(port) {
+        let port= port.to_string();
+        let port = match u32::from_str(port.as_str() ) {
             Ok(port) => port,
             Err(err) => {
-                return Err(nom::Err::Error(ErrorTree::from_error_kind(
-                    input,
-                    ErrorKind::Tag,
-                )))
+                return Err(MsgErr::from_500(format!("bad port {}", port ).as_str() ));
             }
         };
         let host_and_port = HostAndPort {
             host,
             port
         };
-        Ok((next, host_and_port))
+        Ok(host_and_port)
     }
 
 }

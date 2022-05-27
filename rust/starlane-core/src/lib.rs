@@ -1,6 +1,4 @@
-#![feature(fn_traits)]
-#![feature(unboxed_closures)]
-#![feature(trivial_bounds)]
+#![allow(warnings)]
 
 
 #[macro_use]
@@ -35,9 +33,12 @@ extern crate validate;
 extern crate wasmer;
 #[macro_use]
 extern crate async_recursion;
+extern crate core;
 
 
 use std::str::FromStr;
+use std::time::SystemTime;
+use chrono::{DateTime, Utc};
 
 use semver;
 use uuid::Uuid;
@@ -59,7 +60,7 @@ pub mod logger;
 pub mod message;
 pub mod names;
 pub mod proto;
-pub mod resource;
+pub mod particle;
 pub mod server;
 pub mod service;
 pub mod space;
@@ -70,13 +71,15 @@ pub mod util;
 pub mod watch;
 pub mod parse;
 pub mod html;
-pub mod security;
 pub mod pattern;
 pub mod fail;
 pub mod command;
 pub mod user;
 pub mod mechtron;
 pub mod endpoint;
+pub mod registry;
+pub mod bindex;
+pub mod databases;
 
 lazy_static! {
     static ref VERSION: semver::Version = {
@@ -86,8 +89,13 @@ lazy_static! {
 }
 
 #[no_mangle]
-pub extern "C" fn mesh_portal_unique_id() -> String
+pub extern "C" fn mesh_portal_uuid() -> String
 {
     Uuid::new_v4().to_string()
 }
 
+
+#[no_mangle]
+pub extern "C" fn mesh_portal_timestamp() -> DateTime<Utc>{
+    Utc::now()
+}

@@ -15,11 +15,11 @@ use futures::future::join_all;
 use futures::{FutureExt, StreamExt, TryFutureExt};
 use mesh_portal::version::latest::frame::PrimitiveFrame;
 use mesh_portal_api_server::Portal;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::path;
 use mesh_portal_tcp_client::PortalTcpClient;
 use mesh_portal_tcp_common::{FrameReader, FrameWriter, PrimitiveFrameReader, PrimitiveFrameWriter};
-use mesh_portal_tcp_server::{PortalTcpServer, TcpServerCall};
+use mesh_portal_tcp_server::{PointFactory, PortalTcpServer, TcpServerCall};
 
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
@@ -40,9 +40,8 @@ use crate::lane::{ClientSideTunnelConnector, LocalTunnelConnector, ProtoLaneEnd,
 use crate::logger::{Flags, Logger};
 use crate::mechtron::portal_client::MechtronPortalClient;
 
-use crate::proto::{
-    local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoTunnel,
-};
+use crate::proto::{local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoStarKey, ProtoTunnel};
+use crate::registry::{Registry, RegistryApi};
 
 use crate::star::surface::SurfaceApi;
 use crate::star::{ConstellationBroadcast, StarKind, StarStatus};
@@ -54,7 +53,7 @@ use crate::template::{
     ConstellationData, ConstellationLayout, ConstellationSelector, ConstellationTemplate,
     ConstellationTemplateHandle, MachineName, StarInConstellationTemplateHandle,
     StarInConstellationTemplateSelector, StarKeyConstellationIndexTemplate,
-    StarKeySubgraphTemplate, StarKeyTemplate, StarSelector, StarTemplate, StarTemplateHandle,
+    StarKeySubgraphTemplate, StarKeyTemplate, StarSelector, StarTemplate, StarHandle,
 };
 use crate::user::HyperUser;
 use crate::util::{AsyncHashMap, JwksCache};
@@ -77,15 +76,16 @@ pub struct StarlaneMachine {
     tx: mpsc::Sender<StarlaneCommand>,
     run_complete_signal_tx: broadcast::Sender<()>,
     machine_filesystem: Arc<MachineFileSystem>,
-    portals: Arc<DashMap<String,Portal>>
+    portals: Arc<DashMap<String,Portal>>,
+    pub registry: RegistryApi
 }
 
 impl StarlaneMachine {
-    pub fn new(name: MachineName) -> Result<Self, Error> {
-        Self::new_with_artifact_caches(name, Option::None)
+    pub async fn new(name: MachineName) -> Result<Self, Error> {
+        Self::new_with_artifact_caches(name, Option::None).await
     }
 
-    pub fn new_with_artifact_caches(
+    pub async fn new_with_artifact_caches(
         name: MachineName,
         artifact_caches: Option<Arc<ProtoArtifactCachesFactory>>
     ) -> Result<Self, Error> {
@@ -95,7 +95,12 @@ impl StarlaneMachine {
         let delete_data_on_start = std::env::var("STARLANE_DELETE_DATA_ON_START").unwrap_or("true".to_string()).parse::<bool>().unwrap_or(true);
 
         if delete_cache_on_start {
-            fs::remove_dir_all(STARLANE_CACHE_DIR.to_string() ).unwrap_or_default();
+            match fs::remove_dir_all(STARLANE_CACHE_DIR.to_string() ) {
+                Ok(_) => {}
+                Err(err) => {
+                    error!("{}",err.to_string());
+                }
+            }
         }
         if delete_data_on_start {
             fs::remove_dir_all(STARLANE_DATA_DIR.to_string() ).unwrap_or_default();
@@ -104,11 +109,13 @@ impl StarlaneMachine {
         let runner = StarlaneMachineRunner::new_with_artifact_caches(name, artifact_caches)?;
         let tx = runner.command_tx.clone();
         let run_complete_signal_tx = runner.run();
+        let registry = Registry::new().await?;
         let starlane = Self {
             tx: tx,
             run_complete_signal_tx: run_complete_signal_tx,
             machine_filesystem: Arc::new(MachineFileSystem::new()?),
-            portals: Arc::new(DashMap::new())
+            portals: Arc::new(DashMap::new()),
+            registry: Arc::new(registry)
         };
 
         Result::Ok(starlane)
@@ -128,7 +135,6 @@ impl StarlaneMachine {
             .send(StarlaneCommand::GetProtoArtifactCachesFactory(tx))
             .await?;
         Ok(rx.await?.ok_or("expected proto artifact cache")?)
-
     }
 
     pub async fn start_mechtron_portal_server( &self ) -> Result<mpsc::Sender<TcpServerCall>,Error> {
@@ -269,11 +275,11 @@ impl StarlaneMachineRunner {
                 } else {
                     let (prev_info, _) = best.as_ref().unwrap();
                     match info.kind {
-                        StarKind::Mesh => {
+                        StarKind::Relay => {
                             best = Option::Some((info, star_ctrl));
                         }
                         StarKind::Client => {
-                            if prev_info.kind != StarKind::Mesh {
+                            if prev_info.kind != StarKind::Relay {
                                 best = Option::Some((info, star_ctrl));
                             }
                         }
@@ -420,7 +426,9 @@ impl StarlaneMachineRunner {
                     star_template.handle.to_string()
                 ))?;
             if self.name == *machine {
-                let star_key = star_template.key.create();
+                let star_key = StarKey::new(&name, &star_template.handle ) ;
+                // hacking to ProtoStarKey so we don't have to trouble with fixing the old setup yet
+                let star_key = ProtoStarKey::Key(star_key);
 
                 let (evolve_tx, evolve_rx) = oneshot::channel();
                 evolve_rxs.push(evolve_rx);
@@ -547,25 +555,6 @@ impl StarlaneMachineRunner {
                                 self.add_local_lane(local_star.clone(), second_star).await?;
                             proto_lane_evolution_rxs.append(&mut evolution_rxs);
                         }
-                        ConstellationSelector::AnyWithGatewayInsideMachine(machine_name) => {
-                            let host_address =
-                                layout.get_machine_host_adddress(machine_name.clone());
-                            let star_ctrl = self
-                                .star_controllers
-                                .get(local_star.clone())
-                                .await?
-                                .ok_or("expected local star to have star_ctrl")?;
-                            let proto_lane_evolution_rx = self
-                                .add_client_side_lane_ctrl(
-                                    star_ctrl,
-                                    host_address,
-                                    lane.star_selector.clone(),
-                                    true,
-                                    OnCloseAction::Remove
-                                )
-                                .await?;
-                            proto_lane_evolution_rxs.push(proto_lane_evolution_rx);
-                        }
                     }
                 }
             }
@@ -649,7 +638,17 @@ impl StarlaneMachineRunner {
                 if let Some(serve_tx) = &flags.mechtron_portal_server {
                     Ok(serve_tx.clone() )
                 } else {
-                    let server_tx = PortalTcpServer::new( STARLANE_MECHTRON_PORT.clone() , Box::new(MechtronPortalServer::new(starlane_api ) ) );
+
+                    pub struct HackedPointFactory{ };
+
+                    impl PointFactory for HackedPointFactory {
+                        fn point(&self) -> Point {
+                            Point::from_str("<<HACK>>::portal").unwrap()
+                        }
+                    }
+
+
+                    let server_tx = PortalTcpServer::new( STARLANE_MECHTRON_PORT.clone() , Box::new(MechtronPortalServer::new(starlane_api ) ), Arc::new( HackedPointFactory{}) );
                     flags.mechtron_portal_server = Option::Some(server_tx.clone());
                     Ok(server_tx)
                 }

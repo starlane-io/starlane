@@ -12,10 +12,13 @@ use std::time::Duration;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::entity::request::create::KindTemplate;
 
-use mesh_portal::version::latest::id::{Address, KindParts, ResourceKind, Specific};
+use mesh_portal::version::latest::id::{Point, KindParts, ResourceKind, Specific};
 use mesh_portal::version::latest::payload::Payload;
-use mesh_portal::version::latest::resource::{ResourceStub, Status};
-use mesh_portal_versions::version::v0_0_1::pattern::parse::consume_kind;
+use mesh_portal::version::latest::particle::{Stub, Status};
+use mesh_portal::version::latest::security::Permissions;
+use mesh_portal_versions::version::v0_0_1::parse::consume_kind;
+use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
+use mesh_portal_versions::version::v0_0_1::span::new_span;
 use rusqlite::{Connection, params, params_from_iter, Row, ToSql, Transaction};
 use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 use serde::{Deserialize, Serialize};
@@ -32,11 +35,10 @@ use crate::logger::{elog, LogInfo, StaticLogInfo};
 
 use crate::message::{MessageExpect, ProtoStarMessage, ReplyKind};
 use crate::names::Name;
-use crate::resource::BaseKind::Mechtron;
-use crate::resource::property::{AddressPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPermit, PropertySource, U64Pattern};
+use crate::particle::KindBase::Mechtron;
+use crate::particle::property::{AddressPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPermit, PropertySource, U64Pattern};
 use crate::star::{StarInfo, StarKey, StarSkel};
 use crate::star::core::resource::driver::user::UsernamePattern;
-use crate::star::shell::wrangler::{StarWrangle};
 use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
 
@@ -47,18 +49,18 @@ pub mod property;
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ResourceLocation {
+pub enum ParticleLocation {
     Unassigned,
-    Host(StarKey)
+    Star(StarKey)
 }
 
-impl ToString for ResourceLocation {
+impl ToString for ParticleLocation {
     fn to_string(&self) -> String {
         match self {
-            ResourceLocation::Unassigned => {
+            ParticleLocation::Unassigned => {
                 "Unassigned".to_string()
             }
-            ResourceLocation::Host(host) => {
+            ParticleLocation::Star(host) => {
                 host.to_string()
             }
         }
@@ -66,20 +68,20 @@ impl ToString for ResourceLocation {
 }
 
 
-impl ResourceLocation {
+impl ParticleLocation {
     pub fn new(star: StarKey) -> Self {
-        ResourceLocation::Host( star )
+        ParticleLocation::Star( star )
     }
     pub fn root() -> Self {
-        ResourceLocation::Host(StarKey::central())
+        ParticleLocation::Star(StarKey::central())
     }
 
     pub fn ok_or(&self)->Result<StarKey,Error> {
         match self {
-            ResourceLocation::Unassigned => {
+            ParticleLocation::Unassigned => {
                 Err("ResourceLocation is unassigned".into())
             }
-            ResourceLocation::Host(star) => {
+            ParticleLocation::Star(star) => {
                 Ok(star.clone())
             }
         }
@@ -118,38 +120,59 @@ impl FromStr for DisplayValue {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceRecord {
-    pub stub: ResourceStub,
-    pub location: ResourceLocation,
+pub struct ParticleRecord {
+    pub details: ParticleDetails,
+    pub location: ParticleLocation,
 }
 
 
-impl ResourceRecord {
-    pub fn new(stub: ResourceStub, host: StarKey) -> Self {
-        ResourceRecord {
-            stub: stub,
-            location: ResourceLocation::new(host),
+impl Default for ParticleRecord {
+    fn default() -> Self {
+        Self {
+            details: ParticleDetails {
+                stub: Stub {
+                    point: Point::root(),
+                    kind: Kind::Root.to_resource_kind(),
+                    status: Status::Ready
+                },
+                properties: Default::default()
+            },
+            location: ParticleLocation::Star(StarKey::central()),
+        }
+    }
+}
+
+
+
+
+impl ParticleRecord {
+    pub fn new(details: ParticleDetails, host: StarKey ) -> Self {
+        ParticleRecord {
+            details,
+            location: ParticleLocation::new(host),
         }
     }
 
     pub fn root() -> Self {
         Self {
-            stub: ResourceStub {
-              address: Address::root(),
-              kind: Kind::Root.to_resource_kind(),
-              properties: Default::default(),
-              status: Status::Ready
+            details: ParticleDetails {
+                stub: Stub {
+                    point: Point::root(),
+                    kind: Kind::Root.to_resource_kind(),
+                    status: Status::Ready
+                },
+                properties: Default::default(),
             },
-            location: ResourceLocation::root(),
+            location: ParticleLocation::Star(StarKey::central())
         }
     }
 
 
 }
 
-impl Into<ResourceStub> for ResourceRecord {
-    fn into(self) -> ResourceStub {
-        self.stub
+impl Into<Stub> for ParticleRecord {
+    fn into(self) -> Stub {
+        self.details.stub
     }
 }
 
@@ -162,9 +185,9 @@ impl Into<ResourceStub> for ResourceRecord {
     PartialEq,
     Hash,
     strum_macros::Display,
-    strum_macros::EnumString
+    strum_macros::EnumString,
 )]
-pub enum ResourceType {
+pub enum KindBase {
     Root,
     Space,
     UserBase,
@@ -185,8 +208,8 @@ pub enum ResourceType {
 }
 
 /*
-impl FromStr for ResourceType{
-    type Err = mesh_portal::error::Error;
+impl FromStr for KindBase{
+    type Err = mesh_portal::error::MsgErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(
@@ -208,29 +231,30 @@ impl FromStr for ResourceType{
                "Credentials" => Self::Credentials,
                "Control" => Self::Control,
                what => {
-                   return Err(format!("invalid ResourceType: '{}'", what).into());
+                   return Err(format!("invalid Kind: '{}'", what).into());
                }
            }
         )
     }
 }
+
  */
 
-impl Into<String> for ResourceType {
+impl Into<String> for KindBase {
     fn into(self) -> String {
         self.to_string()
     }
 }
 
-impl TryFrom<String> for ResourceType {
+impl TryFrom<String> for KindBase {
     type Error = mesh_portal::error::MsgErr;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        Ok(ResourceType::from_str(value.as_str())?)
+        Ok(KindBase::from_str(value.as_str())?)
     }
 }
 
-impl ResourceType {
+impl KindBase {
     pub fn child_resource_registry_handler(&self) -> ChildResourceRegistryHandler {
         match self {
             Self::UserBase => ChildResourceRegistryHandler::Core,
@@ -251,18 +275,18 @@ impl ResourceType {
 pub enum Kind {
     Root,
     Space,
-    UserBase(UserBaseKind),
-    Base(BaseKind),
+    UserBase(UserBaseSubKind),
+    Base(BaseSubKind),
     User,
     App,
     Mechtron,
     FileSystem,
-    File(FileKind),
-    Database(DatabaseKind),
+    File(FileSubKind),
+    Database(DatabaseSubKind),
     Authenticator,
     ArtifactBundleSeries,
     ArtifactBundle,
-    Artifact(ArtifactKind),
+    Artifact(ArtifactSubKind),
     Proxy,
     Credentials,
     Control
@@ -281,8 +305,8 @@ impl TryInto<KindTemplate> for Kind {
 
     fn try_into(self) -> Result<KindTemplate, Self::Error> {
         Ok(KindTemplate {
-            resource_type: self.resource_type().to_string(),
-            kind: self.sub_string(),
+            kind: self.kind().to_string(),
+            sub_kind: self.sub_kind(),
             specific: match self.specific() {
                 None => None,
                 Some(specific) => Some(specific.try_into()?)
@@ -323,7 +347,7 @@ impl TryInto<mesh_portal::version::latest::id::ResourceKind> for Kind {
         let parts: KindParts = self.into();
 
         Ok(mesh_portal::version::latest::id::ResourceKind {
-            resource_type: parts.resource_type.into(),
+            kind: parts.kind.into(),
             kind: parts.kind,
             specific: parts.specific
         })
@@ -336,32 +360,32 @@ impl TryFrom<KindParts> for Kind {
     type Error = mesh_portal::error::MsgErr;
 
     fn try_from(parts: KindParts) -> Result<Self, Self::Error> {
-        match ResourceType::from_str(parts.resource_type.as_str() )? {
-            ResourceType::Base => {
-                let parts: String = match parts.kind {
+        match KindBase::from_str(parts.kind.as_str() )? {
+            KindBase::Base => {
+                match parts.sub_kind {
                     None => {
                         return Err("expected parts".into());
                     }
                     Some(parts) => {
-                        return Ok(Self::Base(BaseKind::from_str(parts.as_str())?));
+                        return Ok(Self::Base(BaseSubKind::from_str(parts.as_str())?));
                     }
-                };
+                }
             }
-            ResourceType::Database => {
-                match parts.kind
+            KindBase::Database => {
+                match parts.sub_kind
                 {
                     None => {
                         return Err("expected kind".into());
                     }
-                    Some(kind) => {
-                        match kind.as_str() {
+                    Some(sub_kind) => {
+                        match sub_kind.as_str() {
                             "Relational" => {
                                 match parts.specific {
                                     None => {
                                         return Err("expected specific".into());
                                     }
                                     Some(specific) => {
-                                        return Ok(Kind::Database(DatabaseKind::Relational(specific)));
+                                        return Ok(Kind::Database(DatabaseSubKind::Relational(specific)));
                                     }
                                 }
                             }
@@ -373,41 +397,41 @@ impl TryFrom<KindParts> for Kind {
 
                 }
             }
-            ResourceType::Artifact => {
-                match parts.kind {
+            KindBase::Artifact => {
+                match parts.sub_kind {
                     None => {
                         return Err("kind needs to be set".into())
                     }
-                    Some(kind)  => {
-                        return Ok(Self::Artifact(ArtifactKind::from_str(kind.as_str())?))
+                    Some(sub_kind)  => {
+                        return Ok(Self::Artifact(ArtifactSubKind::from_str(sub_kind.as_str())?))
                     }
                 }
             }
-            ResourceType::UserBase=> {
-                match parts.kind {
+            KindBase::UserBase=> {
+                match parts.sub_kind {
                     None => {
                         return Err("kind needs to be set for UserBase".into())
                     }
-                    Some(kind)  => {
-                        return Ok(Self::UserBase(UserBaseKind::from_str(kind.as_str())?))
+                    Some(sub_kind)  => {
+                        return Ok(Self::UserBase(UserBaseSubKind::from_str(sub_kind.as_str())?))
                     }
                 }
             }
             _ => {}
         }
 
-        Ok(match ResourceType::from_str(parts.resource_type.as_str())? {
-            ResourceType::Root => {Self::Root}
-            ResourceType::Space => {Self::Space}
-            ResourceType::User => {Self::User}
-            ResourceType::App => {Self::App}
-            ResourceType::Mechtron => {Self::Mechtron}
-            ResourceType::FileSystem => {Self::FileSystem}
-            ResourceType::Authenticator => {Self::Authenticator}
-            ResourceType::ArtifactBundleSeries => {Self::ArtifactBundleSeries}
-            ResourceType::ArtifactBundle => {Self::ArtifactBundle}
-            ResourceType::Proxy => {Self::Proxy}
-            ResourceType::Credentials => {Self::Credentials}
+        Ok(match KindBase::from_str(parts.kind.as_str())? {
+            KindBase::Root => {Self::Root}
+            KindBase::Space => {Self::Space}
+            KindBase::User => {Self::User}
+            KindBase::App => {Self::App}
+            KindBase::Mechtron => {Self::Mechtron}
+            KindBase::FileSystem => {Self::FileSystem}
+            KindBase::Authenticator => {Self::Authenticator}
+            KindBase::ArtifactBundleSeries => {Self::ArtifactBundleSeries}
+            KindBase::ArtifactBundle => {Self::ArtifactBundle}
+            KindBase::Proxy => {Self::Proxy}
+            KindBase::Credentials => {Self::Credentials}
             what => { return Err(format!("missing Kind from_str for: {}",what.to_string()).into())}
         })
     }
@@ -417,7 +441,7 @@ impl FromStr for Kind {
     type Err = mesh_portal::error::MsgErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let resource_kind = consume_kind(s)?;
+        let resource_kind = consume_kind(new_span(s))?;
         Ok(resource_kind.try_into()?)
     }
 }
@@ -425,37 +449,37 @@ impl FromStr for Kind {
 impl Into<KindParts> for Kind {
     fn into(self) -> KindParts {
         KindParts {
-            resource_type: self.resource_type().to_string(),
-            kind: self.sub_string(),
+            kind: self.kind().to_string(),
+            sub_kind: self.sub_kind(),
             specific: self.specific()
         }
     }
 }
 
 impl Kind {
-    pub fn resource_type(&self) -> ResourceType {
+    pub fn kind(&self) -> KindBase {
         match self {
-            Kind::Root => ResourceType::Root,
-            Kind::Space => ResourceType::Space,
-            Kind::Base(_) => ResourceType::Base,
-            Kind::User => ResourceType::User,
-            Kind::App => ResourceType::App,
-            Kind::Mechtron => ResourceType::Mechtron,
-            Kind::FileSystem => ResourceType::FileSystem,
-            Kind::File(_) => ResourceType::File,
-            Kind::Database(_) => ResourceType::Database,
-            Kind::Authenticator => ResourceType::Authenticator,
-            Kind::ArtifactBundleSeries => ResourceType::ArtifactBundleSeries,
-            Kind::ArtifactBundle => ResourceType::ArtifactBundle,
-            Kind::Artifact(_) => ResourceType::Artifact,
-            Kind::Proxy => ResourceType::Proxy,
-            Kind::Credentials => ResourceType::Credentials,
-            Kind::Control => ResourceType::Control,
-            Kind::UserBase(_) => ResourceType::UserBase
+            Kind::Root => KindBase::Root,
+            Kind::Space => KindBase::Space,
+            Kind::Base(_) => KindBase::Base,
+            Kind::User => KindBase::User,
+            Kind::App => KindBase::App,
+            Kind::Mechtron => KindBase::Mechtron,
+            Kind::FileSystem => KindBase::FileSystem,
+            Kind::File(_) => KindBase::File,
+            Kind::Database(_) => KindBase::Database,
+            Kind::Authenticator => KindBase::Authenticator,
+            Kind::ArtifactBundleSeries => KindBase::ArtifactBundleSeries,
+            Kind::ArtifactBundle => KindBase::ArtifactBundle,
+            Kind::Artifact(_) => KindBase::Artifact,
+            Kind::Proxy => KindBase::Proxy,
+            Kind::Credentials => KindBase::Credentials,
+            Kind::Control => KindBase::Control,
+            Kind::UserBase(_) => KindBase::UserBase
         }
     }
 
-    pub fn sub_string(&self) -> Option<String> {
+    pub fn sub_kind(&self) -> Option<String> {
         match self {
             Self::Base(base) =>  {
                 Option::Some(base.to_string())
@@ -485,28 +509,28 @@ impl Kind {
         }
     }
 
-    pub fn from( resource_type: ResourceType, kind: Option<String>, specific: Option<Specific> ) -> Result<Self,Error> {
-        Ok(match resource_type {
-            ResourceType::Root => {Self::Root}
-            ResourceType::Space => {Self::Space}
-            ResourceType::Base => {
-                match kind {
+    pub fn from(kind: KindBase, sub_kind: Option<String>, specific: Option<Specific> ) -> Result<Self,Error> {
+        Ok(match kind {
+            KindBase::Root => {Self::Root}
+            KindBase::Space => {Self::Space}
+            KindBase::Base => {
+                match sub_kind {
                     None => {
                         return Err("expected kind".into());
                     }
                     Some(kind) => {
-                        return Ok(Self::Base(BaseKind::from_str(kind.as_str())?));
+                        return Ok(Self::Base(BaseSubKind::from_str(kind.as_str())?));
                     }
                 }
             }
-            ResourceType::User => { Self::User}
-            ResourceType::App => {Self::App}
-            ResourceType::Mechtron => {Self::Mechtron}
-            ResourceType::FileSystem => {Self::FileSystem}
-            ResourceType::File => {
-                let kind = match kind.ok_or("expected sub kind".into() ){
-                    Ok(kind) => {
-                        return Ok(Self::File(FileKind::from_str(kind.as_str())?));
+            KindBase::User => { Self::User}
+            KindBase::App => {Self::App}
+            KindBase::Mechtron => {Self::Mechtron}
+            KindBase::FileSystem => {Self::FileSystem}
+            KindBase::File => {
+                let sub_kind = match sub_kind.ok_or("expected sub kind".into() ){
+                    Ok(sub_kind) => {
+                        return Ok(Self::File(FileSubKind::from_str(sub_kind.as_str())?));
                     }
                     Err(err) => {
                         return Err(err);
@@ -514,16 +538,16 @@ impl Kind {
                 };
 
             }
-            ResourceType::Database => {
-                match kind.ok_or("expected sub kind".into() )
+            KindBase::Database => {
+                match sub_kind.ok_or("expected sub kind".into() )
                 {
-                    Ok(kind) => {
-                        if "Relational" != kind.as_str() {
-                            return Err(format!("DatabaseKind is not recognized found: {}",kind).into());
+                    Ok(sub_kind) => {
+                        if "Relational" != sub_kind.as_str() {
+                            return Err(format!("DatabaseKind is not recognized found: {}",sub_kind).into());
                         }
                         match specific.ok_or("expected Database<Relational<specific>>".into() ) {
                             Ok(specific) => {
-                                return Ok(Self::Database(DatabaseKind::Relational(specific)));
+                                return Ok(Self::Database(DatabaseSubKind::Relational(specific)));
                             }
                             Err(err) => {
                                 return Err(err)
@@ -536,29 +560,29 @@ impl Kind {
                 }
 
             }
-            ResourceType::Authenticator => {Self::Authenticator}
-            ResourceType::ArtifactBundleSeries => {Self::ArtifactBundleSeries}
-            ResourceType::ArtifactBundle => {Self::ArtifactBundle}
-            ResourceType::Artifact => {
-                match kind {
+            KindBase::Authenticator => {Self::Authenticator}
+            KindBase::ArtifactBundleSeries => {Self::ArtifactBundleSeries}
+            KindBase::ArtifactBundle => {Self::ArtifactBundle}
+            KindBase::Artifact => {
+                match sub_kind {
                     None => {
                         return Err("expected Artifact<kind>".into());
                     }
-                    Some(kind) => {
-                        return Ok(Self::Artifact(ArtifactKind::from_str(kind.as_str())?));
+                    Some(sub_kind) => {
+                        return Ok(Self::Artifact(ArtifactSubKind::from_str(sub_kind.as_str())?));
                     }
                 };
             }
-            ResourceType::Proxy => {Self::Proxy}
-            ResourceType::Credentials => {Self::Credentials}
-            ResourceType::Control => Self::Control,
-            ResourceType::UserBase => {
-                match kind {
+            KindBase::Proxy => {Self::Proxy}
+            KindBase::Credentials => {Self::Credentials}
+            KindBase::Control => Self::Control,
+            KindBase::UserBase => {
+                match sub_kind {
                     None => {
                         return Err("expected UserBase kind (UserBase<kind>)".into());
                     }
-                    Some(kind) => {
-                        return Ok(Self::UserBase(UserBaseKind::from_str(kind.as_str())?));
+                    Some(sub_kind) => {
+                        return Ok(Self::UserBase(UserBaseSubKind::from_str(sub_kind.as_str())?));
                     }
                 }
             }
@@ -587,11 +611,11 @@ impl Kind {
     Deserialize,
     strum_macros::Display,
 )]
-pub enum DatabaseKind {
+pub enum DatabaseSubKind {
     Relational(Specific),
 }
 
-impl DatabaseKind {
+impl DatabaseSubKind {
     pub fn specific(&self) -> Option<Specific> {
         match self {
             Self::Relational(specific) => Option::Some(specific.clone()),
@@ -611,7 +635,7 @@ impl DatabaseKind {
     strum_macros::Display,
     strum_macros::EnumString,
 )]
-pub enum BaseKind {
+pub enum BaseSubKind {
     User,
     App,
     Mechtron,
@@ -631,7 +655,7 @@ Deserialize,
 strum_macros::Display,
 strum_macros::EnumString,
 )]
-pub enum UserBaseKind {
+pub enum UserBaseSubKind {
     Keycloak
 }
 
@@ -646,7 +670,7 @@ pub enum UserBaseKind {
     strum_macros::Display,
     strum_macros::EnumString,
 )]
-pub enum FileKind {
+pub enum FileSubKind {
     File,
     Dir,
 }
@@ -662,30 +686,30 @@ pub enum FileKind {
     strum_macros::Display,
     strum_macros::EnumString,
 )]
-pub enum ArtifactKind {
+pub enum ArtifactSubKind {
     Raw,
-    ResourceConfig,
+    ParticleConfig,
     Bind,
     Wasm,
     Dir,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Resource {
-    pub stub: ResourceStub,
+pub struct Particle {
+    pub stub: Stub,
     pub state: Payload,
 }
 
-impl Resource {
-    pub fn new(stub: ResourceStub, state: Payload) -> Resource {
-        Resource {
+impl Particle {
+    pub fn new(stub: Stub, state: Payload) -> Particle {
+        Particle {
             stub,
             state
         }
     }
 
-    pub fn address(&self) -> Address {
-        self.stub.address.clone()
+    pub fn point(&self) -> Point {
+        self.stub.point.clone()
     }
 
     pub fn state_src(&self) -> Payload {
@@ -695,7 +719,7 @@ impl Resource {
 
 /// can have other options like to Initialize the state data
 #[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
-pub enum AssignResourceStateSrc {
+pub enum AssignParticleStateSrc {
     Stateless,
     Direct(Payload),
 }
@@ -708,19 +732,19 @@ pub enum AssignKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceAssign {
+pub struct ParticleAssign {
     pub kind: AssignKind,
-    pub stub: ResourceStub,
+    pub details: ParticleDetails,
     pub state: StateSrc,
 }
 
 
-impl ResourceAssign {
+impl ParticleAssign {
 
-    pub fn new(kind: AssignKind, stub: ResourceStub, state: StateSrc) -> Self {
+    pub fn new(kind: AssignKind, details: ParticleDetails, state: StateSrc) -> Self {
         Self {
             kind,
-            stub,
+            details,
             state
         }
     }

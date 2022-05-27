@@ -225,7 +225,7 @@ pub fn parse_resource_kind(input: &str) -> Res<&str, Result<ResourceKind,Error>>
 
 pub fn parse_resource_path(input: &str) -> Res<&str, ResourcePath> {
     context(
-        "resource-path",
+        "particle-path",
         separated_list0(
             nom::character::complete::char(':'),
             any_resource_path_segment,
@@ -361,7 +361,7 @@ pub fn parse_resource_property_value_selector(input: &str) -> Res<&str, Result<R
            "config" => {
                (next_input,Ok(ResourcePropertyValueSelector::Registry(ResourceRegistryPropertyValueSelector::Config)))
            }
-           property => return (next_input, Err(format!("cannot match a selector for resource property '{}'",property).into()))
+           property => return (next_input, Err(format!("cannot match a selector for particle property '{}'",property).into()))
        }
 
     })
@@ -553,7 +553,7 @@ mod tests {
         let (leftover, result)= parse_resource_property_assignment("hello:my::config=future:friend")?;
         let assignment = result?;
         assert!(leftover.len()==0);
-        assert!(assignment.resource.to_string().as_str() == "hello:my");
+        assert!(assignment.particle.to_string().as_str() == "hello:my");
         if let ResourceProperty::Config(config) = assignment.property {
             if let ConfigSrc::Artifact(artifact) = config {
                 assert!( artifact.to_string().as_str() == "future:friend")
@@ -566,7 +566,7 @@ mod tests {
         let (leftover, result)= parse_resource_property_assignment("hello:my::config =  future:friend  ")?;
         let assignment = result?;
         assert!(leftover.len()==0);
-        assert!(assignment.resource.to_string().as_str() == "hello:my");
+        assert!(assignment.particle.to_string().as_str() == "hello:my");
         if let ResourceProperty::Config(config) = assignment.property {
             if let ConfigSrc::Artifact(artifact) = config {
                 assert!( artifact.to_string().as_str() == "future:friend")

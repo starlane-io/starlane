@@ -58,6 +58,7 @@ clap = { version="2.33", features=["yaml"] }
 yaml-rust = "0.3.5"
 tempfile = "3.2.0"
 regex = "1.5.4"
+chrono = "0.4.19"
 
 kube = { version = "0.57.0", features = ["derive","native-tls"], default-features = false}
 kube-runtime = "0.57.0"
@@ -82,6 +83,7 @@ mesh-portal-api-server= { path="../../../mesh-portal/rust/mesh-portal-api-server
 mesh-portal-tcp-common = { path="../../../mesh-portal/rust/mesh-portal-tcp-common"}
 mesh-portal-tcp-client = { path="../../../mesh-portal/rust/mesh-portal-tcp-client"}
 mesh-portal-tcp-server= { path="../../../mesh-portal/rust/mesh-portal-tcp-server"}
+mesh-artifact-api ={ path="../../../mesh-portal/rust/mesh-artifact-api", default-features=true }
 
 async-recursion = "1.0.0"
 dashmap = "4.0.2"
@@ -94,3 +96,4 @@ http = "0.2.6"
 http-serde = "1.1.0"
 tiny_http = "0.11.0"
 ascii = "1.0.0"
+sqlx = { version = "0.5.11", features = [ "runtime-tokio-rustls", "postgres", "macros", "any" ] }

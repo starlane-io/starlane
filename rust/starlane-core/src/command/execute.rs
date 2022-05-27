@@ -1,34 +1,36 @@
 use crate::command::cli::outlet;
 use crate::command::compose::CommandOp;
 use crate::command::parse::command_line;
-use crate::resource::ResourceType;
+use crate::particle::KindBase;
 use crate::star::StarSkel;
 use crate::starlane::api::StarlaneApi;
 use mesh_portal::version::latest::entity::request::create::{Create, CreateOp, Set};
 use mesh_portal::version::latest::entity::request::get::Get;
 use mesh_portal::version::latest::entity::request::select::Select;
-use mesh_portal::version::latest::entity::request::{Action, Rc};
+use mesh_portal::version::latest::entity::request::{Method, Rc};
 use mesh_portal::version::latest::messaging::{Request, Response};
 use mesh_portal::version::latest::payload::{Payload, Primitive};
-use mesh_portal::version::latest::resource::ResourceStub;
+use mesh_portal::version::latest::particle::Stub;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::entity::request::create::{Fulfillment, KindTemplate};
-use mesh_portal_versions::version::v0_0_1::parse::Res;
+use mesh_portal_versions::version::v0_0_1::parse::{Env, Res, ToResolved};
 use std::string::FromUtf8Error;
+use mesh_portal_versions::version::v0_0_1::span::new_span;
 use tokio::sync::mpsc;
 
 pub struct CommandExecutor {
     api: StarlaneApi,
-    stub: ResourceStub,
+    stub: Stub,
     line: String,
     output_tx: mpsc::Sender<outlet::Frame>,
     fulfillments: Vec<Fulfillment>,
+    env: Env
 }
 
 impl CommandExecutor {
     pub fn exec_simple(
         line: String,
-        stub: ResourceStub,
+        stub: Stub,
         api: StarlaneApi,
     ) -> mpsc::Receiver<outlet::Frame> {
         let (output_tx, output_rx) = mpsc::channel(1024);
@@ -41,7 +43,7 @@ impl CommandExecutor {
     pub async fn execute(
         line: String,
         output_tx: mpsc::Sender<outlet::Frame>,
-        stub: ResourceStub,
+        stub: Stub,
         api: StarlaneApi,
         fulfillments: Vec<Fulfillment>,
     ) {
@@ -51,6 +53,7 @@ impl CommandExecutor {
             output_tx,
             line,
             fulfillments,
+            env: Env::empty()
         };
         tokio::task::spawn_blocking(move || {
             tokio::spawn(async move {
@@ -61,7 +64,7 @@ impl CommandExecutor {
     }
 
     async fn parse(&self) {
-        match command_line(self.line.as_str()) {
+        match command_line(new_span(self.line.as_str())) {
             Ok((_, op)) => match op {
                 CommandOp::Create(create) => {
                     self.exec_create(create).await;
@@ -70,12 +73,15 @@ impl CommandExecutor {
                     self.exec_select(select).await;
                 }
                 CommandOp::Publish(create_op) => {
+                    let create_op = create_op.collapse().unwrap().collapse().unwrap();
                     self.exec_publish(create_op).await;
                 }
                 CommandOp::Set(set) => {
+                    let set = set.collapse().unwrap();
                     self.exec_set(set).await;
                 }
                 CommandOp::Get(get) => {
+                    let get = get.collapse().unwrap();
                     self.exec_get(get).await;
                 }
             },
@@ -91,9 +97,9 @@ impl CommandExecutor {
 
     async fn exec_create(&self, create: Create) {
 
-        let parent = create.template.address.parent.clone();
-        let action = Action::Rc(Rc::Create(create));
-        let request = Request::new(action.into(), self.stub.address.clone(), parent);
+        let parent = create.template.point.parent.clone();
+        let action = Method::Cmd(Rc::Create(create));
+        let request = Request::new(action.into(), self.stub.point.clone(), parent);
         let response = self.api.exchange(request).await;
 
         match response.ok_or() {
@@ -111,9 +117,9 @@ impl CommandExecutor {
 
     async fn exec_select(&self, select: Select) {
         let query_root = select.pattern.query_root();
-        let action = Action::Rc(Rc::Select(select));
+        let action = Method::Cmd(Rc::Select(select));
         let core = action.into();
-        let request = Request::new(core, self.stub.address.clone(), query_root);
+        let request = Request::new(core, self.stub.point.clone(), query_root);
         let response = self.api.exchange(request).await;
         match response.ok_or() {
             Ok(response) => {
@@ -130,10 +136,10 @@ impl CommandExecutor {
                 match &response.core.body {
                     Payload::List(list) => {
                         for stub in list.iter() {
-                            if let Primitive::Stub(stub) = stub {
+                            if let Payload::Stub(stub) = &**stub {
                                 self.output_tx
                                     .send(outlet::Frame::StdOut(
-                                        stub.clone().address_and_kind().to_string(),
+                                        stub.clone().point_and_kind().to_string(),
                                     ))
                                     .await;
                             }
@@ -171,15 +177,15 @@ impl CommandExecutor {
         {
             let mut create = create.fulfillment(content);
             create.template.kind = KindTemplate {
-                resource_type: ResourceType::ArtifactBundle.to_string(),
-                kind: None,
+                kind: KindBase::ArtifactBundle.to_string(),
+                sub_kind: None,
                 specific: None,
             };
 
-            let parent = create.template.address.parent.clone();
-            let action = Action::Rc(Rc::Create(create));
+            let parent = create.template.point.parent.clone();
+            let action = Method::Cmd(Rc::Create(create));
             let core = action.into();
-            let request = Request::new(core, self.stub.address.clone(), parent);
+            let request = Request::new(core, self.stub.point.clone(), parent);
             match self.api.exchange(request).await.ok_or() {
                 Ok(response) => match response.ok_or() {
                     Ok(_) => {
@@ -211,10 +217,10 @@ impl CommandExecutor {
     }
 
     async fn exec_set(&self, set: Set) {
-        let to = set.address.parent().clone().expect("expect parent");
-        let action = Action::Rc(Rc::Set(set));
+        let to = set.point.parent().clone().expect("expect parent");
+        let action = Method::Cmd(Rc::Set(set));
         let core = action.into();
-        let request = Request::new(core, self.stub.address.clone(), to);
+        let request = Request::new(core, self.stub.point.clone(), to);
         match self.api.exchange(request).await.ok_or() {
             Ok(response) => {
                     self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
@@ -229,13 +235,13 @@ impl CommandExecutor {
     }
 
     async fn exec_get(&self, get: Get) {
-        let to = get.address.parent().clone().expect("expect parent");
-        let action = Action::Rc(Rc::Get(get.clone()));
+        let to = get.point.parent().clone().expect("expect parent");
+        let action = Method::Cmd(Rc::Get(get.clone()));
         let core = action.into();
-        let request = Request::new(core, self.stub.address.clone(), to);
+        let request = Request::new(core, self.stub.point.clone(), to);
         match self.api.exchange(request).await.ok_or() {
             Ok(response) => match response.core.body {
-                Payload::Primitive(Primitive::Bin(bin)) => {
+                Payload::Bin(bin) => {
                     match String::from_utf8((*bin).clone()) {
                         Ok(text) => {
                             self.output_tx.send(outlet::Frame::StdOut(text)).await;
@@ -251,16 +257,16 @@ impl CommandExecutor {
                         }
                     }
                 }
-                Payload::Primitive(Primitive::Text(text)) => {
+                Payload::Text(text) => {
                     self.output_tx.send(outlet::Frame::StdOut(text)).await;
                     self.output_tx.send(outlet::Frame::EndOfCommand(0)).await;
                 }
                 Payload::Map(map) => {
                     let mut rtn = String::new();
-                    rtn.push_str(get.address.to_string().as_str());
+                    rtn.push_str(get.point.to_string().as_str());
                     rtn.push_str("{ ");
                     for (index, (key, payload)) in map.iter().enumerate() {
-                        if let Payload::Primitive(Primitive::Text(value)) = payload {
+                        if let Payload::Text(value) = payload {
                             rtn.push_str(key.as_str());
                             rtn.push_str("=");
                             rtn.push_str(value.as_str());

@@ -1,5 +1,6 @@
 use mesh_portal_versions::version::v0_0_1::entity::request::set::Set;
 use mesh_portal_versions::version::v0_0_1::parse::{create, get, publish, Res, select, set};
+use mesh_portal_versions::version::v0_0_1::wrap::Span;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{multispace0, space1};
@@ -9,37 +10,37 @@ use nom::multi::many0;
 use nom::sequence::{terminated, tuple};
 use crate::command::compose::{CommandOp, Strategy};
 
-fn create_command(input: &str) -> Res<&str, CommandOp> {
+fn create_command<I:Span>(input: I) -> Res<I, CommandOp> {
     tuple((tag("create"),space1,create))(input).map( |(next,(_,_,create))|{
         (next, CommandOp::Create(create))
     })
 }
 
-fn publish_command(input: &str) -> Res<&str, CommandOp> {
+fn publish_command<I:Span>(input: I) -> Res<I, CommandOp> {
     tuple((tag("publish"),space1,publish))(input).map( |(next,(_,_,create))|{
         (next, CommandOp::Publish(create))
     })
 }
 
-fn select_command(input: &str) -> Res<&str, CommandOp> {
+fn select_command<I:Span>(input: I) -> Res<I, CommandOp> {
     tuple((tag("select"),space1,select))(input).map( |(next,(_,_,select))|{
         (next, CommandOp::Select(select))
     })
 }
 
-fn set_command(input: &str) -> Res<&str, CommandOp> {
+fn set_command<I:Span>(input: I) -> Res<I, CommandOp> {
     tuple((tag("set"),space1,set))(input).map( |(next,(_,_,set))|{
         (next, CommandOp::Set(set))
     })
 }
 
-fn get_command(input: &str) -> Res<&str, CommandOp> {
+fn get_command<I:Span>(input: I) -> Res<I, CommandOp> {
     tuple((tag("get"),space1,get))(input).map( |(next,(_,_,get))|{
         (next, CommandOp::Get(get))
     })
 }
 
-pub fn command_strategy(input: &str) -> Res<&str, Strategy> {
+pub fn command_strategy<I:Span>(input: I) -> Res<I, Strategy> {
     opt( tuple((tag("?"),multispace0)) )(input).map( |(next,hint)| {
         match hint {
             None => (next, Strategy::Commit),
@@ -49,44 +50,45 @@ pub fn command_strategy(input: &str) -> Res<&str, Strategy> {
 
 }
 
-pub fn command(input: &str) -> Res<&str, CommandOp> {
+pub fn command<I:Span>(input: I) -> Res<I, CommandOp> {
     context("command", alt( (create_command, publish_command, select_command, set_command, get_command,fail) ))(input)
 }
 
-pub fn command_mutation(input: &str) -> Res<&str, CommandOp> {
+pub fn command_mutation<I:Span>(input: I) -> Res<I, CommandOp> {
     context("command_mutation", tuple((command_strategy, command)))(input).map( |(next,(strategy,mut command)),| {
         command.set_strategy(strategy);
         (next, command)
     })
 }
 
-pub fn command_line(input: &str) -> Res<&str, CommandOp> {
+pub fn command_line<I:Span>(input: I) -> Res<I, CommandOp> {
     tuple( (multispace0,command_mutation,multispace0,opt(tag(";")),multispace0))(input).map(|(next,(_,command,_,_,_))|{
         (next,command)
     })
 }
 
-pub fn script_line(input: &str) -> Res<&str, CommandOp> {
+pub fn script_line<I:Span>(input: I) -> Res<I, CommandOp> {
     tuple( (multispace0,command_mutation,multispace0,tag(";"),multispace0))(input).map(|(next,(_,command,_,_,_))|{
         (next,command)
     })
 }
 
-pub fn script(input: &str) -> Res<&str,Vec<CommandOp>> {
+pub fn script<I:Span>(input: I) -> Res<I,Vec<CommandOp>> {
     many0(script_line)(input)
 }
 
-pub fn consume_command_line(input: &str) -> Res<&str, CommandOp> {
+pub fn consume_command_line<I:Span>(input: I) -> Res<I, CommandOp> {
     all_consuming(command_line)(input)
 }
 
-pub fn rec_script_line(input: &str) -> Res<&str, &str> {
+pub fn rec_script_line<I:Span>(input: I) -> Res<I,I> {
     recognize(script_line)(input)
 }
 
 #[cfg(test)]
 pub mod test {
     use mesh_portal_versions::version::v0_0_1::parse::Res;
+    use mesh_portal_versions::version::v0_0_1::span::new_span;
     use nom::error::{VerboseError, VerboseErrorKind};
     use nom_supreme::final_parser::{ExtractContext, final_parser};
     use crate::command::compose::CommandOp;
@@ -114,10 +116,10 @@ pub mod test {
     #[test]
     pub async fn test() -> Result<(),Error>{
         let input = "? xreate localhost<Space>";
-        match command_mutation(input) {
+        match command_mutation(new_span(input)) {
             Ok(_) => {}
             Err(nom::Err::Error(e)) => {
-                eprintln!("{}",e.to_string());
+                eprintln!("yikes!");
                 return Err("could not find context".into());
             }
             Err(e) => {
@@ -130,10 +132,10 @@ pub mod test {
     #[test]
     pub async fn test_kind() -> Result<(),Error>{
         let input = "create localhost:users<UserBase<Keycloak>>";
-        let (_, command) = command(input)?;
+        let (_, command) = command(new_span(input))?;
         match command {
             CommandOp::Create(create) => {
-                assert_eq!(create.template.kind.kind,Some("Keycloak".to_string()));
+                assert_eq!(create.template.kind.sub_kind, Some("Keycloak".to_string()));
             }
             _ => {
                 panic!("expected create command")
@@ -152,7 +154,7 @@ pub mod test {
 set localhost{ +bind=localhost:repo:tutorial:1.0.0:/bind/localhost.bind };
         "#;
 
-        script(input)?;
+        script(new_span(input))?;
         Ok(())
     }
 

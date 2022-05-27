@@ -1,18 +1,18 @@
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 use mesh_portal::version::latest::command::common::StateSrc;
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
-use crate::resource::{
-     ResourceType,
+use crate::particle::{
+    KindBase,
 };
 
 #[derive(Clone)]
 pub struct File {
-    address: Address,
+    address: Point,
     state_src: StateSrc
 }
 

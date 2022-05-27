@@ -1,6 +1,6 @@
 use std::fmt;
 use std::fmt::{Debug, Formatter};
-use mesh_portal::version::latest::id::Address;
+use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Request, Response};
 
 use semver::SemVerError;
@@ -14,9 +14,9 @@ use crate::id::Id;
 use crate::logger::Flags;
 use crate::message::{MessageExpect, MessageUpdate, ProtoStarMessage, MessageId, Reply};
 use crate::message::delivery::ActorMessage;
-use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify, StarSubGraphKey};
+use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify };
 use crate::watch::{Notification, Watch, WatchKey};
-use crate::resource::{ResourceType, ResourceAssign, AssignResourceStateSrc, ResourceRecord};
+use crate::particle::{KindBase, ParticleAssign, AssignParticleStateSrc, ParticleRecord};
 use crate::fail::{Fail, StarlaneFailure};
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
@@ -49,8 +49,6 @@ pub enum SearchTraversal {
 pub enum ProtoFrame {
     StarLaneProtocolVersion(i32),
     ReportStarKey(StarKey),
-    GatewaySelect,
-    GatewayAssign(Vec<StarSubGraphKey>),
 }
 
 
@@ -153,8 +151,7 @@ pub enum StarPattern {
     Any,
     None,
     StarKey(StarKey),
-    StarKind(StarKind),
-    StarKeySubgraph(Vec<StarSubGraphKey>)
+    StarKind(StarKind)
 }
 
 impl StarPattern {
@@ -166,9 +163,6 @@ impl StarPattern {
                 self.key_match(&info.key)
             }
             StarPattern::StarKind(pattern) => *pattern == info.kind,
-            StarPattern::StarKeySubgraph(_) => {
-                self.key_match(&info.key)
-            }
         }
     }
 
@@ -178,10 +172,6 @@ impl StarPattern {
             StarPattern::None => false,
             StarPattern::StarKey(pattern) => *star == *pattern,
             StarPattern::StarKind(_) => false,
-            StarPattern::StarKeySubgraph(pattern) => {
-                // TODO match tail end of subgraph
-                *pattern == star.subgraph
-            }
         }
     }
 
@@ -192,7 +182,6 @@ impl StarPattern {
             StarPattern::StarKind(_) => false,
             StarPattern::Any => false,
             StarPattern::None => false,
-            StarPattern::StarKeySubgraph(_) => false
         }
     }
 }
@@ -371,15 +360,15 @@ pub enum MessagePayload {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum ResourceHostAction {
     //IsHosting(Address),
-    Assign(ResourceAssign),
-    Init(Address),
-    GetState(Address)
+    Assign(ParticleAssign),
+    Init(Point),
+    GetState(Point)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResourceRegistryRequest {
-    Location(ResourceRecord),
-    Find(Address)
+    Location(ParticleRecord),
+    Find(Point)
 }
 
 impl ToString for ResourceRegistryRequest {
@@ -591,8 +580,6 @@ impl fmt::Display for ProtoFrame {
             ProtoFrame::ReportStarKey(key) => {
                 format!("ReportStarKey({})", key.to_string()).to_string()
             }
-            ProtoFrame::GatewaySelect => format!("GatewaySelect").to_string(),
-            ProtoFrame::GatewayAssign { .. } => "GatewayAssign".to_string(),
         };
         write!(f, "{}", r)
     }

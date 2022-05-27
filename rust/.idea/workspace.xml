@@ -31,6 +31,12 @@
       <filtered-out-file-type name="COMMIT_BY_MESSAGE" />
     </file-type-list>
   </component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/tracing-core-0.1.23/src/dispatcher.rs" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/../../mesh-portal/rust/mesh-portal-versions/src/version/v0_0_1/mod.rs" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/../../mesh-portal/rust/mesh-portal-versions/src/version/v0_0_1/parse.rs" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/../../mesh-portal/rust/mesh-portal/src/lib.rs" root0="SKIP_INSPECTION" />
+  </component>
   <component name="KotlinMultiplatform">
     <allAvailableExecutables />
   </component>
@@ -50,49 +56,31 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">
-    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
-    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
-    <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="jdk.selected.JAVA_MODULE" value="14" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager" />
-    <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
-    <property name="project.structure.last.edited" value="Modules" />
-    <property name="project.structure.proportion" value="0.0" />
-    <property name="project.structure.side.proportion" value="0.2" />
-    <property name="settings.editor.selected.configurable" value="language.rust" />
-  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/scott/projects/starlane/rust/starlane-core/src/star&quot;,
+    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;
+  }
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/starlane-core/src/star" />
       <recent name="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager" />
       <recent name="$PROJECT_DIR$/starlane-core/src/star/variant" />
       <recent name="$PROJECT_DIR$/starlane-core/src/star/core/resource/host" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/starlane-core/src/star/shell" />
       <recent name="$PROJECT_DIR$/starlane-core/src/mechtron" />
       <recent name="$PROJECT_DIR$/starlane-core/src/mechtron/wasm.rs" />
-      <recent name="$PROJECT_DIR$/starlane-core/src/star/shell" />
       <recent name="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager" />
       <recent name="$PROJECT_DIR$/starlane-core/src/pattern.rs" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Run">
-    <configuration name="Run starlane-operator" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="run --package starlane-operator --bin starlane-operator" />
-      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
-      <option name="channel" value="DEFAULT" />
-      <option name="requiredFeatures" value="true" />
-      <option name="allFeatures" value="false" />
-      <option name="emulateTerminal" value="false" />
-      <option name="withSudo" value="false" />
-      <option name="backtrace" value="SHORT" />
-      <envs />
-      <option name="isRedirectInput" value="false" />
-      <option name="redirectInputPath" value="" />
-      <method v="2">
-        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
-      </method>
-    </configuration>
+  <component name="RunManager" selected="Cargo.Test star::shell::db::test::test">
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
       <option name="command" value="run  --bin starlane -- serve " />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -101,6 +89,7 @@
       <option name="allFeatures" value="false" />
       <option name="emulateTerminal" value="false" />
       <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
       <option name="backtrace" value="SHORT" />
       <envs>
         <env name="RUST_BACKTRACE" value="full" />
@@ -108,7 +97,9 @@
         <env name="STARLANE_DELETE_DATA_ON_START" value="true" />
         <env name="STARLANE_KEYCLOAK_URL" value="http://localhost:8080" />
         <env name="STARLANE_PASSWORD" value="password" />
-        <env name="STARLANE_PORT" value="5555" />
+        <env name="STARLANE_POSTGRES_PASSWORD" value="password" />
+        <env name="STARLANE_POSTGRES_URL" value="localhost:5432" />
+        <env name="STARLANE_POSTGRES_USER" value="postgres" />
         <env name="STARLANE_WEB_PORT" value="8000" />
       </envs>
       <option name="isRedirectInput" value="false" />
@@ -117,14 +108,15 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test command::parse::test::test_kind" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib command::parse::test::test_kind -- --exact" />
+    <configuration name="Test registry::test::test_access" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib registry::test::test_access -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
       <option name="allFeatures" value="false" />
       <option name="emulateTerminal" value="false" />
       <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
       <option name="backtrace" value="SHORT" />
       <envs />
       <option name="isRedirectInput" value="false" />
@@ -133,14 +125,15 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test config::parse::test::test_rec_command_lines" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib config::parse::test::test_rec_command_lines -- --exact" />
+    <configuration name="Test star::shell::db::test::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib star::shell::db::test::test -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
       <option name="allFeatures" value="false" />
       <option name="emulateTerminal" value="false" />
       <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
       <option name="backtrace" value="SHORT" />
       <envs />
       <option name="isRedirectInput" value="false" />
@@ -149,14 +142,15 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test config::parse::test::test_replace" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib config::parse::test::test_replace -- --exact" />
+    <configuration name="Test tests::it_works" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane --bin starlane tests::it_works -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
       <option name="allFeatures" value="false" />
       <option name="emulateTerminal" value="false" />
       <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
       <option name="backtrace" value="SHORT" />
       <envs />
       <option name="isRedirectInput" value="false" />
@@ -165,14 +159,32 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test constellation::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib constellation::test" />
+    <configuration name="Test version::v0_0_1::test::test_inclusive" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package mesh-portal-versions --lib version::v0_0_1::test::test_inclusive -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
       <option name="allFeatures" value="false" />
       <option name="emulateTerminal" value="false" />
       <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
+      <option name="backtrace" value="SHORT" />
+      <envs />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test version::v0_0_1::test::test_query_root" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package mesh-portal-versions --lib version::v0_0_1::test::test_query_root -- --exact" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
       <option name="backtrace" value="SHORT" />
       <envs />
       <option name="isRedirectInput" value="false" />
@@ -189,6 +201,7 @@
       <option name="allFeatures" value="false" />
       <option name="emulateTerminal" value="false" />
       <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
       <option name="backtrace" value="SHORT" />
       <envs />
       <option name="isRedirectInput" value="false" />
@@ -200,19 +213,19 @@
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test" />
-      <item itemvalue="Cargo.Run starlane-operator" />
-      <item itemvalue="Cargo.Test command::parse::test::test_kind" />
-      <item itemvalue="Cargo.Test config::parse::test::test_replace" />
-      <item itemvalue="Cargo.Test config::parse::test::test_rec_command_lines" />
-      <item itemvalue="Cargo.Test constellation::test" />
+      <item itemvalue="Cargo.Test star::shell::db::test::test" />
+      <item itemvalue="Cargo.Test tests::it_works" />
+      <item itemvalue="Cargo.Test registry::test::test_access" />
+      <item itemvalue="Cargo.Test version::v0_0_1::test::test_inclusive" />
+      <item itemvalue="Cargo.Test version::v0_0_1::test::test_query_root" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Cargo.Test command::parse::test::test_kind" />
-        <item itemvalue="Cargo.Test constellation::test" />
-        <item itemvalue="Cargo.Test config::parse::test::test_rec_command_lines" />
-        <item itemvalue="Cargo.Test config::parse::test::test_replace" />
-        <item itemvalue="Cargo.Run starlane-operator" />
+        <item itemvalue="Cargo.Test star::shell::db::test::test" />
+        <item itemvalue="Cargo.Test tests::it_works" />
+        <item itemvalue="Cargo.Test registry::test::test_access" />
+        <item itemvalue="Cargo.Test version::v0_0_1::test::test_query_root" />
+        <item itemvalue="Cargo.Test version::v0_0_1::test::test_inclusive" />
       </list>
     </recent_temporary>
   </component>
@@ -267,6 +280,31 @@
       <workItem from="1648594167007" duration="1416000" />
       <workItem from="1648705543958" duration="92000" />
       <workItem from="1648885322291" duration="18006000" />
+      <workItem from="1649409070862" duration="230000" />
+      <workItem from="1649409317731" duration="29000" />
+      <workItem from="1649409414423" duration="29004000" />
+      <workItem from="1649454867022" duration="28648000" />
+      <workItem from="1649796150949" duration="571000" />
+      <workItem from="1649797125000" duration="637000" />
+      <workItem from="1649797827311" duration="293000" />
+      <workItem from="1649799587760" duration="14000" />
+      <workItem from="1650249262747" duration="4140000" />
+      <workItem from="1650570711001" duration="599000" />
+      <workItem from="1650634976195" duration="16330000" />
+      <workItem from="1652005681748" duration="8456000" />
+      <workItem from="1652137687808" duration="7751000" />
+      <workItem from="1652169095486" duration="18643000" />
+      <workItem from="1652272502156" duration="3874000" />
+      <workItem from="1652302908775" duration="22683000" />
+      <workItem from="1652383724843" duration="1829000" />
+      <workItem from="1652392037145" duration="17871000" />
+      <workItem from="1652460941811" duration="2294000" />
+      <workItem from="1652463972689" duration="17889000" />
+      <workItem from="1653052596601" duration="352000" />
+      <workItem from="1653523854361" duration="864000" />
+      <workItem from="1653543772643" duration="10316000" />
+      <workItem from="1653580708083" duration="14123000" />
+      <workItem from="1653635904752" duration="2705000" />
     </task>
     <servers />
   </component>
