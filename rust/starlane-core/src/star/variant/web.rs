@@ -85,7 +85,6 @@ impl WebVariant {
 }
 
 fn start(api: StarlaneApi,skel: StarSkel) {
-    info!("staring web server");
     thread::spawn(move || {
 
         let runtime = Runtime::new().unwrap();

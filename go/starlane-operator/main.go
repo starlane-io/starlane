@@ -41,6 +41,8 @@ var (
 	setupLog = ctrl.Log.WithName("setup")
 )
 
+var DefaultImage = "none"
+
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
@@ -49,6 +51,7 @@ func init() {
 }
 
 func main() {
+	controllers.DefaultImage = DefaultImage
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string

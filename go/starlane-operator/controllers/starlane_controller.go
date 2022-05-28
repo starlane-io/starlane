@@ -42,6 +42,8 @@ type StarlaneReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+var DefaultImage = "unset"
+
 //+kubebuilder:rbac:groups=starlane.starlane.io,resources=starlanes,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=starlane.starlane.io,resources=starlanes/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=starlane.starlane.io,resources=starlanes/finalizers,verbs=update
@@ -65,6 +67,7 @@ func (r *StarlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// Fetch the Starlane instance
 	starlane := &starlanev1alpha1.Starlane{}
+
 	err := r.Get(ctx, req.NamespacedName, starlane)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -368,6 +371,12 @@ func (r *StarlaneReconciler) deploymentForStarlane(m *starlanev1alpha1.Starlane)
 	ls := labelsForStandalone(m.Name)
 	replicas := int32(1)
 
+	Image := m.Spec.Image
+	if Image == "" {
+		Image = DefaultImage
+	}
+	//	log.Info("Image = ", "Image", Image)
+
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      m.Name,
@@ -384,12 +393,12 @@ func (r *StarlaneReconciler) deploymentForStarlane(m *starlanev1alpha1.Starlane)
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Image: m.Spec.Image,
+						Image: Image,
 						Name:  "starlane",
 						Args:  []string{"serve", "--with-external"},
 						Env: []corev1.EnvVar{
 							{Name: "STARLANE_KUBERNETES_INSTANCE_NAME", Value: m.Name},
-							{Name: "STARLANE_KEYCLOAK_URL", Value: "http://" + keycloakName(m) + ":8080"},
+							{Name: "STARLANE_KEYCLOAK_URL", Value: "http://" + keycloakName(m) + ":8001"},
 							{
 								Name: "STARLANE_KEYCLOAK_PASSWORD",
 								ValueFrom: &corev1.EnvVarSource{
@@ -456,7 +465,7 @@ func (r *StarlaneReconciler) webServiceForStarlane(m *starlanev1alpha1.Starlane)
 			Type: m.Spec.WebServiceType,
 			Ports: []corev1.ServicePort{
 				{Name: "http",
-					Port:       80,
+					Port:       8000,
 					TargetPort: intstr.FromInt(8080),
 					Protocol:   corev1.ProtocolTCP,
 				},
@@ -782,7 +791,7 @@ func (r *StarlaneReconciler) keycloakService(m *starlanev1alpha1.Starlane) *core
 			Type: m.Spec.KeycloakServiceType,
 			Ports: []corev1.ServicePort{
 				{Name: "keycloak",
-					Port:       8080,
+					Port:       8001,
 					TargetPort: intstr.FromInt(8080),
 					Protocol:   corev1.ProtocolTCP,
 				},

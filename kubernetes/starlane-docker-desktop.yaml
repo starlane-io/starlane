@@ -1,8 +1,19 @@
+apiVersion: v1
+data:
+  password: cGFzc3dvcmQ=
+kind: Secret
+metadata:
+  name: my-starlane
+
+---
+
 apiVersion: starlane.starlane.io/v1alpha1
 kind: Starlane
 metadata:
   name: my-starlane
 spec:
+  keycloak-service-type: LoadBalancer
+  postgres-service-type: LoadBalancer
   web-service-type: LoadBalancer
   gateway-service-type: LoadBalancer
   storage-class: hostpath

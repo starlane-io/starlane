@@ -6,13 +6,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/Makefile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/starlane_types.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/starlane_types.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlane_controller.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlane_controller.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../kubernetes/starlane-docker-desktop.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../kubernetes/starlane-docker-desktop.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/driver/user.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/driver/user.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/shell/db.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/shell/db.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant/central.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/central.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant/web.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/web.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/user.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/user.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -312,7 +311,7 @@
       <workItem from="1653580708083" duration="14123000" />
       <workItem from="1653635904752" duration="2705000" />
       <workItem from="1653679144144" duration="1799000" />
-      <workItem from="1653721677382" duration="5754000" />
+      <workItem from="1653721677382" duration="6657000" />
     </task>
     <servers />
   </component>
