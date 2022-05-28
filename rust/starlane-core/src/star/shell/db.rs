@@ -3,7 +3,7 @@ use std::iter::FromIterator;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
+use sqlx::postgres::{PgArguments, PgColumn, PgPoolOptions, PgRow};
 use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
 use sqlx::error::DatabaseError;
 use crate::databases::lookup_db_for_star;
@@ -32,7 +32,7 @@ impl StarDB {
 
         match star_db.setup().await {
             Ok(_) => {
-                info!("star_db setup complete.");
+                debug!("star_db setup complete.");
             }
             Err(err) => {
                 let message = err.into_database_error().unwrap().message().to_string();
@@ -63,6 +63,8 @@ impl StarDB {
         transaction.execute(schema.as_str()).await?;
         transaction.execute(wrangles.as_str()).await?;
 
+        transaction.commit().await?;
+
         Ok(())
     }
 
@@ -84,7 +86,7 @@ impl StarDB {
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
 
-        let statement = format!("INSERT INTO {}.wrangles (key,kind,hops) VALUES ('{}','{}','{}') ON CONFLICT key DO UPDATE SET kind='{}', hops='{}'", self.schema, key, kind, wrangle.hops, kind, wrangle.hops );
+        let statement = format!("INSERT INTO {}.wrangles (key,kind,hops) VALUES ('{}','{}','{}') ON CONFLICT (key) DO UPDATE SET kind='{}', hops='{}'", self.schema, key, kind, wrangle.hops, kind, wrangle.hops );
         trans.execute(statement.as_str()).await?;
 
         trans.commit().await?;
@@ -200,7 +202,7 @@ impl StarDB {
         let mut lacking: HashSet<StarKind> = kinds.iter().filter(|wk|wk.required).map(|wk|wk.kind.clone()).collect();
 
         let mut conn = self.pool.acquire().await?;
-        let wrangles = sqlx::query_as::<Postgres, StarWrangle>("SELECT kind,count(*) as count FROM {}.wrangles group by kind")
+        let wrangles = sqlx::query_as::<Postgres, WrangleCount>(format!("SELECT kind,count(*) as count FROM {}.wrangles group by kind",self.schema).as_str())
             .fetch_all(&mut conn)
             .await?;
 
@@ -213,6 +215,22 @@ impl StarDB {
         } else {
             Ok( StarWrangleSatisfaction::Lacking(lacking) )
         }
+    }
+}
+
+impl sqlx::FromRow<'_, PgRow> for WrangleCount{
+    fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
+        let kind: String = row.get(0);
+        let count: i64 = row.get(1);
+        let count: u64 = count.abs() as u64;
+        let kind = match StarKind::from_str(kind.as_str()) {
+            Ok(kind) => kind,
+            Err(_) => {
+                return Err(sqlx::Error::RowNotFound)
+            }
+
+        };
+        Ok(Self {  kind, count })
     }
 }
 
@@ -239,7 +257,6 @@ impl sqlx::FromRow<'_, PgRow> for StarWrangle {
     }
 }
 
-
 #[cfg(test)]
 pub mod test {
 
@@ -255,6 +272,11 @@ pub struct StarWrangle {
     pub key: StarKey,
     pub kind: StarKind,
     pub hops: usize,
+}
+
+pub struct WrangleCount{
+    pub kind: StarKind,
+    pub count: u64,
 }
 
 pub struct StarSelector {

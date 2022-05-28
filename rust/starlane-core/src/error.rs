@@ -261,18 +261,6 @@ impl From<SemVerError> for Error {
     }
 }
 
-impl From<rusqlite::Error> for Error {
-    fn from(err: rusqlite::Error) -> Self {
-        Error::from_internal("rusqlite::Error")
-    }
-}
-
-impl Into<rusqlite::Error> for Error {
-    fn into(self) -> rusqlite::Error {
-        rusqlite::Error::InvalidQuery
-    }
-}
-
 
 impl From<tokio::sync::oneshot::error::RecvError> for Error {
     fn from(err: tokio::sync::oneshot::error::RecvError) -> Self {

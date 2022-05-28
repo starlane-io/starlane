@@ -56,19 +56,6 @@ impl CentralVariant {
         } else {
             self.initialized = true;
         }
-
-        let skel = self.skel.clone();
-
-        tokio::spawn(async move {
-            skel.sys_api.create( HyperUser::template(), HyperUser::messenger()  ).await;
-
-            let starlane_api = StarlaneApi::new(skel.surface_api.clone(), skel.info.address.clone() );
-            let result = Self::ensure(starlane_api).await;
-            if let Result::Err(error) = result.as_ref() {
-                error!("Central Init Error: {}", error.to_string());
-            }
-            tx.send(result);
-        });
     }
 }
 

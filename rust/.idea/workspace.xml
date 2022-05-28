@@ -6,15 +6,13 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/Makefile" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/starlane_types.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/starlane_types.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/build.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/build.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/crd/bases/starlane.starlane.io_starlanes.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/config/crd/bases/starlane.starlane.io_starlanes.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/manager/kustomization.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/config/manager/kustomization.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/manifests/bases/starlane-operator.clusterserviceversion.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/config/manifests/bases/starlane-operator.clusterserviceversion.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlane_controller.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlane_controller.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/deploy.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/deploy.sh" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/core/resource/driver/user.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/core/resource/driver/user.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/shell/db.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/shell/db.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant/central.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/central.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant/web.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/web.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane-core/src/user.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/user.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -64,15 +62,15 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/scott/projects/starlane/rust/starlane-core/src/star&quot;,
-    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "WebServerToolWindowFactoryState": "false",
+    "last_opened_file_path": "/Users/scott/cosmic/starlane/rust",
+    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/starlane-core/src/star" />
@@ -88,7 +86,7 @@
       <recent name="$PROJECT_DIR$/starlane-core/src/pattern.rs" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test star::shell::db::test::test">
+  <component name="RunManager" selected="Cargo.Run">
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
       <option name="command" value="run  --bin starlane -- serve " />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -314,6 +312,7 @@
       <workItem from="1653580708083" duration="14123000" />
       <workItem from="1653635904752" duration="2705000" />
       <workItem from="1653679144144" duration="1799000" />
+      <workItem from="1653721677382" duration="5754000" />
     </task>
     <servers />
   </component>

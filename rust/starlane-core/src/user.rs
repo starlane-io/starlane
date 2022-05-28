@@ -6,15 +6,21 @@ use tokio::sync::mpsc;
 use crate::message::delivery::Delivery;
 use crate::star::StarKey;
 
+lazy_static! {
+    pub static ref HYPERUSER: &'static str ="hyperspace:users:hyperuser";
+    pub static ref HYPER_USERBASE: &'static str ="hyperspace:users";
+}
+
 pub struct HyperUser {
 
 }
 
 impl HyperUser {
     pub fn address() -> Point {
-        Point::from_str(format!("<<{}>>::hyperuser", StarKey::central().to_string()).as_str() ).expect("should be a valid hyperuser address")
+        Point::from_str(&HYPERUSER).expect("should be a valid hyperuser address")
     }
 
+    /*
     pub fn template() -> Template {
         Template {
             point:
@@ -26,6 +32,8 @@ impl HyperUser {
             }
         }
     }
+
+     */
 
     pub fn messenger() -> mpsc::Sender<Message> {
         let (messenger_tx,mut messenger_rx) = mpsc::channel(1024);

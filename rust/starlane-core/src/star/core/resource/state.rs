@@ -5,8 +5,6 @@ use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::path::Path;
 use mesh_portal::version::latest::payload::Payload;
 
-use rusqlite::{Connection, params, Row};
-use rusqlite::types::ValueRef;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::error::Error;

@@ -61,6 +61,8 @@ use mesh_portal_versions::version::v0_0_1::parse::{lowercase_alphanumeric, Res, 
 use mesh_portal_versions::version::v0_0_1::parse::error::result;
 use mesh_portal_versions::version::v0_0_1::span::new_span;
 use mesh_portal_versions::version::v0_0_1::wrap::Span;
+use mysql::prelude::FromRow;
+use mysql::{FromRowError, Row};
 use nom::sequence::{delimited, preceded, terminated, tuple};
 use nom::multi::many0;
 use nom::bytes::complete::tag;
@@ -70,6 +72,7 @@ use nom::combinator::all_consuming;
 use nom::error::{ErrorKind, ParseError, VerboseError};
 use nom::Parser;
 use nom_supreme::error::ErrorTree;
+use sqlx::postgres::PgTypeInfo;
 use crate::registry::RegistryApi;
 use crate::logger::{Flags, Logger, LogInfo};
 use crate::star::shell::db::{StarDB, StarDBApi, StarWrangle, StarWrangleSatisfaction};
@@ -92,6 +95,8 @@ pub mod shell;
     Hash,
     strum_macros::EnumString,
     strum_macros::Display,
+    sqlx::Decode,
+    sqlx::Encode,
 )]
 pub enum StarKind {
     Central,
@@ -107,6 +112,12 @@ pub enum StarKind {
     Web,
     K8s,
     Portal
+}
+
+impl FromRow for StarKind {
+    fn from_row_opt(row: Row) -> Result<Self, FromRowError> where Self: Sized {
+        Ok(StarKind::Link)
+    }
 }
 
 impl StarKind {
@@ -1007,6 +1018,7 @@ impl FrameHold {
         return self.hold.contains_key(star);
     }
 }
+
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Hash, Debug, Clone, Serialize, Deserialize)]
 pub struct StarKey {

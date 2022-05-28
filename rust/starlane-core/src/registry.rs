@@ -1447,11 +1447,6 @@ impl From<Error> for RegError {
     }
 }
 
-impl From<rusqlite::Error> for RegError {
-    fn from(e: rusqlite::Error) -> Self {
-        RegError::Error(e.into())
-    }
-}
 
 impl<T> From<mpsc::error::SendError<T>> for RegError {
     fn from(e: mpsc::error::SendError<T>) -> Self {

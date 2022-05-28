@@ -33,10 +33,6 @@ use crate::registry::{match_kind};
 use crate::star::core::resource::driver::ParticleCoreDriver;
 use crate::star::StarSkel;
 
-lazy_static! {
-    pub static ref HYPERUSER: &'static str ="hyperspace:users:hyperuser";
-    pub static ref HYPER_USERBASE: &'static str ="hyperspace:users";
-}
 
 
 

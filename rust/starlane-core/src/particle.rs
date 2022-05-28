@@ -19,8 +19,6 @@ use mesh_portal::version::latest::security::Permissions;
 use mesh_portal_versions::version::v0_0_1::parse::consume_kind;
 use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
 use mesh_portal_versions::version::v0_0_1::span::new_span;
-use rusqlite::{Connection, params, params_from_iter, Row, ToSql, Transaction};
-use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::Receiver;

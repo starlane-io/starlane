@@ -85,14 +85,18 @@ impl WebVariant {
 }
 
 fn start(api: StarlaneApi,skel: StarSkel) {
+    info!("staring web server");
     thread::spawn(move || {
 
         let runtime = Runtime::new().unwrap();
         runtime.block_on( async move {
 
             let STARLANE_WEB_PORT = std::env::var("STARLANE_WEB_PORT").unwrap_or("8080".to_string());
+            info!("STARLANE_WEB_PORT: {}",STARLANE_WEB_PORT);
             let server = Server::http(format!("0.0.0.0:{}",STARLANE_WEB_PORT)).unwrap();
             for req in server.incoming_requests() {
+
+                info!("handling incoming http request");
                 handle(req,api.clone(),skel.clone());
             }
         });
