@@ -30,6 +30,7 @@ type StarlaneSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	DisableStarlaneDeployment bool               `json:"disable-starlane-deployment,omitempty,default=false"`
+	Image                     string             `json:"image,omitempty,default=starlane/starlane:latest"`
 	PostgresServiceType       corev1.ServiceType `json:"postgres-service-type,omitempty,default=ClusterIP" protobuf:"bytes,4,opt,name=postgres-service-type,casttype=ServiceType,default=ClusterIP"`
 	KeycloakServiceType       corev1.ServiceType `json:"keycloak-service-type,omitempty,default=ClusterIP" protobuf:"bytes,4,opt,name=keycloak-service-type,casttype=ServiceType,default=ClusterIP"`
 	WebServiceType            corev1.ServiceType `json:"web-service-type,omitempty" protobuf:"bytes,4,opt,name=web-service-type,casttype=ServiceType"`

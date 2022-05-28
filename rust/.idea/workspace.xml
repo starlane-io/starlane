@@ -6,6 +6,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/Makefile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/starlane_types.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/starlane_types.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/build.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/build.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/crd/bases/starlane.starlane.io_starlanes.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/config/crd/bases/starlane.starlane.io_starlanes.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/manager/kustomization.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/config/manager/kustomization.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/config/manifests/bases/starlane-operator.clusterserviceversion.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/config/manifests/bases/starlane-operator.clusterserviceversion.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlane_controller.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlane_controller.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/deploy.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/deploy.sh" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -305,6 +313,7 @@
       <workItem from="1653543772643" duration="10316000" />
       <workItem from="1653580708083" duration="14123000" />
       <workItem from="1653635904752" duration="2705000" />
+      <workItem from="1653679144144" duration="1799000" />
     </task>
     <servers />
   </component>

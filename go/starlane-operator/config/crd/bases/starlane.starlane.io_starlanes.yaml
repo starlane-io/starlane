@@ -41,6 +41,8 @@ spec:
               gateway-service-type:
                 description: Service Type string describes ingress methods for a service
                 type: string
+              image:
+                type: string
               keycloak-service-type:
                 description: Service Type string describes ingress methods for a service
                 type: string

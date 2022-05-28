@@ -384,7 +384,7 @@ func (r *StarlaneReconciler) deploymentForStarlane(m *starlanev1alpha1.Starlane)
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Image: "starlane/starlane:latest",
+						Image: m.Spec.Image,
 						Name:  "starlane",
 						Args:  []string{"serve", "--with-external"},
 						Env: []corev1.EnvVar{
