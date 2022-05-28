@@ -3,6 +3,11 @@ Starlane makes it easy to deploy and interoperate with secure WebAssembly code i
 
 To learn more checkout the [about page](http://starlane.io/about/).
 
+## INSTALLING STARLANE
+An excellent tutorial exists for installing Starlane on your local environment here: [https://github.com/mechtronium/starlane-tutorial/tree/main/lesson-0](https://github.com/mechtronium/starlane-tutorial/tree/main/lesson-0)
+
+
+
 ## A WORK IN PROGRESS 
 Starlane is a work in progress and not ready for production yet, however it is ready for community feedback.
 
