@@ -17,7 +17,7 @@ use crate::error::Error;
 use bytes::BytesMut;
 use httparse::{Request, Header};
 use std::sync::Arc;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use handlebars::Handlebars;
 use serde_json::json;
 use std::future::Future;
@@ -38,6 +38,8 @@ use regex::Regex;
 use crate::particle::ArtifactSubKind;
 use serde::{Serialize,Deserialize};
 use tiny_http::{HeaderField, Server, StatusCode};
+use mesh_portal::version::latest::http::HttpMethod;
+use mesh_portal::version::latest::payload::Payload;
 use mesh_portal_versions::version::v0_0_1::messaging::AsyncMessengerAgent;
 use crate::message::StarlaneMessenger;
 use crate::star::variant::web::parse::host_and_port;
@@ -168,7 +170,14 @@ async fn process_request( http_request: http::Request<Bin>, api: StarlaneMesseng
 
     let host_and_port = http_request.headers().get("Host").ok_or("HOST header not set")?;
     let host = host_and_port.to_str()?.split(":").next().ok_or("expected host")?.to_string();
-    let core = RequestCore::from(http_request);
+
+    let core = RequestCore  {
+        headers: http_request.headers().clone().into(),
+        method: Method::Http(HttpMethod::try_from(http_request.method().clone() )?),
+        uri: http_request.uri().clone(),
+        body: Payload::Bin(http_request.body().clone())
+    };
+
     let to = Point::from_str( host.as_str() )?;
     let from = skel.info.point;
     let request = messaging::Request::new( core, from, to );

@@ -16,10 +16,12 @@ use crate::frame::{StarMessagePayload, StarMessage};
 
 use std::str::FromStr;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
+use mesh_portal::version::latest::command::request::CmdMethod;
 use mesh_portal::version::latest::entity::request::create::{PointSegFactory, PointTemplate, Create, KindTemplate, Strategy, Template};
-use mesh_portal::version::latest::entity::request::{Method, Rc};
+use mesh_portal::version::latest::entity::request::{Method, Rc, RequestCore};
 use mesh_portal::version::latest::id::{Point, AddressAndKind, KindParts};
 use mesh_portal::version::latest::messaging::Request;
+use mesh_portal_versions::version::v0_0_1::messaging::ProtoRequest;
 
 #[derive(Debug)]
 pub struct FileCoreManager {
@@ -137,10 +139,9 @@ impl ParticleCoreDriver for FileSystemManager {
                 registry: Default::default()
             };
 
-            let action = Method::Cmd(Rc::Create(create));
-            let core = action.into();
-            let request = Request::new(core, assign.details.stub.point.clone(), assign.details.stub.point.clone());
-            let response = skel.messaging_api.request(request).await;
+            let request :RequestCore= create.into();
+            let request = Request::new(request, assign.details.stub.point.clone(), Point::registry() );
+            skel.messaging_api.request(request).await;
         });
         Ok(())
     }

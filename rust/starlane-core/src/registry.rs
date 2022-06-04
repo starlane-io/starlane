@@ -1746,13 +1746,7 @@ impl Registry {
 
                     match self.register(&registration).await {
                         Ok(stub) => {
-                            if let Strategy::HostedBy(key) = &create.strategy {
-                                let key = StarKey::from_str(key.as_str())?;
-                                self.assign(&point, &key).await?;
-                                return Ok(stub);
-                            } else {
-                                break stub;
-                            }
+                            return Ok(stub)
                         }
                         Err(RegError::Dupe) => {
                             // continue loop

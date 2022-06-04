@@ -198,8 +198,7 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
                                     registry: Default::default()
                                 };
 
-                                let action = Method::Cmd(Rc::Create(create));
-                                let core = action.into();
+                                let core = create.into();
                                 let request = Request::new(core, assign.details.stub.point.clone(), parent);
                                 let response = skel.messaging_api.request(request).await;
 

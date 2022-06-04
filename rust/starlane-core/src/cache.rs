@@ -18,6 +18,7 @@ use tokio::io::AsyncReadExt;
 use tokio::runtime::Handle;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use wasmer::{Cranelift, Store, Universal};
+use mesh_portal::version::latest::payload::Payload;
 
 use crate::artifact::ArtifactRef;
 use crate::bindex::BindConfigCache;
@@ -547,7 +548,22 @@ impl ArtifactBundleSrc {
     pub async fn get_bundle_zip(&self, point: Point) -> Result<Bin, Error> {
         Ok(match self {
             ArtifactBundleSrc::STARLANE_API(api) => {
-                api.get_state(point).await.as_result()?
+                match api.get_state(point).await.as_result::<Error,Payload>() {
+                    Ok(payload) => {
+                        match payload {
+                            Payload::Bin(bin) => {
+                                bin
+                            }
+                            _ => {
+                                return Err("bad data".into())
+                            }
+                        }
+
+                    }
+                    Err(_) => {
+                        return Err("err".into());
+                    }
+                }
             }
         })
     }

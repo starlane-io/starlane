@@ -35,6 +35,8 @@ use mesh_portal_versions::version::v0_0_1::util::{ToResolved, ValueMatcher};
 use nom::combinator::map_res;
 use tokio::io::AsyncBufReadExt;
 use tokio::sync::Mutex;
+use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
+use mesh_portal_versions::version::v0_0_1::messaging::CmdMethod;
 use crate::cache::{ArtifactItem, Cacheable, CachedConfig};
 
 /// The idea here is to eventually move this funcitionality into it's own crate 'mesh-bindex'
@@ -87,13 +89,11 @@ impl BindEx {
 
         let env = {
             let path_regex_capture_resolver = RegexCapturesResolver::new(regex, delivery.item.core.uri.path().to_string())?;
-            let mut map_resolver = MapResolver::new();
-            map_resolver.insert("self.bundle", bind.bundle()?);
-            map_resolver.insert("self.bind", bind.point().clone());
-            let mut resolver = MultiVarResolver::new();
-            resolver.push( map_resolver );
-            resolver.push( path_regex_capture_resolver );
-            Env::new_with_resolver(delivery.item.to.clone(), Box::new(resolver))
+            let mut env = Env::new(delivery.item.to.clone().to_point() );
+            env.add_var_resolver(Arc::new(path_regex_capture_resolver));
+            env.set_var( "self.bundle", bind.bundle()?.to_string().as_str() );
+            env.set_var( "self.bind", bind.point().clone().to_string().as_str() );
+            env
         };
 
         let request_id = request_id(&delivery.item);
@@ -284,10 +284,7 @@ impl PipeEx {
             PipelineStopVar::Point(point) => {
                 let uri = self.traversal.uri.clone();
                 let point:Point = point.clone().to_resolved(&self.env)?;
-                let method = Method::Cmd(Rc::Get(Get {
-                    point: point.clone(),
-                    op: GetOp::State,
-                }));
+                let method = Method::Cmd(CmdMethod::Read);
                 let core = method.into();
                 let request = Request::new(core, self.traversal.to(), point);
                 Ok(PipeAction::MeshRequest(request))
@@ -353,11 +350,11 @@ impl Traverser {
     }
 
     pub fn to(&self) -> Point {
-        self.initial_request.to.clone()
+        self.initial_request.to.clone().to_point()
     }
 
     pub fn from(&self) -> Point {
-        self.initial_request.from.clone()
+        self.initial_request.from.clone().to_point()
     }
 
     pub fn request(&self) -> Request {
